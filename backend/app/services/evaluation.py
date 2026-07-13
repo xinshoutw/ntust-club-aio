@@ -94,6 +94,7 @@ async def gather_scoring_input(db: AsyncSession, club_id: int, window: EvalWindo
                 File.subject_type == "activity",
                 File.slot == "report_photo",
                 File.subject_id.in_(activity_ids),
+                File.archived_at.is_(None),
             )
             .group_by(File.subject_id)
         )

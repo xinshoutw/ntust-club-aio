@@ -1,6 +1,7 @@
 import { App, Button, Form, Input } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import { useAuth } from '../../app/auth'
+import { CLUB_PROFILE } from './mock'
 
 export default function ClubSettingsPage() {
   const { user } = useAuth()
@@ -41,8 +42,13 @@ export default function ClubSettingsPage() {
         <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 18 }}>社團簡介</div>
         <Form
           layout="vertical"
-          onFinish={() => message.success('社團簡介已更新')}
-          initialValues={{ name: user?.club, url: '', intro: '致力於推廣程式設計與技術交流。' }}
+          onFinish={(v: { url?: string; intro?: string }) => {
+            // 寫回共用 mock:評鑑「網頁經營」行政分即時反映
+            CLUB_PROFILE.url = v.url?.trim() ?? ''
+            CLUB_PROFILE.intro = v.intro ?? ''
+            message.success('社團簡介已更新')
+          }}
+          initialValues={{ name: user?.club, url: CLUB_PROFILE.url, intro: CLUB_PROFILE.intro }}
         >
           <Form.Item name="name" label="社團名稱">
             <Input readOnly style={{ background: 'var(--paper)' }} />

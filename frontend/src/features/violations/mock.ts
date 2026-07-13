@@ -41,4 +41,13 @@ export const VIOLATIONS: Violation[] = [
     status: 'violation_resolved',
     note: '已完成愛校服務 2 小時,已銷案',
   },
+  {
+    id: 'VIO-114-0503',
+    club: '資工系學會',
+    date: '2026/06/22',
+    location: '社辦 S315',
+    items: ['社辦電燈未關'],
+    filler: '李工讀',
+    status: 'violation_open',
+  },
 ]

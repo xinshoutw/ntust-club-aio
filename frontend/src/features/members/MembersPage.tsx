@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { App, Button, Form, Input, Modal, Select } from 'antd'
+import { App, Button, Form, Input, Modal, Popconfirm, Select } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import { useAuth } from '../../app/auth'
 import { MEMBERS, type Member } from './mock'
@@ -59,13 +59,15 @@ export default function MembersPage() {
                 <td>{m.title ?? '—'}</td>
                 <td className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.updatedAt}</td>
                 <td className="r">
-                  <button
-                    type="button"
-                    className="link-btn danger"
-                    onClick={() => setMembers((ms) => ms.filter((x) => x.id !== m.id))}
+                  <Popconfirm
+                    title={`移除 ${m.name}?`}
+                    okText="移除"
+                    okButtonProps={{ danger: true }}
+                    cancelText="取消"
+                    onConfirm={() => setMembers((ms) => ms.filter((x) => x.id !== m.id))}
                   >
-                    移除
-                  </button>
+                    <button type="button" className="link-btn danger">移除</button>
+                  </Popconfirm>
                 </td>
               </tr>
             ))}
@@ -76,7 +78,16 @@ export default function MembersPage() {
         幹部需填職稱;名單定期更新採計「社員、幹部名單更新」行政分。
       </div>
 
-      <Modal open={addOpen} title="新增社員" onCancel={() => setAddOpen(false)} onOk={() => form.submit()} okText="新增">
+      <Modal
+        open={addOpen}
+        title="新增社員"
+        onCancel={() => {
+          setAddOpen(false)
+          form.resetFields()
+        }}
+        onOk={() => form.submit()}
+        okText="新增"
+      >
         <Form form={form} layout="vertical" onFinish={onAdd} initialValues={{ kind: '社員' }}>
           <Form.Item name="name" label="姓名" rules={[{ required: true, message: '請輸入姓名' }]}>
             <Input />
@@ -88,7 +99,7 @@ export default function MembersPage() {
             <Select options={[{ value: '社員' }, { value: '幹部' }]} />
           </Form.Item>
           {kind === '幹部' && (
-            <Form.Item name="title" label="職稱" rules={[{ required: true, message: '幹部需填職稱' }]}>
+            <Form.Item name="title" label="職稱" preserve={false} rules={[{ required: true, message: '幹部需填職稱' }]}>
               <Input placeholder="例:社長、總務" />
             </Form.Item>
           )}

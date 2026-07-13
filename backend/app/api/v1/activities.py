@@ -165,6 +165,8 @@ async def update_activity(
     if activity.status not in _EDITABLE:
         raise conflict("僅草稿或退回件可修改")
     await _validate_categories(db, body.budget_items)
+    if body.is_large != activity.is_large:
+        activity.is_large_approved = None  # 大型申請變動,舊認可不得沿用
     for field, value in body.model_dump(exclude={"budget_items"}).items():
         setattr(activity, field, value)
     svc.replace_budget_items(activity, body.budget_items)

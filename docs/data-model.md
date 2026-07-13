@@ -140,6 +140,7 @@ erDiagram
 | attribute | enum(自治性,學藝性,服務性,聯誼性,藝術性,體育性) | 公告分眾、統計用 |
 | intro | text | 社團簡介 |
 | website_url | text NULL | 影響行政分「網頁經營」(ad6) |
+| discord_webhook_url | text NULL | 社團自設 webhook(管理項目,2026-07-13 前端定案);該社事件另推一份 |
 | advisor_name / advisor_dept / advisor_email / advisor_ext | text NULL | 指導老師(社團自行維護) |
 | suspended_until | date NULL | 停權至;NULL=未停權 |
 | suspend_reason | text NULL | |

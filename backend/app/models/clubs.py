@@ -15,6 +15,8 @@ class Club(Base, TimestampMixin):
     attribute: Mapped[ClubAttribute] = mapped_column(db_enum(ClubAttribute, "club_attribute"))
     intro: Mapped[str] = mapped_column(sa.Text, default="")
     website_url: Mapped[str | None] = mapped_column(sa.Text)  # 行政分 ad6 依據
+    # 社團自設的 Discord webhook(管理項目;該社事件另推一份到這裡)
+    discord_webhook_url: Mapped[str | None] = mapped_column(sa.Text)
     # 指導老師(單一,社團自行維護;需多位時再抽表)
     advisor_name: Mapped[str | None] = mapped_column(sa.Text)
     advisor_dept: Mapped[str | None] = mapped_column(sa.Text)

@@ -1,8 +1,8 @@
 """initial schema
 
-Revision ID: 40b01257bc89
+Revision ID: ba53d89a99d4
 Revises: 
-Create Date: 2026-07-14 06:21:07.189239
+Create Date: 2026-07-14 06:24:17.393868
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '40b01257bc89'
+revision: str = 'ba53d89a99d4'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -39,6 +39,7 @@ def upgrade() -> None:
     sa.Column('attribute', sa.Enum('自治性', '學藝性', '服務性', '聯誼性', '藝術性', '體育性', name='club_attribute', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('intro', sa.Text(), nullable=False),
     sa.Column('website_url', sa.Text(), nullable=True),
+    sa.Column('discord_webhook_url', sa.Text(), nullable=True),
     sa.Column('advisor_name', sa.Text(), nullable=True),
     sa.Column('advisor_dept', sa.Text(), nullable=True),
     sa.Column('advisor_email', sa.Text(), nullable=True),

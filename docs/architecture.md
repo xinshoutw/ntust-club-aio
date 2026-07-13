@@ -182,6 +182,46 @@ MAIL_FROM_NAME=noreply
 - REST JSON,前綴 `/api/v1`;統一回應信封 `{ success, data, error, meta }`
 - 後端 Pydantic schema 是唯一真相 → OpenAPI → **openapi-typescript** 產前端型別(零執行期依賴),配薄 fetch 包裝接 TanStack Query
 
+### 4.1 回應與錯誤慣例(2026-07-14 定案,後端已實作)
+
+**信封**(對齊 `frontend/src/api/client.ts`):
+
+```json
+{ "success": true,  "data": …,    "error": null, "meta": null }
+{ "success": false, "data": null, "error": "使用者可讀訊息", "meta": { "code": "機器碼" } }
+```
+
+- `error` 一律繁中、面向使用者、不含內部細節;未攔截例外回 500 + 通用訊息(細節只進 log)
+- `meta.code` 為機器可讀錯誤碼,前端據此分流(如導向改密頁)
+
+**錯誤碼表**:
+
+| HTTP | code | 情境 |
+|------|------|------|
+| 400 | `BAD_REQUEST` | 一般請求錯誤 |
+| 401 | `UNAUTHENTICATED` | 未登入/session 過期/帳密錯誤 |
+| 403 | `FORBIDDEN` | 無權限 |
+| 403 | `CSRF_FAILED` | CSRF 驗證失敗 |
+| 403 | `PASSWORD_CHANGE_REQUIRED` | 首登未改密(僅放行改密/登出/me) |
+| 403 | `ACCOUNT_LOCKED` | 連錯 5 次鎖 15 分 |
+| 404 | `NOT_FOUND` | 資源不存在或不屬於該社團(不區分,避免探測) |
+| 409 | `CONFLICT` | 狀態衝突(重複報名、重複時段…) |
+| 413 | `FILE_TOO_LARGE` | 超過該類型上傳上限 |
+| 415 | `UNSUPPORTED_FILE_TYPE` | 魔術位元組驗證失敗 |
+| 422 | `VALIDATION` | Pydantic 驗證失敗(`meta.detail` 附明細) |
+| 422 | `PASSWORD_POLICY` / `PASSWORD_REUSED` / `PASSWORD_MISMATCH` | 密碼政策 |
+| 422 | `INVALID_SORT` | 排序欄位不在白名單 |
+| 429 | `RATE_LIMITED` | 超過速率限制 |
+| 500 | `INTERNAL` | 未預期錯誤(訊息固定,不洩漏) |
+
+**分頁**:`?page=1&page_size=20`(1-based;page_size 上限 100);回應 `meta = { page, page_size, total }`。列表端點一律分頁,不做無界查詢。
+
+**排序**:`?sort=field` 升冪、`?sort=-field` 降冪;欄位採各端點白名單,未知欄位回 422 `INVALID_SORT`;各端點自訂預設排序(通常 `-created_at`)。
+
+**CSRF**:登入時發 `csrf_token` cookie(非 HttpOnly,double-submit 綁 session 列);所有 POST/PUT/PATCH/DELETE 必須帶 `X-CSRF-Token` header,前端 `client.ts` 自動附帶。
+
+**認證 cookie**:`session_id`(HttpOnly、SameSite=Lax、prod 加 Secure);7 天滑動效期(剩餘低於 6 天 23 小時才回寫,避免每請求 UPDATE)。
+
 | 替代方案 | 不選原因 |
 |----------|----------|
 | 手寫前端型別 | 必然漂移,審核流程欄位多,漂移成本高 |

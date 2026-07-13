@@ -7,12 +7,24 @@ export interface ApiResponse<T> {
 
 const BASE = '/api/v1'
 
+const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
+
+function csrfToken(): string {
+  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/)
+  return match ? decodeURIComponent(match[1]) : ''
+}
+
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   // 正確合併 headers(展開 init 不可蓋掉);FormData 交給瀏覽器帶 boundary
   const headers = new Headers(init.headers)
   const isFormData = init.body instanceof FormData
   if (!isFormData && init.body != null && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json')
+  }
+  // CSRF double-submit:狀態變更請求自動回送 csrf_token cookie(見 architecture.md §4.1)
+  const method = (init.method ?? 'GET').toUpperCase()
+  if (UNSAFE_METHODS.has(method) && !headers.has('X-CSRF-Token')) {
+    headers.set('X-CSRF-Token', csrfToken())
   }
 
   const res = await fetch(`${BASE}${path}`, {

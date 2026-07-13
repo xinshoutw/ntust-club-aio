@@ -54,11 +54,19 @@ const todayStr = () => {
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
 }
 
+// 副檔名只當提示;宣稱 PDF 的檔案驗魔術位元組,冒名檔降級為 other(不進 iframe 預覽)
+async function isPdfContent(f: File): Promise<boolean> {
+  const head = new Uint8Array(await f.slice(0, 5).arrayBuffer())
+  return String.fromCharCode(...head) === '%PDF-'
+}
+
 export async function toEvalFile(f: File, hash?: string): Promise<EvalFile> {
+  let type = fileTypeOf(f.name)
+  if (type === 'pdf' && !(await isPdfContent(f))) type = 'other'
   return {
     id: nextFileId(),
     name: f.name,
-    type: fileTypeOf(f.name),
+    type,
     size: f.size,
     url: URL.createObjectURL(f),
     hash,

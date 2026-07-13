@@ -5,6 +5,7 @@ import type { UploadFile } from 'antd'
 import { FileTextOutlined, InboxOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { useAuth } from '../../app/auth'
+import { blurLeavesRow } from '../../lib/form'
 import { addDraft, nextActivityId } from './mock'
 import { BUDGET_CATEGORIES, BUDGET_HINTS, fmtMoney, type Activity } from './types'
 import './actform.css'
@@ -36,10 +37,6 @@ interface WorkRow {
 }
 
 const isWorkEmpty = (w: WorkRow) => w.task.trim() === '' && w.owner.trim() === ''
-
-// 只在焦點真正離開該列時才整理空列(列內欄位間移動不觸發)
-const blurLeavesRow = (e: React.FocusEvent<HTMLDivElement>) =>
-  !e.currentTarget.contains(e.relatedTarget as Node | null)
 
 export default function ActivityFormPage() {
   const navigate = useNavigate()

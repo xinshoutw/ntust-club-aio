@@ -14,6 +14,30 @@ export interface WorkItem {
   owner: string
 }
 
+export interface Reflection {
+  name: string
+  dept: string
+  text: string
+}
+
+// 活動成果報告(結案表單;送審驗證心得 ≥3 筆)
+export interface ActivityReport {
+  attendExpected?: number
+  attendRegistered?: number
+  attendShould?: number
+  attendActual: number
+  attendLeave?: number
+  highlights: string
+  goals?: string
+  others?: string
+  reviewMeeting: boolean
+  reviewDate?: string
+  videoLink?: string
+  expense: number
+  reflections: Reflection[]
+  submittedAt?: string
+}
+
 export interface Activity {
   id: string
   name: string
@@ -30,6 +54,8 @@ export interface Activity {
   works?: WorkItem[]
   status: StatusKey
   budget: BudgetItem[]
+  report?: ActivityReport // 已送結案後存在
+  closeDraft?: Partial<ActivityReport> // 結案草稿(不含照片檔)
   rejectReason?: { by: string; date: string; text: string }
   closeDeadline?: string
   closeDaysLeft?: number

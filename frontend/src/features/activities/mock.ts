@@ -76,6 +76,16 @@ export const CLUB_ACTIVITIES: Activity[] = [
     budget: [
       { id: 1, category: '印刷費', description: '迎新海報與手冊', selfFund: 2000, requestedSubsidy: 6000 },
     ],
+    report: {
+      attendExpected: 120, attendRegistered: 115, attendShould: 115, attendActual: 110, attendLeave: 5,
+      highlights: '迎新破冰、社團介紹', goals: '凝聚新生向心力', others: '順利完成',
+      reviewMeeting: true, reviewDate: '2026/03/08', expense: 7800, submittedAt: '2026/03/09',
+      reflections: [
+        { name: '江安博', dept: '資工一甲', text: '認識很多新朋友,收穫滿滿。' },
+        { name: '廖士鋐', dept: '資工一乙', text: '學長姐很親切,活動安排很用心。' },
+        { name: '楊伯文', dept: '資工一丙', text: '破冰遊戲很有趣,融入得很快。' },
+      ],
+    },
   },
   {
     id: 'ACT-114-0010',
@@ -85,6 +95,16 @@ export const CLUB_ACTIVITIES: Activity[] = [
     date: '2026/04/09',
     status: 'closed',
     budget: [],
+    report: {
+      attendExpected: 40, attendRegistered: 36, attendShould: 36, attendActual: 33, attendLeave: 3,
+      highlights: 'Python 基礎語法與實作練習', goals: '建立社員程式基礎', others: '',
+      reviewMeeting: true, reviewDate: '2026/04/12', expense: 1200, submittedAt: '2026/04/13',
+      reflections: [
+        { name: '許庭瑄', dept: '企管二甲', text: '第一次寫程式,講解很清楚。' },
+        { name: '高梓睿', dept: '機械一乙', text: '實作範例實用,期待下一堂。' },
+        { name: '沈可欣', dept: '材料一甲', text: '助教協助很到位。' },
+      ],
+    },
   },
   {
     id: 'ACT-114-0008',
@@ -98,6 +118,18 @@ export const CLUB_ACTIVITIES: Activity[] = [
     budget: [
       { id: 1, category: '比賽獎勵品', description: '獎盃與獎品', selfFund: 12000, requestedSubsidy: 30000 },
     ],
+    report: {
+      attendExpected: 150, attendRegistered: 168, attendShould: 168, attendActual: 154, attendLeave: 14,
+      highlights: '六校聯合競賽、企業參訪攤位', goals: '提升校際交流與實戰經驗', others: '媒體報導兩則',
+      reviewMeeting: true, reviewDate: '2026/05/22', videoLink: 'https://youtu.be/mock-contest-2026',
+      expense: 41200, submittedAt: '2026/05/23',
+      reflections: [
+        { name: '曾威宇', dept: '資工三甲', text: '第一次辦跨校活動,學到流程控管。' },
+        { name: '鄭以樂', dept: '資工二乙', text: '出題與評測系統維運經驗寶貴。' },
+        { name: '范植羽', dept: '電機二甲', text: '接待他校選手讓我更有自信。' },
+        { name: '吳沛璇', dept: '工管三乙', text: '贊助洽談的經驗對未來很有幫助。' },
+      ],
+    },
   },
 ]
 

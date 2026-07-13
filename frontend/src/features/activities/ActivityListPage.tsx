@@ -1,12 +1,16 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { App, Button, Dropdown, Modal, Pagination, Select, Tooltip } from 'antd'
-import { FileImageOutlined, FileTextOutlined, FilterOutlined, SwapOutlined } from '@ant-design/icons'
+import { FileImageOutlined, FileTextOutlined, FilterOutlined, LinkOutlined, SwapOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
 import { STATUS, type StatusKey } from '../../lib/status'
 import { semesterOf, semesterOptions } from '../../lib/semester'
+import { resultOf } from '../eval/store'
+import type { EvalFile } from '../eval/types'
+import FilePreview from '../eval/FilePreview'
+import ActivityCloseModal from './ActivityCloseModal'
 import { CLUB_ACTIVITIES } from './mock'
 import { budgetTotals, fmtMoney, type Activity } from './types'
 
@@ -28,7 +32,7 @@ function sortValue(a: Activity, key: SortKey): string | number {
   return a[key] ?? ''
 }
 
-function PreviewModal({ a, open, onClose, afterClose, onEdit }: { a: Activity | null; open: boolean; onClose: () => void; afterClose: () => void; onEdit: () => void }) {
+function PreviewModal({ a, open, onClose, afterClose, onEdit, onPreviewFile }: { a: Activity | null; open: boolean; onClose: () => void; afterClose: () => void; onEdit: () => void; onPreviewFile: (f: EvalFile) => void }) {
   if (!a) return null
   const t = budgetTotals(a.budget)
   const editable = a.status === 'draft' || a.status === 'rejected'
@@ -95,14 +99,66 @@ function PreviewModal({ a, open, onClose, afterClose, onEdit }: { a: Activity | 
         </div>
       )}
 
-      {a.status === 'closed' && (
+      {(a.status === 'closed' || a.status === 'closing_pending_advisor') && a.report && (
         <>
-          <div style={{ fontSize: 13, fontWeight: 600, margin: '14px 0 6px' }}>結案成果(示意)</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
-            <span><FileTextOutlined style={{ color: 'var(--steel)', marginRight: 6 }} />{a.name}_成果報告.pdf</span>
-            <span><FileImageOutlined style={{ color: 'var(--steel)', marginRight: 6 }} />{a.name}_照片.zip(5 張)</span>
-            <span><FileTextOutlined style={{ color: 'var(--steel)', marginRight: 6 }} />學習心得彙整(3 人).pdf</span>
+          <div style={{ fontSize: 13, fontWeight: 600, margin: '14px 0 6px' }}>結案成果</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '88px 1fr', gap: '8px 12px', fontSize: 13 }}>
+            <div style={{ color: 'var(--steel)' }}>實到/應到</div>
+            <div className="num">{a.report.attendActual} / {a.report.attendShould ?? '—'} 人 · 實際支出 {fmtMoney(a.report.expense)}</div>
+            <div style={{ color: 'var(--steel)' }}>活動重點</div><div>{a.report.highlights}</div>
+            {a.report.goals && (<><div style={{ color: 'var(--steel)' }}>達成目標</div><div>{a.report.goals}</div></>)}
+            {a.report.others && (<><div style={{ color: 'var(--steel)' }}>其他成果</div><div>{a.report.others}</div></>)}
+            <div style={{ color: 'var(--steel)' }}>檢討會</div>
+            <div>
+              {a.report.reviewMeeting ? '是' : '否'}
+              {a.report.reviewDate ? <span className="num"> · {a.report.reviewDate}</span> : ''}
+            </div>
+            <div style={{ color: 'var(--steel)' }}>學習心得</div>
+            <div>
+              <span className="num">{a.report.reflections.length}</span> 人:
+              {a.report.reflections.map((r) => `${r.name}(${r.dept})`).join('、')}
+            </div>
           </div>
+          {(() => {
+            const r = resultOf(a.id)
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13, marginTop: 10 }}>
+                {r.photos.length > 0 && (
+                  <span>
+                    <FileImageOutlined style={{ color: 'var(--steel)', marginRight: 6 }} />
+                    照片 <span className="num">{r.photos.length}</span> 張:
+                    {r.photos.map((p) => (
+                      <button key={p.id} type="button" className="link-btn" style={{ padding: '0 2px', fontSize: 13, color: 'var(--focus)' }} onClick={() => onPreviewFile(p)}>
+                        {p.name}
+                      </button>
+                    ))}
+                  </span>
+                )}
+                {r.report && (
+                  <span>
+                    <FileTextOutlined style={{ color: 'var(--steel)', marginRight: 6 }} />
+                    <button type="button" className="link-btn" style={{ padding: 0, fontSize: 13, color: 'var(--focus)' }} onClick={() => onPreviewFile(r.report!)}>
+                      {r.report.name}
+                    </button>
+                  </span>
+                )}
+                {r.feedback && (
+                  <span>
+                    <FileTextOutlined style={{ color: 'var(--steel)', marginRight: 6 }} />
+                    <button type="button" className="link-btn" style={{ padding: 0, fontSize: 13, color: 'var(--focus)' }} onClick={() => onPreviewFile(r.feedback!)}>
+                      {r.feedback.name}
+                    </button>
+                  </span>
+                )}
+                {r.videoLink && (
+                  <span>
+                    <LinkOutlined style={{ color: 'var(--steel)', marginRight: 6 }} />
+                    <a href={r.videoLink} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13 }}>{r.videoLink}</a>
+                  </span>
+                )}
+              </div>
+            )
+          })()}
         </>
       )}
       {(a.status === 'approved' || a.status === 'locked') && a.closeDeadline && (
@@ -127,8 +183,19 @@ export default function ActivityListPage() {
   const [statusFilter, setStatusFilter] = useState<StatusKey[]>([])
   const [preview, setPreview] = useState<Activity | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [closing, setClosing] = useState<Activity | null>(null)
+  const [closeOpen, setCloseOpen] = useState(false)
+  const [filePreview, setFilePreview] = useState<EvalFile | null>(null)
+  const [filePreviewOpen, setFilePreviewOpen] = useState(false)
+  // 結案送出會改動模組 mock;bump 讓 memo 重算
+  const [version, setVersion] = useState(0)
 
   const act = (label: string, a: Activity) => message.info(`「${label}」尚未接上後端(${a.name})`)
+
+  const openClose = (a: Activity) => {
+    setClosing(a)
+    setCloseOpen(true)
+  }
 
   const drafts = CLUB_ACTIVITIES.filter((a) => a.status === 'draft')
   const rest = useMemo(() => {
@@ -143,7 +210,8 @@ export default function ActivityListPage() {
       })
     }
     return list
-  }, [semester, sort, typeFilter, statusFilter])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [semester, sort, typeFilter, statusFilter, version])
 
   const paged = rest.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
   const toggleSort = (key: SortKey) =>
@@ -157,8 +225,18 @@ export default function ActivityListPage() {
 
   const statusKeys = [...new Set(CLUB_ACTIVITIES.filter((a) => a.status !== 'draft').map((a) => a.status))]
 
+  // 等待結案的活動:點列直接開結案表單;其餘開預覽
+  const onRowClick = (a: Activity) => {
+    if (a.status === 'approved') {
+      openClose(a)
+    } else {
+      setPreview(a)
+      setPreviewOpen(true)
+    }
+  }
+
   const row = (a: Activity, actions: React.ReactNode) => (
-    <tr key={a.id} onClick={() => { setPreview(a); setPreviewOpen(true) }} style={{ cursor: 'pointer' }}>
+    <tr key={a.id} onClick={() => onRowClick(a)} style={{ cursor: 'pointer' }}>
       <td style={{ fontWeight: 500 }}>{a.name}</td>
       <td>
         {a.type}
@@ -286,7 +364,14 @@ export default function ActivityListPage() {
               row(
                 a,
                 a.status === 'approved' ? (
-                  <Button size="small" type="primary" onClick={() => act('結案', a)}>結案</Button>
+                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                    {a.closeDraft && (
+                      <Tooltip title="已暫存結案草稿">
+                        <span style={{ fontSize: 11, color: 'var(--steel)', border: '1px solid var(--line)', borderRadius: 4, padding: '0 4px' }}>草稿</span>
+                      </Tooltip>
+                    )}
+                    <Button size="small" type="primary" onClick={() => openClose(a)}>結案</Button>
+                  </span>
                 ) : null,
               ),
             )}
@@ -318,6 +403,26 @@ export default function ActivityListPage() {
           setPreviewOpen(false)
           navigate('/activities/new')
         }}
+        onPreviewFile={(f) => {
+          setFilePreview(f)
+          setFilePreviewOpen(true)
+        }}
+      />
+      {closing && (
+        <ActivityCloseModal
+          key={closing.id}
+          activity={closing}
+          open={closeOpen}
+          onClose={() => setCloseOpen(false)}
+          afterClose={() => setClosing(null)}
+          onChanged={() => setVersion((v) => v + 1)}
+        />
+      )}
+      <FilePreview
+        file={filePreview}
+        open={filePreviewOpen}
+        onClose={() => setFilePreviewOpen(false)}
+        afterClose={() => setFilePreview(null)}
       />
     </div>
   )

@@ -46,7 +46,10 @@ const mockPdf = (name: string, uploadedAt: string): EvalFile => ({
   uploadedAt,
 })
 
-const today = () => {
+// 結案送出時由表單資料生成的成果報告/心得彙整(mock 以空白 PDF 代替)
+export const generatedPdf = (name: string): EvalFile => mockPdf(name, todayStr())
+
+const todayStr = () => {
   const d = new Date()
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`
 }
@@ -59,7 +62,7 @@ export async function toEvalFile(f: File, hash?: string): Promise<EvalFile> {
     size: f.size,
     url: URL.createObjectURL(f),
     hash,
-    uploadedAt: today(),
+    uploadedAt: todayStr(),
     raw: f,
   }
 }
@@ -72,8 +75,14 @@ export async function sha256(f: File): Promise<string> {
 // ---- 活動成果(ad2–ad4 的輸入) ----
 
 export const ACTIVITY_RESULTS: ActivityResult[] = [
-  // 新生迎新茶會:照片不足 5 張、缺成果單與心得 → 展示未達標狀態
-  { activityId: 'ACT-114-0011', photos: [svgPhoto('迎新茶會_01', '#5B7C99', '2026/03/06'), svgPhoto('迎新茶會_02', '#7C6A8A', '2026/03/06')], videoLink: '', report: null, feedback: null },
+  // 新生迎新茶會:結案有報告與心得,但照片僅 2 張(未達 5 張)→ 展示 ad2 未達標
+  {
+    activityId: 'ACT-114-0011',
+    photos: [svgPhoto('迎新茶會_01', '#5B7C99', '2026/03/06'), svgPhoto('迎新茶會_02', '#7C6A8A', '2026/03/06')],
+    videoLink: '',
+    report: mockPdf('新生迎新茶會_成果報告', '2026/03/09'),
+    feedback: mockPdf('新生迎新茶會_心得(3人)', '2026/03/09'),
+  },
   {
     activityId: 'ACT-114-0010',
     photos: ['#4E7A5A', '#8A5A44', '#44618A', '#8A4460', '#60738A'].map((c, i) => svgPhoto(`Python社課_${i + 1}`, c, '2026/04/10')),

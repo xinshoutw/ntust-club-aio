@@ -1,0 +1,131 @@
+import re
+from datetime import date, datetime
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.models.enums import (
+    BookingStatus,
+    CertPosition,
+    MaintenanceStatus,
+    PostalReason,
+)
+
+_TERM_RE = re.compile(r"^\d{3}(-[12])?$")  # 114 / 114-1 / 114-2
+
+# 郵局事由互斥組合(2026-07-13 前端先行判斷,後端同規則)
+_POSTAL_EXCLUSIVE: tuple[tuple[PostalReason, PostalReason], ...] = (
+    (PostalReason.CHANGE_AGENT, PostalReason.NEW_ACCOUNT),
+    (PostalReason.NEW_ACCOUNT, PostalReason.CLOSE_ACCOUNT),
+    (PostalReason.CHANGE_AGENT, PostalReason.CLOSE_ACCOUNT),
+)
+
+
+class OfficerCertIn(BaseModel):
+    term: str = Field(max_length=10)
+    position: CertPosition
+
+    @field_validator("term")
+    @classmethod
+    def _term(cls, v: str) -> str:
+        if not _TERM_RE.match(v):
+            raise ValueError("學年期格式錯誤(如 114、114-1)")
+        return v
+
+
+class OfficerCertOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    term: str
+    position: CertPosition
+    applicant_name: str
+    status: BookingStatus
+    created_at: datetime
+
+
+class PostalChangeIn(BaseModel):
+    reasons: list[PostalReason] = Field(min_length=1, max_length=6)
+    account_name: str = Field(min_length=1, max_length=50)
+    account_number: str = Field(min_length=6, max_length=20, pattern=r"^[\d-]+$")
+    new_agent_name: str | None = Field(None, max_length=50)
+    new_agent_phone: str | None = Field(None, max_length=20)
+
+    @model_validator(mode="after")
+    def _check(self):
+        chosen = set(self.reasons)
+        if len(chosen) != len(self.reasons):
+            raise ValueError("事由重複")
+        for a, b in _POSTAL_EXCLUSIVE:
+            if a in chosen and b in chosen:
+                raise ValueError(f"「{a.value}」與「{b.value}」不可同時勾選")
+        if PostalReason.CHANGE_AGENT in chosen and not (
+            self.new_agent_name and self.new_agent_phone
+        ):
+            raise ValueError("更換代理人需填寫新代理人姓名與電話")
+        return self
+
+
+def mask_account(number: str) -> str:
+    """個資遮罩:前 3 碼 + 末 2 碼(決議 §6-11)。"""
+    if len(number) <= 5:
+        return number[0] + "*" * (len(number) - 1) if number else ""
+    return f"{number[:3]}{'*' * (len(number) - 5)}{number[-2:]}"
+
+
+def mask_phone(phone: str | None) -> str | None:
+    """電話顯示末 3 碼。"""
+    if not phone:
+        return phone
+    return "*" * max(len(phone) - 3, 0) + phone[-3:]
+
+
+class PostalChangeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    reasons: list[PostalReason]
+    account_name: str
+    account_number: str  # 一律回遮罩值(完整值僅審核詳情)
+    new_agent_name: str | None
+    new_agent_phone: str | None
+    status: BookingStatus
+    created_at: datetime
+
+
+class MaintenanceIn(BaseModel):
+    location: str = Field(min_length=1, max_length=100)
+    items: str = Field(min_length=1, max_length=500)
+
+
+class MaintenanceOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    location: str
+    items: str
+    status: MaintenanceStatus
+    handle_note: str | None
+    created_at: datetime
+
+
+class ViolationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    occurred_on: date
+    location: str
+    items: list[str]
+    other: str | None
+    status: str
+    resolve_note: str | None
+    created_at: datetime
+
+
+class AnnouncementOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    title: str
+    content: str
+    is_auto: bool
+    created_at: datetime

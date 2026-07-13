@@ -25,8 +25,21 @@ const emptyBudget = (key: number): BudgetRow => ({
   requestedSubsidy: null,
 })
 
+// 科目仍為預設值且其餘皆空才視為空列,避免剛選好的科目被 blur 整理吃掉
 const isBudgetEmpty = (r: BudgetRow) =>
-  !r.description.trim() && r.selfFund == null && r.requestedSubsidy == null
+  r.category === BUDGET_CATEGORIES[0] && !r.description.trim() && r.selfFund == null && r.requestedSubsidy == null
+
+interface WorkRow {
+  key: number
+  task: string
+  owner: string
+}
+
+const isWorkEmpty = (w: WorkRow) => w.task.trim() === '' && w.owner.trim() === ''
+
+// 只在焦點真正離開該列時才整理空列(列內欄位間移動不觸發)
+const blurLeavesRow = (e: React.FocusEvent<HTMLDivElement>) =>
+  !e.currentTarget.contains(e.relatedTarget as Node | null)
 
 export default function ActivityFormPage() {
   const navigate = useNavigate()
@@ -37,21 +50,27 @@ export default function ActivityFormPage() {
   const [files, setFiles] = useState<UploadFile[]>([])
 
   // 自動增列:保證尾端永遠有一列空白;清空的列自動移除
-  const [works, setWorks] = useState<{ task: string; owner: string }[]>([{ task: '', owner: '' }])
+  const workKeyRef = useRef(2)
+  const [works, setWorks] = useState<WorkRow[]>([{ key: 1, task: '', owner: '' }])
   const budgetKeyRef = useRef(2)
   const [budget, setBudget] = useState<BudgetRow[]>([emptyBudget(1)])
 
   // 輸入時只增列;空列的移除延後到 blur(避免打字中列被吃掉)
-  const setWork = (idx: number, patch: Partial<{ task: string; owner: string }>) => {
+  const setWork = (key: number, patch: Partial<Omit<WorkRow, 'key'>>) => {
     setWorks((ws) => {
-      const next = ws.map((w, i) => (i === idx ? { ...w, ...patch } : w))
-      const last = next[next.length - 1]
-      if (last.task.trim() !== '' || last.owner.trim() !== '') next.push({ task: '', owner: '' })
+      const next = ws.map((w) => (w.key === key ? { ...w, ...patch } : w))
+      if (!isWorkEmpty(next[next.length - 1])) {
+        workKeyRef.current += 1
+        next.push({ key: workKeyRef.current, task: '', owner: '' })
+      }
       return next
     })
   }
   const compactWorks = () =>
-    setWorks((ws) => [...ws.filter((w) => w.task.trim() !== '' || w.owner.trim() !== ''), { task: '', owner: '' }])
+    setWorks((ws) => {
+      workKeyRef.current += 1
+      return [...ws.filter((w) => !isWorkEmpty(w)), { key: workKeyRef.current, task: '', owner: '' }]
+    })
 
   // 輸入時只增列;空列的移除延後到 blur
   const updateBudget = (key: number, patch: Partial<BudgetRow>) => {
@@ -79,7 +98,7 @@ export default function ActivityFormPage() {
 
   const buildDraft = (status: Activity['status']): Activity => {
     const v = form.getFieldsValue()
-    const filledWorks = works.filter((w) => w.task.trim() !== '' || w.owner.trim() !== '')
+    const filledWorks = works.filter((w) => !isWorkEmpty(w))
     return {
       id: nextActivityId(),
       name: (v.name as string)?.trim() || '(未命名活動)',
@@ -232,16 +251,16 @@ export default function ActivityFormPage() {
                   </span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {works.map((w, idx) => (
-                    <div key={idx} onBlur={compactWorks} style={{ display: 'flex', gap: 8 }}>
+                  {works.map((w) => (
+                    <div key={w.key} onBlur={(e) => blurLeavesRow(e) && compactWorks()} style={{ display: 'flex', gap: 8 }}>
                       <Input
                         value={w.task}
-                        onChange={(e) => setWork(idx, { task: e.target.value })}
+                        onChange={(e) => setWork(w.key, { task: e.target.value })}
                         placeholder="工作項目"
                       />
                       <Input
                         value={w.owner}
-                        onChange={(e) => setWork(idx, { owner: e.target.value })}
+                        onChange={(e) => setWork(w.key, { owner: e.target.value })}
                         placeholder="負責人"
                       />
                     </div>
@@ -262,7 +281,7 @@ export default function ActivityFormPage() {
                 {budget.map((r) => {
                   const hint = BUDGET_HINTS[r.category]
                   return (
-                    <div key={r.key} onBlur={compactBudget} style={{ border: '1px solid var(--line)', borderRadius: 6, padding: '10px 12px' }}>
+                    <div key={r.key} onBlur={(e) => blurLeavesRow(e) && compactBudget()} style={{ border: '1px solid var(--line)', borderRadius: 6, padding: '10px 12px' }}>
                       <div className="budget-row">
                         <Select
                           aria-label="經費科目"

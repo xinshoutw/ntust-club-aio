@@ -42,6 +42,17 @@ export default function FixedRoomPage() {
       message.error('請至少新增一筆借用時段。')
       return
     }
+    const seen = new Set<string>()
+    for (const e of filled) {
+      for (const p of e.periods) {
+        const slot = `${e.date}|${p}`
+        if (seen.has(slot)) {
+          message.error(`「${e.date} 第${p}節」重複選取,請合併或移除。`)
+          return
+        }
+        seen.add(slot)
+      }
+    }
     message.success(`已送出「${values.room}」固定借用申請(${filled.length} 筆)`)
     form.resetFields()
     setEntries([{ key: 1, periods: [] }])

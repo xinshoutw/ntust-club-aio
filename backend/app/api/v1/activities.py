@@ -12,6 +12,7 @@ from urllib.parse import quote
 
 import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Query, Request, Response, UploadFile
+from starlette.concurrency import run_in_threadpool
 
 from app.api.pagination import Pagination, parse_sort
 from app.core.deps import ClubUser, DbDep, client_ip
@@ -336,7 +337,8 @@ async def download_report_pdf(activity_id: int, user: ClubUser, db: DbDep) -> Re
     """成果報告表 PDF(依需求方模板於下載時動態生成)。"""
     activity = await _closed_activity_with_report(db, user, activity_id)
     club = await _club_of(db, user)
-    content = pdf.report_pdf(club, activity, activity.report)
+    # reportlab 為同步 CPU 工作,丟 threadpool 避免卡住 event loop
+    content = await run_in_threadpool(pdf.report_pdf, club, activity, activity.report)
     return _pdf_response(content, f"{club.name}_{activity.name}_成果報告表.pdf")
 
 
@@ -345,7 +347,9 @@ async def download_reflections_pdf(activity_id: int, user: ClubUser, db: DbDep) 
     """學習心得 PDF(依需求方模板於下載時動態生成)。"""
     activity = await _closed_activity_with_report(db, user, activity_id)
     club = await _club_of(db, user)
-    content = pdf.reflections_pdf(club, activity, activity.report.reflections)
+    content = await run_in_threadpool(
+        pdf.reflections_pdf, club, activity, activity.report.reflections
+    )
     return _pdf_response(content, f"{club.name}_{activity.name}_學習心得.pdf")
 
 

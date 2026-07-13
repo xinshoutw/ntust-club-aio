@@ -78,6 +78,9 @@ def _build(title: str, rows: list[tuple[str, Paragraph]]) -> bytes:
         [[_para(label, _LABEL), content] for label, content in rows],
         colWidths=[32 * mm, 142 * mm],
         style=_TABLE_STYLE,
+        # 合法上限的長文(心得 3×5000 字)會超過單頁,必須允許列內跨頁
+        splitByRow=1,
+        splitInRow=1,
     )
     doc.build([Paragraph(title, _TITLE), Spacer(1, 2 * mm), table])
     return buf.getvalue()

@@ -46,6 +46,38 @@ async def test_reflections_pdf_generated_on_download(client, db):
     assert len(resp.content) > 1200
 
 
+async def test_pdf_handles_maximum_length_content(client, db):
+    """合法上限的長文(2000 字欄位、3×5000 字心得)必須能跨頁生成,不得 500。"""
+    club = await make_club(db)
+    await make_user(db, username="club01", club_id=club.id)
+    await login(client, "club01")
+    past = (date.today() - timedelta(days=3)).isoformat()
+    data = await create_activity(client, date=past)
+    await db.execute(
+        sa.update(Activity).where(Activity.id == data["id"]).values(status="approved")
+    )
+    await db.commit()
+
+    long_text = "很" * 2000
+    body = close_payload(
+        highlights=long_text,
+        goals=long_text,
+        others=long_text,
+        reflections=[
+            {"student_name": f"社員{i}", "dept": "資工三", "body": "感" * 5000} for i in range(3)
+        ],
+    )
+    resp = await client.post(
+        f"/api/v1/club/activities/{data['id']}/close", json=body, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200
+
+    for path in ("report-pdf", "reflections-pdf"):
+        resp = await client.get(f"/api/v1/club/activities/{data['id']}/{path}")
+        assert resp.status_code == 200, resp.text
+        assert resp.content.startswith(b"%PDF")
+
+
 async def test_pdf_requires_submitted_report(client, db):
     club = await make_club(db)
     await make_user(db, username="club01", club_id=club.id)

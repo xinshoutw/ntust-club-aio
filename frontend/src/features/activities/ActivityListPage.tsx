@@ -52,8 +52,21 @@ function PreviewModal({ a, open, onClose, afterClose, onEdit }: { a: Activity | 
     >
       <div style={{ display: 'grid', gridTemplateColumns: '88px 1fr', gap: '8px 12px', fontSize: 13, marginTop: 8 }}>
         <div style={{ color: 'var(--steel)' }}>類型</div><div>{a.type}</div>
-        <div style={{ color: 'var(--steel)' }}>日期</div><div className="num">{a.date}</div>
+        <div style={{ color: 'var(--steel)' }}>日期</div><div className="num">{a.date}{a.timeRange ? ` ${a.timeRange}` : ''}</div>
         {a.location && (<><div style={{ color: 'var(--steel)' }}>地點</div><div>{a.location}</div></>)}
+        {(a.participantsIn != null || a.participantsOut != null) && (
+          <>
+            <div style={{ color: 'var(--steel)' }}>人數</div>
+            <div className="num">校內 {a.participantsIn ?? 0} · 校外 {a.participantsOut ?? 0}</div>
+          </>
+        )}
+        {a.content && (<><div style={{ color: 'var(--steel)' }}>內容</div><div style={{ lineHeight: 1.6 }}>{a.content}</div></>)}
+        {a.works && a.works.length > 0 && (
+          <>
+            <div style={{ color: 'var(--steel)' }}>工作分配</div>
+            <div>{a.works.map((w) => [w.task, w.owner].filter(Boolean).join(':')).join('、')}</div>
+          </>
+        )}
         <div style={{ color: 'var(--steel)' }}>經費</div>
         <div className="num">{money(a) === '–' ? '無申請經費' : `自籌 ${fmtMoney(t.self)} · 擬請 ${fmtMoney(t.requested)}`}</div>
       </div>

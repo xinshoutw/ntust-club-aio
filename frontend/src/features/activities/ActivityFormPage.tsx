@@ -79,13 +79,19 @@ export default function ActivityFormPage() {
 
   const buildDraft = (status: Activity['status']): Activity => {
     const v = form.getFieldsValue()
+    const filledWorks = works.filter((w) => w.task.trim() !== '' || w.owner.trim() !== '')
     return {
       id: nextActivityId(),
       name: (v.name as string)?.trim() || '(未命名活動)',
       club: user?.club ?? '',
       type: (v.type as Activity['type']) ?? '社課',
       date: v.date ? v.date.format('YYYY/MM/DD') : '—',
+      timeRange: v.timeRange ? `${v.timeRange[0].format('HH:mm')}–${v.timeRange[1].format('HH:mm')}` : undefined,
       location: v.location,
+      participantsIn: v.participantsIn ?? undefined,
+      participantsOut: v.participantsOut ?? undefined,
+      content: (v.content as string)?.trim() || undefined,
+      works: filledWorks.length ? filledWorks.map((w) => ({ task: w.task.trim(), owner: w.owner.trim() })) : undefined,
       isLarge: v.type === '活動' ? !!v.isLarge : undefined,
       status,
       budget: filledBudget.map((r, i) => ({

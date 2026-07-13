@@ -9,6 +9,11 @@ export interface BudgetItem {
   approvedSubsidy?: number | null
 }
 
+export interface WorkItem {
+  task: string
+  owner: string
+}
+
 export interface Activity {
   id: string
   name: string
@@ -20,6 +25,8 @@ export interface Activity {
   location?: string
   participantsIn?: number
   participantsOut?: number
+  content?: string
+  works?: WorkItem[]
   status: StatusKey
   budget: BudgetItem[]
   rejectReason?: { by: string; date: string; text: string }

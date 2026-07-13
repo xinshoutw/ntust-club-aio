@@ -103,10 +103,21 @@
 - 線上報名:「報名截止」改「截止日」;違規勸導紀錄去 ID
 - **待辦**:資料總覽與評鑑結果重設計(等需求方規格);下一階段=社團評鑑判斷邏輯與架構重構 → 後端開發
 
+## 社團評鑑重構決議(2026-07-14,依 `docs/社團評鑑/` 各 PDF)
+
+- **行政分 ad1–ad8 + 加減分規則定案**,可執行規格=`frontend/src/features/eval/scoring.ts`(vitest 測試同檔目錄;規則明細表在 `data-model.md` §3.8):結案始算、一天至多計 1 件、大型 ×3、名單 0/2.5/5 分級、**網頁經營有連結即 5 分**(需求方簡化)、會議/幹訓依出席、未銷案勸導每筆 −1 上限 −10、表現優良 +5 由學務處登錄
+- **大型活動**:申請時勾選(僅類型=活動),**管理員審核認可(`largeApproved`)後才計 ×3**;列表「大」標記實底=已認可、外框=待認可
+- **報名活動類型**:`SignupKind`(普通/幹訓/社團負責人會議),管理員建立時指定,社團端卡片顯示彩色標記;幹訓/負責人會議報名出席餵 ad7/ad8
+- **資料總覽(/eval)重建**:頂部=自動評分各項(含依據說明、管理員調整標示、來源頁連結);(二)成果區=每結案活動一列(照片/影片、成果單、心得上傳);底部=五獎項卡片(進度 x/y)→ `/eval/award/:key` 詳細頁(每評分細項一個上傳槽位,含配分與評分重點)
+- **照片重複偵測**:前端 SHA-256,跨活動比對,重複即拒絕(檔名不同也擋);files 表加 sha256 欄
+- **檔案即時預覽**(FilePreview):圖片 img、PDF 瀏覽器原生 iframe、docx 動態載入 mammoth + DOMPurify 白名單;舊版 .doc 僅下載
+- **管理員「行政分審核」頁**(/admin/eval):逐項「手動調整分數」/「回到自動計算結果」,表現優良加分直接輸入;調整即時反映社團端
+- 待與承辦確認:違規扣分只計**未銷案**是否正確;最佳活動獎兩份文件配分不一致(評分標準 PDF 執行 35%/經費 5% vs 實施計畫 45%/15%,暫依實施計畫);評鑑結果頁重設計規格
+
 ## 技術決策(詳見 `docs/architecture.md`)
 
 - 版本策略:無特殊理由一律用最新穩定版,優先挑支援週期長的
-- 前端:**Vite + React + TS**、Ant Design 6、TanStack Query、React Router、pnpm
+- 前端:**Vite + React + TS**、Ant Design 6、TanStack Query、React Router、pnpm;測試 vitest(`pnpm test`);檔案預覽用 mammoth + dompurify
 - 後端:**FastAPI**、Python 3.14、uv、SQLAlchemy 2(async)+ Alembic、PostgreSQL 18
 - 認證:行政建帳號(argon2id + DB session cookie、密碼歷史、首登強制改密);**SSO 僅預留(`auth_provider`),前端不顯示**
 - Email:aiosmtplib + BackgroundTasks;SMTP 全走 `.env`(暫用開發者 iCloud+ 信箱,relay 未定)

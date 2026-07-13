@@ -174,7 +174,9 @@ erDiagram
 | id | serial PK | |
 | club_id | FK | |
 | name / content / location | text | |
-| type | enum(社課,活動,會議) | 2026-07-13 需求調整(原:一般活動/社課/大型活動)。**注意**:評鑑行政分原有「大型活動×3」加權,類型取消後此規則待與承辦重新對齊 |
+| type | enum(社課,活動,會議) | 2026-07-13 需求調整(原:一般活動/社課/大型活動) |
+| is_large | bool default false | 社團申請大型活動(僅 type=活動 可勾);定義:工作人員或服務對象 50 人以上/連辦 2-3 天或逾 20 小時/經費 10 萬以上/籌備 3 個月以上且 5 次以上籌備會議 |
+| is_large_approved | bool NULL | 審核時管理員認可;**認可後評鑑行政分才享大型 ×3 加權**(2026-07-14 定案,取代原「類型=大型活動」) |
 | date | date | 活動日期(學期用日期推導) |
 | start_time / end_time | time | 原型 timeRange |
 | participants_in / participants_out | int | 校內/校外人數 |
@@ -233,6 +235,7 @@ approved 且 活動日期+1個月 已過 且未送結案 → 「逾期鎖定」(
 | subject_type / subject_id | text / int NULL | 所屬單據(結案、維修、郵局、違規、評鑑上傳…) |
 | slot | text NULL | 同單據內的位置(report_photo, evidence, passbook…) |
 | original_name / size / mime | | |
+| sha256 | text | 內容雜湊;評鑑照片上傳以此拒絕重複(檔名不同亦擋),前端先算、後端驗證 |
 | path | text | 磁碟相對路徑 `{module}/{YYYY}/{MM}/{uuid}`(月份分類,配合歸檔作業) |
 | archived_at | timestamptz NULL | 已由行政備份下載並自磁碟刪除的時間;非 NULL 時 UI 顯示「已歸檔」。競賽採計中的檔案不歸檔 |
 | created_at | | |
@@ -286,6 +289,7 @@ approved 且 活動日期+1個月 已過 且未送結案 → 「逾期鎖定」(
 | event_date, time_text, place, audience | 活動資訊 |
 | allow_multiple / max_participants | 是否多人報名與人數上限(單一社團) |
 | fields | jsonb:表單欄位定義陣列 `[{key, label, type(text/textarea/radio/checkbox/select), options[], required}]`,如「姓名」「葷/素 單選」「備註」 |
+| kind | enum(normal, cadre_training, leader_meeting) | 活動類型(2026-07-14):幹訓/負責人會議有評鑑採計(ad7/ad8),社團端列表顯示彩色標記 |
 | session_based / requires_confirmation / is_eval | 場次採計(負責人會議)、需行政確認、競賽報名項 |
 | created_by, created_at | |
 
@@ -323,12 +327,24 @@ approved 且 活動日期+1個月 已過 且未送結案 → 「逾期鎖定」(
 **review_score_items**(id, score_id FK, rubric_item_id FK, score int, comment text)
 — 百分比與名次一律推導;草稿機制(原型 localStorage draft)可先做前端暫存,後端不建草稿表(YAGNI)。
 
-**eval_adjustments**(id, year, award_id, club_id, kind enum(admin_score_override(行政分調整), final_override(總分覆寫), award_override(獎項覆寫)), value jsonb, reason text 必填, actor_id, created_at)
-— 人工調整全部留痕;查詢時「調整值蓋過計算值」。
+**eval_adjustments**(id, year, award_id, club_id, kind enum(admin_score_override(行政分逐項調整), merit_bonus(表現優良加分 0–5), final_override(總分覆寫), award_override(獎項覆寫)), value jsonb, reason text 必填, actor_id, created_at)
+— 人工調整全部留痕;查詢時「調整值蓋過計算值」,刪除(或註銷)調整列即「回到自動計算結果」。
 
 **eval_settings**(year, award_id, PK(year,award_id), comment_released bool(評語開放社團查看), unlocked bool(行政資料開放))
 
-行政分(ad1–ad8)**不落表**:活動申請數、照片/成果/心得(從已結案活動)、名單更新(club_members.updated_at)、網頁經營(clubs.website_url)、會議出席(session_attendance)、幹訓(signups)——全部即時彙算,加上 eval_adjustments 的人工調整。這是原型「系統自動評分」的正式化。
+行政分(ad1–ad8)**不落表**:全部即時彙算,加上 eval_adjustments 的人工調整。這是原型「系統自動評分」的正式化。**計分規則 2026-07-14 定案**(可執行規格見 `frontend/src/features/eval/scoring.ts` + 測試,後端依同規則實作):
+
+| 項目 | 規則 | 資料來源 |
+|---|---|---|
+| ad1 活動申請 15 | 結案始算;一般 1 分、認可之大型 3 分;**一天至多計 1 件(取當日最高)**;上限 15 | activities(closed, is_large_approved) |
+| ad2 照/影片 15 | 每活動照片 ≥5 張**或**影片連結 → 1 分;大型 3 分;上限 15 | files(slot=report_photo)+activity_reports.video_url |
+| ad3 成果單 15 | 有上傳即 1 分;大型 3 分;上限 15 | activity_reports |
+| ad4 心得回饋 30 | 有上傳即 2 分;大型 6 分;上限 30 | activity_reflections |
+| ad5 名單更新 10 | 每學期:0 人 0 分、1–9 人 2.5 分、10 人以上 5 分;兩學期合計 | club_members × semester |
+| ad6 網頁經營 5 | **有連結即 5 分**(需求方簡化,不追蹤更新時間) | clubs.website_url |
+| ad7 負責人會議 5 | 全程參與 5 分 | session_attendance(kind=leader_meeting) |
+| ad8 幹訓 5 | 派幹部全程參與 5 分 | signups(kind=cadre_training) |
+| 加減分 | 表現優良最多 +5(eval_adjustments.merit_bonus);未銷案勸導每筆 −1、上限 −10 | violations(open, 採計期間內) |
 
 ### 3.9 公告、違規、稽核、通知
 

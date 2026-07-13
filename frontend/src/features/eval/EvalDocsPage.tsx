@@ -13,10 +13,9 @@ import {
   closedActivities,
   overridesOf,
   resultOf,
-  sha256,
-  toEvalFile,
   uploadProgress,
 } from './store'
+import { sha256, toEvalFile } from './files'
 import { AD_LABELS, type EvalFile } from './types'
 import FilePreview from './FilePreview'
 

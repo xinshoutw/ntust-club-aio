@@ -69,6 +69,13 @@ async def test_login_rate_limited_per_ip(client, db):
     assert resp.json()["meta"]["code"] == "RATE_LIMITED"
 
 
+async def test_successful_logins_do_not_consume_rate_limit(client, db):
+    # 校園 NAT 共用出口 IP:只有失敗嘗試計入限流
+    await make_user(db, username="club01")
+    for _ in range(12):
+        assert (await login(client, "club01")).status_code == 200
+
+
 async def test_csrf_required_on_state_changing_requests(client, db):
     await make_user(db, username="club01")
     await login(client, "club01")

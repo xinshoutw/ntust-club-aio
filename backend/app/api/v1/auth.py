@@ -8,7 +8,7 @@ from app.core.deps import (
     DbDep,
     client_ip,
 )
-from app.core.errors import rate_limited
+from app.core.errors import AppError, rate_limited
 from app.core.rate_limit import login_limiter
 from app.core.security import SESSION_TTL
 from app.schemas.auth import ChangePasswordRequest, LoginRequest, UserOut
@@ -48,15 +48,19 @@ async def login(
     body: LoginRequest, request: Request, response: Response, db: DbDep
 ) -> ApiResponse[UserOut]:
     ip = client_ip(request)
-    if not login_limiter.allow(ip or "unknown"):
+    if login_limiter.blocked(ip or "unknown"):
         raise rate_limited("登入嘗試過於頻繁,請稍後再試")
-    user, session = await auth_service.login(
-        db,
-        username=body.username,
-        password=body.password,
-        ip=ip,
-        user_agent=request.headers.get("user-agent"),
-    )
+    try:
+        user, session = await auth_service.login(
+            db,
+            username=body.username,
+            password=body.password,
+            ip=ip,
+            user_agent=request.headers.get("user-agent"),
+        )
+    except AppError:
+        login_limiter.hit(ip or "unknown")  # 只計失敗:校園 NAT 下成功登入不佔額度
+        raise
     _set_auth_cookies(response, str(session.id), session.csrf_token)
     return ApiResponse(data=UserOut.model_validate(user))
 

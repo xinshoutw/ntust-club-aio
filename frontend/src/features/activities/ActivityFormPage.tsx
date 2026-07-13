@@ -8,13 +8,14 @@ import PageHeader from '../../components/ui/PageHeader'
 import { useAuth } from '../../app/auth'
 import { blurLeavesRow } from '../../lib/form'
 import { CLUB_ACTIVITIES, addDraft, nextActivityId, replaceActivity } from './mock'
+import { TIME_RANGE_SEP } from './utils'
 import { BUDGET_CATEGORIES, BUDGET_HINTS, fmtMoney, type Activity } from './types'
 import './actform.css'
 
-// '18:00–21:00'(或 -)→ TimePicker.RangePicker 值
+// '18:00–21:00'(容忍 -/—)→ TimePicker.RangePicker 值
 function parseTimeRange(tr?: string): [dayjs.Dayjs, dayjs.Dayjs] | undefined {
   if (!tr) return undefined
-  const [a, b] = tr.split(/[–-]/).map((t) => dayjs(t.trim(), 'HH:mm'))
+  const [a, b] = tr.split(TIME_RANGE_SEP).map((t) => dayjs(t.trim(), 'HH:mm'))
   return a?.isValid() && b?.isValid() ? [a, b] : undefined
 }
 

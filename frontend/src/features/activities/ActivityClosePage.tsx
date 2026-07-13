@@ -10,7 +10,7 @@ import { allPhotoHashes, resultOf } from '../eval/store'
 import type { EvalFile } from '../eval/types'
 import { CLUB_ACTIVITIES } from './mock'
 import type { Activity, Reflection } from './types'
-import { canClose } from './utils'
+import { TIME_RANGE_SEP, canClose } from './utils'
 import './actform.css'
 
 interface ReflectRow extends Reflection {
@@ -30,9 +30,9 @@ const toTime = (s?: string): Dayjs | null => {
   return t.isValid() ? t : null
 }
 
-// 申請的預估時間 '10:00–16:00'(或 -)→ [開始, 結束]
+// 申請的預估時間 '10:00–16:00'(容忍 -/—)→ [開始, 結束]
 const plannedTimes = (tr?: string): [string, string] => {
-  const [a = '', b = ''] = (tr ?? '').split(/[–-]/).map((t) => t.trim())
+  const [a = '', b = ''] = (tr ?? '').split(TIME_RANGE_SEP).map((t) => t.trim())
   return [a, b]
 }
 

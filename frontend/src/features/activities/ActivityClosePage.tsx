@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 import { App, Button, DatePicker, Input, InputNumber, Select, TimePicker, Upload } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
-import { LeftOutlined, UploadOutlined } from '@ant-design/icons'
+import { UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { blurLeavesRow } from '../../lib/form'
 import { generatedPdf, releaseFile, sha256, toEvalFile } from '../eval/files'
@@ -10,6 +10,7 @@ import { allPhotoHashes, resultOf } from '../eval/store'
 import type { EvalFile } from '../eval/types'
 import { CLUB_ACTIVITIES } from './mock'
 import type { Activity, Reflection } from './types'
+import './actform.css'
 
 interface ReflectRow extends Reflection {
   key: number
@@ -34,16 +35,48 @@ const plannedTimes = (tr?: string): [string, string] => {
   return [a, b]
 }
 
-// 活動結案(獨立頁,入口=活動列表的結案動作):
-// 成果調查(預填申請值)+ 學習心得 ≥3 + 照片/影片/支出;除影片連結外全必填
+// 活動結案(側欄頁):選擇已核准之活動 → 成果調查(預填申請值)+ 心得 ≥3 + 照片/影片/支出
+// 除影片連結外全必填;送出後由輔導老師審核,結案通過始計入評鑑行政分
 export default function ActivityClosePage() {
-  const { id } = useParams()
   const navigate = useNavigate()
+  const [params, setParams] = useSearchParams()
   const { message, modal } = App.useApp()
 
-  const activity = CLUB_ACTIVITIES.find((a) => a.id === id && a.status === 'approved')
-  if (!activity) return <Navigate to="/activities" replace />
-  return <CloseForm key={activity.id} activity={activity} onDone={() => navigate('/activities')} message={message} modal={modal} />
+  const closable = CLUB_ACTIVITIES.filter((a) => a.status === 'approved')
+  const selectedId = params.get('id')
+  const activity = closable.find((a) => a.id === selectedId)
+
+  return (
+    <div>
+      <PageHeader
+        title="活動結案"
+        extra={
+          <Select
+            style={{ width: 260 }}
+            placeholder="選擇已核准之活動"
+            value={activity?.id}
+            onChange={(id) => setParams({ id }, { replace: true })}
+            options={closable.map((a) => ({ value: a.id, label: `${a.name}(${a.date})` }))}
+          />
+        }
+      />
+      <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
+        除「影片連結」外皆為必填;送出後由輔導老師審核,結案通過始計入評鑑行政分。
+      </div>
+
+      {!activity && (
+        <div className="card" style={{ marginTop: 20, padding: '40px 24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
+          {closable.length
+            ? '請於右上角選擇要結案的已核准活動;也可從活動列表點「結案」進入。'
+            : '目前沒有等待結案的已核准活動。'}
+        </div>
+      )}
+
+      {activity && (
+        <CloseForm key={activity.id} activity={activity} onDone={() => navigate('/activities')} message={message} modal={modal} />
+      )}
+    </div>
+  )
 }
 
 function CloseForm({
@@ -62,14 +95,14 @@ function CloseForm({
 
   const [memberCount, setMemberCount] = useState<number | null>(d?.memberCount ?? null)
   const [nonMemberCount, setNonMemberCount] = useState<number | null>(d?.nonMemberCount ?? null)
-  // 實際時間/地點:預填申請時的預估值(草稿優先)
+  // 實際時間/地點:預填申請時的預估值(草稿優先),placeholder 亦顯示預估值
   const [actualStart, setActualStart] = useState<string>(d?.actualStart ?? plannedStart)
   const [actualEnd, setActualEnd] = useState<string>(d?.actualEnd ?? plannedEnd)
   const [actualLocation, setActualLocation] = useState<string>(d?.actualLocation ?? activity.location ?? '')
   const [highlights, setHighlights] = useState(d?.highlights ?? '')
   const [goals, setGoals] = useState(d?.goals ?? '')
   const [others, setOthers] = useState(d?.others ?? '')
-  const [reviewMeeting, setReviewMeeting] = useState<boolean>(d?.reviewMeeting ?? true)
+  const [reviewMeeting, setReviewMeeting] = useState<boolean>(d?.reviewMeeting ?? false)
   const [reviewDate, setReviewDate] = useState(d?.reviewDate ?? '')
   const [videoLink, setVideoLink] = useState(d?.videoLink ?? '')
   const [expense, setExpense] = useState<number | null>(d?.expense ?? null)
@@ -228,205 +261,201 @@ function CloseForm({
   }
 
   return (
-    <div style={{ maxWidth: 860, margin: '0 auto' }}>
-      <Link to="/activities" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-        <LeftOutlined style={{ fontSize: 12 }} />
-        返回活動列表
-      </Link>
-      <div style={{ marginTop: 12 }}>
-        <PageHeader
-          title="活動結案"
-          sub={
-            <>
-              {activity.name} · <span className="num">{activity.date}</span>
-              {activity.closeDeadline && (
-                <>
-                  {' '}· 結案期限 <span className="num">{activity.closeDeadline}</span>
-                </>
-              )}
-            </>
-          }
-        />
-      </div>
-      <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        除「影片連結」外皆為必填;送出後由輔導老師審核,結案通過始計入評鑑行政分。
+    <>
+      <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 12, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <span style={{ fontWeight: 500, color: 'var(--ink)' }}>{activity.name}</span>
+        <span className="num">{activity.date}</span>
+        {activity.closeDeadline && (
+          <span>
+            結案期限 <span className="num">{activity.closeDeadline}</span>
+          </span>
+        )}
       </div>
 
-      <div className="card" style={{ marginTop: 16, padding: 24 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>一、活動成果調查</div>
-        <div className="form-grid-2">
-          <div>
-            <div style={label}>實際社員人數{requiredMark}</div>
-            <InputNumber
-              min={0}
-              precision={0}
-              style={{ width: '100%' }}
-              value={memberCount}
-              onChange={setMemberCount}
-              placeholder={activity.participantsIn != null ? String(activity.participantsIn) : undefined}
-              aria-label="實際社員人數"
-            />
-          </div>
-          <div>
-            <div style={label}>實際非社員人數{requiredMark}</div>
-            <InputNumber
-              min={0}
-              precision={0}
-              style={{ width: '100%' }}
-              value={nonMemberCount}
-              onChange={setNonMemberCount}
-              placeholder={activity.participantsOut != null ? String(activity.participantsOut) : undefined}
-              aria-label="實際非社員人數"
-            />
-          </div>
-          <div>
-            <div style={label}>實際開始時間{requiredMark}</div>
-            <TimePicker
-              style={{ width: '100%' }}
-              format={{ format: 'HH:mm', type: 'mask' }}
-              needConfirm={false}
-              value={toTime(actualStart)}
-              onChange={(_, ts) => setActualStart((ts as string) || '')}
-            />
-          </div>
-          <div>
-            <div style={label}>實際結束時間{requiredMark}</div>
-            <TimePicker
-              style={{ width: '100%' }}
-              format={{ format: 'HH:mm', type: 'mask' }}
-              needConfirm={false}
-              value={toTime(actualEnd)}
-              onChange={(_, ts) => setActualEnd((ts as string) || '')}
-            />
-          </div>
-          <div style={{ gridColumn: '1 / -1' }}>
-            <div style={label}>實際地點{requiredMark}</div>
-            <Input value={actualLocation} onChange={(e) => setActualLocation(e.target.value)} />
-          </div>
-        </div>
-        <div style={{ marginTop: 12 }}>
-          <div style={label}>活動重點{requiredMark}</div>
-          <Input.TextArea rows={2} value={highlights} onChange={(e) => setHighlights(e.target.value)} placeholder="本次活動重點" />
-        </div>
-        <div style={{ marginTop: 12 }}>
-          <div style={label}>如何達成活動目標{requiredMark}</div>
-          <Input.TextArea rows={2} value={goals} onChange={(e) => setGoals(e.target.value)} placeholder="說明達成目標之方式" />
-        </div>
-        <div style={{ marginTop: 12 }}>
-          <div style={label}>其他執行狀況與成果{requiredMark}</div>
-          <Input.TextArea rows={2} value={others} onChange={(e) => setOthers(e.target.value)} placeholder="其他成果" />
-        </div>
-        <div className="form-grid-2" style={{ marginTop: 12 }}>
-          <div>
-            <div style={label}>事後是否召開檢討會{requiredMark}</div>
-            <Select
-              style={{ width: '100%' }}
-              value={reviewMeeting}
-              onChange={setReviewMeeting}
-              options={[
-                { value: true, label: '是' },
-                { value: false, label: '否' },
-              ]}
-            />
-          </div>
-          {reviewMeeting && (
+      <div className="actform-grid" style={{ marginTop: 12 }}>
+        {/* 左欄:一、活動成果調查 */}
+        <div className="card" style={{ padding: 24 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>一、活動成果調查</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10 }}>
             <div>
-              <div style={label}>檢討會日期{requiredMark}</div>
-              <DatePicker
+              <div style={label}>實際社員人數{requiredMark}</div>
+              <InputNumber
+                min={0}
+                precision={0}
                 style={{ width: '100%' }}
-                format="YYYY/MM/DD"
-                value={reviewDate ? dayjs(reviewDate, 'YYYY/MM/DD') : null}
-                onChange={(_, ds) => setReviewDate((ds as string) || '')}
+                value={memberCount}
+                onChange={setMemberCount}
+                placeholder={activity.participantsIn != null ? String(activity.participantsIn) : undefined}
+                aria-label="實際社員人數"
               />
             </div>
-          )}
-        </div>
-      </div>
-
-      <div className="card" style={{ marginTop: 16, padding: 24 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>二、學習心得{requiredMark}</div>
-        <div style={{ fontSize: 12, color: 'var(--steel)', marginBottom: 12 }}>
-          至少 {MIN_REFLECTIONS} 位本校學生;填寫後自動增列,清空即移除
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {reflects.map((r) => (
-            <div key={r.key} onBlur={(e) => blurLeavesRow(e) && compactReflects()} style={{ border: '1px solid var(--line)', borderRadius: 6, padding: '10px 12px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <Input value={r.name} onChange={(e) => setReflect(r.key, { name: e.target.value })} placeholder="姓名" aria-label="姓名" />
-                <Input value={r.dept} onChange={(e) => setReflect(r.key, { dept: e.target.value })} placeholder="系級" aria-label="系級" />
-              </div>
-              <Input.TextArea
-                value={r.text}
-                onChange={(e) => setReflect(r.key, { text: e.target.value })}
-                placeholder="學習心得內容"
-                aria-label="學習心得內容"
-                autoSize={{ minRows: 2, maxRows: 6 }}
-                style={{ marginTop: 8 }}
+            <div>
+              <div style={label}>實際非社員人數{requiredMark}</div>
+              <InputNumber
+                min={0}
+                precision={0}
+                style={{ width: '100%' }}
+                value={nonMemberCount}
+                onChange={setNonMemberCount}
+                placeholder={activity.participantsOut != null ? String(activity.participantsOut) : undefined}
+                aria-label="實際非社員人數"
               />
             </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="card" style={{ marginTop: 16, padding: 24 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>三、附件與經費</div>
-        <div>
-          <div style={label}>
-            活動照片(≥{MIN_PHOTOS} 張,限 JPG/PNG){requiredMark}
+            <div>
+              <div style={label}>實際開始時間{requiredMark}</div>
+              <TimePicker
+                style={{ width: '100%' }}
+                format={{ format: 'HH:mm', type: 'mask' }}
+                needConfirm={false}
+                placeholder={plannedStart || undefined}
+                value={toTime(actualStart)}
+                onChange={(_, ts) => setActualStart((ts as string) || '')}
+              />
+            </div>
+            <div>
+              <div style={label}>實際結束時間{requiredMark}</div>
+              <TimePicker
+                style={{ width: '100%' }}
+                format={{ format: 'HH:mm', type: 'mask' }}
+                needConfirm={false}
+                placeholder={plannedEnd || undefined}
+                value={toTime(actualEnd)}
+                onChange={(_, ts) => setActualEnd((ts as string) || '')}
+              />
+            </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            {photos.map((p) => (
-              <span key={p.id} style={{ position: 'relative', display: 'inline-flex' }}>
-                <img src={p.url} alt={p.name} title={p.name} style={{ width: 52, height: 40, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--line)' }} />
-                <button
-                  type="button"
-                  className="link-btn danger"
-                  aria-label={`移除 ${p.name}`}
-                  style={{ position: 'absolute', top: -6, right: -6, background: '#fff', border: '1px solid var(--line)', borderRadius: '50%', width: 16, height: 16, lineHeight: '12px', padding: 0, fontSize: 11 }}
-                  onClick={() => {
-                    releaseFile(p)
-                    if (p.hash) photoHashes.current.delete(p.hash)
-                    setPhotos((ps) => ps.filter((x) => x.id !== p.id))
+          <div style={{ marginTop: 12 }}>
+            <div style={label}>實際地點{requiredMark}</div>
+            <Input value={actualLocation} onChange={(e) => setActualLocation(e.target.value)} placeholder={activity.location} />
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <div style={label}>活動重點{requiredMark}</div>
+            <Input.TextArea rows={4} value={highlights} onChange={(e) => setHighlights(e.target.value)} placeholder="本次活動重點" />
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <div style={label}>如何達成活動目標{requiredMark}</div>
+            <Input.TextArea rows={4} value={goals} onChange={(e) => setGoals(e.target.value)} placeholder="說明達成目標之方式" />
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <div style={label}>其他執行狀況與成果{requiredMark}</div>
+            <Input.TextArea rows={4} value={others} onChange={(e) => setOthers(e.target.value)} placeholder="其他成果" />
+          </div>
+          <div className="form-grid-2" style={{ marginTop: 12 }}>
+            <div>
+              <div style={label}>事後是否召開檢討會{requiredMark}</div>
+              <Select
+                style={{ width: '100%' }}
+                value={reviewMeeting}
+                onChange={setReviewMeeting}
+                options={[
+                  { value: false, label: '否' },
+                  { value: true, label: '是' },
+                ]}
+              />
+            </div>
+            {reviewMeeting && (
+              <div>
+                <div style={label}>檢討會日期{requiredMark}</div>
+                <DatePicker
+                  style={{ width: '100%' }}
+                  format="YYYY/MM/DD"
+                  value={reviewDate ? dayjs(reviewDate, 'YYYY/MM/DD') : null}
+                  onChange={(_, ds) => setReviewDate((ds as string) || '')}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 右欄:二、學習心得 + 三、附件與經費 */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="card" style={{ padding: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 12 }}>
+              <div style={{ fontSize: 15, fontWeight: 600 }}>二、學習心得{requiredMark}</div>
+              <div style={{ fontSize: 12, color: 'var(--steel)' }}>至少 {MIN_REFLECTIONS} 位本校學生;填寫後自動增列</div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {reflects.map((r) => (
+                <div
+                  key={r.key}
+                  onBlur={(e) => blurLeavesRow(e) && compactReflects()}
+                  style={{ display: 'grid', gridTemplateColumns: '104px 104px 1fr', gap: 8, alignItems: 'start' }}
+                >
+                  <Input value={r.name} onChange={(e) => setReflect(r.key, { name: e.target.value })} placeholder="姓名" aria-label="姓名" />
+                  <Input value={r.dept} onChange={(e) => setReflect(r.key, { dept: e.target.value })} placeholder="系級" aria-label="系級" />
+                  <Input.TextArea
+                    value={r.text}
+                    onChange={(e) => setReflect(r.key, { text: e.target.value })}
+                    placeholder="學習心得內容"
+                    aria-label="學習心得內容"
+                    autoSize={{ minRows: 2, maxRows: 8 }}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card" style={{ padding: 24 }}>
+            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>三、附件與經費</div>
+            <div>
+              <div style={label}>
+                活動照片(≥{MIN_PHOTOS} 張,限 JPG/PNG){requiredMark}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                {photos.map((p) => (
+                  <span key={p.id} style={{ position: 'relative', display: 'inline-flex' }}>
+                    <img src={p.url} alt={p.name} title={p.name} style={{ width: 52, height: 40, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--line)' }} />
+                    <button
+                      type="button"
+                      className="link-btn danger"
+                      aria-label={`移除 ${p.name}`}
+                      style={{ position: 'absolute', top: -6, right: -6, background: '#fff', border: '1px solid var(--line)', borderRadius: '50%', width: 16, height: 16, lineHeight: '12px', padding: 0, fontSize: 11 }}
+                      onClick={() => {
+                        releaseFile(p)
+                        if (p.hash) photoHashes.current.delete(p.hash)
+                        setPhotos((ps) => ps.filter((x) => x.id !== p.id))
+                      }}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                <Upload
+                  accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+                  multiple
+                  showUploadList={false}
+                  beforeUpload={(f) => {
+                    addPhoto(f)
+                    return false
                   }}
                 >
-                  ×
-                </button>
-              </span>
-            ))}
-            <Upload
-              accept="image/jpeg,image/png,.jpg,.jpeg,.png"
-              multiple
-              showUploadList={false}
-              beforeUpload={(f) => {
-                addPhoto(f)
-                return false
-              }}
-            >
-              <Button icon={<UploadOutlined />}>選擇照片</Button>
-            </Upload>
-            <span className="num" style={{ fontSize: 12, color: photos.length >= MIN_PHOTOS ? '#1F6B45' : 'var(--steel)' }}>
-              {photos.length} 張
-            </span>
+                  <Button icon={<UploadOutlined />}>選擇照片</Button>
+                </Upload>
+                <span className="num" style={{ fontSize: 12, color: photos.length >= MIN_PHOTOS ? '#1F6B45' : 'var(--steel)' }}>
+                  {photos.length} 張
+                </span>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>內容相同的照片(即使檔名不同)會被拒絕。</div>
+            </div>
+            <div className="form-grid-2" style={{ marginTop: 12 }}>
+              <div>
+                <div style={label}>影片連結(可選)</div>
+                <Input value={videoLink} onChange={(e) => setVideoLink(e.target.value)} placeholder="YouTube 等" />
+              </div>
+              <div>
+                <div style={label}>實際支出(元){requiredMark}</div>
+                <InputNumber min={0} precision={0} style={{ width: '100%' }} className="num-right" value={expense} onChange={setExpense} placeholder="核銷依據" />
+              </div>
+            </div>
           </div>
-          <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>內容相同的照片(即使檔名不同)會被拒絕。</div>
-        </div>
-        <div className="form-grid-2" style={{ marginTop: 12 }}>
-          <div>
-            <div style={label}>影片連結(可選)</div>
-            <Input value={videoLink} onChange={(e) => setVideoLink(e.target.value)} placeholder="YouTube 等" />
-          </div>
-          <div>
-            <div style={label}>實際支出(元){requiredMark}</div>
-            <InputNumber min={0} precision={0} style={{ width: '100%' }} className="num-right" value={expense} onChange={setExpense} placeholder="核銷依據" />
-          </div>
-        </div>
-      </div>
 
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-        <Button onClick={leave}>取消</Button>
-        <Button onClick={saveDraft}>儲存草稿</Button>
-        <Button type="primary" onClick={submit}>送出結案</Button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <Button onClick={leave}>取消</Button>
+            <Button onClick={saveDraft}>儲存草稿</Button>
+            <Button type="primary" onClick={submit}>送出結案</Button>
+          </div>
+        </div>
       </div>
-    </div>
+    </>
   )
 }

@@ -276,7 +276,7 @@ export default function ActivityListPage() {
   )
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+    <div>
       <PageHeader
         title="活動列表"
         sub={
@@ -379,7 +379,7 @@ export default function ActivityListPage() {
                         <span style={{ fontSize: 11, color: 'var(--steel)', border: '1px solid var(--line)', borderRadius: 4, padding: '0 4px' }}>草稿</span>
                       </Tooltip>
                     )}
-                    <Button size="small" type="primary" onClick={() => navigate(`/activities/${a.id}/close`)}>結案</Button>
+                    <Button size="small" type="primary" onClick={() => navigate(`/activities/close?id=${a.id}`)}>結案</Button>
                   </span>
                 ) : null,
               ),
@@ -414,7 +414,7 @@ export default function ActivityListPage() {
         }}
         onGoClose={() => {
           setPreviewOpen(false)
-          if (preview) navigate(`/activities/${preview.id}/close`)
+          if (preview) navigate(`/activities/close?id=${preview.id}`)
         }}
         onPreviewFile={(f) => {
           setFilePreview(f)

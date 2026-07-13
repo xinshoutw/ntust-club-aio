@@ -50,6 +50,7 @@ export const CLUB_NAV: NavGroup[] = [
     label: '活動管理',
     items: [
       { key: 'act-new', label: '活動申請', path: '/activities/new', icon: <FormOutlined /> },
+      { key: 'act-close', label: '活動結案', path: '/activities/close', icon: <FileDoneOutlined /> },
       { key: 'act-list', label: '活動列表', path: '/activities', icon: <UnorderedListOutlined /> },
     ],
   },

@@ -65,7 +65,7 @@ export default function App() {
         <Route path="activities" element={<ActivityListPage />} />
         <Route path="activities/new" element={<ActivityFormPage />} />
         <Route path="activities/:id/edit" element={<ActivityFormPage />} />
-        <Route path="activities/:id/close" element={<ActivityClosePage />} />
+        <Route path="activities/close" element={<ActivityClosePage />} />
         <Route path="signup" element={<SignupListPage />} />
         <Route path="signup/:id" element={<SignupFormPage />} />
         <Route path="members" element={<MembersPage />} />

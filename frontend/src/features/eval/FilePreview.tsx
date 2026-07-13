@@ -66,6 +66,7 @@ interface FilePreviewProps {
 }
 
 // 檔案即時預覽:圖片(img)、PDF(瀏覽器原生 iframe)、doc/docx(mammoth)
+// zIndex 高於一般 Modal:預覽常由其他 popup 內開啟,避免被蓋住
 export default function FilePreview({ file, open, onClose, afterClose }: FilePreviewProps) {
   return (
     <Modal
@@ -73,7 +74,8 @@ export default function FilePreview({ file, open, onClose, afterClose }: FilePre
       onCancel={onClose}
       afterClose={afterClose}
       footer={null}
-      width={840}
+      width={1100}
+      zIndex={1100}
       title={
         file && (
           <span style={{ display: 'inline-flex', gap: 10, alignItems: 'baseline' }}>
@@ -87,12 +89,17 @@ export default function FilePreview({ file, open, onClose, afterClose }: FilePre
     >
       {file?.type === 'image' && (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 8 }}>
-          <img src={file.url} alt={file.name} style={{ maxWidth: '100%', maxHeight: '65vh', borderRadius: 4 }} />
+          <img src={file.url} alt={file.name} style={{ maxWidth: '100%', maxHeight: '76vh', borderRadius: 4 }} />
         </div>
       )}
       {file?.type === 'pdf' &&
         (file.url ? (
-          <iframe src={file.url} title={file.name} style={{ width: '100%', height: '65vh', border: '1px solid var(--line)', borderRadius: 6 }} />
+          <iframe
+            // PDF open params:預設收起左側目錄/縮圖窗格
+            src={`${file.url}#pagemode=none&navpanes=0`}
+            title={file.name}
+            style={{ width: '100%', height: '76vh', border: '1px solid var(--line)', borderRadius: 6 }}
+          />
         ) : (
           <Center>示意檔案無實際內容;實際上傳的 PDF 可在此預覽。</Center>
         ))}

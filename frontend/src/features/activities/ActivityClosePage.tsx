@@ -10,6 +10,7 @@ import { allPhotoHashes, resultOf } from '../eval/store'
 import type { EvalFile } from '../eval/types'
 import { CLUB_ACTIVITIES } from './mock'
 import type { Activity, Reflection } from './types'
+import { canClose } from './utils'
 import './actform.css'
 
 interface ReflectRow extends Reflection {
@@ -42,7 +43,8 @@ export default function ActivityClosePage() {
   const [params, setParams] = useSearchParams()
   const { message, modal } = App.useApp()
 
-  const closable = CLUB_ACTIVITIES.filter((a) => a.status === 'approved')
+  // 已核准且活動已結束才可結案
+  const closable = CLUB_ACTIVITIES.filter(canClose)
   const selectedId = params.get('id')
   const activity = closable.find((a) => a.id === selectedId)
 
@@ -52,7 +54,7 @@ export default function ActivityClosePage() {
         title="活動結案"
         extra={
           <Select
-            style={{ width: 260 }}
+            style={{ width: 380 }}
             placeholder="選擇已核准之活動"
             value={activity?.id}
             onChange={(id) => setParams({ id }, { replace: true })}
@@ -61,14 +63,14 @@ export default function ActivityClosePage() {
         }
       />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        除「影片連結」外皆為必填;送出後進入結案審核,結案通過始計入評鑑行政分。
+        僅已核准且活動已結束者可結案;除「影片連結」外皆為必填,送出後進入結案審核,結案通過始計入評鑑行政分。
       </div>
 
       {!activity && (
         <div className="card" style={{ marginTop: 20, padding: '40px 24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
           {closable.length
-            ? '請於右上角選擇要結案的已核准活動;也可從活動列表點「結案」進入。'
-            : '目前沒有等待結案的已核准活動。'}
+            ? '請於右上角選擇要結案的活動(已核准且已結束);也可從活動列表點「結案」進入。'
+            : '目前沒有可結案的活動(須已核准且活動已結束)。'}
         </div>
       )}
 

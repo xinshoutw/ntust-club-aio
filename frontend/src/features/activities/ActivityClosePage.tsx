@@ -20,6 +20,15 @@ interface ReflectRow extends Reflection {
 const isReflectEmpty = (r: ReflectRow) => !r.name.trim() && !r.dept.trim() && !r.text.trim()
 const MIN_REFLECTIONS = 3
 const MIN_PHOTOS = 5
+const MAX_PHOTO_BYTES = 10 * 1024 * 1024 // 圖片上限 10MB(architecture.md)
+
+// 副檔名/accept 擋不住改名檔:驗 JPEG/PNG 魔術位元組
+async function isJpgOrPng(f: File): Promise<boolean> {
+  const head = new Uint8Array(await f.slice(0, 4).arrayBuffer())
+  const jpg = head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff
+  const png = head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47
+  return jpg || png
+}
 
 const label: React.CSSProperties = { fontSize: 13, fontWeight: 500, marginBottom: 6 }
 const requiredMark = <span style={{ color: '#C13B34' }}> *</span>
@@ -195,6 +204,14 @@ function CloseForm({
   const addPhoto = (f: File) => {
     photoQueue.current = photoQueue.current.then(async () => {
       try {
+        if (f.size > MAX_PHOTO_BYTES) {
+          message.error(`「${f.name}」超過 10MB 上限,請壓縮後再上傳`)
+          return
+        }
+        if (!(await isJpgOrPng(f))) {
+          message.error(`「${f.name}」不是有效的 JPG/PNG 圖片`)
+          return
+        }
         const hash = await sha256(f)
         if (allPhotoHashes().has(hash) || photoHashes.current.has(hash)) {
           message.error(`「${f.name}」與已上傳的照片內容相同,已拒絕重複上傳`)

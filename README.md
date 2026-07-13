@@ -38,6 +38,12 @@ cd frontend && pnpm build   # 型別檢查 + 建置
 
 ## 正式部署(GCE 單機)
 
+映像由 CI 產出並推到 registry,**VM 上永不 build**:
+
 ```bash
-docker compose up -d   # db + backend + web(:8080),前面接既有 edge proxy
+# .env 設定 ENV=prod、強密碼、BACKEND_IMAGE/WEB_IMAGE
+docker compose pull
+docker compose up -d --no-build   # db + backend + web(:8080),前面接既有 edge proxy
 ```
+
+上線切換與 edge proxy 需要的調整見 `docs/architecture.md` §6.5 切換清單。

@@ -25,9 +25,11 @@ export default function MembersPage() {
   const kind = Form.useWatch('kind', form)
 
   const nextId = () => Math.max(0, ...members.map((m) => m.id)) + 1
+  // 頁面目前顯示的學期(「全部學期」時退回當前學期),作為各對話框的預設
+  const pageSemester = semester === 'all' ? CURRENT_SEMESTER : semester
 
-  const onAdd = (values: { name: string; studentId: string; kind: Member['kind']; title?: string }) => {
-    setMembers((ms) => [...ms, { id: nextId(), semester: CURRENT_SEMESTER, updatedAt: '—(未儲存)', ...values }])
+  const onAdd = (values: { name: string; studentId: string; kind: Member['kind']; title?: string; semester: string }) => {
+    setMembers((ms) => [...ms, { id: nextId(), updatedAt: '—(未儲存)', ...values }])
     setAddOpen(false)
     form.resetFields()
     message.success('已新增社員(名單更新影響評鑑行政分)')
@@ -101,7 +103,14 @@ export default function MembersPage() {
             <Button style={{ height: 36 }} icon={<UploadOutlined />} onClick={() => setCsvOpen(true)}>
               匯入 CSV
             </Button>
-            <Button type="primary" style={{ height: 36 }} onClick={() => setAddOpen(true)}>
+            <Button
+              type="primary"
+              style={{ height: 36 }}
+              onClick={() => {
+                form.setFieldsValue({ semester: pageSemester })
+                setAddOpen(true)
+              }}
+            >
               + 新增社員
             </Button>
           </div>
@@ -230,12 +239,15 @@ export default function MembersPage() {
         onOk={() => form.submit()}
         okText="新增"
       >
-        <Form form={form} layout="vertical" onFinish={onAdd} initialValues={{ kind: '社員' }}>
+        <Form form={form} layout="vertical" onFinish={onAdd} initialValues={{ kind: '社員', semester: CURRENT_SEMESTER }}>
           <Form.Item name="name" label="姓名" rules={[{ required: true, message: '請輸入姓名' }]}>
             <Input />
           </Form.Item>
           <Form.Item name="studentId" label="學號" rules={[{ required: true, message: '請輸入學號' }]}>
             <Input className="num" />
+          </Form.Item>
+          <Form.Item name="semester" label="學期" rules={[{ required: true }]}>
+            <Select options={semesterOptions(members.map((m) => m.semester))} />
           </Form.Item>
           <Form.Item name="kind" label="身份" rules={[{ required: true }]}>
             <Select options={KINDS.map((k) => ({ value: k, label: k }))} />

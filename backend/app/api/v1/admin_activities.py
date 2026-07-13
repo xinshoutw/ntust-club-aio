@@ -54,16 +54,45 @@ Reviewer = Annotated[CurrentUser, Depends(_reviewer)]
 
 
 def _require_stage_key(user, key: str) -> None:
+    # 學務長關卡=本人操作:即使 super 也必須明確持有 approve_dean(避免代簽)
+    if key == "approve_dean":
+        if key not in user.permissions:
+            raise forbidden("學務長關卡須由本人簽核")
+        return
     if not user.is_super and key not in user.permissions:
         raise forbidden("沒有此簽核關卡的權限")
 
 
-async def _get_activity(db, activity_id: int) -> Activity:
-    activity = await db.scalar(
+def _visible_statuses(user) -> set[ActivityStatus] | None:
+    """受限關卡帳號只看得到自己關卡相關的狀態;None=不限(super 或持審核頁權限)。"""
+    if user.is_super or "aact" in user.permissions:
+        return None
+    visible: set[ActivityStatus] = set()
+    if "approve_advisor" in user.permissions:
+        visible |= {ActivityStatus.PENDING_ADVISOR, ActivityStatus.CLOSING_PENDING_ADVISOR}
+    if "approve_chief" in user.permissions:
+        visible.add(ActivityStatus.PENDING_CHIEF)
+    if "approve_dean" in user.permissions:
+        visible.add(ActivityStatus.PENDING_DEAN)
+    if "aclose" in user.permissions:
+        visible |= {
+            ActivityStatus.CLOSING_PENDING_ADVISOR,
+            ActivityStatus.APPROVED,
+            ActivityStatus.CLOSED,
+        }
+    return visible
+
+
+async def _get_activity(db, activity_id: int, *, for_update: bool = False) -> Activity:
+    query = (
         sa.select(Activity)
         .where(Activity.id == activity_id)
         .options(sa.orm.selectinload(Activity.budget_items))
     )
+    if for_update:
+        # 狀態轉移一律鎖列:並行核准/退回不得留下矛盾狀態與稽核
+        query = query.with_for_update()
+    activity = await db.scalar(query)
     if activity is None:
         raise not_found("找不到活動")
     return activity
@@ -105,6 +134,9 @@ async def list_activities(
         .options(sa.orm.selectinload(Activity.budget_items))
         .order_by(Activity.id.desc())
     )
+    visible = _visible_statuses(user)
+    if visible is not None:
+        query = query.where(Activity.status.in_(visible))
     if status:
         query = query.where(Activity.status == status)
     if club_id:
@@ -137,6 +169,9 @@ async def get_activity(
     )
     if activity is None:
         raise not_found("找不到活動")
+    visible = _visible_statuses(user)
+    if visible is not None and activity.status not in visible:
+        raise not_found("找不到活動")  # 受限關卡帳號視同不存在,避免探測
     lock_months = await get_setting(db, "close_lock_months")
     out = ActivityDetailOut.model_validate(activity)
     svc.decorate(out, activity, lock_months)
@@ -170,13 +205,14 @@ async def approve(
     request: Request,
     background: BackgroundTasks,
 ) -> ApiResponse[ActivityOut]:
-    activity = await _get_activity(db, activity_id)
+    activity = await _get_activity(db, activity_id, for_update=True)
     stage_info = _STAGE_BY_STATUS.get(activity.status)
     if stage_info is None:
         raise conflict("此活動不在待審狀態")
     key, stage = stage_info
     _require_stage_key(user, key)
 
+    requested_total = sum(i.requested_subsidy for i in activity.budget_items)
     if stage == "advisor":
         # 第一關:經費來源、逐項核定、大型活動認可
         if body.fund_source is not None:
@@ -187,18 +223,21 @@ async def approve(
             if item is None:
                 raise validation_error("核定金額對應的經費項目不存在")
             item.approved_subsidy = approval.approved_subsidy
+        if requested_total > 0:
+            # 有申請補助:經費來源必填、每個項目都要有核定金額,總額由後端加總
+            if not activity.fund_source:
+                raise validation_error("有申請補助的案件必須認定經費來源")
+            missing = [i for i in activity.budget_items if i.approved_subsidy is None]
+            if missing:
+                raise validation_error("尚有經費項目未核定金額")
         if activity.is_large:
             activity.is_large_approved = (
                 body.is_large_approved if body.is_large_approved is not None else False
             )
-        approved_total = sum(
+        activity.school_approved = sum(
             i.approved_subsidy for i in activity.budget_items if i.approved_subsidy is not None
         )
-        activity.school_approved = (
-            body.school_approved if body.school_approved is not None else approved_total
-        )
 
-    requested_total = sum(i.requested_subsidy for i in activity.budget_items)
     if stage == "advisor" and requested_total > 0:
         activity.status = ActivityStatus.PENDING_CHIEF
     elif stage == "chief":
@@ -240,7 +279,7 @@ async def reject(
     request: Request,
     background: BackgroundTasks,
 ) -> ApiResponse[None]:
-    activity = await _get_activity(db, activity_id)
+    activity = await _get_activity(db, activity_id, for_update=True)
     stage_info = _STAGE_BY_STATUS.get(activity.status)
     if stage_info is None:
         raise conflict("此活動不在待審狀態")
@@ -278,7 +317,7 @@ async def close_approve(
     request: Request,
     background: BackgroundTasks,
 ) -> ApiResponse[None]:
-    activity = await _get_activity(db, activity_id)
+    activity = await _get_activity(db, activity_id, for_update=True)
     if activity.status != ActivityStatus.CLOSING_PENDING_ADVISOR:
         raise conflict("此活動不在結案待審狀態")
     _require_stage_key(user, "approve_advisor")  # 結案:輔導老師單關
@@ -308,7 +347,7 @@ async def close_reject(
     request: Request,
     background: BackgroundTasks,
 ) -> ApiResponse[None]:
-    activity = await _get_activity(db, activity_id)
+    activity = await _get_activity(db, activity_id, for_update=True)
     if activity.status != ActivityStatus.CLOSING_PENDING_ADVISOR:
         raise conflict("此活動不在結案待審狀態")
     _require_stage_key(user, "approve_advisor")
@@ -350,9 +389,13 @@ async def unlock(
     request: Request,
     background: BackgroundTasks,
 ) -> ApiResponse[None]:
-    activity = await _get_activity(db, activity_id)
+    activity = await _get_activity(db, activity_id, for_update=True)
     if activity.status != ActivityStatus.APPROVED:
         raise conflict("僅已核准且未結案的活動可解鎖")
+    lock_months = await get_setting(db, "close_lock_months")
+    if not svc.is_close_locked(activity, lock_months):
+        # 未逾期不得預先解鎖,否則永久繞過結案鎖定
+        raise conflict("此活動尚未逾期鎖定,無需解鎖")
     activity.close_unlocked = True
     _record(db, activity, ApprovalSubject.ACTIVITY_CLOSE, "advisor", ApprovalDecision.UNLOCK, user)
     audit.record(

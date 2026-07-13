@@ -114,31 +114,100 @@ async def test_reject_requires_reason_and_allows_resubmit(client, db):
     assert resp.status_code == 200
 
 
+async def approve_first_stage(client, aid: int, **extra):
+    detail = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]
+    body = {
+        "fund_source": "學務處經費",
+        "budget": [{"item_id": i["id"], "approved_subsidy": 100} for i in detail["budget_items"]],
+        **extra,
+    }
+    return await client.post(
+        f"/api/v1/admin/activities/{aid}/approve", json=body, headers=csrf_headers(client)
+    )
+
+
 async def test_large_approval_flag(client, db):
     await seed(client, db)
     aid = await submit_activity(client, db, is_large=True)
 
     await login(client, "advisor")
+    resp = await approve_first_stage(client, aid, is_large_approved=True)
+    assert resp.json()["data"]["is_large_approved"] is True
+
+
+async def test_subsidized_approval_requires_full_budget_decision(client, db):
+    await seed(client, db)
+    aid = await submit_activity(client, db)
+
+    await login(client, "advisor")
+    # 空 body:有補助案件不得未核定就過關
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/approve", json={}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 422
+
+    # 只核定一項也不行
+    detail = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]
+    first = detail["budget_items"][0]["id"]
     resp = await client.post(
         f"/api/v1/admin/activities/{aid}/approve",
-        json={"is_large_approved": True},
+        json={"fund_source": "學務處經費", "budget": [{"item_id": first, "approved_subsidy": 10}]},
         headers=csrf_headers(client),
     )
-    assert resp.json()["data"]["is_large_approved"] is True
+    assert resp.status_code == 422
+
+
+async def test_super_cannot_sign_dean_stage(client, db):
+    await seed(client, db)
+    await make_user(db, username="root", role="admin", is_super=True)
+    aid = await submit_activity(client, db)
+
+    await login(client, "advisor")
+    await approve_first_stage(client, aid)
+    await login(client, "chief")
+    await client.post(
+        f"/api/v1/admin/activities/{aid}/approve", json={}, headers=csrf_headers(client)
+    )
+
+    # 學務長關卡=本人操作:super 未持 approve_dean 不得代簽
+    await login(client, "root")
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/approve", json={}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 403
+
+
+async def test_stage_only_account_visibility_is_scoped(client, db):
+    await seed(client, db)
+    aid = await submit_activity(client, db)  # pending_advisor
+
+    # 只持 approve_dean 的帳號:列表看不到、詳情視同不存在
+    await login(client, "dean")
+    listing = (await client.get("/api/v1/admin/activities")).json()
+    assert listing["meta"]["total"] == 0
+    assert (await client.get(f"/api/v1/admin/activities/{aid}")).status_code == 404
+
+    # 持 aact 的帳號可全覽
+    await login(client, "advisor")
+    assert (await client.get(f"/api/v1/admin/activities/{aid}")).status_code == 200
+
+
+async def test_unlock_requires_actual_lock(client, db):
+    await seed(client, db)
+    recent = (date.today() - timedelta(days=2)).isoformat()
+    aid = await submit_activity(client, db, date=recent)
+    await db.execute(sa.update(Activity).where(Activity.id == aid).values(status="approved"))
+    await db.commit()
+
+    await login(client, "advisor")
+    resp = await client.post(f"/api/v1/admin/activities/{aid}/unlock", headers=csrf_headers(client))
+    assert resp.status_code == 409  # 未逾期不得預先解鎖
 
 
 async def test_close_review_flow(client, db):
     await seed(client, db)
     past = (date.today() - timedelta(days=2)).isoformat()
     aid = await submit_activity(client, db, date=past)
-
-    await login(client, "advisor")
-    await client.post(
-        f"/api/v1/admin/activities/{aid}/approve",
-        json={"budget": []},
-        headers=csrf_headers(client),
-    )
-    # 直接走無補助單關?此活動有補助 → 需要三關,改用 DB 直接核准以聚焦結案流程
     await db.execute(sa.update(Activity).where(Activity.id == aid).values(status="approved"))
     await db.commit()
 

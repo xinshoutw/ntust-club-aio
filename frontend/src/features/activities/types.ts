@@ -1,4 +1,5 @@
 import type { StatusKey } from '../../lib/status'
+import type { EvalFile } from '../eval/types'
 
 export interface BudgetItem {
   id: number
@@ -20,19 +21,19 @@ export interface Reflection {
   text: string
 }
 
-// 活動成果報告(結案表單;送審驗證心得 ≥3 筆)
+// 活動成果調查(結案表單;除影片連結外全必填,心得 ≥3 筆)
 export interface ActivityReport {
-  attendExpected?: number
-  attendRegistered?: number
-  attendShould?: number
-  attendActual: number
-  attendLeave?: number
+  memberCount: number // 實際社員人數(預期值=申請的校內人數)
+  nonMemberCount: number // 實際非社員人數(預期值=申請的校外人數)
+  actualStart: string // 實際開始時間 HH:mm(預填申請的預估時間)
+  actualEnd: string
+  actualLocation: string // 實際地點(預填申請地點)
   highlights: string
-  goals?: string
-  others?: string
+  goals: string
+  others: string
   reviewMeeting: boolean
-  reviewDate?: string
-  videoLink?: string
+  reviewDate?: string // 檢討會=是 時必填
+  videoLink?: string // 唯一選填欄位
   expense: number
   reflections: Reflection[]
   submittedAt?: string
@@ -61,7 +62,7 @@ export interface Activity {
   closeDaysLeft?: number
   submittedAt?: string
   submittedBy?: string
-  attachments?: string[]
+  attachments?: EvalFile[] // 申請附件(企劃書、估價單等,可預覽/下載)
 }
 
 export const BUDGET_CATEGORIES = [

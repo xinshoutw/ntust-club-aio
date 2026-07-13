@@ -7,6 +7,7 @@ import LoginPage from './features/auth/LoginPage'
 import OverviewPage from './features/overview/OverviewPage'
 import ActivityListPage from './features/activities/ActivityListPage'
 import ActivityFormPage from './features/activities/ActivityFormPage'
+import ActivityClosePage from './features/activities/ActivityClosePage'
 import SignupListPage from './features/signup/SignupListPage'
 import SignupFormPage from './features/signup/SignupFormPage'
 import ReviewPage from './features/admin/ReviewPage'
@@ -64,6 +65,7 @@ export default function App() {
         <Route path="activities" element={<ActivityListPage />} />
         <Route path="activities/new" element={<ActivityFormPage />} />
         <Route path="activities/:id/edit" element={<ActivityFormPage />} />
+        <Route path="activities/:id/close" element={<ActivityClosePage />} />
         <Route path="signup" element={<SignupListPage />} />
         <Route path="signup/:id" element={<SignupFormPage />} />
         <Route path="members" element={<MembersPage />} />

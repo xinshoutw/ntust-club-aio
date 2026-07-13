@@ -38,9 +38,18 @@ export default function SignupBuilderPage() {
   }
 
   const addOption = (key: number) => {
-    const value = window.prompt('選項內容')
-    if (!value?.trim()) return
-    setFields((fs) => fs.map((f) => (f.key === key ? { ...f, options: [...f.options, value.trim()] } : f)))
+    const value = window.prompt('選項內容')?.trim()
+    if (!value) return
+    setFields((fs) =>
+      fs.map((f) => {
+        if (f.key !== key) return f
+        if (f.options.includes(value)) {
+          message.error(`選項「${value}」已存在`)
+          return f
+        }
+        return { ...f, options: [...f.options, value] }
+      }),
+    )
   }
 
   return (

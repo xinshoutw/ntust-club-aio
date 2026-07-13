@@ -38,6 +38,10 @@ export default function MaintenancePage() {
           layout="vertical"
           requiredMark
           onFinish={() => {
+            if (!files.length) {
+              message.error('請附上損壞照片或影片佐證。')
+              return
+            }
             message.success('已送出報修')
             form.resetFields()
             setFiles([])
@@ -49,12 +53,20 @@ export default function MaintenancePage() {
           <Form.Item name="items" label="損壞項目" rules={[{ required: true, message: '請描述損壞項目' }]}>
             <Input.TextArea rows={3} placeholder="例:天花板漏水、燈管不亮" />
           </Form.Item>
-          <Form.Item label="佐證照片/影片">
+          <Form.Item label="佐證照片/影片" required>
             <Upload.Dragger
               multiple
               accept="image/*,video/*"
               fileList={files}
-              beforeUpload={() => false}
+              beforeUpload={(f) => {
+                const isVideo = f.type.startsWith('video/')
+                const limit = isVideo ? 200 : 10
+                if (f.size > limit * 1024 * 1024) {
+                  message.error(`${isVideo ? '影片' : '照片'}超過 ${limit}MB 上限。`)
+                  return Upload.LIST_IGNORE
+                }
+                return false
+              }}
               onChange={({ fileList }) => setFiles(fileList)}
             >
               <p style={{ margin: '4px 0 8px' }}>

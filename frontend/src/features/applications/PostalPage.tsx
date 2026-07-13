@@ -25,6 +25,10 @@ export default function PostalPage() {
           layout="vertical"
           requiredMark
           onFinish={() => {
+            if (!files.length) {
+              message.error('請上傳原存簿影本或新開戶申請表。')
+              return
+            }
             message.success('已送出郵局帳戶異動申請')
             form.resetFields()
             setFiles([])
@@ -61,7 +65,13 @@ export default function PostalPage() {
             <Upload.Dragger
               accept=".pdf,image/*"
               fileList={files}
-              beforeUpload={() => false}
+              beforeUpload={(f) => {
+                if (f.size > 50 * 1024 * 1024) {
+                  message.error('檔案超過 50MB 上限。')
+                  return Upload.LIST_IGNORE
+                }
+                return false
+              }}
               onChange={({ fileList }) => setFiles(fileList)}
               maxCount={1}
             >

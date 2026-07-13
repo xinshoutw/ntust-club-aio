@@ -133,6 +133,8 @@ export default function ActivityFormPage() {
       participantsOut: v.participantsOut ?? undefined,
       content: (v.content as string)?.trim() || undefined,
       works: filledWorks.length ? filledWorks.map((w) => ({ task: w.task.trim(), owner: w.owner.trim() })) : undefined,
+      // 編輯重送保留原有附件(mock 不落地新選檔;真實上傳接後端時處理)
+      attachments: editing?.attachments,
       isLarge: v.type === '活動' ? !!v.isLarge : undefined,
       status,
       budget: filledBudget.map((r, i) => ({

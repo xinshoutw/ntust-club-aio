@@ -43,8 +43,14 @@ export default function PeriodPicker({ value, onChange, size = 'middle', nowrap 
               setDragTo(to)
               apply(p, to)
             }}
-            onMouseEnter={() => {
-              if (dragTo !== null) apply(p, dragTo)
+            onMouseEnter={(e) => {
+              if (dragTo === null) return
+              // 在視窗外放開滑鼠收不到 mouseup;按鍵已放開就結束拖曳
+              if (e.buttons === 0) {
+                setDragTo(null)
+                return
+              }
+              apply(p, dragTo)
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {

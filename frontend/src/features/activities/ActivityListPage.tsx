@@ -83,9 +83,11 @@ export default function ActivityListPage() {
           </>
         }
         extra={
-          <Button type="primary" style={{ height: 36 }} onClick={() => navigate('/activities/new')}>
-            + 活動申請
-          </Button>
+          <span className="desktop-only">
+            <Button type="primary" style={{ height: 36 }} onClick={() => navigate('/activities/new')}>
+              + 活動申請
+            </Button>
+          </span>
         }
       />
 

@@ -11,7 +11,7 @@ export default function VenueBookingPage() {
   const { message } = App.useApp()
   const [form] = Form.useForm()
   const [periods, setPeriods] = useState<string[]>([])
-  const mine = VENUE_BOOKINGS.filter((v) => v.club === user?.club)
+  const mine = VENUE_BOOKINGS.filter((v) => v.club === user?.club).slice(0, 5)
 
   const submit = (values: { venue: string }) => {
     if (!periods.length) {
@@ -61,12 +61,11 @@ export default function VenueBookingPage() {
       </div>
 
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>我的申請</div>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>我的申請(近 5 筆)</div>
         <table className="tb" style={{ minWidth: 560 }}>
           <tbody>
             {mine.map((v) => (
               <tr key={v.id}>
-                <td className="num" style={{ color: 'var(--steel)', width: 150 }}>{v.id}</td>
                 <td style={{ fontWeight: 500 }}>{v.venue}</td>
                 <td className="num" style={{ fontSize: 13 }}>{v.date}</td>
                 <td style={{ color: 'var(--steel)', fontSize: 13 }}>第 {v.periods.join('、')} 節</td>

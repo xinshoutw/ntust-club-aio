@@ -10,7 +10,7 @@ export default function EquipmentPage() {
   const [form] = Form.useForm()
   const selectedName = Form.useWatch('equipment', form) as string | undefined
   const selected = EQUIPMENT.find((e) => e.name === selectedName)
-  const mine = EQUIPMENT_LOANS.filter((l) => l.club === user?.club)
+  const mine = EQUIPMENT_LOANS.filter((l) => l.club === user?.club).slice(0, 5)
 
   const submit = (values: { equipment: string; qty: number }) => {
     message.success(`已送出「${values.equipment} ×${values.qty}」借用申請`)
@@ -37,7 +37,15 @@ export default function EquipmentPage() {
             </thead>
             <tbody>
               {EQUIPMENT.map((e) => (
-                <tr key={e.name}>
+                <tr
+                  key={e.name}
+                  onClick={() => {
+                    if (e.available === 0) return
+                    form.setFieldValue('equipment', e.name)
+                    form.resetFields(['qty'])
+                  }}
+                  style={e.available === 0 ? { background: '#EEF0F3', color: 'var(--muted)', cursor: 'not-allowed' } : { cursor: 'pointer' }}
+                >
                   <td style={{ fontWeight: 500 }}>{e.name}</td>
                   <td style={{ color: 'var(--steel)', fontSize: 13 }}>
                     {e.category}
@@ -90,12 +98,11 @@ export default function EquipmentPage() {
       </div>
 
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>我的借用與歸還</div>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>我的借用與歸還(近 5 筆)</div>
         <table className="tb" style={{ minWidth: 720 }}>
           <tbody>
             {mine.map((l) => (
               <tr key={l.id}>
-                <td className="num" style={{ color: 'var(--steel)', width: 150 }}>{l.id}</td>
                 <td style={{ fontWeight: 500 }}>
                   {l.equipment} <span className="num">×{l.qty}</span>
                   {l.serials?.length ? (

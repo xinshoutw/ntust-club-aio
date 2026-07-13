@@ -1,42 +1,50 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { App, Button, DatePicker, Form, Input, Select } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
-import { PERIODS, ROOM_REQUESTS, VENUES } from './mock'
+import { ROOM_REQUESTS, VENUES } from './mock'
+import PeriodPicker from './PeriodPicker'
 
 interface Entry {
   key: number
   date?: string
-  period?: string
+  periods: string[]
 }
+
+const isEntryEmpty = (e: Entry) => !e.date && e.periods.length === 0
 
 export default function FixedRoomPage() {
   const { user } = useAuth()
   const { message } = App.useApp()
   const [form] = Form.useForm()
-  const [entries, setEntries] = useState<Entry[]>([{ key: 1 }])
-  const [nextKey, setNextKey] = useState(2)
-  const mine = ROOM_REQUESTS.filter((r) => r.club === user?.club)
+  const [entries, setEntries] = useState<Entry[]>([{ key: 1, periods: [] }])
+  const keyRef = useRef(2)
+  const mine = ROOM_REQUESTS.filter((r) => r.club === user?.club).slice(0, 5)
+
+  // 填寫後自動補一列空白;整列清空自動移除
+  const updateEntry = (key: number, patch: Partial<Entry>) => {
+    setEntries((es) => {
+      const next = es.map((x) => (x.key === key ? { ...x, ...patch } : x))
+      const filled = next.filter((x) => !isEntryEmpty(x))
+      keyRef.current += 1
+      return [...filled, { key: keyRef.current, periods: [] }]
+    })
+  }
 
   const submit = (values: { room: string; note?: string }) => {
-    if (entries.some((e) => !e.date !== !e.period)) {
-      message.error('請補齊或刪除未完成的時段列。')
+    const filled = entries.filter((e) => !isEntryEmpty(e))
+    if (filled.some((e) => !e.date || e.periods.length === 0)) {
+      message.error('請補齊每列的日期與節次。')
       return
     }
-    const filled = entries.filter((e) => e.date && e.period)
     if (!filled.length) {
       message.error('請至少新增一筆借用時段。')
       return
     }
-    const keys = filled.map((e) => `${e.date}|${e.period}`)
-    if (new Set(keys).size !== keys.length) {
-      message.error('借用時段重複,請調整。')
-      return
-    }
-    message.success(`已送出「${values.room}」固定借用申請(${filled.length} 個時段)`)
+    message.success(`已送出「${values.room}」固定借用申請(${filled.length} 筆)`)
     form.resetFields()
-    setEntries([{ key: 1 }])
+    setEntries([{ key: 1, periods: [] }])
   }
 
   return (
@@ -65,45 +73,24 @@ export default function FixedRoomPage() {
 
           <div style={{ fontSize: 13, fontWeight: 500, margin: '18px 0 8px' }}>
             借用時段 <span style={{ color: '#C13B34' }}>*</span>
-            <span style={{ fontWeight: 400, color: 'var(--steel)', marginLeft: 8, fontSize: 12 }}>可新增多筆</span>
+            <span style={{ fontWeight: 400, color: 'var(--steel)', marginLeft: 8, fontSize: 12 }}>
+              填寫後自動增列;節次可按住拖曳批量選取
+            </span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {entries.map((e) => (
-              <div key={e.key} style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <div key={e.key} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap', border: '1px solid var(--line)', borderRadius: 6, padding: '10px 12px' }}>
                 <DatePicker
                   format="YYYY/MM/DD"
                   placeholder="日期"
-                  onChange={(_, ds) =>
-                    setEntries((es) => es.map((x) => (x.key === e.key ? { ...x, date: ds as string } : x)))
-                  }
+                  onChange={(_, ds) => updateEntry(e.key, { date: (ds as string) || undefined })}
                 />
-                <Select
-                  placeholder="節次"
-                  style={{ width: 120 }}
-                  options={PERIODS.map((p) => ({ value: p, label: `第 ${p} 節` }))}
-                  onChange={(v) => setEntries((es) => es.map((x) => (x.key === e.key ? { ...x, period: v } : x)))}
-                />
-                {entries.length > 1 && (
-                  <button
-                    type="button"
-                    className="link-btn danger"
-                    onClick={() => setEntries((es) => es.filter((x) => x.key !== e.key))}
-                  >
-                    刪除
-                  </button>
-                )}
+                <div style={{ flex: 1, minWidth: 260 }}>
+                  <PeriodPicker size="small" value={e.periods} onChange={(ps) => updateEntry(e.key, { periods: ps })} />
+                </div>
               </div>
             ))}
           </div>
-          <Button
-            style={{ marginTop: 10, height: 34 }}
-            onClick={() => {
-              setEntries((es) => [...es, { key: nextKey }])
-              setNextKey((k) => k + 1)
-            }}
-          >
-            + 新增時段
-          </Button>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
             <Button type="primary" htmlType="submit">送出申請</Button>
@@ -112,12 +99,11 @@ export default function FixedRoomPage() {
       </div>
 
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>我的申請</div>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>我的申請(近 5 筆)</div>
         <table className="tb" style={{ minWidth: 560 }}>
           <tbody>
             {mine.map((r) => (
               <tr key={r.id}>
-                <td className="num" style={{ color: 'var(--steel)', width: 150 }}>{r.id}</td>
                 <td style={{ fontWeight: 500 }}>{r.room}</td>
                 <td style={{ color: 'var(--steel)', fontSize: 13 }}>
                   {r.entries.map((x) => `${x.date} 第${x.period}節`).join('、')}

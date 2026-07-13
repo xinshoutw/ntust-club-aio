@@ -90,7 +90,6 @@ export default function AppShell({ nav, badgeLabel, showYear = true }: AppShellP
         <div className="topbar-divider" />
         <Dropdown menu={userMenu} trigger={['click']}>
           <button type="button" className="topbar-user" aria-label="帳號選單">
-            <span className="topbar-avatar">{displayName.charAt(0)}</span>
             <span className="topbar-username">{displayName}</span>
             <DownOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />
           </button>

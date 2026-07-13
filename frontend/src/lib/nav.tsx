@@ -139,6 +139,12 @@ export const ADMIN_NAV: NavGroup[] = [
     ],
   },
   {
+    label: '社團評鑑',
+    items: [
+      { key: 'a-eval', label: '行政分審核', path: '/admin/eval', icon: <TrophyOutlined /> },
+    ],
+  },
+  {
     label: '帳號與權限',
     items: [
       { key: 'a-admins', label: '管理員帳號', path: '/admin/accounts/admins', icon: <SolutionOutlined /> },

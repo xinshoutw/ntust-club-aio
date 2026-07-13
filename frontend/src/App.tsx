@@ -32,6 +32,7 @@ import AdminBookingsPage from './features/admin/AdminBookingsPage'
 import AdminRoomsPage from './features/admin/AdminRoomsPage'
 import AdminMembersPage from './features/admin/AdminMembersPage'
 import OverduePage from './features/admin/OverduePage'
+import AdminEvalPage from './features/admin/AdminEvalPage'
 import { AdminAccountsPage, ClubAccountsPage, ViewerAccountsPage } from './features/admin/AccountsPage'
 import AdminMaintenancePage from './features/admin/AdminMaintenancePage'
 import AdminViolationsPage from './features/admin/AdminViolationsPage'
@@ -97,6 +98,7 @@ export default function App() {
         <Route path="rooms" element={<AdminRoomsPage />} />
         <Route path="members" element={<AdminMembersPage />} />
         <Route path="overdue" element={<OverduePage />} />
+        <Route path="eval" element={<AdminEvalPage />} />
         <Route path="accounts/admins" element={<AdminAccountsPage />} />
         <Route path="accounts/clubs" element={<ClubAccountsPage />} />
         <Route path="accounts/viewers" element={<ViewerAccountsPage />} />

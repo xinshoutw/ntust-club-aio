@@ -170,8 +170,8 @@ export default function MembersPage() {
                       selectable: true,
                       multiple: true,
                       selectedKeys: kindFilter,
-                      onSelect: ({ selectedKeys }) => setKindFilter(selectedKeys as Member['kind'][]),
-                      onDeselect: ({ selectedKeys }) => setKindFilter(selectedKeys as Member['kind'][]),
+                      onSelect: ({ selectedKeys }) => { setKindFilter(selectedKeys as Member['kind'][]); setPage(1) },
+                      onDeselect: ({ selectedKeys }) => { setKindFilter(selectedKeys as Member['kind'][]); setPage(1) },
                     }}
                   >
                     <FilterOutlined style={{ fontSize: 11, color: kindFilter.length ? 'var(--seal)' : 'var(--steel)', cursor: 'pointer' }} />

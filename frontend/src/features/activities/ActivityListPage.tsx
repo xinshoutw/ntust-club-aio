@@ -222,8 +222,8 @@ export default function ActivityListPage() {
                       selectable: true,
                       multiple: true,
                       selectedKeys: typeFilter,
-                      onSelect: ({ selectedKeys }) => setTypeFilter(selectedKeys),
-                      onDeselect: ({ selectedKeys }) => setTypeFilter(selectedKeys),
+                      onSelect: ({ selectedKeys }) => { setTypeFilter(selectedKeys); setPage(1) },
+                      onDeselect: ({ selectedKeys }) => { setTypeFilter(selectedKeys); setPage(1) },
                     }}
                   >
                     <FilterOutlined style={{ fontSize: 11, color: typeFilter.length ? 'var(--seal)' : 'var(--steel)', cursor: 'pointer' }} />
@@ -241,8 +241,8 @@ export default function ActivityListPage() {
                       selectable: true,
                       multiple: true,
                       selectedKeys: statusFilter,
-                      onSelect: ({ selectedKeys }) => setStatusFilter(selectedKeys as StatusKey[]),
-                      onDeselect: ({ selectedKeys }) => setStatusFilter(selectedKeys as StatusKey[]),
+                      onSelect: ({ selectedKeys }) => { setStatusFilter(selectedKeys as StatusKey[]); setPage(1) },
+                      onDeselect: ({ selectedKeys }) => { setStatusFilter(selectedKeys as StatusKey[]); setPage(1) },
                     }}
                   >
                     <FilterOutlined style={{ fontSize: 11, color: statusFilter.length ? 'var(--seal)' : 'var(--steel)', cursor: 'pointer' }} />

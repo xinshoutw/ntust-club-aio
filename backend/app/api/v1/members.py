@@ -104,8 +104,12 @@ async def update_member(
     member_id: int, body: MemberUpdate, user: ClubUser, db: DbDep
 ) -> ApiResponse[MemberOut]:
     member = await _own_member(db, user, member_id)
-    changed = body.model_dump(exclude_unset=True)
-    if "student_id" in changed and changed["student_id"] != member.student_id:
+    changed = {
+        field: value
+        for field, value in body.model_dump(exclude_unset=True).items()
+        if getattr(member, field) != value  # 行內編輯自動儲存常送未變值,不得動 updated_at
+    }
+    if "student_id" in changed:
         dup = await db.scalar(
             sa.select(ClubMember.id).where(
                 ClubMember.club_id == user.club_id,
@@ -157,6 +161,9 @@ async def import_members(
         if not name or not student_id:
             errors.append(f"第 {line_no} 列:姓名與學號必填")
             continue
+        if len(name) > 50 or len(student_id) > 20 or (title and len(title) > 30):
+            errors.append(f"第 {line_no} 列:欄位長度超過上限")
+            continue
         if student_id in seen:
             errors.append(f"第 {line_no} 列:學號 {student_id} 重複出現")
             continue
@@ -183,7 +190,8 @@ async def import_members(
                 )
             )
             created += 1
-        else:
+        elif (member.name, member.kind, member.title) != (name, kind, title):
+            # 值沒變就不觸碰:no-op 重匯不得改動 updated_at(ad5 名單更新依據)
             member.name, member.kind, member.title = name, kind, title
             updated += 1
 

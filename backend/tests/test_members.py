@@ -120,6 +120,52 @@ async def test_member_list_pagination_filter_sort(client, db):
     assert resp.status_code == 422
 
 
+async def test_noop_reimport_keeps_updated_at(client, db):
+    """重匯同一份 CSV 不得改動 updated_at(ad5 名單更新分數的依據)。"""
+    await setup_club_session(client, db)
+    csv_text = "陳大文,B11109001,社長\n李小明,B11109002,社員"
+    await client.post(
+        "/api/v1/club/members/import", json={"csv_text": csv_text}, headers=csrf_headers(client)
+    )
+    before = {
+        m.student_id: m.updated_at
+        for m in await db.scalars(sa.select(ClubMember))
+    }
+
+    resp = await client.post(
+        "/api/v1/club/members/import", json={"csv_text": csv_text}, headers=csrf_headers(client)
+    )
+    result = resp.json()["data"]
+    assert (result["created"], result["updated"]) == (0, 0)
+
+    db.expire_all()
+    after = {m.student_id: m.updated_at for m in await db.scalars(sa.select(ClubMember))}
+    assert after == before
+
+    # 行內編輯送未變值亦不動 updated_at
+    member_id = (await client.get("/api/v1/club/members")).json()["data"][0]["id"]
+    await client.patch(
+        f"/api/v1/club/members/{member_id}",
+        json={"kind": "幹部", "title": "社長"},
+        headers=csrf_headers(client),
+    )
+    db.expire_all()
+    after2 = {m.student_id: m.updated_at for m in await db.scalars(sa.select(ClubMember))}
+    assert after2 == before
+
+
+async def test_csv_import_rejects_oversized_fields(client, db):
+    await setup_club_session(client, db)
+    resp = await client.post(
+        "/api/v1/club/members/import",
+        json={"csv_text": f"{'超' * 51},B11109001,社員"},
+        headers=csrf_headers(client),
+    )
+    result = resp.json()["data"]
+    assert result["created"] == 0
+    assert "長度" in result["errors"][0]
+
+
 async def test_csv_import_upsert_and_errors(client, db):
     await setup_club_session(client, db)
     await client.post(

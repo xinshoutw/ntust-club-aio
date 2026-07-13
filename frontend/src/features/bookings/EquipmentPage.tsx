@@ -54,7 +54,15 @@ export default function EquipmentPage() {
 
         <div className="card" style={{ padding: 24 }}>
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>借用申請</div>
-          <Form form={form} layout="vertical" onFinish={submit} requiredMark>
+          <Form
+            form={form}
+            layout="vertical"
+            onFinish={submit}
+            requiredMark
+            onValuesChange={(changed) => {
+              if ('equipment' in changed) form.resetFields(['qty'])
+            }}
+          >
             <Form.Item name="equipment" label="品項" rules={[{ required: true, message: '請選擇品項' }]}>
               <Select
                 placeholder="請選擇"

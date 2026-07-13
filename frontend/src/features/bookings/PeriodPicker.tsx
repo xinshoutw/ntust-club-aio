@@ -11,7 +11,7 @@ export default function PeriodPicker({ value, onChange }: PeriodPickerProps) {
     onChange(value.includes(p) ? value.filter((x) => x !== p) : [...value, p])
 
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+    <div role="group" aria-label="節次" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
       {PERIODS.map((p) => {
         const on = value.includes(p)
         return (

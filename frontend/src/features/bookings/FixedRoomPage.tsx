@@ -20,9 +20,18 @@ export default function FixedRoomPage() {
   const mine = ROOM_REQUESTS.filter((r) => r.club === user?.club)
 
   const submit = (values: { room: string; note?: string }) => {
+    if (entries.some((e) => !e.date !== !e.period)) {
+      message.error('請補齊或刪除未完成的時段列。')
+      return
+    }
     const filled = entries.filter((e) => e.date && e.period)
     if (!filled.length) {
       message.error('請至少新增一筆借用時段。')
+      return
+    }
+    const keys = filled.map((e) => `${e.date}|${e.period}`)
+    if (new Set(keys).size !== keys.length) {
+      message.error('借用時段重複,請調整。')
       return
     }
     message.success(`已送出「${values.room}」固定借用申請(${filled.length} 個時段)`)

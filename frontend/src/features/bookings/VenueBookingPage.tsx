@@ -50,11 +50,13 @@ export default function VenueBookingPage() {
             時段 <span style={{ color: '#C13B34' }}>*</span>
             <span style={{ fontWeight: 400, color: 'var(--steel)', marginLeft: 8, fontSize: 12 }}>可按住拖曳批量選取</span>
           </div>
-          <div style={{ border: '1px solid var(--line)', borderRadius: 6, padding: '10px 12px' }}>
-            <Form.Item name="date" rules={[{ required: true, message: '請選擇日期' }]} style={{ marginBottom: 8 }}>
-              <DatePicker format="YYYY/MM/DD" placeholder="日期" />
+          <div style={{ border: '1px solid var(--line)', borderRadius: 6, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <Form.Item name="date" rules={[{ required: true, message: '請選擇日期' }]} style={{ marginBottom: 0, flexShrink: 0 }}>
+              <DatePicker format="YYYY/MM/DD" placeholder="日期" style={{ width: 140 }} />
             </Form.Item>
-            <PeriodPicker size="small" nowrap value={periods} onChange={setPeriods} />
+            <div style={{ flex: 1, minWidth: 280 }}>
+              <PeriodPicker size="small" nowrap value={periods} onChange={setPeriods} />
+            </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
             <Button type="primary" htmlType="submit">送出申請</Button>

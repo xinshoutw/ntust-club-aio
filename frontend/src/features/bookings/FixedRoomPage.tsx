@@ -90,14 +90,16 @@ export default function FixedRoomPage() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {entries.map((e) => (
-              <div key={e.key} style={{ border: '1px solid var(--line)', borderRadius: 6, padding: '10px 12px' }}>
+              <div key={e.key} style={{ border: '1px solid var(--line)', borderRadius: 6, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <DatePicker
-                  style={{ marginBottom: 8 }}
+                  style={{ width: 140, flexShrink: 0 }}
                   format="YYYY/MM/DD"
                   placeholder="日期"
                   onChange={(_, ds) => updateEntry(e.key, { date: (ds as string) || undefined })}
                 />
-                <PeriodPicker size="small" nowrap value={e.periods} onChange={(ps) => updateEntry(e.key, { periods: ps })} />
+                <div style={{ flex: 1, minWidth: 280 }}>
+                  <PeriodPicker size="small" nowrap value={e.periods} onChange={(ps) => updateEntry(e.key, { periods: ps })} />
+                </div>
               </div>
             ))}
           </div>

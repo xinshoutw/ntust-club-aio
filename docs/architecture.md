@@ -266,6 +266,16 @@ CPU:e2-medium 為共享核心(基準約 1 vCPU、可突發 2),CRUD 型負載足�
 - 部署:`gcloud compute ssh` 執行 `docker compose pull && docker compose up -d`;backend 容器啟動時自動 `alembic upgrade head`(單 instance 無競態)
 - VM 上永不 build(2 共享 vCPU + 4GB 不適合跑 vite build)
 
+### 6.5 上線切換清單(edge proxy 端,2026-09 執行)
+
+切換 = 在 edge 改 `clubs.ntust.edu.tw` 的 vhost;回滾 = 改回舊值。需要動的地方:
+
+1. upstream 指到 **`<新 VM 內網 IP>:8080`**——edge 現行 upstream 沒寫埠號(預設 80),漏掉埠號會 502
+2. 該 vhost 的 `client_max_body_size` 從全域 3072M 收斂為 **256m**(與內層一致,避免 edge 被塞超大請求)
+3. 該 vhost 加 **`proxy_request_buffering off`**(上傳串流直通,不在 edge 暫存整包)
+4. proxy header 改為**覆寫式**:`proxy_set_header X-Forwarded-For $remote_addr;` 並補 `proxy_set_header X-Forwarded-Proto $scheme;`(edge 現行用 `$proxy_add_x_forwarded_for` 會保留客戶端偽造的 XFF,且沒送 XFP)
+5. `clubclass.ntust.edu.tw` 屆時再決定是否 307 導向
+
 ### 6.4 安全細節(內層)
 
 - 稽核軌跡需要真實 IP:信任鏈 edge → web → backend 逐層傳遞 `X-Forwarded-For`,uvicorn 設 `--proxy-headers` 且僅信任 web 容器來源

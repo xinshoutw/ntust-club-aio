@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { DatePicker, Pagination } from 'antd'
+import { DatePicker, Pagination, Tooltip } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
@@ -79,10 +79,18 @@ export default function BookingOverviewPage() {
                   <td style={{ fontSize: 13, whiteSpace: 'nowrap', paddingRight: 8 }}>{v.name}</td>
                   {PERIODS.map((p) => {
                     const info = cellInfo(v.name, p, mine)
-                    const tip = `${v.name} 第${p}節:${CELL[info.state].label}${info.club ? `(${info.club})` : ''}`
+                    const cell = (
+                      <div style={{ width: 28, height: 22, borderRadius: 4, background: CELL[info.state].bg }} />
+                    )
                     return (
                       <td key={p}>
-                        <div title={tip} style={{ width: 28, height: 22, borderRadius: 4, background: CELL[info.state].bg }} />
+                        {info.club ? (
+                          <Tooltip title={<span style={{ fontSize: 14 }}>{info.club}</span>} mouseEnterDelay={0}>
+                            {cell}
+                          </Tooltip>
+                        ) : (
+                          cell
+                        )}
                       </td>
                     )
                   })}

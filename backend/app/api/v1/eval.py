@@ -220,7 +220,8 @@ async def delete_eval_file(
         raise not_found("找不到上傳紀錄")
     file = await db.get(File, upload.file_id)
     await db.delete(upload)
-    if file is not None:
-        await file_service.delete_file(db, file)
+    disk = await file_service.delete_file(db, file) if file is not None else None
     await db.commit()
+    if disk is not None:  # commit 成功後才動磁碟
+        disk.unlink(missing_ok=True)
     return ApiResponse()

@@ -179,11 +179,14 @@ async def delete_activity(activity_id: int, user: ClubUser, db: DbDep) -> ApiRes
     activity = await svc.get_own_activity(db, user, activity_id)
     if activity.status != ActivityStatus.DRAFT:
         raise conflict("僅草稿可刪除")
+    disk_paths = []
     for slot in (svc.PHOTO_SLOT, svc.ATTACHMENT_SLOT):
         for f in await svc.activity_files(db, activity, slot):
-            await file_service.delete_file(db, f)
+            disk_paths.append(await file_service.delete_file(db, f))
     await db.delete(activity)
     await db.commit()
+    for path in disk_paths:  # commit 成功後才動磁碟
+        path.unlink(missing_ok=True)
     return ApiResponse()
 
 
@@ -269,8 +272,9 @@ async def delete_photo(
         or file.slot != svc.PHOTO_SLOT
     ):
         raise not_found("找不到照片")
-    await file_service.delete_file(db, file)
+    disk = await file_service.delete_file(db, file)
     await db.commit()
+    disk.unlink(missing_ok=True)
     return ApiResponse()
 
 
@@ -311,8 +315,9 @@ async def delete_attachment(
         or file.slot != svc.ATTACHMENT_SLOT
     ):
         raise not_found("找不到附件")
-    await file_service.delete_file(db, file)
+    disk = await file_service.delete_file(db, file)
     await db.commit()
+    disk.unlink(missing_ok=True)
     return ApiResponse()
 
 

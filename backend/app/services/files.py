@@ -206,7 +206,12 @@ async def file_response(db: AsyncSession, file_id: uuid.UUID, user: User) -> Fil
     )
 
 
-async def delete_file(db: AsyncSession, file: File) -> None:
-    """實體檔+中介資料一併刪(重傳/撤回附件用;歸檔刪除另走 archived_at)。"""
-    (Path(settings.upload_dir) / file.path).unlink(missing_ok=True)
+async def delete_file(db: AsyncSession, file: File) -> Path:
+    """刪 DB 列並回傳磁碟路徑;**呼叫端 commit 成功後才 unlink**。
+
+    先刪檔再 commit 的話,rollback 會留下「DB 有列、磁碟無檔」的壞狀態;
+    反向(commit 後 unlink 失敗)只留孤兒檔,無害且可清掃。
+    """
+    disk = Path(settings.upload_dir) / file.path
     await db.delete(file)
+    return disk

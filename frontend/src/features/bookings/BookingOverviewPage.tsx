@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import dayjs, { type Dayjs } from 'dayjs'
 import { DatePicker, Pagination, Tooltip } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
@@ -37,6 +38,10 @@ export default function BookingOverviewPage() {
   const { user } = useAuth()
   const mine = user?.club
   const [returnedPage, setReturnedPage] = useState(1)
+  const [gridDate, setGridDate] = useState<Dayjs>(() => dayjs())
+  // ponytail: mock 場況依所選日期輪轉示意;接後端後由 API 取當日資料
+  const dayShift = gridDate.date() % PERIODS.length
+  const shiftedPeriod = (p: string) => PERIODS[(PERIODS.indexOf(p) + dayShift) % PERIODS.length]
 
   const rooms = ROOM_REQUESTS.filter((r) => r.club === mine)
   const venues = VENUE_BOOKINGS.filter((v) => v.club === mine)
@@ -52,7 +57,13 @@ export default function BookingOverviewPage() {
       <div className="card" style={{ marginTop: 20, padding: '16px 20px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ fontSize: 15, fontWeight: 600 }}>場地借用情形</div>
-          <DatePicker format="YYYY/MM/DD" size="small" placeholder="2026/09/15" />
+          <DatePicker
+            format="YYYY/MM/DD"
+            size="small"
+            allowClear={false}
+            value={gridDate}
+            onChange={(d) => d && setGridDate(d)}
+          />
           <div style={{ flex: 1 }} />
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {(Object.keys(CELL) as CellState[]).map((k) => (
@@ -78,9 +89,13 @@ export default function BookingOverviewPage() {
                 <tr key={v.name}>
                   <td style={{ fontSize: 13, whiteSpace: 'nowrap', paddingRight: 8 }}>{v.name}</td>
                   {PERIODS.map((p) => {
-                    const info = cellInfo(v.name, p, mine)
+                    const info = cellInfo(v.name, shiftedPeriod(p), mine)
                     const cell = (
-                      <div style={{ width: 28, height: 22, borderRadius: 4, background: CELL[info.state].bg }} />
+                      <div
+                        role="img"
+                        aria-label={`${v.name} 第${p}節:${CELL[info.state].label}${info.club ? `(${info.club})` : ''}`}
+                        style={{ width: 28, height: 22, borderRadius: 4, background: CELL[info.state].bg }}
+                      />
                     )
                     return (
                       <td key={p}>

@@ -13,13 +13,17 @@ _TEXT_MAX = 1000
 def validate_answers(fields: list[dict[str, Any]], answers: dict[str, Any]) -> list[str]:
     """回傳錯誤訊息清單(空=通過)。未知欄位一律拒絕。"""
     errors: list[str] = []
-    known_keys = {f["key"] for f in fields}
+    known_keys = {f.get("key") for f in fields if f.get("key")}
     for key in answers:
         if key not in known_keys:
             errors.append(f"未知欄位:{key}")
 
     for field in fields:
-        key, label = field["key"], field.get("label", field["key"])
+        key = field.get("key")
+        if not key:  # 欄位定義不良(缺 key)不得炸 500
+            errors.append("表單欄位定義有誤,請聯絡學務處")
+            continue
+        label = field.get("label", key)
         ftype = field.get("type", "text")
         required = bool(field.get("required"))
         options = field.get("options") or []

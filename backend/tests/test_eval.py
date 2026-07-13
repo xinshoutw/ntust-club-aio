@@ -218,6 +218,37 @@ async def test_award_upload_progress_and_delete(client, db):
     assert detail["items"][0]["uploads"] == []
 
 
+async def test_locked_award_files_cannot_be_deleted_via_other_award(client, db):
+    club, user, admin = await setup(client, db)
+    await _seed_award(db)
+    db.add(Award(id="finance", name="最佳財務獎", kind=AwardKind.GROUP))
+    await db.commit()
+    items = await seed_rubric(db)
+
+    files = {"file": ("doc.png", io.BytesIO(b"\x89PNG\r\n\x1a\n" + b"\x00" * 16), "image/png")}
+    resp = await client.post(
+        f"/api/v1/club/eval/awards/club/items/{items[0].id}/files",
+        files=files,
+        headers=csrf_headers(client),
+    )
+    upload_id = resp.json()["data"]["id"]
+
+    # 鎖定最佳社團獎後,不得借道未鎖定的其他獎項路徑刪除其檔案
+    db.add(EvalSetting(year=EVAL_YEAR, award_id="club", unlocked=False))
+    await db.commit()
+    resp = await client.delete(
+        f"/api/v1/club/eval/awards/finance/items/{items[0].id}/files/{upload_id}",
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 404
+
+    resp = await client.delete(
+        f"/api/v1/club/eval/awards/club/items/{items[0].id}/files/{upload_id}",
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 409  # 本獎項已鎖
+
+
 async def test_upload_locked_by_eval_settings(client, db):
     club, user, admin = await setup(client, db)
     await _seed_award(db)

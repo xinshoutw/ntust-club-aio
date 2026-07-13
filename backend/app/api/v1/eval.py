@@ -205,6 +205,11 @@ async def delete_eval_file(
     if await _upload_locked(db, window.year, award.id):
         raise conflict("該獎項的資料上傳目前未開放")
 
+    # item 必須屬於路徑上的獎項,否則可借道未鎖定的獎項刪除已凍結獎項的檔案
+    item = await db.get(AwardRubricItem, item_id)
+    if item is None or item.award_id != award.id or item.year != window.year:
+        raise not_found("找不到評分項目")
+
     upload = await db.get(EvalUpload, upload_id)
     if (
         upload is None

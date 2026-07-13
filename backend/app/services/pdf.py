@@ -2,25 +2,27 @@
 
 版型依 docs/模板_社團活動成果報告表.docx 與 模板_社團活動學習心得.docx
 (標籤/值兩欄表格;需求方允許版型調整)。
-ponytail: 字型用 reportlab 內建 CID MSung-Light(免帶字型檔);若使用端檢視器
-無法顯示再改捆 Noto Sans TC。
+字型內嵌 Noto Sans TC(OFL):CID 字型(MSung-Light)在多數檢視器不渲染中文,
+正式文件必須嵌字。
 """
 
 import io
+from pathlib import Path
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.core.semesters import semester_of
 from app.models import Activity, ActivityReflection, ActivityReport, Club
 
-_FONT = "MSung-Light"
-pdfmetrics.registerFont(UnicodeCIDFont(_FONT))
+_FONT = "NotoSansTC"
+_FONT_PATH = Path(__file__).resolve().parents[1] / "assets" / "NotoSansTC-Regular.ttf"
+pdfmetrics.registerFont(TTFont(_FONT, str(_FONT_PATH)))
 
 _TITLE = ParagraphStyle(
     "title", fontName=_FONT, fontSize=16, leading=22, alignment=1, spaceAfter=6 * mm

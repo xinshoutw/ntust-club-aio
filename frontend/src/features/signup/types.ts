@@ -13,10 +13,19 @@ export interface SignupSubmission {
   participants: Record<string, string>[]
 }
 
+// 評鑑對幹訓/負責人會議有特別規範,報名活動需標記類型
+export type SignupKind = 'normal' | 'cadre_training' | 'leader_meeting'
+
+export const SIGNUP_KIND_BADGE: Record<Exclude<SignupKind, 'normal'>, { label: string; fg: string; bg: string }> = {
+  cadre_training: { label: '幹訓', fg: '#6B4FA3', bg: '#F0EBF9' },
+  leader_meeting: { label: '社團負責人會議', fg: '#0F5E5A', bg: '#DFF1EF' },
+}
+
 export interface SignupItem {
   id: string
   name: string
   status: 'open' | 'ended'
+  kind: SignupKind
   semester: string
   info: string
   description?: string

@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { App, Button, Checkbox, DatePicker, Input, InputNumber, Select, Tag } from 'antd'
 import { HolderOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
-import { FIELD_TYPE_LABEL, type FieldType } from '../signup/types'
+import { FIELD_TYPE_LABEL, type FieldType, type SignupKind } from '../signup/types'
+import KindBadge from '../signup/KindBadge'
 import './builder.css'
 
 interface BuilderField {
@@ -20,6 +21,8 @@ const requiredMark = <span style={{ color: '#C13B34' }}> *</span>
 export default function SignupBuilderPage() {
   const { message } = App.useApp()
   const [name, setName] = useState('社團幹訓')
+  // 評鑑對幹訓/負責人會議有特別採計,建立時即標記類型
+  const [kind, setKind] = useState<SignupKind>('normal')
   const [cap, setCap] = useState<number | null>(5)
   const [fields, setFields] = useState<BuilderField[]>([
     { key: 1, label: '聯絡電話', type: 'text', required: true, options: [] },
@@ -73,6 +76,19 @@ export default function SignupBuilderPage() {
               <label style={{ gridColumn: '1 / -1' }}>
                 <div style={fieldLabel}>活動名稱{requiredMark}</div>
                 <Input value={name} onChange={(e) => setName(e.target.value)} />
+              </label>
+              <label>
+                <div style={fieldLabel}>活動類型{requiredMark}</div>
+                <Select
+                  value={kind}
+                  onChange={setKind}
+                  style={{ width: '100%' }}
+                  options={[
+                    { value: 'normal', label: '普通活動' },
+                    { value: 'cadre_training', label: '幹訓' },
+                    { value: 'leader_meeting', label: '社團負責人會議' },
+                  ]}
+                />
               </label>
               <label>
                 <div style={fieldLabel}>活動時間{requiredMark}</div>
@@ -174,7 +190,10 @@ export default function SignupBuilderPage() {
           </div>
           <div className="builder-preview-frame">
             <div style={{ background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 6, padding: 16 }}>
-              <div style={{ fontSize: 16, fontWeight: 600 }}>{name || '(未命名活動)'} — 報名</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: 16, fontWeight: 600 }}>{name || '(未命名活動)'} — 報名</div>
+                <KindBadge kind={kind} />
+              </div>
               <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 6, padding: 14, marginTop: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
                   <div style={{ fontSize: 13, fontWeight: 600 }}>

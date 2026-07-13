@@ -7,6 +7,7 @@ import { CURRENT_SEMESTER, semesterOptions } from '../../lib/semester'
 import { SIGNUP_ITEMS } from './mock'
 import type { SignupItem } from './types'
 import SubmissionRecord from './SubmissionRecord'
+import KindBadge from './KindBadge'
 import './signup.css'
 
 export default function SignupListPage() {
@@ -60,6 +61,7 @@ export default function SignupListPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                   <div style={{ fontSize: 15, fontWeight: 500 }}>{item.name}</div>
                   <StatusPill status={item.status} />
+                  <KindBadge kind={item.kind} />
                   {item.submission && <StatusPill status="registered" />}
                   {!item.submission && item.hasDraft && item.status === 'open' && <StatusPill status="draft" />}
                 </div>

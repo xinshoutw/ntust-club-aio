@@ -29,7 +29,7 @@ export default function PostalPage() {
     <div>
       <PageHeader title="郵局帳戶異動" />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        事由可複選;公文作業約 3–5 個工作天。
+        公文作業約 3–5 個工作天。
       </div>
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
@@ -124,7 +124,6 @@ export default function PostalPage() {
           </tbody>
         </table>
       </div>
-      <div style={{ marginTop: 10, fontSize: 12, color: 'var(--steel)' }}>局號帳號預設遮罩,承辦於審核頁可見完整值。</div>
     </div>
   )
 }

@@ -76,7 +76,7 @@ export default function FixedRoomPage() {
     <div>
       <PageHeader title="固定場地借用" />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        整學期固定時段之教室借用;送學務處審核,時段衝突者依送件順序協調。
+        整學期固定時段借用;時段衝突依送件順序協調。
       </div>
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>

@@ -34,7 +34,7 @@ export default function MembersPage() {
     setMembers((ms) => [...ms, { id: nextId(), updatedAt: '—(未儲存)', ...values }])
     setAddOpen(false)
     form.resetFields()
-    message.success('已新增社員(名單更新影響評鑑行政分)')
+    message.success('已新增社員')
   }
 
   // CSV:姓名,學號,身份[,職稱];身份留空視為社員,無法辨識的列略過並提示
@@ -282,7 +282,7 @@ export default function MembersPage() {
         </div>
       )}
       <div style={{ marginTop: 10, fontSize: 12, color: 'var(--steel)' }}>
-        點擊身份/職稱可直接修改(社員無職稱);名單定期更新採計「社員、幹部名單更新」行政分。
+        名單定期更新採計評鑑「社員、幹部名單更新」行政分。
       </div>
 
       <Modal

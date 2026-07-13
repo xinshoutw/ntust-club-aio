@@ -37,7 +37,7 @@ export default function CertificatePage() {
     <div>
       <PageHeader title="幹部證明" />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        社(會)長、副社(會)長服務證明;姓名由成員名單自動帶出,製作約 <span className="num">2</span> 個工作天。
+        社(會)長、副社(會)長服務證明,製作約 <span className="num">2</span> 個工作天。
       </div>
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>

@@ -72,7 +72,7 @@ export default function ClubSettingsPage() {
       <div className="card" style={{ marginTop: 16, padding: 24 }}>
         <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>即時通知 Webhook</div>
         <div style={{ fontSize: 12, color: 'var(--steel)', marginBottom: 16 }}>
-          審核結果與提醒將推送到你的 Discord 頻道;Telegram Bot 之後提供。
+          審核結果與提醒將推送到你的 Discord 頻道。
         </div>
         <Form
           layout="vertical"

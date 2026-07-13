@@ -219,9 +219,6 @@ export default function BookingOverviewPage() {
           </div>
         )}
       </div>
-      <div style={{ marginTop: 10, fontSize: 12, color: 'var(--steel)' }}>
-        器材應於借用結束日之隔天上班日 <span className="num">10:30</span> 前歸還。
-      </div>
     </div>
   )
 }

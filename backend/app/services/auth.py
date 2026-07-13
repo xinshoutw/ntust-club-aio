@@ -39,16 +39,26 @@ async def login(
         raise unauthenticated(_GENERIC_LOGIN_ERROR)
 
     if user.locked_until and user.locked_until > now:
+        verify_password(None, password)  # 時間等化:鎖定路徑不得比錯密路徑快
         audit.record(db, action="login_locked", user=user, ip=ip)
         await db.commit()
         raise forbidden("登入失敗次數過多,帳號已鎖定 15 分鐘", code="ACCOUNT_LOCKED")
 
     if not verify_password(user.password_hash, password):
-        user.failed_login_attempts += 1
-        detail = f"attempt={user.failed_login_attempts}"
-        if user.failed_login_attempts >= MAX_FAILED_LOGIN_ATTEMPTS:
-            user.locked_until = now + LOCKOUT_DURATION
-            user.failed_login_attempts = 0
+        # 原子累加:並發失敗登入不得互相覆蓋而低估次數
+        attempts = await db.scalar(
+            sa.update(User)
+            .where(User.id == user.id)
+            .values(failed_login_attempts=User.failed_login_attempts + 1)
+            .returning(User.failed_login_attempts)
+        )
+        detail = f"attempt={attempts}"
+        if attempts >= MAX_FAILED_LOGIN_ATTEMPTS:
+            await db.execute(
+                sa.update(User)
+                .where(User.id == user.id)
+                .values(locked_until=now + LOCKOUT_DURATION, failed_login_attempts=0)
+            )
             detail += ";locked"
         audit.record(db, action="login_failed", user=user, detail=detail, ip=ip)
         await db.commit()

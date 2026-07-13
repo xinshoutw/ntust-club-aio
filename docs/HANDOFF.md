@@ -19,10 +19,17 @@
 
 驗證:`cd backend && uv run pytest`(85 passed)、`uv run ruff check .`;前端 `pnpm build/test` 不受影響。
 
+## 交叉檢查(三輪全部完成並修畢)
+
+1. **opus 第一輪(models+auth)**:1H4M 全修——信任代理(XFF `'*'` 移除)、enum CHECK、鎖定時間等化、失敗計數原子化、限流只計失敗、prod 關 docs、純 ASGI headers
+2. **opus 第二輪(社團端 API)**:無 CRITICAL;2H6M 全修——評鑑刪檔綁定獎項(凍結鎖繞過)、成員 no-op 寫入不動 updated_at(ad5 歸零問題)、IntegrityError→409(含照片去重部分唯一索引)、實體檔 commit 後才刪、停權借用執行點、eval_settings 預設開放、假日批次查詢、草稿大小上限、LOW 批次(ad2 歸檔過濾、表單欄位防 500、檢討日期殘值、大型認可重置)
+3. **codex(管理端+PDF)**:1H6M1L 全修——super 不得代學務長簽核(本人操作)、關卡帳號可見範圍限縮、未逾期不得預先解鎖、狀態轉移 FOR UPDATE、有補助案第一關強制逐項核定+經費來源+總額後端加總、行政分 override 依 AD_MAX 夾擠、PDF 長文跨頁+threadpool、原因欄空白擋
+
+**已知延後**(單校規模可接受,記於此):`/admin/eval/clubs` 全社團即時彙算無分頁(行政日常頁面,量大改集合查詢);viewer 檔案下載範圍待評審端 API 落地時收斂到分組社團;passbook/evidence 上傳無數量上限;save_upload 交易 rollback 會留孤兒檔(無 DB 列,無害,可定期清掃)
+
 ## 進行中/接下來
 
-- **交叉檢查**:第一輪 opus(models+auth)已完成並修畢(信任代理、enum CHECK、時間等化、原子計數、限流只計失敗、prod docs、純 ASGI headers);第二輪 opus(社團端 API)與 codex(管理端+PDF)審查**進行中,回報後逐項修正並分 commit**
-- **ui-polish 分支**(勿進 dev):社團端文字精簡+管理員端人性化,等使用者逐項裁決
+- **ui-polish 分支**(勿進 dev):opus agent 於 worktree `../club-aio-ui-polish` 執行中(社團端文字精簡+管理員端人性化,每項一 commit),完成後等使用者逐項裁決
 
 ## 待裁決(使用者回來看)
 

@@ -34,6 +34,8 @@ DEFAULTS: dict[str, Any] = {
     # 器材歸還時限:結束日之隔天上班日此時刻前
     "equipment_return_time": "10:30",
     # 評鑑視窗(2026-07-14 拍板:預設 116 年,2026/02/01–2027/01/31)
+    # 注意:ad7/ad8 以 signup_items.year == eval_window.year 篩選;
+    # 管理端建報名項目時若用 current_year,兩者必須對齊,否則幹訓/會議餵不進行政分
     "eval_window": {"year": 116, "start": "2026-02-01", "end": "2027-01-31"},
     # 目前學年度(報名等年輪資料寫入時取用)
     "current_year": 114,

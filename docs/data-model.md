@@ -273,13 +273,29 @@ approved 且 活動日期+1個月 已過 且未送結案 → 「逾期鎖定」(
 
 > **選擇三張窄表而非單一 applications+JSONB**:三者欄位、驗證、狀態機(維修多「處理中」)都不同;窄表有欄位級約束與型別安全。「待審申請彙整」「我的申請進度」由三表 UNION 出 view(資料量小,毫無壓力)。**替代:單表+type+JSONB payload**——新申請型別免 migration 是唯一優點,但失去 schema 約束、查詢醜陋;新型別本來就該認真設計,不採。
 
-### 3.7 線上報名與出席
+### 3.7 線上報名與出席(2026-07-13 依需求方重設計)
 
-**signup_items**(id, year, name, is_open, session_based bool, requires_confirmation bool, is_eval bool(競賽報名項), note, event_date, semester, time_text, place, deadline, audience, created_at)
-**signup_item_sessions**(id, item_id FK, name, date, semester)— 負責人會議 4 場次
-**signups**(id, item_id FK, club_id, presenter, note, confirmed bool, created_at;UNIQUE(item_id, club_id))
+線上報名改為**管理員自訂表單的活動報名系統**:管理員自由建立活動項目並定義報名欄位;社團點進活動子頁填寫;允許多人的活動可逐人新增至上限。
+
+**signup_items** — 報名活動項目(管理員建立)
+
+| 欄位 | 說明 |
+|---|---|
+| id, year, name, description | |
+| is_open / deadline | 開放狀態與截止 |
+| event_date, time_text, place, audience | 活動資訊 |
+| allow_multiple / max_participants | 是否多人報名與人數上限(單一社團) |
+| fields | jsonb:表單欄位定義陣列 `[{key, label, type(text/textarea/radio/checkbox/select), options[], required}]`,如「姓名」「葷/素 單選」「備註」 |
+| session_based / requires_confirmation / is_eval | 場次採計(負責人會議)、需行政確認、競賽報名項 |
+| created_by, created_at | |
+
+**signup_item_sessions**(id, item_id FK, name, date, semester)— 場次(如負責人會議 4 場)
+**signups**(id, item_id FK, club_id, confirmed bool, created_at;UNIQUE(item_id, club_id))— 一社一單
+**signup_entries**(id, signup_id FK, answers jsonb(`{field_key: value}`), created_at)— **一人一列**,筆數 ≤ max_participants(應用層強制)
 **signup_awards**(signup_id FK, award_id FK)— 競賽報名勾選的獎項
 **session_attendance**(id, session_id FK, club_id, attended bool, marked_by FK users, marked_at)— 出席→行政分 ad7
+
+> 欄位定義用 jsonb 而非開表:欄位 schema 是管理員任意定義、逐活動不同、只在該活動生效的資料,正是 jsonb 的正確使用場景;answers 以 field key 對應。注意:活動已有報名後修改 fields 需前端警告(舊 entries 不回填)。
 
 ### 3.8 競賽(評鑑)
 

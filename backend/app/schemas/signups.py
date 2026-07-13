@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.enums import SignupKind
 
@@ -59,3 +59,12 @@ class SignupSubmitIn(BaseModel):
 
 class SignupDraftIn(BaseModel):
     participants: list[dict[str, Any]] = Field(default_factory=list, max_length=500)
+
+    @field_validator("participants")
+    @classmethod
+    def _size_cap(cls, v: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        import json
+
+        if len(json.dumps(v, ensure_ascii=False)) > 50_000:
+            raise ValueError("草稿內容過大")
+        return v

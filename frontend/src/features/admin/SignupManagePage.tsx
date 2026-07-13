@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router'
+import { useNavigate } from 'react-router'
 import { App, Button, DatePicker } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
@@ -16,6 +16,7 @@ const REGISTRATIONS: Record<string, { club: string; count: number; confirmed: bo
 
 export default function SignupManagePage() {
   const { message } = App.useApp()
+  const navigate = useNavigate()
   const [expanded, setExpanded] = useState<string | null>('cadre-training')
 
   return (
@@ -23,9 +24,9 @@ export default function SignupManagePage() {
       <PageHeader
         title="報名管理"
         extra={
-          <Link to="/admin/signup-items/new">
-            <Button type="primary" style={{ height: 36 }}>+ 報名活動建立</Button>
-          </Link>
+          <Button type="primary" style={{ height: 36 }} onClick={() => navigate('/admin/signup-items/new')}>
+            + 報名活動建立
+          </Button>
         }
       />
 

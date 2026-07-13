@@ -85,7 +85,10 @@ export default function OverduePage() {
         okText="確認停權"
         okButtonProps={{ danger: true }}
         onOk={() => form.submit()}
-        onCancel={() => setSuspendOpen(false)}
+        onCancel={() => {
+          setSuspendOpen(false)
+          form.resetFields()
+        }}
       >
         <Form
           form={form}

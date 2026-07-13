@@ -1,6 +1,6 @@
 import { App, Button } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
-import StatusPill from '../../components/ui/StatusPill'
+
 
 // 三個帳號管理頁共用同一版型:表格 + 重設密碼/停用
 export function AdminAccountsPage() {
@@ -59,7 +59,23 @@ export function ClubAccountsPage() {
               <tr key={c.account}>
                 <td style={{ fontWeight: 500 }}>{c.club}</td>
                 <td className="num" style={{ color: 'var(--steel)' }}>{c.account}</td>
-                <td><StatusPill status={c.active ? 'approved' : 'suspended'} /></td>
+                <td>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      height: 22,
+                      padding: '0 10px',
+                      borderRadius: 999,
+                      fontSize: 12,
+                      fontWeight: 500,
+                      background: c.active ? '#E3F2E9' : '#E8EAEE',
+                      color: c.active ? '#1F6B45' : '#3A3F4A',
+                    }}
+                  >
+                    {c.active ? '啟用' : '停用'}
+                  </span>
+                </td>
                 <td className="r" style={{ whiteSpace: 'nowrap' }}>
                   <button type="button" className="link-btn" onClick={() => message.success(`已重設 ${c.club} 密碼(首次登入強制改密)`)}>重設密碼</button>
                 </td>

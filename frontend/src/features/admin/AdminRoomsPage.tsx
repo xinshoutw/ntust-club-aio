@@ -61,6 +61,7 @@ export default function AdminRoomsPage() {
                       <span key={`${e.date}-${e.period}`} className="num" style={{ color: conflict ? '#C13B34' : undefined, fontWeight: conflict ? 500 : undefined }}>
                         {i > 0 && '、'}
                         {e.date} 第{e.period}節
+                        {conflict && <span style={{ fontSize: 12 }}>(衝突)</span>}
                       </span>
                     )
                   })}

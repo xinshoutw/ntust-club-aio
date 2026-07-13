@@ -65,7 +65,10 @@ export default function AdminViolationsPage() {
         title={`銷案 ${resolving?.id ?? ''}`}
         okText="確認銷案"
         onOk={() => form.submit()}
-        onCancel={() => setResolving(null)}
+        onCancel={() => {
+          setResolving(null)
+          form.resetFields()
+        }}
       >
         <Form
           form={form}

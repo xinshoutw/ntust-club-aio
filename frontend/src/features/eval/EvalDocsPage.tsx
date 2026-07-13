@@ -107,13 +107,18 @@ export default function EvalDocsPage() {
   const photoQueue = useRef(Promise.resolve())
   const addPhoto = (activityId: string, f: File) => {
     photoQueue.current = photoQueue.current.then(async () => {
-      const hash = await sha256(f)
-      if (allPhotoHashes().has(hash)) {
-        message.error(`「${f.name}」與已上傳的照片內容相同,已拒絕重複上傳`)
-        return
+      try {
+        const hash = await sha256(f)
+        if (allPhotoHashes().has(hash)) {
+          message.error(`「${f.name}」與已上傳的照片內容相同,已拒絕重複上傳`)
+          return
+        }
+        resultOf(activityId).photos.push(await toEvalFile(f, hash))
+        force()
+      } catch (e) {
+        // 失敗不留毒:讓佇列繼續可用
+        message.error(`照片處理失敗:${e instanceof Error ? e.message : String(e)}`)
       }
-      resultOf(activityId).photos.push(await toEvalFile(f, hash))
-      force()
     })
   }
 

@@ -289,6 +289,15 @@ function CloseForm({
       message.error(`請填寫「${missing}」。`)
       return
     }
+    if (!dayjs(actualEnd, 'HH:mm').isAfter(dayjs(actualStart, 'HH:mm'))) {
+      message.error('實際結束時間須晚於實際開始時間。')
+      return
+    }
+    const video = videoLink.trim()
+    if (video && !/^https?:\/\/\S+$/i.test(video)) {
+      message.error('影片連結格式不正確,需為 http(s) 網址。')
+      return
+    }
     const complete = filledReflects.filter((r) => r.name.trim() && r.dept.trim() && r.text.trim())
     if (complete.length < filledReflects.length) {
       message.error('學習心得每列的姓名、系級與內容皆為必填。')

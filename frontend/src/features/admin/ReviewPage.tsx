@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { App, Button, Checkbox, Drawer, Input, InputNumber, Modal } from 'antd'
+import { RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import StampTrail, { type StampStage } from '../../components/ui/StampTrail'
@@ -264,12 +265,9 @@ export default function ReviewPage() {
       />
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-        <table className="tb dense" style={{ minWidth: 900 }}>
+        <table className="tb dense" style={{ minWidth: 840 }}>
           <thead>
             <tr>
-              <th style={{ width: 36, paddingRight: 0 }}>
-                <Checkbox aria-label="全選" />
-              </th>
               <th>單號</th>
               <th>社團</th>
               <th>活動名稱</th>
@@ -277,15 +275,16 @@ export default function ReviewPage() {
               <th>活動日期</th>
               <th className="r">擬請補助</th>
               <th>狀態</th>
-              <th className="r">動作</th>
+              <th aria-label="開啟" style={{ width: 32 }} />
             </tr>
           </thead>
           <tbody>
             {REVIEW_ITEMS.map((item) => (
-              <tr key={item.id} style={selected?.id === item.id ? { background: 'var(--seal-tint)' } : undefined}>
-                <td style={{ paddingRight: 0 }}>
-                  <Checkbox aria-label="選取" />
-                </td>
+              <tr
+                key={item.id}
+                onClick={() => setSelected(item)}
+                style={{ cursor: 'pointer', ...(selected?.id === item.id ? { background: 'var(--seal-tint)' } : {}) }}
+              >
                 <td className="num" style={{ color: 'var(--steel)' }}>{item.id}</td>
                 <td>{item.club}</td>
                 <td style={{ fontWeight: 500 }}>{item.name}</td>
@@ -293,20 +292,13 @@ export default function ReviewPage() {
                 <td className="num">{item.date}</td>
                 <td className="r num">{fmtMoney(item.requested)}</td>
                 <td><StatusPill status={item.status} /></td>
-                <td className="r">
-                  <button
-                    type="button"
-                    className={item.status === 'pending_advisor' ? 'link-btn primary' : 'link-btn'}
-                    onClick={() => setSelected(item)}
-                  >
-                    {item.status === 'pending_advisor' ? '審核' : '查看'}
-                  </button>
-                </td>
+                <td className="r"><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      <div style={{ marginTop: 10, fontSize: 12, color: 'var(--steel)' }}>點擊列開啟審核。</div>
 
       {/* key 依單據重掛,核定金額與退回原因不會殘留到下一張 */}
       {selected && <DetailDrawer key={selected.id} item={selected} onClose={() => setSelected(null)} />}

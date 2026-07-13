@@ -120,12 +120,14 @@ erDiagram
 | must_change_password | bool default true | 行政發放初始密碼,首登強制改密 |
 | is_active | bool default true | 停用而非刪除 |
 | last_login_at | timestamptz NULL | |
+| failed_login_attempts | int default 0 | 登入防爆破:連錯 5 次鎖 15 分(2026-07-14 實作補充) |
+| locked_until | timestamptz NULL | 鎖定至;NULL=未鎖定 |
 
 > **選擇單表而非四張角色表**:登入、session、密碼歷史、稽核都以「使用者」為單位,拆表要重複四份;角色專屬欄位僅少數幾欄,NULL 成本遠低於 JOIN 與重複邏輯。**替代:每角色一表**——查詢與外鍵複雜化,未來加角色(如「輔導老師」帳號)要開新表,不採。
 
 **password_history**(user_id, password_hash, changed_at)— 禁止重複使用近期密碼;舊系統已有此制度(club/staff_password_history),保留。
 
-**sessions**(id uuid PK, user_id FK, ip, user_agent, created_at, expires_at)— cookie session 存放處;刪列即登出,停權立即生效。
+**sessions**(id uuid PK, user_id FK, csrf_token, ip, user_agent, created_at, expires_at)— cookie session 存放處;刪列即登出,停權立即生效。`csrf_token` 為 double-submit CSRF 防護的 session 綁定值(2026-07-14 實作補充)。
 
 ### 3.2 社團與主檔
 
@@ -285,7 +287,7 @@ approved 且 活動日期+1個月 已過 且未送結案 → 「逾期鎖定」(
 
 **officer_certificates**(id, club_id, term(如 114-2), position enum(社長或會長,副社長或副會長), applicant_name, status enum(pending,approved,rejected), created_at)
 
-**postal_account_changes**(id, club_id, reason enum(更換代理人,新開戶,印鑑變更,帳簿遺失,結清銷戶), account_name, account_number, new_agent_name, new_agent_phone, status 同上, created_at)— 存簿影本走 files(slot=passbook)。
+**postal_account_changes**(id, club_id, reasons text[](事由**複選**:更換代理人,新開戶,印鑑變更,帳簿遺失,結清銷戶,存簿密碼異動;2026-07-13 前端定案,互斥組合由應用層驗證), account_name, account_number, new_agent_name, new_agent_phone, status 同上, created_at)— 存簿影本走 files(slot=passbook)。
 
 **maintenance_requests**(id, club_id, location, items text(損壞項目), status enum(pending,in_progress,done), handle_note, created_at)— 佐證照片/影片走 files(slot=evidence)。
 
@@ -343,8 +345,8 @@ approved 且 活動日期+1個月 已過 且未送結案 → 「逾期鎖定」(
 **review_score_items**(id, score_id FK, rubric_item_id FK, score int, comment text)
 — 百分比與名次一律推導;草稿機制(原型 localStorage draft)可先做前端暫存,後端不建草稿表(YAGNI)。
 
-**eval_adjustments**(id, year, award_id, club_id, kind enum(admin_score_override(行政分逐項調整), merit_bonus(表現優良加分 0–5), final_override(總分覆寫), award_override(獎項覆寫)), value jsonb, reason text 必填, actor_id, created_at)
-— 人工調整全部留痕;查詢時「調整值蓋過計算值」,刪除(或註銷)調整列即「回到自動計算結果」。
+**eval_adjustments**(id, year, award_id, club_id, kind enum(admin_score_override(行政分逐項調整), merit_bonus(表現優良加分 0–5), final_override(總分覆寫), award_override(獎項覆寫)), value jsonb, reason text 必填, actor_id, revoked_at timestamptz NULL, created_at)
+— 人工調整全部留痕;查詢時「調整值蓋過計算值」,**註銷**(填 revoked_at,不硬刪)即「回到自動計算結果」,歷次調整可稽核。
 
 **eval_settings**(year, award_id, PK(year,award_id), comment_released bool(評語開放社團查看), unlocked bool(行政資料開放))
 

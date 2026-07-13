@@ -12,6 +12,7 @@ dependencies = [
     "pydantic-settings",
     "argon2-cffi",
     "aiosmtplib",
+    "httpx>=0.28.1",
 ]
 
 [dependency-groups]

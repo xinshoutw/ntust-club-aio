@@ -1,21 +1,36 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router'
+import { Select } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
+import { CURRENT_SEMESTER, semesterOptions } from '../../lib/semester'
 import { SIGNUP_ITEMS } from './mock'
 import './signup.css'
 
 export default function SignupListPage() {
   const navigate = useNavigate()
+  const [semester, setSemester] = useState(CURRENT_SEMESTER)
+  const items = SIGNUP_ITEMS.filter((i) => i.semester === semester)
 
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto' }}>
-      <PageHeader title="線上報名" />
+      <PageHeader
+        title="線上報名"
+        extra={
+          <Select
+            value={semester}
+            onChange={setSemester}
+            style={{ width: 120 }}
+            options={semesterOptions(SIGNUP_ITEMS.map((i) => i.semester))}
+          />
+        }
+      />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
         學務處開放報名之會議與活動;人數上限為單一社團配額。
       </div>
 
       <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {SIGNUP_ITEMS.map((item) => {
+        {items.map((item) => {
           const ended = item.status === 'ended'
           return (
             <div
@@ -45,6 +60,11 @@ export default function SignupListPage() {
             </div>
           )
         })}
+        {!items.length && (
+          <div className="card" style={{ padding: '40px 24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
+            本學期沒有開放報名的項目。
+          </div>
+        )}
       </div>
     </div>
   )

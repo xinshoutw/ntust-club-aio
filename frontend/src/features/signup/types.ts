@@ -12,6 +12,7 @@ export interface SignupItem {
   id: string
   name: string
   status: 'open' | 'ended'
+  semester: string
   info: string
   description?: string
   deadline: string

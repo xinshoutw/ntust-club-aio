@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Outlet, useNavigate } from 'react-router'
+import { Outlet, useLocation, useNavigate } from 'react-router'
 import { Drawer, Dropdown } from 'antd'
 import { BellOutlined, DownOutlined, LogoutOutlined, MenuOutlined } from '@ant-design/icons'
 import { useAuth } from '../../app/auth'
@@ -15,7 +15,14 @@ interface AppShellProps {
 export default function AppShell({ nav, badgeLabel }: AppShellProps) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
+
+  // 手機 topbar 依設計顯示目前頁名(對應 nav 項目;無對應時顯示系統名)
+  const currentItem = nav
+    .flatMap((g) => g.items)
+    .find((i) => i.path === location.pathname)
+  const mobileTitle = currentItem?.label ?? '社團管理系統'
 
   const userMenu = {
     items: [
@@ -41,6 +48,7 @@ export default function AppShell({ nav, badgeLabel }: AppShellProps) {
           <MenuOutlined />
         </button>
         <div className="topbar-brand">臺科大社團管理系統</div>
+        <div className="topbar-mobile-title">{mobileTitle}</div>
         {badgeLabel && <span className="topbar-scope">{badgeLabel}</span>}
         <div className="topbar-spacer" />
         <button type="button" className="topbar-year num" aria-label="切換學年度">
@@ -78,6 +86,20 @@ export default function AppShell({ nav, badgeLabel }: AppShellProps) {
         title="臺科大社團管理系統"
       >
         <Sidebar groups={nav} onNavigate={() => setDrawerOpen(false)} />
+        <div style={{ borderTop: '1px solid var(--line)', padding: '10px 10px 16px' }}>
+          <button
+            type="button"
+            className="sidebar-item"
+            style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', font: 'inherit' }}
+            onClick={() => {
+              logout()
+              navigate('/login', { replace: true })
+            }}
+          >
+            <span className="sidebar-item-icon"><LogoutOutlined /></span>
+            <span className="sidebar-item-label">登出({user?.name})</span>
+          </button>
+        </div>
       </Drawer>
     </div>
   )

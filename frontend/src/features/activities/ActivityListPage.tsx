@@ -93,8 +93,8 @@ export default function ActivityListPage() {
 
       {/* 桌面:表格 */}
       <div className="desktop-only">
-        <div className="card" style={{ marginTop: 20, overflow: 'hidden' }}>
-          <table className="tb">
+        <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+          <table className="tb" style={{ minWidth: 860 }}>
             <thead>
               <tr>
                 <th>單號</th>

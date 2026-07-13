@@ -23,6 +23,16 @@
   letter-spacing: 0.5px;
   white-space: nowrap;
 }
+.topbar-mobile-title {
+  display: none;
+  flex: 1;
+  text-align: center;
+  font-weight: 600;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .topbar-scope {
   font-size: 12px;
   color: var(--steel);
@@ -154,16 +164,28 @@
     display: flex;
   }
   .topbar {
-    padding: 0 12px;
-    gap: 8px;
+    padding: 0 8px;
+    gap: 4px;
   }
-  .topbar-brand {
-    font-size: 15px;
+  .topbar-menu-btn,
+  .topbar-icon-btn {
+    width: 44px;
+    height: 44px;
   }
   .topbar-year,
-  .topbar-username,
   .topbar-scope {
     display: none;
+  }
+}
+@media (max-width: 767px) {
+  .topbar-brand,
+  .topbar-username,
+  .topbar-divider,
+  .topbar-user {
+    display: none;
+  }
+  .topbar-mobile-title {
+    display: block;
   }
   .shell-main {
     padding: 20px 16px 48px;

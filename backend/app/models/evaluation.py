@@ -141,4 +141,5 @@ class EvalSetting(Base, TimestampMixin):
     year: Mapped[int] = mapped_column(primary_key=True)
     award_id: Mapped[str] = mapped_column(sa.ForeignKey("awards.id"), primary_key=True)
     comment_released: Mapped[bool] = mapped_column(default=False)
-    unlocked: Mapped[bool] = mapped_column(default=False)
+    # 預設 True:與「無設定列=開放」語意一致,建列調 comment_released 不會誤鎖上傳
+    unlocked: Mapped[bool] = mapped_column(default=True)

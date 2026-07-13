@@ -1,0 +1,171 @@
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---- topbar ---- */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  height: 56px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 24px;
+}
+.topbar-brand {
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+.topbar-scope {
+  font-size: 12px;
+  color: var(--steel);
+  background: #eef0f3;
+  border-radius: 4px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.topbar-spacer {
+  flex: 1;
+}
+.topbar-year {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.topbar-year:hover {
+  background: var(--paper);
+}
+.topbar-icon-btn {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--ink);
+}
+.topbar-icon-btn:hover {
+  background: var(--paper);
+}
+.topbar-dot {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #c13b34;
+  border: 1.5px solid #fff;
+}
+.topbar-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--line);
+}
+.topbar-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 8px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.topbar-user:hover {
+  background: var(--paper);
+}
+.topbar-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #eef0f3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--steel);
+}
+.topbar-username {
+  font-size: 14px;
+  color: var(--ink);
+}
+.topbar-menu-btn {
+  display: none;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  color: var(--ink);
+}
+
+/* ---- body ---- */
+.shell-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  align-items: stretch;
+}
+.shell-sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+}
+.shell-main {
+  min-width: 0;
+  padding: 28px 32px 64px;
+}
+
+@media (max-width: 991px) {
+  .shell-body {
+    grid-template-columns: 1fr;
+  }
+  .shell-sidebar {
+    display: none;
+  }
+  .topbar-menu-btn {
+    display: flex;
+  }
+  .topbar {
+    padding: 0 12px;
+    gap: 8px;
+  }
+  .topbar-brand {
+    font-size: 15px;
+  }
+  .topbar-year,
+  .topbar-username,
+  .topbar-scope {
+    display: none;
+  }
+  .shell-main {
+    padding: 20px 16px 48px;
+  }
+}

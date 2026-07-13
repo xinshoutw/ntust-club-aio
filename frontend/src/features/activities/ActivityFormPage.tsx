@@ -326,21 +326,15 @@ export default function ActivityFormPage() {
                 {budget.map((r) => {
                   const hint = BUDGET_HINTS[r.category]
                   return (
-                    <div key={r.key} onBlur={(e) => blurLeavesRow(e) && compactBudget()} style={{ border: '1px solid var(--line)', borderRadius: 6, padding: '10px 12px' }}>
-                      <div className="budget-row">
+                    <div key={r.key} onBlur={(e) => blurLeavesRow(e) && compactBudget()} style={{ background: 'var(--paper)', borderRadius: 8, padding: '10px 12px' }}>
+                      {/* 第一列:類別/自籌/擬請;第二列:經費說明整行(避免窄欄換行截斷) */}
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <Select
                           aria-label="經費科目"
                           value={r.category}
                           onChange={(v) => updateBudget(r.key, { category: v })}
                           options={BUDGET_CATEGORIES.map((c) => ({ value: c, label: c }))}
-                          style={{ width: 150 }}
-                        />
-                        <Input
-                          aria-label="經費說明"
-                          value={r.description}
-                          onChange={(e) => updateBudget(r.key, { description: e.target.value })}
-                          placeholder="經費說明"
-                          style={{ flex: 1, minWidth: 180 }}
+                          style={{ flex: 1, minWidth: 150 }}
                         />
                         <InputNumber
                           aria-label="自籌"
@@ -351,7 +345,7 @@ export default function ActivityFormPage() {
                           precision={0}
                           controls={false}
                           placeholder="自籌"
-                          style={{ width: 96 }}
+                          style={{ width: 100 }}
                         />
                         <InputNumber
                           aria-label="擬請補助"
@@ -362,9 +356,16 @@ export default function ActivityFormPage() {
                           precision={0}
                           controls={false}
                           placeholder="擬請"
-                          style={{ width: 96 }}
+                          style={{ width: 100 }}
                         />
                       </div>
+                      <Input
+                        aria-label="經費說明"
+                        value={r.description}
+                        onChange={(e) => updateBudget(r.key, { description: e.target.value })}
+                        placeholder="經費說明"
+                        style={{ marginTop: 8 }}
+                      />
                       {hint && (
                         <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 6 }}>{hint}</div>
                       )}

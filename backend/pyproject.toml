@@ -25,6 +25,9 @@ dev = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+# 全部測試共用同一個 event loop:app engine 的連線池綁 loop,分 loop 會炸
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 testpaths = ["tests"]
 pythonpath = ["."]
 

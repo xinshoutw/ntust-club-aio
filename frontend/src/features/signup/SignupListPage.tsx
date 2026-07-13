@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router'
 import { Button, Modal, Select } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
-import { CURRENT_SEMESTER, semesterOptions } from '../../lib/semester'
+import { semesterOptions } from '../../lib/semester'
 import { SIGNUP_ITEMS } from './mock'
 import type { SignupItem } from './types'
 import SubmissionRecord from './SubmissionRecord'
@@ -12,7 +12,9 @@ import './signup.css'
 
 export default function SignupListPage() {
   const navigate = useNavigate()
-  const [semester, setSemester] = useState(CURRENT_SEMESTER)
+  // 預設=資料中最新學期(同活動列表慣例)
+  const semOptions = semesterOptions(SIGNUP_ITEMS.map((i) => i.semester))
+  const [semester, setSemester] = useState(semOptions[0].value)
   const [recordOpen, setRecordOpen] = useState(false)
   const [recordItem, setRecordItem] = useState<SignupItem | null>(null)
   const items = SIGNUP_ITEMS.filter((i) => i.semester === semester)
@@ -31,12 +33,7 @@ export default function SignupListPage() {
       <PageHeader
         title="線上報名"
         extra={
-          <Select
-            value={semester}
-            onChange={setSemester}
-            style={{ width: 120 }}
-            options={semesterOptions(SIGNUP_ITEMS.map((i) => i.semester))}
-          />
+          <Select value={semester} onChange={setSemester} style={{ width: 120 }} options={semOptions} />
         }
       />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>

@@ -14,6 +14,12 @@ export type StatusKey =
   | 'open'
   | 'ended'
   | 'suspended'
+  | 'checked_out'
+  | 'returned'
+  | 'overdue'
+  | 'done'
+  | 'violation_open'
+  | 'violation_resolved'
 
 export interface StatusStyle {
   label: string
@@ -39,4 +45,10 @@ export const STATUS: Record<StatusKey, StatusStyle> = {
   open: { label: '開放中', fg: '#1F6B45', bg: '#E3F2E9', border: 'rgba(31,107,69,.4)' },
   ended: { label: '已截止', fg: '#3A3F4A', bg: '#E8EAEE' },
   suspended: { label: '停權', fg: '#3A3F4A', bg: '#E8EAEE' },
+  checked_out: { label: '已借出', fg: '#1D5A9E', bg: '#E8F0FB' },
+  returned: { label: '已歸還', fg: '#FFFFFF', bg: '#2E7D57' },
+  overdue: { label: '逾期未還', fg: '#A3341F', bg: '#F9E4DE', withLock: true },
+  done: { label: '已完成', fg: '#FFFFFF', bg: '#2E7D57' },
+  violation_open: { label: '未銷案', fg: '#B03A2E', bg: '#FBE9E7' },
+  violation_resolved: { label: '已銷案', fg: '#1F6B45', bg: '#E3F2E9', border: 'rgba(31,107,69,.4)' },
 }

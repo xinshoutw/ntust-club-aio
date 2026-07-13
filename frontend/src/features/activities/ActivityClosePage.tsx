@@ -61,7 +61,7 @@ export default function ActivityClosePage() {
         }
       />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        除「影片連結」外皆為必填;送出後由輔導老師審核,結案通過始計入評鑑行政分。
+        除「影片連結」外皆為必填;送出後進入結案審核,結案通過始計入評鑑行政分。
       </div>
 
       {!activity && (
@@ -256,7 +256,7 @@ function CloseForm({
     r.report = generatedPdf(`${activity.name}_成果報告`)
     r.feedback = generatedPdf(`${activity.name}_心得(${reflections.length}人)`)
 
-    message.success('結案已送出,等待輔導老師審核')
+    message.success('結案已送出,等待審核')
     onDone()
   }
 

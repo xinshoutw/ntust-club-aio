@@ -12,6 +12,7 @@ COPY . .
 EXPOSE 8000
 
 # 啟動時自動跑 migration(單 instance 無競態)。
-# forwarded-allow-ips '*' 的前提:backend 埠不對外發布,唯一能連進來的是
-# compose 內網的 web 容器,且 web 已覆寫(非追加)X-Forwarded-For,鏈上無不可信值。
-CMD ["sh", "-c", "uv run --no-dev alembic upgrade head && uv run --no-dev uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips '*'"]
+# 信任代理清單由環境變數 FORWARDED_ALLOW_IPS 提供(compose 設 compose 子網,
+# 部署時另加 edge VM 內網 IP);絕不可用 '*'——XFF 最左值是客戶端可控的,
+# 全信會讓登入限流被繞過、稽核 IP 被投毒。未設定時 uvicorn 預設只信 127.0.0.1。
+CMD ["sh", "-c", "uv run --no-dev alembic upgrade head && uv run --no-dev uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers"]

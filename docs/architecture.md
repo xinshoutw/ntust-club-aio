@@ -314,6 +314,7 @@ CPU:e2-medium 為共享核心(基準約 1 vCPU、可突發 2),CRUD 型負載足�
 2. 該 vhost 的 `client_max_body_size` 從全域 3072M 收斂為 **256m**(與內層一致,避免 edge 被塞超大請求)
 3. 該 vhost 加 **`proxy_request_buffering off`**(上傳串流直通,不在 edge 暫存整包)
 4. proxy header 改為**覆寫式**:`proxy_set_header X-Forwarded-For $remote_addr;` 並補 `proxy_set_header X-Forwarded-Proto $scheme;`(edge 現行用 `$proxy_add_x_forwarded_for` 會保留客戶端偽造的 XFF,且沒送 XFP)
+5. `.env` 設 `FORWARDED_ALLOW_IPS=172.28.0.0/24,<edge VM 內網 IP>`:backend 由右往左跳過信任跳點取真實 client IP;漏設 edge IP 會讓所有人的 IP 塌縮成 edge IP(限流變全域)。**絕不可用 `*`**(XFF 最左值客戶端可控,限流可被繞過、稽核 IP 可被投毒)
 5. `clubclass.ntust.edu.tw` 屆時再決定是否 307 導向
 
 ### 6.4 安全細節(內層)

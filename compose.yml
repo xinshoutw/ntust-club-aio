@@ -39,6 +39,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?請在 .env 設定 POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-club_aio}
       UPLOAD_DIR: /srv/uploads
+      # 信任代理:compose 子網(web 容器)+ 部署時於 .env 加 edge VM 內網 IP;
+      # uvicorn 由右往左跳過信任跳點取真實 client IP(限流與稽核依賴它)
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-172.28.0.0/24}
     volumes:
       - uploads:/srv/uploads
     depends_on:
@@ -59,3 +62,10 @@ services:
 volumes:
   pgdata:
   uploads:
+
+networks:
+  # 固定子網,FORWARDED_ALLOW_IPS 才有穩定的信任範圍可填
+  default:
+    ipam:
+      config:
+        - subnet: 172.28.0.0/24

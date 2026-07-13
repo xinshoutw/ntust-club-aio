@@ -62,6 +62,16 @@
 - 一律英文、conventional format;一個 commit 一個行為(多個修正分開 commit);標題描述變更行為本身,不寫「review fixes」之類的元描述
 - **開發推 `dev` 分支**(避免草稿觸發 main 的 CI 映像發佈);穩定後才合併 `main`
 
+## 後端現況(2026-07-14,session 交接用)
+
+- **44 表 models + Alembic 初始 migration 已落地**(照 data-model.md;政策補充欄位已回寫該文件);API 慣例(信封/錯誤碼/分頁/排序/CSRF)在 `docs/architecture.md` §4.1
+- **社團端 API 全數完成**+pytest(獨立 `club_aio_test` 庫):auth/成員含 CSV/活動申請與結案(含 DB 草稿)/三種借用/三種申請/違規/報名含草稿/評鑑 overview 與五獎上傳/公告;**管理端**只做已定案流程(活動三關/單關、結案審核、解鎖、行政分調整 `aeval`)
+- 結構:`app/core`(config/db/deps/security/errors/rate_limit/semesters)、`app/models`、`app/schemas`、`app/api/v1`(社團端 `/club/*`、管理端 `/admin/*`)、`app/services`(業務與推導:scoring/evaluation/activity/booking/signup/files/notify/pdf/audit/settings)
+- 慣例:推導不儲存(可借數/逾期/鎖定/行政分);簽核走 `approval_records`;高風險操作 `audit.record`(add 不 commit,隨交易);事件推 Discord(`notify.club_event`=全域+社團自設 webhook);列表一律分頁+排序白名單;錯誤用 `core/errors` 工廠
+- 測試慣例:`tests/conftest.py` 於 import app 前切 `club_aio_test`;factories(make_club/make_user)、`csrf_headers()`;每測試 TRUNCATE;`asyncio_default_*_loop_scope=session`(連線池綁 loop)
+- **前端尚未接線**(使用者回來後逐頁換 TanStack Query);工讀生端/評審端/管理端其餘頁面 API 未做
+- PDF:成果報告表/心得於下載時生成(`services/pdf.py`,內嵌 Noto Sans TC);seed:`uv run python scripts/seed.py`
+
 ## 前端現況(2026-07-13,session 交接用)
 
 - **全部 26 頁 + shell 已實作**(社團端 12、行政端 14),資料皆 mock、動作以 toast 提示;後端 API 完成後逐頁換 TanStack Query(`src/api/client.ts` 為信封解包層)

@@ -1,0 +1,51 @@
+# club-aio 服務組成
+# 開發:docker compose up -d db(前後端在本機熱重載)
+# 正式:docker compose up -d(GCE 單機,前面是既有 edge proxy)
+name: club-aio
+
+services:
+  db:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-club}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-club}
+      POSTGRES_DB: ${POSTGRES_DB:-club_aio}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # postgres:18 映像的掛載點是 /var/lib/postgresql(非舊版的 .../data)
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-club} -d ${POSTGRES_DB:-club_aio}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    image: ${BACKEND_IMAGE:-club-aio-backend:local}
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-club}:${POSTGRES_PASSWORD:-club}@db:5432/${POSTGRES_DB:-club_aio}
+      UPLOAD_DIR: /srv/uploads
+    volumes:
+      - uploads:/srv/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build: ./frontend
+    image: ${WEB_IMAGE:-club-aio-web:local}
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  uploads:

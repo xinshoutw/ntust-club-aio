@@ -24,7 +24,7 @@ export default function AwardDetailPage() {
 
   if (!award) {
     return (
-      <div style={{ maxWidth: 860, margin: '0 auto' }}>
+      <div>
         <Link to="/eval" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
           <LeftOutlined style={{ fontSize: 12 }} />
           返回資料總覽
@@ -51,7 +51,7 @@ export default function AwardDetailPage() {
   }
 
   return (
-    <div style={{ maxWidth: 860, margin: '0 auto' }}>
+    <div>
       <Link to="/eval" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
         <LeftOutlined style={{ fontSize: 12 }} />
         返回資料總覽

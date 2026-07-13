@@ -45,7 +45,7 @@ export default function AdminEvalPage() {
   }
 
   return (
-    <div style={{ maxWidth: 980, margin: '0 auto' }}>
+    <div>
       <PageHeader
         title="評鑑行政分審核"
         sub={

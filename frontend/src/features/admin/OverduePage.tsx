@@ -21,7 +21,7 @@ export default function OverduePage() {
   const overdue = EQUIPMENT_LOANS.filter((l) => l.status === 'overdue')
 
   return (
-    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+    <div>
       <PageHeader
         title="逾期追蹤與停權"
         extra={

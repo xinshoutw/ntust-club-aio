@@ -130,7 +130,7 @@ export default function EvalDocsPage() {
   )
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+    <div>
       <PageHeader
         title="資料總覽"
         sub={

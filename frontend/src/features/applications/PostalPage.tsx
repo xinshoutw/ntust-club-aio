@@ -26,7 +26,7 @@ export default function PostalPage() {
   const needAccountNo = !reasons.includes('新開戶') || reasons.length > 1
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto' }}>
+    <div>
       <PageHeader title="郵局帳戶異動" />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
         事由可複選;公文作業約 3–5 個工作天。

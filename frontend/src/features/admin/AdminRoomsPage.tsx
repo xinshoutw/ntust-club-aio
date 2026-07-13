@@ -22,7 +22,7 @@ export default function AdminRoomsPage() {
   }
 
   return (
-    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+    <div>
       <PageHeader
         title="教室固定借用"
         sub={

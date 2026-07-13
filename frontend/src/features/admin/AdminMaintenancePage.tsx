@@ -14,7 +14,7 @@ export default function AdminMaintenancePage() {
   const { message } = App.useApp()
 
   return (
-    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+    <div>
       <PageHeader
         title="維修管理"
         sub={

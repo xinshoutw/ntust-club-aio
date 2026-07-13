@@ -16,7 +16,7 @@ export default function AdminBookingsPage() {
   )
 
   return (
-    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+    <div>
       <PageHeader
         title="臨時場地器材借用"
         sub={

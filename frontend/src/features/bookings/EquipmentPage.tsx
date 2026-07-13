@@ -18,7 +18,7 @@ export default function EquipmentPage() {
   }
 
   return (
-    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+    <div>
       <PageHeader title="器材借用" />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
         核准後由工讀生點交借出;結束日之隔天上班日 <span className="num">10:30</span> 前歸還。

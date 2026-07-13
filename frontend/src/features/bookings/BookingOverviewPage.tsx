@@ -50,7 +50,7 @@ export default function BookingOverviewPage() {
   const returnedPaged = returned.slice((returnedPage - 1) * RETURNED_PAGE, returnedPage * RETURNED_PAGE)
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+    <div>
       <PageHeader title="借用總覽" sub={mine} />
 
       {/* 場地借用情形 */}

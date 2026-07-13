@@ -24,7 +24,7 @@ export default function VenueBookingPage() {
   }
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto' }}>
+    <div>
       <PageHeader title="臨時場地借用" />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
         單日活動之場地借用;核准後依核定時段使用。

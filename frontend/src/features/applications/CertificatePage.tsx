@@ -34,7 +34,7 @@ export default function CertificatePage() {
     !term || !position ? 'idle' : uniqueNames.length === 1 ? 'ok' : uniqueNames.length === 0 ? 'none' : 'many'
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto' }}>
+    <div>
       <PageHeader title="幹部證明" />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
         社(會)長、副社(會)長服務證明;姓名由成員名單自動帶出,製作約 <span className="num">2</span> 個工作天。

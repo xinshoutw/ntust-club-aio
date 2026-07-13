@@ -33,7 +33,7 @@ export default function SignupFormPage() {
 
   if (item?.submission) {
     return (
-      <div style={{ maxWidth: 720, margin: '0 auto' }}>
+      <div>
         <Link to="/signup" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
           <LeftOutlined style={{ fontSize: 12 }} />
           返回線上報名
@@ -51,7 +51,7 @@ export default function SignupFormPage() {
 
   if (!item || item.status !== 'open') {
     return (
-      <div style={{ maxWidth: 720, margin: '0 auto' }}>
+      <div>
         <Link to="/signup" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
           <LeftOutlined style={{ fontSize: 12 }} />
           返回線上報名
@@ -84,7 +84,7 @@ export default function SignupFormPage() {
   }
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto' }}>
+    <div>
       <Link to="/signup" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
         <LeftOutlined style={{ fontSize: 12 }} />
         返回線上報名

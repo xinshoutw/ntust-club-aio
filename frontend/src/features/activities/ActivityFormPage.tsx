@@ -180,7 +180,7 @@ export default function ActivityFormPage() {
   if (id && !editing) return <Navigate to="/activities" replace />
 
   return (
-    <div style={{ maxWidth: 1360, margin: '0 auto' }}>
+    <div>
       <PageHeader title="活動申請" />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
         申請活動或社課,核准後辦理;辦理後 <span className="num">1</span> 個月內須完成結案。

@@ -29,7 +29,7 @@ export default function SignupListPage() {
   }
 
   return (
-    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+    <div>
       <PageHeader
         title="線上報名"
         extra={

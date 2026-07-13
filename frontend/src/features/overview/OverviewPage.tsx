@@ -32,7 +32,7 @@ export default function OverviewPage() {
   const categories = ['活動', '借用', '線上申請'] as const
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+    <div>
       <PageHeader
         title="社團總覽"
         sub={

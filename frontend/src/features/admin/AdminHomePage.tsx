@@ -21,7 +21,7 @@ export default function AdminHomePage() {
   ]
 
   return (
-    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+    <div>
       <PageHeader title="總覽" sub="114 學年第 2 學期" />
       <div
         style={{

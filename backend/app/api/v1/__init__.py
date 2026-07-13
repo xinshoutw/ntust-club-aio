@@ -10,6 +10,9 @@ from app.api.v1 import (
     members,
     signups,
 )
+from app.api.v1 import (
+    eval as eval_api,
+)
 from app.schemas.common import ApiResponse
 
 router = APIRouter()
@@ -21,6 +24,7 @@ router.include_router(activities.router)
 router.include_router(bookings.router)
 router.include_router(applications.router)
 router.include_router(signups.router)
+router.include_router(eval_api.router)
 
 
 @router.get("/health")

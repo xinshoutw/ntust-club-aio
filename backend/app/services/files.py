@@ -168,6 +168,8 @@ async def save_upload(
         path=rel_path,
     )
     db.add(row)
+    # 先 flush:讓後續同交易引用 file_id 的列(如 eval_uploads)有正確的插入順序
+    await db.flush()
     return row
 
 

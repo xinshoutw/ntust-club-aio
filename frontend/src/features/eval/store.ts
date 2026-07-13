@@ -110,6 +110,14 @@ export const ACTIVITY_RESULTS: ActivityResult[] = [
     report: mockPdf('校際程式競賽_成果單', '2026/05/20'),
     feedback: mockPdf('校際程式競賽_心得彙整', '2026/05/20'),
   },
+  // 開學迎新工作坊:已送結案待輔導老師審核(未結案,尚不計行政分)
+  {
+    activityId: 'ACT-115-0001',
+    photos: ['#3F6E5A', '#6E3F55', '#3F536E', '#6E5A3F', '#55406E'].map((c, i) => svgPhoto(`迎新工作坊_${i + 1}`, c, '2026/09/08')),
+    videoLink: '',
+    report: mockPdf('開學迎新工作坊_成果報告', '2026/09/08'),
+    feedback: mockPdf('開學迎新工作坊_心得(3人)', '2026/09/08'),
+  },
 ]
 
 export function resultOf(activityId: string): ActivityResult {

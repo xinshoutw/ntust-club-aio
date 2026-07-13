@@ -13,6 +13,7 @@ import type { EvalFile } from '../eval/types'
 import FilePreview from '../eval/FilePreview'
 import { CLUB_ACTIVITIES } from './mock'
 import { budgetTotals, fmtMoney, type Activity } from './types'
+import { canClose } from './utils'
 
 const PAGE_SIZE = 20
 type SortKey = 'name' | 'type' | 'date' | 'budget' | 'status'
@@ -56,10 +57,14 @@ function SectionTitle({ children, first }: { children: React.ReactNode; first?: 
   )
 }
 
-// 申請值後方的「實際值」備註:未變動不顯示
-const changedNote = (text: string) => (
-  <span style={{ color: '#8A5A00', marginLeft: 6 }}>(實際 {text})</span>
-)
+// 與申請不一致的實際值:直接取代原值並以色彩標示,hover 立即顯示預計值
+function ActualValue({ actual, planned }: { actual: React.ReactNode; planned: string }) {
+  return (
+    <Tooltip mouseEnterDelay={0} title={<span style={{ fontSize: 14 }}>預計 {planned}</span>}>
+      <span className="num" style={{ color: '#8A5A00', borderBottom: '1px dotted #8A5A00', cursor: 'help' }}>{actual}</span>
+    </Tooltip>
+  )
+}
 
 function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPreviewFile }: { a: Activity | null; open: boolean; onClose: () => void; afterClose: () => void; onEdit: () => void; onGoClose: () => void; onPreviewFile: (f: EvalFile) => void }) {
   if (!a) return null
@@ -113,7 +118,7 @@ function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPrevi
           <Button type="primary" onClick={onEdit}>
             {a.status === 'rejected' ? '編輯重送' : '繼續編輯'}
           </Button>
-        ) : a.status === 'approved' ? (
+        ) : canClose(a) ? (
           <Button type="primary" onClick={onGoClose}>前往結案</Button>
         ) : null
       }
@@ -126,15 +131,22 @@ function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPrevi
             <div style={{ color: 'var(--steel)' }}>類型</div><div>{a.type}</div>
             <div style={{ color: 'var(--steel)' }}>日期</div>
             <div>
-              <span className="num">{a.date}{a.timeRange ? ` ${a.timeRange}` : ''}</span>
-              {timeChanged && changedNote(actualTime)}
+              <span className="num">{a.date}</span>{' '}
+              {timeChanged && rep ? (
+                <ActualValue actual={actualTime} planned={a.timeRange ?? '未填'} />
+              ) : (
+                a.timeRange && <span className="num">{a.timeRange}</span>
+              )}
             </div>
             {(a.location || locationChanged) && (
               <>
                 <div style={{ color: 'var(--steel)' }}>地點</div>
                 <div>
-                  {a.location ?? '—'}
-                  {locationChanged && rep && changedNote(rep.actualLocation)}
+                  {locationChanged && rep ? (
+                    <ActualValue actual={rep.actualLocation} planned={a.location ?? '未填'} />
+                  ) : (
+                    a.location ?? '—'
+                  )}
                 </div>
               </>
             )}
@@ -142,9 +154,21 @@ function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPrevi
               <>
                 <div style={{ color: 'var(--steel)' }}>人數</div>
                 <div>
-                  <span className="num">校內 {a.participantsIn ?? 0} · 校外 {a.participantsOut ?? 0}</span>
-                  {countChanged && rep && changedNote(`社員 ${rep.memberCount} · 非社員 ${rep.nonMemberCount}`)}
+                  {countChanged && rep ? (
+                    <ActualValue
+                      actual={`社員 ${rep.memberCount} · 非社員 ${rep.nonMemberCount}`}
+                      planned={`校內 ${a.participantsIn ?? 0} · 校外 ${a.participantsOut ?? 0}`}
+                    />
+                  ) : (
+                    <span className="num">校內 {a.participantsIn ?? 0} · 校外 {a.participantsOut ?? 0}</span>
+                  )}
                 </div>
+              </>
+            )}
+            {rep?.reviewMeeting && (
+              <>
+                <div style={{ color: 'var(--steel)' }}>檢討</div>
+                <div className="num">{rep.reviewDate ?? '—'}</div>
               </>
             )}
             {a.content && (<><div style={{ color: 'var(--steel)' }}>內容</div><div style={{ lineHeight: 1.7 }}>{a.content}</div></>)}
@@ -205,7 +229,7 @@ function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPrevi
           {rep && (r.report || r.feedback || r.videoLink) && (
             <>
               <SectionTitle>結案檔案</SectionTitle>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                 {r.report && <FileChip f={r.report} onPreview={onPreviewFile} />}
                 {r.feedback && <FileChip f={r.feedback} onPreview={onPreviewFile} />}
                 {r.videoLink && (
@@ -231,11 +255,11 @@ function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPrevi
           <div>
             <SectionTitle first>
               結案成果
-              <span style={{ fontWeight: 400, color: 'var(--steel)', marginLeft: 8, fontSize: 12 }}>
-                檢討會 {rep.reviewMeeting ? '是' : '否'}
-                {rep.reviewDate && <span className="num"> · {rep.reviewDate}</span>}
-                {rep.submittedAt && <> · 送出 <span className="num">{rep.submittedAt}</span></>}
-              </span>
+              {rep.submittedAt && (
+                <span style={{ fontWeight: 400, color: 'var(--steel)', marginLeft: 8, fontSize: 12 }}>
+                  送出 <span className="num">{rep.submittedAt}</span>
+                </span>
+              )}
             </SectionTitle>
             {([['活動重點', rep.highlights], ['達成目標', rep.goals], ['其他成果', rep.others]] as const).map(([lab, text]) => (
               <div key={lab} style={{ marginBottom: 14 }}>
@@ -440,7 +464,7 @@ export default function ActivityListPage() {
             {paged.map((a) =>
               row(
                 a,
-                a.status === 'approved' ? (
+                canClose(a) ? (
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     {a.closeDraft && (
                       <Tooltip title="已暫存結案草稿">
@@ -449,6 +473,10 @@ export default function ActivityListPage() {
                     )}
                     <Button size="small" type="primary" onClick={() => navigate(`/activities/close?id=${a.id}`)}>結案</Button>
                   </span>
+                ) : a.status === 'approved' ? (
+                  <Tooltip title="活動結束後才可結案">
+                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>未開始/進行中</span>
+                  </Tooltip>
                 ) : null,
               ),
             )}

@@ -1,5 +1,4 @@
 import { useNavigate } from 'react-router'
-import { Button } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { SIGNUP_ITEMS } from './mock'
@@ -22,7 +21,11 @@ export default function SignupListPage() {
             <div
               key={item.id}
               className="card signup-card"
-              style={{ opacity: ended ? 0.72 : undefined }}
+              role="button"
+              tabIndex={ended ? -1 : 0}
+              onClick={() => !ended && navigate(`/signup/${item.id}`)}
+              onKeyDown={(e) => e.key === 'Enter' && !ended && navigate(`/signup/${item.id}`)}
+              style={{ opacity: ended ? 0.72 : undefined, cursor: ended ? 'default' : 'pointer' }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -38,13 +41,6 @@ export default function SignupListPage() {
                   <div style={{ fontSize: 12, color: 'var(--steel)' }}>報名截止</div>
                   <div className="num" style={{ fontSize: 13, marginTop: 2 }}>{item.deadline}</div>
                 </div>
-                <Button
-                  style={{ height: 36 }}
-                  disabled={ended}
-                  onClick={() => navigate(`/signup/${item.id}`)}
-                >
-                  {ended ? '已截止' : '前往報名'}
-                </Button>
               </div>
             </div>
           )

@@ -13,6 +13,7 @@ export interface SignupItem {
   name: string
   status: 'open' | 'ended'
   info: string
+  description?: string
   deadline: string
   time?: string
   place?: string

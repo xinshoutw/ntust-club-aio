@@ -62,6 +62,33 @@ export default function ClubSettingsPage() {
           </div>
         </Form>
       </div>
+
+      <div className="card" style={{ marginTop: 16, padding: 24 }}>
+        <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 6 }}>即時通知 Webhook</div>
+        <div style={{ fontSize: 12, color: 'var(--steel)', marginBottom: 16 }}>
+          審核結果與提醒將推送到你的 Discord 頻道;Telegram Bot 之後提供。
+        </div>
+        <Form
+          layout="vertical"
+          onFinish={() => message.success('Webhook 已儲存,將發送測試訊息')}
+        >
+          <Form.Item
+            name="discordWebhook"
+            label="Discord Webhook URL"
+            rules={[
+              {
+                pattern: /^https:\/\/(discord|discordapp)\.com\/api\/webhooks\/.+/,
+                message: '格式須為 https://discord.com/api/webhooks/…',
+              },
+            ]}
+          >
+            <Input placeholder="https://discord.com/api/webhooks/…" />
+          </Form.Item>
+          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+            <Button type="primary" htmlType="submit">儲存</Button>
+          </div>
+        </Form>
+      </div>
     </div>
   )
 }

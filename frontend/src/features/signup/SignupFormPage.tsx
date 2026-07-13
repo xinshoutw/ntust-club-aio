@@ -75,6 +75,11 @@ export default function SignupFormPage() {
       </div>
 
       <div className="card" style={{ marginTop: 16, padding: '18px 24px' }}>
+        {item.description && (
+          <div style={{ fontSize: 13, lineHeight: 1.7, marginBottom: 14, paddingBottom: 14, borderBottom: '1px solid var(--line)' }}>
+            {item.description}
+          </div>
+        )}
         <div className="form-grid-2" style={{ gap: '12px 24px' }}>
           {item.time && (
             <div>
@@ -190,6 +195,13 @@ export default function SignupFormPage() {
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
           <Button onClick={() => navigate('/signup')}>取消</Button>
+          <Button
+            onClick={() => {
+              message.success('已儲存草稿(本機示意,接後端後保存)')
+            }}
+          >
+            儲存草稿
+          </Button>
           <Button type="primary" htmlType="submit">
             送出報名
           </Button>

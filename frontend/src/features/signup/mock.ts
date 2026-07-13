@@ -17,6 +17,7 @@ export const SIGNUP_ITEMS: SignupItem[] = [
     status: 'open',
     info: '2026/09/20 09:00-17:00 · 國際大樓 IB-101 · 對象:各社團幹部(至少 3 人)',
     deadline: '2026/09/15',
+    description: '一日幹部訓練:社團經營、經費核銷、活動安全講習與分組演練;請幹部準時報到並全程參與,午餐由學務處提供。',
     time: '2026/09/20 09:00-17:00',
     place: '國際大樓 IB-101',
     maxParticipants: 5,

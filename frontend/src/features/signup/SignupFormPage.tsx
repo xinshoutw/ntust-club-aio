@@ -5,6 +5,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { SIGNUP_ITEMS } from './mock'
 import type { SignupField } from './types'
+import SubmissionRecord from './SubmissionRecord'
 
 // 依管理員定義的欄位 schema 渲染輸入元件
 function dynamicControl(field: SignupField) {
@@ -29,6 +30,24 @@ export default function SignupFormPage() {
   const { message } = App.useApp()
   const [form] = Form.useForm()
   const item = SIGNUP_ITEMS.find((s) => s.id === id)
+
+  if (item?.submission) {
+    return (
+      <div style={{ maxWidth: 720, margin: '0 auto' }}>
+        <Link to="/signup" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+          <LeftOutlined style={{ fontSize: 12 }} />
+          返回線上報名
+        </Link>
+        <div style={{ marginTop: 12 }}>
+          <PageHeader title={`${item.name} — 報名紀錄`} />
+        </div>
+        <div className="card" style={{ marginTop: 16, padding: '18px 24px' }}>
+          <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 12 }}>已完成報名;一經報名不得更改。</div>
+          <SubmissionRecord item={item} />
+        </div>
+      </div>
+    )
+  }
 
   if (!item || item.status !== 'open') {
     return (

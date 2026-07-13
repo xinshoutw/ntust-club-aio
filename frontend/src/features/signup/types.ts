@@ -8,6 +8,11 @@ export interface SignupField {
   options?: string[]
 }
 
+export interface SignupSubmission {
+  submittedAt: string
+  participants: Record<string, string>[]
+}
+
 export interface SignupItem {
   id: string
   name: string
@@ -20,6 +25,8 @@ export interface SignupItem {
   place?: string
   maxParticipants: number
   fields: SignupField[]
+  hasDraft?: boolean
+  submission?: SignupSubmission
 }
 
 export const FIELD_TYPE_LABEL: Record<FieldType, string> = {

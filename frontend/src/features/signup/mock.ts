@@ -11,6 +11,10 @@ export const SIGNUP_ITEMS: SignupItem[] = [
     deadline: '2026/07/20',
     maxParticipants: 1,
     fields: [{ key: 'phone', label: '聯絡電話', type: 'text', required: true }],
+    submission: {
+      submittedAt: '2026/07/02 14:30',
+      participants: [{ name: '陳予恩', studentId: 'B11209001', dept: '資工三', phone: '0912-345-678' }],
+    },
   },
   {
     id: 'cadre-training',
@@ -23,6 +27,7 @@ export const SIGNUP_ITEMS: SignupItem[] = [
     time: '2026/09/20 09:00-17:00',
     place: '國際大樓 IB-101',
     maxParticipants: 5,
+    hasDraft: true,
     fields: [
       { key: 'phone', label: '聯絡電話', type: 'text', required: true },
       { key: 'meal', label: '膳食需求', type: 'select', required: true, options: ['葷', '素'] },
@@ -49,5 +54,12 @@ export const SIGNUP_ITEMS: SignupItem[] = [
     deadline: '2026/06/30',
     maxParticipants: 3,
     fields: [],
+    submission: {
+      submittedAt: '2026/06/25 10:12',
+      participants: [
+        { name: '林詠晴', studentId: 'B11305012', dept: '企管二' },
+        { name: '張佑群', studentId: 'B11209033', dept: '資工三' },
+      ],
+    },
   },
 ]

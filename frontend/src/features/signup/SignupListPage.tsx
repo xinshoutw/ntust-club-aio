@@ -1,16 +1,29 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Select } from 'antd'
+import { Button, Modal, Select } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { CURRENT_SEMESTER, semesterOptions } from '../../lib/semester'
 import { SIGNUP_ITEMS } from './mock'
+import type { SignupItem } from './types'
+import SubmissionRecord from './SubmissionRecord'
 import './signup.css'
 
 export default function SignupListPage() {
   const navigate = useNavigate()
   const [semester, setSemester] = useState(CURRENT_SEMESTER)
+  const [recordOpen, setRecordOpen] = useState(false)
+  const [recordItem, setRecordItem] = useState<SignupItem | null>(null)
   const items = SIGNUP_ITEMS.filter((i) => i.semester === semester)
+
+  const openCard = (item: SignupItem) => {
+    if (item.submission) {
+      setRecordItem(item)
+      setRecordOpen(true)
+    } else if (item.status === 'open') {
+      navigate(`/signup/${item.id}`)
+    }
+  }
 
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto' }}>
@@ -26,26 +39,29 @@ export default function SignupListPage() {
         }
       />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        學務處開放報名之會議與活動;人數上限為單一社團配額。
+        學務處開放報名之會議與活動;人數上限為單一社團配額。已報名/已截止的活動點擊可查看填寫紀錄。
       </div>
 
       <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
         {items.map((item) => {
           const ended = item.status === 'ended'
+          const clickable = !ended || !!item.submission
           return (
             <div
               key={item.id}
               className="card signup-card"
               role="button"
-              tabIndex={ended ? -1 : 0}
-              onClick={() => !ended && navigate(`/signup/${item.id}`)}
-              onKeyDown={(e) => e.key === 'Enter' && !ended && navigate(`/signup/${item.id}`)}
-              style={{ opacity: ended ? 0.72 : undefined, cursor: ended ? 'default' : 'pointer' }}
+              tabIndex={clickable ? 0 : -1}
+              onClick={() => openCard(item)}
+              onKeyDown={(e) => e.key === 'Enter' && openCard(item)}
+              style={{ opacity: ended ? 0.72 : undefined, cursor: clickable ? 'pointer' : 'default' }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                   <div style={{ fontSize: 15, fontWeight: 500 }}>{item.name}</div>
                   <StatusPill status={item.status} />
+                  {item.submission && <StatusPill status="registered" />}
+                  {!item.submission && item.hasDraft && item.status === 'open' && <StatusPill status="draft" />}
                 </div>
                 <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 5, lineHeight: 1.6 }}>
                   {item.info}
@@ -66,6 +82,16 @@ export default function SignupListPage() {
           </div>
         )}
       </div>
+
+      <Modal
+        open={recordOpen}
+        title={recordItem ? `${recordItem.name} — 報名紀錄` : ''}
+        onCancel={() => setRecordOpen(false)}
+        afterClose={() => setRecordItem(null)}
+        footer={<Button onClick={() => setRecordOpen(false)}>關閉</Button>}
+      >
+        {recordItem && <SubmissionRecord item={recordItem} />}
+      </Modal>
     </div>
   )
 }

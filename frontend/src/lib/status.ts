@@ -10,6 +10,7 @@ export type StatusKey =
   | 'locked'
   | 'in_progress'
   | 'pending'
+  | 'closing_due'
   | 'open'
   | 'ended'
   | 'suspended'
@@ -25,6 +26,7 @@ export interface StatusStyle {
 export const STATUS: Record<StatusKey, StatusStyle> = {
   draft: { label: '草稿', fg: '#5B6472', bg: '#EEF0F3' },
   pending: { label: '待審', fg: '#8A5A00', bg: '#FFF3D6' },
+  closing_due: { label: '待結案', fg: '#8A5A00', bg: '#FFF3D6' },
   pending_advisor: { label: '待輔導老師審核', fg: '#8A5A00', bg: '#FFF3D6' },
   pending_chief: { label: '待組長審核', fg: '#1D5A9E', bg: '#E8F0FB' },
   pending_dean: { label: '待學務長審核', fg: '#6B4FA3', bg: '#F0EBF9' },

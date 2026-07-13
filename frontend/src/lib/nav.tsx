@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { REVIEW_ITEMS } from '../features/admin/reviewMock'
 import {
   ApartmentOutlined,
   AppstoreOutlined,
@@ -99,7 +100,14 @@ export const ADMIN_NAV: NavGroup[] = [
   {
     label: '活動審核',
     items: [
-      { key: 'a-review', label: '活動申請審核', path: '/admin/review', icon: <AuditOutlined />, badge: 7 },
+      {
+        key: 'a-review',
+        label: '活動申請審核',
+        path: '/admin/review',
+        icon: <AuditOutlined />,
+        // ponytail: mock 期由假資料推導;接後端後改為共用 query
+        badge: REVIEW_ITEMS.filter((i) => i.status === 'pending_advisor').length,
+      },
       { key: 'a-close', label: '結案審核', path: '/admin/close-review', icon: <FileDoneOutlined />, badge: 2 },
     ],
   },

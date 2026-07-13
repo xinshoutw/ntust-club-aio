@@ -108,13 +108,14 @@ export interface TrackedApplication {
   name: string
   category: '活動' | '借用' | '線上申請'
   status: import('../../lib/status').StatusKey
+  path: string
 }
 
 export const TRACKED: TrackedApplication[] = [
-  { id: 'ACT-114-0012', name: '程式設計工作坊', category: '活動', status: 'approved' },
-  { id: 'ACT-114-0018', name: '迎新宿營', category: '活動', status: 'approved' },
-  { id: 'ACT-114-0020', name: '資訊週(大型活動)', category: '活動', status: 'pending_dean' },
-  { id: 'ROOM-114-0301', name: '教室固定借用 S304', category: '借用', status: 'pending' },
-  { id: 'MNT-114-0023', name: '社團空間維修 S304', category: '線上申請', status: 'in_progress' },
-  { id: 'OFC-114-0021', name: '幹部證明', category: '線上申請', status: 'pending' },
+  { id: 'ACT-114-0012', name: '程式設計工作坊', category: '活動', status: 'approved', path: '/activities' },
+  { id: 'ACT-114-0018', name: '迎新宿營', category: '活動', status: 'closing_due', path: '/activities' },
+  { id: 'ACT-114-0020', name: '資訊週(大型活動)', category: '活動', status: 'pending_dean', path: '/activities' },
+  { id: 'ROOM-114-0301', name: '教室固定借用 S304', category: '借用', status: 'pending', path: '/bookings/fixed' },
+  { id: 'MNT-114-0023', name: '社團空間維修 S304', category: '線上申請', status: 'in_progress', path: '/maintenance' },
+  { id: 'OFC-114-0021', name: '幹部證明', category: '線上申請', status: 'pending', path: '/certificates' },
 ]

@@ -56,7 +56,7 @@ export default function OverviewPage() {
           </div>
         </div>
         <div className="todo-row">
-          <StatusPill status="pending" />
+          <StatusPill status="closing_due" />
           <div style={{ fontSize: 14, lineHeight: 1.6 }}>
             「迎新宿營」請於 <span className="num">2026/07/28</span> 前完成結案(剩 <span className="num">15</span> 天)。
           </div>
@@ -103,11 +103,7 @@ export default function OverviewPage() {
                 {cat}
               </div>
               {TRACKED.filter((t) => t.category === cat).map((t) => (
-                <Link
-                  key={t.id}
-                  to={cat === '活動' ? '/activities' : '#'}
-                  className="tracked-row"
-                >
+                <Link key={t.id} to={t.path} className="tracked-row">
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, color: 'var(--ink)' }}>{t.name}</div>
                     <div className="num" style={{ fontSize: 12, color: 'var(--steel)' }}>

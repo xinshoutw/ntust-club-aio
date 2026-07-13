@@ -30,6 +30,8 @@ services:
       - path: .env
         required: false
     environment:
+      # ENV 必須由 .env 明確宣告(dev/prod),避免正式機遺漏設定而靜默跳過 prod 防呆
+      ENV: ${ENV:?請在 .env 設定 ENV(dev 或 prod)}
       # 分離欄位交給後端 URL.create 組合,密碼含特殊字元也安全
       POSTGRES_HOST: db
       POSTGRES_PORT: "5432"

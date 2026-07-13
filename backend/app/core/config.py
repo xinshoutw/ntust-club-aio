@@ -8,6 +8,10 @@ from sqlalchemy import URL
 # repo 根目錄(club-aio/):config.py 位於 backend/app/core/
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
+# 已知的佔位字串一律不得用於正式環境(含 .env.example 的範本值)
+_PLACEHOLDER_SECRETS = frozenset(
+    {"dev-secret-change-me", "change-me", "change-me-to-a-long-random-string"}
+)
 _DEV_SECRET = "dev-secret-change-me"
 
 
@@ -55,7 +59,7 @@ class Settings(BaseSettings):
     def _forbid_dev_defaults_in_prod(self) -> Settings:
         if self.env == "prod":
             problems = []
-            if self.secret_key == _DEV_SECRET or len(self.secret_key) < 32:
+            if self.secret_key in _PLACEHOLDER_SECRETS or len(self.secret_key) < 32:
                 problems.append("SECRET_KEY 必須為 32 字元以上的隨機值")
             if self.postgres_password in ("", "club"):
                 problems.append("POSTGRES_PASSWORD 不可使用開發預設值")

@@ -23,9 +23,9 @@ target_metadata = Base.metadata
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
-    # render_as_string 會遮罩密碼,離線模式僅輸出 SQL 用不到密碼
+    # 離線模式只拿 URL 偵測 dialect,遮罩密碼即可(輸出 SQL 不含連線資訊)
     context.configure(
-        url=settings.sqlalchemy_url.render_as_string(hide_password=False),
+        url=settings.sqlalchemy_url.render_as_string(hide_password=True),
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},

@@ -401,7 +401,7 @@ export default function ActivityListPage() {
         afterClose={() => setPreview(null)}
         onEdit={() => {
           setPreviewOpen(false)
-          navigate('/activities/new')
+          if (preview) navigate(`/activities/${preview.id}/edit`)
         }}
         onPreviewFile={(f) => {
           setFilePreview(f)

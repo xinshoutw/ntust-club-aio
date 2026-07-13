@@ -180,6 +180,13 @@ export function addDraft(draft: Activity): void {
   CLUB_ACTIVITIES.unshift(draft)
 }
 
+// 編輯草稿/退回件後整筆置換(id 不變)
+export function replaceActivity(next: Activity): void {
+  const i = CLUB_ACTIVITIES.findIndex((a) => a.id === next.id)
+  if (i >= 0) CLUB_ACTIVITIES[i] = next
+  else CLUB_ACTIVITIES.unshift(next)
+}
+
 export function nextActivityId(): string {
   return `ACT-114-${String(40 + CLUB_ACTIVITIES.length).padStart(4, '0')}`
 }

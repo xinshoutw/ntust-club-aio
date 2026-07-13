@@ -1,14 +1,22 @@
 import { useRef, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { Navigate, useNavigate, useParams } from 'react-router'
 import { App, Button, Checkbox, DatePicker, Form, Input, InputNumber, Select, TimePicker, Tooltip, Upload } from 'antd'
 import type { UploadFile } from 'antd'
+import dayjs from 'dayjs'
 import { FileTextOutlined, InboxOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { useAuth } from '../../app/auth'
 import { blurLeavesRow } from '../../lib/form'
-import { addDraft, nextActivityId } from './mock'
+import { CLUB_ACTIVITIES, addDraft, nextActivityId, replaceActivity } from './mock'
 import { BUDGET_CATEGORIES, BUDGET_HINTS, fmtMoney, type Activity } from './types'
 import './actform.css'
+
+// '18:00–21:00'(或 -)→ TimePicker.RangePicker 值
+function parseTimeRange(tr?: string): [dayjs.Dayjs, dayjs.Dayjs] | undefined {
+  if (!tr) return undefined
+  const [a, b] = tr.split(/[–-]/).map((t) => dayjs(t.trim(), 'HH:mm'))
+  return a?.isValid() && b?.isValid() ? [a, b] : undefined
+}
 
 interface BudgetRow {
   key: number
@@ -40,17 +48,33 @@ const isWorkEmpty = (w: WorkRow) => w.task.trim() === '' && w.owner.trim() === '
 
 export default function ActivityFormPage() {
   const navigate = useNavigate()
+  const { id } = useParams()
   const { user } = useAuth()
   const { message, modal } = App.useApp()
   const [form] = Form.useForm()
   const activityType = Form.useWatch('type', form)
   const [files, setFiles] = useState<UploadFile[]>([])
 
+  // 編輯模式:僅草稿與被退回件可編輯,整筆預填
+  const editing = id ? CLUB_ACTIVITIES.find((a) => a.id === id && (a.status === 'draft' || a.status === 'rejected')) : undefined
+
   // 自動增列:保證尾端永遠有一列空白;清空的列自動移除
-  const workKeyRef = useRef(2)
-  const [works, setWorks] = useState<WorkRow[]>([{ key: 1, task: '', owner: '' }])
-  const budgetKeyRef = useRef(2)
-  const [budget, setBudget] = useState<BudgetRow[]>([emptyBudget(1)])
+  const workKeyRef = useRef((editing?.works?.length ?? 0) + 2)
+  const [works, setWorks] = useState<WorkRow[]>(() => {
+    const base = (editing?.works ?? []).map((w, i) => ({ key: i + 1, ...w }))
+    return [...base, { key: base.length + 1, task: '', owner: '' }]
+  })
+  const budgetKeyRef = useRef((editing?.budget.length ?? 0) + 2)
+  const [budget, setBudget] = useState<BudgetRow[]>(() => {
+    const base = (editing?.budget ?? []).map((b, i) => ({
+      key: i + 1,
+      category: b.category,
+      description: b.description,
+      selfFund: b.selfFund || null,
+      requestedSubsidy: b.requestedSubsidy || null,
+    }))
+    return [...base, emptyBudget(base.length + 1)]
+  })
 
   // 輸入時只增列;空列的移除延後到 blur(避免打字中列被吃掉)
   const setWork = (key: number, patch: Partial<Omit<WorkRow, 'key'>>) => {
@@ -97,7 +121,7 @@ export default function ActivityFormPage() {
     const v = form.getFieldsValue()
     const filledWorks = works.filter((w) => !isWorkEmpty(w))
     return {
-      id: nextActivityId(),
+      id: editing?.id ?? nextActivityId(),
       name: (v.name as string)?.trim() || '(未命名活動)',
       club: user?.club ?? '',
       type: (v.type as Activity['type']) ?? '社課',
@@ -120,9 +144,11 @@ export default function ActivityFormPage() {
     }
   }
 
+  const persist = (a: Activity) => (editing ? replaceActivity(a) : addDraft(a))
+
   const saveDraft = () => {
     const doSave = () => {
-      addDraft(buildDraft('draft'))
+      persist(buildDraft('draft'))
       message.success('已暫存草稿')
       navigate('/activities')
     }
@@ -146,10 +172,12 @@ export default function ActivityFormPage() {
       message.error('請填寫至少一筆工作分配。')
       return
     }
-    addDraft(buildDraft('pending_advisor'))
+    persist(buildDraft('pending_advisor'))
     message.success('已送出申請')
     navigate('/activities')
   }
+
+  if (id && !editing) return <Navigate to="/activities" replace />
 
   return (
     <div style={{ maxWidth: 1360, margin: '0 auto' }}>
@@ -158,7 +186,27 @@ export default function ActivityFormPage() {
         申請活動或社課,核准後辦理;辦理後 <span className="num">1</span> 個月內須完成結案。
       </div>
 
-      <Form form={form} layout="vertical" onFinish={onFinish} requiredMark initialValues={{ type: '社課' }}>
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={onFinish}
+        requiredMark
+        initialValues={
+          editing
+            ? {
+                name: editing.name === '(未命名活動)' ? '' : editing.name,
+                type: editing.type,
+                isLarge: editing.isLarge,
+                location: editing.location,
+                date: editing.date !== '—' ? dayjs(editing.date, 'YYYY/MM/DD') : undefined,
+                timeRange: parseTimeRange(editing.timeRange),
+                participantsIn: editing.participantsIn,
+                participantsOut: editing.participantsOut,
+                content: editing.content,
+              }
+            : { type: '社課' }
+        }
+      >
         <div className="actform-grid">
           {/* 左欄:基本資料 */}
           <div className="card" style={{ padding: 24 }}>

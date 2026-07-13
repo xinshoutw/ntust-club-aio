@@ -8,9 +8,10 @@ approved →(活動結束後)close → closing_pending_advisor → closed;退回
 """
 
 from datetime import UTC, datetime
+from urllib.parse import quote
 
 import sqlalchemy as sa
-from fastapi import APIRouter, BackgroundTasks, Query, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Query, Request, Response, UploadFile
 
 from app.api.pagination import Pagination, parse_sort
 from app.core.deps import ClubUser, DbDep, client_ip
@@ -36,7 +37,7 @@ from app.schemas.activities import (
 )
 from app.schemas.common import ApiResponse
 from app.services import activity_service as svc
-from app.services import audit, notify
+from app.services import audit, notify, pdf
 from app.services import files as file_service
 from app.services.settings_service import get_setting
 
@@ -312,6 +313,40 @@ async def delete_attachment(
     await file_service.delete_file(db, file)
     await db.commit()
     return ApiResponse()
+
+
+def _pdf_response(content: bytes, filename: str) -> Response:
+    quoted = quote(filename)
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename*=UTF-8''{quoted}"},
+    )
+
+
+async def _closed_activity_with_report(db, user, activity_id: int) -> Activity:
+    activity = await svc.get_own_activity(db, user, activity_id, with_detail=True)
+    if activity.report is None:
+        raise conflict("此活動尚未送出結案,無法產生文件")
+    return activity
+
+
+@router.get("/{activity_id}/report-pdf")
+async def download_report_pdf(activity_id: int, user: ClubUser, db: DbDep) -> Response:
+    """成果報告表 PDF(依需求方模板於下載時動態生成)。"""
+    activity = await _closed_activity_with_report(db, user, activity_id)
+    club = await _club_of(db, user)
+    content = pdf.report_pdf(club, activity, activity.report)
+    return _pdf_response(content, f"{club.name}_{activity.name}_成果報告表.pdf")
+
+
+@router.get("/{activity_id}/reflections-pdf")
+async def download_reflections_pdf(activity_id: int, user: ClubUser, db: DbDep) -> Response:
+    """學習心得 PDF(依需求方模板於下載時動態生成)。"""
+    activity = await _closed_activity_with_report(db, user, activity_id)
+    club = await _club_of(db, user)
+    content = pdf.reflections_pdf(club, activity, activity.report.reflections)
+    return _pdf_response(content, f"{club.name}_{activity.name}_學習心得.pdf")
 
 
 @router.post("/{activity_id}/close")

@@ -20,7 +20,10 @@ function money(a: Activity): string {
 }
 
 function sortValue(a: Activity, key: SortKey): string | number {
-  if (key === 'budget') return budgetTotals(a.budget).requested
+  if (key === 'budget') {
+    const t = budgetTotals(a.budget)
+    return t.self + t.requested
+  }
   if (key === 'status') return STATUS[a.status].label
   return a[key] ?? ''
 }

@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1 import activities, auth, club_profile, files, members
+from app.api.v1 import activities, auth, bookings, club_profile, files, members
 from app.schemas.common import ApiResponse
 
 router = APIRouter()
@@ -9,6 +9,7 @@ router.include_router(files.router)
 router.include_router(club_profile.router)
 router.include_router(members.router)
 router.include_router(activities.router)
+router.include_router(bookings.router)
 
 
 @router.get("/health")

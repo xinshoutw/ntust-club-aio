@@ -117,19 +117,10 @@ export default function EvalDocsPage() {
     })
   }
 
-  const setDocFile = async (activityId: string, kind: 'report' | 'feedback', f: File) => {
-    resultOf(activityId)[kind] = await toEvalFile(f)
-    message.success(`已上傳「${f.name}」`)
-    force()
-  }
-
-  const fileChip = (f: EvalFile, onRemove: () => void) => (
+  const fileChip = (f: EvalFile) => (
     <span key={f.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 4, padding: '2px 6px', maxWidth: 220 }}>
       <button type="button" className="link-btn" style={{ padding: 0, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} onClick={() => openPreview(f)}>
         {f.name}
-      </button>
-      <button type="button" className="link-btn danger" aria-label={`移除 ${f.name}`} style={{ padding: '0 2px', fontSize: 12 }} onClick={onRemove}>
-        ×
       </button>
     </span>
   )
@@ -167,6 +158,9 @@ export default function EvalDocsPage() {
           <div style={{ fontSize: 12, color: 'var(--steel)' }}>
             照片/影片 <span className="num">{byKey.ad2.final}/{byKey.ad2.max}</span> · 成果單 <span className="num">{byKey.ad3.final}/{byKey.ad3.max}</span> · 心得回饋 <span className="num">{byKey.ad4.final}/{byKey.ad4.max}</span>
           </div>
+        </div>
+        <div style={{ fontSize: 12, color: 'var(--steel)', padding: '0 20px 8px' }}>
+          成果單與心得由「活動結案」流程繳交(活動列表點等待結案的活動);照片與影片連結可於此補充。
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table className="tb" style={{ minWidth: 860 }}>
@@ -227,28 +221,16 @@ export default function EvalDocsPage() {
                     </td>
                     {(['report', 'feedback'] as const).map((kind) => (
                       <td key={kind} style={{ verticalAlign: 'top' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          {r[kind] ? (
-                            <>
-                              {okMark}
-                              {fileChip(r[kind], () => {
-                                r[kind] = null
-                                force()
-                              })}
-                            </>
-                          ) : (
-                            <Upload
-                              accept=".pdf,.doc,.docx"
-                              showUploadList={false}
-                              beforeUpload={(f) => {
-                                void setDocFile(a.id, kind, f)
-                                return false
-                              }}
-                            >
-                              <Button size="small" icon={<UploadOutlined />}>上傳</Button>
-                            </Upload>
-                          )}
-                        </div>
+                        {r[kind] ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                            {okMark}
+                            {fileChip(r[kind])}
+                          </div>
+                        ) : (
+                          <Tooltip title="由「活動結案」流程繳交">
+                            <span style={{ fontSize: 12, color: 'var(--muted)' }}>未繳交</span>
+                          </Tooltip>
+                        )}
                       </td>
                     ))}
                   </tr>

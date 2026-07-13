@@ -67,7 +67,9 @@ export default function LoginPage() {
             登入
           </Button>
           <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <a style={{ fontSize: 13 }}>忘記密碼?</a>
+            <button type="button" className="link-btn" style={{ color: 'var(--focus)' }}>
+              忘記密碼?
+            </button>
           </div>
         </form>
       </div>

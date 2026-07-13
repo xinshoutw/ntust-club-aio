@@ -4,19 +4,23 @@ from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.datastructures import MutableHeaders
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.api.v1 import router as api_v1_router
+from app.core.config import settings
 from app.core.errors import AppError
 
 logger = logging.getLogger("club_aio")
 
-# docs 掛在 /api 下,經 nginx 反代一樣可用
+_IS_DEV = settings.env == "dev"
+
+# docs 掛在 /api 下,經 nginx 反代一樣可用;正式環境不暴露 API 介面說明
 app = FastAPI(
     title="club-aio",
-    docs_url="/api/docs",
-    openapi_url="/api/openapi.json",
+    docs_url="/api/docs" if _IS_DEV else None,
+    openapi_url="/api/openapi.json" if _IS_DEV else None,
     redoc_url=None,
 )
 app.include_router(api_v1_router, prefix="/api/v1")
@@ -31,12 +35,30 @@ _SECURITY_HEADERS = {
 }
 
 
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
-        response = await call_next(request)
-        for k, v in _SECURITY_HEADERS.items():
-            response.headers.setdefault(k, v)
-        return response
+class SecurityHeadersMiddleware:
+    """純 ASGI(BaseHTTPMiddleware 會干擾串流回應與 BackgroundTasks)。"""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        # Swagger UI(僅 dev 存在)需要載入自身資源,不套 default-src 'none'
+        skip_csp = scope["path"].startswith("/api/docs")
+
+        async def send_with_headers(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                for key, value in _SECURITY_HEADERS.items():
+                    if key == "Content-Security-Policy" and skip_csp:
+                        continue
+                    if key not in headers:
+                        headers.append(key, value)
+            await send(message)
+
+        await self.app(scope, receive, send_with_headers)
 
 
 app.add_middleware(SecurityHeadersMiddleware)

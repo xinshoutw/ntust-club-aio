@@ -1,0 +1,25 @@
+.actform-grid {
+  margin-top: 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 1199px) {
+  .actform-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.budget-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* 金額輸入靠右 */
+.num-right input {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

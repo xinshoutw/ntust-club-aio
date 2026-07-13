@@ -13,7 +13,7 @@ import type { EvalFile } from '../eval/types'
 import FilePreview from '../eval/FilePreview'
 import { CLUB_ACTIVITIES } from './mock'
 import { budgetTotals, fmtMoney, type Activity } from './types'
-import { canClose } from './utils'
+import { TIME_RANGE_SEP, canClose } from './utils'
 
 const PAGE_SIZE = 20
 type SortKey = 'name' | 'type' | 'date' | 'budget' | 'status'
@@ -73,11 +73,15 @@ function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPrevi
   const r = resultOf(a.id)
   const rep = (a.status === 'closed' || a.status === 'closing_pending_advisor') ? a.report : undefined
 
-  // 與申請值比對:相同就不顯示實際值
+  // 與申請值比對:相同就不顯示實際值;比較前正規化分隔符,申請未填則一律視為變動並以「未填」呈現
+  const normTime = (tr: string) => tr.split(TIME_RANGE_SEP).map((s) => s.trim()).join('–')
   const actualTime = rep ? `${rep.actualStart}–${rep.actualEnd}` : ''
-  const timeChanged = !!rep && actualTime !== (a.timeRange ?? '')
+  const timeChanged = !!rep && normTime(actualTime) !== normTime(a.timeRange ?? '')
   const locationChanged = !!rep && rep.actualLocation !== (a.location ?? '')
-  const countChanged = !!rep && (rep.memberCount !== (a.participantsIn ?? 0) || rep.nonMemberCount !== (a.participantsOut ?? 0))
+  const plannedCountsMissing = a.participantsIn == null && a.participantsOut == null
+  const plannedCountsText = plannedCountsMissing ? '未填' : `校內 ${a.participantsIn ?? 0} · 校外 ${a.participantsOut ?? 0}`
+  const countChanged =
+    !!rep && (plannedCountsMissing || rep.memberCount !== (a.participantsIn ?? 0) || rep.nonMemberCount !== (a.participantsOut ?? 0))
 
   const downloadItems = [
     { key: 'photos', label: '下載照片檔', disabled: r.photos.length === 0 },
@@ -155,12 +159,9 @@ function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPrevi
                 <div style={{ color: 'var(--steel)' }}>人數</div>
                 <div>
                   {countChanged && rep ? (
-                    <ActualValue
-                      actual={`社員 ${rep.memberCount} · 非社員 ${rep.nonMemberCount}`}
-                      planned={`校內 ${a.participantsIn ?? 0} · 校外 ${a.participantsOut ?? 0}`}
-                    />
+                    <ActualValue actual={`社員 ${rep.memberCount} · 非社員 ${rep.nonMemberCount}`} planned={plannedCountsText} />
                   ) : (
-                    <span className="num">校內 {a.participantsIn ?? 0} · 校外 {a.participantsOut ?? 0}</span>
+                    <span className="num">{plannedCountsText}</span>
                   )}
                 </div>
               </>

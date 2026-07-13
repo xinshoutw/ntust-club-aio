@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     postgres_password: str = "club"
     postgres_db: str = "club_aio"
 
+    # Discord webhook(公告/審核/通過/拒絕等事件推送;空值=停用)
+    discord_webhook_url: str = ""
+
     smtp_host: str = ""
     smtp_port: int = 587
     smtp_security: Literal["starttls", "ssl", "none"] = "starttls"

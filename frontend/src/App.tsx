@@ -54,7 +54,7 @@ export default function App() {
       <Route
         element={
           <RequireRole roles={['club']}>
-            <AppShell nav={CLUB_NAV} />
+            <AppShell nav={CLUB_NAV} showYear={false} />
           </RequireRole>
         }
       >

@@ -1,28 +1,37 @@
 import { useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
-import { Drawer, Dropdown } from 'antd'
+import { Badge, Drawer, Dropdown, Popover } from 'antd'
 import { BellOutlined, DownOutlined, LogoutOutlined, MenuOutlined } from '@ant-design/icons'
 import { useAuth } from '../../app/auth'
 import type { NavGroup } from '../../lib/nav'
 import Sidebar from './Sidebar'
 import './shell.css'
 
+const NOTIFICATIONS = [
+  { title: '「迎新宿營」結案期限剩 15 天', time: '2026/07/13 09:00' },
+  { title: '您申請的 S304 教室(節次 3、4)已核准', time: '2026/06/16 14:20' },
+  { title: '114-2 社團評鑑報名開始', time: '2026/06/18 10:00' },
+]
+
 interface AppShellProps {
   nav: NavGroup[]
   badgeLabel?: string
+  showYear?: boolean
 }
 
-export default function AppShell({ nav, badgeLabel }: AppShellProps) {
+export default function AppShell({ nav, badgeLabel, showYear = true }: AppShellProps) {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [notifRead, setNotifRead] = useState(false)
 
   // 手機 topbar 依設計顯示目前頁名(對應 nav 項目;無對應時顯示系統名)
   const currentItem = nav
     .flatMap((g) => g.items)
     .find((i) => i.path === location.pathname)
   const mobileTitle = currentItem?.label ?? '社團管理系統'
+  const displayName = (user?.role === 'club' ? user.club : user?.name) ?? ''
 
   const userMenu = {
     items: [
@@ -51,18 +60,38 @@ export default function AppShell({ nav, badgeLabel }: AppShellProps) {
         <div className="topbar-mobile-title">{mobileTitle}</div>
         {badgeLabel && <span className="topbar-scope">{badgeLabel}</span>}
         <div className="topbar-spacer" />
-        <button type="button" className="topbar-year num" aria-label="切換學年度">
-          114 學年 <DownOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />
-        </button>
-        <button type="button" className="topbar-icon-btn" aria-label="通知">
-          <BellOutlined style={{ fontSize: 18 }} />
-          <span className="topbar-dot" />
-        </button>
+        {showYear && (
+          <button type="button" className="topbar-year num" aria-label="切換學年度">
+            114 學年 <DownOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />
+          </button>
+        )}
+        <Popover
+          trigger="click"
+          placement="bottomRight"
+          onOpenChange={(open) => open && setNotifRead(true)}
+          content={
+            <div style={{ width: 300 }}>
+              {NOTIFICATIONS.map((n) => (
+                <div key={n.title} style={{ padding: '10px 4px', borderBottom: '1px solid var(--line)' }}>
+                  <div style={{ fontSize: 13, fontWeight: 500 }}>{n.title}</div>
+                  <div className="num" style={{ fontSize: 12, color: 'var(--steel)', marginTop: 2 }}>{n.time}</div>
+                </div>
+              ))}
+              <div style={{ padding: '8px 4px 2px', fontSize: 12, color: 'var(--steel)', textAlign: 'center' }}>沒有更多通知</div>
+            </div>
+          }
+        >
+          <button type="button" className="topbar-icon-btn" aria-label="通知">
+            <Badge dot={!notifRead} offset={[-2, 2]}>
+              <BellOutlined style={{ fontSize: 18 }} />
+            </Badge>
+          </button>
+        </Popover>
         <div className="topbar-divider" />
         <Dropdown menu={userMenu} trigger={['click']}>
           <button type="button" className="topbar-user" aria-label="帳號選單">
-            <span className="topbar-avatar">{user?.name.charAt(0)}</span>
-            <span className="topbar-username">{user?.name}</span>
+            <span className="topbar-avatar">{displayName.charAt(0)}</span>
+            <span className="topbar-username">{displayName}</span>
             <DownOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />
           </button>
         </Dropdown>

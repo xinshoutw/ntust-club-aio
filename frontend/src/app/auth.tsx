@@ -17,10 +17,22 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null)
 const STORAGE_KEY = 'club-aio.session'
 
+function isSessionUser(value: unknown): value is SessionUser {
+  if (typeof value !== 'object' || value === null) return false
+  const v = value as Record<string, unknown>
+  return (
+    typeof v.name === 'string' &&
+    (v.role === 'club' || v.role === 'admin') &&
+    (v.club === undefined || typeof v.club === 'string')
+  )
+}
+
 function readStored(): SessionUser | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? (JSON.parse(raw) as SessionUser) : null
+    if (!raw) return null
+    const parsed: unknown = JSON.parse(raw)
+    return isSessionUser(parsed) ? parsed : null
   } catch {
     return null
   }

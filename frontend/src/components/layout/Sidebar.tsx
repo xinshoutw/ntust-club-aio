@@ -22,7 +22,7 @@ export default function Sidebar({ groups, onNavigate }: SidebarProps) {
             <NavLink
               key={item.key}
               to={item.path}
-              end={item.path === '/' || item.path === '/admin'}
+              end
               className={({ isActive }) => `sidebar-item${isActive ? ' active' : ''}`}
               onClick={onNavigate}
             >

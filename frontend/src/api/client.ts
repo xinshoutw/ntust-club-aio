@@ -28,8 +28,12 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new Error(`HTTP ${res.status}`)
   }
 
+  if (typeof body?.success !== 'boolean') {
+    throw new Error(`HTTP ${res.status}`)
+  }
   if (!res.ok || !body.success) {
     throw new Error(body.error ?? `HTTP ${res.status}`)
   }
+  // data 可為 null:呼叫端以 api<T | null> 表達可空端點
   return body.data as T
 }

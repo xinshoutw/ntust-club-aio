@@ -1,6 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router'
 import type { ReactNode } from 'react'
-import { useAuth } from './app/auth'
+import { useAuth, type Role } from './app/auth'
 import { ADMIN_NAV, CLUB_NAV } from './lib/nav'
 import AppShell from './components/layout/AppShell'
 import PlaceholderPage from './components/ui/PlaceholderPage'
@@ -13,11 +13,13 @@ import SignupFormPage from './features/signup/SignupFormPage'
 import ReviewPage from './features/admin/ReviewPage'
 import SignupBuilderPage from './features/admin/SignupBuilderPage'
 
-function RequireRole({ role, children }: { role: 'club' | 'admin'; children: ReactNode }) {
+function RequireRole({ roles, children }: { roles: Role[]; children: ReactNode }) {
   const { user } = useAuth()
   const location = useLocation()
   if (!user) return <Navigate to="/login" replace state={{ from: location }} />
-  if (user.role !== role) return <Navigate to={user.role === 'admin' ? '/admin' : '/'} replace />
+  if (!roles.includes(user.role)) {
+    return <Navigate to={user.role === 'admin' ? '/admin' : '/'} replace />
+  }
   return children
 }
 
@@ -28,7 +30,7 @@ export default function App() {
 
       <Route
         element={
-          <RequireRole role="club">
+          <RequireRole roles={['club']}>
             <AppShell nav={CLUB_NAV} />
           </RequireRole>
         }
@@ -55,7 +57,7 @@ export default function App() {
       <Route
         path="/admin"
         element={
-          <RequireRole role="admin">
+          <RequireRole roles={['admin']}>
             <AppShell nav={ADMIN_NAV} badgeLabel="行政後台" />
           </RequireRole>
         }

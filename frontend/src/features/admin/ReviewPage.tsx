@@ -49,6 +49,8 @@ function DetailDrawer({ item, onClose }: { item: ReviewItem; onClose: () => void
   const { message } = App.useApp()
   const [rejectOpen, setRejectOpen] = useState(false)
   const [reason, setReason] = useState('')
+  // 大型活動由社團申請、審核時認可;認可後行政分才享 ×3 加權
+  const [largeApproved, setLargeApproved] = useState(true)
   const d = item.detail
   // 核定金額:controlled,依預算列 id 管理
   const [approvals, setApprovals] = useState<Record<number, number>>(() =>
@@ -101,7 +103,8 @@ function DetailDrawer({ item, onClose }: { item: ReviewItem; onClose: () => void
               type="primary"
               style={{ height: 38 }}
               onClick={() => {
-                message.success(`已核准 ${item.id},送組長關`)
+                const largeNote = item.type === '大型活動' ? `(大型活動${largeApproved ? '已認可' : '未認可'})` : ''
+                message.success(`已核准 ${item.id}${largeNote},送組長關`)
                 onClose()
               }}
             >
@@ -149,6 +152,18 @@ function DetailDrawer({ item, onClose }: { item: ReviewItem; onClose: () => void
             : '—'}
         </div>
       </div>
+
+      {item.type === '大型活動' && (
+        <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--paper)', borderRadius: 6 }}>
+          <Checkbox
+            checked={largeApproved}
+            disabled={!canReview}
+            onChange={(e) => setLargeApproved(e.target.checked)}
+          >
+            認可為大型活動(評鑑行政分 ×3 加權)
+          </Checkbox>
+        </div>
+      )}
 
       {d && d.budget.length > 0 && (
         <>

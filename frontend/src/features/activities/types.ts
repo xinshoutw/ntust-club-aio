@@ -19,7 +19,8 @@ export interface Activity {
   name: string
   club: string
   type: '社課' | '活動' | '會議'
-  isLarge?: boolean
+  isLarge?: boolean // 社團申請大型活動
+  largeApproved?: boolean // 管理員認可後行政分才享大型 ×3 加權
   date: string
   timeRange?: string
   location?: string

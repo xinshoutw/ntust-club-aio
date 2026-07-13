@@ -77,6 +77,28 @@ export const CLUB_ACTIVITIES: Activity[] = [
       { id: 1, category: '印刷費', description: '迎新海報與手冊', selfFund: 2000, requestedSubsidy: 6000 },
     ],
   },
+  {
+    id: 'ACT-114-0010',
+    name: 'Python 入門系列(一)',
+    club: '資工系學會',
+    type: '社課',
+    date: '2026/04/09',
+    status: 'closed',
+    budget: [],
+  },
+  {
+    id: 'ACT-114-0008',
+    name: '校際程式競賽',
+    club: '資工系學會',
+    type: '活動',
+    isLarge: true,
+    largeApproved: true,
+    date: '2026/05/16',
+    status: 'closed',
+    budget: [
+      { id: 1, category: '比賽獎勵品', description: '獎盃與獎品', selfFund: 12000, requestedSubsidy: 30000 },
+    ],
+  },
 ]
 
 export interface Announcement {

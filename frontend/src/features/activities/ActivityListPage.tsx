@@ -6,7 +6,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
 import { STATUS, type StatusKey } from '../../lib/status'
-import { CURRENT_SEMESTER, semesterOf, semesterOptions } from '../../lib/semester'
+import { semesterOf, semesterOptions } from '../../lib/semester'
 import { CLUB_ACTIVITIES } from './mock'
 import { budgetTotals, fmtMoney, type Activity } from './types'
 
@@ -25,14 +25,15 @@ function sortValue(a: Activity, key: SortKey): string | number {
   return a[key] ?? ''
 }
 
-function PreviewModal({ a, onClose, onEdit }: { a: Activity | null; onClose: () => void; onEdit: () => void }) {
+function PreviewModal({ a, open, onClose, afterClose, onEdit }: { a: Activity | null; open: boolean; onClose: () => void; afterClose: () => void; onEdit: () => void }) {
   if (!a) return null
   const t = budgetTotals(a.budget)
   const editable = a.status === 'draft' || a.status === 'rejected'
   return (
     <Modal
-      open
+      open={open}
       onCancel={onClose}
+      afterClose={afterClose}
       title={
         <span style={{ display: 'inline-flex', gap: 10, alignItems: 'center' }}>
           {a.name} <StatusPill status={a.status} />
@@ -102,12 +103,14 @@ export default function ActivityListPage() {
   const { user } = useAuth()
   const navigate = useNavigate()
   const { message } = App.useApp()
-  const [semester, setSemester] = useState(CURRENT_SEMESTER)
+  const semOptions = semesterOptions(CLUB_ACTIVITIES.filter((a) => a.status !== 'draft').map((a) => semesterOf(a.date)))
+  const [semester, setSemester] = useState(semOptions[0].value)
   const [page, setPage] = useState(1)
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 } | null>(null)
   const [typeFilter, setTypeFilter] = useState<string[]>([])
   const [statusFilter, setStatusFilter] = useState<StatusKey[]>([])
   const [preview, setPreview] = useState<Activity | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
 
   const act = (label: string, a: Activity) => message.info(`「${label}」尚未接上後端(${a.name})`)
 
@@ -139,9 +142,9 @@ export default function ActivityListPage() {
   const statusKeys = [...new Set(CLUB_ACTIVITIES.filter((a) => a.status !== 'draft').map((a) => a.status))]
 
   const row = (a: Activity, actions: React.ReactNode) => (
-    <tr key={a.id} onClick={() => setPreview(a)} style={{ cursor: 'pointer' }}>
+    <tr key={a.id} onClick={() => { setPreview(a); setPreviewOpen(true) }} style={{ cursor: 'pointer' }}>
       <td style={{ fontWeight: 500 }}>{a.name}</td>
-      <td>{a.type}</td>
+      <td>{a.type}{a.isLarge && <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 500, color: 'var(--seal)', border: '1px solid var(--seal)', borderRadius: 4, padding: '0 4px' }}>大</span>}</td>
       <td className="num" style={{ fontSize: 13 }}>{a.date}</td>
       <td className="r num" style={{ fontSize: 13 }}>{money(a)}</td>
       <td><StatusPill status={a.status} /></td>
@@ -166,7 +169,7 @@ export default function ActivityListPage() {
               setPage(1)
             }}
             style={{ width: 110 }}
-            options={semesterOptions(CLUB_ACTIVITIES.filter((a) => a.status !== 'draft').map((a) => semesterOf(a.date)))}
+            options={semOptions}
           />
         }
       />
@@ -266,9 +269,11 @@ export default function ActivityListPage() {
 
       <PreviewModal
         a={preview}
-        onClose={() => setPreview(null)}
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        afterClose={() => setPreview(null)}
         onEdit={() => {
-          setPreview(null)
+          setPreviewOpen(false)
           navigate('/activities/new')
         }}
       />

@@ -13,21 +13,24 @@ const CELL: Record<CellState, { label: string; bg: string; fg?: string }> = {
   free: { label: '可借', bg: '#EEF0F3' },
   closed: { label: '不開放', bg: '#9AA1AC', fg: '#fff' },
   reviewing: { label: '審核中', bg: '#F5A623', fg: '#fff' },
-  temp: { label: '臨時借用', bg: '#FBE9E7' },
+  temp: { label: '臨時借用', bg: '#F0A899' },
   fixed: { label: '固定借用', bg: '#9E1B32', fg: '#fff' },
   mine: { label: '我的借用', bg: '#2E7D57', fg: '#fff' },
 }
 
-// mock 佔用資料(接後端後由 API 取當日場況)
-function cellState(venue: string, period: string, myClub?: string): CellState {
-  if (venue === 'TR 練團室' && ['1', '2'].includes(period)) return 'closed'
-  if (venue === 'S304 音樂教室' && period === '3')
-    return ROOM_REQUESTS.some((r) => r.club === myClub && r.room === venue) ? 'mine' : 'fixed'
-  if (venue === 'S304 音樂教室' && period === '4') return 'reviewing'
-  if (venue === '精誠廣場 1' && ['5', '6', '7'].includes(period)) return myClub === '資工系學會' ? 'mine' : 'temp'
-  if (venue === 'S312/S313' && ['A', 'B'].includes(period)) return 'temp'
-  if (venue === 'S207' && ['6', '7'].includes(period)) return 'fixed'
-  return 'free'
+// mock 佔用資料(接後端後由 API 取當日場況);全校社團的借用皆會顯示
+function cellInfo(venue: string, period: string, myClub?: string): { state: CellState; club?: string } {
+  if (venue === 'TR 練團室' && ['1', '2'].includes(period)) return { state: 'closed' }
+  if (venue === 'S304 音樂教室' && period === '3') {
+    const isMine = ROOM_REQUESTS.some((r) => r.club === myClub && r.room === venue)
+    return { state: isMine ? 'mine' : 'fixed', club: isMine ? myClub : '電機系學會' }
+  }
+  if (venue === 'S304 音樂教室' && period === '4') return { state: 'reviewing', club: '電機系學會' }
+  if (venue === '精誠廣場 1' && ['5', '6', '7'].includes(period))
+    return myClub === '資工系學會' ? { state: 'mine', club: myClub } : { state: 'temp', club: '資工系學會' }
+  if (venue === 'S312/S313' && ['A', 'B'].includes(period)) return { state: 'temp', club: '機器人研究社' }
+  if (venue === 'S207' && ['6', '7'].includes(period)) return { state: 'fixed', club: '美術社' }
+  return { state: 'free' }
 }
 
 export default function BookingOverviewPage() {
@@ -75,13 +78,11 @@ export default function BookingOverviewPage() {
                 <tr key={v.name}>
                   <td style={{ fontSize: 13, whiteSpace: 'nowrap', paddingRight: 8 }}>{v.name}</td>
                   {PERIODS.map((p) => {
-                    const st = cellState(v.name, p, mine)
+                    const info = cellInfo(v.name, p, mine)
+                    const tip = `${v.name} 第${p}節:${CELL[info.state].label}${info.club ? `(${info.club})` : ''}`
                     return (
                       <td key={p}>
-                        <div
-                          title={`${v.name} 第${p}節:${CELL[st].label}`}
-                          style={{ width: 28, height: 22, borderRadius: 4, background: CELL[st].bg }}
-                        />
+                        <div title={tip} style={{ width: 28, height: 22, borderRadius: 4, background: CELL[info.state].bg }} />
                       </td>
                     )
                   })}
@@ -92,53 +93,45 @@ export default function BookingOverviewPage() {
         </div>
       </div>
 
+      {/* 我的借用:單卡整併(固定/臨時/器材),僅顯示自己社團 */}
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>固定場地</div>
-        <table className="tb" style={{ minWidth: 560 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>我的借用(進行中)</div>
+        <table className="tb" style={{ minWidth: 680 }}>
+          <thead>
+            <tr>
+              <th style={{ width: 90 }}>類別</th>
+              <th>內容</th>
+              <th>時間</th>
+              <th style={{ width: 110 }}>狀態</th>
+            </tr>
+          </thead>
           <tbody>
             {rooms.map((r) => (
               <tr key={r.id}>
+                <td style={{ color: 'var(--steel)', fontSize: 13 }}>固定場地</td>
                 <td style={{ fontWeight: 500 }}>{r.room}</td>
                 <td style={{ color: 'var(--steel)', fontSize: 13 }}>
                   {r.entries.map((e) => `${e.date} 第${e.period}節`).join('、')}
                 </td>
-                <td style={{ width: 110 }}><StatusPill status={r.status} /></td>
+                <td><StatusPill status={r.status} /></td>
               </tr>
             ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>臨時場地</div>
-        <table className="tb" style={{ minWidth: 560 }}>
-          <tbody>
             {venues.map((v) => (
               <tr key={v.id}>
-                <td style={{ fontWeight: 500 }}>{v.venue}</td>
-                <td className="num" style={{ fontSize: 13 }}>{v.date}</td>
-                <td style={{ color: 'var(--steel)', fontSize: 13 }}>第 {v.periods.join('、')} 節 · {v.purpose}</td>
-                <td style={{ width: 110 }}><StatusPill status={v.status} /></td>
+                <td style={{ color: 'var(--steel)', fontSize: 13 }}>臨時場地</td>
+                <td style={{ fontWeight: 500 }}>{v.venue}<span style={{ color: 'var(--steel)', fontWeight: 400, fontSize: 13 }}> · {v.purpose}</span></td>
+                <td className="num" style={{ color: 'var(--steel)', fontSize: 13 }}>{v.date} 第 {v.periods.join('、')} 節</td>
+                <td><StatusPill status={v.status} /></td>
               </tr>
             ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>器材(借用中)</div>
-        <table className="tb" style={{ minWidth: 640 }}>
-          <tbody>
             {active.map((l) => (
               <tr key={l.id}>
-                <td style={{ fontWeight: 500 }}>
-                  {l.equipment} <span className="num">×{l.qty}</span>
+                <td style={{ color: 'var(--steel)', fontSize: 13 }}>器材</td>
+                <td style={{ fontWeight: 500 }}>{l.equipment} <span className="num">×{l.qty}</span></td>
+                <td className="num" style={{ color: 'var(--steel)', fontSize: 13 }}>
+                  {l.status === 'checked_out' && l.returnDue ? `歸還期限 ${l.returnDue}` : `${l.startDate} – ${l.endDate}`}
                 </td>
-                <td className="num" style={{ fontSize: 13 }}>{l.startDate} – {l.endDate}</td>
-                <td style={{ color: 'var(--steel)', fontSize: 13 }}>
-                  {l.status === 'checked_out' && l.returnDue ? `歸還期限 ${l.returnDue}` : l.purpose}
-                </td>
-                <td style={{ width: 110 }}><StatusPill status={l.status} /></td>
+                <td><StatusPill status={l.status} /></td>
               </tr>
             ))}
           </tbody>

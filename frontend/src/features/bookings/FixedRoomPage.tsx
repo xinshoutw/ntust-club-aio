@@ -57,7 +57,7 @@ export default function FixedRoomPage() {
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
         <Form form={form} layout="vertical" onFinish={submit} requiredMark>
           <div className="form-grid-2">
-            <Form.Item name="room" label="教室" rules={[{ required: true, message: '請選擇教室' }]} style={{ marginBottom: 0 }}>
+            <Form.Item name="room" label="場地" rules={[{ required: true, message: '請選擇場地' }]} style={{ marginBottom: 0 }}>
               <Select
                 placeholder="請選擇"
                 options={VENUES.filter((v) => v.allowFixed).map((v) => ({
@@ -72,22 +72,21 @@ export default function FixedRoomPage() {
           </div>
 
           <div style={{ fontSize: 13, fontWeight: 500, margin: '18px 0 8px' }}>
-            借用時段 <span style={{ color: '#C13B34' }}>*</span>
+            時段 <span style={{ color: '#C13B34' }}>*</span>
             <span style={{ fontWeight: 400, color: 'var(--steel)', marginLeft: 8, fontSize: 12 }}>
-              填寫後自動增列;節次可按住拖曳批量選取
+              填寫後自動增列;可按住拖曳批量選取
             </span>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {entries.map((e) => (
-              <div key={e.key} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', flexWrap: 'wrap', border: '1px solid var(--line)', borderRadius: 6, padding: '10px 12px' }}>
+              <div key={e.key} style={{ border: '1px solid var(--line)', borderRadius: 6, padding: '10px 12px' }}>
                 <DatePicker
+                  style={{ marginBottom: 8 }}
                   format="YYYY/MM/DD"
                   placeholder="日期"
                   onChange={(_, ds) => updateEntry(e.key, { date: (ds as string) || undefined })}
                 />
-                <div style={{ flex: 1, minWidth: 260 }}>
-                  <PeriodPicker size="small" value={e.periods} onChange={(ps) => updateEntry(e.key, { periods: ps })} />
-                </div>
+                <PeriodPicker size="small" nowrap value={e.periods} onChange={(ps) => updateEntry(e.key, { periods: ps })} />
               </div>
             ))}
           </div>

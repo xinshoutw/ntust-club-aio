@@ -30,9 +30,8 @@ _COLORS = {
 }
 
 
-async def discord(kind: str, title: str, description: str = "") -> None:
-    """推送單一事件到 Discord webhook;kind ∈ _COLORS。"""
-    url = settings.discord_webhook_url
+async def discord_to(url: str, kind: str, title: str, description: str = "") -> None:
+    """推送單一事件到指定 webhook;kind ∈ _COLORS。"""
     if not url:
         logger.info("discord disabled: %s %s", kind, title)
         return
@@ -51,6 +50,20 @@ async def discord(kind: str, title: str, description: str = "") -> None:
             resp.raise_for_status()
     except Exception:  # noqa: BLE001 - 通知失敗不得影響業務
         logger.exception("discord webhook failed: %s %s", kind, title)
+
+
+async def discord(kind: str, title: str, description: str = "") -> None:
+    """推送到學務處全域 webhook(.env)。"""
+    await discord_to(settings.discord_webhook_url, kind, title, description)
+
+
+async def club_event(
+    kind: str, title: str, description: str = "", club_webhook: str | None = None
+) -> None:
+    """社團相關事件:推全域 webhook,社團自設 webhook(管理項目)另推一份。"""
+    await discord(kind, title, description)
+    if club_webhook:
+        await discord_to(club_webhook, kind, title, description)
 
 
 async def send_email(to_addr: str, subject: str, body: str, template: str = "generic") -> None:

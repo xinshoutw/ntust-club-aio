@@ -10,7 +10,7 @@ export default function AnnouncementsPage() {
   const target = Form.useWatch('target', form) as string | undefined
 
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div style={{ maxWidth: 720, margin: '0 auto' }}>
       <PageHeader title="發布系統公告" />
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>

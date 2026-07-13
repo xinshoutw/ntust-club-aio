@@ -11,7 +11,7 @@ export default function BookingOverviewPage() {
   const loans = EQUIPMENT_LOANS.filter((l) => l.club === mine)
 
   return (
-    <div style={{ maxWidth: 1000 }}>
+    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <PageHeader title="借用總覽" sub={mine} />
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>

@@ -7,35 +7,23 @@ import { useAuth } from '../../app/auth'
 import { CLUB_ACTIVITIES } from './mock'
 import { budgetTotals, fmtMoney, type Activity } from './types'
 
-// 依狀態決定列動作(結案/退回為列表內動作與狀態,無獨立頁)
+// 列上僅保留狀態動作(編輯/查看改為點擊整列)
 function rowActions(a: Activity, act: (label: string, a: Activity) => void) {
+  const stop = (e: React.MouseEvent) => e.stopPropagation()
   switch (a.status) {
     case 'draft':
       return (
         <>
-          <button type="button" className="link-btn primary" onClick={() => act('送出', a)}>送出</button>
-          <button type="button" className="link-btn" onClick={() => act('編輯', a)}>編輯</button>
-          <button type="button" className="link-btn" onClick={() => act('刪除', a)}>刪除</button>
-        </>
-      )
-    case 'rejected':
-      return (
-        <>
-          <button type="button" className="link-btn primary" onClick={() => act('編輯重送', a)}>編輯重送</button>
-          <button type="button" className="link-btn" onClick={() => act('查看', a)}>查看</button>
+          <button type="button" className="link-btn primary" onClick={(e) => { stop(e); act('送出', a) }}>送出</button>
+          <button type="button" className="link-btn danger" onClick={(e) => { stop(e); act('刪除', a) }}>刪除</button>
         </>
       )
     case 'approved':
       return (
-        <>
-          <button type="button" className="link-btn primary" onClick={() => act('結案', a)}>結案</button>
-          <button type="button" className="link-btn" onClick={() => act('查看', a)}>查看</button>
-        </>
+        <button type="button" className="link-btn primary" onClick={(e) => { stop(e); act('結案', a) }}>結案</button>
       )
     default:
-      return (
-        <button type="button" className="link-btn" onClick={() => act('查看', a)}>查看</button>
-      )
+      return null
   }
 }
 
@@ -66,15 +54,12 @@ export default function ActivityListPage() {
   const { message } = App.useApp()
 
   const act = (label: string, a: Activity) => {
-    if (label === '編輯' || label === '編輯重送') {
-      navigate('/activities/new')
-      return
-    }
-    message.info(`「${label}」尚未接上後端(${a.id})`)
+    message.info(`「${label}」尚未接上後端(${a.name})`)
   }
+  const open = () => navigate('/activities/new')
 
   return (
-    <div style={{ maxWidth: 1200 }}>
+    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
       <PageHeader
         title="活動列表"
         sub={
@@ -84,20 +69,19 @@ export default function ActivityListPage() {
         }
         extra={
           <span className="desktop-only">
-            <Button type="primary" style={{ height: 36 }} onClick={() => navigate('/activities/new')}>
+            <Button type="primary" style={{ height: 36 }} onClick={open}>
               + 活動申請
             </Button>
           </span>
         }
       />
 
-      {/* 桌面:表格 */}
+      {/* 桌面:表格(點列開啟編輯/查看) */}
       <div className="desktop-only">
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-          <table className="tb" style={{ minWidth: 860 }}>
+          <table className="tb" style={{ minWidth: 760 }}>
             <thead>
               <tr>
-                <th>單號</th>
                 <th>名稱</th>
                 <th>類型</th>
                 <th>日期</th>
@@ -111,8 +95,7 @@ export default function ActivityListPage() {
                 const totals = budgetTotals(a.budget)
                 return (
                   <Fragment key={a.id}>
-                    <tr>
-                      <td className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>{a.id}</td>
+                    <tr onClick={open} style={{ cursor: 'pointer' }}>
                       <td style={{ fontWeight: 500 }}>{a.name}</td>
                       <td>{a.type}</td>
                       <td className="num" style={{ fontSize: 13 }}>{a.date}</td>
@@ -124,7 +107,7 @@ export default function ActivityListPage() {
                     </tr>
                     {a.rejectReason && (
                       <tr className="no-hover">
-                        <td colSpan={7} style={{ padding: '0 16px 14px' }}>
+                        <td colSpan={6} style={{ padding: '0 16px 14px' }}>
                           <RejectReasonBox a={a} />
                         </td>
                       </tr>
@@ -136,30 +119,35 @@ export default function ActivityListPage() {
           </table>
         </div>
         <div style={{ marginTop: 10, fontSize: 12, color: 'var(--steel)' }}>
-          「已退回」列展開顯示退回原因;逾期鎖定活動請洽課外活動指導組解鎖後結案。
+          點擊列可編輯/查看;「已退回」列下方顯示退回原因;逾期鎖定活動請洽課外活動指導組解鎖後結案。
         </div>
       </div>
 
-      {/* 手機:卡片 */}
+      {/* 手機:卡片(點卡開啟) */}
       <div className="mobile-only">
         <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <Button type="primary" style={{ height: 44 }} onClick={() => navigate('/activities/new')}>
+          <Button type="primary" style={{ height: 44 }} onClick={open}>
             + 活動申請
           </Button>
           {CLUB_ACTIVITIES.map((a) => {
             const totals = budgetTotals(a.budget)
             return (
-              <div className="card" key={a.id} style={{ padding: '14px 16px', boxShadow: 'none' }}>
+              <div
+                className="card"
+                key={a.id}
+                style={{ padding: '14px 16px', boxShadow: 'none', cursor: 'pointer' }}
+                onClick={open}
+              >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ fontSize: 14, fontWeight: 500, flex: 1 }}>{a.name}</div>
                   <StatusPill status={a.status} />
                 </div>
                 <div className="num" style={{ fontSize: 11, color: 'var(--steel)', marginTop: 4 }}>
-                  {a.id} · {a.date}
+                  {a.type} · {a.date}
                 </div>
                 {a.status === 'pending_dean' && (
                   <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 4 }}>
-                    {a.type} · 自籌 <span className="num">{fmtMoney(totals.self)}</span> · 擬請{' '}
+                    自籌 <span className="num">{fmtMoney(totals.self)}</span> · 擬請{' '}
                     <span className="num">{fmtMoney(totals.requested)}</span>
                   </div>
                 )}
@@ -179,7 +167,7 @@ export default function ActivityListPage() {
                     <RejectReasonBox a={a} compact />
                   </div>
                 )}
-                {(a.status === 'draft' || a.status === 'rejected' || a.status === 'approved') && (
+                {(a.status === 'draft' || a.status === 'approved') && (
                   <div
                     style={{
                       display: 'flex',

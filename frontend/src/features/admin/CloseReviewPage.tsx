@@ -15,7 +15,7 @@ export default function CloseReviewPage() {
   const { message } = App.useApp()
 
   return (
-    <div style={{ maxWidth: 1000 }}>
+    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <PageHeader
         title="結案審核"
         sub={

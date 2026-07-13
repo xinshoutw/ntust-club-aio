@@ -9,7 +9,7 @@ export default function CertificatePage() {
   const [form] = Form.useForm()
 
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div style={{ maxWidth: 720, margin: '0 auto' }}>
       <PageHeader title="幹部證明" />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
         社(會)長、副社(會)長服務證明;製作約 <span className="num">2</span> 個工作天,完成後至課外活動指導組領取。

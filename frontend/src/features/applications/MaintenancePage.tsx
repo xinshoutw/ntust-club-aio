@@ -26,7 +26,7 @@ export default function MaintenancePage() {
   const [files, setFiles] = useState<UploadFile[]>([])
 
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div style={{ maxWidth: 720, margin: '0 auto' }}>
       <PageHeader title="空間報修" />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
         社團活動空間設施損壞報修;可附照片或短片佐證。

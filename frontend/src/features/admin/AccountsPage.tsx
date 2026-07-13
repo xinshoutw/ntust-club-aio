@@ -12,7 +12,7 @@ export function AdminAccountsPage() {
     { name: '學務長', account: 'dean', scope: '受限(僅簽核)', perms: '學務長簽核關' },
   ]
   return (
-    <div style={{ maxWidth: 1000 }}>
+    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <PageHeader title="管理員帳號" extra={<Button type="primary" style={{ height: 36 }} onClick={() => message.info('新增管理員(接後端後啟用)')}>+ 新增</Button>} />
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         <table className="tb" style={{ minWidth: 720 }}>
@@ -47,7 +47,7 @@ export function ClubAccountsPage() {
     { club: '機械系學會', account: 'me_club', active: false },
   ]
   return (
-    <div style={{ maxWidth: 1000 }}>
+    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <PageHeader title="社團帳號" extra={<Button type="primary" style={{ height: 36 }} onClick={() => message.info('新增社團帳號(接後端後啟用)')}>+ 新增</Button>} />
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         <table className="tb" style={{ minWidth: 640 }}>
@@ -96,7 +96,7 @@ export function ViewerAccountsPage() {
     { name: '陳老師', awards: '最佳社團負責人獎', clubs: '第 2 組(學生會)' },
   ]
   return (
-    <div style={{ maxWidth: 1000 }}>
+    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <PageHeader title="評審老師與指派" extra={<Button type="primary" style={{ height: 36 }} onClick={() => message.info('新增評審與分組(接後端後啟用)')}>+ 新增評審</Button>} />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
         評審對社團匿名呈現(依組內排序顯示為評審A、評審B)。

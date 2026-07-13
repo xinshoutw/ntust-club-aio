@@ -11,7 +11,7 @@ const LOGS = [
 
 export default function AuditPage() {
   return (
-    <div style={{ maxWidth: 1000 }}>
+    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <PageHeader title="稽核軌跡" sub="高風險操作紀錄(唯讀)" />
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>

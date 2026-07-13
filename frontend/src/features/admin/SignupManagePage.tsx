@@ -20,7 +20,7 @@ export default function SignupManagePage() {
   const [expanded, setExpanded] = useState<string | null>('cadre-training')
 
   return (
-    <div style={{ maxWidth: 1000 }}>
+    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <PageHeader
         title="報名管理"
         extra={

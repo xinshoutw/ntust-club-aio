@@ -13,7 +13,7 @@ export default function PostalPage() {
   const [files, setFiles] = useState<UploadFile[]>([])
 
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div style={{ maxWidth: 720, margin: '0 auto' }}>
       <PageHeader title="郵局帳戶異動" />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
         更換代理人、新開戶、印鑑變更、帳簿遺失、結清銷戶;公文作業約 3–5 個工作天。

@@ -7,7 +7,7 @@ export default function ClubSettingsPage() {
   const { message } = App.useApp()
 
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div style={{ maxWidth: 720, margin: '0 auto' }}>
       <PageHeader title="管理項目" sub={user?.club} />
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>

@@ -10,7 +10,7 @@ export default function AdminViolationsPage() {
   const [form] = Form.useForm()
 
   return (
-    <div style={{ maxWidth: 1000 }}>
+    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <PageHeader
         title="違規管理"
         sub={

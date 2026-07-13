@@ -9,7 +9,7 @@ export default function AdminMembersPage() {
   const [club, setClub] = useState(CLUBS[0])
 
   return (
-    <div style={{ maxWidth: 1000 }}>
+    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <PageHeader
         title="成員管理"
         extra={

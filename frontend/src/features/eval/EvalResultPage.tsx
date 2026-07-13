@@ -55,7 +55,7 @@ export default function EvalResultPage() {
   const { user } = useAuth()
 
   return (
-    <div style={{ maxWidth: 720 }}>
+    <div style={{ maxWidth: 720, margin: '0 auto' }}>
       <PageHeader title="評鑑結果" sub={`${user?.club} · 114 學年`} />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
         評語由學務處開放後顯示;評審以匿名(評審A/B)呈現。

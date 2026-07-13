@@ -9,7 +9,7 @@ export default function SignupListPage() {
   const navigate = useNavigate()
 
   return (
-    <div style={{ maxWidth: 1000 }}>
+    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <PageHeader title="線上報名" />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
         學務處開放報名之會議與活動;人數上限為單一社團配額。

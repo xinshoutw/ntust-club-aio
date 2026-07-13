@@ -32,7 +32,7 @@ export default function EvalDocsPage() {
   const uploaded = SLOTS.filter((s) => s.files.length > 0).length
 
   return (
-    <div style={{ maxWidth: 1000 }}>
+    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <PageHeader
         title="資料總覽"
         sub={

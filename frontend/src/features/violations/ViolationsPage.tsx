@@ -8,7 +8,7 @@ export default function ViolationsPage() {
   const mine = VIOLATIONS.filter((v) => v.club === user?.club)
 
   return (
-    <div style={{ maxWidth: 1000 }}>
+    <div style={{ maxWidth: 1000, margin: '0 auto' }}>
       <PageHeader
         title="違規勸導紀錄"
         sub={

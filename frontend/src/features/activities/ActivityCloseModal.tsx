@@ -55,6 +55,8 @@ export default function ActivityCloseModal({ activity, open, onClose, afterClose
   })
   const [photos, setPhotos] = useState<EvalFile[]>([])
   const photoQueue = useRef(Promise.resolve())
+  // 本 Modal 已收照片的 hash(同步維護,不受 render 時序影響)
+  const photoHashes = useRef(new Set<string>())
   // 取消/暫存(捨棄照片)時釋放 object URL;送出後照片轉入評鑑 store,不釋放
   const photosRef = useRef<EvalFile[]>([])
   photosRef.current = photos
@@ -87,13 +89,13 @@ export default function ActivityCloseModal({ activity, open, onClose, afterClose
     photoQueue.current = photoQueue.current.then(async () => {
       try {
         const hash = await sha256(f)
-        const dup = allPhotoHashes().has(hash) || photos.some((p) => p.hash === hash)
-        if (dup) {
+        if (allPhotoHashes().has(hash) || photoHashes.current.has(hash)) {
           message.error(`「${f.name}」與已上傳的照片內容相同,已拒絕重複上傳`)
           return
         }
+        photoHashes.current.add(hash)
         const ef = await toEvalFile(f, hash)
-        setPhotos((ps) => (ps.some((p) => p.hash === hash) ? ps : [...ps, ef]))
+        setPhotos((ps) => [...ps, ef])
       } catch (e) {
         message.error(`照片處理失敗:${e instanceof Error ? e.message : String(e)}`)
       }
@@ -319,6 +321,7 @@ export default function ActivityCloseModal({ activity, open, onClose, afterClose
                 style={{ position: 'absolute', top: -6, right: -6, background: '#fff', border: '1px solid var(--line)', borderRadius: '50%', width: 16, height: 16, lineHeight: '12px', padding: 0, fontSize: 11 }}
                 onClick={() => {
                   releaseFile(p)
+                  if (p.hash) photoHashes.current.delete(p.hash)
                   setPhotos((ps) => ps.filter((x) => x.id !== p.id))
                 }}
               >

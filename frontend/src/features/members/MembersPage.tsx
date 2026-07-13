@@ -240,9 +240,9 @@ export default function MembersPage() {
           <Form.Item name="kind" label="身份" rules={[{ required: true }]}>
             <Select options={KINDS.map((k) => ({ value: k, label: k }))} />
           </Form.Item>
-          {kind !== '社員' && (
+          {kind === '幹部' && (
             <Form.Item name="title" label="職稱" preserve={false} rules={[{ required: true, message: '請填寫職稱' }]}>
-              <Input placeholder="例:社長、總務" />
+              <Input placeholder="例:總務、活動" />
             </Form.Item>
           )}
         </Form>

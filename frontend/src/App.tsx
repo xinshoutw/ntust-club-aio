@@ -21,6 +21,7 @@ import MaintenancePage from './features/applications/MaintenancePage'
 import PostalPage from './features/applications/PostalPage'
 import CertificatePage from './features/applications/CertificatePage'
 import EvalDocsPage from './features/eval/EvalDocsPage'
+import AwardDetailPage from './features/eval/AwardDetailPage'
 import EvalResultPage from './features/eval/EvalResultPage'
 import ViolationsPage from './features/violations/ViolationsPage'
 import AdminHomePage from './features/admin/AdminHomePage'
@@ -73,6 +74,7 @@ export default function App() {
         <Route path="postal" element={<PostalPage />} />
         <Route path="certificates" element={<CertificatePage />} />
         <Route path="eval" element={<EvalDocsPage />} />
+        <Route path="eval/award/:award" element={<AwardDetailPage />} />
         <Route path="eval/result" element={<EvalResultPage />} />
         <Route path="violations" element={<ViolationsPage />} />
       </Route>

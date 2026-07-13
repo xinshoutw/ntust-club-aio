@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run"
   },
   "dependencies": {
     "@ant-design/icons": "^6.3.2",
@@ -16,6 +17,8 @@
     "@tanstack/react-query": "^5.101.2",
     "antd": "^6.5.1",
     "dayjs": "^1.11.21",
+    "dompurify": "^3.4.12",
+    "mammoth": "^1.12.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router": "^8.2.0"
@@ -27,6 +30,7 @@
     "@vitejs/plugin-react": "^6.0.3",
     "oxlint": "^1.71.0",
     "typescript": "~6.0.2",
-    "vite": "^8.1.1"
+    "vite": "^8.1.1",
+    "vitest": "^4.1.10"
   }
 }

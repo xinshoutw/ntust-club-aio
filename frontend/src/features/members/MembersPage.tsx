@@ -1,26 +1,80 @@
-import { useState } from 'react'
-import { App, Button, Form, Input, Modal, Popconfirm, Select } from 'antd'
+import { useMemo, useState } from 'react'
+import { App, Button, Dropdown, Form, Input, Modal, Pagination, Popconfirm, Select, Upload } from 'antd'
+import { DownOutlined, FilterOutlined, SwapOutlined, UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { useAuth } from '../../app/auth'
+import { CURRENT_SEMESTER, semesterOptions } from '../../lib/semester'
 import { MEMBERS, type Member } from './mock'
+
+const KINDS: Member['kind'][] = ['社員', '幹部', '副社長／副會長', '社長／會長']
+const PAGE_SIZE = 50
 
 export default function MembersPage() {
   const { user } = useAuth()
   const { message } = App.useApp()
   const [members, setMembers] = useState<Member[]>(MEMBERS)
   const [addOpen, setAddOpen] = useState(false)
+  const [csvOpen, setCsvOpen] = useState(false)
+  const [csvText, setCsvText] = useState('')
+  const [semester, setSemester] = useState<string>(CURRENT_SEMESTER)
+  const [page, setPage] = useState(1)
+  const [sort, setSort] = useState<{ key: 'kind' | 'title'; dir: 1 | -1 } | null>(null)
+  const [kindFilter, setKindFilter] = useState<Member['kind'][]>([])
+  const [editing, setEditing] = useState<{ id: number; field: 'kind' | 'title' } | null>(null)
   const [form] = Form.useForm()
   const kind = Form.useWatch('kind', form)
 
+  const nextId = () => Math.max(0, ...members.map((m) => m.id)) + 1
+
   const onAdd = (values: { name: string; studentId: string; kind: Member['kind']; title?: string }) => {
-    setMembers((ms) => [
-      ...ms,
-      { id: Math.max(0, ...ms.map((m) => m.id)) + 1, updatedAt: '—(未儲存)', ...values },
-    ])
+    setMembers((ms) => [...ms, { id: nextId(), semester: CURRENT_SEMESTER, updatedAt: '—(未儲存)', ...values }])
     setAddOpen(false)
     form.resetFields()
     message.success('已新增社員(名單更新影響評鑑行政分)')
   }
+
+  // CSV:姓名,學號,身份[,職稱]
+  const importCsv = (text: string) => {
+    const rows = text
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((l) => l.split(/[,\t]/).map((c) => c.trim()))
+    const valid: Member[] = []
+    let base = nextId()
+    for (const cols of rows) {
+      const [name, studentId, k, title] = cols
+      if (!name || !studentId) continue
+      const memberKind = (KINDS as string[]).includes(k) ? (k as Member['kind']) : '社員'
+      valid.push({ id: base++, name, studentId, kind: memberKind, title: title || undefined, semester: CURRENT_SEMESTER, updatedAt: '—(未儲存)' })
+    }
+    if (!valid.length) {
+      message.error('沒有可匯入的資料;格式:姓名,學號,身份[,職稱]')
+      return
+    }
+    setMembers((ms) => [...ms, ...valid])
+    setCsvOpen(false)
+    setCsvText('')
+    message.success(`已匯入 ${valid.length} 名社員`)
+  }
+
+  const update = (id: number, patch: Partial<Member>) =>
+    setMembers((ms) => ms.map((m) => (m.id === id ? { ...m, ...patch, updatedAt: '—(未儲存)' } : m)))
+
+  const view = useMemo(() => {
+    let list = members.filter((m) => semester === 'all' || m.semester === semester)
+    if (kindFilter.length) list = list.filter((m) => kindFilter.includes(m.kind))
+    if (sort) {
+      list = [...list].sort(
+        (a, b) => sort.dir * String(a[sort.key] ?? '').localeCompare(String(b[sort.key] ?? ''), 'zh-Hant'),
+      )
+    }
+    return list
+  }, [members, semester, kindFilter, sort])
+
+  const paged = view.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const toggleSort = (key: 'kind' | 'title') =>
+    setSort((s) => (s?.key === key ? (s.dir === 1 ? { key, dir: -1 } : null) : { key, dir: 1 }))
 
   return (
     <div style={{ maxWidth: 1000, margin: '0 auto' }}>
@@ -28,35 +82,116 @@ export default function MembersPage() {
         title="成員列表"
         sub={
           <>
-            {user?.club} · 共 <span className="num">{members.length}</span> 人
+            {user?.club} · 共 <span className="num">{view.length}</span> 人
           </>
         }
         extra={
-          <Button type="primary" style={{ height: 36 }} onClick={() => setAddOpen(true)}>
-            + 新增社員
-          </Button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Select
+              value={semester}
+              onChange={(v) => {
+                setSemester(v)
+                setPage(1)
+              }}
+              style={{ width: 120 }}
+              options={semesterOptions(members.map((m) => m.semester), true)}
+            />
+            <Button style={{ height: 36 }} icon={<UploadOutlined />} onClick={() => setCsvOpen(true)}>
+              匯入 CSV
+            </Button>
+            <Button type="primary" style={{ height: 36 }} onClick={() => setAddOpen(true)}>
+              + 新增社員
+            </Button>
+          </div>
         }
       />
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-        <table className="tb" style={{ minWidth: 640 }}>
+        <table className="tb" style={{ minWidth: 680 }}>
           <thead>
             <tr>
               <th>姓名</th>
               <th>學號</th>
-              <th>身分</th>
-              <th>職稱</th>
+              <th>
+                <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                  <button type="button" className="link-btn" style={{ padding: 0, fontWeight: 500 }} onClick={() => toggleSort('kind')}>
+                    身份 <SwapOutlined rotate={90} style={{ fontSize: 11 }} />
+                  </button>
+                  <Dropdown
+                    menu={{
+                      items: KINDS.map((k) => ({ key: k, label: k })),
+                      selectable: true,
+                      multiple: true,
+                      selectedKeys: kindFilter,
+                      onSelect: ({ selectedKeys }) => setKindFilter(selectedKeys as Member['kind'][]),
+                      onDeselect: ({ selectedKeys }) => setKindFilter(selectedKeys as Member['kind'][]),
+                    }}
+                  >
+                    <FilterOutlined style={{ fontSize: 11, color: kindFilter.length ? 'var(--seal)' : 'var(--steel)', cursor: 'pointer' }} />
+                  </Dropdown>
+                </span>
+              </th>
+              <th>
+                <button type="button" className="link-btn" style={{ padding: 0, fontWeight: 500 }} onClick={() => toggleSort('title')}>
+                  職稱 <SwapOutlined rotate={90} style={{ fontSize: 11 }} />
+                </button>
+              </th>
+              <th>學期</th>
               <th>更新時間</th>
               <th className="r">動作</th>
             </tr>
           </thead>
           <tbody>
-            {members.map((m) => (
+            {paged.map((m) => (
               <tr key={m.id}>
                 <td style={{ fontWeight: 500 }}>{m.name}</td>
                 <td className="num" style={{ color: 'var(--steel)' }}>{m.studentId}</td>
-                <td>{m.kind}</td>
-                <td>{m.title ?? '—'}</td>
+                <td>
+                  {editing?.id === m.id && editing.field === 'kind' ? (
+                    <Select
+                      size="small"
+                      autoFocus
+                      defaultOpen
+                      value={m.kind}
+                      style={{ width: 150 }}
+                      options={KINDS.map((k) => ({ value: k, label: k }))}
+                      onChange={(v) => {
+                        update(m.id, { kind: v, ...(v === '社員' ? { title: undefined } : {}) })
+                        setEditing(null)
+                      }}
+                      onBlur={() => setEditing(null)}
+                    />
+                  ) : (
+                    <button type="button" className="link-btn" style={{ padding: 0, color: 'var(--ink)' }} onClick={() => setEditing({ id: m.id, field: 'kind' })}>
+                      {m.kind} <DownOutlined style={{ fontSize: 10, color: 'var(--steel)' }} />
+                    </button>
+                  )}
+                </td>
+                <td>
+                  {editing?.id === m.id && editing.field === 'title' ? (
+                    <Input
+                      size="small"
+                      autoFocus
+                      defaultValue={m.title}
+                      style={{ width: 120 }}
+                      onBlur={(e) => {
+                        update(m.id, { title: e.target.value.trim() || undefined })
+                        setEditing(null)
+                      }}
+                      onPressEnter={(e) => {
+                        update(m.id, { title: (e.target as HTMLInputElement).value.trim() || undefined })
+                        setEditing(null)
+                      }}
+                    />
+                  ) : m.kind === '社員' ? (
+                    <span style={{ color: 'var(--muted)' }}>—</span>
+                  ) : (
+                    <button type="button" className="link-btn" style={{ padding: 0, color: 'var(--ink)' }} onClick={() => setEditing({ id: m.id, field: 'title' })}>
+                      {m.title ?? '(未填)'} <DownOutlined style={{ fontSize: 10, color: 'var(--steel)' }} />
+                    </button>
+                  )}
+                </td>
+                <td className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.semester}</td>
                 <td className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.updatedAt}</td>
                 <td className="r">
                   <Popconfirm
@@ -66,7 +201,7 @@ export default function MembersPage() {
                     cancelText="取消"
                     onConfirm={() => setMembers((ms) => ms.filter((x) => x.id !== m.id))}
                   >
-                    <button type="button" className="link-btn danger">移除</button>
+                    <Button size="small" danger>移除</Button>
                   </Popconfirm>
                 </td>
               </tr>
@@ -74,8 +209,13 @@ export default function MembersPage() {
           </tbody>
         </table>
       </div>
+      {view.length > PAGE_SIZE && (
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 14 }}>
+          <Pagination current={page} pageSize={PAGE_SIZE} total={view.length} onChange={setPage} showSizeChanger={false} />
+        </div>
+      )}
       <div style={{ marginTop: 10, fontSize: 12, color: 'var(--steel)' }}>
-        幹部需填職稱;名單定期更新採計「社員、幹部名單更新」行政分。
+        點擊身份/職稱可直接修改(社員無職稱);名單定期更新採計「社員、幹部名單更新」行政分。
       </div>
 
       <Modal
@@ -95,15 +235,44 @@ export default function MembersPage() {
           <Form.Item name="studentId" label="學號" rules={[{ required: true, message: '請輸入學號' }]}>
             <Input className="num" />
           </Form.Item>
-          <Form.Item name="kind" label="身分" rules={[{ required: true }]}>
-            <Select options={[{ value: '社員' }, { value: '幹部' }]} />
+          <Form.Item name="kind" label="身份" rules={[{ required: true }]}>
+            <Select options={KINDS.map((k) => ({ value: k, label: k }))} />
           </Form.Item>
-          {kind === '幹部' && (
-            <Form.Item name="title" label="職稱" preserve={false} rules={[{ required: true, message: '幹部需填職稱' }]}>
+          {kind !== '社員' && (
+            <Form.Item name="title" label="職稱" preserve={false} rules={[{ required: true, message: '請填寫職稱' }]}>
               <Input placeholder="例:社長、總務" />
             </Form.Item>
           )}
         </Form>
+      </Modal>
+
+      <Modal
+        open={csvOpen}
+        title="匯入社員(CSV)"
+        onCancel={() => setCsvOpen(false)}
+        onOk={() => importCsv(csvText)}
+        okText="匯入"
+      >
+        <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 10 }}>
+          每行一人:<span className="num">姓名,學號,身份[,職稱]</span>;可上傳 .csv 或直接貼上。
+        </div>
+        <Upload
+          accept=".csv,.txt"
+          maxCount={1}
+          showUploadList={false}
+          beforeUpload={(f) => {
+            f.text().then(setCsvText)
+            return false
+          }}
+        >
+          <Button icon={<UploadOutlined />} style={{ marginBottom: 10 }}>選擇 CSV 檔</Button>
+        </Upload>
+        <Input.TextArea
+          rows={6}
+          value={csvText}
+          onChange={(e) => setCsvText(e.target.value)}
+          placeholder={'王小明,B11100001,幹部,活動\n林大同,B11100002,社員'}
+        />
       </Modal>
     </div>
   )

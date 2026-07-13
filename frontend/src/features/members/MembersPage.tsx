@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { App, Button, Dropdown, Form, Input, Modal, Pagination, Popconfirm, Select, Upload } from 'antd'
-import { DownOutlined, FilterOutlined, SwapOutlined, UploadOutlined } from '@ant-design/icons'
+import { DownOutlined, EditOutlined, FilterOutlined, SwapOutlined, UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { useAuth } from '../../app/auth'
 import { CURRENT_SEMESTER, semesterOptions } from '../../lib/semester'
@@ -58,8 +58,10 @@ export default function MembersPage() {
     message.success(`已匯入 ${valid.length} 名社員`)
   }
 
-  const update = (id: number, patch: Partial<Member>) =>
-    setMembers((ms) => ms.map((m) => (m.id === id ? { ...m, ...patch, updatedAt: '—(未儲存)' } : m)))
+  const update = (id: number, patch: Partial<Member>) => {
+    setMembers((ms) => ms.map((m) => (m.id === id ? { ...m, ...patch, updatedAt: '剛剛' } : m)))
+    message.success('已自動儲存')
+  }
 
   const view = useMemo(() => {
     let list = members.filter((m) => semester === 'all' || m.semester === semester)
@@ -114,7 +116,7 @@ export default function MembersPage() {
               <th>學號</th>
               <th>
                 <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                  <button type="button" className="link-btn" style={{ padding: 0, fontWeight: 500 }} onClick={() => toggleSort('kind')}>
+                  <button type="button" className="link-btn" style={{ padding: 0, fontWeight: 500, color: sort?.key === 'kind' ? 'var(--seal)' : undefined }} onClick={() => toggleSort('kind')}>
                     身份 <SwapOutlined rotate={90} style={{ fontSize: 11 }} />
                   </button>
                   <Dropdown
@@ -132,7 +134,7 @@ export default function MembersPage() {
                 </span>
               </th>
               <th>
-                <button type="button" className="link-btn" style={{ padding: 0, fontWeight: 500 }} onClick={() => toggleSort('title')}>
+                <button type="button" className="link-btn" style={{ padding: 0, fontWeight: 500, color: sort?.key === 'title' ? 'var(--seal)' : undefined }} onClick={() => toggleSort('title')}>
                   職稱 <SwapOutlined rotate={90} style={{ fontSize: 11 }} />
                 </button>
               </th>
@@ -183,11 +185,11 @@ export default function MembersPage() {
                         setEditing(null)
                       }}
                     />
-                  ) : m.kind === '社員' ? (
+                  ) : m.kind !== '幹部' ? (
                     <span style={{ color: 'var(--muted)' }}>—</span>
                   ) : (
                     <button type="button" className="link-btn" style={{ padding: 0, color: 'var(--ink)' }} onClick={() => setEditing({ id: m.id, field: 'title' })}>
-                      {m.title ?? '(未填)'} <DownOutlined style={{ fontSize: 10, color: 'var(--steel)' }} />
+                      {m.title ?? '(未填)'} <EditOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />
                     </button>
                   )}
                 </td>

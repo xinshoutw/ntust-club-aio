@@ -174,7 +174,7 @@ erDiagram
 | id | serial PK | |
 | club_id | FK | |
 | name / content / location | text | |
-| type | enum(一般活動,社課,大型活動) | 影響行政分權重(大型×3) |
+| type | enum(社課,活動,會議) | 2026-07-13 需求調整(原:一般活動/社課/大型活動)。**注意**:評鑑行政分原有「大型活動×3」加權,類型取消後此規則待與承辦重新對齊 |
 | date | date | 活動日期(學期用日期推導) |
 | start_time / end_time | time | 原型 timeRange |
 | participants_in / participants_out | int | 校內/校外人數 |
@@ -198,7 +198,7 @@ approved → [社團送結案] → closing_pending_advisor(結案待輔導老師
 approved 且 活動日期+1個月 已過 且未送結案 → 「逾期鎖定」(推導狀態,非欄位;close_unlocked=true 可解鎖)
 ```
 
-**activity_budget_items**(id, activity_id FK, category text(經費科目:印刷費/比賽獎勵品/指導老師教練費/演講裁判費/其他…), description, self_fund int, requested_subsidy int, approved_subsidy int NULL)
+**activity_budget_items**(id, activity_id FK, category text(經費科目九項:指導老師教練費/保險費/交通費/膳食費/印刷費/比賽獎勵品/雜支/其他/活動收入,2026-07-13 定案,含 UI 提示文字), description, self_fund int, requested_subsidy int, approved_subsidy int NULL)
 — 逐項編列;`approved_subsidy` 由輔導老師關卡逐項核定。科目先用 text + 前端下拉(科目表進 settings),不開表(YAGNI,科目穩定後再說)。
 
 **activity_reports**(activity_id PK/FK 1:1, attend_expected, attend_registered, attend_should, attend_actual, attend_leave, highlights, goals, others, review_meeting bool, review_date date, video_url text, expense int, submitted_at)

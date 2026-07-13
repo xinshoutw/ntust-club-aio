@@ -16,7 +16,7 @@ export interface ReviewItem {
     submittedAt: string
     submittedBy: string
     attachments: string[]
-    budget: { category: string; description: string; selfFund: number; requested: number; approved: number }[]
+    budget: { id: number; category: string; description: string; selfFund: number; requested: number; approved: number }[]
   }
 }
 
@@ -38,9 +38,9 @@ export const REVIEW_ITEMS: ReviewItem[] = [
       submittedBy: '王小明(社長)',
       attachments: ['電機之夜_企劃書.pdf', '舞台估價單.pdf'],
       budget: [
-        { category: '指導老師/教練費', description: '晚會導演與技術指導', selfFund: 20000, requested: 20000, approved: 20000 },
-        { category: '印刷費', description: '宣傳與場刊', selfFund: 15000, requested: 15000, approved: 12000 },
-        { category: '其他', description: '舞台燈光音響租賃', selfFund: 66800, requested: 66800, approved: 60000 },
+        { id: 1, category: '指導老師/教練費', description: '晚會導演與技術指導', selfFund: 20000, requested: 20000, approved: 20000 },
+        { id: 2, category: '印刷費', description: '宣傳與場刊', selfFund: 15000, requested: 15000, approved: 12000 },
+        { id: 3, category: '其他', description: '舞台燈光音響租賃', selfFund: 66800, requested: 66800, approved: 60000 },
       ],
     },
   },

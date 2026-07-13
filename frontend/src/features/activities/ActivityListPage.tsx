@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { App, Button, Dropdown, Modal, Pagination, Select, Tooltip } from 'antd'
-import { DownloadOutlined, FileTextOutlined, FilterOutlined, LinkOutlined, MoreOutlined, SwapOutlined } from '@ant-design/icons'
+import { DownloadOutlined, EllipsisOutlined, FileTextOutlined, FilterOutlined, LinkOutlined, SwapOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
-import { STATUS, type StatusKey } from '../../lib/status'
+import { STATUS } from '../../lib/status'
 import { semesterOf, semesterOptions } from '../../lib/semester'
 import { resultOf } from '../eval/store'
-import { downloadEvalFile } from '../eval/files'
+import { downloadEvalFile, downloadPhotosZip } from '../eval/files'
 import type { EvalFile } from '../eval/types'
 import FilePreview from '../eval/FilePreview'
 import { CLUB_ACTIVITIES } from './mock'
@@ -47,33 +47,63 @@ function FileChip({ f, onPreview }: { f: EvalFile; onPreview: (f: EvalFile) => v
   )
 }
 
+// 詳情彈窗的分區標題
+function SectionTitle({ children, first }: { children: React.ReactNode; first?: boolean }) {
+  return (
+    <div style={{ fontSize: 13, fontWeight: 600, margin: first ? '0 0 10px' : '22px 0 10px', paddingBottom: 6, borderBottom: '1px solid var(--line)' }}>
+      {children}
+    </div>
+  )
+}
+
+// 申請值後方的「實際值」備註:未變動不顯示
+const changedNote = (text: string) => (
+  <span style={{ color: '#8A5A00', marginLeft: 6 }}>(實際 {text})</span>
+)
+
 function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPreviewFile }: { a: Activity | null; open: boolean; onClose: () => void; afterClose: () => void; onEdit: () => void; onGoClose: () => void; onPreviewFile: (f: EvalFile) => void }) {
   if (!a) return null
   const t = budgetTotals(a.budget)
   const editable = a.status === 'draft' || a.status === 'rejected'
   const r = resultOf(a.id)
+  const rep = (a.status === 'closed' || a.status === 'closing_pending_advisor') ? a.report : undefined
+
+  // 與申請值比對:相同就不顯示實際值
+  const actualTime = rep ? `${rep.actualStart}–${rep.actualEnd}` : ''
+  const timeChanged = !!rep && actualTime !== (a.timeRange ?? '')
+  const locationChanged = !!rep && rep.actualLocation !== (a.location ?? '')
+  const countChanged = !!rep && (rep.memberCount !== (a.participantsIn ?? 0) || rep.nonMemberCount !== (a.participantsOut ?? 0))
+
   const downloadItems = [
     { key: 'photos', label: '下載照片檔', disabled: r.photos.length === 0 },
     { key: 'feedback', label: '下載學習心得檔案', disabled: !r.feedback },
     { key: 'report', label: '下載活動成果報告', disabled: !r.report },
   ]
   const onDownload = ({ key }: { key: string }) => {
-    if (key === 'photos') r.photos.forEach(downloadEvalFile)
+    // 照片打包成 zip(僅 archive);成果報告/心得之後依需求方模板於下載時動態生成 PDF
+    if (key === 'photos') void downloadPhotosZip(`${a.name}_照片`, r.photos)
     if (key === 'feedback' && r.feedback) downloadEvalFile(r.feedback)
     if (key === 'report' && r.report) downloadEvalFile(r.report)
   }
+
   return (
     <Modal
       open={open}
       onCancel={onClose}
       afterClose={afterClose}
+      width={rep ? 1080 : 640}
       title={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 30 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 26 }}>
           {a.name} <StatusPill status={a.status} />
           <span style={{ flex: 1 }} />
           <Dropdown trigger={['click']} menu={{ items: downloadItems, onClick: onDownload }}>
-            <button type="button" className="link-btn" aria-label="下載選單" style={{ padding: '0 4px' }}>
-              <MoreOutlined style={{ fontSize: 18, color: 'var(--steel)' }} />
+            <button
+              type="button"
+              className="link-btn"
+              aria-label="下載選單"
+              style={{ padding: 0, width: 24, height: 24, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <EllipsisOutlined style={{ fontSize: 18, color: 'var(--steel)' }} />
             </button>
           </Dropdown>
         </div>
@@ -88,108 +118,145 @@ function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPrevi
         ) : null
       }
     >
-      <div style={{ display: 'grid', gridTemplateColumns: '88px 1fr', gap: '8px 12px', fontSize: 13, marginTop: 8 }}>
-        <div style={{ color: 'var(--steel)' }}>類型</div><div>{a.type}</div>
-        <div style={{ color: 'var(--steel)' }}>日期</div><div className="num">{a.date}{a.timeRange ? ` ${a.timeRange}` : ''}</div>
-        {a.location && (<><div style={{ color: 'var(--steel)' }}>地點</div><div>{a.location}</div></>)}
-        {(a.participantsIn != null || a.participantsOut != null) && (
-          <>
-            <div style={{ color: 'var(--steel)' }}>人數</div>
-            <div className="num">校內 {a.participantsIn ?? 0} · 校外 {a.participantsOut ?? 0}</div>
-          </>
-        )}
-        {a.content && (<><div style={{ color: 'var(--steel)' }}>內容</div><div style={{ lineHeight: 1.6 }}>{a.content}</div></>)}
-        {a.works && a.works.length > 0 && (
-          <>
-            <div style={{ color: 'var(--steel)' }}>工作分配</div>
-            <div>{a.works.map((w) => [w.task, w.owner].filter(Boolean).join(':')).join('、')}</div>
-          </>
-        )}
-        <div style={{ color: 'var(--steel)' }}>經費</div>
-        <div className="num">{money(a) === '–' ? '無申請經費' : `自籌 ${fmtMoney(t.self)} · 擬請 ${fmtMoney(t.requested)}`}</div>
-        {a.attachments && a.attachments.length > 0 && (
-          <>
-            <div style={{ color: 'var(--steel)' }}>附件</div>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-              {a.attachments.map((f) => (
-                <FileChip key={f.id} f={f} onPreview={onPreviewFile} />
-              ))}
+      <div style={{ display: 'grid', gridTemplateColumns: rep ? 'minmax(0, 1fr) minmax(0, 1fr)' : '1fr', gap: 32, marginTop: 10, alignItems: 'start' }}>
+        {/* 左欄:申請資料、經費、檔案 */}
+        <div>
+          <SectionTitle first>基本資料</SectionTitle>
+          <div style={{ display: 'grid', gridTemplateColumns: '88px 1fr', gap: '9px 12px', fontSize: 13 }}>
+            <div style={{ color: 'var(--steel)' }}>類型</div><div>{a.type}</div>
+            <div style={{ color: 'var(--steel)' }}>日期</div>
+            <div>
+              <span className="num">{a.date}{a.timeRange ? ` ${a.timeRange}` : ''}</span>
+              {timeChanged && changedNote(actualTime)}
             </div>
-          </>
-        )}
-      </div>
+            {(a.location || locationChanged) && (
+              <>
+                <div style={{ color: 'var(--steel)' }}>地點</div>
+                <div>
+                  {a.location ?? '—'}
+                  {locationChanged && rep && changedNote(rep.actualLocation)}
+                </div>
+              </>
+            )}
+            {(a.participantsIn != null || a.participantsOut != null || countChanged) && (
+              <>
+                <div style={{ color: 'var(--steel)' }}>人數</div>
+                <div>
+                  <span className="num">校內 {a.participantsIn ?? 0} · 校外 {a.participantsOut ?? 0}</span>
+                  {countChanged && rep && changedNote(`社員 ${rep.memberCount} · 非社員 ${rep.nonMemberCount}`)}
+                </div>
+              </>
+            )}
+            {a.content && (<><div style={{ color: 'var(--steel)' }}>內容</div><div style={{ lineHeight: 1.7 }}>{a.content}</div></>)}
+            {a.works && a.works.length > 0 && (
+              <>
+                <div style={{ color: 'var(--steel)' }}>工作分配</div>
+                <div style={{ lineHeight: 1.7 }}>{a.works.map((w) => [w.task, w.owner].filter(Boolean).join(':')).join('、')}</div>
+              </>
+            )}
+            {a.attachments && a.attachments.length > 0 && (
+              <>
+                <div style={{ color: 'var(--steel)' }}>附件</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {a.attachments.map((f) => (
+                    <FileChip key={f.id} f={f} onPreview={onPreviewFile} />
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
 
-      {a.budget.length > 0 && (
-        <>
-          <div style={{ fontSize: 13, fontWeight: 600, margin: '14px 0 6px' }}>經費明細</div>
+          <SectionTitle>
+            經費
+            <span style={{ fontWeight: 400, color: 'var(--steel)', marginLeft: 8, fontSize: 12 }}>
+              {money(a) === '–' ? '無申請經費' : <>自籌 <span className="num">{fmtMoney(t.self)}</span> · 擬請 <span className="num">{fmtMoney(t.requested)}</span></>}
+              {rep && <> · 實際支出 <span className="num">{fmtMoney(rep.expense)}</span></>}
+            </span>
+          </SectionTitle>
           {a.budget.map((b) => (
-            <div key={b.id} style={{ display: 'flex', gap: 8, fontSize: 13, padding: '4px 0', borderBottom: '1px solid var(--line)' }}>
+            <div key={b.id} style={{ display: 'flex', gap: 8, fontSize: 13, padding: '5px 0', borderBottom: '1px solid var(--line)' }}>
               <span style={{ width: 110, color: 'var(--steel)' }}>{b.category}</span>
               <span style={{ flex: 1 }}>{b.description}</span>
               <span className="num">{b.selfFund.toLocaleString()} / {b.requestedSubsidy.toLocaleString()}</span>
             </div>
           ))}
-        </>
-      )}
 
-      {a.rejectReason && (
-        <div style={{ background: 'var(--paper)', borderRadius: 6, padding: '10px 12px', fontSize: 13, lineHeight: 1.7, marginTop: 14 }}>
-          <span style={{ fontWeight: 500, color: '#B03A2E' }}>退回原因</span>
-          <span style={{ color: 'var(--steel)' }}> — {a.rejectReason.by} · <span className="num">{a.rejectReason.date}</span>:</span>
-          {a.rejectReason.text}
+          {a.rejectReason && (
+            <div style={{ background: 'var(--paper)', borderRadius: 6, padding: '10px 12px', fontSize: 13, lineHeight: 1.7, marginTop: 16 }}>
+              <span style={{ fontWeight: 500, color: '#B03A2E' }}>退回原因</span>
+              <span style={{ color: 'var(--steel)' }}> — {a.rejectReason.by} · <span className="num">{a.rejectReason.date}</span>:</span>
+              {a.rejectReason.text}
+            </div>
+          )}
+
+          {rep && r.photos.length > 0 && (
+            <>
+              <SectionTitle>活動照片(<span className="num">{r.photos.length}</span> 張)</SectionTitle>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {r.photos.map((p) => (
+                  <button key={p.id} type="button" className="link-btn" style={{ padding: 0 }} aria-label={`預覽 ${p.name}`} onClick={() => onPreviewFile(p)}>
+                    <img src={p.url} alt={p.name} title={p.name} style={{ width: 104, height: 78, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--line)', display: 'block' }} />
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {rep && (r.report || r.feedback || r.videoLink) && (
+            <>
+              <SectionTitle>結案檔案</SectionTitle>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'flex-start' }}>
+                {r.report && <FileChip f={r.report} onPreview={onPreviewFile} />}
+                {r.feedback && <FileChip f={r.feedback} onPreview={onPreviewFile} />}
+                {r.videoLink && (
+                  <span style={{ fontSize: 13 }}>
+                    <LinkOutlined style={{ color: 'var(--steel)', marginRight: 6 }} />
+                    <a href={r.videoLink} target="_blank" rel="noopener noreferrer">{r.videoLink}</a>
+                  </span>
+                )}
+              </div>
+            </>
+          )}
+
+          {(a.status === 'approved' || a.status === 'locked') && a.closeDeadline && (
+            <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 16 }}>
+              結案期限 <span className="num">{a.closeDeadline}</span>
+              {a.status === 'locked' ? ',已逾期鎖定,請洽課外活動指導組解鎖。' : `,剩 ${a.closeDaysLeft} 天。`}
+            </div>
+          )}
         </div>
-      )}
 
-      {(a.status === 'closed' || a.status === 'closing_pending_advisor') && a.report && (
-        <>
-          <div style={{ fontSize: 13, fontWeight: 600, margin: '14px 0 6px' }}>結案成果</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '88px 1fr', gap: '8px 12px', fontSize: 13 }}>
-            <div style={{ color: 'var(--steel)' }}>實際人數</div>
-            <div className="num">社員 {a.report.memberCount} · 非社員 {a.report.nonMemberCount}</div>
-            <div style={{ color: 'var(--steel)' }}>實際時間</div>
-            <div className="num">{a.report.actualStart}–{a.report.actualEnd} · 實際支出 {fmtMoney(a.report.expense)}</div>
-            <div style={{ color: 'var(--steel)' }}>實際地點</div><div>{a.report.actualLocation}</div>
-            <div style={{ color: 'var(--steel)' }}>活動重點</div><div>{a.report.highlights}</div>
-            <div style={{ color: 'var(--steel)' }}>達成目標</div><div>{a.report.goals}</div>
-            <div style={{ color: 'var(--steel)' }}>其他成果</div><div>{a.report.others}</div>
-            <div style={{ color: 'var(--steel)' }}>檢討會</div>
-            <div>
-              {a.report.reviewMeeting ? '是' : '否'}
-              {a.report.reviewDate ? <span className="num"> · {a.report.reviewDate}</span> : ''}
-            </div>
-            <div style={{ color: 'var(--steel)' }}>學習心得</div>
-            <div>
-              <span className="num">{a.report.reflections.length}</span> 人:
-              {a.report.reflections.map((x) => `${x.name}(${x.dept})`).join('、')}
-            </div>
-          </div>
-          {r.photos.length > 0 && (
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
-              {r.photos.map((p) => (
-                <button key={p.id} type="button" className="link-btn" style={{ padding: 0 }} aria-label={`預覽 ${p.name}`} onClick={() => onPreviewFile(p)}>
-                  <img src={p.url} alt={p.name} title={p.name} style={{ width: 72, height: 54, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--line)', display: 'block' }} />
-                </button>
+        {/* 右欄:結案成果全文 */}
+        {rep && (
+          <div>
+            <SectionTitle first>
+              結案成果
+              <span style={{ fontWeight: 400, color: 'var(--steel)', marginLeft: 8, fontSize: 12 }}>
+                檢討會 {rep.reviewMeeting ? '是' : '否'}
+                {rep.reviewDate && <span className="num"> · {rep.reviewDate}</span>}
+                {rep.submittedAt && <> · 送出 <span className="num">{rep.submittedAt}</span></>}
+              </span>
+            </SectionTitle>
+            {([['活動重點', rep.highlights], ['達成目標', rep.goals], ['其他成果', rep.others]] as const).map(([lab, text]) => (
+              <div key={lab} style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 12, color: 'var(--steel)', marginBottom: 3 }}>{lab}</div>
+                <div style={{ fontSize: 13, lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{text}</div>
+              </div>
+            ))}
+            <SectionTitle>學習心得(<span className="num">{rep.reflections.length}</span> 人)</SectionTitle>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {rep.reflections.map((x) => (
+                <div key={`${x.name}-${x.dept}`} style={{ background: 'var(--paper)', borderRadius: 6, padding: '10px 12px' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600 }}>
+                    {x.name} <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--steel)' }}>{x.dept}</span>
+                  </div>
+                  <div style={{ fontSize: 13, lineHeight: 1.8, marginTop: 4, whiteSpace: 'pre-wrap' }}>{x.text}</div>
+                </div>
               ))}
             </div>
-          )}
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
-            {r.report && <FileChip f={r.report} onPreview={onPreviewFile} />}
-            {r.feedback && <FileChip f={r.feedback} onPreview={onPreviewFile} />}
           </div>
-          {r.videoLink && (
-            <div style={{ marginTop: 8, fontSize: 13 }}>
-              <LinkOutlined style={{ color: 'var(--steel)', marginRight: 6 }} />
-              <a href={r.videoLink} target="_blank" rel="noopener noreferrer">{r.videoLink}</a>
-            </div>
-          )}
-        </>
-      )}
-      {(a.status === 'approved' || a.status === 'locked') && a.closeDeadline && (
-        <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 14 }}>
-          結案期限 <span className="num">{a.closeDeadline}</span>
-          {a.status === 'locked' ? ',已逾期鎖定,請洽課外活動指導組解鎖。' : `,剩 ${a.closeDaysLeft} 天。`}
-        </div>
-      )}
+        )}
+      </div>
     </Modal>
   )
 }
@@ -203,7 +270,8 @@ export default function ActivityListPage() {
   const [page, setPage] = useState(1)
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 } | null>(null)
   const [typeFilter, setTypeFilter] = useState<string[]>([])
-  const [statusFilter, setStatusFilter] = useState<StatusKey[]>([])
+  // 以顯示標籤篩選:三個申請關卡共用「申請待審核」,避免選單出現重複項
+  const [statusFilter, setStatusFilter] = useState<string[]>([])
   const [preview, setPreview] = useState<Activity | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [filePreview, setFilePreview] = useState<EvalFile | null>(null)
@@ -215,7 +283,7 @@ export default function ActivityListPage() {
   const rest = useMemo(() => {
     let list = CLUB_ACTIVITIES.filter((a) => a.status !== 'draft' && semesterOf(a.date) === semester)
     if (typeFilter.length) list = list.filter((a) => typeFilter.includes(a.type))
-    if (statusFilter.length) list = list.filter((a) => statusFilter.includes(a.status))
+    if (statusFilter.length) list = list.filter((a) => statusFilter.includes(STATUS[a.status].label))
     if (sort) {
       list = [...list].sort((x, y) => {
         const a = sortValue(x, sort.key)
@@ -236,7 +304,7 @@ export default function ActivityListPage() {
     </button>
   )
 
-  const statusKeys = [...new Set(CLUB_ACTIVITIES.filter((a) => a.status !== 'draft').map((a) => a.status))]
+  const statusLabels = [...new Set(CLUB_ACTIVITIES.filter((a) => a.status !== 'draft').map((a) => STATUS[a.status].label))]
 
   // 點列一律開活動詳情預覽;結案走列上的動作鈕(或預覽內「前往結案」)
   const onRowClick = (a: Activity) => {
@@ -351,12 +419,12 @@ export default function ActivityListPage() {
                   <Dropdown
                     trigger={['click']}
                     menu={{
-                      items: statusKeys.map((k) => ({ key: k, label: STATUS[k].label })),
+                      items: statusLabels.map((l) => ({ key: l, label: l })),
                       selectable: true,
                       multiple: true,
                       selectedKeys: statusFilter,
-                      onSelect: ({ selectedKeys }) => { setStatusFilter(selectedKeys as StatusKey[]); setPage(1) },
-                      onDeselect: ({ selectedKeys }) => { setStatusFilter(selectedKeys as StatusKey[]); setPage(1) },
+                      onSelect: ({ selectedKeys }) => { setStatusFilter(selectedKeys); setPage(1) },
+                      onDeselect: ({ selectedKeys }) => { setStatusFilter(selectedKeys); setPage(1) },
                     }}
                   >
                     <button type="button" className="link-btn" aria-label="篩選狀態" style={{ padding: 0 }}>

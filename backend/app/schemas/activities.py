@@ -95,6 +95,8 @@ class CloseSubmitIn(BaseModel):
             raise ValueError("實際結束時間必須晚於開始時間")
         if self.review_meeting and self.review_date is None:
             raise ValueError("有召開檢討會時必須填寫日期")
+        if not self.review_meeting:
+            self.review_date = None  # 未開檢討會就不留日期殘值
         return self
 
 

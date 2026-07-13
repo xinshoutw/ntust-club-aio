@@ -25,7 +25,6 @@ export default function ViolationsPage() {
         <table className="tb" style={{ minWidth: 640 }}>
           <thead>
             <tr>
-              <th>單號</th>
               <th>日期</th>
               <th>地點</th>
               <th>違規項目</th>
@@ -35,7 +34,6 @@ export default function ViolationsPage() {
           <tbody>
             {mine.map((v) => (
               <tr key={v.id}>
-                <td className="num" style={{ color: 'var(--steel)' }}>{v.id}</td>
                 <td className="num" style={{ fontSize: 13 }}>{v.date}</td>
                 <td>{v.location}</td>
                 <td>

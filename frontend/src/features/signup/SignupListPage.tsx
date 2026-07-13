@@ -38,7 +38,7 @@ export default function SignupListPage() {
               </div>
               <div className="signup-card-side">
                 <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                  <div style={{ fontSize: 12, color: 'var(--steel)' }}>報名截止</div>
+                  <div style={{ fontSize: 12, color: 'var(--steel)' }}>截止日</div>
                   <div className="num" style={{ fontSize: 13, marginTop: 2 }}>{item.deadline}</div>
                 </div>
               </div>

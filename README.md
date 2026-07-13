@@ -1,0 +1,43 @@
+# club-aio — 臺科大社團管理系統(All-in-One)
+
+取代舊版社團管理系統與教室器材借用系統的新版整合系統。
+
+- 設計文件:[docs/architecture.md](docs/architecture.md)、[docs/data-model.md](docs/data-model.md)
+- 需求原型:`docs/社團管理系統_優化原型_v6.html`
+
+## 技術棧
+
+前端 Vite + React + TypeScript + Ant Design 6;後端 FastAPI(Python 3.14)+ SQLAlchemy 2 + PostgreSQL 18;Docker Compose 部署。
+
+## 開發
+
+```bash
+cp .env.example .env
+
+# 1. 資料庫
+docker compose up -d db
+
+# 2. 後端(http://localhost:8000,API docs 在 /api/docs)
+cd backend
+uv sync
+uv run alembic upgrade head
+uv run uvicorn app.main:app --reload
+
+# 3. 前端(http://localhost:5173,/api 代理到 8000)
+cd frontend
+pnpm install
+pnpm dev
+```
+
+### 測試
+
+```bash
+cd backend && uv run pytest
+cd frontend && pnpm build   # 型別檢查 + 建置
+```
+
+## 正式部署(GCE 單機)
+
+```bash
+docker compose up -d   # db + backend + web(:8080),前面接既有 edge proxy
+```

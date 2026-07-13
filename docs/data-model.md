@@ -1,0 +1,359 @@
+# club-aio 資料模型設計
+
+- 日期:2026-07-13
+- 狀態:**草案,待確認**
+- 資料庫:PostgreSQL 18;schema 以 Alembic migration 為準,本文件是設計依據
+- 慣例:表名 snake_case 複數;主鍵 `id`(整數自增,對外資源另有 uuid 者註明);所有表都有 `created_at`/`updated_at`(TIMESTAMPTZ);金額用 `integer`(新台幣元,無小數)
+
+## 0. 設計原則(未來兼容性的核心)
+
+1. **學年度掛軸**:評鑑、報名、評分、分組等「一年一輪」的資料全部帶 `year`(民國學年度,如 114)。系統可同時保有歷年資料,新學年開新輪,不覆寫舊資料。原型是單年快照,這是它沒表達但正式系統必備的維度。
+2. **評分表逐年版本化**:評分項目(rubric)綁 `(award, year)`。學校的評分辦法幾乎年年微調,若把 rubric 寫死在程式碼,每年要改 code + 歷史成績會對不上舊表。版本化後,歷年成績永遠對得上當年的評分表。
+3. **推導優於儲存**:器材可借數、逾期與否、結案鎖定、競賽行政分,一律由來源資料即時計算,不存副本(原型存 `avail` 是 demo 簡化)。需要人工介入的地方開**明確的 override 表**(如行政分調整),保留「系統算的」與「人改的」兩層,可稽核。
+4. **狀態機 + 簽核紀錄分離**:單據存「目前狀態」一欄;每一次核准/退回/解鎖寫入 `approval_records`(誰、哪一關、決定、原因、何時)。退回原因必填、三關簽核歷程、稽核需求全靠它,狀態欄永遠只是快照。
+5. **檔案集中管理**:所有上傳檔進單一 `files` 表(uuid、擁有者、所屬單據、slot),磁碟路徑不進業務表。權限檢查、備份、未來搬物件儲存都只動一處。
+6. **帳號單表 + SSO 預留**:四種角色共用 `users` 表,`auth_provider='local'`(預留 `'sso'`),`password_hash` 可空。SSO 上線時只是多一種登入路徑,資料模型不動。
+7. **主檔不硬刪**:社團、場地、器材、獎項用 `is_active` 停用;流程單據(申請、借用、成績)永不刪除。行政系統的歷史就是證據。
+8. **遷移可重跑**:`legacy_id_map` 記錄舊系統 id → 新 id 對應,migration scripts 以此做到 idempotent,切換前可反覆演練。
+
+## 1. 資料原型盤點(需求覆蓋證明)
+
+### 1.1 原型 HTML(v6)的資料結構 → 新表對應
+
+| 原型結構 | 內容 | 新表 |
+|---|---|---|
+| `ADMINS` / `staffAccounts` / `clubAccounts` / `VIEWERS` | 四種帳號,含 `pwHistory`、admin `permissions[]`+`super` | `users`、`password_history` |
+| `CLUBS` / `clubType` / `clubMeta` | 社團、六種性質、停權(suspended/until/reason)與逾期數 | `clubs`(逾期數改為推導) |
+| `state.members` | 社員:姓名/學號/幹部或社員/職稱/時間 | `club_members` |
+| 指導老師頁 | 姓名/系所/Email/分機 | `clubs`(advisor_* 欄) |
+| 社團簡介頁 | 簡介文字、社團網頁連結(影響評分 ad6) | `clubs` |
+| `state.activities` | 活動申請:名稱/類型/日期/時間/地點/校內外人數/內容/工作人員/經費明細/經費來源/核定金額/狀態 | `activities`、`activity_budget_items` |
+| `activities[].report` | 結案:五種出席數/亮點/目標/其他/檢討會議/心得(≥3人)/照片/影片連結/核銷金額/檔案 | `activity_reports`、`activity_reflections`、`files` |
+| `ACT_STAGES`/`CLOSE_STAGES`/`closeUnlocked` | 三關簽核、結案單關、逾期鎖定與解鎖 | `activities.status`、`approval_records` |
+| `state.applications` | 幹部證明/郵局帳戶異動/空間維修 | `officer_certificates`、`postal_account_changes`、`maintenance_requests` |
+| `roomBookings` + `PERIODS` | 教室固定借用:教室/多筆(日期,節次)/用途/狀態 | `room_booking_requests`、`room_booking_slots` |
+| `bookings`(場地) + `VENUES`/`BK_SLOTS` | 臨時場地借用:場地/日期/節次(1-10,A-D)/用途 | `venue_bookings`、`venues` |
+| `bookings`(器材) + `EQUIP`/`SERIAL_CATS` | 器材借用:品項/數量/起訖日/點交(借出人/歸還人/序號)/逾期 | `equipment_loans`、`equipment` |
+| `GOV_HOLIDAYS` + `isWorkday` | 逾期規則:結束日之隔天**上班日** 10:30 前未還 | `holidays`(規則進 `system_settings`) |
+| `signupItems`/`signups`/`sessionAttend`/`regWindow` | 線上報名(負責人會議含場次、幹訓、競賽報名+選獎項)、場次出席、報名窗 | `signup_items`、`signup_item_sessions`、`signups`、`signup_awards`、`session_attendance`、`system_settings` |
+| `AWARDS` + 五套 RUBRIC | 五獎項(團體/個人、加權群組、現場簡報20%)、評分項目 | `awards`、`award_rubric_items` |
+| `state.docs` | 競賽資料上傳:club × rubric key × 檔案 | `eval_uploads` + `files` |
+| `groups` | 評鑑分組(社團×評審;評審A/B 匿名) | `eval_groups`、`eval_group_clubs`、`eval_group_reviewers` |
+| `scores` | 評審評分:每項分數+評語、加減分、簡報分、時間 | `review_scores`、`review_score_items` |
+| `scoreOverride`/`clubFinalOverride`/`awardOverride` | 行政分手動調整、總分/獎項覆寫 | `eval_adjustments` |
+| `commentRelease`/`evalUnlocked` | 評語開放、行政資料開放 | `eval_settings` |
+| `announcements` | 公告:標題/內容/對象(全部/性質/單一社團)/自動 | `announcements` |
+| `violations` + `VIOL_ITEMS` | 違規勸導:社團/日期/地點/項目(複選+其他)/填寫工讀生/佐證/銷案狀態 | `violations` + `files` |
+| `auditLog` | 稽核:時間/誰/角色/動作/內容 | `audit_logs`(加 `ip`) |
+| `AD_RUBRIC` 自動評分 | 行政分:活動申請數/照片/成果單/心得/名單更新/網頁/會議出席/幹訓 | 由來源表推導 + `eval_adjustments` |
+
+### 1.2 舊系統實體 → 覆蓋檢查(功能對等保證)
+
+| 舊系統 | 舊實體 | 新模型對應 |
+|---|---|---|
+| ClubManagementSystem | club, club_content, club_property | `clubs` |
+| | student(社員), teacher(指導老師) | `club_members`、`clubs.advisor_*` |
+| | activity, activity_fund, activity_files, activity_images, activity_staff, activity_meta | `activities`、`activity_budget_items`、`files`、`activity_reports` |
+| | news | `announcements` |
+| | staff(行政帳號), club_token/staff_token(session), club/staff_password_history | `users`、`sessions`、`password_history` |
+| | club_record_from_staff(輔導/違規紀錄) | `violations` |
+| | audit_activity, audit_activity_record, staff_activity_log | `audit_logs`、`approval_records` |
+| | calendar | `holidays` + `system_settings` |
+| | viewer.AssessmentDuration(評鑑期間) | `signup_items.deadline`、`system_settings` |
+| clubclass | classroom, classroom_rule | `venues`(+節次規則進設定) |
+| | apply(教室借用) | `venue_bookings`、`room_booking_requests` |
+| | device, device_apply, device_log | `equipment`、`equipment_loans`、`approval_records` |
+| | admin, notice | `users`、`announcements` |
+
+兩套舊系統的每個實體都有落點;原型新增的功能(評鑑評分、線上報名、幹部證明、郵局異動、維修、停權)也全數入模。
+
+## 2. ER 總覽(核心關聯)
+
+```mermaid
+erDiagram
+  users ||--o{ sessions : ""
+  users ||--o{ password_history : ""
+  clubs ||--o{ users : "club 帳號"
+  clubs ||--o{ club_members : ""
+  clubs ||--o{ activities : ""
+  activities ||--o{ activity_budget_items : ""
+  activities ||--|| activity_reports : "結案"
+  activity_reports ||--o{ activity_reflections : "心得≥3"
+  clubs ||--o{ venue_bookings : "臨時場地"
+  clubs ||--o{ equipment_loans : "器材"
+  clubs ||--o{ room_booking_requests : "固定教室"
+  room_booking_requests ||--o{ room_booking_slots : ""
+  venues ||--o{ venue_bookings : ""
+  equipment ||--o{ equipment_loans : ""
+  awards ||--o{ award_rubric_items : "逐年版本"
+  clubs ||--o{ eval_uploads : ""
+  award_rubric_items ||--o{ eval_uploads : ""
+  eval_groups ||--o{ eval_group_clubs : ""
+  eval_groups ||--o{ eval_group_reviewers : ""
+  users ||--o{ review_scores : "評審"
+  review_scores ||--o{ review_score_items : ""
+  clubs ||--o{ violations : ""
+  files }o--|| clubs : "歸屬"
+```
+
+(申請三表、公告、稽核、設定為獨立弱關聯,圖中省略)
+
+## 3. 資料表定義
+
+### 3.1 帳號與身分
+
+**users** — 四角色單表
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| id | serial PK | |
+| role | enum(`admin`,`staff`,`club`,`viewer`) | |
+| username | text UNIQUE | 登入帳號 |
+| password_hash | text NULL | argon2id;SSO 帳號為 NULL |
+| auth_provider | enum(`local`,`sso`) default `local` | SSO 預留 |
+| name | text | 顯示名稱(社團帳號=社團名) |
+| email | text NULL | 通知信箱 |
+| club_id | FK clubs NULL | 僅 role=club(一社一帳號) |
+| is_super | bool default false | 僅 admin:最高權限 |
+| permissions | text[] default {} | 僅 admin:頁面權限鍵(aact/aclose/aapply/areg/abook/aroom/amaint/aviol/amembers…)+ 簽核關卡鍵(`approve_advisor`/`approve_chief`/`approve_dean`)。**學務長=本人操作**:開 admin 帳號僅持 `approve_dean` 與對應待審頁,看不到其他管理功能 |
+| can_view_eval | bool default false | 僅 viewer:可否看評鑑資料 |
+| must_change_password | bool default true | 行政發放初始密碼,首登強制改密 |
+| is_active | bool default true | 停用而非刪除 |
+| last_login_at | timestamptz NULL | |
+
+> **選擇單表而非四張角色表**:登入、session、密碼歷史、稽核都以「使用者」為單位,拆表要重複四份;角色專屬欄位僅少數幾欄,NULL 成本遠低於 JOIN 與重複邏輯。**替代:每角色一表**——查詢與外鍵複雜化,未來加角色(如「輔導老師」帳號)要開新表,不採。
+
+**password_history**(user_id, password_hash, changed_at)— 禁止重複使用近期密碼;舊系統已有此制度(club/staff_password_history),保留。
+
+**sessions**(id uuid PK, user_id FK, ip, user_agent, created_at, expires_at)— cookie session 存放處;刪列即登出,停權立即生效。
+
+### 3.2 社團與主檔
+
+**clubs**
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| id | serial PK | |
+| name | text UNIQUE | |
+| attribute | enum(自治性,學藝性,服務性,聯誼性,藝術性,體育性) | 公告分眾、統計用 |
+| intro | text | 社團簡介 |
+| website_url | text NULL | 影響行政分「網頁經營」(ad6) |
+| advisor_name / advisor_dept / advisor_email / advisor_ext | text NULL | 指導老師(社團自行維護) |
+| suspended_until | date NULL | 停權至;NULL=未停權 |
+| suspend_reason | text NULL | |
+| is_active | bool | 退社/未立案=停用 |
+
+> 社長不另設欄位:由 `club_members`(kind=幹部、title=社長/會長)推導,單一真相。逾期次數同理由 `equipment_loans` 推導。**替代:照原型存 leader/overdue 欄**——與名單/借用紀錄雙寫必然漂移,不採。指導老師先做單一(原型如此),若未來要多位再抽 `club_advisors` 表,現在不預建(YAGNI)。
+
+**club_members**(id, club_id FK, name, student_id, kind enum(幹部,社員), title text NULL(幹部必填), created_at, updated_at;UNIQUE(club_id, student_id))
+— 名單更新時間影響行政分 ad5(「名單更新」),`updated_at` 即依據。
+
+**venues** — 統一場地主檔(固定借用的 13 間教室與臨時借用的 16 處場地有重疊,用旗標區分用途)
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| id / name / capacity | | 名稱、容納人數 |
+| category | enum(教室,練習空間,廣場戶外) | |
+| allow_fixed | bool | 可申請「教室固定借用」(如 S304 音樂教室) |
+| allow_temp | bool | 可申請「臨時場地借用」(如精誠廣場) |
+| sort / is_active | | 排序、停用 |
+
+**equipment**(id, name, category enum(一般,電子設備,投影布幕,帳篷), total_qty, needs_serial bool, sort, is_active)
+— `needs_serial`:電子設備/投影布幕/帳篷點交需登記序號(原型 SERIAL_CATS);可借數 = total − 未歸還中數量,**推導不儲存**。
+
+**holidays**(date PK, name)— 政府行事曆假日;器材逾期判定「隔天上班日 10:30」與行政人員作業日都用它。每年由行政匯入。
+
+**system_settings**(key PK, value jsonb)— 報名窗(regWindow)、結案鎖定月數(CLOSE_LOCK_MONTHS=1)、學期起訖規則、目前學年度、器材歸還時限(10:30)等可調參數。
+
+### 3.3 活動申請與結案
+
+**activities**
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| id | serial PK | |
+| club_id | FK | |
+| name / content / location | text | |
+| type | enum(一般活動,社課,大型活動) | 影響行政分權重(大型×3) |
+| date | date | 活動日期(學期用日期推導) |
+| start_time / end_time | time | 原型 timeRange |
+| participants_in / participants_out | int | 校內/校外人數 |
+| staff_text | text | 工作人員(「總務>陳大文;美宣>…」,自由格式) |
+| fund_source | text NULL | 經費來源(輔導老師第一關認定:學務處經費/校務基金/高教深耕…) |
+| school_approved | int NULL | 學校核定補助金額 |
+| status | enum,見下 | |
+| close_unlocked | bool default false | 逾期鎖定的管理員解鎖旗標 |
+| created_by | FK users | |
+
+狀態機(v6 三階層):
+
+```
+draft(暫存)
+  → pending_advisor(待輔導老師審核)
+      ├─ 無申請補助(擬請補助=0):核准 → approved
+      └─ 有申請補助:→ pending_chief(待組長) → pending_dean(待學務長) → approved(已核准)
+  任一關退回 → rejected(已退回,原因必填,寫入 approval_records;可修改後重送)
+approved → [社團送結案] → closing_pending_advisor(結案待輔導老師審核,單關)
+  → closed(已結案)   或退回 → approved(帶退回原因)
+approved 且 活動日期+1個月 已過 且未送結案 → 「逾期鎖定」(推導狀態,非欄位;close_unlocked=true 可解鎖)
+```
+
+**activity_budget_items**(id, activity_id FK, category text(經費科目:印刷費/比賽獎勵品/指導老師教練費/演講裁判費/其他…), description, self_fund int, requested_subsidy int, approved_subsidy int NULL)
+— 逐項編列;`approved_subsidy` 由輔導老師關卡逐項核定。科目先用 text + 前端下拉(科目表進 settings),不開表(YAGNI,科目穩定後再說)。
+
+**activity_reports**(activity_id PK/FK 1:1, attend_expected, attend_registered, attend_should, attend_actual, attend_leave, highlights, goals, others, review_meeting bool, review_date date, video_url text, expense int, submitted_at)
+— 照片與成果檔走 `files`(slot 區分:report_photo / report_file);影片是**外部連結**(原型慣例)。
+
+**activity_reflections**(id, report_id FK, student_name, dept(系級), body text)— 送審驗證 ≥3 筆。
+
+**approval_records** — 全系統簽核軌跡(通用)
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| id | serial PK | |
+| subject_type | enum(activity, activity_close, room_booking, venue_booking, equipment_loan, officer_cert, postal_change, maintenance, signup) | |
+| subject_id | int | |
+| stage | text | advisor / chief / dean / single… |
+| decision | enum(approve, reject, unlock, revoke) | |
+| actor_id | FK users | |
+| reason | text NULL | 退回必填(應用層強制) |
+| created_at | timestamptz | |
+
+> **選擇通用簽核表而非各單據自帶 reviewed_by 欄**:三關流程一單多筆紀錄,欄位放不下;退回重送再審會產生多輪歷程;「待審申請彙整」與稽核要跨單據查「誰核了什麼」。**替代:每表加審核欄**——只記得住最後一次,歷程遺失,不採。
+
+### 3.4 檔案
+
+**files**
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| id | uuid PK | 下載網址用 uuid,不可列舉 |
+| club_id | FK NULL | 權限邊界(社團只能取自己的) |
+| uploaded_by | FK users | |
+| subject_type / subject_id | text / int NULL | 所屬單據(結案、維修、郵局、違規、評鑑上傳…) |
+| slot | text NULL | 同單據內的位置(report_photo, evidence, passbook…) |
+| original_name / size / mime | | |
+| path | text | 磁碟相對路徑 `{module}/{YYYY}/{MM}/{uuid}`(月份分類,配合歸檔作業) |
+| archived_at | timestamptz NULL | 已由行政備份下載並自磁碟刪除的時間;非 NULL 時 UI 顯示「已歸檔」。競賽採計中的檔案不歸檔 |
+| created_at | | |
+
+> 一檔一擁有單據,存取一律經 API 檢查 club_id/角色。**替代:各表自存檔名欄位(原型作法)**——權限檢查與備份邏輯散落各處,搬物件儲存要全改,不採。
+
+### 3.5 借用(涵蓋 clubclass 全部功能)
+
+**room_booking_requests**(id, club_id, venue_id(allow_fixed), purpose, status enum(pending,approved,rejected), created_at)
+**room_booking_slots**(id, request_id FK, date, period char(1-10,A-D);UNIQUE(venue_id 經 request, date, period) 由應用層+部分索引防重)
+— 教室**固定**借用:一單多時段;審核在 aroom。核准時檢查時段衝突(兩社搶同節次)。
+
+**venue_bookings**(id, club_id, venue_id(allow_temp), date, periods char[](複選節次), purpose, status enum(pending,approved,rejected), created_at)
+— **臨時**場地借用,單日多節次。
+
+**equipment_loans**
+
+| 欄位 | 說明 |
+|---|---|
+| id, club_id, equipment_id, qty | 一單一品項(原型如此;多品項=多單,簡單且點交/逾期各自獨立) |
+| start_date / end_date | 借用區間 |
+| purpose | 用途 |
+| status | enum(pending, approved, rejected, checked_out(已借出), returned(已歸還)) |
+| checkout_by / checkout_at / serials text[] | 借出點交(工讀生;需序號類登記序號) |
+| checkin_by / checkin_at / checkin_note | 歸還點交 |
+
+— **逾期=推導**:status=checked_out 且 now > (end_date 之隔天上班日 10:30)。逾期追蹤頁、停權管理、社團 `overdue` 數全由此查詢;工讀生端三頁(借出/歸還/逾期)共用此表。
+
+> **拆三張表而非原型的單一 bookings**:固定借用(週期時段)、臨時場地(單日節次)、器材(區間+點交+序號+逾期)欄位與生命週期完全不同,硬塞一張表會一半欄位恆 NULL 且狀態機混雜。**替代:單表+type**——省一張表但每條查詢都要 filter type、欄位語意靠註解,不採。
+
+### 3.6 其他申請(三表,共用狀態欄慣例)
+
+**officer_certificates**(id, club_id, term(如 114-2), position enum(社長或會長,副社長或副會長), applicant_name, status enum(pending,approved,rejected), created_at)
+
+**postal_account_changes**(id, club_id, reason enum(更換代理人,新開戶,印鑑變更,帳簿遺失,結清銷戶), account_name, account_number, new_agent_name, new_agent_phone, status 同上, created_at)— 存簿影本走 files(slot=passbook)。
+
+**maintenance_requests**(id, club_id, location, items text(損壞項目), status enum(pending,in_progress,done), handle_note, created_at)— 佐證照片/影片走 files(slot=evidence)。
+
+> **選擇三張窄表而非單一 applications+JSONB**:三者欄位、驗證、狀態機(維修多「處理中」)都不同;窄表有欄位級約束與型別安全。「待審申請彙整」「我的申請進度」由三表 UNION 出 view(資料量小,毫無壓力)。**替代:單表+type+JSONB payload**——新申請型別免 migration 是唯一優點,但失去 schema 約束、查詢醜陋;新型別本來就該認真設計,不採。
+
+### 3.7 線上報名與出席
+
+**signup_items**(id, year, name, is_open, session_based bool, requires_confirmation bool, is_eval bool(競賽報名項), note, event_date, semester, time_text, place, deadline, audience, created_at)
+**signup_item_sessions**(id, item_id FK, name, date, semester)— 負責人會議 4 場次
+**signups**(id, item_id FK, club_id, presenter, note, confirmed bool, created_at;UNIQUE(item_id, club_id))
+**signup_awards**(signup_id FK, award_id FK)— 競賽報名勾選的獎項
+**session_attendance**(id, session_id FK, club_id, attended bool, marked_by FK users, marked_at)— 出席→行政分 ad7
+
+### 3.8 競賽(評鑑)
+
+**awards**(id slug PK:club/finance/activity/result/leader, name, kind enum(團體,個人), has_presentation bool(現場簡報 20%), is_weighted bool(最佳社團獎 行政40%+營運60%), sort, is_active)
+
+**award_rubric_items** — **逐年版本化的評分表**
+
+| 欄位 | 說明 |
+|---|---|
+| id, award_id FK, year | UNIQUE(award_id, year, item_key) |
+| group_label / group_weight | 群組(如「行政資料」0.4)與占比;非加權獎項 weight NULL |
+| item_key | ad1/o1/f1/ac1/r1/l1…(上傳槽位與評分項共用鍵) |
+| name / max_score / help | 項目、滿分、評分說明 |
+| is_admin_item | bool:行政資料項(ad1–ad8,系統自動評分+社團上傳) |
+| sort | |
+
+> 新學年由行政「複製上年評分表再修改」,歷年成績永遠對應當年條目。**替代:rubric 寫死在程式碼(原型作法)**——每年改辦法就改 code 重佈署,且歷史成績對不上舊表,不採。
+
+**eval_uploads**(id, year, club_id, rubric_item_id FK, file_id FK, created_at)— 競賽資料上傳:社團 × 項目 × 多檔。
+
+**eval_groups**(id, year, name, sort)/ **eval_group_clubs**(group_id, club_id)/ **eval_group_reviewers**(group_id, user_id, sort)
+— 分組與評審指派;`sort` 決定「評審A/評審B」匿名代號。
+
+**review_scores**(id, year, award_id FK, club_id FK, reviewer_id FK users, presentation_score int NULL(簡報 20 分), bonus int, penalty int, submitted_at;UNIQUE(year, award_id, club_id, reviewer_id))
+**review_score_items**(id, score_id FK, rubric_item_id FK, score int, comment text)
+— 百分比與名次一律推導;草稿機制(原型 localStorage draft)可先做前端暫存,後端不建草稿表(YAGNI)。
+
+**eval_adjustments**(id, year, award_id, club_id, kind enum(admin_score_override(行政分調整), final_override(總分覆寫), award_override(獎項覆寫)), value jsonb, reason text 必填, actor_id, created_at)
+— 人工調整全部留痕;查詢時「調整值蓋過計算值」。
+
+**eval_settings**(year, award_id, PK(year,award_id), comment_released bool(評語開放社團查看), unlocked bool(行政資料開放))
+
+行政分(ad1–ad8)**不落表**:活動申請數、照片/成果/心得(從已結案活動)、名單更新(club_members.updated_at)、網頁經營(clubs.website_url)、會議出席(session_attendance)、幹訓(signups)——全部即時彙算,加上 eval_adjustments 的人工調整。這是原型「系統自動評分」的正式化。
+
+### 3.9 公告、違規、稽核、通知
+
+**announcements**(id, title, content, target_type enum(all,attr,club), target_value text NULL(性質名或 club_id), is_auto bool(系統自動通知,如核准訊息), created_by, created_at)
+
+**violations**(id, club_id, occurred_on date, location, items text[](違規項目複選,目錄進 settings), other text, filler_id FK users(工讀生), status enum(open(未銷案), resolved(已銷案)), resolve_note, created_at)— 佐證照片走 files。
+
+**audit_logs**(id, user_id FK NULL, role, action, detail, ip inet, created_at)— 高風險操作全記;不設上限(原型截 500 筆是 demo 限制),量大再做分區/歸檔。
+
+**email_logs**(id, to_addr, subject, template, status enum(sent,failed), error, created_at)— 寄信結果留底,通知糾紛時可查。
+
+### 3.10 遷移輔助
+
+**legacy_id_map**(id, legacy_system enum(cms,clubclass), legacy_table, legacy_id, new_table, new_id, migrated_at;UNIQUE(legacy_system, legacy_table, legacy_id))
+— migration scripts 先查 map 再寫入,重跑不重複;對照除錯用。
+
+## 4. 學年與學期規則(已確認)
+
+- **上學期 = 8–1 月、下學期 = 2–7 月**(原型 `semesterOf` 寫反了,以本規則為準)
+- 「目前學年度」與學期起訖放 `system_settings`,所有年輪資料寫入時取當前設定,不寫死
+- 活動本身只存 `date`,統計與行政分計算時依當年度區間篩選——學年度規則變動不影響歷史資料
+
+### 設定分層原則(需求方指定)
+
+- **恆不變** → `.env`(如 DB 連線、SMTP、secret key)
+- **會變/可能變** → `system_settings`,管理員後台即時調整(如報名窗、結案鎖定月數、幹部證明申請時間窗、上傳上限、違規項目目錄、經費科目)
+
+## 5. 已知簡化與升級路徑
+
+| 簡化 | 觸發升級的時機 |
+|---|---|
+| 經費科目、違規項目目錄放 settings 不開表 | 需要逐科目統計報表時開表 |
+| 指導老師單一、存於 clubs 欄位 | 需求出現多指導老師時抽表 |
+| 評分草稿只做前端暫存 | 評審反映跨裝置需求時加 draft 表 |
+| 器材不做逐台資產管理(僅序號登記於借用單) | 需要維修/報廢生命週期時開 equipment_units |
+| 幹部證明產出(PDF)不入模型 | 實作時由資料即時產生,不存檔 |
+
+## 6. 決議補充(2026-07-13)
+
+1. 學期起訖:上學期 8–1 月、下學期 2–7 月(§4)
+2. 學務長本人操作,開受限權限帳號(§3.1 users)
+3. 幹部證明申請時間窗等規則 → `system_settings`,管理員可調(§4 設定分層)
+4. 個資遮罩:郵局局號/帳號顯示前 3 碼 + 末 2 碼、電話顯示末 3 碼;僅具審核權限者於審核詳情頁見完整值(模型不變,API 回應層處理)
+5. 競賽「現場簡報 20 分」照原型設計

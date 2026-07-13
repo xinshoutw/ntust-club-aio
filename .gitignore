@@ -1,0 +1,19 @@
+# env / secrets
+.env
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# node
+node_modules/
+dist/
+
+# local data
+data/
+
+# macOS
+.DS_Store

@@ -24,7 +24,9 @@ export default function FixedRoomPage() {
   const [params] = useSearchParams()
   const qVenue = params.get('venue')
   const prefillRoom = VENUES.some((v) => v.allowFixed && v.name === qVenue) ? qVenue ?? undefined : undefined
-  const qDate = params.get('date') ?? undefined
+  const rawDate = params.get('date')
+  // 嚴格驗證 query 日期,無效值不帶入
+  const qDate = rawDate && dayjs(rawDate, 'YYYY/MM/DD', true).isValid() ? rawDate : undefined
   const qPeriod = params.get('period')
   const prefillPeriods = qPeriod && PERIODS.includes(qPeriod) ? [qPeriod] : []
   const hasPrefill = !!(qDate || prefillPeriods.length)

@@ -16,7 +16,9 @@ export default function VenueBookingPage() {
   const [params] = useSearchParams()
   const qVenue = params.get('venue')
   const prefillVenue = VENUES.some((v) => v.allowTemp && v.name === qVenue) ? qVenue ?? undefined : undefined
-  const qDate = params.get('date')
+  const rawDate = params.get('date')
+  // 嚴格驗證 query 日期(非嚴格 parse 會把 2026/99/99 正規化成別的日期)
+  const qDate = rawDate && dayjs(rawDate, 'YYYY/MM/DD', true).isValid() ? rawDate : undefined
   const qPeriod = params.get('period')
   const [periods, setPeriods] = useState<string[]>(() => (qPeriod && PERIODS.includes(qPeriod) ? [qPeriod] : []))
   const mine = VENUE_BOOKINGS.filter((v) => v.club === user?.club).slice(0, 5)

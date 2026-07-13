@@ -8,6 +8,7 @@ from app.api.v1 import (
     club_profile,
     files,
     members,
+    signups,
 )
 from app.schemas.common import ApiResponse
 
@@ -19,6 +20,7 @@ router.include_router(members.router)
 router.include_router(activities.router)
 router.include_router(bookings.router)
 router.include_router(applications.router)
+router.include_router(signups.router)
 
 
 @router.get("/health")

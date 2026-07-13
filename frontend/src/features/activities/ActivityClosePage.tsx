@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { App, Button, DatePicker, Input, InputNumber, Select, TimePicker, Upload } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
-import { UploadOutlined } from '@ant-design/icons'
+import { RightOutlined, UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { blurLeavesRow } from '../../lib/form'
 import { generatedPdf, releaseFile, sha256, toEvalFile } from '../eval/files'
@@ -66,11 +66,53 @@ export default function ActivityClosePage() {
         僅已核准且活動已結束者可結案;除「影片連結」外皆為必填,送出後進入結案審核,結案通過始計入評鑑行政分。
       </div>
 
-      {!activity && (
+      {/* 未選活動:直接列出可結案的活動供點選 */}
+      {!activity && closable.length > 0 && (
+        <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {closable.map((a) => (
+            <div
+              key={a.id}
+              className="card"
+              role="button"
+              tabIndex={0}
+              onClick={() => setParams({ id: a.id }, { replace: true })}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  setParams({ id: a.id }, { replace: true })
+                }
+              }}
+              style={{ padding: '16px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}
+            >
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 15, fontWeight: 500 }}>{a.name}</span>
+                  {a.closeDraft && (
+                    <span style={{ fontSize: 11, color: 'var(--steel)', border: '1px solid var(--line)', borderRadius: 4, padding: '0 4px' }}>
+                      結案草稿
+                    </span>
+                  )}
+                </div>
+                <div className="num" style={{ fontSize: 12, color: 'var(--steel)', marginTop: 3 }}>
+                  {a.date}
+                  {a.timeRange ? ` ${a.timeRange}` : ''}
+                  {a.location ? ` · ${a.location}` : ''}
+                </div>
+              </div>
+              {a.closeDeadline && (
+                <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: 12, color: 'var(--steel)' }}>結案期限</div>
+                  <div className="num" style={{ fontSize: 13, marginTop: 2 }}>{a.closeDeadline}</div>
+                </div>
+              )}
+              <RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />
+            </div>
+          ))}
+        </div>
+      )}
+      {!activity && closable.length === 0 && (
         <div className="card" style={{ marginTop: 20, padding: '40px 24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
-          {closable.length
-            ? '請於右上角選擇要結案的活動(已核准且已結束);也可從活動列表點「結案」進入。'
-            : '目前沒有可結案的活動(須已核准且活動已結束)。'}
+          目前沒有可結案的活動(須已核准且活動已結束)。
         </div>
       )}
 

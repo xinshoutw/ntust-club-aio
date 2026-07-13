@@ -53,8 +53,14 @@ export default function SignupListPage() {
               className="card signup-card"
               role="button"
               tabIndex={clickable ? 0 : -1}
+              aria-disabled={!clickable}
               onClick={() => openCard(item)}
-              onKeyDown={(e) => e.key === 'Enter' && openCard(item)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  openCard(item)
+                }
+              }}
               style={{ opacity: ended ? 0.72 : undefined, cursor: clickable ? 'pointer' : 'default' }}
             >
               <div style={{ flex: 1, minWidth: 0 }}>

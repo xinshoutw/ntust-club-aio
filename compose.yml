@@ -1,6 +1,7 @@
 # club-aio 服務組成
 # 開發:docker compose up -d db(前後端在本機熱重載)
-# 正式:docker compose up -d(GCE 單機,前面是既有 edge proxy)
+# 正式:設定 BACKEND_IMAGE/WEB_IMAGE 後 docker compose pull && docker compose up -d --no-build
+#       (映像由 CI 產出,VM 上永不 build)
 name: club-aio
 
 services:
@@ -8,7 +9,8 @@ services:
     image: postgres:18-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-club}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-club}
+      # 必填:cp .env.example .env 後設定(避免帶著預設密碼啟動)
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?請在 .env 設定 POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-club_aio}
     ports:
       - "127.0.0.1:5432:5432"
@@ -28,7 +30,12 @@ services:
       - path: .env
         required: false
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-club}:${POSTGRES_PASSWORD:-club}@db:5432/${POSTGRES_DB:-club_aio}
+      # 分離欄位交給後端 URL.create 組合,密碼含特殊字元也安全
+      POSTGRES_HOST: db
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: ${POSTGRES_USER:-club}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?請在 .env 設定 POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-club_aio}
       UPLOAD_DIR: /srv/uploads
     volumes:
       - uploads:/srv/uploads
@@ -41,6 +48,7 @@ services:
     build: ./frontend
     image: ${WEB_IMAGE:-club-aio-web:local}
     ports:
+      # 上線切換:edge upstream 必須指到 <VM 內網 IP>:${WEB_PORT}(edge 預設打 80,別漏掉埠號)
       - "${WEB_PORT:-8080}:80"
     depends_on:
       - backend

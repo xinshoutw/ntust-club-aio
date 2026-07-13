@@ -7,11 +7,18 @@ export interface ApiResponse<T> {
 
 const BASE = '/api/v1'
 
-export async function api<T>(path: string, init?: RequestInit): Promise<T> {
+export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
+  // 正確合併 headers(展開 init 不可蓋掉);FormData 交給瀏覽器帶 boundary
+  const headers = new Headers(init.headers)
+  const isFormData = init.body instanceof FormData
+  if (!isFormData && init.body != null && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+
   const res = await fetch(`${BASE}${path}`, {
     credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
     ...init,
+    headers,
   })
 
   let body: ApiResponse<T>

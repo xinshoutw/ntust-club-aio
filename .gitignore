@@ -1,5 +1,6 @@
-# env / secrets
-.env
+# env / secrets(涵蓋 .env.prod 等變體,只放行範本)
+.env*
+!.env.example
 
 # python
 .venv/

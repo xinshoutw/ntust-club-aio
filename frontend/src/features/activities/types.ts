@@ -14,6 +14,7 @@ export interface Activity {
   name: string
   club: string
   type: '社課' | '活動' | '會議'
+  isLarge?: boolean
   date: string
   timeRange?: string
   location?: string

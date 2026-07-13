@@ -16,6 +16,7 @@ export const CLUB_ACTIVITIES: Activity[] = [
     name: '資訊週',
     club: '資工系學會',
     type: '活動',
+    isLarge: true,
     date: '2026/09/15',
     status: 'pending_dean',
     budget: [

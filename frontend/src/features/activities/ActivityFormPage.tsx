@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { App, Button, DatePicker, Form, Input, InputNumber, Select, TimePicker, Upload } from 'antd'
+import { App, Button, Checkbox, DatePicker, Form, Input, InputNumber, Select, TimePicker, Tooltip, Upload } from 'antd'
 import type { UploadFile } from 'antd'
 import { FileTextOutlined, InboxOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
@@ -33,6 +33,7 @@ export default function ActivityFormPage() {
   const { user } = useAuth()
   const { message, modal } = App.useApp()
   const [form] = Form.useForm()
+  const activityType = Form.useWatch('type', form)
   const [files, setFiles] = useState<UploadFile[]>([])
 
   // 自動增列:保證尾端永遠有一列空白;清空的列自動移除
@@ -40,24 +41,35 @@ export default function ActivityFormPage() {
   const budgetKeyRef = useRef(2)
   const [budget, setBudget] = useState<BudgetRow[]>([emptyBudget(1)])
 
+  // 輸入時只增列;空列的移除延後到 blur(避免打字中列被吃掉)
   const setWork = (idx: number, patch: Partial<{ task: string; owner: string }>) => {
     setWorks((ws) => {
       const next = ws.map((w, i) => (i === idx ? { ...w, ...patch } : w))
-      const filled = next.filter((w) => w.task.trim() !== '' || w.owner.trim() !== '')
-      return [...filled, { task: '', owner: '' }]
+      const last = next[next.length - 1]
+      if (last.task.trim() !== '' || last.owner.trim() !== '') next.push({ task: '', owner: '' })
+      return next
     })
   }
+  const compactWorks = () =>
+    setWorks((ws) => [...ws.filter((w) => w.task.trim() !== '' || w.owner.trim() !== ''), { task: '', owner: '' }])
 
-  // compact=false(換科目)只更新值,不做自動壓縮,避免空列被重建導致選項被重設
-  const updateBudget = (key: number, patch: Partial<BudgetRow>, compact = true) => {
+  // 輸入時只增列;空列的移除延後到 blur
+  const updateBudget = (key: number, patch: Partial<BudgetRow>) => {
     setBudget((rows) => {
       const next = rows.map((r) => (r.key === key ? { ...r, ...patch } : r))
-      if (!compact) return next
-      const filled = next.filter((r) => !isBudgetEmpty(r))
+      if (!isBudgetEmpty(next[next.length - 1])) {
+        budgetKeyRef.current += 1
+        next.push(emptyBudget(budgetKeyRef.current))
+      }
+      return next
+    })
+  }
+  const compactBudget = () =>
+    setBudget((rows) => {
+      const filled = rows.filter((r) => !isBudgetEmpty(r))
       budgetKeyRef.current += 1
       return [...filled, emptyBudget(budgetKeyRef.current)]
     })
-  }
 
   const filledBudget = budget.filter((r) => !isBudgetEmpty(r))
   const totals = filledBudget.reduce(
@@ -74,6 +86,7 @@ export default function ActivityFormPage() {
       type: (v.type as Activity['type']) ?? '社課',
       date: v.date ? v.date.format('YYYY/MM/DD') : '—',
       location: v.location,
+      isLarge: v.type === '活動' ? !!v.isLarge : undefined,
       status,
       budget: filledBudget.map((r, i) => ({
         id: i + 1,
@@ -97,6 +110,7 @@ export default function ActivityFormPage() {
         title: '附件不會隨草稿保存',
         content: `已選擇的 ${files.length} 個附件將被捨棄,送出申請時需重新上傳。確定要暫存草稿?`,
         okText: '捨棄附件並暫存',
+        maskClosable: true,
         cancelText: '取消',
         onOk: doSave,
       })
@@ -137,8 +151,19 @@ export default function ActivityFormPage() {
                 <Input placeholder="活動名稱" />
               </Form.Item>
               <div className="form-grid-2">
-                <Form.Item name="type" label="活動類型" rules={[{ required: true }]} style={{ marginBottom: 0 }}>
-                  <Select options={['社課', '活動', '會議'].map((v) => ({ value: v, label: v }))} />
+                <Form.Item label="活動類型" required style={{ marginBottom: 0 }}>
+                  <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <Form.Item name="type" noStyle rules={[{ required: true }]}>
+                      <Select style={{ flex: 1 }} options={['社課', '活動', '會議'].map((v) => ({ value: v, label: v }))} />
+                    </Form.Item>
+                    {activityType === '活動' && (
+                      <Tooltip title="大型活動在行政資料能夠獲得較高的評分">
+                        <Form.Item name="isLarge" valuePropName="checked" noStyle>
+                          <Checkbox style={{ whiteSpace: 'nowrap' }}>大型活動申請</Checkbox>
+                        </Form.Item>
+                      </Tooltip>
+                    )}
+                  </div>
                 </Form.Item>
                 <Form.Item
                   name="location"
@@ -202,7 +227,7 @@ export default function ActivityFormPage() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {works.map((w, idx) => (
-                    <div key={idx} style={{ display: 'flex', gap: 8 }}>
+                    <div key={idx} onBlur={compactWorks} style={{ display: 'flex', gap: 8 }}>
                       <Input
                         value={w.task}
                         onChange={(e) => setWork(idx, { task: e.target.value })}
@@ -231,12 +256,12 @@ export default function ActivityFormPage() {
                 {budget.map((r) => {
                   const hint = BUDGET_HINTS[r.category]
                   return (
-                    <div key={r.key} style={{ border: '1px solid var(--line)', borderRadius: 6, padding: '10px 12px' }}>
+                    <div key={r.key} onBlur={compactBudget} style={{ border: '1px solid var(--line)', borderRadius: 6, padding: '10px 12px' }}>
                       <div className="budget-row">
                         <Select
                           aria-label="經費科目"
                           value={r.category}
-                          onChange={(v) => updateBudget(r.key, { category: v }, false)}
+                          onChange={(v) => updateBudget(r.key, { category: v })}
                           options={BUDGET_CATEGORIES.map((c) => ({ value: c, label: c }))}
                           style={{ width: 150 }}
                         />

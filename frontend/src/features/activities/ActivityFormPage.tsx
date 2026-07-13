@@ -31,26 +31,28 @@ const isBudgetEmpty = (r: BudgetRow) =>
 export default function ActivityFormPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const [form] = Form.useForm()
   const [files, setFiles] = useState<UploadFile[]>([])
 
   // 自動增列:保證尾端永遠有一列空白;清空的列自動移除
-  const [works, setWorks] = useState<string[]>([''])
+  const [works, setWorks] = useState<{ task: string; owner: string }[]>([{ task: '', owner: '' }])
   const budgetKeyRef = useRef(2)
   const [budget, setBudget] = useState<BudgetRow[]>([emptyBudget(1)])
 
-  const setWork = (idx: number, value: string) => {
+  const setWork = (idx: number, patch: Partial<{ task: string; owner: string }>) => {
     setWorks((ws) => {
-      const next = ws.map((w, i) => (i === idx ? value : w))
-      const filled = next.filter((w) => w.trim() !== '')
-      return [...filled, '']
+      const next = ws.map((w, i) => (i === idx ? { ...w, ...patch } : w))
+      const filled = next.filter((w) => w.task.trim() !== '' || w.owner.trim() !== '')
+      return [...filled, { task: '', owner: '' }]
     })
   }
 
-  const updateBudget = (key: number, patch: Partial<BudgetRow>) => {
+  // compact=false(換科目)只更新值,不做自動壓縮,避免空列被重建導致選項被重設
+  const updateBudget = (key: number, patch: Partial<BudgetRow>, compact = true) => {
     setBudget((rows) => {
       const next = rows.map((r) => (r.key === key ? { ...r, ...patch } : r))
+      if (!compact) return next
       const filled = next.filter((r) => !isBudgetEmpty(r))
       budgetKeyRef.current += 1
       return [...filled, emptyBudget(budgetKeyRef.current)]
@@ -84,13 +86,27 @@ export default function ActivityFormPage() {
   }
 
   const saveDraft = () => {
-    addDraft(buildDraft('draft'))
-    message.success('已暫存草稿')
-    navigate('/activities')
+    const doSave = () => {
+      addDraft(buildDraft('draft'))
+      message.success('已暫存草稿')
+      navigate('/activities')
+    }
+    if (files.length > 0) {
+      // 草稿不保存附件:避免未送出檔案殘留伺服器(孤兒檔案/個資殘留)
+      modal.confirm({
+        title: '附件不會隨草稿保存',
+        content: `已選擇的 ${files.length} 個附件將被捨棄,送出申請時需重新上傳。確定要暫存草稿?`,
+        okText: '捨棄附件並暫存',
+        cancelText: '取消',
+        onOk: doSave,
+      })
+      return
+    }
+    doSave()
   }
 
   const onFinish = () => {
-    if (!works.some((w) => w.trim() !== '')) {
+    if (!works.some((w) => w.task.trim() !== '' && w.owner.trim() !== '')) {
       message.error('請填寫至少一筆工作分配。')
       return
     }
@@ -142,20 +158,37 @@ export default function ActivityFormPage() {
                 >
                   <DatePicker style={{ width: '100%' }} format="YYYY/MM/DD" />
                 </Form.Item>
-                <Form.Item name="timeRange" label="活動時間" style={{ marginBottom: 0 }}>
-                  <TimePicker.RangePicker style={{ width: '100%' }} format="HH:mm" />
+                <Form.Item
+                  name="timeRange"
+                  label="活動時間"
+                  rules={[{ required: true, message: '請選擇活動時間' }]}
+                  style={{ marginBottom: 0 }}
+                >
+                  <TimePicker.RangePicker
+                    style={{ width: '100%' }}
+                    format={{ format: 'HH:mm', type: 'mask' }}
+                    needConfirm={false}
+                  />
                 </Form.Item>
               </div>
-              <Form.Item label="參加人數(校內 / 校外)" style={{ marginBottom: 0 }}>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <Form.Item name="participantsIn" noStyle>
-                    <InputNumber style={{ width: '100%' }} min={0} precision={0} aria-label="校內人數" placeholder="校內" />
-                  </Form.Item>
-                  <Form.Item name="participantsOut" noStyle>
-                    <InputNumber style={{ width: '100%' }} min={0} precision={0} aria-label="校外人數" placeholder="校外" />
-                  </Form.Item>
-                </div>
-              </Form.Item>
+              <div className="form-grid-2">
+                <Form.Item
+                  name="participantsIn"
+                  label="參加人數(校內)"
+                  rules={[{ required: true, message: '請輸入校內人數' }]}
+                  style={{ marginBottom: 0 }}
+                >
+                  <InputNumber style={{ width: '100%' }} min={0} precision={0} />
+                </Form.Item>
+                <Form.Item
+                  name="participantsOut"
+                  label="參加人數(校外)"
+                  rules={[{ required: true, message: '請輸入校外人數' }]}
+                  style={{ marginBottom: 0 }}
+                >
+                  <InputNumber style={{ width: '100%' }} min={0} precision={0} />
+                </Form.Item>
+              </div>
               <Form.Item name="content" label="活動內容(至多 150 字)" style={{ marginBottom: 0 }}>
                 <Input.TextArea rows={6} maxLength={150} showCount placeholder="活動目的、內容、預期效益" />
               </Form.Item>
@@ -169,12 +202,18 @@ export default function ActivityFormPage() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {works.map((w, idx) => (
-                    <Input
-                      key={idx}
-                      value={w}
-                      onChange={(e) => setWork(idx, e.target.value)}
-                      placeholder="例:總務>陳大文"
-                    />
+                    <div key={idx} style={{ display: 'flex', gap: 8 }}>
+                      <Input
+                        value={w.task}
+                        onChange={(e) => setWork(idx, { task: e.target.value })}
+                        placeholder="工作項目"
+                      />
+                      <Input
+                        value={w.owner}
+                        onChange={(e) => setWork(idx, { owner: e.target.value })}
+                        placeholder="負責人"
+                      />
+                    </div>
                   ))}
                 </div>
               </div>
@@ -197,7 +236,7 @@ export default function ActivityFormPage() {
                         <Select
                           aria-label="經費科目"
                           value={r.category}
-                          onChange={(v) => updateBudget(r.key, { category: v })}
+                          onChange={(v) => updateBudget(r.key, { category: v }, false)}
                           options={BUDGET_CATEGORIES.map((c) => ({ value: c, label: c }))}
                           style={{ width: 150 }}
                         />

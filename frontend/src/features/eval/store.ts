@@ -113,10 +113,18 @@ export function allPhotoHashes(): Set<string> {
   return new Set(ACTIVITY_RESULTS.flatMap((r) => r.photos.map((p) => p.hash)).filter((h): h is string => !!h))
 }
 
-// ---- 管理員調整 ----
+// ---- 管理員調整(以社團為單位;後端對應 eval_adjustments year+club) ----
 
-export const OVERRIDES: Partial<Record<AdKey, number | null>> = {}
-export const MERIT = { value: 0 } // 表現優良加分(學務處登錄)
+const overridesByClub: Record<string, Partial<Record<AdKey, number | null>>> = {}
+export function overridesOf(club: string): Partial<Record<AdKey, number | null>> {
+  return (overridesByClub[club] ??= {})
+}
+
+const meritByClub: Record<string, number> = {} // 表現優良加分(學務處登錄)
+export const meritOf = (club: string): number => meritByClub[club] ?? 0
+export const setMerit = (club: string, v: number): void => {
+  meritByClub[club] = v
+}
 
 // ---- 評分輸入 ----
 
@@ -145,12 +153,13 @@ export function buildScoringInput(club: string): ScoringInput {
       EVAL_WINDOW.semesters.map((s) => [s, MEMBERS.filter((m) => m.semester === s).length]),
     ),
     hasWebsite: CLUB_PROFILE.url.trim() !== '',
+    // mock 以報名紀錄暫代出席;後端須以實際出席(session_attendance/幹訓簽到)餵入
     leaderMeetingAttended: SIGNUP_ITEMS.some((i) => i.kind === 'leader_meeting' && i.submission),
     cadreTrainingAttended: SIGNUP_ITEMS.some((i) => i.kind === 'cadre_training' && i.submission),
     violationCount: VIOLATIONS.filter(
       (v) => v.club === club && v.status === 'violation_open' && EVAL_WINDOW.semesters.includes(semesterOf(v.date)),
     ).length,
-    merit: MERIT.value,
+    merit: meritOf(club),
   }
 }
 

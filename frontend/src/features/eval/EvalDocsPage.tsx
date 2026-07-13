@@ -8,10 +8,10 @@ import { applyOverrides, computeAdScores, totalOf, type AdKey, type FinalScore }
 import {
   AWARDS,
   EVAL_WINDOW,
-  OVERRIDES,
   allPhotoHashes,
   buildScoringInput,
   closedActivities,
+  overridesOf,
   resultOf,
   sha256,
   toEvalFile,
@@ -93,7 +93,7 @@ export default function EvalDocsPage() {
 
   const club = user?.club ?? ''
   const closed = closedActivities()
-  const scores = applyOverrides(computeAdScores(buildScoringInput(club)), OVERRIDES)
+  const scores = applyOverrides(computeAdScores(buildScoringInput(club)), overridesOf(club))
   const byKey = Object.fromEntries(scores.map((s) => [s.key, s])) as Record<AdKey, FinalScore>
   const total = totalOf(scores)
 

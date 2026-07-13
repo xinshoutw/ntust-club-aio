@@ -2,7 +2,7 @@ import { useReducer, useState } from 'react'
 import { App, Button, InputNumber, Select, Tooltip } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import { applyOverrides, computeAdScores, totalOf, type AdKey } from '../eval/scoring'
-import { EVAL_WINDOW, MERIT, OVERRIDES, buildScoringInput } from '../eval/store'
+import { EVAL_WINDOW, buildScoringInput, meritOf, overridesOf, setMerit } from '../eval/store'
 import { AD_LABELS } from '../eval/types'
 
 // ponytail: mock 僅資工系學會有完整平時資料;其餘社團顯示同一組示意數據
@@ -16,7 +16,9 @@ export default function AdminEvalPage() {
   const [editing, setEditing] = useState<AdKey | null>(null)
   const [editValue, setEditValue] = useState<number | null>(null)
 
-  const scores = applyOverrides(computeAdScores(buildScoringInput(club)), OVERRIDES)
+  // 調整以社團為單位;切換社團互不影響
+  const overrides = overridesOf(club)
+  const scores = applyOverrides(computeAdScores(buildScoringInput(club)), overrides)
   const total = totalOf(scores)
 
   const startEdit = (key: AdKey, current: number) => {
@@ -29,14 +31,14 @@ export default function AdminEvalPage() {
       message.error('請輸入分數')
       return
     }
-    OVERRIDES[key] = editValue
+    overrides[key] = editValue
     setEditing(null)
     message.success(`「${AD_LABELS[key].name}」已調整為 ${editValue} 分`)
     force()
   }
 
   const revert = (key: AdKey) => {
-    OVERRIDES[key] = null
+    overrides[key] = null
     setEditing(null)
     message.success(`「${AD_LABELS[key].name}」已回到自動計算結果`)
     force()
@@ -132,17 +134,17 @@ export default function AdminEvalPage() {
                 </div>
               </td>
               <td className="r num" style={{ fontSize: 13, color: 'var(--steel)' }}>—</td>
-              <td className="r num" style={{ fontSize: 15, fontWeight: 600 }}>+{MERIT.value}</td>
+              <td className="r num" style={{ fontSize: 15, fontWeight: 600 }}>+{meritOf(club)}</td>
               <td>
                 <InputNumber
                   size="small"
-                  value={MERIT.value}
+                  value={meritOf(club)}
                   min={0}
                   max={5}
                   step={1}
                   style={{ width: 90 }}
                   onChange={(v) => {
-                    MERIT.value = v ?? 0
+                    setMerit(club, v ?? 0)
                     force()
                   }}
                   aria-label="表現優良加分"

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { App, Button, Dropdown, Form, Input, Modal, Pagination, Popconfirm, Select, Upload } from 'antd'
-import { DownOutlined, EditOutlined, FilterOutlined, SwapOutlined, UploadOutlined } from '@ant-design/icons'
+import { DownOutlined, DownloadOutlined, EditOutlined, FilterOutlined, SwapOutlined, UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { useAuth } from '../../app/auth'
 import { CURRENT_SEMESTER, semesterOptions } from '../../lib/semester'
@@ -16,6 +16,8 @@ export default function MembersPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [csvOpen, setCsvOpen] = useState(false)
   const [csvText, setCsvText] = useState('')
+  const [exportOpen, setExportOpen] = useState(false)
+  const [csvSemester, setCsvSemester] = useState<string>(CURRENT_SEMESTER)
   const [semester, setSemester] = useState<string>(CURRENT_SEMESTER)
   const [page, setPage] = useState(1)
   const [sort, setSort] = useState<{ key: 'kind' | 'title'; dir: 1 | -1 } | null>(null)
@@ -48,7 +50,7 @@ export default function MembersPage() {
       const [name, studentId, k, title] = cols
       if (!name || !studentId) continue
       const memberKind = (KINDS as string[]).includes(k) ? (k as Member['kind']) : '社員'
-      valid.push({ id: base++, name, studentId, kind: memberKind, title: title || undefined, semester: CURRENT_SEMESTER, updatedAt: '—(未儲存)' })
+      valid.push({ id: base++, name, studentId, kind: memberKind, title: title || undefined, semester: csvSemester, updatedAt: '—(未儲存)' })
     }
     if (!valid.length) {
       message.error('沒有可匯入的資料;格式:姓名,學號,身份[,職稱]')
@@ -57,7 +59,24 @@ export default function MembersPage() {
     setMembers((ms) => [...ms, ...valid])
     setCsvOpen(false)
     setCsvText('')
-    message.success(`已匯入 ${valid.length} 名社員`)
+    message.success(`已匯入 ${valid.length} 名社員至 ${csvSemester}`)
+  }
+
+  const exportCsv = () => {
+    const rows = members.filter((m) => m.semester === csvSemester)
+    if (!rows.length) {
+      message.error(`${csvSemester} 沒有成員可匯出`)
+      return
+    }
+    const text = rows.map((m) => [m.name, m.studentId, m.kind, m.title].filter(Boolean).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob(['\uFEFF' + text], { type: 'text/csv;charset=utf-8' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `成員名單_${csvSemester}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    setExportOpen(false)
+    message.success(`已匯出 ${rows.length} 名成員(${csvSemester})`)
   }
 
   const update = (id: number, patch: Partial<Member>) => {
@@ -100,8 +119,25 @@ export default function MembersPage() {
               style={{ width: 120 }}
               options={semesterOptions(members.map((m) => m.semester), true)}
             />
-            <Button style={{ height: 36 }} icon={<UploadOutlined />} onClick={() => setCsvOpen(true)}>
+            <Button
+              style={{ height: 36 }}
+              icon={<UploadOutlined />}
+              onClick={() => {
+                setCsvSemester(pageSemester)
+                setCsvOpen(true)
+              }}
+            >
               匯入 CSV
+            </Button>
+            <Button
+              style={{ height: 36 }}
+              icon={<DownloadOutlined />}
+              onClick={() => {
+                setCsvSemester(pageSemester)
+                setExportOpen(true)
+              }}
+            >
+              匯出 CSV
             </Button>
             <Button
               type="primary"
@@ -270,6 +306,10 @@ export default function MembersPage() {
         <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 10 }}>
           每行一人:<span className="num">姓名,學號,身份[,職稱]</span>;可上傳 .csv 或直接貼上。
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+          <span style={{ fontSize: 13 }}>匯入至學期</span>
+          <Select value={csvSemester} onChange={setCsvSemester} style={{ width: 110 }} options={semesterOptions(members.map((m) => m.semester))} />
+        </div>
         <Upload
           accept=".csv,.txt"
           maxCount={1}
@@ -287,6 +327,25 @@ export default function MembersPage() {
           onChange={(e) => setCsvText(e.target.value)}
           placeholder={'王小明,B11100001,幹部,活動\n林大同,B11100002,社員'}
         />
+      </Modal>
+
+      <Modal
+        open={exportOpen}
+        title="匯出社員(CSV)"
+        onCancel={() => setExportOpen(false)}
+        onOk={exportCsv}
+        okText="匯出"
+      >
+        <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 10 }}>
+          匯出所選學期的成員名單(格式同匯入),可直接匯入至其他學期。
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 13 }}>匯出學期</span>
+          <Select value={csvSemester} onChange={setCsvSemester} style={{ width: 110 }} options={semesterOptions(members.map((m) => m.semester))} />
+          <span style={{ fontSize: 13, color: 'var(--steel)' }}>
+            共 <span className="num">{members.filter((m) => m.semester === csvSemester).length}</span> 人
+          </span>
+        </div>
       </Modal>
     </div>
   )

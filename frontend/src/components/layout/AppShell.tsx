@@ -56,7 +56,13 @@ export default function AppShell({ nav, badgeLabel, showYear = true }: AppShellP
         >
           <MenuOutlined />
         </button>
-        <div className="topbar-brand">臺科大社團管理系統</div>
+        <button
+          type="button"
+          className="topbar-brand"
+          onClick={() => navigate(user?.role === 'admin' ? '/admin' : '/')}
+        >
+          臺科大社團管理系統
+        </button>
         <div className="topbar-mobile-title">{mobileTitle}</div>
         {badgeLabel && <span className="topbar-scope">{badgeLabel}</span>}
         <div className="topbar-spacer" />

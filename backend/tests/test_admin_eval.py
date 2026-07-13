@@ -71,6 +71,36 @@ async def test_override_revert_and_merit_flow(client, db):
     assert any(a["revoked"] for a in detail["adjustments"])
 
 
+async def test_override_score_capped_per_item(client, db):
+    club = await seed(client, db)
+    await login(client, "evaladmin")
+
+    # ad6 滿分 5,不得 override 成 30;也不得為負
+    for bad in (30, -1):
+        resp = await client.post(
+            f"/api/v1/admin/eval/clubs/{club.id}/override",
+            json={"key": "ad6", "score": bad, "reason": "x"},
+            headers=csrf_headers(client),
+        )
+        assert resp.status_code == 422
+
+    # adj 允許 -10..5
+    resp = await client.post(
+        f"/api/v1/admin/eval/clubs/{club.id}/override",
+        json={"key": "adj", "score": -10, "reason": "重大違規"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200
+
+    # 空白原因不得過關
+    resp = await client.post(
+        f"/api/v1/admin/eval/clubs/{club.id}/override",
+        json={"key": "ad6", "score": 3, "reason": "   "},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+
+
 async def test_invalid_key_and_permission_guard(client, db):
     club = await seed(client, db)
     await login(client, "evaladmin")

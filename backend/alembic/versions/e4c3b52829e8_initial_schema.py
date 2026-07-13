@@ -1,8 +1,8 @@
 """initial schema
 
-Revision ID: ba53d89a99d4
+Revision ID: e4c3b52829e8
 Revises: 
-Create Date: 2026-07-14 06:24:17.393868
+Create Date: 2026-07-14 07:14:44.380291
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = 'ba53d89a99d4'
+revision: str = 'e4c3b52829e8'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -414,6 +414,7 @@ def upgrade() -> None:
     )
     op.create_index('ix_files_club_sha256', 'files', ['club_id', 'sha256'], unique=False)
     op.create_index('ix_files_subject', 'files', ['subject_type', 'subject_id'], unique=False)
+    op.create_index('uq_files_club_report_photo_sha', 'files', ['club_id', 'sha256'], unique=True, postgresql_where=sa.text("archived_at IS NULL AND slot = 'report_photo'"))
     op.create_table('password_history',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
@@ -694,6 +695,7 @@ def downgrade() -> None:
     op.drop_table('review_scores')
     op.drop_index(op.f('ix_password_history_user_id'), table_name='password_history')
     op.drop_table('password_history')
+    op.drop_index('uq_files_club_report_photo_sha', table_name='files', postgresql_where=sa.text("archived_at IS NULL AND slot = 'report_photo'"))
     op.drop_index('ix_files_subject', table_name='files')
     op.drop_index('ix_files_club_sha256', table_name='files')
     op.drop_table('files')

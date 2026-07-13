@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import IntegrityError
 from starlette.datastructures import MutableHeaders
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -92,6 +93,13 @@ async def validation_exception_handler(
     return _envelope(
         422, "輸入驗證失敗", {"code": "VALIDATION", "detail": jsonable_encoder(exc.errors())}
     )
+
+
+@app.exception_handler(IntegrityError)
+async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:
+    # UNIQUE/FK 競態(如雙擊送出):約束擋下的第二筆回 409,不是 500
+    logger.warning("integrity conflict on %s %s", request.method, request.url.path)
+    return _envelope(409, "資料狀態已變更或重複送出,請重新整理後再試", {"code": "CONFLICT"})
 
 
 @app.exception_handler(Exception)

@@ -14,6 +14,14 @@ class File(Base, TimestampMixin):
     __table_args__ = (
         sa.Index("ix_files_subject", "subject_type", "subject_id"),
         sa.Index("ix_files_club_sha256", "club_id", "sha256"),
+        # 照片去重的 DB 層收口:並發同檔上傳其一會撞索引 → 全域 handler 回 409
+        sa.Index(
+            "uq_files_club_report_photo_sha",
+            "club_id",
+            "sha256",
+            unique=True,
+            postgresql_where=sa.text("archived_at IS NULL AND slot = 'report_photo'"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)

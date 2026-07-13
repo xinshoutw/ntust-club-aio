@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { App, Button, DatePicker, Input, InputNumber, Select, TimePicker, Upload } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
@@ -164,6 +164,18 @@ function CloseForm({
   const photoHashes = useRef(new Set<string>())
   const photosRef = useRef<EvalFile[]>([])
   photosRef.current = photos
+  const submittedRef = useRef(false)
+  const mountedRef = useRef(true)
+
+  // 未送出而離開(取消/暫存/換活動/側欄導航)一律於卸載時釋放照片 object URL;
+  // 送出後照片已轉入評鑑 store,不得釋放
+  useEffect(
+    () => () => {
+      mountedRef.current = false
+      if (!submittedRef.current) photosRef.current.forEach(releaseFile)
+    },
+    [],
+  )
 
   // 自動增列:填寫尾列即補一列;blur 離開列時移除空列(保底 3 列)
   const setReflect = (key: number, patch: Partial<Reflection>) => {
@@ -190,6 +202,11 @@ function CloseForm({
         }
         photoHashes.current.add(hash)
         const ef = await toEvalFile(f, hash)
+        if (!mountedRef.current) {
+          // 表單已卸載(處理中就離開):立即釋放,不殘留
+          releaseFile(ef)
+          return
+        }
         setPhotos((ps) => [...ps, ef])
       } catch (e) {
         message.error(`照片處理失敗:${e instanceof Error ? e.message : String(e)}`)
@@ -215,16 +232,11 @@ function CloseForm({
     reflections: filledReflects.map(({ name, dept, text }) => ({ name: name.trim(), dept: dept.trim(), text: text.trim() })),
   })
 
-  const leave = () => {
-    photosRef.current.forEach(releaseFile)
-    onDone()
-  }
-
   const saveDraft = () => {
     const doSave = () => {
       activity.closeDraft = buildDraftReport()
       message.success('已暫存結案草稿')
-      leave()
+      onDone()
     }
     if (photos.length > 0) {
       // 與活動申請同慣例:草稿不保存附件
@@ -300,6 +312,7 @@ function CloseForm({
     r.report = generatedPdf(`${activity.name}_成果報告`)
     r.feedback = generatedPdf(`${activity.name}_心得(${reflections.length}人)`)
 
+    submittedRef.current = true
     message.success('結案已送出,等待審核')
     onDone()
   }
@@ -494,7 +507,7 @@ function CloseForm({
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-            <Button onClick={leave}>取消</Button>
+            <Button onClick={onDone}>取消</Button>
             <Button onClick={saveDraft}>儲存草稿</Button>
             <Button type="primary" onClick={submit}>送出結案</Button>
           </div>

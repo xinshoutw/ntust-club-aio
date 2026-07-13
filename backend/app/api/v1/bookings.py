@@ -216,11 +216,12 @@ async def list_equipment_loans(
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = await db.execute(query.offset(page.offset).limit(page.page_size))
     return_time = await get_setting(db, "equipment_return_time")
+    holidays = await svc.load_holidays(db)
     data = []
     for loan, equipment_name in rows:
         out = EquipmentLoanOut.model_validate(loan)
         out.equipment_name = equipment_name
-        out.overdue = await svc.is_overdue(db, loan, return_time)
+        out.overdue = svc.is_overdue_in(loan, return_time, holidays)
         data.append(out)
     return ApiResponse(data=data, meta=page.meta(total or 0))
 

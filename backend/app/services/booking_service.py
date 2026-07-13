@@ -24,33 +24,40 @@ async def equipment_available(db: AsyncSession, equipment_id: int, total_qty: in
     return max(total_qty - int(out or 0), 0)
 
 
-async def next_workday(db: AsyncSession, d: date) -> date:
-    """下一個上班日(跳過週末與政府行事曆假日)。"""
-    holidays = {
-        h
-        for h in await db.scalars(
-            sa.select(Holiday.date).where(Holiday.date > d, Holiday.date <= d + timedelta(days=30))
-        )
-    }
+def next_workday_in(d: date, holidays: set[date]) -> date:
+    """下一個上班日(跳過週末與政府行事曆假日);純函式,假日集合由呼叫端提供。"""
     cursor = d + timedelta(days=1)
     while cursor.weekday() >= 5 or cursor in holidays:
         cursor += timedelta(days=1)
     return cursor
 
 
-async def overdue_deadline(db: AsyncSession, end_date: date, return_time: str) -> datetime:
+def overdue_deadline_in(end_date: date, return_time: str, holidays: set[date]) -> datetime:
     """歸還期限:結束日之隔天上班日 HH:MM(台北時區)。"""
-    workday = await next_workday(db, end_date)
+    workday = next_workday_in(end_date, holidays)
     hour, minute = (int(x) for x in return_time.split(":"))
     return datetime.combine(workday, time(hour, minute), tzinfo=TAIPEI)
 
 
-async def is_overdue(db: AsyncSession, loan: EquipmentLoan, return_time: str) -> bool:
+def is_overdue_in(loan: EquipmentLoan, return_time: str, holidays: set[date]) -> bool:
     if loan.status != LoanStatus.CHECKED_OUT:
         return False
     from datetime import UTC
 
-    return datetime.now(UTC) >= await overdue_deadline(db, loan.end_date, return_time)
+    return datetime.now(UTC) >= overdue_deadline_in(loan.end_date, return_time, holidays)
+
+
+async def load_holidays(db: AsyncSession) -> set[date]:
+    """全表撈一次(一年不過百餘筆);列表端點每請求呼叫一次,避免逐列查詢。"""
+    return set(await db.scalars(sa.select(Holiday.date)))
+
+
+async def next_workday(db: AsyncSession, d: date) -> date:
+    return next_workday_in(d, await load_holidays(db))
+
+
+async def overdue_deadline(db: AsyncSession, end_date: date, return_time: str) -> datetime:
+    return overdue_deadline_in(end_date, return_time, await load_holidays(db))
 
 
 async def availability_grid(

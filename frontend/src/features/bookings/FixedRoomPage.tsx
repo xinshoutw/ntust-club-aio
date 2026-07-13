@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react'
+import { useSearchParams } from 'react-router'
+import dayjs from 'dayjs'
 import { App, Button, DatePicker, Form, Input, Select } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
-import { ROOM_REQUESTS, VENUES } from './mock'
+import { PERIODS, ROOM_REQUESTS, VENUES } from './mock'
 import PeriodPicker from './PeriodPicker'
 
 interface Entry {
@@ -18,8 +20,18 @@ export default function FixedRoomPage() {
   const { user } = useAuth()
   const { message } = App.useApp()
   const [form] = Form.useForm()
-  const [entries, setEntries] = useState<Entry[]>([{ key: 1, periods: [] }])
-  const keyRef = useRef(2)
+  // 借用總覽格子點入時自動帶入場地、日期、時段
+  const [params] = useSearchParams()
+  const qVenue = params.get('venue')
+  const prefillRoom = VENUES.some((v) => v.allowFixed && v.name === qVenue) ? qVenue ?? undefined : undefined
+  const qDate = params.get('date') ?? undefined
+  const qPeriod = params.get('period')
+  const prefillPeriods = qPeriod && PERIODS.includes(qPeriod) ? [qPeriod] : []
+  const hasPrefill = !!(qDate || prefillPeriods.length)
+  const [entries, setEntries] = useState<Entry[]>(() =>
+    hasPrefill ? [{ key: 1, date: qDate, periods: prefillPeriods }, { key: 2, periods: [] }] : [{ key: 1, periods: [] }],
+  )
+  const keyRef = useRef(hasPrefill ? 3 : 2)
   const mine = ROOM_REQUESTS.filter((r) => r.club === user?.club).slice(0, 5)
 
   // 填寫後自動補一列空白;整列清空自動移除
@@ -66,7 +78,7 @@ export default function FixedRoomPage() {
       </div>
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
-        <Form form={form} layout="vertical" onFinish={submit} requiredMark>
+        <Form form={form} layout="vertical" onFinish={submit} requiredMark initialValues={{ room: prefillRoom }}>
           <div className="form-grid-2">
             <Form.Item name="room" label="場地" rules={[{ required: true, message: '請選擇場地' }]} style={{ marginBottom: 0 }}>
               <Select
@@ -90,11 +102,12 @@ export default function FixedRoomPage() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {entries.map((e) => (
-              <div key={e.key} style={{ border: '1px solid var(--line)', borderRadius: 6, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <div key={e.key} style={{ background: 'var(--paper)', borderRadius: 8, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <DatePicker
                   style={{ width: 140, flexShrink: 0 }}
                   format="YYYY/MM/DD"
                   placeholder="日期"
+                  defaultValue={e.date ? dayjs(e.date, 'YYYY/MM/DD') : undefined}
                   onChange={(_, ds) => updateEntry(e.key, { date: (ds as string) || undefined })}
                 />
                 <div style={{ flex: 1, minWidth: 280 }}>

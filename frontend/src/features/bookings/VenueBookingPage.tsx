@@ -1,16 +1,24 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router'
+import dayjs from 'dayjs'
 import { App, Button, DatePicker, Form, Input, Select } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
-import { VENUE_BOOKINGS, VENUES } from './mock'
+import { PERIODS, VENUE_BOOKINGS, VENUES } from './mock'
 import PeriodPicker from './PeriodPicker'
 
 export default function VenueBookingPage() {
   const { user } = useAuth()
   const { message } = App.useApp()
   const [form] = Form.useForm()
-  const [periods, setPeriods] = useState<string[]>([])
+  // 借用總覽格子點入時自動帶入場地、日期、時段
+  const [params] = useSearchParams()
+  const qVenue = params.get('venue')
+  const prefillVenue = VENUES.some((v) => v.allowTemp && v.name === qVenue) ? qVenue ?? undefined : undefined
+  const qDate = params.get('date')
+  const qPeriod = params.get('period')
+  const [periods, setPeriods] = useState<string[]>(() => (qPeriod && PERIODS.includes(qPeriod) ? [qPeriod] : []))
   const mine = VENUE_BOOKINGS.filter((v) => v.club === user?.club).slice(0, 5)
 
   const submit = (values: { venue: string }) => {
@@ -31,7 +39,13 @@ export default function VenueBookingPage() {
       </div>
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
-        <Form form={form} layout="vertical" onFinish={submit} requiredMark>
+        <Form
+          form={form}
+          layout="vertical"
+          onFinish={submit}
+          requiredMark
+          initialValues={{ venue: prefillVenue, date: qDate ? dayjs(qDate, 'YYYY/MM/DD') : undefined }}
+        >
           <div className="form-grid-2">
             <Form.Item name="venue" label="場地" rules={[{ required: true, message: '請選擇場地' }]} style={{ marginBottom: 0 }}>
               <Select
@@ -50,7 +64,7 @@ export default function VenueBookingPage() {
             時段 <span style={{ color: '#C13B34' }}>*</span>
             <span style={{ fontWeight: 400, color: 'var(--steel)', marginLeft: 8, fontSize: 12 }}>可按住拖曳批量選取</span>
           </div>
-          <div style={{ border: '1px solid var(--line)', borderRadius: 6, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ background: 'var(--paper)', borderRadius: 8, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <Form.Item name="date" rules={[{ required: true, message: '請選擇日期' }]} style={{ marginBottom: 0, flexShrink: 0 }}>
               <DatePicker format="YYYY/MM/DD" placeholder="日期" style={{ width: 140 }} />
             </Form.Item>

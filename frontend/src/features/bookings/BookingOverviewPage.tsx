@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router'
 import dayjs, { type Dayjs } from 'dayjs'
-import { DatePicker, Pagination, Tooltip } from 'antd'
+import { Button, DatePicker, Pagination, Popover, Tooltip } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
@@ -36,6 +37,7 @@ function cellInfo(venue: string, period: string, myClub?: string): { state: Cell
 
 export default function BookingOverviewPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const mine = user?.club
   const [returnedPage, setReturnedPage] = useState(1)
   const [gridDate, setGridDate] = useState<Dayjs>(() => dayjs())
@@ -90,12 +92,40 @@ export default function BookingOverviewPage() {
                   <td style={{ fontSize: 13, whiteSpace: 'nowrap', paddingRight: 8 }}>{v.name}</td>
                   {PERIODS.map((p) => {
                     const info = cellInfo(v.name, shiftedPeriod(p), mine)
-                    const cell = (
-                      <div
-                        role="img"
-                        aria-label={`${v.name} 第${p}節:${CELL[info.state].label}${info.club ? `(${info.club})` : ''}`}
-                        style={{ width: 28, height: 22, borderRadius: 4, background: CELL[info.state].bg }}
-                      />
+                    // 可借/審核中的格子可點:原地展開「固定/臨時場地借用」並帶入場地、日期、時段
+                    const bookable = info.state === 'free' || info.state === 'reviewing'
+                    const label = `${v.name} 第${p}節:${CELL[info.state].label}${info.club ? `(${info.club})` : ''}`
+                    const cell = bookable ? (
+                      <Popover
+                        trigger="click"
+                        content={
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            {([
+                              ['固定場地借用', '/bookings/fixed', v.allowFixed],
+                              ['臨時場地借用', '/bookings/venue', v.allowTemp],
+                            ] as const).map(([text, path, allowed]) => (
+                              <Button
+                                key={path}
+                                size="small"
+                                disabled={!allowed}
+                                onClick={() =>
+                                  navigate(`${path}?venue=${encodeURIComponent(v.name)}&date=${gridDate.format('YYYY/MM/DD')}&period=${p}`)
+                                }
+                              >
+                                {text}
+                              </Button>
+                            ))}
+                          </div>
+                        }
+                      >
+                        <button
+                          type="button"
+                          aria-label={`${label},點擊借用`}
+                          style={{ width: 28, height: 22, borderRadius: 4, background: CELL[info.state].bg, border: 'none', padding: 0, cursor: 'pointer', display: 'block' }}
+                        />
+                      </Popover>
+                    ) : (
+                      <div role="img" aria-label={label} style={{ width: 28, height: 22, borderRadius: 4, background: CELL[info.state].bg }} />
                     )
                     return (
                       <td key={p}>

@@ -206,7 +206,8 @@ export default function MembersPage() {
                       style={{ width: 150 }}
                       options={KINDS.map((k) => ({ value: k, label: k }))}
                       onChange={(v) => {
-                        update(m.id, { kind: v, ...(v === '社員' ? { title: undefined } : {}) })
+                        // 職稱僅幹部有;換成其他身份一律清除,避免殘留舊職稱
+                        update(m.id, { kind: v, ...(v === '幹部' ? {} : { title: undefined }) })
                         setEditing(null)
                       }}
                       onBlur={() => setEditing(null)}

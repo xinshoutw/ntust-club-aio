@@ -165,6 +165,7 @@ export default function MembersPage() {
                     身份 <SwapOutlined rotate={90} style={{ fontSize: 11 }} />
                   </button>
                   <Dropdown
+                    trigger={['click']}
                     menu={{
                       items: KINDS.map((k) => ({ key: k, label: k })),
                       selectable: true,
@@ -174,7 +175,9 @@ export default function MembersPage() {
                       onDeselect: ({ selectedKeys }) => { setKindFilter(selectedKeys as Member['kind'][]); setPage(1) },
                     }}
                   >
-                    <FilterOutlined style={{ fontSize: 11, color: kindFilter.length ? 'var(--seal)' : 'var(--steel)', cursor: 'pointer' }} />
+                    <button type="button" className="link-btn" aria-label="篩選身份" style={{ padding: 0 }}>
+                      <FilterOutlined style={{ fontSize: 11, color: kindFilter.length ? 'var(--seal)' : 'var(--steel)' }} />
+                    </button>
                   </Dropdown>
                 </span>
               </th>

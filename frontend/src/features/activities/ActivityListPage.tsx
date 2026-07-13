@@ -220,6 +220,7 @@ export default function ActivityListPage() {
                 <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                   {sortHeader('類型', 'type')}
                   <Dropdown
+                    trigger={['click']}
                     menu={{
                       items: ['社課', '活動', '會議'].map((t) => ({ key: t, label: t })),
                       selectable: true,
@@ -229,7 +230,9 @@ export default function ActivityListPage() {
                       onDeselect: ({ selectedKeys }) => { setTypeFilter(selectedKeys); setPage(1) },
                     }}
                   >
-                    <FilterOutlined style={{ fontSize: 11, color: typeFilter.length ? 'var(--seal)' : 'var(--steel)', cursor: 'pointer' }} />
+                    <button type="button" className="link-btn" aria-label="篩選類型" style={{ padding: 0 }}>
+                      <FilterOutlined style={{ fontSize: 11, color: typeFilter.length ? 'var(--seal)' : 'var(--steel)' }} />
+                    </button>
                   </Dropdown>
                 </span>
               </th>
@@ -239,6 +242,7 @@ export default function ActivityListPage() {
                 <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                   {sortHeader('狀態', 'status')}
                   <Dropdown
+                    trigger={['click']}
                     menu={{
                       items: statusKeys.map((k) => ({ key: k, label: STATUS[k].label })),
                       selectable: true,
@@ -248,7 +252,9 @@ export default function ActivityListPage() {
                       onDeselect: ({ selectedKeys }) => { setStatusFilter(selectedKeys as StatusKey[]); setPage(1) },
                     }}
                   >
-                    <FilterOutlined style={{ fontSize: 11, color: statusFilter.length ? 'var(--seal)' : 'var(--steel)', cursor: 'pointer' }} />
+                    <button type="button" className="link-btn" aria-label="篩選狀態" style={{ padding: 0 }}>
+                      <FilterOutlined style={{ fontSize: 11, color: statusFilter.length ? 'var(--seal)' : 'var(--steel)' }} />
+                    </button>
                   </Dropdown>
                 </span>
               </th>

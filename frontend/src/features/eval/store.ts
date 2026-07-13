@@ -67,6 +67,11 @@ export async function toEvalFile(f: File, hash?: string): Promise<EvalFile> {
   }
 }
 
+// 上傳檔移除/捨棄時釋放 object URL(mock 檔為 data URL,不受影響)
+export function releaseFile(f: EvalFile): void {
+  if (f.url.startsWith('blob:')) URL.revokeObjectURL(f.url)
+}
+
 export async function sha256(f: File): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', await f.arrayBuffer())
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')

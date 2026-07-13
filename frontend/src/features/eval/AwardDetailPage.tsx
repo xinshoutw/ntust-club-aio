@@ -4,7 +4,7 @@ import { App, Button, Upload } from 'antd'
 import { LeftOutlined, UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { useAuth } from '../../app/auth'
-import { AWARDS, slotFiles, toEvalFile, uploadProgress } from './store'
+import { AWARDS, releaseFile, slotFiles, toEvalFile, uploadProgress } from './store'
 import type { AwardKey, EvalFile } from './types'
 import FilePreview from './FilePreview'
 
@@ -109,6 +109,7 @@ export default function AwardDetailPage() {
                               onClick={() => {
                                 const list = slotFiles(award.key, slot.key)
                                 list.splice(list.findIndex((x) => x.id === f.id), 1)
+                                releaseFile(f)
                                 force()
                               }}
                             >

@@ -3,7 +3,7 @@ import { App, Button, DatePicker, Input, InputNumber, Modal, Select, Upload } fr
 import dayjs from 'dayjs'
 import { UploadOutlined } from '@ant-design/icons'
 import { blurLeavesRow } from '../../lib/form'
-import { allPhotoHashes, generatedPdf, resultOf, sha256, toEvalFile } from '../eval/store'
+import { allPhotoHashes, generatedPdf, releaseFile, resultOf, sha256, toEvalFile } from '../eval/store'
 import type { EvalFile } from '../eval/types'
 import type { Activity, Reflection } from './types'
 
@@ -55,6 +55,10 @@ export default function ActivityCloseModal({ activity, open, onClose, afterClose
   })
   const [photos, setPhotos] = useState<EvalFile[]>([])
   const photoQueue = useRef(Promise.resolve())
+  // 取消/暫存(捨棄照片)時釋放 object URL;送出後照片轉入評鑑 store,不釋放
+  const photosRef = useRef<EvalFile[]>([])
+  photosRef.current = photos
+  const submittedRef = useRef(false)
 
   // 自動增列:填寫尾列即補一列;blur 離開列時移除空列(保底 3 列)
   const setReflect = (key: number, patch: Partial<Reflection>) => {
@@ -188,6 +192,7 @@ export default function ActivityCloseModal({ activity, open, onClose, afterClose
     r.report = generatedPdf(`${activity.name}_成果報告`)
     r.feedback = generatedPdf(`${activity.name}_心得(${reflections.length}人)`)
 
+    submittedRef.current = true
     message.success('結案已送出,等待輔導老師審核')
     onChanged()
     onClose()
@@ -197,7 +202,10 @@ export default function ActivityCloseModal({ activity, open, onClose, afterClose
     <Modal
       open={open}
       onCancel={onClose}
-      afterClose={afterClose}
+      afterClose={() => {
+        if (!submittedRef.current) photosRef.current.forEach(releaseFile)
+        afterClose()
+      }}
       width={760}
       title={
         <span style={{ display: 'inline-flex', gap: 10, alignItems: 'baseline', flexWrap: 'wrap' }}>
@@ -309,7 +317,10 @@ export default function ActivityCloseModal({ activity, open, onClose, afterClose
                 className="link-btn danger"
                 aria-label={`移除 ${p.name}`}
                 style={{ position: 'absolute', top: -6, right: -6, background: '#fff', border: '1px solid var(--line)', borderRadius: '50%', width: 16, height: 16, lineHeight: '12px', padding: 0, fontSize: 11 }}
-                onClick={() => setPhotos((ps) => ps.filter((x) => x.id !== p.id))}
+                onClick={() => {
+                  releaseFile(p)
+                  setPhotos((ps) => ps.filter((x) => x.id !== p.id))
+                }}
               >
                 ×
               </button>

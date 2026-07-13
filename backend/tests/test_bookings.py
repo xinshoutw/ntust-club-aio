@@ -230,6 +230,47 @@ async def test_next_workday_skips_weekend_and_holiday(db):
     assert (deadline.hour, deadline.minute) == (10, 30)
 
 
+async def test_suspended_club_cannot_book(client, db):
+    from datetime import date as date_cls
+
+    club = await setup_session(client, db)
+    club.suspended_until = date_cls.today() + timedelta(days=7)
+    await db.commit()
+    eq = await make_equipment(db, name="音響", total_qty=2)
+    venue = await make_venue(db, name="精誠廣場", allow_fixed=False, allow_temp=True)
+
+    resp = await client.post(
+        "/api/v1/club/equipment-loans",
+        json={
+            "equipment_id": eq.id,
+            "qty": 1,
+            "start_date": "2026-03-10",
+            "end_date": "2026-03-12",
+            "purpose": "x",
+        },
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 403
+    assert resp.json()["meta"]["code"] == "CLUB_SUSPENDED"
+
+    resp = await client.post(
+        "/api/v1/club/venue-bookings",
+        json={"venue_id": venue.id, "date": "2026-03-05", "periods": ["3"], "purpose": "x"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 403
+
+    # 停權期滿即恢復
+    club.suspended_until = date_cls.today() - timedelta(days=1)
+    await db.commit()
+    resp = await client.post(
+        "/api/v1/club/venue-bookings",
+        json={"venue_id": venue.id, "date": "2026-03-05", "periods": ["3"], "purpose": "x"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201
+
+
 async def test_loan_overdue_flag(client, db):
     club = await setup_session(client, db)
     eq = await make_equipment(db, name="麥克風", total_qty=2)

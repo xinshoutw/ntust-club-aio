@@ -1,13 +1,14 @@
 """社團端:空間與器材借用(固定教室/臨時場地/器材)+ 借用總覽色格圖。"""
 
-from datetime import date
+from datetime import UTC, date, datetime
 
 import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Request
 
 from app.api.pagination import Pagination
 from app.core.deps import ClubUser, DbDep, client_ip
-from app.core.errors import conflict, validation_error
+from app.core.errors import conflict, forbidden, validation_error
+from app.core.semesters import TAIPEI
 from app.models import (
     Club,
     Equipment,
@@ -39,6 +40,16 @@ router = APIRouter(prefix="/club", tags=["bookings"])
 async def _notify_submit(background: BackgroundTasks, db, user, title: str, desc: str) -> None:
     club = await db.get(Club, user.club_id)
     background.add_task(notify.club_event, "submit", title, desc, club.discord_webhook_url)
+
+
+async def _ensure_not_suspended(db, user) -> None:
+    """停權中的社團不得申請借用(器材逾期停權管理的執行點)。"""
+    club = await db.get(Club, user.club_id)
+    today_tw = datetime.now(UTC).astimezone(TAIPEI).date()
+    if club.suspended_until and club.suspended_until >= today_tw:
+        raise forbidden(
+            f"社團停權中(至 {club.suspended_until}),暫停借用申請", code="CLUB_SUSPENDED"
+        )
 
 
 # ---- 主檔 ----
@@ -110,6 +121,7 @@ async def create_room_booking(
     request: Request,
     background: BackgroundTasks,
 ) -> ApiResponse[RoomBookingOut]:
+    await _ensure_not_suspended(db, user)
     venue = await db.get(Venue, body.venue_id)
     if venue is None or not venue.is_active or not venue.allow_fixed:
         raise validation_error("該場地不開放固定借用")
@@ -162,6 +174,7 @@ async def create_venue_booking(
     request: Request,
     background: BackgroundTasks,
 ) -> ApiResponse[VenueBookingOut]:
+    await _ensure_not_suspended(db, user)
     venue = await db.get(Venue, body.venue_id)
     if venue is None or not venue.is_active or not venue.allow_temp:
         raise validation_error("該場地不開放臨時借用")
@@ -234,6 +247,7 @@ async def create_equipment_loan(
     request: Request,
     background: BackgroundTasks,
 ) -> ApiResponse[EquipmentLoanOut]:
+    await _ensure_not_suspended(db, user)
     equipment = await db.get(Equipment, body.equipment_id)
     if equipment is None or not equipment.is_active:
         raise validation_error("找不到該器材")

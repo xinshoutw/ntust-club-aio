@@ -37,7 +37,7 @@ export default function MembersPage() {
     message.success('已新增社員(名單更新影響評鑑行政分)')
   }
 
-  // CSV:姓名,學號,身份[,職稱]
+  // CSV:姓名,學號,身份[,職稱];身份留空視為社員,無法辨識的列略過並提示
   const importCsv = (text: string) => {
     const rows = text
       .split(/\r?\n/)
@@ -45,16 +45,32 @@ export default function MembersPage() {
       .filter(Boolean)
       .map((l) => l.split(/[,\t]/).map((c) => c.trim()))
     const valid: Member[] = []
+    const skipped: number[] = []
     let base = nextId()
-    for (const cols of rows) {
+    rows.forEach((cols, i) => {
       const [name, studentId, k, title] = cols
-      if (!name || !studentId) continue
-      const memberKind = (KINDS as string[]).includes(k) ? (k as Member['kind']) : '社員'
-      valid.push({ id: base++, name, studentId, kind: memberKind, title: title || undefined, semester: csvSemester, updatedAt: '—(未儲存)' })
-    }
+      const kind = (k ?? '').replace(/\//g, '／')
+      const memberKind = kind === '' ? '社員' : (KINDS as string[]).includes(kind) ? (kind as Member['kind']) : null
+      if (!name || !studentId || !memberKind) {
+        skipped.push(i + 1)
+        return
+      }
+      valid.push({
+        id: base++,
+        name,
+        studentId,
+        kind: memberKind,
+        title: memberKind === '幹部' ? title || undefined : undefined,
+        semester: csvSemester,
+        updatedAt: '—(未儲存)',
+      })
+    })
     if (!valid.length) {
       message.error('沒有可匯入的資料;格式:姓名,學號,身份[,職稱]')
       return
+    }
+    if (skipped.length) {
+      message.warning(`第 ${skipped.join('、')} 行缺欄位或身份無法辨識,已略過`)
     }
     setMembers((ms) => [...ms, ...valid])
     setCsvOpen(false)

@@ -55,7 +55,16 @@ export default function AdminEvalPage() {
         }
         extra={
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Select value={club} onChange={setClub} style={{ width: 170 }} options={CLUBS.map((c) => ({ value: c, label: c }))} />
+            <Select
+              value={club}
+              onChange={(v) => {
+                // 切換社團時放棄進行中的編輯,避免把 A 社輸入的分數存進 B 社
+                setClub(v)
+                setEditing(null)
+              }}
+              style={{ width: 170 }}
+              options={CLUBS.map((c) => ({ value: c, label: c }))}
+            />
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 12, color: 'var(--steel)' }}>採用總分</div>
               <div className="num" style={{ fontSize: 22, fontWeight: 600, lineHeight: 1.2 }}>{total}</div>

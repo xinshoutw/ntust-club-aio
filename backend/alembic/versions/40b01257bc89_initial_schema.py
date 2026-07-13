@@ -1,8 +1,8 @@
 """initial schema
 
-Revision ID: c1fe2e77f829
+Revision ID: 40b01257bc89
 Revises: 
-Create Date: 2026-07-14 05:57:11.116620
+Create Date: 2026-07-14 06:21:07.189239
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = 'c1fe2e77f829'
+revision: str = '40b01257bc89'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -24,7 +24,7 @@ def upgrade() -> None:
     op.create_table('awards',
     sa.Column('id', sa.Text(), nullable=False),
     sa.Column('name', sa.Text(), nullable=False),
-    sa.Column('kind', sa.Enum('團體', '個人', name='award_kind', native_enum=False, length=32), nullable=False),
+    sa.Column('kind', sa.Enum('團體', '個人', name='award_kind', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('has_presentation', sa.Boolean(), nullable=False),
     sa.Column('is_weighted', sa.Boolean(), nullable=False),
     sa.Column('sort', sa.Integer(), nullable=False),
@@ -36,7 +36,7 @@ def upgrade() -> None:
     op.create_table('clubs',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.Text(), nullable=False),
-    sa.Column('attribute', sa.Enum('自治性', '學藝性', '服務性', '聯誼性', '藝術性', '體育性', name='club_attribute', native_enum=False, length=32), nullable=False),
+    sa.Column('attribute', sa.Enum('自治性', '學藝性', '服務性', '聯誼性', '藝術性', '體育性', name='club_attribute', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('intro', sa.Text(), nullable=False),
     sa.Column('website_url', sa.Text(), nullable=True),
     sa.Column('advisor_name', sa.Text(), nullable=True),
@@ -56,7 +56,7 @@ def upgrade() -> None:
     sa.Column('to_addr', sa.Text(), nullable=False),
     sa.Column('subject', sa.Text(), nullable=False),
     sa.Column('template', sa.Text(), nullable=False),
-    sa.Column('status', sa.Enum('sent', 'failed', name='email_status', native_enum=False, length=32), nullable=False),
+    sa.Column('status', sa.Enum('sent', 'failed', name='email_status', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('error', sa.Text(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -65,7 +65,7 @@ def upgrade() -> None:
     op.create_table('equipment',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.Text(), nullable=False),
-    sa.Column('category', sa.Enum('一般', '電子設備', '投影布幕', '帳篷', name='equipment_category', native_enum=False, length=32), nullable=False),
+    sa.Column('category', sa.Enum('一般', '電子設備', '投影布幕', '帳篷', name='equipment_category', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('total_qty', sa.Integer(), nullable=False),
     sa.Column('needs_serial', sa.Boolean(), nullable=False),
     sa.Column('sort', sa.Integer(), nullable=False),
@@ -94,7 +94,7 @@ def upgrade() -> None:
     )
     op.create_table('legacy_id_map',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('legacy_system', sa.Enum('cms', 'clubclass', name='legacy_system', native_enum=False, length=32), nullable=False),
+    sa.Column('legacy_system', sa.Enum('cms', 'clubclass', name='legacy_system', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('legacy_table', sa.Text(), nullable=False),
     sa.Column('legacy_id', sa.Text(), nullable=False),
     sa.Column('new_table', sa.Text(), nullable=False),
@@ -116,7 +116,7 @@ def upgrade() -> None:
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.Text(), nullable=False),
     sa.Column('capacity', sa.Integer(), nullable=True),
-    sa.Column('category', sa.Enum('教室', '練習空間', '廣場戶外', name='venue_category', native_enum=False, length=32), nullable=False),
+    sa.Column('category', sa.Enum('教室', '練習空間', '廣場戶外', name='venue_category', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('allow_fixed', sa.Boolean(), nullable=False),
     sa.Column('allow_temp', sa.Boolean(), nullable=False),
     sa.Column('sort', sa.Integer(), nullable=False),
@@ -149,7 +149,7 @@ def upgrade() -> None:
     sa.Column('club_id', sa.Integer(), nullable=False),
     sa.Column('name', sa.Text(), nullable=False),
     sa.Column('student_id', sa.Text(), nullable=False),
-    sa.Column('kind', sa.Enum('幹部', '社員', name='member_kind', native_enum=False, length=32), nullable=False),
+    sa.Column('kind', sa.Enum('幹部', '社員', name='member_kind', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('title', sa.Text(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -181,7 +181,7 @@ def upgrade() -> None:
     sa.Column('club_id', sa.Integer(), nullable=False),
     sa.Column('location', sa.Text(), nullable=False),
     sa.Column('items', sa.Text(), nullable=False),
-    sa.Column('status', sa.Enum('pending', 'in_progress', 'done', name='maintenance_status', native_enum=False, length=32), nullable=False),
+    sa.Column('status', sa.Enum('pending', 'in_progress', 'done', name='maintenance_status', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('handle_note', sa.Text(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -193,9 +193,9 @@ def upgrade() -> None:
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('club_id', sa.Integer(), nullable=False),
     sa.Column('term', sa.Text(), nullable=False),
-    sa.Column('position', sa.Enum('社長或會長', '副社長或副會長', name='cert_position', native_enum=False, length=32), nullable=False),
+    sa.Column('position', sa.Enum('社長或會長', '副社長或副會長', name='cert_position', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('applicant_name', sa.Text(), nullable=False),
-    sa.Column('status', sa.Enum('pending', 'approved', 'rejected', name='booking_status', native_enum=False, length=32), nullable=False),
+    sa.Column('status', sa.Enum('pending', 'approved', 'rejected', name='booking_status', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['club_id'], ['clubs.id'], name=op.f('fk_officer_certificates_club_id_clubs')),
@@ -210,7 +210,7 @@ def upgrade() -> None:
     sa.Column('account_number', sa.Text(), nullable=False),
     sa.Column('new_agent_name', sa.Text(), nullable=True),
     sa.Column('new_agent_phone', sa.Text(), nullable=True),
-    sa.Column('status', sa.Enum('pending', 'approved', 'rejected', name='booking_status', native_enum=False, length=32), nullable=False),
+    sa.Column('status', sa.Enum('pending', 'approved', 'rejected', name='booking_status', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['club_id'], ['clubs.id'], name=op.f('fk_postal_account_changes_club_id_clubs')),
@@ -222,7 +222,7 @@ def upgrade() -> None:
     sa.Column('club_id', sa.Integer(), nullable=False),
     sa.Column('venue_id', sa.Integer(), nullable=False),
     sa.Column('purpose', sa.Text(), nullable=False),
-    sa.Column('status', sa.Enum('pending', 'approved', 'rejected', name='booking_status', native_enum=False, length=32), nullable=False),
+    sa.Column('status', sa.Enum('pending', 'approved', 'rejected', name='booking_status', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['club_id'], ['clubs.id'], name=op.f('fk_room_booking_requests_club_id_clubs')),
@@ -232,10 +232,10 @@ def upgrade() -> None:
     op.create_index(op.f('ix_room_booking_requests_club_id'), 'room_booking_requests', ['club_id'], unique=False)
     op.create_table('users',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('role', sa.Enum('admin', 'staff', 'club', 'viewer', name='user_role', native_enum=False, length=32), nullable=False),
+    sa.Column('role', sa.Enum('admin', 'staff', 'club', 'viewer', name='user_role', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('username', sa.Text(), nullable=False),
     sa.Column('password_hash', sa.Text(), nullable=True),
-    sa.Column('auth_provider', sa.Enum('local', 'sso', name='auth_provider', native_enum=False, length=32), nullable=False),
+    sa.Column('auth_provider', sa.Enum('local', 'sso', name='auth_provider', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('name', sa.Text(), nullable=False),
     sa.Column('email', sa.Text(), nullable=True),
     sa.Column('club_id', sa.Integer(), nullable=True),
@@ -260,7 +260,7 @@ def upgrade() -> None:
     sa.Column('date', sa.Date(), nullable=False),
     sa.Column('periods', postgresql.ARRAY(sa.String(length=2)), nullable=False),
     sa.Column('purpose', sa.Text(), nullable=False),
-    sa.Column('status', sa.Enum('pending', 'approved', 'rejected', name='booking_status', native_enum=False, length=32), nullable=False),
+    sa.Column('status', sa.Enum('pending', 'approved', 'rejected', name='booking_status', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.ForeignKeyConstraint(['club_id'], ['clubs.id'], name=op.f('fk_venue_bookings_club_id_clubs')),
@@ -275,7 +275,7 @@ def upgrade() -> None:
     sa.Column('name', sa.Text(), nullable=False),
     sa.Column('content', sa.Text(), nullable=False),
     sa.Column('location', sa.Text(), nullable=False),
-    sa.Column('type', sa.Enum('社課', '活動', '會議', name='activity_type', native_enum=False, length=32), nullable=False),
+    sa.Column('type', sa.Enum('社課', '活動', '會議', name='activity_type', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('is_large', sa.Boolean(), nullable=False),
     sa.Column('is_large_approved', sa.Boolean(), nullable=True),
     sa.Column('date', sa.Date(), nullable=False),
@@ -286,7 +286,7 @@ def upgrade() -> None:
     sa.Column('staff_text', sa.Text(), nullable=False),
     sa.Column('fund_source', sa.Text(), nullable=True),
     sa.Column('school_approved', sa.Integer(), nullable=True),
-    sa.Column('status', sa.Enum('draft', 'pending_advisor', 'pending_chief', 'pending_dean', 'approved', 'rejected', 'closing_pending_advisor', 'closed', name='activity_status', native_enum=False, length=32), nullable=False),
+    sa.Column('status', sa.Enum('draft', 'pending_advisor', 'pending_chief', 'pending_dean', 'approved', 'rejected', 'closing_pending_advisor', 'closed', name='activity_status', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('close_unlocked', sa.Boolean(), nullable=False),
     sa.Column('close_draft', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('created_by', sa.Integer(), nullable=False),
@@ -302,7 +302,7 @@ def upgrade() -> None:
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('title', sa.Text(), nullable=False),
     sa.Column('content', sa.Text(), nullable=False),
-    sa.Column('target_type', sa.Enum('all', 'attr', 'club', name='announcement_target', native_enum=False, length=32), nullable=False),
+    sa.Column('target_type', sa.Enum('all', 'attr', 'club', name='announcement_target', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('target_value', sa.Text(), nullable=True),
     sa.Column('is_auto', sa.Boolean(), nullable=False),
     sa.Column('created_by', sa.Integer(), nullable=False),
@@ -313,10 +313,10 @@ def upgrade() -> None:
     )
     op.create_table('approval_records',
     sa.Column('id', sa.Integer(), nullable=False),
-    sa.Column('subject_type', sa.Enum('activity', 'activity_close', 'room_booking', 'venue_booking', 'equipment_loan', 'officer_cert', 'postal_change', 'maintenance', 'signup', name='approval_subject', native_enum=False, length=32), nullable=False),
+    sa.Column('subject_type', sa.Enum('activity', 'activity_close', 'room_booking', 'venue_booking', 'equipment_loan', 'officer_cert', 'postal_change', 'maintenance', 'signup', name='approval_subject', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('subject_id', sa.Integer(), nullable=False),
     sa.Column('stage', sa.Text(), nullable=False),
-    sa.Column('decision', sa.Enum('approve', 'reject', 'unlock', 'revoke', name='approval_decision', native_enum=False, length=32), nullable=False),
+    sa.Column('decision', sa.Enum('approve', 'reject', 'unlock', 'revoke', name='approval_decision', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('actor_id', sa.Integer(), nullable=False),
     sa.Column('reason', sa.Text(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -347,7 +347,7 @@ def upgrade() -> None:
     sa.Column('start_date', sa.Date(), nullable=False),
     sa.Column('end_date', sa.Date(), nullable=False),
     sa.Column('purpose', sa.Text(), nullable=False),
-    sa.Column('status', sa.Enum('pending', 'approved', 'rejected', 'checked_out', 'returned', name='loan_status', native_enum=False, length=32), nullable=False),
+    sa.Column('status', sa.Enum('pending', 'approved', 'rejected', 'checked_out', 'returned', name='loan_status', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('checkout_by', sa.Integer(), nullable=True),
     sa.Column('checkout_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('serials', postgresql.ARRAY(sa.Text()), nullable=True),
@@ -369,7 +369,7 @@ def upgrade() -> None:
     sa.Column('year', sa.Integer(), nullable=False),
     sa.Column('award_id', sa.Text(), nullable=False),
     sa.Column('club_id', sa.Integer(), nullable=False),
-    sa.Column('kind', sa.Enum('admin_score_override', 'merit_bonus', 'final_override', 'award_override', name='adjustment_kind', native_enum=False, length=32), nullable=False),
+    sa.Column('kind', sa.Enum('admin_score_override', 'merit_bonus', 'final_override', 'award_override', name='adjustment_kind', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('value', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
     sa.Column('reason', sa.Text(), nullable=False),
     sa.Column('actor_id', sa.Integer(), nullable=False),
@@ -481,7 +481,7 @@ def upgrade() -> None:
     sa.Column('allow_multiple', sa.Boolean(), nullable=False),
     sa.Column('max_participants', sa.Integer(), nullable=True),
     sa.Column('fields', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
-    sa.Column('kind', sa.Enum('normal', 'cadre_training', 'leader_meeting', name='signup_kind', native_enum=False, length=32), nullable=False),
+    sa.Column('kind', sa.Enum('normal', 'cadre_training', 'leader_meeting', name='signup_kind', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('session_based', sa.Boolean(), nullable=False),
     sa.Column('requires_confirmation', sa.Boolean(), nullable=False),
     sa.Column('is_eval', sa.Boolean(), nullable=False),
@@ -500,7 +500,7 @@ def upgrade() -> None:
     sa.Column('items', postgresql.ARRAY(sa.Text()), nullable=False),
     sa.Column('other', sa.Text(), nullable=True),
     sa.Column('filler_id', sa.Integer(), nullable=False),
-    sa.Column('status', sa.Enum('open', 'resolved', name='violation_status', native_enum=False, length=32), nullable=False),
+    sa.Column('status', sa.Enum('open', 'resolved', name='violation_status', native_enum=False, create_constraint=True, length=32), nullable=False),
     sa.Column('resolve_note', sa.Text(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),

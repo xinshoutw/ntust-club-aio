@@ -20,11 +20,16 @@ class Base(DeclarativeBase):
 
 
 def db_enum(enum_cls: type[StrEnum], name: str) -> sa.Enum:
-    """非原生 enum(VARCHAR + CHECK):加值只改 CHECK,不需 ALTER TYPE;存 .value(含中文值)。"""
+    """非原生 enum(VARCHAR + CHECK):加值只改 CHECK,不需 ALTER TYPE;存 .value(含中文值)。
+
+    create_constraint 必須明給:SQLAlchemy 預設不建 CHECK,少了它 raw SQL/遷移腳本
+    寫壞值 DB 不擋,讀取時才 LookupError。
+    """
     return sa.Enum(
         enum_cls,
         name=name,
         native_enum=False,
+        create_constraint=True,
         length=32,
         values_callable=lambda e: [m.value for m in e],
     )

@@ -185,6 +185,7 @@ erDiagram
 | school_approved | int NULL | 學校核定補助金額 |
 | status | enum,見下 | |
 | close_unlocked | bool default false | 逾期鎖定的管理員解鎖旗標 |
+| close_draft | jsonb NULL | **結案草稿**(2026-07-14 定案:草稿寫 DB,換裝置可續填);不含照片(草稿不保存附件);送出結案時清除。結案資格=approved 且活動已結束(date+end_time,未填以當日 23:59 計) |
 | created_by | FK users | |
 
 狀態機(v6 三階層):
@@ -203,10 +204,24 @@ approved 且 活動日期+1個月 已過 且未送結案 → 「逾期鎖定」(
 **activity_budget_items**(id, activity_id FK, category text(經費科目九項:指導老師教練費/保險費/交通費/膳食費/印刷費/比賽獎勵品/雜支/其他/活動收入,2026-07-13 定案,含 UI 提示文字), description, self_fund int, requested_subsidy int, approved_subsidy int NULL)
 — 逐項編列;`approved_subsidy` 由輔導老師關卡逐項核定。科目先用 text + 前端下拉(科目表進 settings),不開表(YAGNI,科目穩定後再說)。
 
-**activity_reports**(activity_id PK/FK 1:1, attend_expected, attend_registered, attend_should, attend_actual, attend_leave, highlights, goals, others, review_meeting bool, review_date date, video_url text, expense int, submitted_at)
-— 照片與成果檔走 `files`(slot 區分:report_photo / report_file);影片是**外部連結**(原型慣例)。
+**activity_reports** — 結案成果調查(2026-07-14 需求方改版,取代原型的報名/應到/實到五欄)
 
-**activity_reflections**(id, report_id FK, student_name, dept(系級), body text)— 送審驗證 ≥3 筆。
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| activity_id | PK/FK 1:1 | |
+| member_count / non_member_count | int NOT NULL | 實際社員/非社員人數(表單 placeholder=申請的校內/校外人數) |
+| actual_start / actual_end | time NOT NULL | 實際起訖(預填申請時間;end > start 應用層驗證) |
+| actual_location | text NOT NULL | 實際地點(預填申請地點) |
+| highlights / goals / others | text NOT NULL | 活動重點/如何達成目標/其他執行狀況(**除影片外全必填**) |
+| review_meeting | bool NOT NULL | 檢討會;true 時 review_date 必填(應用層) |
+| review_date | date NULL | |
+| video_url | text NULL | **唯一選填**;http(s) 格式驗證;照片 <5 張且無影片 → ad2 該活動不計分 |
+| expense | int NOT NULL | 實際支出(核銷依據) |
+| submitted_at | timestamptz | |
+
+— 照片走 `files`(slot=report_photo;**限 JPG/PNG,魔術位元組+10MB 後端重驗**,sha256 跨活動拒重複);成果報告/心得彙整 PDF 由後端依模板**於下載時動態生成**(不落檔,模板待需求方提供)。
+
+**activity_reflections**(id, report_id FK, student_name, dept(系級), body text)— 送審驗證 ≥3 筆,三欄皆必填。
 
 **approval_records** — 全系統簽核軌跡(通用)
 
@@ -294,7 +309,8 @@ approved 且 活動日期+1個月 已過 且未送結案 → 「逾期鎖定」(
 | created_by, created_at | |
 
 **signup_item_sessions**(id, item_id FK, name, date, semester)— 場次(如負責人會議 4 場)
-**signups**(id, item_id FK, club_id, confirmed bool, created_at;UNIQUE(item_id, club_id))— 一社一單
+**signups**(id, item_id FK, club_id, confirmed bool, created_at;UNIQUE(item_id, club_id))— 一社一單;**一經報名不得更改**(存在即拒絕再送/再存草稿),社團端點擊顯示填寫紀錄
+**signup_drafts**(id, item_id FK, club_id, participants jsonb(參加人陣列,同 entries 的 answers 形狀), updated_at;UNIQUE(item_id, club_id))— **報名草稿**(2026-07-14 定案:寫 DB、跨裝置續填);送出報名時刪除;列表以此顯示「草稿」標記
 **signup_entries**(id, signup_id FK, answers jsonb(`{field_key: value}`), created_at)— **一人一列**,筆數 ≤ max_participants(應用層強制)
 **signup_awards**(signup_id FK, award_id FK)— 競賽報名勾選的獎項
 **session_attendance**(id, session_id FK, club_id, attended bool, marked_by FK users, marked_at)— 出席→行政分 ad7

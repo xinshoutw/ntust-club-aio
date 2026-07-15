@@ -54,7 +54,7 @@ export default function ViolationsPage() {
                     ) : (
                       <>
                         {deadline}
-                        <span style={{ color: 'var(--steel)' }}>(剩 {daysLeft} 天)</span>
+                        <span style={{ color: 'var(--steel)' }}>{daysLeft > 0 ? `(剩 ${daysLeft} 天)` : '(今日截止)'}</span>
                       </>
                     )}
                   </td>

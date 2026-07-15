@@ -48,6 +48,9 @@ interface WorkRow {
 
 const isWorkEmpty = (w: WorkRow) => w.task.trim() === '' && w.owner.trim() === ''
 
+// 未命名草稿的預設名稱:寫入與編輯預填比對共用,避免全形/半形不一致
+const UNNAMED_ACTIVITY = '（未命名活動）'
+
 // 附件加總上限(接後端後改讀 system_settings 的管理員設定值)
 const MAX_ATTACHMENT_TOTAL_MB = 50
 const MAX_ATTACHMENT_TOTAL_BYTES = MAX_ATTACHMENT_TOTAL_MB * 1024 * 1024
@@ -129,7 +132,7 @@ export default function ActivityFormPage() {
     const filledWorks = works.filter((w) => !isWorkEmpty(w))
     return {
       id: editing?.id ?? nextActivityId(),
-      name: (v.name as string)?.trim() || '(未命名活動)',
+      name: (v.name as string)?.trim() || UNNAMED_ACTIVITY,
       club: user?.club ?? '',
       type: (v.type as Activity['type']) ?? '社課',
       date: v.date ? v.date.format('YYYY/MM/DD') : '—',
@@ -214,7 +217,7 @@ export default function ActivityFormPage() {
         initialValues={
           editing
             ? {
-                name: editing.name === '（未命名活動）' ? '' : editing.name,
+                name: editing.name === UNNAMED_ACTIVITY ? '' : editing.name,
                 type: editing.type,
                 isLarge: editing.isLarge,
                 location: editing.location,
@@ -454,9 +457,9 @@ export default function ActivityFormPage() {
                 fileList={files}
                 beforeUpload={() => false}
                 onChange={({ fileList }) => {
-                  // 加總大小驗證:超過上限的新增檔整批拒收
+                  // 加總大小驗證:多檔逐一觸發 onChange,超限起拒收後續檔(同 key 提示只跳一次)
                   if (totalBytes(fileList) > MAX_ATTACHMENT_TOTAL_BYTES) {
-                    message.error(`附件合計超過 ${MAX_ATTACHMENT_TOTAL_MB} MB 上限`)
+                    message.error({ content: `附件合計超過 ${MAX_ATTACHMENT_TOTAL_MB} MB 上限`, key: 'attach-limit' })
                     return
                   }
                   setFiles(fileList)

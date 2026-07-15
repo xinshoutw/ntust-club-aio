@@ -69,8 +69,7 @@ export default function LoginPage() {
         </form>
       </div>
       <div style={{ marginTop: 28, fontSize: 12, color: 'var(--steel)' }}>
-        {/*TODO: 改成像之前一樣 clubs.ntust.edu.tw*/}
-        © 國立臺灣科技大學 課外活動指導組 · 114 學年
+        © 國立臺灣科技大學 課外活動指導組 · <span className="num">clubs.ntust.edu.tw</span>
       </div>
     </div>
   )

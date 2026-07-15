@@ -1,4 +1,4 @@
-# Session Handoff(2026-07-15,需求方第五輪 UI/規則調整)
+# Session Handoff(2026-07-15,第五輪規則調整 + ui-polish 合併 + 第六輪 club panel)
 
 > 給下一個 session 的交接快照。永久性專案知識在三層 `AGENTS.md`(OSA 根/project/club-aio)與 `docs/architecture.md`、`docs/data-model.md`、`docs/design-guide.md`;本檔只記「現在進行到哪、接下來做什麼」。過期即刪。
 
@@ -51,9 +51,17 @@
 
 衝突解決:AdminRoomsPage 的審核 Modal 移植到新「星期×節次」固定借用模型(衝突鍵 room|dow|period、整單擇一文案);AdminViolationsPage 空狀態併入銷案期限欄(colSpan 9);FixedRoomPage 說明行取兩版合併「整學期每週固定使用所選時段;衝突由學務處擇一社團核准」。合併後 build/test(15)/lint 全綠。分支與 worktree(`../club-aio-ui-polish`)未刪,可自行清理。
 
-## 下一步(使用者宣告)
+## 第六輪 club panel(2026-07-15 稍晚,已完成推 dev)
 
-**admin panel 頁面調整與迭代**——現行行政端 14 頁 + 本輪新增檔案管理頁;審核流已統一為點列開 Drawer/Modal(見上)。迭代時注意:結案審核頁(aclose)待做「照片/成果/心得繳交確認」勾選;報名管理已有簽到登錄;固定借用審核已為週次模型。
+9 個 commit:總覽改名、Header 設定捷徑、管理項目重構(Email×3/更換密碼/並排/髒欄位橘框+統一儲存)、臨時借用綁核准活動、固定借用拖曳、借用總覽 icon 導航+星期+場地名反白+15 天視窗(−7~+7、不含過去)。決議全文見 AGENTS.md 第六輪。
+交叉檢查:opus 一輪,1 MEDIUM(ClubSettings INITIAL 模組級快照 remount 回歸)+2 LOW+1 NOTE(dayjs customParseFormat 未載入,既有項)——全修。
+
+## 下一步:admin panel 調整與迭代(使用者主導,提案待拍板)
+
+使用者已給部分規格 + 要求討論;完整提案已在對話中回覆(2026-07-15),要點:
+- **已定案可直接做**:Header 移除學年度下拉、帳號選單加設定/稽核軌跡;申請/結案審核移除單號;大型活動五態徽章(空心/空心加斜線/實心);審核表格 filter+sort;結案 Modal 關閉動畫(改 open+afterClose 模式,ui-polish 的 `{selected && <Modal open>}` 寫法是動畫缺失主因);社團下拉跨頁同步(AdminClubContext+sessionStorage);空間審核頁頂部場況圖(僅橘格可點開審核)
+- **建議待使用者拍板**:社團帳號操作(重設密碼/啟停用)收進「社團管理>管理項目」並自帳號與權限移除 ClubAccountsPage;帳號管理合一頁(tabs:管理員/工讀生/評審+權限 drawer);「設定」選單目標=新開 `/admin/settings` 系統設定頁(集中 system_settings:報名窗/固定借用開放窗+手動加開/工作天緩衝/結案鎖定月數/上傳上限/違規目錄/經費科目/評鑑視窗);評審新增=產生帳密一次性顯示(關窗即失,帳號可再查)
+- 注意:申請審核「右側推入」ui-polish 已是 Drawer,無需重做;結案審核頁(aclose)仍待做「照片/成果/心得繳交確認」勾選
 
 ## 待裁決(使用者回來看,沿上輪)
 

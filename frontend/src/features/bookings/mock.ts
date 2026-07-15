@@ -68,6 +68,7 @@ export const EQUIPMENT: Equipment[] = [
 
 // 可借數為動態推導:總數 − 指定區間內(未歸還且未退回)借用單的重疊數量
 // 須先知道借用區間(由關聯活動起訖推導)才能計算
+// 逾期未還=器材仍在外,無論原借用區間是否已過,一律視為佔用
 export function availableInWindow(name: string, start: string, end: string, excludeId?: string): number {
   const eq = EQUIPMENT.find((e) => e.name === name)
   if (!eq) return 0
@@ -79,8 +80,8 @@ export function availableInWindow(name: string, start: string, end: string, excl
       l.id !== excludeId &&
       l.status !== 'returned' &&
       l.status !== 'rejected' &&
-      !dayjs(l.endDate, 'YYYY/MM/DD').isBefore(s, 'day') &&
-      !dayjs(l.startDate, 'YYYY/MM/DD').isAfter(en, 'day'),
+      (l.status === 'overdue' ||
+        (!dayjs(l.endDate, 'YYYY/MM/DD').isBefore(s, 'day') && !dayjs(l.startDate, 'YYYY/MM/DD').isAfter(en, 'day'))),
   ).reduce((sum, l) => sum + l.qty, 0)
   return Math.max(0, eq.total - used)
 }

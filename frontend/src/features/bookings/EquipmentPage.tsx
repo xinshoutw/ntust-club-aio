@@ -69,7 +69,8 @@ export default function EquipmentPage() {
             <tbody>
               {EQUIPMENT.map((e) => {
                 const a = avail(e.name)
-                const disabled = a === 0
+                // 未選關聯活動(a===null)前不可點選帶入;可借 0 也不可點
+                const disabled = a === null || a === 0
                 return (
                   <tr
                     key={e.name}
@@ -78,7 +79,11 @@ export default function EquipmentPage() {
                       form.setFieldValue('equipment', e.name)
                       form.resetFields(['qty'])
                     }}
-                    style={disabled ? { background: '#EEF0F3', color: 'var(--muted)', cursor: 'not-allowed' } : { cursor: 'pointer' }}
+                    style={
+                      a === 0
+                        ? { background: '#EEF0F3', color: 'var(--muted)', cursor: 'not-allowed' }
+                        : { cursor: disabled ? 'default' : 'pointer' }
+                    }
                   >
                     <td style={{ fontWeight: 500 }}>{e.name}</td>
                     <td style={{ color: 'var(--steel)', fontSize: 13 }}>
@@ -104,13 +109,14 @@ export default function EquipmentPage() {
             requiredMark
             onValuesChange={(changed) => {
               if ('equipment' in changed) form.resetFields(['qty'])
-              // 換活動=換借用區間,可借數重新推導;原選品項在新區間不可借就清掉
+              // 換活動=換借用區間,可借數重新推導:數量一律重填;原選品項在新區間不可借就清掉
               if ('activity' in changed) {
+                form.resetFields(['qty'])
                 const name = form.getFieldValue('equipment') as string | undefined
                 const a = approved.find((x) => x.id === changed.activity)
                 const w = a ? loanWindow(a) : null
                 if (name && (!w || availableInWindow(name, w.start, w.end) === 0)) {
-                  form.resetFields(['equipment', 'qty'])
+                  form.resetFields(['equipment'])
                 }
               }
             }}
@@ -149,7 +155,20 @@ export default function EquipmentPage() {
                 })}
               />
             </Form.Item>
-            <Form.Item name="qty" label="數量" rules={[{ required: true, message: '請輸入數量' }]}>
+            <Form.Item
+              name="qty"
+              label="數量"
+              rules={[
+                { required: true, message: '請輸入數量' },
+                {
+                  // max 只擋鍵入,不會回夾既有值:送出前再驗一次不可超過可借數
+                  validator: (_, v: number | null) =>
+                    v != null && selectedAvail != null && v > selectedAvail
+                      ? Promise.reject(new Error(`該區間可借 ${selectedAvail} 件`))
+                      : Promise.resolve(),
+                },
+              ]}
+            >
               <InputNumber style={{ width: '100%' }} min={1} max={selectedAvail ?? 99} precision={0} disabled={!window} />
             </Form.Item>
 

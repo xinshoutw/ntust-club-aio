@@ -102,6 +102,13 @@ async def test_validation_rules(client, db):
     )
     assert resp.status_code == 422
 
+    # 結束日早於開始日 → 422
+    bad_range = payload(end_date="2026-06-19")
+    resp = await client.post(
+        "/api/v1/club/activities", json=bad_range, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 422
+
     large_course = payload(type="社課", is_large=True)
     resp = await client.post(
         "/api/v1/club/activities", json=large_course, headers=csrf_headers(client)
@@ -177,6 +184,41 @@ async def test_close_requires_approved_and_ended(client, db):
     assert "尚未結束" in resp.json()["error"]
 
 
+async def test_close_eligibility_and_lock_derive_from_end_date(client, db):
+    """起訖區間(2026-07-15):結案資格與逾期鎖定皆以 end_date 推導。"""
+    await setup_session(client, db)
+
+    # 開始已過、結束在未來 → 進行中不可結案
+    start = (date.today() - timedelta(days=5)).isoformat()
+    end = (date.today() + timedelta(days=5)).isoformat()
+    data = await create_activity(client, date=start, end_date=end)
+    assert data["end_date"] == end
+    await approve(db, data["id"])
+    resp = await client.post(
+        f"/api/v1/club/activities/{data['id']}/close",
+        json=close_payload(),
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 409
+    assert "尚未結束" in resp.json()["error"]
+
+    # 開始日已逾 1 個月但結束日在近期 → 以 end_date 推導,不鎖定、可結案
+    start = (date.today() - timedelta(days=70)).isoformat()
+    end = (date.today() - timedelta(days=3)).isoformat()
+    data = await create_activity(client, name="跨日活動", date=start, end_date=end)
+    await approve(db, data["id"])
+    listing = (await client.get("/api/v1/club/activities")).json()["data"]
+    row = next(a for a in listing if a["id"] == data["id"])
+    assert row["close_locked"] is False
+    assert row["can_close"] is True
+    resp = await client.post(
+        f"/api/v1/club/activities/{data['id']}/close",
+        json=close_payload(),
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200
+
+
 async def test_close_submit_and_report(client, db):
     await setup_session(client, db)
     past = (date.today() - timedelta(days=3)).isoformat()
@@ -210,9 +252,24 @@ async def test_close_submit_and_report(client, db):
     )
     assert resp.status_code == 422
 
+    # 檢討會=是:日期/與會人數/討論事項/內容決議四欄皆必填(2026-07-15)
+    review = {
+        "review_meeting": True,
+        "review_date": "2026-06-21",
+        "review_attendees": 12,
+        "review_topics": "動線與器材調度",
+        "review_conclusion": "下次提前一週彩排",
+    }
+    for missing in ("review_attendees", "review_topics", "review_conclusion"):
+        bad = close_payload(**{**review, missing: None})
+        resp = await client.post(
+            f"/api/v1/club/activities/{aid}/close", json=bad, headers=csrf_headers(client)
+        )
+        assert resp.status_code == 422, missing
+
     resp = await client.post(
         f"/api/v1/club/activities/{aid}/close",
-        json=close_payload(),
+        json=close_payload(**review),
         headers=csrf_headers(client),
     )
     assert resp.status_code == 200, resp.text
@@ -222,6 +279,9 @@ async def test_close_submit_and_report(client, db):
     assert detail["close_draft"] is None  # 送出即清除草稿
     assert detail["report"]["member_count"] == 25
     assert len(detail["report"]["reflections"]) == 3
+    assert detail["report"]["review_attendees"] == 12
+    assert detail["report"]["review_topics"] == "動線與器材調度"
+    assert detail["report"]["review_conclusion"] == "下次提前一週彩排"
 
 
 async def test_close_locked_after_deadline(client, db):

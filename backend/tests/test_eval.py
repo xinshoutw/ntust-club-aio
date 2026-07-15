@@ -44,6 +44,7 @@ async def seed_closed_activity(db, club, user, *, day, large=False, photos=0, vi
         is_large=large,
         is_large_approved=large,
         date=day,
+        end_date=day,
         participants_in=10,
         participants_out=0,
         status="closed",
@@ -140,6 +141,67 @@ async def _seed_award(db) -> Award:
         db.add(award)
         await db.commit()
     return award
+
+
+async def test_ad7_ad8_score_only_by_attendance(client, db):
+    """ad7 每場簽到 1.25 分(4 場滿分 5);ad8 幹訓簽到即 5;僅報名不計分。"""
+    from datetime import date as date_cls
+
+    from app.models import SessionAttendance, Signup, SignupItem, SignupItemSession
+
+    club, user, admin = await setup(client, db)
+    meeting = SignupItem(
+        year=EVAL_YEAR, name="社團負責人會議", kind="leader_meeting",
+        session_based=True, created_by=admin.id,
+    )
+    training = SignupItem(
+        year=EVAL_YEAR, name="幹部訓練", kind="cadre_training", created_by=admin.id
+    )
+    db.add_all([meeting, training])
+    await db.flush()
+    sessions = [
+        SignupItemSession(
+            item_id=meeting.id, name=f"第{i}場", date=date_cls(2026, 3, i + 1), semester="114-2"
+        )
+        for i in range(1, 5)
+    ]
+    t_session = SignupItemSession(
+        item_id=training.id, name="幹訓", date=date_cls(2026, 5, 1), semester="114-2"
+    )
+    db.add_all([*sessions, t_session])
+    await db.flush()
+    # 僅報名(未簽到)→ 不計分
+    db.add_all([
+        Signup(item_id=meeting.id, club_id=club.id),
+        Signup(item_id=training.id, club_id=club.id),
+    ])
+    await db.commit()
+
+    data = (await client.get("/api/v1/club/eval/overview")).json()["data"]
+    scores = {s["key"]: s for s in data["scores"]}
+    assert scores["ad7"]["auto"] == 0
+    assert scores["ad8"]["auto"] == 0
+
+    # 簽到 2 場會議 → 2.5;幹訓簽到 → 5
+    now = datetime.now(UTC)
+    db.add_all([
+        SessionAttendance(
+            session_id=s.id, club_id=club.id, attended=True, marked_by=admin.id, marked_at=now
+        )
+        for s in sessions[:2]
+    ])
+    db.add(
+        SessionAttendance(
+            session_id=t_session.id, club_id=club.id, attended=True,
+            marked_by=admin.id, marked_at=now,
+        )
+    )
+    await db.commit()
+
+    data = (await client.get("/api/v1/club/eval/overview")).json()["data"]
+    scores = {s["key"]: s for s in data["scores"]}
+    assert scores["ad7"]["auto"] == 2.5
+    assert scores["ad8"]["auto"] == 5
 
 
 async def test_override_covers_auto_score(client, db):

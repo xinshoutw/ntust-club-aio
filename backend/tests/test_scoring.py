@@ -72,8 +72,15 @@ class TestAd5:
 class TestAd6ToAdj:
     def test_website_meeting_training(self):
         assert score("ad6", has_website=True) == 5
-        assert score("ad7", leader_meeting_attended=True) == 5
+        # ad7 每場簽到 1.25 分(每學期 2 場、全學年 4 場滿分 5)
+        assert score("ad7", leader_meeting_sessions=0) == 0
+        assert score("ad7", leader_meeting_sessions=1) == 1.25
+        assert score("ad7", leader_meeting_sessions=2) == 2.5
+        assert score("ad7", leader_meeting_sessions=4) == 5
+        assert score("ad7", leader_meeting_sessions=6) == 5  # 超額封頂
+        # ad8 幹訓簽到即滿分(僅報名不計)
         assert score("ad8", cadre_training_attended=True) == 5
+        assert score("ad8", cadre_training_attended=False) == 0
 
     def test_penalty_and_merit_caps(self):
         assert score("adj", violation_count=3) == -3
@@ -98,3 +105,27 @@ class TestOverrides:
     def test_total_sums_final_values(self):
         scores = apply_overrides(compute_ad_scores(ScoringInput(has_website=True, merit=3)), {})
         assert total_of(scores) == 8
+
+    def test_total_capped_at_100(self):
+        """各項滿分合計恰 100;表現優良加分不破頂(2026-07-15 定案)。"""
+        closed = tuple(
+            act(i, f"2026/{(i // 27) + 3:02d}/{(i % 27) + 1:02d}", large=True) for i in range(30)
+        )
+        results = tuple(
+            ActivityResult(
+                a.id, photo_count=9, has_video_link=True, has_report=True, has_feedback=True
+            )
+            for a in closed
+        )
+        full = ScoringInput(
+            closed=closed,
+            results=results,
+            roster_by_semester={"114-2": 30, "115-1": 30},
+            has_website=True,
+            leader_meeting_sessions=4,
+            cadre_training_attended=True,
+            merit=5,
+        )
+        scores = apply_overrides(compute_ad_scores(full), {})
+        assert sum(s.final for s in scores) == 105  # 滿分 100 + 表現優良 5
+        assert total_of(scores) == 100

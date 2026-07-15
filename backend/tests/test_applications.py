@@ -97,13 +97,13 @@ async def test_postal_change_exclusive_reasons_and_masking(client, db):
     )
     assert resp.status_code == 201
     data = resp.json()["data"]
-    # 遮罩:前3+末2;電話末3
-    assert data["account_number"] == "000********90"
+    # 2026-07-15 需求方:社團端申請紀錄顯示完整局號帳號(不遮罩);電話仍遮罩末 3 碼
+    assert data["account_number"] == "0001234567890"
     assert data["new_agent_phone"].endswith("678")
     assert "*" in data["new_agent_phone"]
 
     listing = (await client.get("/api/v1/club/postal-changes")).json()["data"]
-    assert listing[0]["account_number"] == "000********90"
+    assert listing[0]["account_number"] == "0001234567890"
 
 
 async def test_maintenance_flow(client, db):
@@ -148,6 +148,9 @@ async def test_violations_scoped_to_club(client, db):
     assert listing["meta"]["total"] == 1
     assert listing["data"][0]["location"] == "操場"
     assert listing["data"][0]["status"] == "open"
+    # 銷案期限=開立日 +1 個月(推導不儲存);2026-03-01 早已逾期截止
+    assert listing["data"][0]["resolve_deadline"] == "2026-04-01"
+    assert listing["data"][0]["resolve_expired"] is True
 
 
 async def test_announcements_targeting(client, db):

@@ -19,7 +19,7 @@ export default function AdminMembersPage() {
 
   return (
     <div>
-      <PageHeader title="成員管理" sub={club} extra={<ClubSelect />} />
+      <PageHeader title="成員列表" sub={club} extra={<ClubSelect />} />
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         <table className="tb" style={{ minWidth: 640 }}>

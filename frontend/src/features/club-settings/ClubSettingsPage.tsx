@@ -23,7 +23,8 @@ interface SettingsValues {
   pwConfirm?: string
 }
 
-const INITIAL: SettingsValues = {
+// 掛載當下讀取共用 mock 活值:存檔會寫回 CLUB_PROFILE,remount 必須帶到最新值
+const buildInitial = (): SettingsValues => ({
   advisorName: '張教授',
   advisorDept: '資訊工程系',
   advisorEmail: 'advisor@mail.ntust.edu.tw',
@@ -37,7 +38,7 @@ const INITIAL: SettingsValues = {
   pwCurrent: '',
   pwNew: '',
   pwConfirm: '',
-}
+})
 
 const sectionTitle: React.CSSProperties = { fontSize: 16, fontWeight: 600, marginBottom: 16 }
 
@@ -46,7 +47,7 @@ export default function ClubSettingsPage() {
   const { user } = useAuth()
   const { message } = App.useApp()
   const [form] = Form.useForm<SettingsValues>()
-  const [saved, setSaved] = useState<SettingsValues>(INITIAL)
+  const [saved, setSaved] = useState<SettingsValues>(buildInitial)
   const [dirty, setDirty] = useState<ReadonlySet<string>>(new Set())
 
   const recomputeDirty = () => {
@@ -83,7 +84,7 @@ export default function ClubSettingsPage() {
       <Form
         form={form}
         layout="vertical"
-        initialValues={INITIAL}
+        initialValues={saved}
         onValuesChange={recomputeDirty}
         onFinish={onFinish}
         onFinishFailed={({ errorFields }) => {

@@ -1,25 +1,61 @@
 import { useEffect, useState } from 'react'
-import { Pagination } from 'antd'
+import { App, Button, Pagination, Select } from 'antd'
+import { DownloadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
+import { CURRENT_SEMESTER, semesterOptions } from '../../lib/semester'
 import { MEMBERS } from '../members/mock'
 import ClubSelect from './ClubSelect'
 import { useAdminClub } from './clubContext'
 
 const PAGE_SIZE = 50
 
-// 唯讀:名單由社團自行維護,行政僅查閱
+// 唯讀:名單由社團自行維護,行政僅查閱;可選學期、匯出 CSV(比照社團端成員列表)
 export default function AdminMembersPage() {
   const { club } = useAdminClub()
+  const { message } = App.useApp()
   const [page, setPage] = useState(1)
-  useEffect(() => setPage(1), [club])
+  const [semester, setSemester] = useState<string>(CURRENT_SEMESTER)
+  useEffect(() => setPage(1), [club, semester])
 
   // mock 僅資工系學會有名單
-  const list = club === '資工系學會' ? MEMBERS : []
+  const all = club === '資工系學會' ? MEMBERS : []
+  const list = all.filter((m) => semester === 'all' || m.semester === semester)
   const paged = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+
+  const exportCsv = () => {
+    if (!list.length) {
+      message.error(`${club} 沒有成員可匯出`)
+      return
+    }
+    const text = list.map((m) => [m.name, m.studentId, m.kind, m.title].filter(Boolean).join(',')).join('\n')
+    const url = URL.createObjectURL(new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `成員名單_${club}_${semester === 'all' ? '全部學期' : semester}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    message.success(`已匯出 ${list.length} 名成員`)
+  }
 
   return (
     <div>
-      <PageHeader title="成員列表" extra={<ClubSelect />} />
+      <PageHeader
+        title="成員列表"
+        extra={
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Select
+              value={semester}
+              onChange={setSemester}
+              style={{ width: 120 }}
+              options={semesterOptions(all.map((m) => m.semester), true)}
+            />
+            <Button style={{ height: 36 }} icon={<DownloadOutlined />} onClick={exportCsv}>
+              匯出 CSV
+            </Button>
+            <ClubSelect />
+          </div>
+        }
+      />
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         <table className="tb" style={{ minWidth: 640 }}>

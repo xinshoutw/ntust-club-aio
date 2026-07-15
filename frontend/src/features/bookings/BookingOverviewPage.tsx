@@ -2,14 +2,20 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import dayjs, { type Dayjs } from 'dayjs'
 import { Button, DatePicker, Pagination, Select, Tooltip } from 'antd'
-import { ArrowLeftOutlined } from '@ant-design/icons'
+import {
+  ArrowLeftOutlined,
+  DoubleLeftOutlined,
+  DoubleRightOutlined,
+  LeftOutlined,
+  RightOutlined,
+} from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
 import { EQUIPMENT_LOANS, PERIODS, ROOM_REQUESTS, VENUE_BOOKINGS, VENUES, roomEntryText } from './mock'
 
 const RETURNED_PAGE = 10
-const VENUE_DAYS = 14 // 單一場地檢視一頁 14 天
+const VENUE_DAYS = 15 // 單一場地檢視:選擇日 −7 ~ +7 共 15 天(不含過去,不足往未來補)
 
 // 場地格狀態(2026-07-15 需求方配色):不開放不畫方框也不列圖例;固定借用改深灰
 type CellState = 'free' | 'closed' | 'reviewing' | 'temp' | 'fixed' | 'mine'
@@ -109,9 +115,12 @@ export default function BookingOverviewPage() {
   const mine = user?.club
   const [returnedPage, setReturnedPage] = useState(1)
   const [gridDate, setGridDate] = useState<Dayjs>(() => dayjs())
-  // 場地檢視:點左側場地名稱進入,顯示該場地自起始日起 14 天場況
+  // 場地檢視:點場地名稱進入,以當時檢視日為中心 −7~+7 共 15 天;後端不提供過去場況,
+  // 起始日不得早於今天,被截掉的天數往未來補(顯示天數固定)
   const [venueView, setVenueView] = useState<string | null>(null)
   const [venueStart, setVenueStart] = useState<Dayjs>(() => dayjs().startOf('day'))
+  const todayStart = dayjs().startOf('day')
+  const clampStart = (d: Dayjs) => (d.isBefore(todayStart, 'day') ? todayStart : d)
 
   const rooms = ROOM_REQUESTS.filter((r) => r.club === mine)
   const venues = VENUE_BOOKINGS.filter((v) => v.club === mine)
@@ -124,7 +133,7 @@ export default function BookingOverviewPage() {
 
   const openVenue = (name: string) => {
     setVenueView(name)
-    setVenueStart(dayjs().startOf('day'))
+    setVenueStart(clampStart(gridDate.startOf('day').subtract(7, 'day')))
   }
 
   const venueDef = venueView ? VENUES.find((v) => v.name === venueView) : undefined
@@ -142,17 +151,40 @@ export default function BookingOverviewPage() {
           {!venueDef ? (
             <>
               <div style={{ fontSize: 15, fontWeight: 600, marginRight: 4 }}>場地借用情形</div>
-              <Button size="small" className="num" aria-label="往前一週" onClick={() => setGridDate((d) => d.subtract(7, 'day'))}>{'<<<'}</Button>
-              <Button size="small" className="num" aria-label="往前一天" onClick={() => setGridDate((d) => d.subtract(1, 'day'))}>{'<'}</Button>
+              <Tooltip title="前一週">
+                <Button
+                  size="small"
+                  icon={<DoubleLeftOutlined />}
+                  aria-label="前一週"
+                  disabled={!gridDate.isAfter(todayStart, 'day')}
+                  onClick={() => setGridDate((d) => clampStart(d.subtract(7, 'day')))}
+                />
+              </Tooltip>
+              <Tooltip title="前一天">
+                <Button
+                  size="small"
+                  icon={<LeftOutlined />}
+                  aria-label="前一天"
+                  disabled={!gridDate.isAfter(todayStart, 'day')}
+                  onClick={() => setGridDate((d) => clampStart(d.subtract(1, 'day')))}
+                />
+              </Tooltip>
               <DatePicker
-                format="YYYY/MM/DD"
+                format={(d) => `${d.format('YYYY/MM/DD')}(週${WEEKDAY[d.day()]})`}
                 size="small"
                 allowClear={false}
+                suffixIcon={null}
+                style={{ width: 156 }}
                 value={gridDate}
+                disabledDate={(d) => d.isBefore(todayStart, 'day')}
                 onChange={(d) => d && setGridDate(d)}
               />
-              <Button size="small" className="num" aria-label="往後一天" onClick={() => setGridDate((d) => d.add(1, 'day'))}>{'>'}</Button>
-              <Button size="small" className="num" aria-label="往後一週" onClick={() => setGridDate((d) => d.add(7, 'day'))}>{'>>>'}</Button>
+              <Tooltip title="後一天">
+                <Button size="small" icon={<RightOutlined />} aria-label="後一天" onClick={() => setGridDate((d) => d.add(1, 'day'))} />
+              </Tooltip>
+              <Tooltip title="後一週">
+                <Button size="small" icon={<DoubleRightOutlined />} aria-label="後一週" onClick={() => setGridDate((d) => d.add(7, 'day'))} />
+              </Tooltip>
               <Button size="small" onClick={() => setGridDate(dayjs())}>今天</Button>
             </>
           ) : (
@@ -168,12 +200,27 @@ export default function BookingOverviewPage() {
                 style={{ minWidth: 190 }}
                 popupMatchSelectWidth={false}
               />
-              <Button size="small" className="num" aria-label={`前 ${VENUE_DAYS} 天`} onClick={() => setVenueStart((s) => s.subtract(VENUE_DAYS, 'day'))}>{'<'}</Button>
+              <Tooltip title={`前 ${VENUE_DAYS} 天`}>
+                <Button
+                  size="small"
+                  icon={<LeftOutlined />}
+                  aria-label={`前 ${VENUE_DAYS} 天`}
+                  disabled={!venueStart.isAfter(todayStart, 'day')}
+                  onClick={() => setVenueStart((s) => clampStart(s.subtract(VENUE_DAYS, 'day')))}
+                />
+              </Tooltip>
               <span className="num" style={{ fontSize: 12, color: 'var(--steel)' }}>
                 {venueStart.format('YYYY/MM/DD')} – {venueStart.add(VENUE_DAYS - 1, 'day').format('MM/DD')}
               </span>
-              <Button size="small" className="num" aria-label={`後 ${VENUE_DAYS} 天`} onClick={() => setVenueStart((s) => s.add(VENUE_DAYS, 'day'))}>{'>'}</Button>
-              <Button size="small" onClick={() => setVenueStart(dayjs().startOf('day'))}>今天起</Button>
+              <Tooltip title={`後 ${VENUE_DAYS} 天`}>
+                <Button
+                  size="small"
+                  icon={<RightOutlined />}
+                  aria-label={`後 ${VENUE_DAYS} 天`}
+                  onClick={() => setVenueStart((s) => s.add(VENUE_DAYS, 'day'))}
+                />
+              </Tooltip>
+              <Button size="small" onClick={() => setVenueStart(todayStart)}>今天起</Button>
             </>
           )}
           <div style={{ flex: 1 }} />
@@ -197,9 +244,8 @@ export default function BookingOverviewPage() {
                     <td style={{ whiteSpace: 'nowrap', paddingRight: 8 }}>
                       <button
                         type="button"
-                        className="link-btn"
-                        style={{ padding: 0, fontSize: 13 }}
-                        aria-label={`檢視 ${v.name} 未來 ${VENUE_DAYS} 天場況`}
+                        className="venue-btn"
+                        aria-label={`檢視 ${v.name} ${VENUE_DAYS} 天場況`}
                         onClick={() => openVenue(v.name)}
                       >
                         {v.name}

@@ -1,5 +1,6 @@
-import { NavLink } from 'react-router'
-import { Tooltip } from 'antd'
+import { NavLink, useNavigate } from 'react-router'
+import { App, Tooltip } from 'antd'
+import { useHasUnsaved } from '../../app/unsaved'
 import type { NavGroup } from '../../lib/nav'
 import './sidebar.css'
 
@@ -14,6 +15,30 @@ interface SidebarProps {
  * - 群組標題:縮小、加字距、上方留白拉開,明顯「不可點」
  */
 export default function Sidebar({ groups, onNavigate }: SidebarProps) {
+  const navigate = useNavigate()
+  const { modal } = App.useApp()
+  const hasUnsaved = useHasUnsaved()
+
+  // 頁面有未儲存變更時攔下側欄導航,確認後才離開
+  const onItemClick = (e: React.MouseEvent, path: string) => {
+    if (!hasUnsaved()) {
+      onNavigate?.()
+      return
+    }
+    e.preventDefault()
+    modal.confirm({
+      title: '尚有未儲存的變更',
+      content: '離開此頁將遺失尚未儲存的修改。',
+      okText: '放棄變更並離開',
+      okButtonProps: { danger: true },
+      cancelText: '留在此頁',
+      onOk: () => {
+        onNavigate?.()
+        navigate(path)
+      },
+    })
+  }
+
   return (
     <nav className="sidebar" aria-label="主選單">
       {groups.map((group, gi) => (
@@ -34,7 +59,7 @@ export default function Sidebar({ groups, onNavigate }: SidebarProps) {
                 to={item.path}
                 end
                 className={({ isActive }) => `sidebar-item${isActive ? ' active' : ''}`}
-                onClick={onNavigate}
+                onClick={(e) => onItemClick(e, item.path)}
               >
                 <span className="sidebar-item-icon">{item.icon}</span>
                 <span className="sidebar-item-label">{item.label}</span>

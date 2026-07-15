@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { App, Button, Form, Input } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import { useAuth } from '../../app/auth'
+import { useUnsavedGuard } from '../../app/unsaved'
 import { CLUB_PROFILE } from './mock'
 
 // 密碼政策(與後端一致):≥10 碼且含大小寫、數字、特殊符號
@@ -49,6 +50,8 @@ export default function ClubSettingsPage() {
   const [form] = Form.useForm<SettingsValues>()
   const [saved, setSaved] = useState<SettingsValues>(buildInitial)
   const [dirty, setDirty] = useState<ReadonlySet<string>>(new Set())
+  // 有未儲存變更時:關閉分頁與側欄/頂欄導航都會先確認
+  useUnsavedGuard(dirty.size > 0)
 
   const recomputeDirty = () => {
     const cur = form.getFieldsValue(true) as SettingsValues

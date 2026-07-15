@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
-import { Badge, Drawer, Dropdown, Popover } from 'antd'
+import { App, Badge, Drawer, Dropdown, Popover } from 'antd'
 import { BellOutlined, DownOutlined, LogoutOutlined, MenuOutlined, SettingOutlined } from '@ant-design/icons'
 import { useAuth } from '../../app/auth'
+import { UnsavedProvider, useHasUnsaved } from '../../app/unsaved'
 import type { NavGroup } from '../../lib/nav'
 import Sidebar from './Sidebar'
 import './shell.css'
@@ -19,12 +20,39 @@ interface AppShellProps {
   showYear?: boolean
 }
 
-export default function AppShell({ nav, badgeLabel, showYear = true }: AppShellProps) {
+// UnsavedProvider 需包住 shell 本體與頁面(側欄/頂欄導航前查詢 dirty)
+export default function AppShell(props: AppShellProps) {
+  return (
+    <UnsavedProvider>
+      <ShellInner {...props} />
+    </UnsavedProvider>
+  )
+}
+
+function ShellInner({ nav, badgeLabel, showYear = true }: AppShellProps) {
   const { user, logout } = useAuth()
+  const { modal } = App.useApp()
+  const hasUnsaved = useHasUnsaved()
   const navigate = useNavigate()
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [notifRead, setNotifRead] = useState(false)
+
+  // 有未儲存變更時,任何 shell 導航先確認
+  const guarded = (go: () => void) => {
+    if (!hasUnsaved()) {
+      go()
+      return
+    }
+    modal.confirm({
+      title: '尚有未儲存的變更',
+      content: '離開此頁將遺失尚未儲存的修改。',
+      okText: '放棄變更並離開',
+      okButtonProps: { danger: true },
+      cancelText: '留在此頁',
+      onOk: go,
+    })
+  }
 
   // 手機 topbar 依設計顯示目前頁名(對應 nav 項目;無對應時顯示系統名)
   const currentItem = nav
@@ -40,10 +68,12 @@ export default function AppShell({ nav, badgeLabel, showYear = true }: AppShellP
       { key: 'logout', icon: <LogoutOutlined />, label: '登出' },
     ],
     onClick: ({ key }: { key: string }) => {
-      if (key === 'settings') navigate('/club-settings')
+      if (key === 'settings') guarded(() => navigate('/club-settings'))
       if (key === 'logout') {
-        logout()
-        navigate('/login', { replace: true })
+        guarded(() => {
+          logout()
+          navigate('/login', { replace: true })
+        })
       }
     },
   }
@@ -62,7 +92,7 @@ export default function AppShell({ nav, badgeLabel, showYear = true }: AppShellP
         <button
           type="button"
           className="topbar-brand"
-          onClick={() => navigate(user?.role === 'admin' ? '/admin' : '/')}
+          onClick={() => guarded(() => navigate(user?.role === 'admin' ? '/admin' : '/'))}
         >
           臺科大社團管理系統
         </button>

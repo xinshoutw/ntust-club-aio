@@ -29,9 +29,11 @@ class Activity(Base, TimestampMixin):
     type: Mapped[ActivityType] = mapped_column(db_enum(ActivityType, "activity_type"))
     is_large: Mapped[bool] = mapped_column(default=False)  # 僅 type=活動 可勾
     is_large_approved: Mapped[bool | None] = mapped_column()  # 管理員認可後行政分才享 ×3
-    date: Mapped[date] = mapped_column(sa.Date)
-    start_time: Mapped[time | None] = mapped_column(sa.Time)
-    end_time: Mapped[time | None] = mapped_column(sa.Time)
+    # 起訖區間(2026-07-15:單日改時間區間;未跨日 end_date=date;學期歸屬與 ad1 皆以開始日推導)
+    date: Mapped[date] = mapped_column(sa.Date)  # 活動開始日
+    end_date: Mapped[date] = mapped_column(sa.Date)  # 活動結束日
+    start_time: Mapped[time | None] = mapped_column(sa.Time)  # 開始時間屬 date
+    end_time: Mapped[time | None] = mapped_column(sa.Time)  # 結束時間屬 end_date
     participants_in: Mapped[int] = mapped_column(default=0)  # 校內人數
     participants_out: Mapped[int] = mapped_column(default=0)  # 校外人數
     staff_text: Mapped[str] = mapped_column(sa.Text, default="")
@@ -82,8 +84,12 @@ class ActivityReport(Base, TimestampMixin):
     highlights: Mapped[str] = mapped_column(sa.Text)
     goals: Mapped[str] = mapped_column(sa.Text)
     others: Mapped[str] = mapped_column(sa.Text)
-    review_meeting: Mapped[bool] = mapped_column()  # true 時 review_date 必填(應用層)
+    # 檢討會議(2026-07-15 獨立 section):true 時日期/與會人數/討論事項/內容決議皆必填(應用層)
+    review_meeting: Mapped[bool] = mapped_column()
     review_date: Mapped[date | None] = mapped_column(sa.Date)
+    review_attendees: Mapped[int | None] = mapped_column()  # 與會人數
+    review_topics: Mapped[str | None] = mapped_column(sa.Text)  # 討論事項
+    review_conclusion: Mapped[str | None] = mapped_column(sa.Text)  # 內容決議
     video_url: Mapped[str | None] = mapped_column(sa.Text)  # 唯一選填;http(s) 驗證
     expense: Mapped[int] = mapped_column()  # 實際支出(核銷依據)
     submitted_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))

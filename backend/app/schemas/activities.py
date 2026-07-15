@@ -25,7 +25,8 @@ class ActivityIn(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     type: ActivityType
     is_large: bool = False
-    date: date
+    date: date  # 開始日期
+    end_date: date | None = None  # 結束日期;未跨日可省略(= date)
     start_time: time
     end_time: time
     location: str = Field(min_length=1, max_length=100)
@@ -37,7 +38,11 @@ class ActivityIn(BaseModel):
 
     @model_validator(mode="after")
     def _check(self):
-        if self.end_time <= self.start_time:
+        if self.end_date is None:
+            self.end_date = self.date  # 未跨日 end_date=date(2026-07-15)
+        if self.end_date < self.date:
+            raise ValueError("結束日期不得早於開始日期")
+        if self.end_date == self.date and self.end_time <= self.start_time:
             raise ValueError("結束時間必須晚於開始時間")
         if self.is_large and self.type != ActivityType.EVENT:
             raise ValueError("僅類型為「活動」可申請大型活動")
@@ -66,7 +71,7 @@ class ReflectionOut(ReflectionIn):
 
 
 class CloseSubmitIn(BaseModel):
-    """結案成果調查:除 video_url 外全必填;心得 ≥3 筆。"""
+    """結案成果調查:除 video_url 外全必填;心得 ≥3 筆;檢討會議=是時四欄必填。"""
 
     member_count: int = Field(ge=0, le=100_000)
     non_member_count: int = Field(ge=0, le=100_000)
@@ -78,6 +83,9 @@ class CloseSubmitIn(BaseModel):
     others: str = Field(min_length=1, max_length=2000)
     review_meeting: bool
     review_date: date | None = None
+    review_attendees: int | None = Field(None, ge=0, le=100_000)
+    review_topics: str | None = Field(None, max_length=2000)
+    review_conclusion: str | None = Field(None, max_length=2000)
     video_url: str | None = Field(None, max_length=500)
     expense: int = Field(ge=0, le=100_000_000)
     reflections: list[ReflectionIn] = Field(min_length=3, max_length=100)
@@ -93,10 +101,22 @@ class CloseSubmitIn(BaseModel):
     def _check(self):
         if self.actual_end <= self.actual_start:
             raise ValueError("實際結束時間必須晚於開始時間")
-        if self.review_meeting and self.review_date is None:
-            raise ValueError("有召開檢討會時必須填寫日期")
-        if not self.review_meeting:
-            self.review_date = None  # 未開檢討會就不留日期殘值
+        if self.review_meeting:
+            # 2026-07-15:檢討會議獨立 section,日期/與會人數/討論事項/內容決議皆必填
+            if self.review_date is None:
+                raise ValueError("有召開檢討會時必須填寫檢討會日期")
+            if self.review_attendees is None:
+                raise ValueError("有召開檢討會時必須填寫與會人數")
+            if not (self.review_topics or "").strip():
+                raise ValueError("有召開檢討會時必須填寫討論事項")
+            if not (self.review_conclusion or "").strip():
+                raise ValueError("有召開檢討會時必須填寫內容決議")
+        else:
+            # 未開檢討會就不留殘值
+            self.review_date = None
+            self.review_attendees = None
+            self.review_topics = None
+            self.review_conclusion = None
         return self
 
 
@@ -113,6 +133,9 @@ class ReportOut(BaseModel):
     others: str
     review_meeting: bool
     review_date: date | None
+    review_attendees: int | None
+    review_topics: str | None
+    review_conclusion: str | None
     video_url: str | None
     expense: int
     submitted_at: datetime
@@ -137,6 +160,7 @@ class ActivityOut(BaseModel):
     is_large: bool
     is_large_approved: bool | None
     date: date
+    end_date: date
     start_time: time | None
     end_time: time | None
     location: str

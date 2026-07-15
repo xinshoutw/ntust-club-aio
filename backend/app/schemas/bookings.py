@@ -3,7 +3,7 @@ from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.enums import BookingStatus, LoanStatus
-from app.services.booking_service import PERIODS
+from app.services.booking_service import MAX_FIXED_SLOTS, PERIODS
 
 
 def _validate_periods(periods: list[str]) -> list[str]:
@@ -36,11 +36,11 @@ class EquipmentOut(BaseModel):
     category: str
     total_qty: int
     needs_serial: bool
-    available: int = 0  # 推導
+    available: int = 0  # 推導(帶 activity_id 查詢時=該活動借用區間內的可借數)
 
 
 class RoomSlotIn(BaseModel):
-    date: date
+    weekday: int = Field(ge=1, le=7)  # 1=週一 … 7=週日
     period: str
 
     @field_validator("period")
@@ -53,13 +53,13 @@ class RoomSlotIn(BaseModel):
 
 class RoomBookingIn(BaseModel):
     venue_id: int
-    purpose: str = Field(min_length=1, max_length=200)
-    slots: list[RoomSlotIn] = Field(min_length=1, max_length=100)
+    purpose: str = Field(min_length=1, max_length=200)  # 用途必填(2026-07-15)
+    slots: list[RoomSlotIn] = Field(min_length=1, max_length=MAX_FIXED_SLOTS)
 
     @field_validator("slots")
     @classmethod
     def _unique(cls, v: list[RoomSlotIn]) -> list[RoomSlotIn]:
-        seen = {(s.date, s.period) for s in v}
+        seen = {(s.weekday, s.period) for s in v}
         if len(seen) != len(v):
             raise ValueError("時段重複")
         return v
@@ -68,7 +68,7 @@ class RoomBookingIn(BaseModel):
 class RoomSlotOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    date: date
+    weekday: int
     period: str
 
 
@@ -84,11 +84,20 @@ class RoomBookingOut(BaseModel):
     slots: list[RoomSlotOut] = []
 
 
+class FixedWindowOut(BaseModel):
+    """固定借用開放窗狀態(未開放時前端側欄反灰移至「其他」)。"""
+
+    open: bool
+    open_months: list[int]
+    manual_open: bool
+
+
 class VenueBookingIn(BaseModel):
     venue_id: int
+    activity_id: int  # 借用活動(限審核通過;2026-07-15 第六輪必選)
     date: date
     periods: list[str] = Field(min_length=1, max_length=14)
-    purpose: str = Field(min_length=1, max_length=200)
+    purpose: str = Field(min_length=1, max_length=200)  # 用途必填(2026-07-15)
 
     @field_validator("periods")
     @classmethod
@@ -102,6 +111,8 @@ class VenueBookingOut(BaseModel):
     id: int
     venue_id: int
     venue_name: str = ""
+    activity_id: int | None
+    activity_name: str | None = None
     date: date
     periods: list[str]
     purpose: str
@@ -110,19 +121,12 @@ class VenueBookingOut(BaseModel):
 
 
 class EquipmentLoanIn(BaseModel):
-    equipment_id: int
-    qty: int = Field(ge=1, le=1000)
-    start_date: date
-    end_date: date
-    purpose: str = Field(min_length=1, max_length=200)
+    """借用區間不再自選:由所綁定審核通過活動的起訖 ± 工作天緩衝推導(2026-07-15)。"""
 
-    @field_validator("end_date")
-    @classmethod
-    def _order(cls, v: date, info) -> date:
-        start = info.data.get("start_date")
-        if start and v < start:
-            raise ValueError("結束日不得早於開始日")
-        return v
+    equipment_id: int
+    activity_id: int
+    qty: int = Field(ge=1, le=1000)
+    purpose: str = Field(min_length=1, max_length=200)
 
 
 class EquipmentLoanOut(BaseModel):
@@ -131,12 +135,16 @@ class EquipmentLoanOut(BaseModel):
     id: int
     equipment_id: int
     equipment_name: str = ""
+    activity_id: int
+    activity_name: str | None = None
     qty: int
     start_date: date
     end_date: date
     purpose: str
     status: LoanStatus
     serials: list[str] | None
+    borrower_name: str | None  # 借用人(借出點交時登記)
+    returner_name: str | None  # 歸還人(歸還點交時登記)
     checkout_at: datetime | None
     checkin_at: datetime | None
     checkin_note: str | None

@@ -31,6 +31,7 @@ class VenueCategory(StrEnum):
     CLASSROOM = "教室"
     PRACTICE = "練習空間"
     OUTDOOR = "廣場戶外"
+    DORM = "宿舍區"  # 2026-07-15 場地主檔定案新增(一宿 B2)
 
 
 class EquipmentCategory(StrEnum):

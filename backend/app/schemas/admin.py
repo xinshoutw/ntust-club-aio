@@ -1,5 +1,9 @@
-from pydantic import BaseModel, Field, field_validator, model_validator
+import uuid
+from datetime import date, datetime
 
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from app.models.enums import MaintenanceStatus, ViolationStatus
 from app.services.scoring import AD_KEYS, AD_MAX
 
 
@@ -68,3 +72,105 @@ class MeritIn(BaseModel):
     reason: str = Field(min_length=1, max_length=500)
 
     _strip = field_validator("reason")(_strip_reason)
+
+
+# ---- 報名簽到登錄(2026-07-15:評鑑僅採計簽到,活動結束後由管理員登錄) ----
+
+
+class AttendanceIn(BaseModel):
+    club_id: int
+    attended: bool
+    session_id: int | None = None  # 場次制活動(如負責人會議)必填;非場次制免帶
+
+
+# ---- 違規勸導管理 ----
+
+
+class ResolveViolationIn(BaseModel):
+    note: str = Field(min_length=1, max_length=500)
+
+    _strip = field_validator("note")(_strip_reason)
+
+
+class AdminViolationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    club_id: int
+    club_name: str = ""
+    occurred_on: date
+    location: str
+    items: list[str]
+    other: str | None
+    filler_id: int
+    filler_name: str = ""
+    status: ViolationStatus
+    resolve_note: str | None
+    created_at: datetime
+    # 銷案期限(推導不儲存):開立日 +1 個月;逾期截止,銷案鈕停用
+    resolve_deadline: date | None = None
+    resolve_expired: bool = False
+
+
+# ---- 維修管理 ----
+
+
+class AdminMaintenanceOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    club_id: int
+    club_name: str = ""
+    location: str
+    items: str
+    status: MaintenanceStatus
+    handle_note: str | None
+    created_at: datetime
+
+
+# ---- 稽核軌跡 ----
+
+
+class AuditLogOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int | None
+    user_name: str | None = None
+    role: str | None
+    action: str
+    detail: str
+    ip: str | None
+    created_at: datetime
+
+    @field_validator("ip", mode="before")
+    @classmethod
+    def _ip_str(cls, v):  # INET 欄位可能回 ipaddress 物件
+        return None if v is None else str(v)
+
+
+# ---- 檔案管理 ----
+
+
+class FileUsageModuleOut(BaseModel):
+    key: str  # close / eval / apply / apps / repair
+    label: str
+    size: int  # bytes(未歸檔檔案佔用)
+    count: int
+
+
+class FileUsageOut(BaseModel):
+    modules: list[FileUsageModuleOut]  # 有報修檔案時 repair 排第一,其餘依固定順序
+    db_size: int  # 「文字內容」:整個 DB 的估算大小(pg_database_size)
+    total_size: int  # 檔案 + DB
+
+
+class AdminFileOut(BaseModel):
+    id: uuid.UUID
+    original_name: str
+    module: str
+    club_name: str | None = None
+    size: int
+    mime: str
+    created_at: datetime
+    archived: bool = False

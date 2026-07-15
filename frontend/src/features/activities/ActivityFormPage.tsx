@@ -47,6 +47,11 @@ interface WorkRow {
 
 const isWorkEmpty = (w: WorkRow) => w.task.trim() === '' && w.owner.trim() === ''
 
+// 附件加總上限(接後端後改讀 system_settings 的管理員設定值)
+const MAX_ATTACHMENT_TOTAL_MB = 50
+const MAX_ATTACHMENT_TOTAL_BYTES = MAX_ATTACHMENT_TOTAL_MB * 1024 * 1024
+const totalBytes = (fs: UploadFile[]) => fs.reduce((sum, f) => sum + (f.size ?? 0), 0)
+
 export default function ActivityFormPage() {
   const navigate = useNavigate()
   const { id } = useParams()
@@ -448,7 +453,14 @@ export default function ActivityFormPage() {
                 accept=".pdf"
                 fileList={files}
                 beforeUpload={() => false}
-                onChange={({ fileList }) => setFiles(fileList)}
+                onChange={({ fileList }) => {
+                  // 加總大小驗證:超過上限的新增檔整批拒收
+                  if (totalBytes(fileList) > MAX_ATTACHMENT_TOTAL_BYTES) {
+                    message.error(`附件合計超過 ${MAX_ATTACHMENT_TOTAL_MB} MB 上限`)
+                    return
+                  }
+                  setFiles(fileList)
+                }}
                 showUploadList={false}
                 style={{ background: 'transparent' }}
               >
@@ -457,9 +469,8 @@ export default function ActivityFormPage() {
                 </p>
                 <p style={{ fontSize: 13, color: 'var(--steel)', margin: 0 }}>拖放 PDF 檔案</p>
                 <p style={{ fontSize: 12, color: 'var(--steel)', margin: '4px 0 0' }}>
-                  總上限 <span className="num">50</span> MB
+                  已使用 <span className="num">{(totalBytes(files) / 1024 / 1024).toFixed(1)}/{MAX_ATTACHMENT_TOTAL_MB}</span> MB
                 </p>
-                {/*TODO: 加總大小驗證 50MB (管理員設定的)，同時要在介面中提示「已使用 XX/XX MB」*/}
               </Upload.Dragger>
               {files.map((f) => (
                 <div key={f.uid} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 4px 2px', fontSize: 13 }}>

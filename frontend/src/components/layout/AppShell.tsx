@@ -160,10 +160,12 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
             type="button"
             className="sidebar-item"
             style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', font: 'inherit' }}
-            onClick={() => {
-              logout()
-              navigate('/login', { replace: true })
-            }}
+            onClick={() =>
+              guarded(() => {
+                logout()
+                navigate('/login', { replace: true })
+              })
+            }
           >
             <span className="sidebar-item-icon"><LogoutOutlined /></span>
             <span className="sidebar-item-label">登出({user?.name})</span>

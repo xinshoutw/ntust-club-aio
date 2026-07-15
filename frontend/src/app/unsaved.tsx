@@ -27,6 +27,8 @@ export function useUnsavedGuard(isDirty: boolean): void {
     if (!isDirty) return
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault()
+      // Safari 以 returnValue 為準
+      e.returnValue = ''
     }
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)

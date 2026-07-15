@@ -52,12 +52,12 @@ export default function AnnouncementsPage() {
               />
             </Form.Item>
             {target === 'attr' && (
-              <Form.Item name="attrs" label="性質(可複選)" rules={[{ required: true, message: '請選擇性質' }]} style={{ marginBottom: 0 }}>
+              <Form.Item name="attrs" label="性質(可複選)" preserve={false} rules={[{ required: true, message: '請選擇性質' }]} style={{ marginBottom: 0 }}>
                 <Select mode="multiple" options={CLUB_ATTRIBUTES.map((a) => ({ value: a, label: a }))} placeholder="請選擇" />
               </Form.Item>
             )}
             {target === 'club' && (
-              <Form.Item name="club" label="社團" rules={[{ required: true, message: '請選擇社團' }]} style={{ marginBottom: 0 }}>
+              <Form.Item name="club" label="社團" preserve={false} rules={[{ required: true, message: '請選擇社團' }]} style={{ marginBottom: 0 }}>
                 <ClubCascader width="100%" placeholder="請選擇" />
               </Form.Item>
             )}
@@ -70,6 +70,7 @@ export default function AnnouncementsPage() {
             {takeover && (
               <Form.Item
                 name="takeoverUntil"
+                preserve={false}
                 rules={[{ required: true, message: '請選擇蓋板截止日期' }]}
                 style={{ marginBottom: 0 }}
               >

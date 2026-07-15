@@ -1,24 +1,92 @@
-"""借用領域的推導規則:節次、器材可借數、逾期判定、場地色格。"""
+"""借用領域的推導規則:節次、固定借用規則、器材可借數與借用區間、逾期判定、場地色格。"""
 
-from datetime import date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.semesters import TAIPEI
-from app.models import EquipmentLoan, Holiday, RoomBookingRequest, RoomBookingSlot, VenueBooking
+from app.models import (
+    Activity,
+    EquipmentLoan,
+    Holiday,
+    RoomBookingRequest,
+    RoomBookingSlot,
+    VenueBooking,
+)
 from app.models.enums import BookingStatus, LoanStatus
 
 # 14 節次(原型 PERIODS/BK_SLOTS)
 PERIODS: tuple[str, ...] = ("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "A", "B", "C", "D")
 
+# 固定借用規則(2026-07-15 需求方定案)
+MAX_FIXED_SLOTS = 10  # 每社至多 10 節(1 節 = 1 小時)
+LATE_PERIODS = frozenset({"10", "A", "B", "C", "D"})  # 晚間時段:需至少連續 3 節起借
+MIN_LATE_RUN = 3
+
+
+def runs_of(periods: list[str]) -> list[list[str]]:
+    """依 PERIODS 順序把已選節次切成連續區段(與前端 FixedRoomPage.runsOf 同規則)。"""
+    idx = sorted(PERIODS.index(p) for p in periods)
+    runs: list[list[int]] = []
+    cur: list[int] = []
+    for i in idx:
+        if cur and i == cur[-1] + 1:
+            cur.append(i)
+        else:
+            if cur:
+                runs.append(cur)
+            cur = [i]
+    if cur:
+        runs.append(cur)
+    return [[PERIODS[i] for i in run] for run in runs]
+
+
+def late_rule_error(periods: list[str]) -> str | None:
+    """晚間時段規則:含第 10 節或 A–D 節的連續區段需 ≥3 節(合法如 9–A、8–10、A–C、B–D)。"""
+    for run in runs_of(periods):
+        if any(p in LATE_PERIODS for p in run) and len(run) < MIN_LATE_RUN:
+            return f"第 10 節及 A–D 節至少需連續 {MIN_LATE_RUN} 節,目前為 {len(run)} 節"
+    return None
+
+
+def fixed_window_open(window: dict, now: datetime | None = None) -> bool:
+    """固定借用開放窗:預設當月在 open_months 或管理員手動加開。
+
+    另支援日期區間 open_from/open_until(2026-07-16 第八輪:系統設定改 RangePicker;
+    設定後以區間為準,含頭含尾)。
+    """
+    today = (now or datetime.now(UTC)).astimezone(TAIPEI).date()
+    open_from = window.get("open_from")
+    open_until = window.get("open_until")
+    if open_from and open_until:
+        return date.fromisoformat(open_from) <= today <= date.fromisoformat(open_until)
+    if window.get("manual_open"):
+        return True
+    return today.month in window.get("open_months", [])
+
 
 async def equipment_available(db: AsyncSession, equipment_id: int, total_qty: int) -> int:
-    """可借數 = total − 未歸還中數量(推導不儲存)。"""
+    """目前可借數 = total − 借出中數量(推導不儲存;未指定活動區間時的粗略值)。"""
     out = await db.scalar(
         sa.select(sa.func.coalesce(sa.func.sum(EquipmentLoan.qty), 0)).where(
             EquipmentLoan.equipment_id == equipment_id,
             EquipmentLoan.status == LoanStatus.CHECKED_OUT,
+        )
+    )
+    return max(total_qty - int(out or 0), 0)
+
+
+async def equipment_available_in_window(
+    db: AsyncSession, equipment_id: int, total_qty: int, start: date, end: date
+) -> int:
+    """指定區間可借數 = total − 區間重疊之未歸還且未退回借用量(pending/approved/checked_out)。"""
+    out = await db.scalar(
+        sa.select(sa.func.coalesce(sa.func.sum(EquipmentLoan.qty), 0)).where(
+            EquipmentLoan.equipment_id == equipment_id,
+            EquipmentLoan.status.notin_([LoanStatus.REJECTED, LoanStatus.RETURNED]),
+            EquipmentLoan.start_date <= end,
+            EquipmentLoan.end_date >= start,
         )
     )
     return max(total_qty - int(out or 0), 0)
@@ -32,6 +100,28 @@ def next_workday_in(d: date, holidays: set[date]) -> date:
     return cursor
 
 
+def add_workdays(d: date, n: int, holidays: set[date]) -> date:
+    """往前/往後 n 個工作天(跳過週末與 holidays 表的政府行事曆假日)。
+
+    holidays 每年由行政匯入(data-model.md §3.2);未匯入年度僅排除週六日。
+    """
+    step = 1 if n > 0 else -1
+    left = abs(n)
+    cursor = d
+    while left > 0:
+        cursor += timedelta(days=step)
+        if cursor.weekday() < 5 and cursor not in holidays:
+            left -= 1
+    return cursor
+
+
+def loan_window(activity: Activity, buffer: dict, holidays: set[date]) -> tuple[date, date]:
+    """器材借用區間=活動開始日 −before 個工作天 ~ 活動結束日 +after 個工作天。"""
+    start = add_workdays(activity.date, -int(buffer.get("before", 2)), holidays)
+    end = add_workdays(activity.end_date or activity.date, int(buffer.get("after", 1)), holidays)
+    return start, end
+
+
 def overdue_deadline_in(end_date: date, return_time: str, holidays: set[date]) -> datetime:
     """歸還期限:結束日之隔天上班日 HH:MM(台北時區)。"""
     workday = next_workday_in(end_date, holidays)
@@ -42,8 +132,6 @@ def overdue_deadline_in(end_date: date, return_time: str, holidays: set[date]) -
 def is_overdue_in(loan: EquipmentLoan, return_time: str, holidays: set[date]) -> bool:
     if loan.status != LoanStatus.CHECKED_OUT:
         return False
-    from datetime import UTC
-
     return datetime.now(UTC) >= overdue_deadline_in(loan.end_date, return_time, holidays)
 
 
@@ -65,7 +153,9 @@ async def availability_grid(
 ) -> dict[int, dict[str, str]]:
     """場地 × 節次 → 狀態:pending(審核中)/temp(臨時借用)/fixed(固定借用)/mine(自己)。
 
-    只回傳被佔用/審核中的格子;其餘由前端依 venue 開放旗標補 available/closed。
+    - 只回傳被佔用/審核中的格子;其餘由前端依 venue 開放旗標補 available/closed
+    - 固定借用為每週固定時段(weekday 對應);只顯示已核准,審核中的固定借用不顯示
+    - 審核中僅顯示臨時借用(2026-07-15)
     """
     grid: dict[int, dict[str, str]] = {}
 
@@ -93,14 +183,15 @@ async def availability_grid(
     fixed_rows = await db.execute(
         sa.select(RoomBookingSlot, RoomBookingRequest)
         .join(RoomBookingRequest, RoomBookingSlot.request_id == RoomBookingRequest.id)
-        .where(RoomBookingSlot.date == day, RoomBookingRequest.status != BookingStatus.REJECTED)
+        .where(
+            RoomBookingSlot.weekday == day.isoweekday(),
+            RoomBookingRequest.status == BookingStatus.APPROVED,
+        )
     )
     for slot, request in fixed_rows:
         if request.club_id == own_club_id:
             mark(request.venue_id, slot.period, "mine")
-        elif request.status == BookingStatus.APPROVED:
-            mark(request.venue_id, slot.period, "fixed")
         else:
-            mark(request.venue_id, slot.period, "pending")
+            mark(request.venue_id, slot.period, "fixed")
 
     return grid

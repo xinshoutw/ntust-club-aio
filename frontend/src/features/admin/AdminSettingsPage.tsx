@@ -94,13 +94,13 @@ export default function AdminSettingsPage() {
           <div className="card" style={{ padding: 24 }}>
             <div style={sectionTitle}>違規項目目錄</div>
             <Form.Item name="violItems" style={{ marginBottom: 0 }}>
-              <Select mode="tags" placeholder="輸入後按 Enter 新增" open={false} suffixIcon={null} />
+              <Select mode="tags" placeholder="輸入後按 Enter 新增" notFoundContent={null} suffixIcon={null} tokenSeparators={[',', '、']} />
             </Form.Item>
           </div>
           <div className="card" style={{ padding: 24 }}>
             <div style={sectionTitle}>經費科目</div>
             <Form.Item name="budgetCats" style={{ marginBottom: 0 }}>
-              <Select mode="tags" placeholder="輸入後按 Enter 新增" open={false} suffixIcon={null} />
+              <Select mode="tags" placeholder="輸入後按 Enter 新增" notFoundContent={null} suffixIcon={null} tokenSeparators={[',', '、']} />
             </Form.Item>
           </div>
         </div>

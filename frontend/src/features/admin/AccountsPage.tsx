@@ -24,15 +24,16 @@ interface Account {
   active: boolean
   scope?: string // 管理員:最高權限/一般/受限
   perms?: string
+  permKeys?: string[] // 管理員:實際頁面權限鍵(權限彈窗預設值)
   awards?: string // 評審:負責獎項
   group?: string // 評審:分組
 }
 
 const ADMINS: Account[] = [
   { name: '王組長', account: 'admin_wang', active: true, scope: '最高權限', perms: '全部' },
-  { name: '李承辦', account: 'admin_lee', active: true, scope: '一般', perms: '活動審核、結案審核、報名管理' },
-  { name: '陳助理', account: 'admin_chen', active: true, scope: '一般', perms: '借用審核、維修、違規、社團管理' },
-  { name: '學務長', account: 'dean', active: true, scope: '受限(僅簽核)', perms: '學務長簽核關' },
+  { name: '李承辦', account: 'admin_lee', active: true, scope: '一般', perms: '活動審核、結案審核、報名管理', permKeys: ['areview', 'aclose', 'asignup'] },
+  { name: '陳助理', account: 'admin_chen', active: true, scope: '一般', perms: '借用審核、維修、違規、社團管理', permKeys: ['abooking', 'aroom', 'amaint', 'aviol', 'amember'] },
+  { name: '學務長', account: 'dean', active: true, scope: '受限(僅簽核)', perms: '學務長簽核關', permKeys: [] },
 ]
 
 const STAFF: Account[] = [
@@ -284,8 +285,10 @@ export default function AccountsPage() {
         }}
         onCancel={() => setPermOpen(false)}
       >
+        {/* key 依帳號重掛:載入該管理員實際權限,且切換對象不殘留上一組勾選 */}
         <Checkbox.Group
-          defaultValue={['areview', 'aclose', 'asignup']}
+          key={permTarget?.account ?? 'none'}
+          defaultValue={permTarget?.permKeys ?? []}
           style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}
           options={PERMISSION_KEYS.map(([value, label]) => ({ value, label }))}
         />

@@ -15,7 +15,7 @@ const MODULES: Record<ModuleKey, { label: string; color: string }> = {
 
 // mock 彙總(接後端後由 API 取):MB
 const CAPACITY_MB = 50 * 1024
-const USAGE: Record<ModuleKey, { sizeMb: number; count: number }> = {
+const INITIAL_USAGE: Record<ModuleKey, { sizeMb: number; count: number }> = {
   close: { sizeMb: 6.2 * 1024, count: 1482 },
   eval: { sizeMb: 3.1 * 1024, count: 356 },
   apply: { sizeMb: 2.4 * 1024, count: 512 },
@@ -55,16 +55,25 @@ const pct = (n: number, d: number): string => `${Math.round((n / d) * 100)}%`
 export default function AdminFilesPage() {
   const { message } = App.useApp()
   const [files, setFiles] = useState(LARGE_FILES)
+  const [usage, setUsage] = useState(INITIAL_USAGE)
   const [moduleFilter, setModuleFilter] = useState<ModuleKey | 'all'>('all')
   const [deleting, setDeleting] = useState<StoredFile | null>(null)
 
-  const usedMb = Object.values(USAGE).reduce((s, u) => s + u.sizeMb, 0)
-  const totalCount = Object.values(USAGE).reduce((s, u) => s + u.count, 0)
+  const usedMb = Object.values(usage).reduce((s, u) => s + u.sizeMb, 0)
+  const totalCount = Object.values(usage).reduce((s, u) => s + u.count, 0)
   const list = files.filter((f) => moduleFilter === 'all' || f.module === moduleFilter)
 
   const confirmDelete = () => {
     if (!deleting) return
     setFiles((fs) => fs.filter((f) => f.id !== deleting.id))
+    // 已用空間與模組彙總同步扣減,刪檔立即反映於比例條
+    setUsage((u) => ({
+      ...u,
+      [deleting.module]: {
+        sizeMb: Math.max(0, u[deleting.module].sizeMb - deleting.sizeMb),
+        count: Math.max(0, u[deleting.module].count - 1),
+      },
+    }))
     message.success(`已刪除「${deleting.name}」(${fmtSize(deleting.sizeMb)})`)
     setDeleting(null)
   }
@@ -106,14 +115,14 @@ export default function AdminFilesPage() {
               key={k}
               title={
                 <span style={{ fontSize: 13 }}>
-                  {MODULES[k].label} · {fmtSize(USAGE[k].sizeMb)}({pct(USAGE[k].sizeMb, CAPACITY_MB)})· {USAGE[k].count.toLocaleString()} 個檔案
+                  {MODULES[k].label} · {fmtSize(usage[k].sizeMb)}({pct(usage[k].sizeMb, CAPACITY_MB)})· {usage[k].count.toLocaleString()} 個檔案
                 </span>
               }
             >
               <div
                 role="img"
-                aria-label={`${MODULES[k].label} ${fmtSize(USAGE[k].sizeMb)}`}
-                style={{ width: `${(USAGE[k].sizeMb / CAPACITY_MB) * 100}%`, background: MODULES[k].color, minWidth: 6 }}
+                aria-label={`${MODULES[k].label} ${fmtSize(usage[k].sizeMb)}`}
+                style={{ width: `${(usage[k].sizeMb / CAPACITY_MB) * 100}%`, background: MODULES[k].color, minWidth: 6 }}
               />
             </Tooltip>
           ))}
@@ -125,7 +134,7 @@ export default function AdminFilesPage() {
             <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--steel)' }}>
               <span style={{ width: 10, height: 10, borderRadius: 3, background: MODULES[k].color }} />
               {MODULES[k].label}
-              <span className="num">{fmtSize(USAGE[k].sizeMb)}</span>
+              <span className="num">{fmtSize(usage[k].sizeMb)}</span>
             </span>
           ))}
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--steel)' }}>

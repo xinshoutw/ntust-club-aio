@@ -95,6 +95,7 @@ function CloseReviewModal({
         open={rejectOpen}
         title="退回結案"
         okText="確認退回"
+        destroyOnHidden
         okButtonProps={{ danger: true }}
         cancelText="取消"
         onOk={submitReject}
@@ -104,6 +105,7 @@ function CloseReviewModal({
           退回原因(必填,將顯示於社團的活動列表)
         </div>
         <Input.TextArea
+          autoFocus
           rows={3}
           value={reason}
           onChange={(e) => setReason(e.target.value)}

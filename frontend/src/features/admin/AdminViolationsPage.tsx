@@ -81,6 +81,7 @@ export default function AdminViolationsPage() {
         open={!!resolving}
         title="銷案"
         okText="確認銷案"
+        destroyOnHidden
         onOk={() => form.submit()}
         onCancel={() => {
           setResolving(null)
@@ -97,7 +98,7 @@ export default function AdminViolationsPage() {
           }}
         >
           <Form.Item name="note" label="銷案說明" rules={[{ required: true, message: '簡述原因' }]}>
-            <Input.TextArea rows={2} placeholder="已完成愛校服務 2 小時" />
+            <Input.TextArea rows={2} placeholder="已完成愛校服務 2 小時" autoFocus />
           </Form.Item>
         </Form>
       </Modal>

@@ -226,7 +226,8 @@ export default function AdminFilesPage() {
         open={!!deleting}
         title="刪除檔案"
         okText="確認刪除"
-        okButtonProps={{ danger: true }}
+        destroyOnHidden
+        okButtonProps={{ danger: true, autoFocus: true }}
         cancelText="取消"
         onOk={confirmDelete}
         onCancel={() => setDeleting(null)}

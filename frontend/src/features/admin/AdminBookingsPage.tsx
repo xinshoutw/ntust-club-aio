@@ -124,6 +124,7 @@ function BookingReviewModal({
         open={rejectOpen}
         title="退回借用申請"
         okText="確認退回"
+        destroyOnHidden
         okButtonProps={{ danger: true }}
         cancelText="取消"
         onOk={submitReject}
@@ -131,6 +132,7 @@ function BookingReviewModal({
       >
         <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 8 }}>退回原因(必填,通知社團)</div>
         <Input.TextArea
+          autoFocus
           rows={3}
           value={reason}
           onChange={(e) => setReason(e.target.value)}

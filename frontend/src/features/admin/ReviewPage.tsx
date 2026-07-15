@@ -251,6 +251,7 @@ function DetailModal({
         open={rejectOpen}
         title="退回申請"
         okText="確認退回"
+        destroyOnHidden
         okButtonProps={{ danger: true }}
         cancelText="取消"
         onOk={submitReject}
@@ -260,6 +261,7 @@ function DetailModal({
           退回原因(必填,將顯示於社團的活動列表)
         </div>
         <Input.TextArea
+          autoFocus
           rows={3}
           value={reason}
           onChange={(e) => setReason(e.target.value)}

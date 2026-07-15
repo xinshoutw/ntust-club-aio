@@ -93,6 +93,7 @@ export default function OverduePage() {
         open={suspendOpen}
         title="停權社團"
         okText="確認停權"
+        destroyOnHidden
         okButtonProps={{ danger: true }}
         onOk={() => form.submit()}
         onCancel={() => {
@@ -110,7 +111,7 @@ export default function OverduePage() {
           }}
         >
           <Form.Item name="club" label="社團" rules={[{ required: true, message: '請輸入社團名稱' }]}>
-            <Input />
+            <Input autoFocus />
           </Form.Item>
           <Form.Item name="until" label="停權至" rules={[{ required: true, message: '請選擇日期' }]}>
             <DatePicker style={{ width: '100%' }} format="YYYY/MM/DD" />

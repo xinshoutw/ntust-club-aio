@@ -102,7 +102,8 @@ function RoomReviewModal({
         open={rejectOpen}
         title="退回借用申請"
         okText="確認退回"
-        okButtonProps={{ danger: true }}
+        destroyOnHidden
+        okButtonProps={{ danger: true, autoFocus: true }}
         cancelText="取消"
         onOk={submitReject}
         onCancel={closeReject}

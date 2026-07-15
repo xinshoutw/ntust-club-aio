@@ -12,10 +12,8 @@ function TagListInput({ value = [], onChange }: { value?: string[]; onChange?: (
   const [draft, setDraft] = useState('')
 
   const commit = (raw: string) => {
-    const parts = raw
-      .split(/[,、]/)
-      .map((s) => s.trim())
-      .filter((s) => s && !value.includes(s))
+    // 同批輸入也去重(避免「甲,甲」產生重複 tag / 重複 key)
+    const parts = [...new Set(raw.split(/[,、]/).map((s) => s.trim()))].filter((s) => s && !value.includes(s))
     if (parts.length) onChange?.([...value, ...parts])
     setDraft('')
   }
@@ -40,7 +38,11 @@ function TagListInput({ value = [], onChange }: { value?: string[]; onChange?: (
         style={{ width: 180 }}
         placeholder="輸入後按 Enter 新增"
         value={draft}
-        onChange={(e) => setDraft(e.target.value)}
+        onChange={(e) => {
+          // 打出逗號/頓號當下即成 tag(對齊原 tokenSeparators 行為)
+          if (/[,、]$/.test(e.target.value)) commit(e.target.value)
+          else setDraft(e.target.value)
+        }}
         onPressEnter={(e) => {
           e.preventDefault()
           commit(draft)

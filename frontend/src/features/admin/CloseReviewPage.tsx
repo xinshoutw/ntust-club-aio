@@ -176,7 +176,6 @@ export default function CloseReviewPage() {
           <tbody>
             {LOCKED.map((l) => (
               <tr key={l.id} className="no-hover">
-                <td className="num" style={{ color: 'var(--steel)', width: 150 }}>{l.id}</td>
                 <td>{l.club}</td>
                 <td style={{ fontWeight: 500 }}>{l.name}</td>
                 <td style={{ fontSize: 13, color: 'var(--steel)' }}>
@@ -192,7 +191,7 @@ export default function CloseReviewPage() {
             ))}
             {LOCKED.length === 0 && (
               <tr className="no-hover">
-                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>沒有逾期鎖定的活動。</td>
+                <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>沒有逾期鎖定的活動。</td>
               </tr>
             )}
           </tbody>

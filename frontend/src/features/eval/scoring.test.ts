@@ -108,4 +108,20 @@ describe('管理員調整', () => {
     const scores = applyOverrides(computeAdScores({ ...base, hasWebsite: true, merit: 3 }), {})
     expect(totalOf(scores)).toBe(8)
   })
+  test('行政資料總分上限 100(滿分加計表現優良仍以 100 計)', () => {
+    const closed = Array.from({ length: 20 }, (_, i) =>
+      act(`x${i}`, `2026/03/${String(i + 1).padStart(2, '0')}`, true),
+    )
+    const full: ScoringInput = {
+      closed,
+      results: closed.map((a) => result(a.id, { photoCount: 9, hasReport: true, hasFeedback: true })),
+      rosterBySemester: { '114-2': 30, '115-1': 30 },
+      hasWebsite: true,
+      leaderMeetingsAttended: 4,
+      cadreTrainingAttended: true,
+      violationCount: 0,
+      merit: 5,
+    }
+    expect(totalOf(applyOverrides(computeAdScores(full), {}))).toBe(100)
+  })
 })

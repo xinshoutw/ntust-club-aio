@@ -138,5 +138,7 @@ export function applyOverrides(
   })
 }
 
+// 行政資料總分上限 100(各項滿分合計 100,加分後仍以 100 計)
+export const ADMIN_TOTAL_MAX = 100
 export const totalOf = (scores: FinalScore[]): number =>
-  scores.reduce((sum, s) => sum + s.final, 0)
+  Math.min(ADMIN_TOTAL_MAX, scores.reduce((sum, s) => sum + s.final, 0))

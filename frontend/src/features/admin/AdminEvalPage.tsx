@@ -67,7 +67,10 @@ export default function AdminEvalPage() {
             />
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 12, color: 'var(--steel)' }}>採用總分</div>
-              <div className="num" style={{ fontSize: 22, fontWeight: 600, lineHeight: 1.2 }}>{total}</div>
+              <div style={{ lineHeight: 1.2 }}>
+                <span className="num" style={{ fontSize: 22, fontWeight: 600 }}>{total}</span>
+                <span className="num" style={{ fontSize: 12, color: 'var(--steel)' }}> / 100</span>
+              </div>
             </div>
           </div>
         }

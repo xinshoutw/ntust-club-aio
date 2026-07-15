@@ -60,7 +60,9 @@ export default function AdminFilesPage() {
   const [files, setFiles] = useState(LARGE_FILES)
   const [usage, setUsage] = useState(INITIAL_USAGE)
   const [moduleFilter, setModuleFilter] = useState<ModuleKey | 'all'>('all')
+  // 刪除確認:open/afterClose 常駐模式,關閉動畫期間內容不消失
   const [deleting, setDeleting] = useState<StoredFile | null>(null)
+  const [delOpen, setDelOpen] = useState(false)
 
   const usedMb = Object.values(usage).reduce((s, u) => s + u.sizeMb, 0) + DB_TEXT.sizeMb
   const totalCount = Object.values(usage).reduce((s, u) => s + u.count, 0)
@@ -83,7 +85,7 @@ export default function AdminFilesPage() {
       },
     }))
     message.success(`已刪除「${deleting.name}」(${fmtSize(deleting.sizeMb)})`)
-    setDeleting(null)
+    setDelOpen(false)
   }
 
   return (
@@ -223,7 +225,10 @@ export default function AdminFilesPage() {
                       type="button"
                       className="link-btn danger"
                       aria-label={`刪除 ${f.name}`}
-                      onClick={() => setDeleting(f)}
+                      onClick={() => {
+                        setDeleting(f)
+                        setDelOpen(true)
+                      }}
                     >
                       <DeleteOutlined />
                     </button>
@@ -249,14 +254,15 @@ export default function AdminFilesPage() {
       </div>
 
       <Modal
-        open={!!deleting}
+        open={delOpen}
+        afterClose={() => setDeleting(null)}
         title="刪除檔案"
         okText="確認刪除"
         destroyOnHidden
         okButtonProps={{ danger: true, autoFocus: true }}
         cancelText="取消"
         onOk={confirmDelete}
-        onCancel={() => setDeleting(null)}
+        onCancel={() => setDelOpen(false)}
       >
         <div style={{ fontSize: 13, lineHeight: 1.8 }}>
           將永久刪除「{deleting?.name}」（{deleting ? fmtSize(deleting.sizeMb) : ''}）無法復原

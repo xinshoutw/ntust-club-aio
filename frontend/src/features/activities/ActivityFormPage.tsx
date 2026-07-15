@@ -310,7 +310,14 @@ export default function ActivityFormPage() {
                   rules={[{ required: true, message: '請選擇結束日期' }]}
                   style={{ marginBottom: 0 }}
                 >
-                  <DatePicker style={{ width: '100%' }} format="YYYY/MM/DD" />
+                  <DatePicker
+                    style={{ width: '100%' }}
+                    format="YYYY/MM/DD"
+                    disabledDate={(d) => {
+                      const start = form.getFieldValue('date') as dayjs.Dayjs | undefined
+                      return !!start && d.isBefore(start, 'day')
+                    }}
+                  />
                 </Form.Item>
                 <Form.Item
                   name="endTime"

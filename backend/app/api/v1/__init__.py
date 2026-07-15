@@ -3,7 +3,12 @@ from fastapi import APIRouter
 from app.api.v1 import (
     activities,
     admin_activities,
+    admin_audit,
     admin_eval,
+    admin_files,
+    admin_maintenance,
+    admin_signups,
+    admin_violations,
     applications,
     auth,
     bookings,
@@ -29,6 +34,11 @@ router.include_router(signups.router)
 router.include_router(eval_api.router)
 router.include_router(admin_activities.router)
 router.include_router(admin_eval.router)
+router.include_router(admin_signups.router)
+router.include_router(admin_violations.router)
+router.include_router(admin_maintenance.router)
+router.include_router(admin_audit.router)
+router.include_router(admin_files.router)
 
 
 @router.get("/health")

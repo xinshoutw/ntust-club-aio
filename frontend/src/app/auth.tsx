@@ -48,6 +48,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ? { name: '王家豪(輔導老師)', role: 'admin' }
       : { name: '顏志明', role: 'club', club: '資工系學會' }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+    // 蓋板公告「每次登入」都要重新顯示:清掉上次登入的關閉紀錄
+    sessionStorage.removeItem('club-aio.takeover.dismissed')
     setUser(next)
     return next
   }, [])

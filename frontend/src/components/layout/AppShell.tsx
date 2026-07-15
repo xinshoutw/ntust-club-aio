@@ -7,6 +7,7 @@ import { useAuth } from '../../app/auth'
 import { UnsavedProvider, useHasUnsaved } from '../../app/unsaved'
 import type { NavGroup } from '../../lib/nav'
 import Sidebar from './Sidebar'
+import TakeoverOverlay from './TakeoverOverlay'
 import './shell.css'
 
 const NOTIFICATIONS = [
@@ -146,6 +147,9 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
           <Outlet />
         </main>
       </div>
+
+      {/* 蓋板公告:僅社團端,每次登入顯示 */}
+      {user?.role === 'club' && <TakeoverOverlay />}
 
       <Drawer
         placement="left"

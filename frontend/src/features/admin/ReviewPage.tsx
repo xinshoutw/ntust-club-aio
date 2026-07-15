@@ -48,8 +48,12 @@ function noteOf(state: StampStage['state']): string | undefined {
   }
 }
 
-// 類型的篩選/排序值:已認可大型與一般活動視為不同類型
-const typeKey = (item: ReviewItem): string => (item.type === '活動' && item.largeApproved ? '大型活動' : item.type)
+// 類型的篩選/排序值:有「大」標記者(申請中或已認可)視為大型活動;
+// 申請被否准(largeApproved===false)以一般活動計 — 解讀待需求方確認
+const typeKey = (item: ReviewItem): string =>
+  item.type === '活動' && (item.largeApproved === true || (item.isLarge && item.largeApproved !== false))
+    ? '大型活動'
+    : item.type
 const TYPE_OPTIONS = ['社課', '會議', '活動', '大型活動']
 
 function DetailModal({
@@ -102,7 +106,8 @@ function DetailModal({
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 26 }}>
           <span style={{ fontSize: 16, fontWeight: 600 }}>{item.name}</span>
-          <LargeBadge applied={item.isLarge} approved={item.largeApproved} />
+          {/* 本關可簽核時,徽章即時反映下方「認可為大型活動」勾選 */}
+          <LargeBadge applied={item.isLarge} approved={canReview ? largeApproved : item.largeApproved} />
           <StatusPill status={item.status} />
         </div>
       }

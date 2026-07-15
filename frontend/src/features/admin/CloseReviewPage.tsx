@@ -13,9 +13,12 @@ interface PendingClose {
   expense: number // 實際支出
   photos: number
   videoLink?: string
-  reflections: number
   actualLocation: string
   actualAttendees: number
+  highlights: string // 活動重點
+  goals: string // 達成目標
+  others?: string // 其他成果
+  reflections: { name: string; dept: string; text: string }[]
   reviewMeeting?: { date: string; attendees: number; topics: string; conclusion: string }
 }
 
@@ -30,9 +33,16 @@ const PENDING: PendingClose[] = [
     expense: 19500,
     photos: 8,
     videoLink: 'https://youtu.be/demo114',
-    reflections: 3,
     actualLocation: '學生活動中心',
     actualAttendees: 96,
+    highlights: '展出 42 件社員作品,含期末專題「城市光影」系列;開幕導覽 2 場。',
+    goals: '參觀人次 96(目標 80);社員全數完成至少 1 件參展作品。',
+    others: '與美術社合辦閉幕座談,建立跨社合作管道。',
+    reflections: [
+      { name: '陳予恩', dept: '資工三', text: '第一次負責佈展動線,學會用觀眾視角規劃展場,也體會到燈光對作品呈現的影響。' },
+      { name: '林詠晴', dept: '企管二', text: '售票與導覽的排班讓我練習到跨組協調,若能提前一週彩排會更從容。' },
+      { name: '張佑群', dept: '資工三', text: '負責攝影紀錄,學到活動紀實與作品拍攝的差異,下次想嘗試短片形式。' },
+    ],
     reviewMeeting: { date: '2026/06/12', attendees: 9, topics: '動線與售票流程檢討', conclusion: '入場改雙櫃台,明年提前兩週宣傳' },
   },
   {
@@ -44,9 +54,16 @@ const PENDING: PendingClose[] = [
     approvedBudget: 6000,
     expense: 6200,
     photos: 4,
-    reflections: 4,
     actualLocation: '古亭社區活動中心',
     actualAttendees: 25,
+    highlights: '為社區長者舉辦手機教學與健康量測,服務 25 位長者。',
+    goals: '完成 3 小時服務時數;建立與里辦公室的長期合作。',
+    reflections: [
+      { name: '王思晴', dept: '化工二', text: '教長輩用通訊軟體比想像中需要耐心,拆步驟講解才有效。' },
+      { name: '李承翰', dept: '機械三', text: '量測站的動線一開始混亂,調整成單向排隊後順很多。' },
+      { name: '張晉安', dept: '資工二', text: '第一次全程用台語服務,發現語言親近感對長輩很重要。' },
+      { name: '陳雅婷', dept: '應外一', text: '準備的教材字體太小,現場臨時放大重印,學到受眾優先。' },
+    ],
   },
 ]
 
@@ -158,9 +175,16 @@ function CloseReviewModal({
           ) : (
             ' · 無影片連結'
           )}
-          {' '}· 心得 <span className="num">{item.reflections}</span> 人
+          {' '}· 心得 <span className="num">{item.reflections.length}</span> 人
           {photoShort && <div style={{ color: '#B03A2E', fontSize: 12 }}>照片未達 5 張且無影片連結,成果照片項不計分</div>}
         </div>
+        <div style={detailLabel}>活動重點</div><div style={{ lineHeight: 1.7 }}>{item.highlights}</div>
+        <div style={detailLabel}>達成目標</div><div style={{ lineHeight: 1.7 }}>{item.goals}</div>
+        {item.others && (
+          <>
+            <div style={detailLabel}>其他成果</div><div style={{ lineHeight: 1.7 }}>{item.others}</div>
+          </>
+        )}
         {item.reviewMeeting && (
           <>
             <div style={detailLabel}>檢討會議</div>
@@ -172,6 +196,20 @@ function CloseReviewModal({
             </div>
           </>
         )}
+      </div>
+
+      {/* 學習心得全文:審核者須核實內容 */}
+      <div style={{ marginTop: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>學習心得</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto' }}>
+          {item.reflections.map((r) => (
+            <div key={`${r.name}-${r.dept}`} style={{ padding: '8px 12px', background: 'var(--paper)', borderRadius: 6, fontSize: 13 }}>
+              <span style={{ fontWeight: 500 }}>{r.name}</span>
+              <span style={{ color: 'var(--steel)', fontSize: 12 }}>({r.dept})</span>
+              <div style={{ lineHeight: 1.7, marginTop: 2 }}>{r.text}</div>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* 繳交確認:未勾選之項目評鑑以 0 分計 */}
@@ -273,7 +311,7 @@ export default function CloseReviewPage() {
               <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                 <div style={{ fontSize: 12, color: 'var(--steel)' }}>成果</div>
                 <div className="num" style={{ fontSize: 13, marginTop: 2 }}>
-                  照片 {p.photos} · 心得 {p.reflections}
+                  照片 {p.photos} · 心得 {p.reflections.length}
                 </div>
               </div>
               <div style={{ textAlign: 'right', whiteSpace: 'nowrap', minWidth: 84 }}>

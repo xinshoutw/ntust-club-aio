@@ -85,9 +85,9 @@ class PostalChangeOut(BaseModel):
     id: int
     reasons: list[PostalReason]
     account_name: str
-    account_number: str  # 一律回遮罩值(完整值僅審核詳情)
+    account_number: str  # 2026-07-15 需求方:社團端申請紀錄顯示完整局號帳號(不遮罩)
     new_agent_name: str | None
-    new_agent_phone: str | None
+    new_agent_phone: str | None  # 電話仍依決議 §6-11 遮罩(末 3 碼)
     status: BookingStatus
     created_at: datetime
 
@@ -119,6 +119,9 @@ class ViolationOut(BaseModel):
     status: str
     resolve_note: str | None
     created_at: datetime
+    # 銷案期限(推導不儲存):開立日 +1 個月;逾期即截止,不再受理銷案
+    resolve_deadline: date | None = None
+    resolve_expired: bool = False
 
 
 class AnnouncementOut(BaseModel):

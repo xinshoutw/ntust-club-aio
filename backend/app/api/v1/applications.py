@@ -26,11 +26,10 @@ from app.schemas.applications import (
     PostalChangeIn,
     PostalChangeOut,
     ViolationOut,
-    mask_account,
     mask_phone,
 )
 from app.schemas.common import ApiResponse
-from app.services import audit, notify
+from app.services import audit, notify, violation_service
 from app.services import files as file_service
 
 router = APIRouter(prefix="/club", tags=["applications"])
@@ -105,8 +104,8 @@ async def create_cert(
 
 
 def _postal_out(row: PostalAccountChange) -> PostalChangeOut:
+    # 2026-07-15 需求方:社團端申請紀錄顯示完整局號帳號(不遮罩);電話仍遮罩
     out = PostalChangeOut.model_validate(row)
-    out.account_number = mask_account(row.account_number)
     out.new_agent_phone = mask_phone(row.new_agent_phone)
     return out
 
@@ -253,9 +252,14 @@ async def list_violations(
     )
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = await db.scalars(query.offset(page.offset).limit(page.page_size))
-    return ApiResponse(
-        data=[ViolationOut.model_validate(r) for r in rows], meta=page.meta(total or 0)
-    )
+    today = violation_service.today_taipei()
+    data = []
+    for r in rows:
+        out = ViolationOut.model_validate(r)
+        out.resolve_deadline = violation_service.resolve_deadline(r)
+        out.resolve_expired = violation_service.resolve_expired(r, today)
+        data.append(out)
+    return ApiResponse(data=data, meta=page.meta(total or 0))
 
 
 # ---- 公告(社團端)----

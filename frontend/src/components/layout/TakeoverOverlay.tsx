@@ -30,13 +30,20 @@ export default function TakeoverOverlay() {
       !dismissed.includes(a.id),
   )
   const current = active[0]
+  const currentId = current?.id
 
   useEffect(() => {
-    if (!current) return
+    if (!currentId) return
     setClosable(false)
+    // 蓋板期間鎖住背景捲動
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
     const t = setTimeout(() => setClosable(true), CLOSE_DELAY_MS)
-    return () => clearTimeout(t)
-  }, [current?.id])
+    return () => {
+      clearTimeout(t)
+      document.body.style.overflow = prevOverflow
+    }
+  }, [currentId])
 
   if (!current) return null
 

@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { TAKEOVER_DISMISSED_KEY } from '../components/layout/TakeoverOverlay'
 
 export type Role = 'club' | 'admin'
 
@@ -49,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       : { name: '顏志明', role: 'club', club: '資工系學會' }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
     // 蓋板公告「每次登入」都要重新顯示:清掉上次登入的關閉紀錄
-    sessionStorage.removeItem('club-aio.takeover.dismissed')
+    sessionStorage.removeItem(TAKEOVER_DISMISSED_KEY)
     setUser(next)
     return next
   }, [])

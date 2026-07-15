@@ -182,8 +182,8 @@ erDiagram
 | type | enum(社課,活動,會議) | 2026-07-13 需求調整(原:一般活動/社課/大型活動) |
 | is_large | bool default false | 社團申請大型活動(僅 type=活動 可勾);定義:工作人員或服務對象 50 人以上/連辦 2-3 天或逾 20 小時/經費 10 萬以上/籌備 3 個月以上且 5 次以上籌備會議 |
 | is_large_approved | bool NULL | 審核時管理員認可;**認可後評鑑行政分才享大型 ×3 加權**(2026-07-14 定案,取代原「類型=大型活動」) |
-| date / end_date | date | 活動起訖日期(2026-07-15 需求方:單日改為時間區間;未跨日 end_date=date;學期歸屬與 ad1「一天一件」皆以開始日推導)**後端待同步** |
-| start_time / end_time | time | 開始時間屬 date、結束時間屬 end_date(2026-07-15;原單日 timeRange)**後端待同步** |
+| date / end_date | date | 活動起訖日期(2026-07-15 需求方:單日改為時間區間;未跨日 end_date=date;學期歸屬與 ad1「一天一件」皆以開始日推導)(2026-07-16 已同步) |
+| start_time / end_time | time | 開始時間屬 date、結束時間屬 end_date(2026-07-15;原單日 timeRange)(2026-07-16 已同步) |
 | participants_in / participants_out | int | 校內/校外人數 |
 | staff_text | text | 工作人員(「總務>陳大文;美宣>…」,自由格式) |
 | fund_source | text NULL | 經費來源(輔導老師第一關認定:學務處經費/校務基金/高教深耕…) |
@@ -220,8 +220,8 @@ approved 且 活動結束日(end_date)+1個月 已過 且未送結案 → 「逾
 | highlights / goals / others | text NOT NULL | 活動重點/如何達成目標/其他執行狀況(**除影片外全必填**) |
 | review_meeting | bool NOT NULL | 檢討會議(2026-07-15 起於結案表單獨立為「二、檢討會議」section);true 時日期/與會人數/討論事項/內容決議皆必填(應用層) |
 | review_date | date NULL | |
-| review_attendees | int NULL | 與會人數(2026-07-15 新增)**後端待同步** |
-| review_topics / review_conclusion | text NULL | 討論事項/內容決議(2026-07-15 新增)**後端待同步** |
+| review_attendees | int NULL | 與會人數(2026-07-15 新增)(2026-07-16 已同步) |
+| review_topics / review_conclusion | text NULL | 討論事項/內容決議(2026-07-15 新增)(2026-07-16 已同步) |
 | video_url | text NULL | **唯一選填**;http(s) 格式驗證;照片 <5 張且無影片 → ad2 該活動不計分 |
 | expense | int NOT NULL | 實際支出(核銷依據) |
 | submitted_at | timestamptz | |
@@ -270,14 +270,14 @@ approved 且 活動結束日(end_date)+1個月 已過 且未送結案 → 「逾
 
 **room_booking_requests**(id, club_id, venue_id(allow_fixed), purpose **NOT NULL**(2026-07-15 用途必填), status enum(pending,approved,rejected), created_at)
 **room_booking_slots**(id, request_id FK, **weekday int(1=週一…7=週日)**, period char(1-10,A-D);UNIQUE(request, weekday, period))
-— 教室**固定**借用(2026-07-15 需求方重定義,**後端待同步**):**整學期每週固定時段**,選項為星期×節次,不再選日期。規則:
+— 教室**固定**借用(2026-07-15 需求方重定義,(2026-07-16 已同步)):**整學期每週固定時段**,選項為星期×節次,不再選日期。規則:
   - 僅於**開放窗**受理(system_settings,預設每年 6 月、1 月;未開放時社團端入口反灰移至「其他」)
   - 每社團至多 **10 節**(1 節=1 小時)
   - **晚間時段(第 10 節及 A–D 節)至少連續 3 節**:合法如 9–A、8–10、A–C、B–D;不合法如 9–10、C–D
   - 多社可申請同時段;衝突由管理員**整單擇一核准**(不存在部分同意);核准後借用總覽該時段每週呈深灰(固定借用)
   - 場況圖只顯示**已核准**的固定借用;審核中的固定借用不顯示
 
-**venue_bookings**(id, club_id, venue_id(allow_temp), date, periods char[](複選節次), purpose **NOT NULL**(2026-07-15 用途必填,後端待同步), status enum(pending,approved,rejected), created_at)
+**venue_bookings**(id, club_id, venue_id(allow_temp), date, periods char[](複選節次), purpose **NOT NULL**(2026-07-15 用途必填;2026-07-16 已同步), status enum(pending,approved,rejected), created_at)
 — **臨時**場地借用,單日多節次。借用總覽(2026-07-15 改版):可借格點擊**直接前往臨時場地借用**(不再彈固定/臨時選單);審核中格不可點;不開放格不畫方框也不列圖例;固定借用改深灰;支援單日檢視(±1 天/±1 週導航)與單一場地 14 天檢視(點場地名稱進入、可翻頁)。
 
 **equipment_loans**
@@ -285,14 +285,14 @@ approved 且 活動結束日(end_date)+1個月 已過 且未送結案 → 「逾
 | 欄位 | 說明 |
 |---|---|
 | id, club_id, equipment_id, qty | 一單一品項(原型如此;多品項=多單,簡單且點交/逾期各自獨立) |
-| activity_id | FK activities **NOT NULL**(2026-07-15:器材借用綁定**審核通過活動**,不再自選區間)**後端待同步** |
+| activity_id | FK activities **NOT NULL**(2026-07-15:器材借用綁定**審核通過活動**,不再自選區間)(2026-07-16 已同步) |
 | start_date / end_date | 借用區間=**推導**:活動開始日 −2 個工作天 ~ 活動結束日 +1 個工作天(工作天依 holidays;緩衝天數進 system_settings 可調) |
 | purpose | 用途 |
 | status | enum(pending, approved, rejected, checked_out(已借出), returned(已歸還)) |
 | checkout_by / checkout_at / serials text[] | 借出點交(工讀生;需序號類登記序號) |
-| borrower_name | 借用人(借出點交時登記;2026-07-15 借用紀錄需顯示)**後端待同步** |
+| borrower_name | 借用人(借出點交時登記;2026-07-15 借用紀錄需顯示)(2026-07-16 已同步) |
 | checkin_by / checkin_at / checkin_note | 歸還點交 |
-| returner_name | 歸還人(歸還點交時登記;同上)**後端待同步** |
+| returner_name | 歸還人(歸還點交時登記;同上)(2026-07-16 已同步) |
 
 — **逾期=推導**:status=checked_out 且 now > (end_date 之隔天上班日 10:30)。逾期追蹤頁、停權管理、社團 `overdue` 數全由此查詢;工讀生端三頁(借出/歸還/逾期)共用此表。
 
@@ -387,7 +387,7 @@ approved 且 活動結束日(end_date)+1個月 已過 且未送結案 → 「逾
 **announcements**(id, title, content, target_type enum(all,attr,club), target_value text NULL(性質名或 club_id), is_auto bool(系統自動通知,如核准訊息), created_by, created_at)
 
 **violations**(id, club_id, occurred_on date, location, items text[](違規項目複選,目錄進 settings), other text, filler_id FK users(工讀生), status enum(open(未銷案), resolved(已銷案)), resolve_note, created_at)— 佐證照片走 files。
-— **銷案期限**(2026-07-15 定案,**後端待同步**):開立日 +1 個月內須銷案,逾期即**截止**(不再受理銷案,−1 扣分成立);期限與截止皆為推導不儲存,社團端/管理端列表顯示期限,管理端逾期後銷案鈕停用。
+— **銷案期限**(2026-07-15 定案,(2026-07-16 已同步)):開立日 +1 個月內須銷案,逾期即**截止**(不再受理銷案,−1 扣分成立);期限與截止皆為推導不儲存,社團端/管理端列表顯示期限,管理端逾期後銷案鈕停用。
 
 **audit_logs**(id, user_id FK NULL, role, action, detail, ip inet, created_at)— 高風險操作全記;不設上限(原型截 500 筆是 demo 限制),量大再做分區/歸檔。
 
@@ -397,6 +397,16 @@ approved 且 活動結束日(end_date)+1個月 已過 且未送結案 → 「逾
 
 **legacy_id_map**(id, legacy_system enum(cms,clubclass), legacy_table, legacy_id, new_table, new_id, migrated_at;UNIQUE(legacy_system, legacy_table, legacy_id))
 — migration scripts 先查 map 再寫入,重跑不重複;對照除錯用。
+
+
+### 3.x 第五輪後端同步補記(2026-07-16)
+
+- **equipment_loans.start_date/end_date = 申請當下的推導快照**:之後調整工作天緩衝設定不回溯既有借用;逾期判定沿用 end_date。可借數查詢 `GET /club/equipment?activity_id=`(推導區間在 `meta.loan_start/loan_end`);**逾期未還的借用視為持續佔用**(無論原區間是否已過)
+- **固定借用每社 10 節上限 = 本單+其他「審核中」申請合計**(核准件屬前學期不佔額度;requests 無 semester 欄的最合理解讀);開放窗 `system_settings.fixed_booking_window` 支援 `open_from/open_until` 日期區間(第八輪起以日期區間為準,月份制淘汰);側欄反灰查 `GET /club/room-bookings/window`
+- **簽到登錄** `PUT /admin/signup-items/{id}/attendance`(權限 `areg`):場次制逐場登錄;非場次制自動建立/沿用單一預設場次(session_attendance 單一資料源);場次日期未到/未報名回 409;重複登錄=upsert
+- **檔案管理**權限鍵 `afiles`:usage 依 path 前綴分模組、已歸檔不計佔用、`db_size`=pg_database_size(「文字內容」)、有報修檔案時 repair 排第一;刪除僅限 repair 模組(403 其餘),commit 後才 unlink
+- system_settings 新 key:`equipment_workday_buffer`({before,after},預設 2/1)、`fixed_booking_window`
+- violations 逾期判定同時存在 Python(violation_service)與 SQL(make_interval)兩處實作,邊界=期限當天仍可銷案(已以測試釘住);規則變動需同步兩處
 
 ## 4. 學年與學期規則(已確認)
 

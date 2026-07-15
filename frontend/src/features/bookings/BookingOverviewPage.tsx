@@ -145,7 +145,7 @@ export default function BookingOverviewPage() {
     <div>
       <PageHeader title="借用總覽" sub={mine} />
 
-      {/* 場地借用情形:單日全場地 / 單一場地 14 天,兩種檢視 */}
+      {/* 場地借用情形:單日全場地 / 單一場地 15 天(−7~+7),兩種檢視 */}
       <div className="card" style={{ marginTop: 20, padding: '16px 20px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {!venueDef ? (

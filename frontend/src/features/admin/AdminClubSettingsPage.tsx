@@ -31,23 +31,21 @@ export default function AdminClubSettingsPage() {
     setActive(master?.active ?? true)
   }
 
-  const toggleActive = (next: boolean) => {
-    if (next) {
-      setActive(true)
-      message.success(`已啟用 ${club} 帳號`)
+  // 開關本身不警告;切到「停用」後按「儲存」才確認(需求方 2026-07-16)
+  const save = () => {
+    const wasActive = master?.active ?? true
+    if (wasActive && !active) {
+      confirmDialog(modal, {
+        title: `停用 ${club} 帳號`,
+        content: '儲存後社團將無法登入,進行中的申請不受影響。',
+        okText: '確認停用並儲存',
+        okButtonProps: { danger: true },
+        cancelText: '取消',
+        onOk: () => message.success(`已儲存 ${name} 帳號設定(帳號停用)`),
+      })
       return
     }
-    confirmDialog(modal, {
-      title: `停用 ${club} 帳號`,
-      content: '停用後社團將無法登入,進行中的申請不受影響。',
-      okText: '確認停用',
-      okButtonProps: { danger: true },
-      cancelText: '取消',
-      onOk: () => {
-        setActive(false)
-        message.success(`已停用 ${club} 帳號`)
-      },
-    })
+    message.success(`已儲存 ${name} 帳號設定`)
   }
 
   return (
@@ -80,10 +78,11 @@ export default function AdminClubSettingsPage() {
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: 13, fontWeight: 500 }}>帳號狀態</span>
-              <Switch checked={active} onChange={toggleActive} />
+              <Switch checked={active} onChange={setActive} />
               <span style={{ fontSize: 13, color: active ? '#1F6B45' : '#B03A2E' }}>{active ? '啟用中' : '已停用'}</span>
             </div>
-            <div style={{ display: 'flex', gap: 10, marginTop: 4, flexWrap: 'wrap' }}>
+            {/* 重設密碼獨立生效(不需儲存),與儲存鈕相鄰 */}
+            <div style={{ display: 'flex', gap: 10, marginTop: 4, justifyContent: 'flex-end' }}>
               <Button
                 onClick={() => {
                   setPwMounted(true)
@@ -92,8 +91,7 @@ export default function AdminClubSettingsPage() {
               >
                 重設密碼
               </Button>
-              <span style={{ flex: 1 }} />
-              <Button type="primary" onClick={() => message.success(`已儲存 ${name} 帳號設定`)}>儲存</Button>
+              <Button type="primary" onClick={save}>儲存</Button>
             </div>
           </div>
         </div>
@@ -103,8 +101,12 @@ export default function AdminClubSettingsPage() {
       {pwMounted && (
         <OneTimePasswordModal
           title={`重設密碼 — ${club}`}
+          okLabel="確認重設"
           open={pwOpen}
-          onClose={() => setPwOpen(false)}
+          onClose={() => {
+            message.success(`已重設 ${club} 的密碼`)
+            setPwOpen(false)
+          }}
           afterClose={() => setPwMounted(false)}
         />
       )}

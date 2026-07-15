@@ -72,8 +72,8 @@ function ActiveTag({ active }: { active: boolean }) {
 export default function AccountsPage() {
   const { message, modal } = App.useApp()
   const [tab, setTab] = useState('admins')
-  // 一次性密碼彈窗:目標帳號 + 顯示開關(關閉動畫結束後卸載)
-  const [pwTarget, setPwTarget] = useState<{ title: string; account?: string } | null>(null)
+  // 一次性密碼彈窗:目標帳號 + 顯示開關(關閉動畫結束後卸載);重設流程按鈕文字為「確認重設」
+  const [pwTarget, setPwTarget] = useState<{ title: string; account?: string; okLabel?: string } | null>(null)
   const [pwOpen, setPwOpen] = useState(false)
   // 權限設定彈窗:草稿受控,按「儲存」才生效;未存關閉須確認
   const [permTarget, setPermTarget] = useState<Account | null>(null)
@@ -86,8 +86,8 @@ export default function AccountsPage() {
 
   const roleLabel = tab === 'admins' ? '管理員' : tab === 'staff' ? '工讀生' : '評審'
 
-  const showPassword = (title: string, account?: string) => {
-    setPwTarget({ title, account })
+  const showPassword = (title: string, account?: string, okLabel?: string) => {
+    setPwTarget({ title, account, okLabel })
     setPwOpen(true)
   }
 
@@ -132,7 +132,7 @@ export default function AccountsPage() {
   const actions = (a: Account, extra?: React.ReactNode) => (
     <td className="r" style={{ whiteSpace: 'nowrap' }}>
       {extra}
-      <button type="button" className="link-btn" onClick={() => showPassword(`重設密碼 — ${a.name}`, a.account)}>
+      <button type="button" className="link-btn" onClick={() => showPassword(`重設密碼 — ${a.name}`, a.account, '確認重設')}>
         重設密碼
       </button>
       <button type="button" className="link-btn" onClick={() => toggleActive(a)}>
@@ -344,6 +344,7 @@ export default function AccountsPage() {
         <OneTimePasswordModal
           title={pwTarget.title}
           account={pwTarget.account}
+          okLabel={pwTarget.okLabel}
           open={pwOpen}
           onClose={() => setPwOpen(false)}
           afterClose={() => setPwTarget(null)}

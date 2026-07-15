@@ -37,6 +37,7 @@ import AdminEvalPage from './features/admin/AdminEvalPage'
 import { AdminAccountsPage, ClubAccountsPage, ViewerAccountsPage } from './features/admin/AccountsPage'
 import AdminFilesPage from './features/admin/AdminFilesPage'
 import AdminMaintenancePage from './features/admin/AdminMaintenancePage'
+import AdminSettingsPage from './features/admin/AdminSettingsPage'
 import AdminViolationsPage from './features/admin/AdminViolationsPage'
 import AuditPage from './features/admin/AuditPage'
 
@@ -58,7 +59,7 @@ export default function App() {
       <Route
         element={
           <RequireRole roles={['club']}>
-            <AppShell nav={CLUB_NAV} showYear={false} />
+            <AppShell nav={CLUB_NAV} />
           </RequireRole>
         }
       >
@@ -109,6 +110,7 @@ export default function App() {
         <Route path="maintenance" element={<AdminMaintenancePage />} />
         <Route path="violations" element={<AdminViolationsPage />} />
         <Route path="files" element={<AdminFilesPage />} />
+        <Route path="settings" element={<AdminSettingsPage />} />
         <Route path="audit" element={<AuditPage />} />
       </Route>
 

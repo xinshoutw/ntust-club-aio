@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { App, Badge, Drawer, Dropdown, Popover } from 'antd'
-import { BellOutlined, DownOutlined, LogoutOutlined, MenuOutlined, SettingOutlined } from '@ant-design/icons'
+import { BellOutlined, DownOutlined, HistoryOutlined, LogoutOutlined, MenuOutlined, SettingOutlined } from '@ant-design/icons'
 import { useAuth } from '../../app/auth'
 import { UnsavedProvider, useHasUnsaved } from '../../app/unsaved'
 import type { NavGroup } from '../../lib/nav'
@@ -17,7 +17,6 @@ const NOTIFICATIONS = [
 interface AppShellProps {
   nav: NavGroup[]
   badgeLabel?: string
-  showYear?: boolean
 }
 
 // UnsavedProvider 需包住 shell 本體與頁面(側欄/頂欄導航前查詢 dirty)
@@ -29,7 +28,7 @@ export default function AppShell(props: AppShellProps) {
   )
 }
 
-function ShellInner({ nav, badgeLabel, showYear = true }: AppShellProps) {
+function ShellInner({ nav, badgeLabel }: AppShellProps) {
   const { user, logout } = useAuth()
   const { modal } = App.useApp()
   const hasUnsaved = useHasUnsaved()
@@ -63,12 +62,20 @@ function ShellInner({ nav, badgeLabel, showYear = true }: AppShellProps) {
 
   const userMenu = {
     items: [
-      // 社團帳號:設定捷徑(管理項目)置於登出上方
+      // 登出上方的角色捷徑:社團=設定(管理項目);管理員=系統設定、稽核軌跡
       ...(user?.role === 'club' ? [{ key: 'settings', icon: <SettingOutlined />, label: '設定' }] : []),
+      ...(user?.role === 'admin'
+        ? [
+            { key: 'admin-settings', icon: <SettingOutlined />, label: '設定' },
+            { key: 'admin-audit', icon: <HistoryOutlined />, label: '稽核軌跡' },
+          ]
+        : []),
       { key: 'logout', icon: <LogoutOutlined />, label: '登出' },
     ],
     onClick: ({ key }: { key: string }) => {
       if (key === 'settings') guarded(() => navigate('/club-settings'))
+      if (key === 'admin-settings') guarded(() => navigate('/admin/settings'))
+      if (key === 'admin-audit') guarded(() => navigate('/admin/audit'))
       if (key === 'logout') {
         guarded(() => {
           logout()
@@ -99,11 +106,6 @@ function ShellInner({ nav, badgeLabel, showYear = true }: AppShellProps) {
         <div className="topbar-mobile-title">{mobileTitle}</div>
         {badgeLabel && <span className="topbar-scope">{badgeLabel}</span>}
         <div className="topbar-spacer" />
-        {showYear && (
-          <button type="button" className="topbar-year num" aria-label="切換學年度">
-            114 學年 <DownOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />
-          </button>
-        )}
         <Popover
           trigger="click"
           placement="bottomRight"

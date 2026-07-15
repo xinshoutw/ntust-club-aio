@@ -13,7 +13,6 @@ import {
   FlagOutlined,
   FolderOpenOutlined,
   FormOutlined,
-  HistoryOutlined,
   HomeOutlined,
   IdcardOutlined,
   NotificationOutlined,
@@ -173,8 +172,8 @@ export const ADMIN_NAV: NavGroup[] = [
     items: [
       { key: 'a-maintenance', label: '維修管理', path: '/admin/maintenance', icon: <ToolOutlined /> },
       { key: 'a-violations', label: '違規管理', path: '/admin/violations', icon: <WarningOutlined /> },
+      // 稽核軌跡自側欄移除(2026-07-15 需求方),入口只留 Header 帳號選單
       { key: 'a-files', label: '檔案管理', path: '/admin/files', icon: <FolderOpenOutlined /> },
-      { key: 'a-audit', label: '稽核軌跡', path: '/admin/audit', icon: <HistoryOutlined /> },
     ],
   },
 ]

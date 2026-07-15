@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { App, Button, Checkbox, DatePicker, InputNumber, Tooltip } from 'antd'
+import { App, Button, Checkbox, InputNumber, Tooltip } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { SIGNUP_ITEMS } from '../signup/mock'
@@ -42,13 +42,7 @@ export default function SignupManagePage() {
         }
       />
 
-      <div className="card" style={{ marginTop: 20, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ fontSize: 14, fontWeight: 500 }}>報名時間窗</div>
-        <DatePicker.RangePicker format="YYYY/MM/DD" />
-        <Button style={{ height: 34 }} onClick={() => message.success('已儲存報名時間')}>儲存</Button>
-        <div style={{ fontSize: 12, color: 'var(--steel)' }}>窗外時間社團無法送出報名。</div>
-      </div>
-
+      {/* 報名時間窗已移至「系統設定」頁 */}
       {SIGNUP_ITEMS.map((item) => {
         const regs = REGISTRATIONS[item.id] ?? []
         const open = expanded === item.id

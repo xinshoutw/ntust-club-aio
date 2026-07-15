@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { App, Button, Form, Input, Select } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
@@ -49,7 +49,17 @@ export default function FixedRoomPage() {
   const [form] = Form.useForm()
   // 已選時段:'dow|period'(dow 1=週一 … 7=週日)
   const [slots, setSlots] = useState<ReadonlySet<string>>(new Set())
+  // 拖曳批量選取(與 PeriodPicker 同手感):按下起點決定「選取/取消」,掃過即套用
+  const [dragTo, setDragTo] = useState<boolean | null>(null)
+  const slotsRef = useRef(slots)
+  slotsRef.current = slots
   const mine = ROOM_REQUESTS.filter((r) => r.club === user?.club).slice(0, 5)
+
+  useEffect(() => {
+    const up = () => setDragTo(null)
+    window.addEventListener('mouseup', up)
+    return () => window.removeEventListener('mouseup', up)
+  }, [])
 
   // 僅於管理員開放期間可用;未開放時側欄反灰,直接輸入網址也只顯示說明
   if (!isFixedBookingOpen()) {
@@ -66,16 +76,19 @@ export default function FixedRoomPage() {
     )
   }
 
-  const toggle = (key: string) =>
+  const apply = (key: string, to: boolean) => {
+    const has = slotsRef.current.has(key)
+    if (to === has) return
     setSlots((s) => {
       const next = new Set(s)
-      if (next.has(key)) {
-        next.delete(key)
-      } else {
+      if (to) {
         next.add(key)
+      } else {
+        next.delete(key)
       }
       return next
     })
+  }
 
   const submit = (values: { room: string; note: string }) => {
     if (slots.size === 0) {
@@ -132,7 +145,7 @@ export default function FixedRoomPage() {
               每週時段 <span style={{ color: '#C13B34' }}>*</span>
             </span>
             <span style={{ fontWeight: 400, color: 'var(--steel)', fontSize: 12 }}>
-              點擊切換選取;至多 {MAX_PERIODS} 節,第 10 節及 A–D 節需至少連續 3 節
+              點擊或按住拖曳批量選取;至多 {MAX_PERIODS} 節,第 10 節及 A–D 節需至少連續 3 節
             </span>
             <span style={{ flex: 1 }} />
             <span className="num" style={{ fontSize: 12, color: slots.size > MAX_PERIODS ? '#C13B34' : 'var(--steel)' }}>
@@ -140,7 +153,7 @@ export default function FixedRoomPage() {
             </span>
           </div>
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'separate', borderSpacing: 4, width: '100%', tableLayout: 'fixed', minWidth: 640 }}>
+            <table style={{ borderCollapse: 'separate', borderSpacing: 4, width: '100%', tableLayout: 'fixed', minWidth: 640, userSelect: 'none' }}>
               <thead>
                 <tr>
                   <th style={{ width: 52, fontSize: 11, fontWeight: 500, color: 'var(--steel)', textAlign: 'left' }}>星期</th>
@@ -162,7 +175,27 @@ export default function FixedRoomPage() {
                             type="button"
                             aria-pressed={on}
                             aria-label={`週${DOW_TEXT[dow]} 第${p}節`}
-                            onClick={() => toggle(key)}
+                            onMouseDown={(e) => {
+                              e.preventDefault()
+                              const to = !on
+                              setDragTo(to)
+                              apply(key, to)
+                            }}
+                            onMouseEnter={(e) => {
+                              if (dragTo === null) return
+                              // 視窗外放開滑鼠收不到 mouseup;按鍵已放開就結束拖曳
+                              if (e.buttons === 0) {
+                                setDragTo(null)
+                                return
+                              }
+                              apply(key, dragTo)
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                apply(key, !on)
+                              }
+                            }}
                             className="num"
                             style={{
                               width: '100%',

@@ -21,6 +21,7 @@ export default function LargeBadge({ applied, approved }: LargeBadgeProps) {
   return (
     <Tooltip title={tip}>
       <span
+        role="img"
         aria-label={tip}
         style={{
           marginLeft: 6,

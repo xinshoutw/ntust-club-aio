@@ -173,6 +173,7 @@ export const ADMIN_NAV: NavGroup[] = [
     items: [
       { key: 'a-maintenance', label: '維修管理', path: '/admin/maintenance', icon: <ToolOutlined /> },
       { key: 'a-violations', label: '違規管理', path: '/admin/violations', icon: <WarningOutlined /> },
+      { key: 'a-files', label: '檔案管理', path: '/admin/files', icon: <FolderOpenOutlined /> },
       { key: 'a-audit', label: '稽核軌跡', path: '/admin/audit', icon: <HistoryOutlined /> },
     ],
   },

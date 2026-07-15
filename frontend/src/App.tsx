@@ -35,6 +35,7 @@ import AdminMembersPage from './features/admin/AdminMembersPage'
 import OverduePage from './features/admin/OverduePage'
 import AdminEvalPage from './features/admin/AdminEvalPage'
 import { AdminAccountsPage, ClubAccountsPage, ViewerAccountsPage } from './features/admin/AccountsPage'
+import AdminFilesPage from './features/admin/AdminFilesPage'
 import AdminMaintenancePage from './features/admin/AdminMaintenancePage'
 import AdminViolationsPage from './features/admin/AdminViolationsPage'
 import AuditPage from './features/admin/AuditPage'
@@ -107,6 +108,7 @@ export default function App() {
         <Route path="accounts/viewers" element={<ViewerAccountsPage />} />
         <Route path="maintenance" element={<AdminMaintenancePage />} />
         <Route path="violations" element={<AdminViolationsPage />} />
+        <Route path="files" element={<AdminFilesPage />} />
         <Route path="audit" element={<AuditPage />} />
       </Route>
 

@@ -22,13 +22,23 @@ const MIN_REFLECTIONS = 3
 const MIN_PHOTOS = 5
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024 // 圖片上限 10MB(architecture.md)
 
-// TODO: 允許所有 Image 類型，包含 HEIC, WEBP, ...
-// 副檔名/accept 擋不住改名檔:驗 JPEG/PNG 魔術位元組
-async function isJpgOrPng(f: File): Promise<boolean> {
-  const head = new Uint8Array(await f.slice(0, 4).arrayBuffer())
-  const jpg = head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff
-  const png = head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47
-  return jpg || png
+// 副檔名/accept 擋不住改名檔:驗常見影像魔術位元組(JPEG/PNG/GIF/WebP/BMP/TIFF/HEIC/AVIF)
+async function isImageFile(f: File): Promise<boolean> {
+  const head = new Uint8Array(await f.slice(0, 12).arrayBuffer())
+  if (head.length < 12) return false
+  const ascii = (from: number, to: number) => String.fromCharCode(...head.slice(from, to))
+  if (head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return true // JPEG
+  if (head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47) return true // PNG
+  if (ascii(0, 3) === 'GIF') return true
+  if (ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') return true
+  if (ascii(0, 2) === 'BM') return true // BMP
+  if (ascii(0, 4) === 'II*\0' || ascii(0, 4) === 'MM\0*') return true // TIFF
+  // ISO BMFF(HEIC/HEIF/AVIF):offset 4 起為 'ftyp' + 品牌
+  if (ascii(4, 8) === 'ftyp') {
+    const brand = ascii(8, 12)
+    return ['heic', 'heix', 'heif', 'hevc', 'mif1', 'msf1', 'avif', 'avis'].includes(brand)
+  }
+  return false
 }
 
 const label: React.CSSProperties = { fontSize: 13, fontWeight: 500, marginBottom: 6 }
@@ -209,8 +219,8 @@ function CloseForm({
           message.error(`「${f.name}」超過 10MB 上限,請壓縮後再上傳`)
           return
         }
-        if (!(await isJpgOrPng(f))) {
-          message.error(`「${f.name}」不是有效的 JPG/PNG 圖片`)
+        if (!(await isImageFile(f))) {
+          message.error(`「${f.name}」不是有效的圖片檔`)
           return
         }
         const hash = await sha256(f)
@@ -533,7 +543,7 @@ function CloseForm({
             <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>四、附件與經費</div>
             <div>
               <div style={label}>
-                活動照片(≥{MIN_PHOTOS} 張,限 JPG/PNG){requiredMark}
+                活動照片(≥{MIN_PHOTOS} 張){requiredMark}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 {photos.map((p) => (
@@ -555,7 +565,7 @@ function CloseForm({
                   </span>
                 ))}
                 <Upload
-                  accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+                  accept="image/*,.heic,.heif"
                   multiple
                   showUploadList={false}
                   beforeUpload={(f) => {

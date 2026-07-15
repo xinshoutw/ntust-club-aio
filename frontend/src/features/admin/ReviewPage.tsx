@@ -1,9 +1,11 @@
-import { useState } from 'react'
-import { App, Button, Checkbox, Drawer, Input, InputNumber, Modal } from 'antd'
-import { RightOutlined } from '@ant-design/icons'
+import { useMemo, useState } from 'react'
+import { App, Button, Checkbox, Dropdown, Input, InputNumber, Modal } from 'antd'
+import { FilterOutlined, RightOutlined, SwapOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
+import LargeBadge from '../../components/ui/LargeBadge'
 import StampTrail, { type StampStage } from '../../components/ui/StampTrail'
+import { STATUS } from '../../lib/status'
 import { fmtMoney } from '../activities/types'
 import { REVIEW_ITEMS, type ReviewItem } from './reviewMock'
 
@@ -46,12 +48,26 @@ function noteOf(state: StampStage['state']): string | undefined {
   }
 }
 
-function DetailDrawer({ item, onClose }: { item: ReviewItem; onClose: () => void }) {
+// 類型的篩選/排序值:已認可大型與一般活動視為不同類型
+const typeKey = (item: ReviewItem): string => (item.type === '活動' && item.largeApproved ? '大型活動' : item.type)
+const TYPE_OPTIONS = ['社課', '會議', '活動', '大型活動']
+
+function DetailModal({
+  item,
+  open,
+  onClose,
+  afterClose,
+}: {
+  item: ReviewItem
+  open: boolean
+  onClose: () => void
+  afterClose: () => void
+}) {
   const { message } = App.useApp()
   const [rejectOpen, setRejectOpen] = useState(false)
   const [reason, setReason] = useState('')
-  // 大型活動由社團申請、審核時認可;認可後行政分才享 ×3 加權
-  const [largeApproved, setLargeApproved] = useState(true)
+  // 大型活動:社團申請或管理員逕行核定;認可後行政分才享 ×3 加權
+  const [largeApproved, setLargeApproved] = useState(item.largeApproved ?? !!item.isLarge)
   const d = item.detail
   // 核定金額:controlled,依預算列 id 管理
   const [approvals, setApprovals] = useState<Record<number, number>>(() =>
@@ -72,22 +88,21 @@ function DetailDrawer({ item, onClose }: { item: ReviewItem; onClose: () => void
       message.error('退回原因為必填。')
       return
     }
-    message.success(`已退回 ${item.id}(通知社團修正重送)`)
+    message.success(`已退回「${item.name}」(通知社團修正重送)`)
     closeReject()
     onClose()
   }
 
   return (
-    <Drawer
-      open
-      onClose={onClose}
-      size={560}
-      mask={false}
-      rootStyle={{ top: 56 }}
+    <Modal
+      open={open}
+      onCancel={onClose}
+      afterClose={afterClose}
+      width={680}
       title={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <span className="num" style={{ fontSize: 13, color: 'var(--steel)', fontWeight: 400 }}>{item.id}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 26 }}>
           <span style={{ fontSize: 16, fontWeight: 600 }}>{item.name}</span>
+          <LargeBadge applied={item.isLarge} approved={item.largeApproved} />
           <StatusPill status={item.status} />
         </div>
       }
@@ -104,8 +119,8 @@ function DetailDrawer({ item, onClose }: { item: ReviewItem; onClose: () => void
               type="primary"
               style={{ height: 38 }}
               onClick={() => {
-                const largeNote = item.type === '大型活動' ? `(大型活動${largeApproved ? '已認可' : '未認可'})` : ''
-                message.success(`已核准 ${item.id}${largeNote},送組長關`)
+                const largeNote = item.type === '活動' ? `(大型活動${largeApproved ? '已認可' : '未認可'})` : ''
+                message.success(`已核准「${item.name}」${largeNote},送組長關`)
                 onClose()
               }}
             >
@@ -154,7 +169,7 @@ function DetailDrawer({ item, onClose }: { item: ReviewItem; onClose: () => void
         </div>
       </div>
 
-      {item.type === '大型活動' && (
+      {item.type === '活動' && (
         <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--paper)', borderRadius: 6 }}>
           <Checkbox
             checked={largeApproved}
@@ -163,6 +178,9 @@ function DetailDrawer({ item, onClose }: { item: ReviewItem; onClose: () => void
           >
             認可為大型活動(評鑑行政分 ×3 加權)
           </Checkbox>
+          {item.isLarge && (
+            <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>社團已申請認定為大型活動。</div>
+          )}
         </div>
       )}
 
@@ -243,14 +261,71 @@ function DetailDrawer({ item, onClose }: { item: ReviewItem; onClose: () => void
           placeholder="例:經費明細第 3 項未附估價單"
         />
       </Modal>
-    </Drawer>
+    </Modal>
   )
 }
 
+type SortKey = 'club' | 'name' | 'type' | 'date' | 'status'
+
+function sortValue(item: ReviewItem, key: SortKey): string {
+  if (key === 'type') return typeKey(item)
+  if (key === 'status') return STATUS[item.status].label
+  return item[key]
+}
+
 export default function ReviewPage() {
-  const [selected, setSelected] = useState<ReviewItem | null>(null)
+  const [current, setCurrent] = useState<ReviewItem | null>(null)
+  const [open, setOpen] = useState(false)
+  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 } | null>(null)
+  const [clubFilter, setClubFilter] = useState<string[]>([])
+  const [typeFilter, setTypeFilter] = useState<string[]>([])
+  const [statusFilter, setStatusFilter] = useState<string[]>([])
+
   const pendingCount = REVIEW_ITEMS.filter((i) => i.status === 'pending_advisor').length
   const rejectedCount = REVIEW_ITEMS.filter((i) => i.status === 'rejected').length
+
+  const clubOptions = [...new Set(REVIEW_ITEMS.map((i) => i.club))]
+  const statusOptions = [...new Set(REVIEW_ITEMS.map((i) => STATUS[i.status].label))]
+
+  const rows = useMemo(() => {
+    let list = REVIEW_ITEMS
+    if (clubFilter.length) list = list.filter((i) => clubFilter.includes(i.club))
+    if (typeFilter.length) list = list.filter((i) => typeFilter.includes(typeKey(i)))
+    if (statusFilter.length) list = list.filter((i) => statusFilter.includes(STATUS[i.status].label))
+    if (sort) {
+      list = [...list].sort(
+        (a, b) => sort.dir * String(sortValue(a, sort.key)).localeCompare(String(sortValue(b, sort.key)), 'zh-Hant'),
+      )
+    }
+    return list
+  }, [clubFilter, typeFilter, statusFilter, sort])
+
+  const toggleSort = (key: SortKey) =>
+    setSort((s) => (s?.key === key ? (s.dir === 1 ? { key, dir: -1 } : null) : { key, dir: 1 }))
+
+  const sortHeader = (label: string, key: SortKey) => (
+    <button type="button" className="link-btn" style={{ padding: 0, fontWeight: 500 }} onClick={() => toggleSort(key)}>
+      {label} <SwapOutlined rotate={90} style={{ fontSize: 11, color: sort?.key === key ? 'var(--seal)' : undefined }} />
+    </button>
+  )
+
+  const filterDropdown = (options: string[], selected: string[], onChange: (next: string[]) => void, label: string) => (
+    <Dropdown
+      trigger={['click']}
+      menu={{
+        items: options.map((o) => ({ key: o, label: o })),
+        selectable: true,
+        multiple: true,
+        selectedKeys: selected,
+        onSelect: ({ selectedKeys }) => onChange(selectedKeys),
+        onDeselect: ({ selectedKeys }) => onChange(selectedKeys),
+      }}
+    >
+      <button type="button" className="link-btn" aria-label={label} style={{ padding: 0 }}>
+        <FilterOutlined style={{ fontSize: 11, color: selected.length ? 'var(--seal)' : 'var(--steel)' }} />
+      </button>
+    </Dropdown>
+  )
 
   return (
     <div>
@@ -265,43 +340,77 @@ export default function ReviewPage() {
       />
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-        <table className="tb dense" style={{ minWidth: 840 }}>
+        <table className="tb dense" style={{ minWidth: 800 }}>
           <thead>
             <tr>
-              <th>單號</th>
-              <th>社團</th>
-              <th>活動名稱</th>
-              <th>類型</th>
-              <th>活動日期</th>
+              <th>
+                <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                  {sortHeader('社團', 'club')}
+                  {filterDropdown(clubOptions, clubFilter, setClubFilter, '篩選社團')}
+                </span>
+              </th>
+              <th>{sortHeader('活動名稱', 'name')}</th>
+              <th>
+                <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                  {sortHeader('類型', 'type')}
+                  {filterDropdown(TYPE_OPTIONS, typeFilter, setTypeFilter, '篩選類型')}
+                </span>
+              </th>
+              <th>{sortHeader('活動日期', 'date')}</th>
               <th className="r">擬請補助</th>
-              <th>狀態</th>
+              <th>
+                <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                  {sortHeader('狀態', 'status')}
+                  {filterDropdown(statusOptions, statusFilter, setStatusFilter, '篩選狀態')}
+                </span>
+              </th>
               <th aria-label="開啟" style={{ width: 32 }} />
             </tr>
           </thead>
           <tbody>
-            {REVIEW_ITEMS.map((item) => (
+            {rows.map((item) => (
               <tr
                 key={item.id}
-                onClick={() => setSelected(item)}
-                style={{ cursor: 'pointer', ...(selected?.id === item.id ? { background: 'var(--seal-tint)' } : {}) }}
+                onClick={() => {
+                  setCurrent(item)
+                  setOpen(true)
+                }}
+                style={{ cursor: 'pointer', ...(current?.id === item.id && open ? { background: 'var(--seal-tint)' } : {}) }}
               >
-                <td className="num" style={{ color: 'var(--steel)' }}>{item.id}</td>
                 <td>{item.club}</td>
                 <td style={{ fontWeight: 500 }}>{item.name}</td>
-                <td>{item.type}</td>
+                <td>
+                  {item.type}
+                  <LargeBadge applied={item.isLarge} approved={item.largeApproved} />
+                </td>
                 <td className="num">{item.date}</td>
                 <td className="r num">{fmtMoney(item.requested)}</td>
                 <td><StatusPill status={item.status} /></td>
                 <td className="r"><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>
               </tr>
             ))}
+            {rows.length === 0 && (
+              <tr className="no-hover">
+                <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>無符合篩選條件的申請。</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
-      <div style={{ marginTop: 10, fontSize: 12, color: 'var(--steel)' }}>點擊列開啟審核。</div>
+      <div style={{ marginTop: 10, fontSize: 12, color: 'var(--steel)' }}>
+        點擊列開啟審核;點欄位標題排序,漏斗圖示篩選。
+      </div>
 
-      {/* key 依單據重掛,核定金額與退回原因不會殘留到下一張 */}
-      {selected && <DetailDrawer key={selected.id} item={selected} onClose={() => setSelected(null)} />}
+      {/* Modal 常駐待關閉動畫結束(afterClose)才卸載;key 依單據重掛,核定金額與退回原因不殘留 */}
+      {current && (
+        <DetailModal
+          key={current.id}
+          item={current}
+          open={open}
+          onClose={() => setOpen(false)}
+          afterClose={() => setCurrent(null)}
+        />
+      )}
     </div>
   )
 }

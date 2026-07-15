@@ -4,6 +4,7 @@ import { App, Button, Dropdown, Modal, Pagination, Select, Tooltip } from 'antd'
 import { DownloadOutlined, EllipsisOutlined, FileTextOutlined, FilterOutlined, LinkOutlined, SwapOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
+import LargeBadge from '../../components/ui/LargeBadge'
 import { useAuth } from '../../app/auth'
 import { STATUS } from '../../lib/status'
 import { semesterOf, semesterOptions } from '../../lib/semester'
@@ -355,24 +356,7 @@ export default function ActivityListPage() {
       <td style={{ fontWeight: 500 }}>{a.name}</td>
       <td>
         {a.type}
-        {a.isLarge && (
-          <Tooltip title={a.largeApproved ? '已認可為大型活動(行政分 ×3)' : '大型活動申請,待學務處認可'}>
-            <span
-              style={{
-                marginLeft: 6,
-                fontSize: 11,
-                fontWeight: 500,
-                color: a.largeApproved ? '#fff' : 'var(--seal)',
-                background: a.largeApproved ? 'var(--seal)' : 'transparent',
-                border: '1px solid var(--seal)',
-                borderRadius: 4,
-                padding: '0 4px',
-              }}
-            >
-              大
-            </span>
-          </Tooltip>
-        )}
+        <LargeBadge applied={a.isLarge} approved={a.largeApproved} />
       </td>
       <td className="num" style={{ fontSize: 13 }}>{dateRangeText(a)}</td>
       <td className="r num" style={{ fontSize: 13 }}>{money(a)}</td>

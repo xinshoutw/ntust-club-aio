@@ -123,6 +123,47 @@ body {
   box-shadow: 0 0 0 1px rgba(212, 136, 6, 0.45);
 }
 
+/* ---- 公告 markdown 內容 ---- */
+.md-body {
+  font-size: 13px;
+  line-height: 1.8;
+}
+.md-body p,
+.md-body ul,
+.md-body ol {
+  margin: 0 0 8px;
+}
+.md-body ul,
+.md-body ol {
+  padding-left: 20px;
+}
+.md-body h1,
+.md-body h2,
+.md-body h3,
+.md-body h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 12px 0 6px;
+}
+.md-body :last-child {
+  margin-bottom: 0;
+}
+.md-body img {
+  max-width: 100%;
+}
+.md-body pre {
+  background: var(--paper);
+  border-radius: 6px;
+  padding: 10px 12px;
+  overflow-x: auto;
+}
+.md-body blockquote {
+  margin: 0 0 8px;
+  padding-left: 10px;
+  border-left: 3px solid var(--line);
+  color: var(--steel);
+}
+
 /* ---- 表單 ---- */
 .form-grid-2 {
   display: grid;

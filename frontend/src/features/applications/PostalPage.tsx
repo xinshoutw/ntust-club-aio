@@ -116,7 +116,7 @@ export default function PostalPage() {
             <tr>
               <td style={{ fontWeight: 500 }}>更換郵局存簿代理人</td>
               <td style={{ color: 'var(--steel)', fontSize: 13 }}>
-                戶名:資工系學會 · 帳號:<span className="num">070***‑**312</span>
+                戶名:資工系學會 · 帳號:<span className="num">0031307‑0524312</span>
               </td>
               <td className="num" style={{ fontSize: 13, width: 110 }}>2026/06/12</td>
               <td style={{ width: 100 }}><StatusPill status="pending" /></td>
@@ -124,7 +124,6 @@ export default function PostalPage() {
           </tbody>
         </table>
       </div>
-      <div style={{ marginTop: 10, fontSize: 12, color: 'var(--steel)' }}>局號帳號預設遮罩,承辦於審核頁可見完整值。</div>
     </div>
   )
 }

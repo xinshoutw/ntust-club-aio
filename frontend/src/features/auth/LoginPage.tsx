@@ -66,14 +66,10 @@ export default function LoginPage() {
           <Button type="primary" htmlType="submit" style={{ height: 42, marginTop: 4, fontSize: 15 }}>
             登入
           </Button>
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <button type="button" className="link-btn" style={{ color: 'var(--focus)' }}>
-              忘記密碼?
-            </button>
-          </div>
         </form>
       </div>
       <div style={{ marginTop: 28, fontSize: 12, color: 'var(--steel)' }}>
+        {/*TODO: 改成像之前一樣 clubs.ntust.edu.tw*/}
         © 國立臺灣科技大學 課外活動指導組 · 114 學年
       </div>
     </div>

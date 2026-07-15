@@ -6,7 +6,6 @@ import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
 import { CLUB_ACTIVITIES } from '../activities/mock'
-import { dateRangeText } from '../activities/utils'
 import { PERIODS, VENUE_BOOKINGS, VENUES } from './mock'
 import PeriodPicker from './PeriodPicker'
 
@@ -40,9 +39,6 @@ export default function VenueBookingPage() {
   return (
     <div>
       <PageHeader title="臨時場地借用" />
-      <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        單日活動之臨時場地借用。
-      </div>
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
         <Form
@@ -58,29 +54,35 @@ export default function VenueBookingPage() {
                 placeholder="請選擇"
                 options={VENUES.filter((v) => v.allowTemp).map((v) => ({
                   value: v.name,
-                  label: `${v.name}(${v.category} · ${v.capacity} 人)`,
+                  label: `${v.name} (${v.capacity} 人)`,
                 }))}
               />
             </Form.Item>
-            <Form.Item name="purpose" label="用途" rules={[{ required: true, message: '請輸入用途' }]} style={{ marginBottom: 0 }}>
-              <Input placeholder="例:迎新擺攤" />
-            </Form.Item>
+
             <Form.Item
               name="activity"
-              label="借用活動(限審核通過)"
+              label="關聯活動"
               rules={[{ required: true, message: '請選擇活動' }]}
               style={{ marginBottom: 0 }}
             >
               <Select
                 placeholder="請選擇活動"
-                options={approved.map((a) => ({ value: a.id, label: `${a.name}(${dateRangeText(a)})` }))}
+                options={approved.map((a) => ({ value: a.id, label: `${a.name}` }))}
                 notFoundContent="無審核通過之活動"
               />
+            </Form.Item>
+
+            <Form.Item
+                name="purpose"
+                label="用途"
+                rules={[{ required: true, message: '請輸入用途' }]}
+                style={{ marginBottom: 0, gridColumn: '1 / -1'  }}
+            >
+              <Input placeholder="簡述說明" />
             </Form.Item>
           </div>
           <div style={{ fontSize: 13, fontWeight: 500, margin: '18px 0 8px' }}>
             時段 <span style={{ color: '#C13B34' }}>*</span>
-            <span style={{ fontWeight: 400, color: 'var(--steel)', marginLeft: 8, fontSize: 12 }}>可按住拖曳批量選取</span>
           </div>
           <div style={{ background: 'var(--paper)', borderRadius: 8, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <Form.Item name="date" rules={[{ required: true, message: '請選擇日期' }]} style={{ marginBottom: 0, flexShrink: 0 }}>
@@ -97,7 +99,7 @@ export default function VenueBookingPage() {
       </div>
 
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>我的申請(近 5 筆)</div>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
         <table className="tb" style={{ minWidth: 560 }}>
           <tbody>
             {mine.map((v) => (

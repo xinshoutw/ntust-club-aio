@@ -4,7 +4,6 @@ import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
 import { CLUB_ACTIVITIES } from '../activities/mock'
-import { dateRangeText } from '../activities/utils'
 import type { Activity } from '../activities/types'
 import { EQUIPMENT, EQUIPMENT_LOANS } from './mock'
 
@@ -52,9 +51,6 @@ export default function EquipmentPage() {
   return (
     <div>
       <PageHeader title="器材借用" />
-      <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        結束日之隔天上班日 <span className="num">10:30</span> 前歸還。
-      </div>
 
       <div className="overview-grid" style={{ marginTop: 20 }}>
         <div className="card" style={{ overflowX: 'auto' }}>
@@ -118,27 +114,33 @@ export default function EquipmentPage() {
             </Form.Item>
             <Form.Item
               name="activity"
-              label="借用活動(限審核通過)"
+              label="關聯活動"
               rules={[{ required: true, message: '請選擇活動' }]}
               extra={
                 window ? (
                   <span className="num">
-                    借用區間 {window.start} – {window.end}(活動前 {WORKDAY_BUFFER.before} 個工作天起,至結束後 {WORKDAY_BUFFER.after} 個工作天)
+                    可借用區間 {window.start} – {window.end}
                   </span>
                 ) : (
-                  '借用區間依活動起訖自動推算'
+                  '借用區間自動推算'
                 )
               }
             >
               <Select
                 placeholder="請選擇活動"
-                options={approved.map((a) => ({ value: a.id, label: `${a.name}(${dateRangeText(a)})` }))}
+                options={approved.map((a) => ({ value: a.id, label: `${a.name}` }))}
                 notFoundContent="無審核通過之活動"
               />
             </Form.Item>
-            <Form.Item name="purpose" label="用途">
-              <Input placeholder="例:迎新擺攤" />
+
+            <Form.Item
+                name="purpose"
+                label="用途"
+                rules={[{ required: true, message: '請輸入用途' }]}
+            >
+              <Input placeholder="簡述說明" />
             </Form.Item>
+
             <Button type="primary" htmlType="submit" block>
               送出申請
             </Button>
@@ -147,7 +149,7 @@ export default function EquipmentPage() {
       </div>
 
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>我的借用與歸還(近 5 筆)</div>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近借用</div>
         <table className="tb" style={{ minWidth: 760 }}>
           <tbody>
             {mine.map((l) => (

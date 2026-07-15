@@ -1,22 +1,24 @@
 import { App } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
-import { ROOM_REQUESTS } from '../bookings/mock'
+import { DOW_TEXT, ROOM_REQUESTS } from '../bookings/mock'
 
 export default function AdminRoomsPage() {
   const { message } = App.useApp()
   const pending = ROOM_REQUESTS.filter((r) => r.status === 'pending')
 
-  // 標出互相衝突的時段(同教室同日期同節次)
+  // 標出互相衝突的時段(同教室每週同星期同節次);衝突時擇一社團核准,不做部分同意
   const conflictKeys = new Set<string>()
   const seen = new Map<string, string>()
   for (const r of pending) {
     for (const e of r.entries) {
-      const key = `${r.room}|${e.date}|${e.period}`
-      if (seen.has(key)) {
-        conflictKeys.add(key)
-      } else {
-        seen.set(key, r.id)
+      for (const p of e.periods) {
+        const key = `${r.room}|${e.dow}|${p}`
+        if (seen.has(key) && seen.get(key) !== r.id) {
+          conflictKeys.add(key)
+        } else {
+          seen.set(key, r.id)
+        }
       }
     }
   }
@@ -55,16 +57,17 @@ export default function AdminRoomsPage() {
                 <td>{r.club}</td>
                 <td style={{ fontWeight: 500 }}>{r.room}</td>
                 <td style={{ fontSize: 13 }}>
-                  {r.entries.map((e, i) => {
-                    const conflict = conflictKeys.has(`${r.room}|${e.date}|${e.period}`)
-                    return (
-                      <span key={`${e.date}-${e.period}`} className="num" style={{ color: conflict ? '#C13B34' : undefined, fontWeight: conflict ? 500 : undefined }}>
-                        {i > 0 && '、'}
-                        {e.date} 第{e.period}節
-                        {conflict && <span style={{ fontSize: 12 }}>(衝突)</span>}
-                      </span>
-                    )
-                  })}
+                  {r.entries.flatMap((e) =>
+                    e.periods.map((p) => {
+                      const conflict = conflictKeys.has(`${r.room}|${e.dow}|${p}`)
+                      return (
+                        <span key={`${e.dow}-${p}`} className="num" style={{ color: conflict ? '#C13B34' : undefined, fontWeight: conflict ? 500 : undefined, marginRight: 8, display: 'inline-block' }}>
+                          週{DOW_TEXT[e.dow]} 第{p}節
+                          {conflict && <span style={{ fontSize: 12 }}>(衝突)</span>}
+                        </span>
+                      )
+                    }),
+                  )}
                 </td>
                 <td style={{ fontSize: 13, color: 'var(--steel)' }}>{r.note}</td>
                 <td><StatusPill status={r.status} /></td>

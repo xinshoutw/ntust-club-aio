@@ -1,7 +1,19 @@
+import dayjs from 'dayjs'
 import type { StatusKey } from '../../lib/status'
 
 // 節次:第 1–10 節與 A–D 節(晚間)
 export const PERIODS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'A', 'B', 'C', 'D']
+
+// 固定借用開放窗(system_settings:管理員可調):預設每年 6 月、1 月受理
+export const FIXED_BOOKING_WINDOW = {
+  openMonths: [6, 1],
+  // demo:管理員手動加開,讓 7 月也能檢視表單;正式由後台切換
+  adminOpenNow: true,
+}
+export const isFixedBookingOpenByMonth = (now = dayjs()): boolean =>
+  FIXED_BOOKING_WINDOW.openMonths.includes(now.month() + 1)
+export const isFixedBookingOpen = (now = dayjs()): boolean =>
+  FIXED_BOOKING_WINDOW.adminOpenNow || isFixedBookingOpenByMonth(now)
 
 export interface Venue {
   name: string
@@ -55,24 +67,27 @@ export const EQUIPMENT: Equipment[] = [
   { name: '推車', category: '一般', total: 4, available: 3, needsSerial: false },
 ]
 
+// 固定借用=整學期每週固定時段,以星期表示(1=週一 … 7=週日)
+export const DOW_TEXT = ['', '一', '二', '三', '四', '五', '六', '日']
+
 export interface RoomRequest {
   id: string
   club: string
   room: string
-  entries: { date: string; period: string }[]
+  entries: { dow: number; periods: string[] }[] // dow: 1=週一 … 7=週日
   note: string
   status: StatusKey
 }
+
+export const roomEntryText = (e: RoomRequest['entries'][number]): string =>
+  `週${DOW_TEXT[e.dow]} 第${e.periods.join('、')}節`
 
 export const ROOM_REQUESTS: RoomRequest[] = [
   {
     id: 'ROOM-114-0301',
     club: '資工系學會',
     room: 'S304 音樂教室',
-    entries: [
-      { date: '2026/09/15', period: '3' },
-      { date: '2026/09/22', period: '3' },
-    ],
+    entries: [{ dow: 2, periods: ['3', '4'] }],
     note: '社課練習',
     status: 'pending',
   },
@@ -80,7 +95,7 @@ export const ROOM_REQUESTS: RoomRequest[] = [
     id: 'ROOM-114-0302',
     club: '電機系學會',
     room: 'S304 音樂教室',
-    entries: [{ date: '2026/09/15', period: '3' }],
+    entries: [{ dow: 2, periods: ['3'] }],
     note: '電機週排練',
     status: 'pending',
   },

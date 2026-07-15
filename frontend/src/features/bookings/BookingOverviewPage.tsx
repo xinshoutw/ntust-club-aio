@@ -6,7 +6,7 @@ import { ArrowLeftOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
-import { EQUIPMENT_LOANS, PERIODS, ROOM_REQUESTS, VENUE_BOOKINGS, VENUES } from './mock'
+import { EQUIPMENT_LOANS, PERIODS, ROOM_REQUESTS, VENUE_BOOKINGS, VENUES, roomEntryText } from './mock'
 
 const RETURNED_PAGE = 10
 const VENUE_DAYS = 14 // 單一場地檢視一頁 14 天
@@ -278,7 +278,7 @@ export default function BookingOverviewPage() {
                 <td style={{ color: 'var(--steel)', fontSize: 13 }}>固定場地</td>
                 <td style={{ fontWeight: 500 }}>{r.room}</td>
                 <td style={{ color: 'var(--steel)', fontSize: 13 }}>
-                  {r.entries.map((e) => `${e.date} 第${e.period}節`).join('、')}
+                  每週 {r.entries.map(roomEntryText).join('、')}
                 </td>
                 <td><StatusPill status={r.status} /></td>
               </tr>

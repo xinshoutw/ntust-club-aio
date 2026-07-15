@@ -67,6 +67,15 @@
   font-weight: 500;
 }
 
+.sidebar-item.disabled {
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.sidebar-item.disabled:hover {
+  background: none;
+}
+
 .sidebar-item.active {
   background: var(--seal-tint);
   color: var(--seal);

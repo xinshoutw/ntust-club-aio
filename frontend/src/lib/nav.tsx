@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { REVIEW_ITEMS } from '../features/admin/reviewMock'
+import { isFixedBookingOpen } from '../features/bookings/mock'
 import {
   ApartmentOutlined,
   AppstoreOutlined,
@@ -34,11 +35,22 @@ export interface NavItem {
   path: string
   icon: ReactNode
   badge?: number
+  disabled?: boolean
+  disabledHint?: string
 }
 
 export interface NavGroup {
   label?: string
   items: NavItem[]
+}
+
+// 固定場地借用僅於管理員開放期間可用;未開放時反灰並移至「其他」
+const fixedBookingOpen = isFixedBookingOpen()
+const FIXED_BOOKING_ITEM: NavItem = {
+  key: 'booking-fixed',
+  label: '固定場地借用',
+  path: '/bookings/fixed',
+  icon: <ScheduleOutlined />,
 }
 
 // 社團端資訊架構(2026-07-13 需求方重整版,非設計稿的舊版)
@@ -65,7 +77,7 @@ export const CLUB_NAV: NavGroup[] = [
     label: '空間與器材借用',
     items: [
       { key: 'booking-overview', label: '借用總覽', path: '/bookings', icon: <CalendarOutlined /> },
-      { key: 'booking-fixed', label: '固定場地借用', path: '/bookings/fixed', icon: <ScheduleOutlined /> },
+      ...(fixedBookingOpen ? [FIXED_BOOKING_ITEM] : []),
       { key: 'booking-venue', label: '臨時場地借用', path: '/bookings/venue', icon: <EnvironmentOutlined /> },
       { key: 'booking-equipment', label: '器材借用', path: '/bookings/equipment', icon: <AppstoreOutlined /> },
     ],
@@ -90,6 +102,9 @@ export const CLUB_NAV: NavGroup[] = [
     label: '其他',
     items: [
       { key: 'violations', label: '違規勸導紀錄', path: '/violations', icon: <WarningOutlined /> },
+      ...(fixedBookingOpen
+        ? []
+        : [{ ...FIXED_BOOKING_ITEM, disabled: true, disabledHint: '未開放申請;固定借用預設於每年 6 月、1 月受理' }]),
     ],
   },
 ]

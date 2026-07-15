@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router'
+import { Tooltip } from 'antd'
 import type { NavGroup } from '../../lib/nav'
 import './sidebar.css'
 
@@ -18,21 +19,31 @@ export default function Sidebar({ groups, onNavigate }: SidebarProps) {
       {groups.map((group, gi) => (
         <div className="sidebar-group" key={group.label ?? gi}>
           {group.label && <div className="sidebar-group-label">{group.label}</div>}
-          {group.items.map((item) => (
-            <NavLink
-              key={item.key}
-              to={item.path}
-              end
-              className={({ isActive }) => `sidebar-item${isActive ? ' active' : ''}`}
-              onClick={onNavigate}
-            >
-              <span className="sidebar-item-icon">{item.icon}</span>
-              <span className="sidebar-item-label">{item.label}</span>
-              {item.badge != null && item.badge > 0 && (
-                <span className="sidebar-item-badge num">{item.badge}</span>
-              )}
-            </NavLink>
-          ))}
+          {group.items.map((item) =>
+            item.disabled ? (
+              // 未開放的功能反灰、不可點(如固定場地借用於開放期外)
+              <Tooltip key={item.key} title={item.disabledHint} placement="right">
+                <span className="sidebar-item disabled" aria-disabled="true">
+                  <span className="sidebar-item-icon">{item.icon}</span>
+                  <span className="sidebar-item-label">{item.label}</span>
+                </span>
+              </Tooltip>
+            ) : (
+              <NavLink
+                key={item.key}
+                to={item.path}
+                end
+                className={({ isActive }) => `sidebar-item${isActive ? ' active' : ''}`}
+                onClick={onNavigate}
+              >
+                <span className="sidebar-item-icon">{item.icon}</span>
+                <span className="sidebar-item-label">{item.label}</span>
+                {item.badge != null && item.badge > 0 && (
+                  <span className="sidebar-item-badge num">{item.badge}</span>
+                )}
+              </NavLink>
+            ),
+          )}
         </div>
       ))}
     </nav>

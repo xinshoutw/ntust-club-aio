@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { App, Form, Input, Modal } from 'antd'
+import { App, Form, Input, Modal, Tooltip } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
-import { VIOLATIONS, type Violation } from '../violations/mock'
+import { VIOLATIONS, resolveDeadline, resolveExpired, type Violation } from '../violations/mock'
 
 export default function AdminViolationsPage() {
   const { message } = App.useApp()
@@ -30,32 +30,44 @@ export default function AdminViolationsPage() {
               <th>地點</th>
               <th>項目</th>
               <th>填寫</th>
+              <th>銷案期限</th>
               <th>狀態</th>
               <th className="r">動作</th>
             </tr>
           </thead>
           <tbody>
-            {VIOLATIONS.map((v) => (
-              <tr key={v.id}>
-                <td className="num" style={{ color: 'var(--steel)' }}>{v.id}</td>
-                <td>{v.club}</td>
-                <td className="num" style={{ fontSize: 13 }}>{v.date}</td>
-                <td>{v.location}</td>
-                <td style={{ fontSize: 13 }}>
-                  <div>{v.items.join('、')}</div>
-                  {v.note && <div style={{ fontSize: 12, color: 'var(--steel)' }}>{v.note}</div>}
-                </td>
-                <td style={{ fontSize: 13, color: 'var(--steel)' }}>{v.filler}</td>
-                <td><StatusPill status={v.status} /></td>
-                <td className="r">
-                  {v.status === 'violation_open' && (
-                    <button type="button" className="link-btn primary" onClick={() => setResolving(v)}>
-                      銷案…
-                    </button>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {VIOLATIONS.map((v) => {
+              const expired = resolveExpired(v)
+              return (
+                <tr key={v.id}>
+                  <td className="num" style={{ color: 'var(--steel)' }}>{v.id}</td>
+                  <td>{v.club}</td>
+                  <td className="num" style={{ fontSize: 13 }}>{v.date}</td>
+                  <td>{v.location}</td>
+                  <td style={{ fontSize: 13 }}>
+                    <div>{v.items.join('、')}</div>
+                    {v.note && <div style={{ fontSize: 12, color: 'var(--steel)' }}>{v.note}</div>}
+                  </td>
+                  <td style={{ fontSize: 13, color: 'var(--steel)' }}>{v.filler}</td>
+                  <td className="num" style={{ fontSize: 13, color: expired ? '#B03A2E' : undefined }}>
+                    {v.status === 'violation_resolved' ? '—' : expired ? `${resolveDeadline(v)} 已截止` : resolveDeadline(v)}
+                  </td>
+                  <td><StatusPill status={v.status} /></td>
+                  <td className="r">
+                    {v.status === 'violation_open' &&
+                      (expired ? (
+                        <Tooltip title="已逾 1 個月銷案期限,不再受理銷案">
+                          <span style={{ fontSize: 13, color: 'var(--muted)' }}>已截止</span>
+                        </Tooltip>
+                      ) : (
+                        <button type="button" className="link-btn primary" onClick={() => setResolving(v)}>
+                          銷案…
+                        </button>
+                      ))}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>

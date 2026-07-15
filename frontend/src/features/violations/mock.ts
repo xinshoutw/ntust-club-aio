@@ -1,3 +1,4 @@
+import dayjs from 'dayjs'
 import type { StatusKey } from '../../lib/status'
 
 export const VIOL_ITEMS = [
@@ -20,6 +21,13 @@ export interface Violation {
   status: StatusKey
   note?: string
 }
+
+// 銷案期限:開立日 +1 個月;逾期即截止,不再受理銷案(推導不儲存)
+export const resolveDeadline = (v: Violation): string =>
+  dayjs(v.date, 'YYYY/MM/DD').add(1, 'month').format('YYYY/MM/DD')
+
+export const resolveExpired = (v: Violation, now = dayjs()): boolean =>
+  v.status === 'violation_open' && now.isAfter(dayjs(resolveDeadline(v), 'YYYY/MM/DD'), 'day')
 
 export const VIOLATIONS: Violation[] = [
   {

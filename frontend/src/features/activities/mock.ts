@@ -123,6 +123,7 @@ export const CLUB_ACTIVITIES: Activity[] = [
     club: '資工系學會',
     type: '活動',
     date: '2026/06/28',
+    endDate: '2026/06/29', // 跨日活動示範
     timeRange: '08:00–18:00',
     location: '新店青少年活動中心',
     participantsIn: 100,
@@ -132,7 +133,7 @@ export const CLUB_ACTIVITIES: Activity[] = [
       { id: 1, category: '交通費', description: '遊覽車', selfFund: 18000, requestedSubsidy: 25000 },
     ],
     attachments: [mockPdf('迎新宿營_企劃書', '2026/05/30')],
-    closeDeadline: '2026/07/28',
+    closeDeadline: '2026/07/29',
     closeDaysLeft: 15,
   },
   {

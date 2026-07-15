@@ -46,8 +46,9 @@ export interface Activity {
   type: '社課' | '活動' | '會議'
   isLarge?: boolean // 社團申請大型活動
   largeApproved?: boolean // 管理員認可後行政分才享大型 ×3 加權
-  date: string
-  timeRange?: string
+  date: string // 開始日期
+  endDate?: string // 結束日期;未跨日可省略(視同 date)
+  timeRange?: string // '開始時間–結束時間'(跨日時分屬 date/endDate 兩天)
   location?: string
   participantsIn?: number
   participantsOut?: number

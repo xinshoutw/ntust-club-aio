@@ -13,7 +13,7 @@ import type { EvalFile } from '../eval/types'
 import FilePreview from '../eval/FilePreview'
 import { CLUB_ACTIVITIES } from './mock'
 import { budgetTotals, fmtMoney, type Activity } from './types'
-import { TIME_RANGE_SEP, canClose } from './utils'
+import { TIME_RANGE_SEP, canClose, dateRangeText } from './utils'
 
 const PAGE_SIZE = 20
 type SortKey = 'name' | 'type' | 'date' | 'budget' | 'status'
@@ -135,7 +135,7 @@ function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPrevi
             <div style={{ color: 'var(--steel)' }}>類型</div><div>{a.type}</div>
             <div style={{ color: 'var(--steel)' }}>日期</div>
             <div>
-              <span className="num">{a.date}</span>{' '}
+              <span className="num">{dateRangeText(a)}</span>{' '}
               {timeChanged && rep ? (
                 <ActualValue actual={actualTime} planned={a.timeRange ?? '未填'} />
               ) : (
@@ -361,7 +361,7 @@ export default function ActivityListPage() {
           </Tooltip>
         )}
       </td>
-      <td className="num" style={{ fontSize: 13 }}>{a.date}</td>
+      <td className="num" style={{ fontSize: 13 }}>{dateRangeText(a)}</td>
       <td className="r num" style={{ fontSize: 13 }}>{money(a)}</td>
       <td><StatusPill status={a.status} /></td>
       <td className="r" style={{ whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>{actions}</td>

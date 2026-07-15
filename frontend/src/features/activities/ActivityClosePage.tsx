@@ -10,7 +10,7 @@ import { allPhotoHashes, resultOf } from '../eval/store'
 import type { EvalFile } from '../eval/types'
 import { CLUB_ACTIVITIES } from './mock'
 import type { Activity, Reflection } from './types'
-import { TIME_RANGE_SEP, canClose } from './utils'
+import { TIME_RANGE_SEP, canClose, dateRangeText } from './utils'
 import './actform.css'
 
 interface ReflectRow extends Reflection {
@@ -67,7 +67,7 @@ export default function ActivityClosePage() {
             placeholder="選擇已核准之活動"
             value={activity?.id}
             onChange={(id) => setParams({ id }, { replace: true })}
-            options={closable.map((a) => ({ value: a.id, label: `${a.name}(${a.date})` }))}
+            options={closable.map((a) => ({ value: a.id, label: `${a.name}(${dateRangeText(a)})` }))}
           />
         }
       />
@@ -103,7 +103,7 @@ export default function ActivityClosePage() {
                   )}
                 </div>
                 <div className="num" style={{ fontSize: 12, color: 'var(--steel)', marginTop: 3 }}>
-                  {a.date}
+                  {dateRangeText(a)}
                   {a.timeRange ? ` ${a.timeRange}` : ''}
                   {a.location ? ` · ${a.location}` : ''}
                 </div>
@@ -347,7 +347,7 @@ function CloseForm({
     <>
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 12, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
         <span style={{ fontWeight: 500, color: 'var(--ink)' }}>{activity.name}</span>
-        <span className="num">{activity.date}</span>
+        <span className="num">{dateRangeText(activity)}</span>
         {activity.closeDeadline && (
           <span>
             結案期限 <span className="num">{activity.closeDeadline}</span>

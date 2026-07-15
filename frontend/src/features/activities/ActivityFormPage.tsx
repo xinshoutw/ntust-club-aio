@@ -12,11 +12,11 @@ import { TIME_RANGE_SEP } from './utils'
 import { BUDGET_CATEGORIES, BUDGET_HINTS, fmtMoney, type Activity } from './types'
 import './actform.css'
 
-// '18:00–21:00'(容忍 -/—)→ TimePicker.RangePicker 值
-function parseTimeRange(tr?: string): [dayjs.Dayjs, dayjs.Dayjs] | undefined {
-  if (!tr) return undefined
+// '18:00–21:00'(容忍 -/—)→ [開始, 結束] TimePicker 值
+function parseTimeRange(tr?: string): [dayjs.Dayjs | undefined, dayjs.Dayjs | undefined] {
+  if (!tr) return [undefined, undefined]
   const [a, b] = tr.split(TIME_RANGE_SEP).map((t) => dayjs(t.trim(), 'HH:mm'))
-  return a?.isValid() && b?.isValid() ? [a, b] : undefined
+  return [a?.isValid() ? a : undefined, b?.isValid() ? b : undefined]
 }
 
 interface BudgetRow {
@@ -127,7 +127,8 @@ export default function ActivityFormPage() {
       club: user?.club ?? '',
       type: (v.type as Activity['type']) ?? '社課',
       date: v.date ? v.date.format('YYYY/MM/DD') : '—',
-      timeRange: v.timeRange ? `${v.timeRange[0].format('HH:mm')}–${v.timeRange[1].format('HH:mm')}` : undefined,
+      endDate: v.endDate ? v.endDate.format('YYYY/MM/DD') : undefined,
+      timeRange: v.startTime && v.endTime ? `${v.startTime.format('HH:mm')}–${v.endTime.format('HH:mm')}` : undefined,
       location: v.location,
       participantsIn: v.participantsIn ?? undefined,
       participantsOut: v.participantsOut ?? undefined,
@@ -171,6 +172,14 @@ export default function ActivityFormPage() {
   }
 
   const onFinish = () => {
+    // 起訖為必填,通過 Form 驗證後必有值;僅需檢查先後順序
+    const v = form.getFieldsValue()
+    const start = dayjs(`${v.date.format('YYYY/MM/DD')} ${v.startTime.format('HH:mm')}`, 'YYYY/MM/DD HH:mm')
+    const end = dayjs(`${v.endDate.format('YYYY/MM/DD')} ${v.endTime.format('HH:mm')}`, 'YYYY/MM/DD HH:mm')
+    if (!end.isAfter(start)) {
+      message.error('活動結束時間須晚於開始時間。')
+      return
+    }
     if (!works.some((w) => w.task.trim() !== '' && w.owner.trim() !== '')) {
       message.error('請填寫至少一筆工作分配。')
       return
@@ -194,6 +203,12 @@ export default function ActivityFormPage() {
         layout="vertical"
         onFinish={onFinish}
         requiredMark
+        onValuesChange={(changed) => {
+          // 單日活動居多:選開始日期時,結束日期未填就自動帶同一天
+          if ('date' in changed && changed.date && !form.getFieldValue('endDate')) {
+            form.setFieldValue('endDate', changed.date)
+          }
+        }}
         initialValues={
           editing
             ? {
@@ -202,7 +217,12 @@ export default function ActivityFormPage() {
                 isLarge: editing.isLarge,
                 location: editing.location,
                 date: editing.date !== '—' ? dayjs(editing.date, 'YYYY/MM/DD') : undefined,
-                timeRange: parseTimeRange(editing.timeRange),
+                endDate: (() => {
+                  const d = editing.endDate ?? (editing.date !== '—' ? editing.date : undefined)
+                  return d ? dayjs(d, 'YYYY/MM/DD') : undefined
+                })(),
+                startTime: parseTimeRange(editing.timeRange)[0],
+                endTime: parseTimeRange(editing.timeRange)[1],
                 participantsIn: editing.participantsIn,
                 participantsOut: editing.participantsOut,
                 content: editing.content,
@@ -250,19 +270,41 @@ export default function ActivityFormPage() {
               <div className="form-grid-2">
                 <Form.Item
                   name="date"
-                  label="活動日期"
-                  rules={[{ required: true, message: '請選擇活動日期' }]}
+                  label="開始日期"
+                  rules={[{ required: true, message: '請選擇開始日期' }]}
                   style={{ marginBottom: 0 }}
                 >
                   <DatePicker style={{ width: '100%' }} format="YYYY/MM/DD" />
                 </Form.Item>
                 <Form.Item
-                  name="timeRange"
-                  label="活動時間"
-                  rules={[{ required: true, message: '請選擇活動時間' }]}
+                  name="startTime"
+                  label="開始時間"
+                  rules={[{ required: true, message: '請選擇開始時間' }]}
                   style={{ marginBottom: 0 }}
                 >
-                  <TimePicker.RangePicker
+                  <TimePicker
+                    style={{ width: '100%' }}
+                    format={{ format: 'HH:mm', type: 'mask' }}
+                    needConfirm={false}
+                  />
+                </Form.Item>
+              </div>
+              <div className="form-grid-2">
+                <Form.Item
+                  name="endDate"
+                  label="結束日期"
+                  rules={[{ required: true, message: '請選擇結束日期' }]}
+                  style={{ marginBottom: 0 }}
+                >
+                  <DatePicker style={{ width: '100%' }} format="YYYY/MM/DD" />
+                </Form.Item>
+                <Form.Item
+                  name="endTime"
+                  label="結束時間"
+                  rules={[{ required: true, message: '請選擇結束時間' }]}
+                  style={{ marginBottom: 0 }}
+                >
+                  <TimePicker
                     style={{ width: '100%' }}
                     format={{ format: 'HH:mm', type: 'mask' }}
                     needConfirm={false}

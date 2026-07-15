@@ -25,7 +25,17 @@ const LOCKED = [
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 
 // 結案審核彈窗:輔導老師單關,核准或退回(退回原因必填)
-function CloseReviewModal({ item, onClose }: { item: PendingClose; onClose: () => void }) {
+function CloseReviewModal({
+  item,
+  open,
+  onClose,
+  afterClose,
+}: {
+  item: PendingClose
+  open: boolean
+  onClose: () => void
+  afterClose: () => void
+}) {
   const { message } = App.useApp()
   const [rejectOpen, setRejectOpen] = useState(false)
   const [reason, setReason] = useState('')
@@ -47,12 +57,12 @@ function CloseReviewModal({ item, onClose }: { item: PendingClose; onClose: () =
 
   return (
     <Modal
-      open
+      open={open}
       onCancel={onClose}
+      afterClose={afterClose}
       width={560}
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 26 }}>
-          <span className="num" style={{ fontSize: 13, color: 'var(--steel)', fontWeight: 400 }}>{item.id}</span>
           <span style={{ fontSize: 16, fontWeight: 600 }}>{item.name}</span>
           <StatusPill status="closing_pending_advisor" />
         </div>
@@ -107,6 +117,7 @@ function CloseReviewModal({ item, onClose }: { item: PendingClose; onClose: () =
 export default function CloseReviewPage() {
   const { message } = App.useApp()
   const [selected, setSelected] = useState<PendingClose | null>(null)
+  const [open, setOpen] = useState(false)
 
   return (
     <div>
@@ -121,10 +132,9 @@ export default function CloseReviewPage() {
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>待審結案(輔導老師單關)</div>
-        <table className="tb dense" style={{ minWidth: 720 }}>
+        <table className="tb dense" style={{ minWidth: 680 }}>
           <thead>
             <tr>
-              <th>單號</th>
               <th>社團</th>
               <th>活動</th>
               <th>活動日期</th>
@@ -135,8 +145,14 @@ export default function CloseReviewPage() {
           </thead>
           <tbody>
             {PENDING.map((p) => (
-              <tr key={p.id} onClick={() => setSelected(p)} style={{ cursor: 'pointer' }}>
-                <td className="num" style={{ color: 'var(--steel)' }}>{p.id}</td>
+              <tr
+                key={p.id}
+                onClick={() => {
+                  setSelected(p)
+                  setOpen(true)
+                }}
+                style={{ cursor: 'pointer' }}
+              >
                 <td>{p.club}</td>
                 <td style={{ fontWeight: 500 }}>{p.name}</td>
                 <td className="num">{p.date}</td>
@@ -147,7 +163,7 @@ export default function CloseReviewPage() {
             ))}
             {PENDING.length === 0 && (
               <tr className="no-hover">
-                <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有待審結案。</td>
+                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有待審結案。</td>
               </tr>
             )}
           </tbody>
@@ -183,7 +199,16 @@ export default function CloseReviewPage() {
         </table>
       </div>
 
-      {selected && <CloseReviewModal key={selected.id} item={selected} onClose={() => setSelected(null)} />}
+      {/* Modal 常駐至關閉動畫結束(afterClose)才卸載 */}
+      {selected && (
+        <CloseReviewModal
+          key={selected.id}
+          item={selected}
+          open={open}
+          onClose={() => setOpen(false)}
+          afterClose={() => setSelected(null)}
+        />
+      )}
     </div>
   )
 }

@@ -12,11 +12,15 @@ const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 function RoomReviewModal({
   item,
   isConflict,
+  open,
   onClose,
+  afterClose,
 }: {
   item: RoomRequest
   isConflict: (dow: number, period: string) => boolean
+  open: boolean
   onClose: () => void
+  afterClose: () => void
 }) {
   const { message } = App.useApp()
   const [rejectOpen, setRejectOpen] = useState(false)
@@ -40,8 +44,9 @@ function RoomReviewModal({
 
   return (
     <Modal
-      open
+      open={open}
       onCancel={onClose}
+      afterClose={afterClose}
       width={520}
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 26 }}>
@@ -113,6 +118,7 @@ function RoomReviewModal({
 
 export default function AdminRoomsPage() {
   const [selected, setSelected] = useState<RoomRequest | null>(null)
+  const [open, setOpen] = useState(false)
   const pending = ROOM_REQUESTS.filter((r) => r.status === 'pending')
 
   // 標出互相衝突的時段(同教室每週同星期同節次);衝突時擇一社團核准,不做部分同意
@@ -161,7 +167,14 @@ export default function AdminRoomsPage() {
           </thead>
           <tbody>
             {pending.map((r) => (
-              <tr key={r.id} onClick={() => setSelected(r)} style={{ cursor: 'pointer' }}>
+              <tr
+                key={r.id}
+                onClick={() => {
+                  setSelected(r)
+                  setOpen(true)
+                }}
+                style={{ cursor: 'pointer' }}
+              >
                 <td className="num" style={{ color: 'var(--steel)' }}>{r.id}</td>
                 <td>{r.club}</td>
                 <td style={{ fontWeight: 500 }}>{r.room}</td>
@@ -192,7 +205,17 @@ export default function AdminRoomsPage() {
         </table>
       </div>
 
-      {selected && <RoomReviewModal key={selected.id} item={selected} isConflict={isConflict(selected.room)} onClose={() => setSelected(null)} />}
+      {/* Modal 常駐至關閉動畫結束(afterClose)才卸載 */}
+      {selected && (
+        <RoomReviewModal
+          key={selected.id}
+          item={selected}
+          isConflict={isConflict(selected.room)}
+          open={open}
+          onClose={() => setOpen(false)}
+          afterClose={() => setSelected(null)}
+        />
+      )}
     </div>
   )
 }

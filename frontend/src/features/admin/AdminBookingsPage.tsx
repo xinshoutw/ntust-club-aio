@@ -10,7 +10,17 @@ type Pending = { kind: 'venue'; data: VenueBooking } | { kind: 'loan'; data: Equ
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 
 // 臨時場地/器材借用審核彈窗:核准或退回(退回原因必填)
-function BookingReviewModal({ item, onClose }: { item: Pending; onClose: () => void }) {
+function BookingReviewModal({
+  item,
+  open,
+  onClose,
+  afterClose,
+}: {
+  item: Pending
+  open: boolean
+  onClose: () => void
+  afterClose: () => void
+}) {
   const { message } = App.useApp()
   const [rejectOpen, setRejectOpen] = useState(false)
   const [reason, setReason] = useState('')
@@ -34,8 +44,9 @@ function BookingReviewModal({ item, onClose }: { item: Pending; onClose: () => v
 
   return (
     <Modal
-      open
+      open={open}
       onCancel={onClose}
+      afterClose={afterClose}
       width={520}
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 26 }}>
@@ -101,8 +112,14 @@ function BookingReviewModal({ item, onClose }: { item: Pending; onClose: () => v
 
 export default function AdminBookingsPage() {
   const [selected, setSelected] = useState<Pending | null>(null)
+  const [open, setOpen] = useState(false)
   const pendingVenues = VENUE_BOOKINGS.filter((v) => v.status === 'pending')
   const pendingLoans = EQUIPMENT_LOANS.filter((l) => l.status === 'pending')
+
+  const openReview = (item: Pending) => {
+    setSelected(item)
+    setOpen(true)
+  }
 
   return (
     <div>
@@ -120,7 +137,7 @@ export default function AdminBookingsPage() {
         <table className="tb dense" style={{ minWidth: 720 }}>
           <tbody>
             {pendingVenues.map((v) => (
-              <tr key={v.id} onClick={() => setSelected({ kind: 'venue', data: v })} style={{ cursor: 'pointer' }}>
+              <tr key={v.id} onClick={() => openReview({ kind: 'venue', data: v })} style={{ cursor: 'pointer' }}>
                 <td className="num" style={{ color: 'var(--steel)', width: 140 }}>{v.id}</td>
                 <td>{v.club}</td>
                 <td style={{ fontWeight: 500 }}>{v.venue}</td>
@@ -144,7 +161,7 @@ export default function AdminBookingsPage() {
         <table className="tb dense" style={{ minWidth: 720 }}>
           <tbody>
             {pendingLoans.map((l) => (
-              <tr key={l.id} onClick={() => setSelected({ kind: 'loan', data: l })} style={{ cursor: 'pointer' }}>
+              <tr key={l.id} onClick={() => openReview({ kind: 'loan', data: l })} style={{ cursor: 'pointer' }}>
                 <td className="num" style={{ color: 'var(--steel)', width: 140 }}>{l.id}</td>
                 <td>{l.club}</td>
                 <td style={{ fontWeight: 500 }}>
@@ -165,7 +182,16 @@ export default function AdminBookingsPage() {
         </table>
       </div>
 
-      {selected && <BookingReviewModal key={selected.data.id} item={selected} onClose={() => setSelected(null)} />}
+      {/* Modal 常駐至關閉動畫結束(afterClose)才卸載 */}
+      {selected && (
+        <BookingReviewModal
+          key={selected.data.id}
+          item={selected}
+          open={open}
+          onClose={() => setOpen(false)}
+          afterClose={() => setSelected(null)}
+        />
+      )}
     </div>
   )
 }

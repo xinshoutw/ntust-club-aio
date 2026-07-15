@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { App, Button, Input, Switch } from 'antd'
+import { confirmDialog } from '../../lib/confirm'
 import PageHeader from '../../components/ui/PageHeader'
 import { CLUB_PROFILE } from '../club-settings/mock'
 import ClubSelect from './ClubSelect'
@@ -36,7 +37,7 @@ export default function AdminClubSettingsPage() {
       message.success(`已啟用 ${club} 帳號`)
       return
     }
-    modal.confirm({
+    confirmDialog(modal, {
       title: `停用 ${club} 帳號`,
       content: '停用後社團將無法登入,進行中的申請不受影響。',
       okText: '確認停用',

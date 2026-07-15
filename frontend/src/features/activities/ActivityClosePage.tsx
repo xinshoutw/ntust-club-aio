@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { App, Button, DatePicker, Input, InputNumber, Select, TimePicker, Upload } from 'antd'
+import { confirmDialog } from '../../lib/confirm'
 import dayjs, { type Dayjs } from 'dayjs'
 import { RightOutlined, UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
@@ -271,11 +272,10 @@ function CloseForm({
     }
     if (photos.length > 0) {
       // 與活動申請同慣例:草稿不保存附件
-      modal.confirm({
+      confirmDialog(modal, {
         title: '照片不會隨草稿保存',
         content: `已選擇的 ${photos.length} 張照片將被捨棄,送出結案時需重新上傳。確定要暫存草稿?`,
         okText: '捨棄照片並暫存',
-        maskClosable: true,
         cancelText: '取消',
         onOk: doSave,
       })

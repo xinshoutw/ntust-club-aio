@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { App, Button, Checkbox, Input, Modal, Tabs } from 'antd'
+import { confirmDialog } from '../../lib/confirm'
 import PageHeader from '../../components/ui/PageHeader'
 import OneTimePasswordModal from './OneTimePasswordModal'
 
@@ -90,7 +91,7 @@ export default function AccountsPage() {
   }
 
   const confirmDelete = (a: Account) =>
-    modal.confirm({
+    confirmDialog(modal, {
       title: `刪除帳號 ${a.name}`,
       content: '確認刪除後將無法復原',
       okText: '確認刪除',
@@ -101,7 +102,7 @@ export default function AccountsPage() {
 
   const toggleActive = (a: Account) => {
     if (a.active) {
-      modal.confirm({
+      confirmDialog(modal, {
         title: `停權 ${a.name}`,
         content: '停權後無法登入,可隨時恢復。',
         okText: '確認停權',

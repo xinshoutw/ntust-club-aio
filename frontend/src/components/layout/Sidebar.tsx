@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router'
 import { App, Tooltip } from 'antd'
+import { confirmDialog } from '../../lib/confirm'
 import { useHasUnsaved } from '../../app/unsaved'
 import type { NavGroup } from '../../lib/nav'
 import './sidebar.css'
@@ -26,7 +27,7 @@ export default function Sidebar({ groups, onNavigate }: SidebarProps) {
       return
     }
     e.preventDefault()
-    modal.confirm({
+    confirmDialog(modal, {
       title: '尚有未儲存的變更',
       content: '離開此頁將遺失尚未儲存的修改。',
       okText: '放棄變更並離開',

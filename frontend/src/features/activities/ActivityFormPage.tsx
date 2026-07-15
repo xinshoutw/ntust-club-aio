@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router'
 import { App, Button, Checkbox, DatePicker, Form, Input, InputNumber, Popover, Select, TimePicker, Upload } from 'antd'
+import { confirmDialog } from '../../lib/confirm'
 import type { UploadFile } from 'antd'
 import dayjs from 'dayjs'
 import { FileTextOutlined, InboxOutlined, InfoCircleOutlined } from '@ant-design/icons'
@@ -163,11 +164,10 @@ export default function ActivityFormPage() {
     }
     if (files.length > 0) {
       // 草稿不保存附件:避免未送出檔案殘留伺服器(孤兒檔案/個資殘留)
-      modal.confirm({
+      confirmDialog(modal, {
         title: '附件不會隨草稿保存',
         content: `已選擇的 ${files.length} 個附件將被捨棄,送出申請時需重新上傳。確定要暫存草稿?`,
         okText: '捨棄附件並暫存',
-        maskClosable: true,
         cancelText: '取消',
         onOk: doSave,
       })

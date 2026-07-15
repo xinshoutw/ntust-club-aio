@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { App, Badge, Drawer, Dropdown, Popover } from 'antd'
+import { confirmDialog } from '../../lib/confirm'
 import { BellOutlined, DownOutlined, HistoryOutlined, LogoutOutlined, MenuOutlined, SettingOutlined } from '@ant-design/icons'
 import { useAuth } from '../../app/auth'
 import { UnsavedProvider, useHasUnsaved } from '../../app/unsaved'
@@ -43,7 +44,7 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
       go()
       return
     }
-    modal.confirm({
+    confirmDialog(modal, {
       title: '尚有未儲存的變更',
       content: '離開此頁將遺失尚未儲存的修改。',
       okText: '放棄變更並離開',

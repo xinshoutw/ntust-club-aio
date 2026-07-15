@@ -343,9 +343,11 @@ export default function MembersPage() {
       <Modal
         open={exportOpen}
         title="匯出社員(CSV)"
+        destroyOnHidden
         onCancel={() => setExportOpen(false)}
         onOk={exportCsv}
         okText="匯出"
+        okButtonProps={{ autoFocus: true }}
       >
         <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 10 }}>
           匯出所選學期的成員名單(格式同匯入),可直接匯入至其他學期。

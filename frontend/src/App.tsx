@@ -11,6 +11,9 @@ import ActivityClosePage from './features/activities/ActivityClosePage'
 import SignupListPage from './features/signup/SignupListPage'
 import SignupFormPage from './features/signup/SignupFormPage'
 import ReviewPage from './features/admin/ReviewPage'
+import ClubOverviewPage from './features/admin/ClubOverviewPage'
+import AdminClubSettingsPage from './features/admin/AdminClubSettingsPage'
+import { AdminClubProvider } from './features/admin/clubContext'
 import SignupBuilderPage from './features/admin/SignupBuilderPage'
 import MembersPage from './features/members/MembersPage'
 import ClubSettingsPage from './features/club-settings/ClubSettingsPage'
@@ -34,7 +37,7 @@ import AdminRoomsPage from './features/admin/AdminRoomsPage'
 import AdminMembersPage from './features/admin/AdminMembersPage'
 import OverduePage from './features/admin/OverduePage'
 import AdminEvalPage from './features/admin/AdminEvalPage'
-import { AdminAccountsPage, ClubAccountsPage, ViewerAccountsPage } from './features/admin/AccountsPage'
+import { AdminAccountsPage, ViewerAccountsPage } from './features/admin/AccountsPage'
 import AdminFilesPage from './features/admin/AdminFilesPage'
 import AdminMaintenancePage from './features/admin/AdminMaintenancePage'
 import AdminSettingsPage from './features/admin/AdminSettingsPage'
@@ -89,7 +92,10 @@ export default function App() {
         path="/admin"
         element={
           <RequireRole roles={['admin']}>
-            <AppShell nav={ADMIN_NAV} badgeLabel="行政後台" />
+            {/* 行政端共用「選擇社團」狀態,跨頁同步 */}
+            <AdminClubProvider>
+              <AppShell nav={ADMIN_NAV} badgeLabel="行政後台" />
+            </AdminClubProvider>
           </RequireRole>
         }
       >
@@ -101,11 +107,12 @@ export default function App() {
         <Route path="announcements" element={<AnnouncementsPage />} />
         <Route path="bookings" element={<AdminBookingsPage />} />
         <Route path="rooms" element={<AdminRoomsPage />} />
+        <Route path="club-overview" element={<ClubOverviewPage />} />
         <Route path="members" element={<AdminMembersPage />} />
+        <Route path="club-settings" element={<AdminClubSettingsPage />} />
         <Route path="overdue" element={<OverduePage />} />
         <Route path="eval" element={<AdminEvalPage />} />
         <Route path="accounts/admins" element={<AdminAccountsPage />} />
-        <Route path="accounts/clubs" element={<ClubAccountsPage />} />
         <Route path="accounts/viewers" element={<ViewerAccountsPage />} />
         <Route path="maintenance" element={<AdminMaintenancePage />} />
         <Route path="violations" element={<AdminViolationsPage />} />

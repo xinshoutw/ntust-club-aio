@@ -2,7 +2,6 @@ import type { ReactNode } from 'react'
 import { REVIEW_ITEMS } from '../features/admin/reviewMock'
 import { isFixedBookingOpen } from '../features/bookings/mock'
 import {
-  ApartmentOutlined,
   AppstoreOutlined,
   AuditOutlined,
   BankOutlined,
@@ -147,9 +146,11 @@ export const ADMIN_NAV: NavGroup[] = [
     ],
   },
   {
-    label: '社團',
+    label: '社團管理',
     items: [
-      { key: 'a-members', label: '成員管理', path: '/admin/members', icon: <TeamOutlined /> },
+      { key: 'a-club-overview', label: '社團總覽', path: '/admin/club-overview', icon: <HomeOutlined /> },
+      { key: 'a-members', label: '成員列表', path: '/admin/members', icon: <TeamOutlined /> },
+      { key: 'a-club-settings', label: '管理項目', path: '/admin/club-settings', icon: <SettingOutlined /> },
       { key: 'a-overdue', label: '逾期追蹤與停權', path: '/admin/overdue', icon: <StopOutlined /> },
     ],
   },
@@ -162,8 +163,8 @@ export const ADMIN_NAV: NavGroup[] = [
   {
     label: '帳號與權限',
     items: [
+      // 社團帳號操作已併入「社團管理 > 管理項目」
       { key: 'a-admins', label: '管理員帳號', path: '/admin/accounts/admins', icon: <SolutionOutlined /> },
-      { key: 'a-clubs', label: '社團帳號', path: '/admin/accounts/clubs', icon: <ApartmentOutlined /> },
       { key: 'a-viewers', label: '評審老師與指派', path: '/admin/accounts/viewers', icon: <IdcardOutlined /> },
     ],
   },

@@ -1,20 +1,23 @@
-import { useReducer, useState } from 'react'
-import { App, Button, InputNumber, Select, Tooltip } from 'antd'
+import { useEffect, useReducer, useState } from 'react'
+import { App, Button, InputNumber, Tooltip } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import { applyOverrides, computeAdScores, totalOf, type AdKey } from '../eval/scoring'
 import { EVAL_WINDOW, buildScoringInput, meritOf, overridesOf, setMerit } from '../eval/store'
 import { AD_LABELS } from '../eval/types'
+import ClubSelect from './ClubSelect'
+import { useAdminClub } from './clubContext'
 
 // ponytail: mock 僅資工系學會有完整平時資料;其餘社團顯示同一組示意數據
-const CLUBS = ['資工系學會', '電機系學會', '美術社', '機器人研究社']
-
 // 行政分審核:每項可手動調整分數或回到自動計算結果(直接生效,社團端同步)
 export default function AdminEvalPage() {
   const { message } = App.useApp()
   const [, force] = useReducer((x: number) => x + 1, 0)
-  const [club, setClub] = useState(CLUBS[0])
+  const { club } = useAdminClub()
   const [editing, setEditing] = useState<AdKey | null>(null)
   const [editValue, setEditValue] = useState<number | null>(null)
+
+  // 切換社團時放棄進行中的編輯,避免把 A 社輸入的分數存進 B 社
+  useEffect(() => setEditing(null), [club])
 
   // 調整以社團為單位;切換社團互不影響
   const overrides = overridesOf(club)
@@ -55,16 +58,7 @@ export default function AdminEvalPage() {
         }
         extra={
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Select
-              value={club}
-              onChange={(v) => {
-                // 切換社團時放棄進行中的編輯,避免把 A 社輸入的分數存進 B 社
-                setClub(v)
-                setEditing(null)
-              }}
-              style={{ width: 170 }}
-              options={CLUBS.map((c) => ({ value: c, label: c }))}
-            />
+            <ClubSelect width={190} />
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 12, color: 'var(--steel)' }}>採用總分</div>
               <div style={{ lineHeight: 1.2 }}>

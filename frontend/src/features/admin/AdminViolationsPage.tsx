@@ -68,6 +68,11 @@ export default function AdminViolationsPage() {
                 </tr>
               )
             })}
+            {VIOLATIONS.length === 0 && (
+              <tr className="no-hover">
+                <td colSpan={9} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有違規勸導紀錄。</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

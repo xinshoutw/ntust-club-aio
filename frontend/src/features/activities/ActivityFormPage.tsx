@@ -195,7 +195,7 @@ export default function ActivityFormPage() {
     <div>
       <PageHeader title="活動申請" />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        申請活動或社課,核准後辦理;辦理後 <span className="num">1</span> 個月內須完成結案。
+        核准後辦理,辦理後 <span className="num">1</span> 個月內須完成結案。
       </div>
 
       <Form
@@ -241,7 +241,7 @@ export default function ActivityFormPage() {
                 rules={[{ required: true, message: '請輸入活動名稱' }]}
                 style={{ marginBottom: 0 }}
               >
-                <Input placeholder="活動名稱" />
+                <Input />
               </Form.Item>
               <div className="form-grid-2">
                 <Form.Item label="活動類型" required style={{ marginBottom: 0 }}>

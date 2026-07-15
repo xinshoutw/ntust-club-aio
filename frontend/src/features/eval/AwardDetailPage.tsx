@@ -75,7 +75,7 @@ export default function AwardDetailPage() {
         />
       </div>
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        依評分細項上傳佐證資料(PDF、Word、圖片);點檔名可預覽。
+        依評分細項上傳佐證資料(PDF、Word、圖片)。
       </div>
 
       {groups.map((g) => (

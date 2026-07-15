@@ -102,7 +102,7 @@ export default function FixedRoomPage() {
     <div>
       <PageHeader title="固定場地借用" />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        核准後於本學期內每週固定使用所選時段;時段衝突時由學務處協調,擇一社團核准。
+        整學期每週固定使用所選時段;衝突由學務處擇一社團核准。
       </div>
       {!isFixedBookingOpenByMonth() && (
         <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>

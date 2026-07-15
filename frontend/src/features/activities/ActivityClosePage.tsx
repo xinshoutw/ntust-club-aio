@@ -72,7 +72,7 @@ export default function ActivityClosePage() {
         }
       />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        僅已核准且活動已結束者可結案;除「影片連結」外皆為必填,送出後進入結案審核,結案通過始計入評鑑行政分。
+        除「影片連結」外皆為必填;結案通過始計入評鑑行政分。
       </div>
 
       {/* 未選活動:直接列出可結案的活動供點選 */}

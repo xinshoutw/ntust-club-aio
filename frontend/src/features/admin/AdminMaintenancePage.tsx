@@ -63,6 +63,11 @@ export default function AdminMaintenancePage() {
                 </td>
               </tr>
             ))}
+            {QUEUE.length === 0 && (
+              <tr className="no-hover">
+                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有維修申請。</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

@@ -37,7 +37,7 @@ export default function SignupListPage() {
         }
       />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        學務處開放報名之會議與活動;人數上限為單一社團配額。已報名/已截止的活動點擊可查看填寫紀錄。
+        報名人數上限為單一社團配額。
       </div>
 
       <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>

@@ -29,7 +29,7 @@ export default function MaintenancePage() {
     <div>
       <PageHeader title="空間報修" />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        社團活動空間設施損壞報修;可附照片或短片佐證。
+        社團活動空間設施損壞報修。
       </div>
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>

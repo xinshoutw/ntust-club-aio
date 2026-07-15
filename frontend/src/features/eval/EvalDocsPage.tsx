@@ -64,7 +64,7 @@ export default function EvalDocsPage() {
         }
       />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        行政資料由系統依平時資料自動評分(結案始算),此處僅呈現結果;點擊項目可前往對應功能頁。
+        行政資料由系統依平時資料自動評分(結案始算)。
       </div>
 
       <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12 }}>
@@ -108,7 +108,7 @@ export default function EvalDocsPage() {
       {/* 五獎項 */}
       <div style={{ fontSize: 15, fontWeight: 600, margin: '28px 0 4px' }}>競賽獎項資料</div>
       <div style={{ fontSize: 13, color: 'var(--steel)' }}>
-        各獎項的評分項目與資料上傳;無論是否已線上報名皆可先行準備。
+        無論是否已線上報名,皆可先行準備各獎項資料。
       </div>
       <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
         {AWARDS.map((award) => {

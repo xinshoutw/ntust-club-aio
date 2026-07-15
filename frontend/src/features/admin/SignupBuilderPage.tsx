@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { App, Button, Checkbox, DatePicker, Input, InputNumber, Select, Tag } from 'antd'
+import dayjs, { type Dayjs } from 'dayjs'
 import { HolderOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { FIELD_TYPE_LABEL, type FieldType, type SignupKind } from '../signup/types'
@@ -24,6 +25,11 @@ export default function SignupBuilderPage() {
   // 評鑑對幹訓/負責人會議有特別採計,建立時即標記類型
   const [kind, setKind] = useState<SignupKind>('normal')
   const [cap, setCap] = useState<number | null>(5)
+  const [eventTime, setEventTime] = useState<Dayjs | null>(dayjs('2026/09/20 09:00', 'YYYY/MM/DD HH:mm'))
+  const [signupStart, setSignupStart] = useState<Dayjs | null>(dayjs()) // 報名開始預設今天
+  const [signupEnd, setSignupEnd] = useState<Dayjs | null>(null)
+  const [needsReview, setNeedsReview] = useState(false) // 審核制:報名送出後須管理員核准
+  const [description, setDescription] = useState('各社團幹部(至少 3 人)參加,含團隊帶領與活動企劃課程。')
   const [fields, setFields] = useState<BuilderField[]>([
     { key: 1, label: '聯絡電話', type: 'text', required: true, options: [] },
     { key: 2, label: '膳食需求', type: 'select', required: true, options: ['葷', '素'] },
@@ -31,6 +37,21 @@ export default function SignupBuilderPage() {
     { key: 4, label: '備註', type: 'textarea', required: false, options: [] },
   ])
   const [nextKey, setNextKey] = useState(5)
+
+  // 拖曳排序:按住把手才啟用 draggable,避免干擾列內輸入框的文字選取
+  const [dragKey, setDragKey] = useState<number | null>(null)
+  const [handleKey, setHandleKey] = useState<number | null>(null)
+  const dropOn = (targetKey: number) => {
+    if (dragKey == null || dragKey === targetKey) return
+    setFields((fs) => {
+      const next = [...fs]
+      const from = next.findIndex((f) => f.key === dragKey)
+      const to = next.findIndex((f) => f.key === targetKey)
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
+      return next
+    })
+  }
 
   const update = (key: number, patch: Partial<BuilderField>) =>
     setFields((fs) => fs.map((f) => (f.key === key ? { ...f, ...patch } : f)))
@@ -55,6 +76,15 @@ export default function SignupBuilderPage() {
     )
   }
 
+  const publish = () => {
+    if (!name.trim()) return void message.error('請輸入活動名稱')
+    if (!eventTime) return void message.error('請選擇活動時間')
+    if (cap == null || cap < 1) return void message.error('名額上限為必填,最少 1 名')
+    if (!signupStart || !signupEnd) return void message.error('請選擇報名開始與截止時間')
+    if (!signupEnd.isAfter(signupStart)) return void message.error('報名截止須晚於報名開始')
+    message.success('已發布')
+  }
+
   return (
     <div>
       <PageHeader
@@ -62,7 +92,7 @@ export default function SignupBuilderPage() {
         extra={
           <div style={{ display: 'flex', gap: 10 }}>
             <Button style={{ height: 36 }} onClick={() => message.success('已儲存草稿')}>儲存草稿</Button>
-            <Button type="primary" style={{ height: 36 }} onClick={() => message.success('已發布')}>發布</Button>
+            <Button type="primary" style={{ height: 36 }} onClick={publish}>發布</Button>
           </div>
         }
       />
@@ -90,24 +120,56 @@ export default function SignupBuilderPage() {
                 />
               </label>
               <label>
-                <div style={fieldLabel}>活動時間{requiredMark}</div>
-                <Input className="num" defaultValue="2026/09/20 09:00-17:00" />
-              </label>
-              <label>
                 <div style={fieldLabel}>地點</div>
                 <Input defaultValue="國際大樓 IB-101" />
               </label>
               <label>
-                <div style={fieldLabel}>報名截止{requiredMark}</div>
-                <DatePicker style={{ width: '100%' }} format="YYYY/MM/DD" />
+                <div style={fieldLabel}>活動時間{requiredMark}</div>
+                <DatePicker
+                  showTime={{ format: 'HH:mm' }}
+                  style={{ width: '100%' }}
+                  format="YYYY/MM/DD HH:mm"
+                  value={eventTime}
+                  onChange={setEventTime}
+                />
               </label>
               <label>
-                <div style={fieldLabel}>名額上限</div>
+                <div style={fieldLabel}>名額上限{requiredMark}</div>
                 <InputNumber style={{ width: '100%' }} min={1} value={cap} onChange={setCap} />
               </label>
+              <label>
+                <div style={fieldLabel}>報名開始{requiredMark}</div>
+                <DatePicker
+                  showTime={{ format: 'HH:mm' }}
+                  style={{ width: '100%' }}
+                  format="YYYY/MM/DD HH:mm"
+                  value={signupStart}
+                  onChange={setSignupStart}
+                />
+              </label>
+              <label>
+                <div style={fieldLabel}>報名截止{requiredMark}</div>
+                <DatePicker
+                  showTime={{ format: 'HH:mm' }}
+                  style={{ width: '100%' }}
+                  format="YYYY/MM/DD HH:mm"
+                  value={signupEnd}
+                  onChange={setSignupEnd}
+                />
+              </label>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Checkbox checked={needsReview} onChange={(e) => setNeedsReview(e.target.checked)}>
+                  審核制(報名送出後須管理員核准才算報名成功)
+                </Checkbox>
+              </div>
               <label style={{ gridColumn: '1 / -1' }}>
-                <div style={fieldLabel}>對象說明</div>
-                <Input defaultValue="各社團幹部(至少 3 人)" />
+                <div style={fieldLabel}>活動描述</div>
+                <Input.TextArea
+                  rows={3}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="活動內容、對象、注意事項"
+                />
               </label>
             </div>
           </div>
@@ -118,9 +180,26 @@ export default function SignupBuilderPage() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
               {fields.map((f) => (
-                <div key={f.key} className="builder-field">
+                <div
+                  key={f.key}
+                  className="builder-field"
+                  draggable={handleKey === f.key}
+                  onDragStart={() => setDragKey(f.key)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={() => dropOn(f.key)}
+                  onDragEnd={() => {
+                    setDragKey(null)
+                    setHandleKey(null)
+                  }}
+                  style={dragKey === f.key ? { opacity: 0.45 } : undefined}
+                >
                   <div className="builder-field-main">
-                    <HolderOutlined style={{ color: 'var(--muted)', cursor: 'grab' }} />
+                    <HolderOutlined
+                      style={{ color: 'var(--muted)', cursor: 'grab' }}
+                      aria-label="拖曳排序"
+                      onMouseDown={() => setHandleKey(f.key)}
+                      onMouseUp={() => setHandleKey(null)}
+                    />
                     <Input
                       value={f.label}
                       onChange={(e) => update(f.key, { label: e.target.value })}
@@ -187,7 +266,13 @@ export default function SignupBuilderPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <div style={{ fontSize: 16, fontWeight: 600 }}>{name || '(未命名活動)'} — 報名</div>
               <KindBadge kind={kind} />
+              {needsReview && (
+                <Tag color="gold" style={{ marginInlineEnd: 0 }}>審核制</Tag>
+              )}
             </div>
+            {description.trim() && (
+              <div style={{ fontSize: 12, color: 'var(--steel)', lineHeight: 1.7, marginTop: 6 }}>{description}</div>
+            )}
             <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 6, padding: 14, marginTop: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
                 <div style={{ fontSize: 13, fontWeight: 600 }}>

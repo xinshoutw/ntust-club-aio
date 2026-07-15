@@ -74,8 +74,9 @@ export default function AccountsPage() {
   const [tab, setTab] = useState('admins')
   // 管理員列表為 state:權限彈窗「儲存」須實際落地(重開/列表即時反映)
   const [admins, setAdmins] = useState<Account[]>(ADMINS)
-  // 一次性密碼彈窗:目標帳號 + 顯示開關(關閉動畫結束後卸載);重設流程按鈕文字為「確認重設」
-  const [pwTarget, setPwTarget] = useState<{ title: string; account?: string; okLabel?: string } | null>(null)
+  // 一次性密碼彈窗:目標帳號 + 顯示開關(關閉動畫結束後卸載);
+  // 重設流程按「確認重設」才生效(Esc/遮罩=取消不重設)
+  const [pwTarget, setPwTarget] = useState<{ title: string; account?: string; resetName?: string } | null>(null)
   const [pwOpen, setPwOpen] = useState(false)
   // 權限設定彈窗:草稿受控,按「儲存」才生效;未存關閉須確認
   const [permTarget, setPermTarget] = useState<Account | null>(null)
@@ -88,8 +89,8 @@ export default function AccountsPage() {
 
   const roleLabel = tab === 'admins' ? '管理員' : tab === 'staff' ? '工讀生' : '評審'
 
-  const showPassword = (title: string, account?: string, okLabel?: string) => {
-    setPwTarget({ title, account, okLabel })
+  const showPassword = (title: string, account?: string, resetName?: string) => {
+    setPwTarget({ title, account, resetName })
     setPwOpen(true)
   }
 
@@ -134,7 +135,7 @@ export default function AccountsPage() {
   const actions = (a: Account, extra?: React.ReactNode) => (
     <td className="r" style={{ whiteSpace: 'nowrap' }}>
       {extra}
-      <button type="button" className="link-btn" onClick={() => showPassword(`重設密碼 — ${a.name}`, a.account, '確認重設')}>
+      <button type="button" className="link-btn" onClick={() => showPassword(`重設密碼 — ${a.name}`, a.account, a.name)}>
         重設密碼
       </button>
       <button type="button" className="link-btn" onClick={() => toggleActive(a)}>
@@ -361,7 +362,15 @@ export default function AccountsPage() {
           key={pwTarget.account ?? pwTarget.title}
           title={pwTarget.title}
           account={pwTarget.account}
-          okLabel={pwTarget.okLabel}
+          okLabel={pwTarget.resetName ? '確認重設' : undefined}
+          onOk={
+            pwTarget.resetName
+              ? () => {
+                  message.success(`已重設 ${pwTarget.resetName} 的密碼`)
+                  setPwOpen(false)
+                }
+              : undefined
+          }
           open={pwOpen}
           onClose={() => setPwOpen(false)}
           afterClose={() => setPwTarget(null)}

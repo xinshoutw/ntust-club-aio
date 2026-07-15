@@ -1,0 +1,147 @@
+"""行政端:違規勸導管理(2026-07-15 定案:開立日 +1 個月銷案期限,逾期截止)。
+
+列表支援排序(日期/地點/項目/填寫人/期限/狀態白名單)與過濾;
+預設排序=未銷案在前、時間升冪;逾期後銷案 API 拒絕(RESOLVE_EXPIRED)。
+"""
+
+from datetime import date
+from typing import Annotated
+
+import sqlalchemy as sa
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
+
+from app.api.pagination import Pagination, parse_sort
+from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
+from app.core.errors import conflict, not_found
+from app.models import Club, User, Violation
+from app.models.enums import ViolationStatus
+from app.schemas.admin import AdminViolationOut, ResolveViolationIn
+from app.schemas.common import ApiResponse
+from app.services import audit, notify, violation_service
+
+router = APIRouter(prefix="/admin/violations", tags=["admin"])
+
+ViolationAdmin = Annotated[CurrentUser, Depends(require_permission("aviol"))]
+
+_FILLER = sa.orm.aliased(User)
+
+# 排序白名單:期限=開立日+1 個月(單調),以開立日排序等價
+_SORTABLE = {
+    "date": Violation.occurred_on,
+    "location": Violation.location,
+    "items": sa.func.array_to_string(Violation.items, "、"),
+    "filler": _FILLER.name,
+    "deadline": Violation.occurred_on,
+    "status": Violation.status,
+    "created_at": Violation.created_at,
+}
+
+# 逾期判定的 SQL 對應(推導不儲存;與 violation_service.resolve_deadline 同義,
+# Postgres 的 +1 month 與 add_months 同樣做月底收斂)
+_DEADLINE_SQL = Violation.occurred_on + sa.func.make_interval(0, 1)
+
+
+def _to_out(v: Violation, club_name: str, filler_name: str, today: date) -> AdminViolationOut:
+    out = AdminViolationOut.model_validate(v)
+    out.club_name = club_name
+    out.filler_name = filler_name
+    out.resolve_deadline = violation_service.resolve_deadline(v)
+    out.resolve_expired = violation_service.resolve_expired(v, today)
+    return out
+
+
+@router.get("")
+async def list_violations(
+    user: ViolationAdmin,
+    db: DbDep,
+    page: Pagination,
+    sort: str | None = None,
+    status: ViolationStatus | None = None,
+    club_id: int | None = Query(None),
+    filler_id: int | None = Query(None),
+    item: str | None = Query(None),
+    location: str | None = Query(None),
+    date_from: date | None = None,
+    date_to: date | None = None,
+    expired: bool | None = Query(None),
+) -> ApiResponse[list[AdminViolationOut]]:
+    query = (
+        sa.select(Violation, Club.name, _FILLER.name)
+        .join(Club, Violation.club_id == Club.id)
+        .join(_FILLER, Violation.filler_id == _FILLER.id)
+    )
+    if status:
+        query = query.where(Violation.status == status)
+    if club_id:
+        query = query.where(Violation.club_id == club_id)
+    if filler_id:
+        query = query.where(Violation.filler_id == filler_id)
+    if item:
+        query = query.where(Violation.items.any(item))
+    if location:
+        query = query.where(Violation.location.ilike(f"%{location}%"))
+    if date_from:
+        query = query.where(Violation.occurred_on >= date_from)
+    if date_to:
+        query = query.where(Violation.occurred_on <= date_to)
+    today = violation_service.today_taipei()
+    if expired is not None:
+        # 期限篩選僅對未銷案有意義(已銷案顯示 —)
+        query = query.where(Violation.status == ViolationStatus.OPEN)
+        query = query.where(_DEADLINE_SQL < today if expired else _DEADLINE_SQL >= today)
+
+    if sort:
+        query = query.order_by(*parse_sort(sort, _SORTABLE, None), Violation.id)
+    else:
+        # 預設排序:未銷案在前,各組內時間升冪
+        open_first = sa.case((Violation.status == ViolationStatus.OPEN, 0), else_=1)
+        query = query.order_by(open_first, Violation.occurred_on.asc(), Violation.id)
+
+    total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
+    rows = await db.execute(query.offset(page.offset).limit(page.page_size))
+    data = [_to_out(v, club_name, filler_name, today) for v, club_name, filler_name in rows]
+    return ApiResponse(data=data, meta=page.meta(total or 0))
+
+
+@router.post("/{violation_id}/resolve")
+async def resolve_violation(
+    violation_id: int,
+    body: ResolveViolationIn,
+    user: ViolationAdmin,
+    db: DbDep,
+    request: Request,
+    background: BackgroundTasks,
+) -> ApiResponse[AdminViolationOut]:
+    violation = await db.scalar(
+        sa.select(Violation).where(Violation.id == violation_id).with_for_update()
+    )
+    if violation is None:
+        raise not_found("找不到違規勸導紀錄")
+    if violation.status != ViolationStatus.OPEN:
+        raise conflict("此紀錄已銷案")
+    today = violation_service.today_taipei()
+    if violation_service.resolve_expired(violation, today):
+        # 開立日 +1 個月逾期即截止:不再受理銷案,−1 扣分成立
+        raise conflict("已逾銷案期限,不再受理銷案", code="RESOLVE_EXPIRED")
+
+    violation.status = ViolationStatus.RESOLVED
+    violation.resolve_note = body.note
+    audit.record(
+        db,
+        action="violation_resolved",
+        user=user,
+        detail=f"violation={violation.id}",
+        ip=client_ip(request),
+    )
+    await db.commit()
+
+    club = await db.get(Club, violation.club_id)
+    background.add_task(
+        notify.club_event,
+        "approve",
+        "違規勸導已銷案",
+        f"{club.name}:{violation.occurred_on} {violation.location}",
+        club.discord_webhook_url,
+    )
+    filler = await db.get(User, violation.filler_id)
+    return ApiResponse(data=_to_out(violation, club.name, filler.name if filler else "", today))

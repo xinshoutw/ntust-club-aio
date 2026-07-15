@@ -136,7 +136,7 @@ export const CLUB_ACTIVITIES: Activity[] = [
     ],
     attachments: [mockPdf('迎新宿營_企劃書', '2026/05/30')],
     closeDeadline: '2026/07/29',
-    closeDaysLeft: 15,
+    closeDaysLeft: 14,
   },
   {
     id: 'ACT-114-0012',

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { App as AntApp, ConfigProvider } from 'antd'
 import zhTW from 'antd/locale/zh_TW'
 import dayjs from 'dayjs'
+import customParseFormat from 'dayjs/plugin/customParseFormat'
 import 'dayjs/locale/zh-tw'
 import '@fontsource/noto-sans-tc/400.css'
 import '@fontsource/noto-sans-tc/500.css'
@@ -15,6 +16,8 @@ import App from './App'
 import './index.css'
 
 dayjs.locale('zh-tw')
+// query 日期驗證等處使用 format+strict 解析,需載入外掛才會真正嚴格
+dayjs.extend(customParseFormat)
 
 const queryClient = new QueryClient({
   defaultOptions: {

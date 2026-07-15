@@ -56,7 +56,7 @@ const FIXED_BOOKING_ITEM: NavItem = {
 // 社團端資訊架構(2026-07-13 需求方重整版,非設計稿的舊版)
 export const CLUB_NAV: NavGroup[] = [
   {
-    items: [{ key: 'overview', label: '社團總覽', path: '/', icon: <HomeOutlined /> }],
+    items: [{ key: 'overview', label: '總覽', path: '/', icon: <HomeOutlined /> }],
   },
   {
     label: '活動管理',

@@ -89,14 +89,22 @@ def _build(title: str, rows: list[tuple[str, Paragraph]]) -> bytes:
 def report_pdf(club: Club, activity: Activity, report: ActivityReport) -> bytes:
     """社團活動成果報告表。"""
     year, sem = _semester_title(activity)
+    end_date = activity.end_date or activity.date
+    date_text = f"{activity.date}" if end_date == activity.date else f"{activity.date}–{end_date}"
     attendance = (
         f"實際參與:社員 {report.member_count} 人、非社員 {report.non_member_count} 人\n"
-        f"實際時間:{activity.date} {report.actual_start:%H:%M}–{report.actual_end:%H:%M}\n"
+        f"實際時間:{date_text} {report.actual_start:%H:%M}–{report.actual_end:%H:%M}\n"
         f"實際地點:{report.actual_location}"
     )
     others = report.others
-    if report.review_meeting and report.review_date:
+    if report.review_meeting:
         others += f"\n檢討會議:{report.review_date}"
+        if report.review_attendees is not None:
+            others += f"(與會 {report.review_attendees} 人)"
+        if report.review_topics:
+            others += f"\n討論事項:{report.review_topics}"
+        if report.review_conclusion:
+            others += f"\n內容決議:{report.review_conclusion}"
     if report.video_url:
         others += f"\n成果影片:{report.video_url}"
     others += f"\n實際支出:{report.expense} 元"

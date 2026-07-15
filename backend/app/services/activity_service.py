@@ -18,9 +18,9 @@ ATTACHMENT_SLOT = "proposal"
 
 
 def end_datetime(activity: Activity) -> datetime:
-    """活動結束時刻(台北時區);未填時間以當日 23:59 計。"""
+    """活動結束時刻(台北時區):end_date + end_time;未填時間以當日 23:59 計。"""
     t = activity.end_time or time(23, 59)
-    return datetime.combine(activity.date, t, tzinfo=TAIPEI)
+    return datetime.combine(activity.end_date or activity.date, t, tzinfo=TAIPEI)
 
 
 def add_months(d: date, months: int) -> date:
@@ -48,12 +48,13 @@ def add_months(d: date, months: int) -> date:
 
 
 def is_close_locked(activity: Activity, lock_months: int, now: datetime | None = None) -> bool:
-    """逾期鎖定(推導):已核准、活動日 +N 個月已過、未送結案、未解鎖。"""
+    """逾期鎖定(推導):已核准、活動結束日(end_date)+N 個月已過、未送結案、未解鎖。"""
     if activity.status != ActivityStatus.APPROVED or activity.close_unlocked:
         return False
     now = now or datetime.now(UTC)
+    base = activity.end_date or activity.date
     deadline = datetime.combine(
-        add_months(activity.date, lock_months) + timedelta(days=1), time(0, 0), tzinfo=TAIPEI
+        add_months(base, lock_months) + timedelta(days=1), time(0, 0), tzinfo=TAIPEI
     )
     return now >= deadline
 

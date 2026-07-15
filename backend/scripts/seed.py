@@ -1,4 +1,4 @@
-"""初始資料:五獎項 + 最高權限管理員。
+"""初始資料:五獎項 + 19 處場地主檔 + 最高權限管理員。
 
 用法:
   uv run python scripts/seed.py --admin-username super --admin-password '...'
@@ -16,8 +16,8 @@ import sqlalchemy as sa
 
 from app.core.db import async_session_factory
 from app.core.security import hash_password, validate_password_strength
-from app.models import Award, User
-from app.models.enums import AwardKind, UserRole
+from app.models import Award, User, Venue
+from app.models.enums import AwardKind, UserRole, VenueCategory
 
 # 五獎項(原型 AWARDS;rubric 逐年由行政建立/複製)
 AWARDS = [
@@ -34,6 +34,31 @@ AWARDS = [
     ),
 ]
 
+# 場地主檔(2026-07-15 需求方定案 19 處,與 frontend/src/features/bookings/mock.ts VENUES 對齊;
+# 之後由管理員後台維護,數量/容納人數可調)
+# (名稱, 類別, 容納人數, allow_fixed, allow_temp)
+VENUES: list[tuple[str, VenueCategory, int, bool, bool]] = [
+    ("S204 共享食堂", VenueCategory.CLASSROOM, 60, True, True),
+    ("S207", VenueCategory.CLASSROOM, 60, True, True),
+    ("S209", VenueCategory.CLASSROOM, 60, True, True),
+    ("S301", VenueCategory.CLASSROOM, 50, True, True),
+    ("S302/S303", VenueCategory.CLASSROOM, 90, True, True),
+    ("S304 音樂教室", VenueCategory.CLASSROOM, 50, True, True),
+    ("S311", VenueCategory.CLASSROOM, 50, True, True),
+    ("S312/S313", VenueCategory.CLASSROOM, 90, True, True),
+    ("S314", VenueCategory.CLASSROOM, 50, True, True),
+    ("練團室", VenueCategory.PRACTICE, 15, True, True),
+    ("T4 舞蹈區", VenueCategory.PRACTICE, 15, True, True),
+    ("3F 戶外廣場", VenueCategory.OUTDOOR, 200, False, True),
+    ("戶外精誠廣場 1", VenueCategory.OUTDOOR, 150, False, True),
+    ("戶外精誠廣場 2", VenueCategory.OUTDOOR, 150, False, True),
+    ("戶外精誠廣場 3", VenueCategory.OUTDOOR, 150, False, True),
+    ("戶外精誠廣場 4", VenueCategory.OUTDOOR, 150, False, True),
+    ("戶外精誠廣場 5", VenueCategory.OUTDOOR, 150, False, True),
+    ("一宿 B2 樓梯", VenueCategory.DORM, 120, False, True),
+    ("一宿 B2 白板", VenueCategory.DORM, 120, False, True),
+]
+
 
 async def seed(admin_username: str | None, admin_password: str | None) -> None:
     async with async_session_factory() as db:
@@ -41,6 +66,21 @@ async def seed(admin_username: str | None, admin_password: str | None) -> None:
             if await db.get(Award, award.id) is None:
                 db.add(award)
                 print(f"award created: {award.id}")
+
+        for sort, (name, category, capacity, allow_fixed, allow_temp) in enumerate(VENUES, 1):
+            exists = await db.scalar(sa.select(Venue.id).where(Venue.name == name))
+            if exists is None:
+                db.add(
+                    Venue(
+                        name=name,
+                        category=category,
+                        capacity=capacity,
+                        allow_fixed=allow_fixed,
+                        allow_temp=allow_temp,
+                        sort=sort,
+                    )
+                )
+                print(f"venue created: {name}")
 
         if admin_username and admin_password:
             exists = await db.scalar(sa.select(User.id).where(User.username == admin_username))

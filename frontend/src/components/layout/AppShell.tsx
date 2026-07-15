@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { Badge, Drawer, Dropdown, Popover } from 'antd'
-import { BellOutlined, DownOutlined, LogoutOutlined, MenuOutlined } from '@ant-design/icons'
+import { BellOutlined, DownOutlined, LogoutOutlined, MenuOutlined, SettingOutlined } from '@ant-design/icons'
 import { useAuth } from '../../app/auth'
 import type { NavGroup } from '../../lib/nav'
 import Sidebar from './Sidebar'
@@ -35,9 +35,12 @@ export default function AppShell({ nav, badgeLabel, showYear = true }: AppShellP
 
   const userMenu = {
     items: [
+      // 社團帳號:設定捷徑(管理項目)置於登出上方
+      ...(user?.role === 'club' ? [{ key: 'settings', icon: <SettingOutlined />, label: '設定' }] : []),
       { key: 'logout', icon: <LogoutOutlined />, label: '登出' },
     ],
     onClick: ({ key }: { key: string }) => {
+      if (key === 'settings') navigate('/club-settings')
       if (key === 'logout') {
         logout()
         navigate('/login', { replace: true })

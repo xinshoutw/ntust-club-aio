@@ -103,10 +103,12 @@ export default function AdminClubSettingsPage() {
           title={`重設密碼 — ${club}`}
           okLabel="確認重設"
           open={pwOpen}
-          onClose={() => {
+          onOk={() => {
+            // 僅按「確認重設」才生效;Esc/點遮罩=取消不重設
             message.success(`已重設 ${club} 的密碼`)
             setPwOpen(false)
           }}
+          onClose={() => setPwOpen(false)}
           afterClose={() => setPwMounted(false)}
         />
       )}

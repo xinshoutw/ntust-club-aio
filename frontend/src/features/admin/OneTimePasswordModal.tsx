@@ -22,6 +22,7 @@ export default function OneTimePasswordModal({
   onClose,
   afterClose,
   okLabel = '完成',
+  onOk,
 }: {
   title: string
   account?: string
@@ -29,6 +30,8 @@ export default function OneTimePasswordModal({
   onClose: () => void
   afterClose: () => void
   okLabel?: string
+  // 主按鈕確認動作(與 Esc/遮罩關閉區分);未提供則同 onClose
+  onOk?: () => void
 }) {
   const { message } = App.useApp()
   const [password] = useState(genPassword)
@@ -48,7 +51,7 @@ export default function OneTimePasswordModal({
       onCancel={onClose}
       afterClose={afterClose}
       title={title}
-      footer={<Button type="primary" autoFocus onClick={onClose}>{okLabel}</Button>}
+      footer={<Button type="primary" autoFocus onClick={onOk ?? onClose}>{okLabel}</Button>}
     >
       {account && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 13 }}>

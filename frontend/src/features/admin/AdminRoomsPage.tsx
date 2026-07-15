@@ -7,6 +7,9 @@ import { DOW_TEXT, ROOM_REQUESTS, type RoomRequest } from '../bookings/mock'
 
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 
+// 退回原因預設文案:每次開啟退回視窗都回到此值(可修改後送出)
+const DEFAULT_REJECT_REASON = '很抱歉，目前時段無法受理。若仍有借用需求，請聯絡組長，謝謝'
+
 // 教室固定借用審核彈窗:顯示每週時段(含衝突標示),核准或退回(退回原因必填)
 // 衝突=兩社搶同教室同星期同節次;整單擇一核准,不做部分同意
 function RoomReviewModal({
@@ -24,12 +27,13 @@ function RoomReviewModal({
 }) {
   const { message } = App.useApp()
   const [rejectOpen, setRejectOpen] = useState(false)
-  const [reason, setReason] = useState('很抱歉，目前時段無法受理。若仍有借用需求，請聯絡組長，謝謝') // FIXME: 此用法好像不正確，當popup被重新開啟時，文字會被清空
+  const [reason, setReason] = useState(DEFAULT_REJECT_REASON)
   const hasConflict = item.entries.some((e) => e.periods.some((p) => isConflict(e.dow, p)))
 
+  // 關閉時重設回預設文案,重開才不會是上次殘留或空白
   const closeReject = () => {
     setRejectOpen(false)
-    setReason('')
+    setReason(DEFAULT_REJECT_REASON)
   }
 
   const submitReject = () => {
@@ -103,7 +107,6 @@ function RoomReviewModal({
         onOk={submitReject}
         onCancel={closeReject}
       >
-        <div ></div>
         <Input.TextArea
           rows={3}
           value={reason}

@@ -1,11 +1,55 @@
-import { App, Button, DatePicker, Form, InputNumber, Select, Switch } from 'antd'
+import { useState } from 'react'
+import { App, Button, DatePicker, Form, Input, InputNumber, Select, Tag } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import { BUDGET_CATEGORIES } from '../activities/types'
 import { VIOL_ITEMS } from '../violations/mock'
 
-const MONTHS = Array.from({ length: 12 }, (_, i) => ({ value: i + 1, label: `${i + 1} 月` }))
-
 const sectionTitle: React.CSSProperties = { fontSize: 15, fontWeight: 600, marginBottom: 14 }
+
+// 純 tag 輸入(無下拉選單):輸入後 Enter/逗號/頓號/失焦即新增
+// (Select mode="tags" 會彈出下拉且 open={false} 會壞掉 Enter,需求方指定移除下拉)
+function TagListInput({ value = [], onChange }: { value?: string[]; onChange?: (next: string[]) => void }) {
+  const [draft, setDraft] = useState('')
+
+  const commit = (raw: string) => {
+    const parts = raw
+      .split(/[,、]/)
+      .map((s) => s.trim())
+      .filter((s) => s && !value.includes(s))
+    if (parts.length) onChange?.([...value, ...parts])
+    setDraft('')
+  }
+
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      {value.map((item) => (
+        <Tag
+          key={item}
+          closable
+          onClose={(e) => {
+            e.preventDefault()
+            onChange?.(value.filter((x) => x !== item))
+          }}
+          style={{ margin: 0, fontSize: 13, padding: '2px 8px' }}
+        >
+          {item}
+        </Tag>
+      ))}
+      <Input
+        size="small"
+        style={{ width: 180 }}
+        placeholder="輸入後按 Enter 新增"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onPressEnter={(e) => {
+          e.preventDefault()
+          commit(draft)
+        }}
+        onBlur={() => draft.trim() && commit(draft)}
+      />
+    </div>
+  )
+}
 
 // 系統設定(system_settings):散落各流程的可調參數集中於此;mock 儲存以 toast 示意
 export default function AdminSettingsPage() {
@@ -21,8 +65,6 @@ export default function AdminSettingsPage() {
         layout="vertical"
         onFinish={() => message.success('系統設定已儲存')}
         initialValues={{
-          fixedMonths: [6, 1],
-          fixedOpenNow: true,
           loanBefore: 2,
           loanAfter: 1,
           closeLockMonths: 1,
@@ -37,15 +79,9 @@ export default function AdminSettingsPage() {
       >
         <div className="form-grid-2" style={{ marginTop: 20, alignItems: 'stretch' }}>
           <div className="card" style={{ padding: 24 }}>
-            <div style={sectionTitle}>報名與借用</div>
-            <Form.Item name="regWindow" label="線上報名時間窗(窗外不可送出報名)">
+            <div style={sectionTitle}>借用</div>
+            <Form.Item name="fixedWindow" label="固定場地借用受理期間(期間外不開放申請)">
               <DatePicker.RangePicker style={{ width: '100%' }} format="YYYY/MM/DD" />
-            </Form.Item>
-            <Form.Item name="fixedMonths" label="固定場地借用開放月份">
-              <Select mode="multiple" options={MONTHS} placeholder="請選擇月份" />
-            </Form.Item>
-            <Form.Item name="fixedOpenNow" label="固定場地借用手動加開(不受月份限制)" valuePropName="checked">
-              <Switch />
             </Form.Item>
             <div className="form-grid-2">
               <Form.Item name="loanBefore" label="器材借用:活動前緩衝(工作天)" style={{ marginBottom: 0 }}>
@@ -91,13 +127,13 @@ export default function AdminSettingsPage() {
           <div className="card" style={{ padding: 24 }}>
             <div style={sectionTitle}>違規項目目錄</div>
             <Form.Item name="violItems" style={{ marginBottom: 0 }}>
-              <Select mode="tags" placeholder="輸入後按 Enter 新增" notFoundContent={null} suffixIcon={null} tokenSeparators={[',', '、']} />
+              <TagListInput />
             </Form.Item>
           </div>
           <div className="card" style={{ padding: 24 }}>
             <div style={sectionTitle}>經費科目</div>
             <Form.Item name="budgetCats" style={{ marginBottom: 0 }}>
-              <Select mode="tags" placeholder="輸入後按 Enter 新增" notFoundContent={null} suffixIcon={null} tokenSeparators={[',', '、']} />
+              <TagListInput />
             </Form.Item>
           </div>
         </div>

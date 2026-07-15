@@ -51,14 +51,11 @@ export default function AdminClubSettingsPage() {
 
   return (
     <div>
-      <PageHeader title="管理項目" sub={club} extra={<ClubSelect />} />
-      <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        社團自行維護的資料在此唯讀;帳號層級操作(名稱/帳號/密碼/啟停用)由行政管理。
-      </div>
+      <PageHeader title="管理項目" extra={<ClubSelect />} />
 
       <div className="form-grid-2" style={{ marginTop: 20, alignItems: 'stretch' }}>
         <div className="card" style={{ padding: 24 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>社團資料(唯讀,由社團維護)</div>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>社團資料</div>
           <div style={{ display: 'grid', gridTemplateColumns: '104px 1fr', gap: '10px 12px', fontSize: 13 }}>
             <div style={label}>指導老師</div><div>張教授 · 資訊工程系 · 分機 <span className="num">6000</span></div>
             <div style={label}>網頁連結</div>
@@ -92,7 +89,7 @@ export default function AdminClubSettingsPage() {
                   setPwOpen(true)
                 }}
               >
-                重設密碼…
+                重設密碼
               </Button>
               <span style={{ flex: 1 }} />
               <Button type="primary" onClick={() => message.success(`已儲存 ${name} 帳號設定`)}>儲存</Button>

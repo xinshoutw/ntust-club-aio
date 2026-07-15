@@ -23,7 +23,7 @@ export default function ClubOverviewPage() {
 
   return (
     <div>
-      <PageHeader title="社團總覽" sub={club} extra={<ClubSelect />} />
+      <PageHeader title="社團總覽" extra={<ClubSelect />} />
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>基本資料</div>

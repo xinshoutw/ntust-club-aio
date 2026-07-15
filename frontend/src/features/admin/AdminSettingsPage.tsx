@@ -15,9 +15,6 @@ export default function AdminSettingsPage() {
   return (
     <div>
       <PageHeader title="系統設定" />
-      <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        變更即時生效於對應流程;所有變更皆記入稽核軌跡。
-      </div>
 
       <Form
         form={form}

@@ -79,11 +79,7 @@ export default function ClubSettingsPage() {
 
   return (
     <div>
-      <PageHeader title="管理項目" sub={user?.club} />
-      <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        修改過的欄位以橘黃外框標示,按右下角「儲存」一次生效。
-      </div>
-
+      <PageHeader title="管理項目" />
       <Form
         form={form}
         layout="vertical"
@@ -135,9 +131,9 @@ export default function ClubSettingsPage() {
             </Form.Item>
             <Form.Item
               name="url"
-              label="社團網頁連結(影響評鑑「網頁經營」行政分)"
+              label="社團網頁連結"
               className={itemClass('url')}
-              rules={[{ type: 'url', message: '請輸入正確的網址' }]}
+              rules={[{ type: 'url', message: '網址格式不正確' }]}
             >
               <Input placeholder="https://" />
             </Form.Item>
@@ -153,11 +149,11 @@ export default function ClubSettingsPage() {
             <div style={sectionTitle}>聯絡與通知</div>
             <Form.Item
               name="email1"
-              label="聯絡 Email(至少 1 組,至多 3 組)"
+              label="聯絡通知信箱"
               className={itemClass('email1')}
               rules={[
-                { required: true, message: '請至少填寫一組聯絡 Email' },
-                { type: 'email', message: 'Email 格式不正確' },
+                { required: true, message: '請至少填寫一組聯絡信箱' },
+                { type: 'email', message: '信箱格式不正確' },
               ]}
             >
               <Input placeholder="主要聯絡信箱" />
@@ -165,20 +161,20 @@ export default function ClubSettingsPage() {
             <Form.Item
               name="email2"
               className={itemClass('email2')}
-              rules={[{ type: 'email', message: 'Email 格式不正確' }]}
+              rules={[{ type: 'email', message: '信箱格式不正確' }]}
             >
-              <Input placeholder="聯絡 Email 2(選填)" />
+              <Input placeholder="聯絡信箱 2（選填）" />
             </Form.Item>
             <Form.Item
               name="email3"
               className={itemClass('email3')}
-              rules={[{ type: 'email', message: 'Email 格式不正確' }]}
+              rules={[{ type: 'email', message: '信箱格式不正確' }]}
             >
-              <Input placeholder="聯絡 Email 3(選填)" />
+              <Input placeholder="聯絡信箱 3（選填）" />
             </Form.Item>
             <Form.Item
               name="discordWebhook"
-              label="Discord Webhook URL(審核結果與提醒推送)"
+              label="Discord Webhook URL"
               className={itemClass('discordWebhook')}
               rules={[
                 {
@@ -248,16 +244,13 @@ export default function ClubSettingsPage() {
             >
               <Input.Password autoComplete="new-password" />
             </Form.Item>
-            <div style={{ fontSize: 12, color: 'var(--steel)' }}>
-              更換密碼後,其他已登入的裝置將被登出。
-            </div>
           </div>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 16 }}>
           {dirty.size > 0 && (
             <span style={{ fontSize: 12, color: '#8A5A00' }}>
-              有 <span className="num">{dirty.size}</span> 個欄位尚未儲存
+              尚未儲存
             </span>
           )}
           <Button type="primary" htmlType="submit">儲存</Button>

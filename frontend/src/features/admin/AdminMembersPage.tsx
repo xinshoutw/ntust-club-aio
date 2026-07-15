@@ -19,7 +19,7 @@ export default function AdminMembersPage() {
 
   return (
     <div>
-      <PageHeader title="成員列表" sub={club} extra={<ClubSelect />} />
+      <PageHeader title="成員列表" extra={<ClubSelect />} />
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         <table className="tb" style={{ minWidth: 640 }}>
@@ -57,9 +57,6 @@ export default function AdminMembersPage() {
           <Pagination current={page} pageSize={PAGE_SIZE} total={list.length} onChange={setPage} showSizeChanger={false} />
         </div>
       )}
-      <div style={{ marginTop: 10, fontSize: 12, color: 'var(--steel)' }}>
-        名單由社團自行維護;行政僅供查閱。
-      </div>
     </div>
   )
 }

@@ -1,5 +1,4 @@
 import PageHeader from '../../components/ui/PageHeader'
-import { useAuth } from '../../app/auth'
 
 interface AwardResult {
   award: string
@@ -52,14 +51,9 @@ function gradePill(grade: string) {
 }
 
 export default function EvalResultPage() {
-  const { user } = useAuth()
-
   return (
     <div>
-      <PageHeader title="評鑑結果" sub={`${user?.club} · 114 學年`} />
-      <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        評語由學務處開放後顯示;評審以匿名(評審A/B)呈現。
-      </div>
+      <PageHeader title="評鑑結果" sub={`114 學年`} />
 
       {RESULTS.map((r) => (
         <div className="card" key={r.award} style={{ marginTop: 16 }}>

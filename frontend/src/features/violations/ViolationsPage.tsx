@@ -14,12 +14,12 @@ export default function ViolationsPage() {
         title="違規勸導紀錄"
         sub={
           <>
-            {user?.club} · 共 <span className="num">{mine.length}</span> 筆
+            共 <span className="num">{mine.length}</span> 筆
           </>
         }
       />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        開立後 <span className="num">1</span> 個月內請洽課外活動指導組辦理銷案(如愛校服務);逾期截止,不再受理銷案。
+        請於 <span className="num">1</span> 個月內至學務處活動辦理銷案，逾期將不受理
       </div>
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>

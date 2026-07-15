@@ -22,6 +22,7 @@ const MIN_REFLECTIONS = 3
 const MIN_PHOTOS = 5
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024 // 圖片上限 10MB(architecture.md)
 
+// TODO: 允許所有 Image 類型，包含 HEIC, WEBP, ...
 // 副檔名/accept 擋不住改名檔:驗 JPEG/PNG 魔術位元組
 async function isJpgOrPng(f: File): Promise<boolean> {
   const head = new Uint8Array(await f.slice(0, 4).arrayBuffer())
@@ -71,9 +72,6 @@ export default function ActivityClosePage() {
           />
         }
       />
-      <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        除「影片連結」外皆為必填;結案通過始計入評鑑行政分。
-      </div>
 
       {/* 未選活動:直接列出可結案的活動供點選 */}
       {!activity && closable.length > 0 && (
@@ -509,7 +507,6 @@ function CloseForm({
           <div className="card" style={{ padding: 24 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 12 }}>
               <div style={{ fontSize: 15, fontWeight: 600 }}>三、學習心得{requiredMark}</div>
-              <div style={{ fontSize: 12, color: 'var(--steel)' }}>至少 {MIN_REFLECTIONS} 位本校學生;填寫後自動增列</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {reflects.map((r) => (
@@ -572,16 +569,15 @@ function CloseForm({
                   {photos.length} 張
                 </span>
               </div>
-              <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>內容相同的照片(即使檔名不同)會被拒絕。</div>
             </div>
             <div className="form-grid-2" style={{ marginTop: 12 }}>
               <div>
-                <div style={label}>影片連結(可選)</div>
+                <div style={label}>影片連結</div>
                 <Input value={videoLink} onChange={(e) => setVideoLink(e.target.value)} placeholder="YouTube 等" />
               </div>
               <div>
-                <div style={label}>實際支出(元){requiredMark}</div>
-                <InputNumber min={0} precision={0} style={{ width: '100%' }} className="num-right" value={expense} onChange={setExpense} placeholder="核銷依據" />
+                <div style={label}>實際支出{requiredMark}</div>
+                <InputNumber min={0} precision={0} style={{ width: '100%' }} className="num-right" value={expense} onChange={setExpense} placeholder="元" />
               </div>
             </div>
           </div>

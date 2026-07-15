@@ -9,7 +9,6 @@ import {
   ROOM_REQUESTS,
   VENUES,
   isFixedBookingOpen,
-  isFixedBookingOpenByMonth,
   roomEntryText,
 } from './mock'
 
@@ -37,7 +36,7 @@ function runsOf(periods: string[]): string[][] {
 function lateRuleError(dow: number, periods: string[]): string | null {
   for (const run of runsOf(periods)) {
     if (run.some((p) => LATE.has(p)) && run.length < 3) {
-      return `週${DOW_TEXT[dow]}的第 10 節及 A–D 節至少需連續 3 節(例如 9–A、A–C),目前為「${run.join('–')}」。`
+      return `週${DOW_TEXT[dow]}的第 10 節及 A–D 節至少需連續 3 節，目前為 ${run.length} 節`
     }
   }
   return null
@@ -68,9 +67,6 @@ export default function FixedRoomPage() {
         <PageHeader title="固定場地借用" />
         <div className="card" style={{ marginTop: 20, padding: '48px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: 15, fontWeight: 600 }}>目前未開放申請</div>
-          <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 8 }}>
-            固定場地借用僅於開放期間受理(預設每年 <span className="num">6</span> 月、<span className="num">1</span> 月,依學務處公告為準)。
-          </div>
         </div>
       </div>
     )
@@ -90,13 +86,13 @@ export default function FixedRoomPage() {
     })
   }
 
-  const submit = (values: { room: string; note: string }) => {
+  const submit = () => {
     if (slots.size === 0) {
-      message.error('請至少選擇一個時段。')
+      message.error('請至少選擇一個時段')
       return
     }
     if (slots.size > MAX_PERIODS) {
-      message.error(`每社團固定借用至多 ${MAX_PERIODS} 節,目前已選 ${slots.size} 節。`)
+      message.error(`每社團固定借用至多 ${MAX_PERIODS} 節，目前已選 ${slots.size} 節`)
       return
     }
     for (let dow = 1; dow <= 7; dow++) {
@@ -106,7 +102,7 @@ export default function FixedRoomPage() {
         return
       }
     }
-    message.success(`已送出「${values.room}」固定借用申請(每週 ${slots.size} 節)`)
+    message.success(`已送出固定借用申請`)
     form.resetFields()
     setSlots(new Set())
   }
@@ -114,14 +110,6 @@ export default function FixedRoomPage() {
   return (
     <div>
       <PageHeader title="固定場地借用" />
-      <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        整學期每週固定使用所選時段;衝突由學務處擇一社團核准。
-      </div>
-      {!isFixedBookingOpenByMonth() && (
-        <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>
-          本期間由管理員加開;固定借用預設開放月份為 <span className="num">6</span> 月、<span className="num">1</span> 月。
-        </div>
-      )}
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
         <Form form={form} layout="vertical" onFinish={submit} requiredMark>
@@ -131,21 +119,18 @@ export default function FixedRoomPage() {
                 placeholder="請選擇"
                 options={VENUES.filter((v) => v.allowFixed).map((v) => ({
                   value: v.name,
-                  label: `${v.name}(${v.capacity} 人)`,
+                  label: `${v.name} (${v.capacity} 人)`,
                 }))}
               />
             </Form.Item>
             <Form.Item name="note" label="用途" rules={[{ required: true, message: '請輸入用途' }]} style={{ marginBottom: 0 }}>
-              <Input placeholder="例:社課練習" />
+              <Input placeholder="簡述說明" />
             </Form.Item>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, margin: '18px 0 8px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: 13, fontWeight: 500 }}>
               每週時段 <span style={{ color: '#C13B34' }}>*</span>
-            </span>
-            <span style={{ fontWeight: 400, color: 'var(--steel)', fontSize: 12 }}>
-              點擊或按住拖曳批量選取;至多 {MAX_PERIODS} 節,第 10 節及 A–D 節需至少連續 3 節
             </span>
             <span style={{ flex: 1 }} />
             <span className="num" style={{ fontSize: 12, color: slots.size > MAX_PERIODS ? '#C13B34' : 'var(--steel)' }}>
@@ -223,7 +208,7 @@ export default function FixedRoomPage() {
       </div>
 
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>我的申請(近 5 筆)</div>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
         <table className="tb" style={{ minWidth: 560 }}>
           <tbody>
             {mine.map((r) => (

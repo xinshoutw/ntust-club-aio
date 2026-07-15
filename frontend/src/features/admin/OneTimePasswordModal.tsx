@@ -36,7 +36,7 @@ export default function OneTimePasswordModal({
       await navigator.clipboard.writeText(password)
       message.success('已複製密碼')
     } catch {
-      message.error('複製失敗,請以顯示密碼後手動複製')
+      message.error('複製失敗！請按下顯示密碼後手動複製')
     }
   }
 
@@ -60,8 +60,7 @@ export default function OneTimePasswordModal({
         <Button icon={<CopyOutlined />} onClick={copy}>複製</Button>
       </div>
       <div style={{ fontSize: 12, color: '#8A5A00', marginTop: 10, lineHeight: 1.7 }}>
-        密碼僅顯示這一次,關閉視窗後將無法再查看,請先複製轉交;首次登入將強制變更密碼。
-        {account && '帳號之後仍可於列表查看。'}
+        密碼僅顯示這一次
       </div>
     </Modal>
   )

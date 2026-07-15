@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router'
 import { Button } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
-import { useAuth } from '../../app/auth'
 import { ANNOUNCEMENTS, TRACKED } from '../activities/mock'
 import './overview.css'
 
@@ -27,20 +26,12 @@ function CardTitle({ title, count }: { title: string; count: number }) {
 }
 
 export default function OverviewPage() {
-  const { user } = useAuth()
   const navigate = useNavigate()
   const categories = ['活動', '借用', '線上申請'] as const
 
   return (
     <div>
-      <PageHeader
-        title="總覽"
-        sub={
-          <>
-            {user?.club} · <span className="num">114</span> 學年第 <span className="num">2</span> 學期
-          </>
-        }
-      />
+      <PageHeader title="總覽" />
 
       <div className="card" style={{ marginTop: 20 }}>
         <CardTitle title="待辦" count={2} />

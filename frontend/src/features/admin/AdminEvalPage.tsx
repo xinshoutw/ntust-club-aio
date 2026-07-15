@@ -69,9 +69,6 @@ export default function AdminEvalPage() {
           </div>
         }
       />
-      <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        各項分數由系統自動計算;必要時可逐項手動調整,調整即時反映於社團端資料總覽。
-      </div>
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         <table className="tb" style={{ minWidth: 780 }}>
@@ -159,9 +156,6 @@ export default function AdminEvalPage() {
             </tr>
           </tbody>
         </table>
-      </div>
-      <div style={{ marginTop: 10, fontSize: 12, color: 'var(--steel)' }}>
-        「已調整」項目不再隨平時資料變動;按「回到自動計算結果」恢復即時計算。調整將留存稽核紀錄。
       </div>
     </div>
   )

@@ -88,9 +88,6 @@ export default function AdminFilesPage() {
           </>
         }
       />
-      <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        全系統上傳檔案的空間利用與清理;報修影音佔用大,結案後可於此刪除。
-      </div>
 
       {/* 空間利用:數字 + 依模組分段的比例條(hover 顯示明細) */}
       <div className="card" style={{ marginTop: 20, padding: '20px 24px' }}>
@@ -147,7 +144,7 @@ export default function AdminFilesPage() {
       {/* 大型檔案:清理空間的主要對象;僅報修檔可刪(其餘依歸檔政策由系統管理) */}
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px 8px', flexWrap: 'wrap' }}>
-          <div style={{ fontSize: 15, fontWeight: 600 }}>大型檔案(依大小排序)</div>
+          <div style={{ fontSize: 15, fontWeight: 600 }}>大型檔案</div>
           <div style={{ flex: 1 }} />
           <Select
             size="small"
@@ -224,9 +221,6 @@ export default function AdminFilesPage() {
           </tbody>
         </table>
       </div>
-      <div style={{ marginTop: 10, fontSize: 12, color: 'var(--steel)' }}>
-        報修結案後之照片/影片可直接刪除;其餘檔案由行政定期備份歸檔後再清理,競賽採計檔案保留至評鑑結束。
-      </div>
 
       <Modal
         open={!!deleting}
@@ -238,7 +232,7 @@ export default function AdminFilesPage() {
         onCancel={() => setDeleting(null)}
       >
         <div style={{ fontSize: 13, lineHeight: 1.8 }}>
-          將自系統永久刪除「{deleting?.name}」({deleting ? fmtSize(deleting.sizeMb) : ''}),無法復原。
+          將永久刪除「{deleting?.name}」（{deleting ? fmtSize(deleting.sizeMb) : ''}）無法復原
         </div>
       </Modal>
     </div>

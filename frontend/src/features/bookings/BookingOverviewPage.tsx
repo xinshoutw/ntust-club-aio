@@ -94,7 +94,7 @@ export default function BookingOverviewPage() {
 
   return (
     <div>
-      <PageHeader title="借用總覽" sub={mine} />
+      <PageHeader title="借用總覽" />
 
       {/* 場地借用情形:單日全場地 / 單一場地 15 天(−7~+7),兩種檢視 */}
       <div className="card" style={{ marginTop: 20, padding: '16px 20px 20px' }}>
@@ -121,11 +121,12 @@ export default function BookingOverviewPage() {
                 />
               </Tooltip>
               <DatePicker
-                format={(d) => `${d.format('YYYY/MM/DD')}(週${WEEKDAY[d.day()]})`}
+                format={(d) => `${d.format('YYYY/MM/DD')} (${WEEKDAY[d.day()]})`}
                 size="small"
                 allowClear={false}
                 suffixIcon={null}
-                style={{ width: 156 }}
+                style={{ width: 120 }}
+                styles={{ input: { textAlign: 'center' } }}
                 value={gridDate}
                 disabledDate={(d) => d.isBefore(todayStart, 'day')}
                 onChange={(d) => d && setGridDate(d)}
@@ -183,7 +184,7 @@ export default function BookingOverviewPage() {
             <table style={{ borderCollapse: 'separate', borderSpacing: 3, width: '100%', tableLayout: 'fixed', minWidth: 720 }}>
               <thead>
                 <tr>
-                  <th style={{ ...thStyle, width: 176, textAlign: 'left', paddingRight: 8 }}>場地(容納人數)</th>
+                  <th style={{ ...thStyle, width: 176, textAlign: 'left', paddingRight: 8 }}>場地</th>
                   {PERIODS.map((p) => (
                     <th key={p} className="num" style={thStyle}>{p}</th>
                   ))}
@@ -249,11 +250,6 @@ export default function BookingOverviewPage() {
               </tbody>
             </table>
           )}
-        </div>
-        <div style={{ marginTop: 10, fontSize: 12, color: 'var(--steel)' }}>
-          {!venueDef
-            ? <>點場地名稱檢視該場地 {VENUE_DAYS} 天場況;點「可借」格前往臨時場地借用。</>
-            : <>點「可借」格前往臨時場地借用,並自動帶入場地、日期與時段。</>}
         </div>
       </div>
 

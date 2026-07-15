@@ -70,7 +70,7 @@ export default function AdminViolationsPage() {
             })}
             {VIOLATIONS.length === 0 && (
               <tr className="no-hover">
-                <td colSpan={9} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有違規勸導紀錄。</td>
+                <td colSpan={9} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有違規勸導紀錄</td>
               </tr>
             )}
           </tbody>
@@ -79,7 +79,7 @@ export default function AdminViolationsPage() {
 
       <Modal
         open={!!resolving}
-        title={`銷案 ${resolving?.id ?? ''}`}
+        title="銷案"
         okText="確認銷案"
         onOk={() => form.submit()}
         onCancel={() => {
@@ -96,8 +96,8 @@ export default function AdminViolationsPage() {
             form.resetFields()
           }}
         >
-          <Form.Item name="note" label="銷案說明(必填)" rules={[{ required: true, message: '請輸入銷案說明' }]}>
-            <Input.TextArea rows={2} placeholder="例:已完成愛校服務 2 小時" />
+          <Form.Item name="note" label="銷案說明" rules={[{ required: true, message: '簡述原因' }]}>
+            <Input.TextArea rows={2} placeholder="已完成愛校服務 2 小時" />
           </Form.Item>
         </Form>
       </Modal>

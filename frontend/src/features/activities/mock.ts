@@ -247,7 +247,7 @@ export const ANNOUNCEMENTS: Announcement[] = [
     title: '場地核准通知',
     content: '您申請的 S304 教室(節次 3、4)已核准,請依核定時段使用。',
     date: '2026/06/16',
-    scope: '本社團',
+    scope: '社團',
   },
 ]
 

@@ -92,7 +92,7 @@ export default function AccountsPage() {
   const confirmDelete = (a: Account) =>
     modal.confirm({
       title: `刪除帳號 ${a.name}`,
-      content: '刪除後無法復原;歷史操作紀錄仍保留於稽核軌跡。',
+      content: '確認刪除後將無法復原',
       okText: '確認刪除',
       okButtonProps: { danger: true },
       cancelText: '取消',
@@ -131,7 +131,7 @@ export default function AccountsPage() {
     <td className="r" style={{ whiteSpace: 'nowrap' }}>
       {extra}
       <button type="button" className="link-btn" onClick={() => showPassword(`重設密碼 — ${a.name}`, a.account)}>
-        重設密碼…
+        重設密碼
       </button>
       <button type="button" className="link-btn" onClick={() => toggleActive(a)}>
         {a.active ? '停權' : '恢復'}
@@ -166,7 +166,7 @@ export default function AccountsPage() {
                     setPermOpen(true)
                   }}
                 >
-                  權限…
+                  權限
                 </button>
               ),
             )}
@@ -229,9 +229,6 @@ export default function AccountsPage() {
           </Button>
         }
       />
-      <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        社團帳號請至「社團管理 &gt; 管理項目」操作。
-      </div>
 
       <div className="card" style={{ marginTop: 16, overflowX: 'auto', paddingTop: 8 }}>
         <Tabs
@@ -257,18 +254,14 @@ export default function AccountsPage() {
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>姓名</div>
+
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>姓名</div> {/*  TODO: 要有標記為必填的紅色星號 */}
             <Input value={newName} onChange={(e) => setNewName(e.target.value)} />
           </div>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>帳號(留空自動產生)</div>
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>帳號</div>
             <Input className="num" value={newAccount} onChange={(e) => setNewAccount(e.target.value)} />
           </div>
-          {tab === 'viewers' && (
-            <div style={{ fontSize: 12, color: 'var(--steel)' }}>
-              建立後產生一組帳號密碼;帳號可再次查看,密碼於關閉視窗後消失。
-            </div>
-          )}
         </div>
       </Modal>
 
@@ -292,9 +285,6 @@ export default function AccountsPage() {
           style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}
           options={PERMISSION_KEYS.map(([value, label]) => ({ value, label }))}
         />
-        <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 12 }}>
-          未勾選的頁面不會出現在該管理員的側欄。
-        </div>
       </Modal>
 
       {pwTarget && (

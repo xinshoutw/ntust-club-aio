@@ -50,7 +50,7 @@ export default function EvalDocsPage() {
         title="資料總覽"
         sub={
           <>
-            {club} · {EVAL_WINDOW.label} · 採計期間 <span className="num">{EVAL_WINDOW.range}</span>
+            {EVAL_WINDOW.label} · 採計期間 <span className="num">{EVAL_WINDOW.range}</span>
           </>
         }
         extra={
@@ -63,9 +63,6 @@ export default function EvalDocsPage() {
           </div>
         }
       />
-      <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        行政資料由系統依平時資料自動評分(結案始算)。
-      </div>
 
       <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12 }}>
         {scores.map((s) => (
@@ -107,9 +104,6 @@ export default function EvalDocsPage() {
 
       {/* 五獎項 */}
       <div style={{ fontSize: 15, fontWeight: 600, margin: '28px 0 4px' }}>競賽獎項資料</div>
-      <div style={{ fontSize: 13, color: 'var(--steel)' }}>
-        無論是否已線上報名,皆可先行準備各獎項資料。
-      </div>
       <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
         {AWARDS.map((award) => {
           const p = uploadProgress(award)

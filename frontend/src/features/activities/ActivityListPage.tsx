@@ -5,7 +5,6 @@ import { DownloadOutlined, EllipsisOutlined, FileTextOutlined, FilterOutlined, L
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import LargeBadge from '../../components/ui/LargeBadge'
-import { useAuth } from '../../app/auth'
 import { STATUS } from '../../lib/status'
 import { semesterOf, semesterOptions } from '../../lib/semester'
 import { resultOf } from '../eval/store'
@@ -301,7 +300,6 @@ function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPrevi
 }
 
 export default function ActivityListPage() {
-  const { user } = useAuth()
   const navigate = useNavigate()
   const { message } = App.useApp()
   const semOptions = semesterOptions(CLUB_ACTIVITIES.filter((a) => a.status !== 'draft').map((a) => semesterOf(a.date)))
@@ -371,7 +369,7 @@ export default function ActivityListPage() {
         title="活動列表"
         sub={
           <>
-            {user?.club} · 本學期 <span className="num">{rest.length}</span> 件
+            共 <span className="num">{rest.length}</span> 件
           </>
         }
         extra={
@@ -493,10 +491,6 @@ export default function ActivityListPage() {
           <Pagination current={page} pageSize={PAGE_SIZE} total={rest.length} onChange={setPage} showSizeChanger={false} />
         </div>
       )}
-      <div style={{ marginTop: 10, fontSize: 12, color: 'var(--steel)' }}>
-        點擊列開啟預覽;點欄位標題排序,漏斗圖示篩選。
-      </div>
-
       <PreviewModal
         a={preview}
         open={previewOpen}

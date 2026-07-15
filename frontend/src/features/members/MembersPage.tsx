@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { App, Button, Dropdown, Form, Input, Modal, Pagination, Popconfirm, Select, Upload } from 'antd'
 import { DownOutlined, DownloadOutlined, EditOutlined, FilterOutlined, SwapOutlined, UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
-import { useAuth } from '../../app/auth'
 import { CURRENT_SEMESTER, semesterOptions } from '../../lib/semester'
 import { MEMBERS, type Member } from './mock'
 
@@ -10,7 +9,6 @@ const KINDS: Member['kind'][] = ['社員', '幹部', '副社長／副會長', '�
 const PAGE_SIZE = 50
 
 export default function MembersPage() {
-  const { user } = useAuth()
   const { message } = App.useApp()
   const [members, setMembers] = useState<Member[]>(MEMBERS)
   const [addOpen, setAddOpen] = useState(false)
@@ -119,11 +117,7 @@ export default function MembersPage() {
     <div>
       <PageHeader
         title="成員列表"
-        sub={
-          <>
-            {user?.club} · 共 <span className="num">{view.length}</span> 人
-          </>
-        }
+        sub={ <> 共 <span className="num">{view.length}</span> 人 </> }
         extra={
           <div style={{ display: 'flex', gap: 8 }}>
             <Select
@@ -281,9 +275,6 @@ export default function MembersPage() {
           <Pagination current={page} pageSize={PAGE_SIZE} total={view.length} onChange={setPage} showSizeChanger={false} />
         </div>
       )}
-      <div style={{ marginTop: 10, fontSize: 12, color: 'var(--steel)' }}>
-        名單定期更新採計評鑑「社員、幹部名單更新」行政分。
-      </div>
 
       <Modal
         open={addOpen}

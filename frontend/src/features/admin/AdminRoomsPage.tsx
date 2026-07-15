@@ -24,7 +24,7 @@ function RoomReviewModal({
 }) {
   const { message } = App.useApp()
   const [rejectOpen, setRejectOpen] = useState(false)
-  const [reason, setReason] = useState('')
+  const [reason, setReason] = useState('很抱歉，目前時段無法受理。若仍有借用需求，請聯絡組長，謝謝') // FIXME: 此用法好像不正確，當popup被重新開啟時，文字會被清空
   const hasConflict = item.entries.some((e) => e.periods.some((p) => isConflict(e.dow, p)))
 
   const closeReject = () => {
@@ -56,9 +56,8 @@ function RoomReviewModal({
         </div>
       }
       footer={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ fontSize: 12, color: 'var(--steel)', flex: 1 }}>退回原因必填。</div>
-          <Button danger style={{ height: 38 }} onClick={() => setRejectOpen(true)}>退回…</Button>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
+          <Button danger style={{ height: 38 }} onClick={() => setRejectOpen(true)}>退回</Button>
           <Button
             type="primary"
             style={{ height: 38 }}
@@ -82,7 +81,7 @@ function RoomReviewModal({
               const conflict = isConflict(e.dow, p)
               return (
                 <span key={`${e.dow}-${p}`} className="num" style={{ color: conflict ? '#C13B34' : undefined, fontWeight: conflict ? 500 : undefined }}>
-                  週{DOW_TEXT[e.dow]} 第{p}節{conflict && '(衝突)'}
+                  週{DOW_TEXT[e.dow]} 第 {p} 節{conflict && '（衝突）'}
                 </span>
               )
             }),
@@ -91,7 +90,7 @@ function RoomReviewModal({
       </div>
       {hasConflict && (
         <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--paper)', borderRadius: 6, fontSize: 13, color: '#B03A2E' }}>
-          此申請有時段與其他申請衝突,請整單擇一核准或協調換時段。
+          此申請與其他申請衝突，請擇一核准
         </div>
       )}
 
@@ -104,12 +103,12 @@ function RoomReviewModal({
         onOk={submitReject}
         onCancel={closeReject}
       >
-        <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 8 }}>退回原因(必填,通知社團)</div>
+        <div ></div>
         <Input.TextArea
           rows={3}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="例:所選時段已由其他社團固定借用"
+          placeholder="簡述說明"
         />
       </Modal>
     </Modal>
@@ -148,9 +147,6 @@ export default function AdminRoomsPage() {
           </>
         }
       />
-      <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        紅字時段與其他申請衝突,請擇一核准或協調換時段。
-      </div>
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         <table className="tb dense" style={{ minWidth: 760 }}>

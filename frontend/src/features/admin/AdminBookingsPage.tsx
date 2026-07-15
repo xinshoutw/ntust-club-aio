@@ -71,8 +71,7 @@ function BookingReviewModal({
       }
       footer={
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ fontSize: 12, color: 'var(--steel)', flex: 1 }}>退回原因必填。</div>
-          <Button danger style={{ height: 38 }} onClick={() => setRejectOpen(true)}>退回…</Button>
+          <Button danger style={{ height: 38 }} onClick={() => setRejectOpen(true)}>退回</Button>
           <Button
             type="primary"
             style={{ height: 38 }}

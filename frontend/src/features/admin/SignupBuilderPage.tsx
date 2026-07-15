@@ -59,7 +59,6 @@ export default function SignupBuilderPage() {
     <div>
       <PageHeader
         title="報名活動建立"
-        sub="自訂報名欄位;社團端子頁即時預覽於右側"
         extra={
           <div style={{ display: 'flex', gap: 10 }}>
             <Button style={{ height: 36 }} onClick={() => message.success('已儲存草稿')}>儲存草稿</Button>
@@ -103,7 +102,7 @@ export default function SignupBuilderPage() {
                 <DatePicker style={{ width: '100%' }} format="YYYY/MM/DD" />
               </label>
               <label>
-                <div style={fieldLabel}>每社團名額上限</div>
+                <div style={fieldLabel}>名額上限</div>
                 <InputNumber style={{ width: '100%' }} min={1} value={cap} onChange={setCap} />
               </label>
               <label style={{ gridColumn: '1 / -1' }}>
@@ -115,10 +114,7 @@ export default function SignupBuilderPage() {
 
           <div className="card" style={{ padding: 24 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
-              <div style={{ fontSize: 16, fontWeight: 600 }}>報名欄位</div>
-              <div style={{ fontSize: 12, color: 'var(--steel)' }}>
-                姓名、學號、系級為系統預設欄位,不需另建
-              </div>
+              <div style={{ fontSize: 16, fontWeight: 600 }}>資訊調查</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
               {fields.map((f) => (
@@ -185,39 +181,36 @@ export default function SignupBuilderPage() {
 
         <div className="builder-preview-col">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <span style={{ fontSize: 11, color: 'var(--steel)', letterSpacing: 2, fontWeight: 500 }}>預覽</span>
-            <span style={{ fontSize: 12, color: 'var(--steel)' }}>社團端呈現(即時)</span>
+            <span style={{ fontSize: 11, color: 'var(--steel)', letterSpacing: 2, fontWeight: 500 }}>即時預覽</span>
           </div>
           <div className="builder-preview-frame">
-            <div style={{ background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 6, padding: 16 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                <div style={{ fontSize: 16, fontWeight: 600 }}>{name || '(未命名活動)'} — 報名</div>
-                <KindBadge kind={kind} />
-              </div>
-              <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 6, padding: 14, marginTop: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>
-                    參加人 <span className="num">1</span>
-                  </div>
-                  <div style={{ flex: 1 }} />
-                  <span style={{ fontSize: 12, color: 'var(--steel)' }}>移除</span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    <PreviewInput label="姓名" required />
-                    <PreviewInput label="學號" required />
-                  </div>
-                  <PreviewInput label="系級" required />
-                  {fields.map((f) => (
-                    <PreviewField key={f.key} field={f} />
-                  ))}
-                </div>
-              </div>
-              <div className="builder-preview-add num">
-                + 新增參加人(1/{cap ?? '—'})
-              </div>
-              <div className="builder-preview-submit">送出報名</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 16, fontWeight: 600 }}>{name || '(未命名活動)'} — 報名</div>
+              <KindBadge kind={kind} />
             </div>
+            <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 6, padding: 14, marginTop: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>
+                  參加人 <span className="num">1</span>
+                </div>
+                <div style={{ flex: 1 }} />
+                <span style={{ fontSize: 12, color: 'var(--steel)' }}>移除</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <PreviewInput label="姓名" required />
+                  <PreviewInput label="學號" required />
+                </div>
+                <PreviewInput label="系級" required />
+                {fields.map((f) => (
+                  <PreviewField key={f.key} field={f} />
+                ))}
+              </div>
+            </div>
+            <div className="builder-preview-add num">
+              + 新增參加人(1/{cap ?? '—'})
+            </div>
+            <div className="builder-preview-submit">送出報名</div>
           </div>
         </div>
       </div>

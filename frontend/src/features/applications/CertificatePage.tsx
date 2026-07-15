@@ -37,7 +37,7 @@ export default function CertificatePage() {
     <div>
       <PageHeader title="幹部證明" />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        社(會)長、副社(會)長服務證明,製作約 <span className="num">2</span> 個工作天。
+        製作需 <span className="num">2</span> 個工作天
       </div>
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
@@ -86,11 +86,11 @@ export default function CertificatePage() {
       </div>
 
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>我的申請(近 5 筆)</div>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
         <table className="tb" style={{ minWidth: 480 }}>
           <tbody>
             <tr>
-              <td style={{ fontWeight: 500 }}>顏志明(社長或會長)</td>
+              <td style={{ fontWeight: 500 }}>顏志明 (社長或會長)</td>
               <td style={{ color: 'var(--steel)', fontSize: 13 }}>114學年度第2學期</td>
               <td className="num" style={{ fontSize: 13, width: 110 }}>2026/06/10</td>
               <td style={{ width: 100 }}><StatusPill status="pending" /></td>

@@ -28,9 +28,6 @@ export default function MaintenancePage() {
   return (
     <div>
       <PageHeader title="空間報修" />
-      <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        社團活動空間設施損壞報修。
-      </div>
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
         <Form
@@ -82,7 +79,7 @@ export default function MaintenancePage() {
       </div>
 
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>我的報修(近 5 筆)</div>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近報修</div>
         <table className="tb" style={{ minWidth: 620 }}>
           <tbody>
             {RECORDS.slice(0, 5).map((r) => (

@@ -36,9 +36,6 @@ export default function SignupListPage() {
           <Select value={semester} onChange={setSemester} style={{ width: 120 }} options={semOptions} />
         }
       />
-      <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        報名人數上限為單一社團配額。
-      </div>
 
       <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
         {items.map((item) => {

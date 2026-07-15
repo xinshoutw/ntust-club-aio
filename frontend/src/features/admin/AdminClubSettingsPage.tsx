@@ -1,58 +1,13 @@
 import { useState } from 'react'
-import { App, Button, Input, Modal, Switch } from 'antd'
-import { CopyOutlined } from '@ant-design/icons'
+import { App, Button, Input, Switch } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import { CLUB_PROFILE } from '../club-settings/mock'
 import ClubSelect from './ClubSelect'
+import OneTimePasswordModal from './OneTimePasswordModal'
 import { CLUBS_MASTER } from './clubsMock'
 import { useAdminClub } from './clubContext'
 
 const label: React.CSSProperties = { color: 'var(--steel)' }
-
-// 產生一次性密碼(mock;正式由後端產生並強制首登改密)
-function genPassword(): string {
-  const pick = (chars: string, n: number) =>
-    Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
-  return (
-    pick('ABCDEFGHJKLMNPQRSTUVWXYZ', 3) +
-    pick('abcdefghjkmnpqrstuvwxyz', 4) +
-    pick('23456789', 3) +
-    pick('!@#$%^&*', 2)
-  )
-}
-
-// 一次性密碼彈窗:預設隱藏、可複製;關閉後不再顯示
-function PasswordModal({ club, open, onClose, afterClose }: { club: string; open: boolean; onClose: () => void; afterClose: () => void }) {
-  const { message } = App.useApp()
-  const [password] = useState(genPassword)
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(password)
-      message.success('已複製密碼')
-    } catch {
-      message.error('複製失敗,請以顯示密碼後手動複製')
-    }
-  }
-
-  return (
-    <Modal
-      open={open}
-      onCancel={onClose}
-      afterClose={afterClose}
-      title={`重設密碼 — ${club}`}
-      footer={<Button type="primary" onClick={onClose}>完成</Button>}
-    >
-      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-        <Input.Password value={password} readOnly className="num" />
-        <Button icon={<CopyOutlined />} onClick={copy}>複製</Button>
-      </div>
-      <div style={{ fontSize: 12, color: '#8A5A00', marginTop: 10, lineHeight: 1.7 }}>
-        此密碼僅顯示這一次,關閉視窗後將無法再查看;請先複製並轉交社團。社團首次登入將強制變更密碼。
-      </div>
-    </Modal>
-  )
-}
 
 // 行政端管理項目:社團自行維護的內容唯讀;可改名稱/帳號、重設密碼、啟停用
 export default function AdminClubSettingsPage() {
@@ -146,9 +101,14 @@ export default function AdminClubSettingsPage() {
         </div>
       </div>
 
-      {/* key 依開啟次數不需要:每次掛載重新產生一組密碼;關閉動畫結束後卸載 */}
+      {/* 每次掛載重新產生一組密碼;關閉動畫結束後卸載 */}
       {pwMounted && (
-        <PasswordModal club={club} open={pwOpen} onClose={() => setPwOpen(false)} afterClose={() => setPwMounted(false)} />
+        <OneTimePasswordModal
+          title={`重設密碼 — ${club}`}
+          open={pwOpen}
+          onClose={() => setPwOpen(false)}
+          afterClose={() => setPwMounted(false)}
+        />
       )}
     </div>
   )

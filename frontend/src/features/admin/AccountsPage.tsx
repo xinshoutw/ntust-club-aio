@@ -1,125 +1,308 @@
-import { App, Button } from 'antd'
+import { useState } from 'react'
+import { App, Button, Checkbox, Input, Modal, Tabs } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
+import OneTimePasswordModal from './OneTimePasswordModal'
 
+// 頁面權限鍵(與後端 permissions 對齊;super 不受限)
+const PERMISSION_KEYS = [
+  ['areview', '活動申請審核'],
+  ['aclose', '結案審核'],
+  ['asignup', '報名管理'],
+  ['aannounce', '發布公告'],
+  ['abooking', '臨時場地器材借用審核'],
+  ['aroom', '教室固定借用審核'],
+  ['amember', '社團管理'],
+  ['aeval', '行政分審核'],
+  ['amaint', '維修管理'],
+  ['aviol', '違規管理'],
+  ['afiles', '檔案管理'],
+] as const
 
-// 三個帳號管理頁共用同一版型:表格 + 重設密碼/停用
-export function AdminAccountsPage() {
-  const { message } = App.useApp()
-  const admins = [
-    { name: '王組長', account: 'admin_wang', scope: '最高權限', perms: '全部' },
-    { name: '李承辦', account: 'admin_lee', scope: '一般', perms: '活動審核、結案審核、待審彙整、報名管理' },
-    { name: '陳助理', account: 'admin_chen', scope: '一般', perms: '借用審核、維修、違規、成員管理' },
-    { name: '學務長', account: 'dean', scope: '受限(僅簽核)', perms: '學務長簽核關' },
-  ]
+interface Account {
+  name: string
+  account: string
+  active: boolean
+  scope?: string // 管理員:最高權限/一般/受限
+  perms?: string
+  awards?: string // 評審:負責獎項
+  group?: string // 評審:分組
+}
+
+const ADMINS: Account[] = [
+  { name: '王組長', account: 'admin_wang', active: true, scope: '最高權限', perms: '全部' },
+  { name: '李承辦', account: 'admin_lee', active: true, scope: '一般', perms: '活動審核、結案審核、報名管理' },
+  { name: '陳助理', account: 'admin_chen', active: true, scope: '一般', perms: '借用審核、維修、違規、社團管理' },
+  { name: '學務長', account: 'dean', active: true, scope: '受限(僅簽核)', perms: '學務長簽核關' },
+]
+
+const STAFF: Account[] = [
+  { name: '李工讀', account: 'staff_lee', active: true },
+  { name: '陳工讀', account: 'staff_chen', active: true },
+]
+
+const VIEWERS: Account[] = [
+  { name: '張老師', account: 'viewer01', active: true, awards: '最佳社團獎、最佳活動獎', group: '第 1 組(資工系學會、電機系學會)' },
+  { name: '李老師', account: 'viewer02', active: true, awards: '最佳財務獎、最佳成果發表獎', group: '第 1 組(資工系學會、電機系學會)' },
+  { name: '陳老師', account: 'viewer03', active: false, awards: '最佳社團負責人獎', group: '第 2 組(學生會)' },
+]
+
+function ActiveTag({ active }: { active: boolean }) {
   return (
-    <div>
-      <PageHeader title="管理員帳號" extra={<Button type="primary" style={{ height: 36 }} onClick={() => message.info('新增管理員(接後端後啟用)')}>+ 新增</Button>} />
-      <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-        <table className="tb" style={{ minWidth: 720 }}>
-          <thead>
-            <tr><th>姓名</th><th>帳號</th><th>權限層級</th><th>頁面權限</th><th className="r">動作</th></tr>
-          </thead>
-          <tbody>
-            {admins.map((a) => (
-              <tr key={a.account}>
-                <td style={{ fontWeight: 500 }}>{a.name}</td>
-                <td className="num" style={{ color: 'var(--steel)' }}>{a.account}</td>
-                <td>{a.scope}</td>
-                <td style={{ fontSize: 13, color: 'var(--steel)' }}>{a.perms}</td>
-                <td className="r" style={{ whiteSpace: 'nowrap' }}>
-                  <button type="button" className="link-btn" onClick={() => message.success(`已重設 ${a.name} 密碼並寄送`)}>重設密碼</button>
-                  <button type="button" className="link-btn danger" onClick={() => message.info('停用帳號(接後端後啟用)')}>停用</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        height: 22,
+        padding: '0 10px',
+        borderRadius: 999,
+        fontSize: 12,
+        fontWeight: 500,
+        background: active ? '#E3F2E9' : '#E8EAEE',
+        color: active ? '#1F6B45' : '#3A3F4A',
+      }}
+    >
+      {active ? '啟用' : '停權'}
+    </span>
   )
 }
 
-export function ClubAccountsPage() {
-  const { message } = App.useApp()
-  const clubs = [
-    { club: '資工系學會', account: 'csie_club', active: true },
-    { club: '電機系學會', account: 'ee_club', active: true },
-    { club: '機械系學會', account: 'me_club', active: false },
-  ]
-  return (
-    <div>
-      <PageHeader title="社團帳號" extra={<Button type="primary" style={{ height: 36 }} onClick={() => message.info('新增社團帳號(接後端後啟用)')}>+ 新增</Button>} />
-      <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-        <table className="tb" style={{ minWidth: 640 }}>
-          <thead>
-            <tr><th>社團</th><th>帳號</th><th>狀態</th><th className="r">動作</th></tr>
-          </thead>
-          <tbody>
-            {clubs.map((c) => (
-              <tr key={c.account}>
-                <td style={{ fontWeight: 500 }}>{c.club}</td>
-                <td className="num" style={{ color: 'var(--steel)' }}>{c.account}</td>
-                <td>
-                  <span
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      height: 22,
-                      padding: '0 10px',
-                      borderRadius: 999,
-                      fontSize: 12,
-                      fontWeight: 500,
-                      background: c.active ? '#E3F2E9' : '#E8EAEE',
-                      color: c.active ? '#1F6B45' : '#3A3F4A',
-                    }}
-                  >
-                    {c.active ? '啟用' : '停用'}
-                  </span>
-                </td>
-                <td className="r" style={{ whiteSpace: 'nowrap' }}>
-                  <button type="button" className="link-btn" onClick={() => message.success(`已重設 ${c.club} 密碼(首次登入強制改密)`)}>重設密碼</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
-}
+// 帳號管理合一頁:新增/刪除/停權/重設密碼/權限設定集中於此(社團帳號在「社團管理 > 管理項目」)
+export default function AccountsPage() {
+  const { message, modal } = App.useApp()
+  const [tab, setTab] = useState('admins')
+  // 一次性密碼彈窗:目標帳號 + 顯示開關(關閉動畫結束後卸載)
+  const [pwTarget, setPwTarget] = useState<{ title: string; account?: string } | null>(null)
+  const [pwOpen, setPwOpen] = useState(false)
+  // 權限設定彈窗
+  const [permTarget, setPermTarget] = useState<Account | null>(null)
+  const [permOpen, setPermOpen] = useState(false)
+  // 新增帳號彈窗(依分頁角色)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newAccount, setNewAccount] = useState('')
 
-export function ViewerAccountsPage() {
-  const { message } = App.useApp()
-  const viewers = [
-    { name: '張老師', awards: '最佳社團獎、最佳活動獎', clubs: '第 1 組(資工系學會、電機系學會)' },
-    { name: '李老師', awards: '最佳財務獎、最佳成果發表獎', clubs: '第 1 組(資工系學會、電機系學會)' },
-    { name: '陳老師', awards: '最佳社團負責人獎', clubs: '第 2 組(學生會)' },
-  ]
+  const roleLabel = tab === 'admins' ? '管理員' : tab === 'staff' ? '工讀生' : '評審'
+
+  const showPassword = (title: string, account?: string) => {
+    setPwTarget({ title, account })
+    setPwOpen(true)
+  }
+
+  const confirmDelete = (a: Account) =>
+    modal.confirm({
+      title: `刪除帳號 ${a.name}`,
+      content: '刪除後無法復原;歷史操作紀錄仍保留於稽核軌跡。',
+      okText: '確認刪除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: () => message.success(`已刪除 ${a.name}(${a.account})`),
+    })
+
+  const toggleActive = (a: Account) => {
+    if (a.active) {
+      modal.confirm({
+        title: `停權 ${a.name}`,
+        content: '停權後無法登入,可隨時恢復。',
+        okText: '確認停權',
+        okButtonProps: { danger: true },
+        cancelText: '取消',
+        onOk: () => message.success(`已停權 ${a.name}`),
+      })
+    } else {
+      message.success(`已恢復 ${a.name} 的帳號`)
+    }
+  }
+
+  const createAccount = () => {
+    if (!newName.trim()) {
+      message.error('請輸入姓名。')
+      return
+    }
+    const account = newAccount.trim() || `${tab === 'admins' ? 'admin' : tab === 'staff' ? 'staff' : 'viewer'}_${newName.trim().toLowerCase()}`
+    setCreateOpen(false)
+    setNewName('')
+    setNewAccount('')
+    // 建立後直接顯示帳號與一次性密碼
+    showPassword(`已建立${roleLabel}帳號 — ${newName.trim()}`, account)
+  }
+
+  const actions = (a: Account, extra?: React.ReactNode) => (
+    <td className="r" style={{ whiteSpace: 'nowrap' }}>
+      {extra}
+      <button type="button" className="link-btn" onClick={() => showPassword(`重設密碼 — ${a.name}`, a.account)}>
+        重設密碼…
+      </button>
+      <button type="button" className="link-btn" onClick={() => toggleActive(a)}>
+        {a.active ? '停權' : '恢復'}
+      </button>
+      <button type="button" className="link-btn danger" onClick={() => confirmDelete(a)}>
+        刪除
+      </button>
+    </td>
+  )
+
+  const adminsTable = (
+    <table className="tb" style={{ minWidth: 760 }}>
+      <thead>
+        <tr><th>姓名</th><th>帳號</th><th>權限層級</th><th>頁面權限</th><th>狀態</th><th className="r">動作</th></tr>
+      </thead>
+      <tbody>
+        {ADMINS.map((a) => (
+          <tr key={a.account}>
+            <td style={{ fontWeight: 500 }}>{a.name}</td>
+            <td className="num" style={{ color: 'var(--steel)' }}>{a.account}</td>
+            <td>{a.scope}</td>
+            <td style={{ fontSize: 13, color: 'var(--steel)' }}>{a.perms}</td>
+            <td><ActiveTag active={a.active} /></td>
+            {actions(
+              a,
+              a.scope !== '最高權限' && (
+                <button
+                  type="button"
+                  className="link-btn"
+                  onClick={() => {
+                    setPermTarget(a)
+                    setPermOpen(true)
+                  }}
+                >
+                  權限…
+                </button>
+              ),
+            )}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+
+  const staffTable = (
+    <table className="tb" style={{ minWidth: 560 }}>
+      <thead>
+        <tr><th>姓名</th><th>帳號</th><th>狀態</th><th className="r">動作</th></tr>
+      </thead>
+      <tbody>
+        {STAFF.map((a) => (
+          <tr key={a.account}>
+            <td style={{ fontWeight: 500 }}>{a.name}</td>
+            <td className="num" style={{ color: 'var(--steel)' }}>{a.account}</td>
+            <td><ActiveTag active={a.active} /></td>
+            {actions(a)}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  )
+
+  const viewersTable = (
+    <>
+      <div style={{ fontSize: 13, color: 'var(--steel)', padding: '0 20px 8px' }}>
+        評審對社團匿名呈現(依組內排序顯示為評審A、評審B);分組與獎項指派接後端後在此調整。
+      </div>
+      <table className="tb" style={{ minWidth: 760 }}>
+        <thead>
+          <tr><th>評審</th><th>帳號</th><th>負責獎項</th><th>分組</th><th>狀態</th><th className="r">動作</th></tr>
+        </thead>
+        <tbody>
+          {VIEWERS.map((a) => (
+            <tr key={a.account}>
+              <td style={{ fontWeight: 500 }}>{a.name}</td>
+              <td className="num" style={{ color: 'var(--steel)' }}>{a.account}</td>
+              <td style={{ fontSize: 13 }}>{a.awards}</td>
+              <td style={{ fontSize: 13, color: 'var(--steel)' }}>{a.group}</td>
+              <td><ActiveTag active={a.active} /></td>
+              {actions(a)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  )
+
   return (
     <div>
-      <PageHeader title="評審老師與指派" extra={<Button type="primary" style={{ height: 36 }} onClick={() => message.info('新增評審與分組(接後端後啟用)')}>+ 新增評審</Button>} />
+      <PageHeader
+        title="帳號管理"
+        extra={
+          <Button type="primary" style={{ height: 36 }} onClick={() => setCreateOpen(true)}>
+            + 新增{roleLabel}
+          </Button>
+        }
+      />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        評審對社團匿名呈現(依組內排序顯示為評審A、評審B)。
+        社團帳號請至「社團管理 &gt; 管理項目」操作。
       </div>
-      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-        <table className="tb" style={{ minWidth: 720 }}>
-          <thead>
-            <tr><th>評審</th><th>負責獎項</th><th>分組</th><th className="r">動作</th></tr>
-          </thead>
-          <tbody>
-            {viewers.map((v) => (
-              <tr key={v.name}>
-                <td style={{ fontWeight: 500 }}>{v.name}</td>
-                <td style={{ fontSize: 13 }}>{v.awards}</td>
-                <td style={{ fontSize: 13, color: 'var(--steel)' }}>{v.clubs}</td>
-                <td className="r">
-                  <button type="button" className="link-btn" onClick={() => message.info('調整指派(接後端後啟用)')}>調整指派</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+
+      <div className="card" style={{ marginTop: 16, overflowX: 'auto', paddingTop: 8 }}>
+        <Tabs
+          activeKey={tab}
+          onChange={setTab}
+          style={{ padding: '0 20px' }}
+          items={[
+            { key: 'admins', label: '管理員', children: adminsTable },
+            { key: 'staff', label: '工讀生', children: staffTable },
+            { key: 'viewers', label: '評審', children: viewersTable },
+          ]}
+        />
       </div>
+
+      {/* 新增帳號:建立後顯示帳號與一次性密碼 */}
+      <Modal
+        open={createOpen}
+        title={`新增${roleLabel}`}
+        okText="建立帳號"
+        cancelText="取消"
+        onOk={createAccount}
+        onCancel={() => setCreateOpen(false)}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>姓名</div>
+            <Input value={newName} onChange={(e) => setNewName(e.target.value)} />
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>帳號(留空自動產生)</div>
+            <Input className="num" value={newAccount} onChange={(e) => setNewAccount(e.target.value)} />
+          </div>
+          {tab === 'viewers' && (
+            <div style={{ fontSize: 12, color: 'var(--steel)' }}>
+              建立後產生一組帳號密碼;帳號可再次查看,密碼於關閉視窗後消失。
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* 權限設定(一般管理員) */}
+      <Modal
+        open={permOpen}
+        afterClose={() => setPermTarget(null)}
+        title={`頁面權限 — ${permTarget?.name ?? ''}`}
+        okText="儲存"
+        cancelText="取消"
+        onOk={() => {
+          setPermOpen(false)
+          message.success(`已更新 ${permTarget?.name} 的頁面權限`)
+        }}
+        onCancel={() => setPermOpen(false)}
+      >
+        <Checkbox.Group
+          defaultValue={['areview', 'aclose', 'asignup']}
+          style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}
+          options={PERMISSION_KEYS.map(([value, label]) => ({ value, label }))}
+        />
+        <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 12 }}>
+          未勾選的頁面不會出現在該管理員的側欄。
+        </div>
+      </Modal>
+
+      {pwTarget && (
+        <OneTimePasswordModal
+          title={pwTarget.title}
+          account={pwTarget.account}
+          open={pwOpen}
+          onClose={() => setPwOpen(false)}
+          afterClose={() => setPwTarget(null)}
+        />
+      )}
     </div>
   )
 }

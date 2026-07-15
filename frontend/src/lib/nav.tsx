@@ -163,9 +163,8 @@ export const ADMIN_NAV: NavGroup[] = [
   {
     label: '帳號與權限',
     items: [
-      // 社團帳號操作已併入「社團管理 > 管理項目」
-      { key: 'a-admins', label: '管理員帳號', path: '/admin/accounts/admins', icon: <SolutionOutlined /> },
-      { key: 'a-viewers', label: '評審老師與指派', path: '/admin/accounts/viewers', icon: <IdcardOutlined /> },
+      // 新增/刪除/停權/權限設定合一頁;社團帳號操作在「社團管理 > 管理項目」
+      { key: 'a-accounts', label: '帳號管理', path: '/admin/accounts', icon: <SolutionOutlined /> },
     ],
   },
   {

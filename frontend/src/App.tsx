@@ -37,7 +37,7 @@ import AdminRoomsPage from './features/admin/AdminRoomsPage'
 import AdminMembersPage from './features/admin/AdminMembersPage'
 import OverduePage from './features/admin/OverduePage'
 import AdminEvalPage from './features/admin/AdminEvalPage'
-import { AdminAccountsPage, ViewerAccountsPage } from './features/admin/AccountsPage'
+import AccountsPage from './features/admin/AccountsPage'
 import AdminFilesPage from './features/admin/AdminFilesPage'
 import AdminMaintenancePage from './features/admin/AdminMaintenancePage'
 import AdminSettingsPage from './features/admin/AdminSettingsPage'
@@ -112,8 +112,7 @@ export default function App() {
         <Route path="club-settings" element={<AdminClubSettingsPage />} />
         <Route path="overdue" element={<OverduePage />} />
         <Route path="eval" element={<AdminEvalPage />} />
-        <Route path="accounts/admins" element={<AdminAccountsPage />} />
-        <Route path="accounts/viewers" element={<ViewerAccountsPage />} />
+        <Route path="accounts" element={<AccountsPage />} />
         <Route path="maintenance" element={<AdminMaintenancePage />} />
         <Route path="violations" element={<AdminViolationsPage />} />
         <Route path="files" element={<AdminFilesPage />} />

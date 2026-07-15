@@ -36,6 +36,8 @@ export interface SignupItem {
   fields: SignupField[]
   hasDraft?: boolean
   submission?: SignupSubmission
+  // 管理員於活動結束後登錄之簽到場次數(本社);評鑑僅採計簽到,僅報名不計分
+  attendedSessions?: number
 }
 
 export const FIELD_TYPE_LABEL: Record<FieldType, string> = {

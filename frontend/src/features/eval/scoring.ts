@@ -23,8 +23,8 @@ export interface ScoringInput {
   results: ActivityResultInput[]
   rosterBySemester: Record<string, number> // 區間內兩學期的名單人數
   hasWebsite: boolean
-  leaderMeetingAttended: boolean
-  cadreTrainingAttended: boolean
+  leaderMeetingsAttended: number // 負責人會議已簽到場次(管理員於活動後登錄;每學期 2 場、全學年 4 場)
+  cadreTrainingAttended: boolean // 幹訓已簽到(管理員登錄;僅報名不計)
   violationCount: number // 未銷案勸導紀錄數
   merit: number // 表現優良加分(學務處登錄,0–5)
 }
@@ -38,6 +38,7 @@ export interface AdScore {
 
 const MIN_PHOTOS = 5
 const LARGE_MULTIPLIER = 3
+export const LEADER_MEETING_POINTS = 1.25 // 負責人會議每場 1.25 分,全學年 4 場滿分 5
 export const AD_MAX: Record<AdKey, number> = {
   ad1: 15, ad2: 15, ad3: 15, ad4: 30, ad5: 10, ad6: 5, ad7: 5, ad8: 5, adj: 5,
 }
@@ -80,8 +81,9 @@ export function computeAdScores(i: ScoringInput): AdScore[] {
   // ad6 網頁經營:有連結即給滿分(需求方 2026-07-14 簡化,不追蹤更新時間)
   const ad6 = i.hasWebsite ? AD_MAX.ad6 : 0
 
-  // ad7/ad8 會議與幹訓:全程參與即給分(出席由學務處登錄)
-  const ad7 = i.leaderMeetingAttended ? AD_MAX.ad7 : 0
+  // ad7/ad8 會議與幹訓:以管理員活動後之簽到為準,僅報名不計分
+  // ad7 每場 1.25 分(每學期 2 場、全學年 4 場滿分);ad8 簽到即滿分
+  const ad7 = cap(i.leaderMeetingsAttended * LEADER_MEETING_POINTS, AD_MAX.ad7)
   const ad8 = i.cadreTrainingAttended ? AD_MAX.ad8 : 0
 
   // 加減分:表現優良最多 +5;違規記點一次 −1、最多 −10
@@ -101,8 +103,16 @@ export function computeAdScores(i: ScoringInput): AdScore[] {
       note: semesters.map(([s, c]) => `${s}:${c} 人 → ${semesterScore(c)} 分`).join(';') || '無名單資料',
     },
     { key: 'ad6', auto: ad6, max: AD_MAX.ad6, note: i.hasWebsite ? '已設定網頁連結' : '未設定網頁連結' },
-    { key: 'ad7', auto: ad7, max: AD_MAX.ad7, note: i.leaderMeetingAttended ? '已全程參與' : '無出席紀錄' },
-    { key: 'ad8', auto: ad8, max: AD_MAX.ad8, note: i.cadreTrainingAttended ? '已派幹部全程參與' : '無參與紀錄' },
+    {
+      key: 'ad7',
+      auto: ad7,
+      max: AD_MAX.ad7,
+      note:
+        i.leaderMeetingsAttended > 0
+          ? `已簽到 ${i.leaderMeetingsAttended} 場 × ${LEADER_MEETING_POINTS} 分(全學年 4 場)`
+          : '無簽到紀錄(以管理員活動後登錄之簽到為準)',
+    },
+    { key: 'ad8', auto: ad8, max: AD_MAX.ad8, note: i.cadreTrainingAttended ? '幹訓已簽到' : '無簽到紀錄(以管理員活動後登錄之簽到為準)' },
     {
       key: 'adj',
       auto: adj,

@@ -6,7 +6,7 @@ const base: ScoringInput = {
   results: [],
   rosterBySemester: {},
   hasWebsite: false,
-  leaderMeetingAttended: false,
+  leaderMeetingsAttended: 0,
   cadreTrainingAttended: false,
   violationCount: 0,
   merit: 0,
@@ -75,10 +75,15 @@ describe('ad5 名單更新', () => {
 })
 
 describe('ad6–ad8 與加減分', () => {
-  test('網頁有連結即滿分;會議/幹訓依出席', () => {
+  test('網頁有連結即滿分;幹訓依簽到', () => {
     expect(score({ hasWebsite: true }, 'ad6')).toBe(5)
-    expect(score({ leaderMeetingAttended: true }, 'ad7')).toBe(5)
     expect(score({ cadreTrainingAttended: true }, 'ad8')).toBe(5)
+  })
+  test('負責人會議每場簽到 1.25 分,全學年 4 場滿分 5 分', () => {
+    expect(score({ leaderMeetingsAttended: 0 }, 'ad7')).toBe(0)
+    expect(score({ leaderMeetingsAttended: 2 }, 'ad7')).toBe(2.5)
+    expect(score({ leaderMeetingsAttended: 4 }, 'ad7')).toBe(5)
+    expect(score({ leaderMeetingsAttended: 6 }, 'ad7')).toBe(5)
   })
   test('違規每筆 −1 上限 −10;表現優良上限 +5', () => {
     expect(score({ violationCount: 3 }, 'adj')).toBe(-3)

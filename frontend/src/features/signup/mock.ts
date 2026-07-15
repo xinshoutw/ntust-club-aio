@@ -11,6 +11,7 @@ export const SIGNUP_ITEMS: SignupItem[] = [
     info: '場次制(全學年 4 場)· 每月第一週週三 18:30 · 第二教學大樓 TR-201 · 對象:社長或副社長',
     deadline: '2026/07/20',
     maxParticipants: 1,
+    attendedSessions: 2, // 已簽到 2 場(ad7:每場 1.25 分)
     fields: [{ key: 'phone', label: '聯絡電話', type: 'text', required: true }],
     submission: {
       submittedAt: '2026/07/02 14:30',

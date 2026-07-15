@@ -105,9 +105,12 @@ export function buildScoringInput(club: string): ScoringInput {
       EVAL_WINDOW.semesters.map((s) => [s, MEMBERS.filter((m) => m.semester === s).length]),
     ),
     hasWebsite: CLUB_PROFILE.url.trim() !== '',
-    // mock 以報名紀錄暫代出席;後端須以實際出席(session_attendance/幹訓簽到)餵入
-    leaderMeetingAttended: SIGNUP_ITEMS.some((i) => i.kind === 'leader_meeting' && i.submission),
-    cadreTrainingAttended: SIGNUP_ITEMS.some((i) => i.kind === 'cadre_training' && i.submission),
+    // 出席=管理員於活動後登錄之簽到(attendedSessions);僅報名不計分
+    leaderMeetingsAttended: SIGNUP_ITEMS.filter((i) => i.kind === 'leader_meeting').reduce(
+      (s, i) => s + (i.attendedSessions ?? 0),
+      0,
+    ),
+    cadreTrainingAttended: SIGNUP_ITEMS.some((i) => i.kind === 'cadre_training' && (i.attendedSessions ?? 0) > 0),
     violationCount: VIOLATIONS.filter(
       (v) => v.club === club && v.status === 'violation_open' && EVAL_WINDOW.semesters.includes(semesterOf(v.date)),
     ).length,

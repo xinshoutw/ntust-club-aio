@@ -72,6 +72,8 @@ function ActiveTag({ active }: { active: boolean }) {
 export default function AccountsPage() {
   const { message, modal } = App.useApp()
   const [tab, setTab] = useState('admins')
+  // 管理員列表為 state:權限彈窗「儲存」須實際落地(重開/列表即時反映)
+  const [admins, setAdmins] = useState<Account[]>(ADMINS)
   // 一次性密碼彈窗:目標帳號 + 顯示開關(關閉動畫結束後卸載);重設流程按鈕文字為「確認重設」
   const [pwTarget, setPwTarget] = useState<{ title: string; account?: string; okLabel?: string } | null>(null)
   const [pwOpen, setPwOpen] = useState(false)
@@ -150,7 +152,7 @@ export default function AccountsPage() {
         <tr><th>姓名</th><th>帳號</th><th>權限層級</th><th>頁面權限</th><th>狀態</th><th className="r">動作</th></tr>
       </thead>
       <tbody>
-        {ADMINS.map((a) => (
+        {admins.map((a) => (
           <tr key={a.account}>
             <td style={{ fontWeight: 500 }}>{a.name}</td>
             <td className="num" style={{ color: 'var(--steel)' }}>{a.account}</td>
@@ -246,21 +248,26 @@ export default function AccountsPage() {
         />
       </div>
 
-      {/* 新增帳號:建立後顯示帳號與一次性密碼 */}
+      {/* 新增帳號:建立後顯示帳號與一次性密碼;destroyOnHidden+取消清空,重開不殘留 */}
       <Modal
         open={createOpen}
         title={`新增${roleLabel}`}
         okText="建立帳號"
         cancelText="取消"
+        destroyOnHidden
         onOk={createAccount}
-        onCancel={() => setCreateOpen(false)}
+        onCancel={() => {
+          setCreateOpen(false)
+          setNewName('')
+          setNewAccount('')
+        }}
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
           <div>
             <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
               <span style={{ color: '#C13B34' }}>*</span> 姓名
             </div>
-            <Input value={newName} onChange={(e) => setNewName(e.target.value)} />
+            <Input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} />
           </div>
           <div>
             <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>帳號</div>
@@ -296,6 +303,15 @@ export default function AccountsPage() {
             okText="儲存"
             cancelText="取消"
             onOk={() => {
+              // 儲存落地:寫回列表(頁面權限欄同步),重開彈窗即顯示新勾選
+              const permsText = permDraft.length
+                ? PERMISSION_KEYS.filter(([k]) => permDraft.includes(k)).map(([, l]) => l).join('、')
+                : '—'
+              setAdmins((list) =>
+                list.map((a) =>
+                  a.account === permTarget?.account ? { ...a, permKeys: [...permDraft], perms: permsText } : a,
+                ),
+              )
               setPermOpen(false)
               message.success(`已更新 ${permTarget?.name} 的頁面權限`)
             }}
@@ -342,6 +358,7 @@ export default function AccountsPage() {
 
       {pwTarget && (
         <OneTimePasswordModal
+          key={pwTarget.account ?? pwTarget.title}
           title={pwTarget.title}
           account={pwTarget.account}
           okLabel={pwTarget.okLabel}

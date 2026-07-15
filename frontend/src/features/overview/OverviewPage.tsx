@@ -34,7 +34,7 @@ export default function OverviewPage() {
   return (
     <div>
       <PageHeader
-        title="社團總覽"
+        title="總覽"
         sub={
           <>
             {user?.club} · <span className="num">114</span> 學年第 <span className="num">2</span> 學期

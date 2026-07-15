@@ -4,6 +4,7 @@ import { App, Button, Checkbox, InputNumber, Modal, Tooltip } from 'antd'
 import { DownloadOutlined, RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
+import { downloadCsv } from '../../lib/csv'
 import KindBadge from '../signup/KindBadge'
 import { SIGNUP_ITEMS } from '../signup/mock'
 import type { SignupItem } from '../signup/types'
@@ -51,13 +52,10 @@ function ManageModal({
       message.error('尚無報名名單可匯出')
       return
     }
-    const text = regs.map((r) => [r.club, r.count, r.confirmed ? '已確認' : '待確認'].join(',')).join('\n')
-    const url = URL.createObjectURL(new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' }))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `報名名單_${item.name}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadCsv(`報名名單_${item.name}.csv`, [
+      ['社團', '人數', '狀態'],
+      ...regs.map((r) => [r.club, String(r.count), r.confirmed ? '已確認' : '待確認']),
+    ])
     message.success(`已匯出 ${regs.length} 筆報名`)
   }
 

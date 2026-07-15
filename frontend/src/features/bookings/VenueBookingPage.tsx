@@ -58,7 +58,7 @@ export default function VenueBookingPage() {
                 }))}
               />
             </Form.Item>
-            <Form.Item name="purpose" label="用途" style={{ marginBottom: 0 }}>
+            <Form.Item name="purpose" label="用途" rules={[{ required: true, message: '請輸入用途' }]} style={{ marginBottom: 0 }}>
               <Input placeholder="例:迎新擺攤" />
             </Form.Item>
           </div>

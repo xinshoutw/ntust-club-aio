@@ -97,9 +97,6 @@ export default function OverviewPage() {
                 <Link key={t.id} to={t.path} className="tracked-row">
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 14, color: 'var(--ink)' }}>{t.name}</div>
-                    <div className="num" style={{ fontSize: 12, color: 'var(--steel)' }}>
-                      {t.id}
-                    </div>
                   </div>
                   <StatusPill status={t.status} />
                 </Link>

@@ -41,7 +41,7 @@ function RoomReviewModal({
       message.error('退回原因為必填。')
       return
     }
-    message.success(`已退回 ${item.id}(通知社團修正重送)`)
+    message.success(`已退回 ${item.club} 的固定借用申請(通知社團修正重送)`)
     closeReject()
     onClose()
   }
@@ -54,7 +54,6 @@ function RoomReviewModal({
       width={520}
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 26 }}>
-          <span className="num" style={{ fontSize: 13, color: 'var(--steel)', fontWeight: 400 }}>{item.id}</span>
           <span style={{ fontSize: 16, fontWeight: 600 }}>{item.room}</span>
           <StatusPill status="pending" />
         </div>
@@ -66,7 +65,7 @@ function RoomReviewModal({
             type="primary"
             style={{ height: 38 }}
             onClick={() => {
-              message.success(`已核准 ${item.id}`)
+              message.success(`已核准 ${item.club} 的固定借用申請`)
               onClose()
             }}
           >
@@ -156,7 +155,6 @@ export default function AdminRoomsPage() {
         <table className="tb dense" style={{ minWidth: 760 }}>
           <thead>
             <tr>
-              <th>單號</th>
               <th>社團</th>
               <th>教室</th>
               <th>每週時段</th>
@@ -175,7 +173,6 @@ export default function AdminRoomsPage() {
                 }}
                 style={{ cursor: 'pointer' }}
               >
-                <td className="num" style={{ color: 'var(--steel)' }}>{r.id}</td>
                 <td>{r.club}</td>
                 <td style={{ fontWeight: 500 }}>{r.room}</td>
                 <td style={{ fontSize: 13 }}>
@@ -198,7 +195,7 @@ export default function AdminRoomsPage() {
             ))}
             {pending.length === 0 && (
               <tr className="no-hover">
-                <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>沒有待審的固定借用。</td>
+                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>沒有待審的固定借用。</td>
               </tr>
             )}
           </tbody>

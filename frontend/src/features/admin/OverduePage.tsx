@@ -37,7 +37,6 @@ export default function OverduePage() {
           <tbody>
             {overdue.map((l) => (
               <tr key={l.id}>
-                <td className="num" style={{ color: 'var(--steel)', width: 140 }}>{l.id}</td>
                 <td>{l.club}</td>
                 <td style={{ fontWeight: 500 }}>
                   {l.equipment} <span className="num">×{l.qty}</span>
@@ -55,7 +54,7 @@ export default function OverduePage() {
             ))}
             {overdue.length === 0 && (
               <tr className="no-hover">
-                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有逾期未還的器材。</td>
+                <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有逾期未還的器材。</td>
               </tr>
             )}
           </tbody>

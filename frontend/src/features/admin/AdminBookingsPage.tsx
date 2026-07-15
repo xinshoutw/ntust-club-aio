@@ -38,7 +38,6 @@ function BookingReviewModal({
   const { message } = App.useApp()
   const [rejectOpen, setRejectOpen] = useState(false)
   const [reason, setReason] = useState('')
-  const id = item.data.id
   const title = item.kind === 'venue' ? item.data.venue : `${item.data.equipment} ×${item.data.qty}`
 
   const closeReject = () => {
@@ -51,7 +50,7 @@ function BookingReviewModal({
       message.error('退回原因為必填。')
       return
     }
-    message.success(`已退回 ${id}(通知社團修正重送)`)
+    message.success('已退回借用申請(通知社團修正重送)')
     closeReject()
     onClose()
   }
@@ -64,7 +63,6 @@ function BookingReviewModal({
       width={520}
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 26 }}>
-          <span className="num" style={{ fontSize: 13, color: 'var(--steel)', fontWeight: 400 }}>{id}</span>
           <span style={{ fontSize: 16, fontWeight: 600 }}>{title}</span>
           <StatusPill status="pending" />
         </div>
@@ -76,7 +74,7 @@ function BookingReviewModal({
             type="primary"
             style={{ height: 38 }}
             onClick={() => {
-              message.success(`已核准 ${id}`)
+              message.success('已核准借用申請')
               onClose()
             }}
           >
@@ -256,7 +254,6 @@ export default function AdminBookingsPage() {
           <tbody>
             {pendingVenues.map((v) => (
               <tr key={v.id} onClick={() => openReview({ kind: 'venue', data: v })} style={{ cursor: 'pointer' }}>
-                <td className="num" style={{ color: 'var(--steel)', width: 140 }}>{v.id}</td>
                 <td>{v.club}</td>
                 <td style={{ fontWeight: 500 }}>{v.venue}</td>
                 <td className="num" style={{ fontSize: 13 }}>{v.date}</td>
@@ -267,7 +264,7 @@ export default function AdminBookingsPage() {
             ))}
             {pendingVenues.length === 0 && (
               <tr className="no-hover">
-                <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>沒有待審的場地借用。</td>
+                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>沒有待審的場地借用。</td>
               </tr>
             )}
           </tbody>
@@ -280,7 +277,6 @@ export default function AdminBookingsPage() {
           <tbody>
             {pendingLoans.map((l) => (
               <tr key={l.id} onClick={() => openReview({ kind: 'loan', data: l })} style={{ cursor: 'pointer' }}>
-                <td className="num" style={{ color: 'var(--steel)', width: 140 }}>{l.id}</td>
                 <td>{l.club}</td>
                 <td style={{ fontWeight: 500 }}>
                   {l.equipment} <span className="num">×{l.qty}</span>
@@ -293,7 +289,7 @@ export default function AdminBookingsPage() {
             ))}
             {pendingLoans.length === 0 && (
               <tr className="no-hover">
-                <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>沒有待審的器材借用。</td>
+                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>沒有待審的器材借用。</td>
               </tr>
             )}
           </tbody>

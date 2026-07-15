@@ -50,7 +50,7 @@ function CloseReviewModal({
       message.error('退回原因為必填。')
       return
     }
-    message.success(`已退回結案 ${item.id}(通知社團補正)`)
+    message.success(`已退回「${item.name}」結案(通知社團補正)`)
     closeReject()
     onClose()
   }
@@ -75,7 +75,7 @@ function CloseReviewModal({
             type="primary"
             style={{ height: 38 }}
             onClick={() => {
-              message.success(`已核准結案 ${item.id}`)
+              message.success(`已核准「${item.name}」結案`)
               onClose()
             }}
           >
@@ -185,7 +185,7 @@ export default function CloseReviewPage() {
                 </td>
                 <td style={{ width: 110 }}><StatusPill status="locked" /></td>
                 <td className="r" style={{ width: 90 }}>
-                  <Button size="small" style={{ height: 28 }} onClick={() => message.success(`已解鎖 ${l.id},社團可補送結案`)}>
+                  <Button size="small" style={{ height: 28 }} onClick={() => message.success(`已解鎖「${l.name}」,社團可補送結案`)}>
                     解鎖
                   </Button>
                 </td>

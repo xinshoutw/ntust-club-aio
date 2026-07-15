@@ -33,10 +33,11 @@
 9. **violations**:銷案期限推導(+1 月)、逾期禁止 resolve
 10. **檔案管理**:`/admin/files` 空間彙總+大型檔案列表+報修檔刪除 API
 
-## 交叉檢查
+## 交叉檢查(本輪已完成)
 
-- 本輪前端變更:**opus 審查一輪,發現 N 項已全修**(見 git log 後續 fix commits)——若本行還是 N,表示審查尚未跑完,請先開 `Agent model=opus` 審 `git diff 6453f92..HEAD` 再繼續
-- 歷史:後端三輪(opus×2+codex)已完；前端六輪已完(2026-07-14 前)
+- opus 審查一輪:**無 CRITICAL/HIGH**,11 項規格逐項比對全數正確(晚間連 3 節、工作天負向推算、期限當天可銷案等邊界皆過);2 LOW 已修(mock 天數、刪檔連動 usage 聚合)+3 個 UX 微調已修(切場地保留日期窗、今日截止文案、結束日 disabledDate)
+- 留待接後端自然消解(opus LOW/NOTE,不修):module-level `dayjs()` 快照(跨日長開頁面)、結案實際時間僅 HH:mm 無法表達跨日結束、幹訓簽到 Checkbox 與 `attendedSessions` mock 兩端未接
+- 歷史:後端三輪(opus×2+codex)已完;前端六輪已完(2026-07-14 前)
 
 ## ui-polish 分支(等逐項裁決,勿進 dev)
 

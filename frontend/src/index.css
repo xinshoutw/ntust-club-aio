@@ -96,6 +96,33 @@ body {
   color: #c13b34;
 }
 
+/* 可點的場地名稱:hover 整字圓角反白(取代底線) */
+.venue-btn {
+  border: none;
+  background: transparent;
+  padding: 3px 8px;
+  margin-left: -8px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.venue-btn:hover {
+  background: var(--seal-tint);
+  color: var(--seal);
+}
+.venue-btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+/* 已修改未儲存的欄位:橘黃色外框(box-shadow 避免與 AntD 邊框樣式打架) */
+.field-dirty :is(.ant-input-outlined, .ant-input-affix-wrapper-outlined) {
+  border-color: #d48806;
+  box-shadow: 0 0 0 1px rgba(212, 136, 6, 0.45);
+}
+
 /* ---- 表單 ---- */
 .form-grid-2 {
   display: grid;

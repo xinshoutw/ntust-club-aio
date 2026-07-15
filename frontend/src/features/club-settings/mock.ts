@@ -3,4 +3,6 @@
 export const CLUB_PROFILE = {
   url: '',
   intro: '致力於推廣程式設計與技術交流。',
+  // 聯絡 Email:至少 1 組、至多 3 組
+  emails: ['csie.club@mail.ntust.edu.tw', '', ''],
 }

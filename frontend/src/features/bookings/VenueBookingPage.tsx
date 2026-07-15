@@ -5,6 +5,8 @@ import { App, Button, DatePicker, Form, Input, Select } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
+import { CLUB_ACTIVITIES } from '../activities/mock'
+import { dateRangeText } from '../activities/utils'
 import { PERIODS, VENUE_BOOKINGS, VENUES } from './mock'
 import PeriodPicker from './PeriodPicker'
 
@@ -22,6 +24,8 @@ export default function VenueBookingPage() {
   const qPeriod = params.get('period')
   const [periods, setPeriods] = useState<string[]>(() => (qPeriod && PERIODS.includes(qPeriod) ? [qPeriod] : []))
   const mine = VENUE_BOOKINGS.filter((v) => v.club === user?.club).slice(0, 5)
+  // 借用需綁定審核通過之活動(與器材借用一致)
+  const approved = CLUB_ACTIVITIES.filter((a) => a.club === user?.club && a.status === 'approved')
 
   const submit = (values: { venue: string }) => {
     if (!periods.length) {
@@ -60,6 +64,18 @@ export default function VenueBookingPage() {
             </Form.Item>
             <Form.Item name="purpose" label="用途" rules={[{ required: true, message: '請輸入用途' }]} style={{ marginBottom: 0 }}>
               <Input placeholder="例:迎新擺攤" />
+            </Form.Item>
+            <Form.Item
+              name="activity"
+              label="借用活動(限審核通過)"
+              rules={[{ required: true, message: '請選擇活動' }]}
+              style={{ marginBottom: 0 }}
+            >
+              <Select
+                placeholder="請選擇活動"
+                options={approved.map((a) => ({ value: a.id, label: `${a.name}(${dateRangeText(a)})` }))}
+                notFoundContent="無審核通過之活動"
+              />
             </Form.Item>
           </div>
           <div style={{ fontSize: 13, fontWeight: 500, margin: '18px 0 8px' }}>

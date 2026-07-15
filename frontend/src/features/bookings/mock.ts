@@ -5,23 +5,33 @@ export const PERIODS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'A', 
 
 export interface Venue {
   name: string
-  category: '教室' | '練習空間' | '廣場/戶外'
+  category: '教室' | '練習空間' | '廣場/戶外' | '宿舍區'
   capacity: number
   allowFixed: boolean
   allowTemp: boolean
 }
 
+// 場地主檔(2026-07-15 需求方定案 19 處;之後由管理員後台維護,數量/容納人數可調)
 export const VENUES: Venue[] = [
   { name: 'S204 共享食堂', category: '教室', capacity: 60, allowFixed: true, allowTemp: true },
   { name: 'S207', category: '教室', capacity: 60, allowFixed: true, allowTemp: true },
+  { name: 'S209', category: '教室', capacity: 60, allowFixed: true, allowTemp: true },
   { name: 'S301', category: '教室', capacity: 50, allowFixed: true, allowTemp: true },
+  { name: 'S302/S303', category: '教室', capacity: 90, allowFixed: true, allowTemp: true },
   { name: 'S304 音樂教室', category: '教室', capacity: 50, allowFixed: true, allowTemp: true },
+  { name: 'S311', category: '教室', capacity: 50, allowFixed: true, allowTemp: true },
   { name: 'S312/S313', category: '教室', capacity: 90, allowFixed: true, allowTemp: true },
-  { name: 'TR 練團室', category: '練習空間', capacity: 15, allowFixed: true, allowTemp: true },
-  { name: 'T4 舞蹈區', category: '練習空間', capacity: 30, allowFixed: true, allowTemp: true },
-  { name: '3F 廣場', category: '廣場/戶外', capacity: 200, allowFixed: false, allowTemp: true },
-  { name: '精誠廣場 1', category: '廣場/戶外', capacity: 150, allowFixed: false, allowTemp: true },
-  { name: '一舍 B2', category: '廣場/戶外', capacity: 120, allowFixed: false, allowTemp: true },
+  { name: 'S314', category: '教室', capacity: 50, allowFixed: true, allowTemp: true },
+  { name: '練團室', category: '練習空間', capacity: 15, allowFixed: true, allowTemp: true },
+  { name: 'T4 舞蹈區', category: '練習空間', capacity: 15, allowFixed: true, allowTemp: true },
+  { name: '3F 戶外廣場', category: '廣場/戶外', capacity: 200, allowFixed: false, allowTemp: true },
+  { name: '戶外精誠廣場 1', category: '廣場/戶外', capacity: 150, allowFixed: false, allowTemp: true },
+  { name: '戶外精誠廣場 2', category: '廣場/戶外', capacity: 150, allowFixed: false, allowTemp: true },
+  { name: '戶外精誠廣場 3', category: '廣場/戶外', capacity: 150, allowFixed: false, allowTemp: true },
+  { name: '戶外精誠廣場 4', category: '廣場/戶外', capacity: 150, allowFixed: false, allowTemp: true },
+  { name: '戶外精誠廣場 5', category: '廣場/戶外', capacity: 150, allowFixed: false, allowTemp: true },
+  { name: '一宿 B2 樓梯', category: '宿舍區', capacity: 120, allowFixed: false, allowTemp: true },
+  { name: '一宿 B2 白板', category: '宿舍區', capacity: 120, allowFixed: false, allowTemp: true },
 ]
 
 export interface Equipment {
@@ -88,7 +98,7 @@ export interface VenueBooking {
 
 export const VENUE_BOOKINGS: VenueBooking[] = [
   { id: 'VEN-114-0091', club: '資工系學會', venue: 'S304 音樂教室', date: '2026/06/20', periods: ['3', '4'], purpose: '社課', status: 'pending' },
-  { id: 'VEN-114-0088', club: '資工系學會', venue: '精誠廣場 1', date: '2026/06/05', periods: ['5', '6', '7'], purpose: '社團博覽會攤位', status: 'approved' },
+  { id: 'VEN-114-0088', club: '資工系學會', venue: '戶外精誠廣場 1', date: '2026/06/05', periods: ['5', '6', '7'], purpose: '社團博覽會攤位', status: 'approved' },
 ]
 
 export interface EquipmentLoan {

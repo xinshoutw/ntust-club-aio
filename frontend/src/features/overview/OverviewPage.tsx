@@ -1,9 +1,10 @@
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { Button } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
-import { ANNOUNCEMENTS, TRACKED } from '../activities/mock'
+import AnnouncementModal from '../../components/ui/AnnouncementModal'
+import { ANNOUNCEMENTS, TRACKED, type Announcement } from '../activities/mock'
 import './overview.css'
 
 const countBadge: React.CSSProperties = {
@@ -28,6 +29,8 @@ function CardTitle({ title, count }: { title: string; count: number }) {
 export default function OverviewPage() {
   const navigate = useNavigate()
   const categories = ['活動', '借用', '線上申請'] as const
+  const [viewing, setViewing] = useState<Announcement | null>(null)
+  const [viewOpen, setViewOpen] = useState(false)
 
   return (
     <div>
@@ -63,7 +66,23 @@ export default function OverviewPage() {
         <div className="card">
           <CardTitle title="公告" count={ANNOUNCEMENTS.length} />
           {ANNOUNCEMENTS.map((a) => (
-            <div key={a.id} style={{ padding: '16px 20px', borderTop: '1px solid var(--line)' }}>
+            <div
+              key={a.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => {
+                setViewing(a)
+                setViewOpen(true)
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  setViewing(a)
+                  setViewOpen(true)
+                }
+              }}
+              style={{ padding: '16px 20px', borderTop: '1px solid var(--line)', cursor: 'pointer' }}
+            >
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                 <div style={{ fontSize: 14, fontWeight: 500, flex: 1 }}>{a.title}</div>
                 <span style={{ fontSize: 12, color: 'var(--steel)', background: '#EEF0F3', borderRadius: 4, padding: '1px 6px' }}>
@@ -73,7 +92,19 @@ export default function OverviewPage() {
                   {a.date}
                 </span>
               </div>
-              <div style={{ fontSize: 13, color: 'var(--steel)', lineHeight: 1.7, marginTop: 6 }}>{a.content}</div>
+              <div
+                style={{
+                  fontSize: 13,
+                  color: 'var(--steel)',
+                  lineHeight: 1.7,
+                  marginTop: 6,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {a.content}
+              </div>
             </div>
           ))}
         </div>
@@ -105,6 +136,13 @@ export default function OverviewPage() {
           ))}
         </div>
       </div>
+
+      <AnnouncementModal
+        announcement={viewing}
+        open={viewOpen}
+        onClose={() => setViewOpen(false)}
+        afterClose={() => setViewing(null)}
+      />
     </div>
   )
 }

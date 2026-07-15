@@ -1,0 +1,48 @@
+import { Modal } from 'antd'
+import type { Announcement } from '../../features/activities/mock'
+import Markdown from './Markdown'
+
+// 公告詳情彈窗:兩端共用,點任一公告展開完整內容(markdown)
+export default function AnnouncementModal({
+  announcement,
+  open,
+  onClose,
+  afterClose,
+}: {
+  announcement: Announcement | null
+  open: boolean
+  onClose: () => void
+  afterClose: () => void
+}) {
+  return (
+    <Modal
+      open={open}
+      onCancel={onClose}
+      afterClose={afterClose}
+      footer={null}
+      width={560}
+      title={
+        announcement && (
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', paddingRight: 26 }}>
+            <span style={{ fontSize: 16, fontWeight: 600 }}>{announcement.title}</span>
+            <span style={{ fontSize: 12, color: 'var(--steel)', background: '#EEF0F3', borderRadius: 4, padding: '1px 6px', fontWeight: 400 }}>
+              {announcement.scope}
+            </span>
+            <span className="num" style={{ fontSize: 12, color: 'var(--steel)', fontWeight: 400 }}>{announcement.date}</span>
+          </div>
+        )
+      }
+    >
+      {announcement && (
+        <>
+          <Markdown source={announcement.content} />
+          {announcement.takeoverUntil && (
+            <div className="num" style={{ fontSize: 12, color: '#8A5A00', marginTop: 12 }}>
+              蓋板公告至 {announcement.takeoverUntil}
+            </div>
+          )}
+        </>
+      )}
+    </Modal>
+  )
+}

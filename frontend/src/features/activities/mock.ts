@@ -229,16 +229,28 @@ export const CLUB_ACTIVITIES: Activity[] = [
 export interface Announcement {
   id: string
   title: string
-  content: string
+  content: string // 允許 markdown
   date: string
   scope: string
+  takeoverUntil?: string // 蓋板截止日:期限內社團每次登入顯示蓋板,5 秒後可關閉
+  notify?: boolean // 發布時同步寄送 Email 與 Discord 通知
 }
 
 export const ANNOUNCEMENTS: Announcement[] = [
   {
+    id: 'an0',
+    title: '暑期系統維護公告',
+    content:
+      '系統將於 **7/20(一)00:00 – 06:00** 進行升級維護,期間暫停服務。\n\n維護內容:\n\n- 資料庫升級\n- 檔案儲存空間擴充\n\n如有問題請聯絡課外活動指導組。',
+    date: '2026/07/10',
+    scope: '全校',
+    takeoverUntil: '2026/07/20',
+    notify: true,
+  },
+  {
     id: 'an1',
     title: '114-2 社團評鑑報名開始',
-    content: '請各社團於 9/10 前完成「社團競賽(評鑑)」報名,並依時程準備評鑑資料。',
+    content: '請各社團於 **9/10** 前完成「社團競賽(評鑑)」報名,並依時程準備評鑑資料。',
     date: '2026/06/18',
     scope: '全校',
   },

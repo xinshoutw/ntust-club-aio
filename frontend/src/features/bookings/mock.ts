@@ -1,4 +1,4 @@
-import dayjs from 'dayjs'
+import dayjs, { type Dayjs } from 'dayjs'
 import type { StatusKey } from '../../lib/status'
 
 // 節次:第 1–10 節與 A–D 節(晚間)
@@ -111,10 +111,62 @@ export interface VenueBooking {
   status: StatusKey
 }
 
+// 近日日期以今天為基準,讓場況圖常保有內容
+const rel = (n: number) => dayjs().add(n, 'day').format('YYYY/MM/DD')
+
 export const VENUE_BOOKINGS: VenueBooking[] = [
   { id: 'VEN-114-0091', club: '資工系學會', venue: 'S304 音樂教室', date: '2026/06/20', periods: ['3', '4'], purpose: '社課', status: 'pending' },
   { id: 'VEN-114-0088', club: '資工系學會', venue: '戶外精誠廣場 1', date: '2026/06/05', periods: ['5', '6', '7'], purpose: '社團博覽會攤位', status: 'approved' },
+  { id: 'VEN-114-0101', club: '吉他社', venue: 'S209', date: rel(0), periods: ['3', '4'], purpose: '社課', status: 'approved' },
+  { id: 'VEN-114-0102', club: '電機系學會', venue: 'S304 音樂教室', date: rel(0), periods: ['5'], purpose: '練習', status: 'pending' },
+  { id: 'VEN-114-0103', club: '機器人研究社', venue: 'S312/S313', date: rel(1), periods: ['A', 'B'], purpose: '組裝測試', status: 'approved' },
+  { id: 'VEN-114-0104', club: '熱舞社', venue: '3F 戶外廣場', date: rel(2), periods: ['5', '6', '7'], purpose: '成發彩排', status: 'pending' },
+  { id: 'VEN-114-0105', club: '資工系學會', venue: 'S204 共享食堂', date: rel(3), periods: ['5', '6'], purpose: '期初大會', status: 'approved' },
+  { id: 'VEN-114-0106', club: '登山社', venue: '戶外精誠廣場 2', date: rel(4), periods: ['8', '9', '10'], purpose: '裝備檢整', status: 'approved' },
 ]
+
+// ---- 場況圖共用(社團端借用總覽/行政端空間審核) ----
+
+// 固定借用(已核准):學期內每週同一時段;審核中的固定借用不顯示於場況圖
+export const FIXED_WEEKLY: { venue: string; dow: number; periods: string[]; club: string }[] = [
+  { venue: 'S207', dow: 2, periods: ['6', '7'], club: '美術社' },
+  { venue: 'S304 音樂教室', dow: 3, periods: ['3', '4'], club: '電機系學會' },
+  { venue: '練團室', dow: 1, periods: ['C', 'D'], club: '熱音社' },
+  { venue: 'S302/S303', dow: 4, periods: ['A', 'B', 'C'], club: '資工系學會' },
+]
+
+export type CellState = 'free' | 'closed' | 'reviewing' | 'temp' | 'fixed' | 'mine'
+
+// 場地格配色(2026-07-15 需求方):不開放不畫方框也不列圖例;固定借用深灰
+export const CELL: Record<CellState, { label: string; bg: string }> = {
+  free: { label: '可借', bg: '#EEF0F3' },
+  closed: { label: '不開放', bg: 'transparent' },
+  reviewing: { label: '審核中', bg: '#F5A623' },
+  temp: { label: '臨時借用', bg: '#F0A899' },
+  fixed: { label: '固定借用', bg: '#9AA1AC' },
+  mine: { label: '我的借用', bg: '#2E7D57' },
+}
+
+export interface CellInfo {
+  state: CellState
+  club?: string
+  booking?: VenueBooking // 臨時借用/審核中對應的申請單(行政端點格開審核用)
+}
+
+export function cellInfo(venue: string, date: Dayjs, period: string, myClub?: string): CellInfo {
+  if (venue === '練團室' && ['1', '2'].includes(period)) return { state: 'closed' } // 保養時段示意
+  const fixed = FIXED_WEEKLY.find((f) => f.venue === venue && f.dow === date.day() && f.periods.includes(period))
+  if (fixed) return fixed.club === myClub ? { state: 'mine', club: myClub } : { state: 'fixed', club: fixed.club }
+  const d = date.format('YYYY/MM/DD')
+  const t = VENUE_BOOKINGS.find(
+    (x) => (x.status === 'pending' || x.status === 'approved') && x.venue === venue && x.date === d && x.periods.includes(period),
+  )
+  if (t) {
+    if (t.status === 'pending') return { state: 'reviewing', club: t.club, booking: t }
+    return t.club === myClub ? { state: 'mine', club: t.club, booking: t } : { state: 'temp', club: t.club, booking: t }
+  }
+  return { state: 'free' }
+}
 
 export interface EquipmentLoan {
   id: string

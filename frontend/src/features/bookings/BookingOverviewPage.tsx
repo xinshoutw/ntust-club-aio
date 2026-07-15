@@ -12,64 +12,15 @@ import {
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
-import { EQUIPMENT_LOANS, PERIODS, ROOM_REQUESTS, VENUE_BOOKINGS, VENUES, roomEntryText } from './mock'
+import { CELL, EQUIPMENT_LOANS, PERIODS, ROOM_REQUESTS, VENUE_BOOKINGS, VENUES, cellInfo, roomEntryText, type CellState } from './mock'
 
 const RETURNED_PAGE = 10
 const VENUE_DAYS = 15 // 單一場地檢視:選擇日 −7 ~ +7 共 15 天(不含過去,不足往未來補)
 
-// 場地格狀態(2026-07-15 需求方配色):不開放不畫方框也不列圖例;固定借用改深灰
-type CellState = 'free' | 'closed' | 'reviewing' | 'temp' | 'fixed' | 'mine'
-const CELL: Record<CellState, { label: string; bg: string }> = {
-  free: { label: '可借', bg: '#EEF0F3' },
-  closed: { label: '不開放', bg: 'transparent' },
-  reviewing: { label: '審核中', bg: '#F5A623' },
-  temp: { label: '臨時借用', bg: '#F0A899' },
-  fixed: { label: '固定借用', bg: '#9AA1AC' },
-  mine: { label: '我的借用', bg: '#2E7D57' },
-}
 const LEGEND: CellState[] = ['free', 'reviewing', 'temp', 'fixed', 'mine']
 const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
 
-// ---- mock 場況(接後端後由 API 取) ----
-
-// 固定借用(已核准):學期內每週同一時段;審核中的固定借用不顯示於場況圖
-const FIXED_WEEKLY: { venue: string; dow: number; periods: string[]; club: string }[] = [
-  { venue: 'S207', dow: 2, periods: ['6', '7'], club: '美術社' },
-  { venue: 'S304 音樂教室', dow: 3, periods: ['3', '4'], club: '電機系學會' },
-  { venue: '練團室', dow: 1, periods: ['C', 'D'], club: '熱音社' },
-  { venue: 'S302/S303', dow: 4, periods: ['A', 'B', 'C'], club: '資工系學會' },
-]
-
-// 臨時借用(特定日期):自我的申請 mock 加上其他社團近日借用,讓場況圖有內容
 const today0 = dayjs()
-const GRID_TEMP: { venue: string; date: string; periods: string[]; club: string; pending: boolean }[] = [
-  ...VENUE_BOOKINGS.filter((v) => v.status === 'pending' || v.status === 'approved').map((v) => ({
-    venue: v.venue,
-    date: v.date,
-    periods: v.periods,
-    club: v.club,
-    pending: v.status === 'pending',
-  })),
-  { venue: 'S209', date: today0.format('YYYY/MM/DD'), periods: ['3', '4'], club: '吉他社', pending: false },
-  { venue: 'S304 音樂教室', date: today0.format('YYYY/MM/DD'), periods: ['5'], club: '電機系學會', pending: true },
-  { venue: 'S312/S313', date: today0.add(1, 'day').format('YYYY/MM/DD'), periods: ['A', 'B'], club: '機器人研究社', pending: false },
-  { venue: '3F 戶外廣場', date: today0.add(2, 'day').format('YYYY/MM/DD'), periods: ['5', '6', '7'], club: '熱舞社', pending: true },
-  { venue: 'S204 共享食堂', date: today0.add(3, 'day').format('YYYY/MM/DD'), periods: ['5', '6'], club: '資工系學會', pending: false },
-  { venue: '戶外精誠廣場 2', date: today0.add(4, 'day').format('YYYY/MM/DD'), periods: ['8', '9', '10'], club: '登山社', pending: false },
-]
-
-function cellInfo(venue: string, date: Dayjs, period: string, myClub?: string): { state: CellState; club?: string } {
-  if (venue === '練團室' && ['1', '2'].includes(period)) return { state: 'closed' } // 保養時段示意
-  const fixed = FIXED_WEEKLY.find((f) => f.venue === venue && f.dow === date.day() && f.periods.includes(period))
-  if (fixed) return fixed.club === myClub ? { state: 'mine', club: myClub } : { state: 'fixed', club: fixed.club }
-  const d = date.format('YYYY/MM/DD')
-  const t = GRID_TEMP.find((x) => x.venue === venue && x.date === d && x.periods.includes(period))
-  if (t) {
-    if (t.pending) return { state: 'reviewing', club: t.club }
-    return t.club === myClub ? { state: 'mine', club: t.club } : { state: 'temp', club: t.club }
-  }
-  return { state: 'free' }
-}
 
 // 單一場地格:可借才可點(直接前往臨時場地借用);審核中不可點;不開放不畫方框
 function Cell({ info, label, onBook }: { info: { state: CellState; club?: string }; label: string; onBook: () => void }) {

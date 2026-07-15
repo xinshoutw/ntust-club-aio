@@ -13,6 +13,9 @@ const MODULES: Record<ModuleKey, { label: string; color: string }> = {
   repair: { label: '空間報修', color: '#B04A33' },
 }
 
+// 表單等文字內容存於 DB:整個資料庫算一類納入佔用空間(接後端後以 pg_database_size 取得)
+const DB_TEXT = { label: '文字內容', color: '#4E7D8C', sizeMb: 1.4 * 1024 }
+
 // mock 彙總(接後端後由 API 取):MB
 const CAPACITY_MB = 50 * 1024
 const INITIAL_USAGE: Record<ModuleKey, { sizeMb: number; count: number }> = {
@@ -59,9 +62,14 @@ export default function AdminFilesPage() {
   const [moduleFilter, setModuleFilter] = useState<ModuleKey | 'all'>('all')
   const [deleting, setDeleting] = useState<StoredFile | null>(null)
 
-  const usedMb = Object.values(usage).reduce((s, u) => s + u.sizeMb, 0)
+  const usedMb = Object.values(usage).reduce((s, u) => s + u.sizeMb, 0) + DB_TEXT.sizeMb
   const totalCount = Object.values(usage).reduce((s, u) => s + u.count, 0)
   const list = files.filter((f) => moduleFilter === 'all' || f.module === moduleFilter)
+
+  // 段落順序:有空間報修檔案時報修排第一(檔案大、迭代快),其餘模組在後
+  const moduleOrder: ModuleKey[] = usage.repair.count > 0
+    ? ['repair', ...(Object.keys(MODULES) as ModuleKey[]).filter((k) => k !== 'repair')]
+    : (Object.keys(MODULES) as ModuleKey[])
 
   const confirmDelete = () => {
     if (!deleting) return
@@ -107,7 +115,7 @@ export default function AdminFilesPage() {
         </div>
 
         <div style={{ display: 'flex', gap: 2, marginTop: 16, height: 20, borderRadius: 4, overflow: 'hidden' }}>
-          {(Object.keys(MODULES) as ModuleKey[]).map((k) => (
+          {moduleOrder.map((k) => (
             <Tooltip
               key={k}
               title={
@@ -123,17 +131,35 @@ export default function AdminFilesPage() {
               />
             </Tooltip>
           ))}
+          <Tooltip
+            title={
+              <span style={{ fontSize: 13 }}>
+                {DB_TEXT.label}(表單等資料庫內容)· {fmtSize(DB_TEXT.sizeMb)}({pct(DB_TEXT.sizeMb, CAPACITY_MB)})
+              </span>
+            }
+          >
+            <div
+              role="img"
+              aria-label={`${DB_TEXT.label} ${fmtSize(DB_TEXT.sizeMb)}`}
+              style={{ width: `${(DB_TEXT.sizeMb / CAPACITY_MB) * 100}%`, background: DB_TEXT.color, minWidth: 6 }}
+            />
+          </Tooltip>
           <div role="img" aria-label={`可用 ${fmtSize(CAPACITY_MB - usedMb)}`} style={{ flex: 1, background: '#EEF0F3' }} />
         </div>
 
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 12 }}>
-          {(Object.keys(MODULES) as ModuleKey[]).map((k) => (
+          {moduleOrder.map((k) => (
             <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--steel)' }}>
               <span style={{ width: 10, height: 10, borderRadius: 3, background: MODULES[k].color }} />
               {MODULES[k].label}
               <span className="num">{fmtSize(usage[k].sizeMb)}</span>
             </span>
           ))}
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--steel)' }}>
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: DB_TEXT.color }} />
+            {DB_TEXT.label}
+            <span className="num">{fmtSize(DB_TEXT.sizeMb)}</span>
+          </span>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--steel)' }}>
             <span style={{ width: 10, height: 10, borderRadius: 3, background: '#EEF0F3', border: '1px solid rgba(31,36,48,.12)' }} />
             可用

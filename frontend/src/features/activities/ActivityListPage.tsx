@@ -166,12 +166,6 @@ function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPrevi
                 </div>
               </>
             )}
-            {rep?.reviewMeeting && (
-              <>
-                <div style={{ color: 'var(--steel)' }}>檢討</div>
-                <div className="num">{rep.reviewDate ?? '—'}</div>
-              </>
-            )}
             {a.content && (<><div style={{ color: 'var(--steel)' }}>內容</div><div style={{ lineHeight: 1.7 }}>{a.content}</div></>)}
             {a.works && a.works.length > 0 && (
               <>
@@ -268,6 +262,25 @@ function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPrevi
                 <div style={{ fontSize: 13, lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{text}</div>
               </div>
             ))}
+            {rep.reviewMeeting && (
+              <>
+                <SectionTitle>
+                  檢討會議
+                  <span style={{ fontWeight: 400, color: 'var(--steel)', marginLeft: 8, fontSize: 12 }}>
+                    <span className="num">{rep.reviewDate ?? '—'}</span>
+                    {rep.reviewAttendees != null && <> · 與會 <span className="num">{rep.reviewAttendees}</span> 人</>}
+                  </span>
+                </SectionTitle>
+                {([['討論事項', rep.reviewTopics], ['內容決議', rep.reviewConclusion]] as const).map(([lab, text]) =>
+                  text ? (
+                    <div key={lab} style={{ marginBottom: 14 }}>
+                      <div style={{ fontSize: 12, color: 'var(--steel)', marginBottom: 3 }}>{lab}</div>
+                      <div style={{ fontSize: 13, lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{text}</div>
+                    </div>
+                  ) : null,
+                )}
+              </>
+            )}
             <SectionTitle>學習心得(<span className="num">{rep.reflections.length}</span> 人)</SectionTitle>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {rep.reflections.map((x) => (

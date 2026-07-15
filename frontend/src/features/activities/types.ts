@@ -33,6 +33,9 @@ export interface ActivityReport {
   others: string
   reviewMeeting: boolean
   reviewDate?: string // 檢討會=是 時必填
+  reviewAttendees?: number // 與會人數(檢討會=是 時必填)
+  reviewTopics?: string // 討論事項(檢討會=是 時必填)
+  reviewConclusion?: string // 內容決議(檢討會=是 時必填)
   videoLink?: string // 唯一選填欄位
   expense: number
   reflections: Reflection[]

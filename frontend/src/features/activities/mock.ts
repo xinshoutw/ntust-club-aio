@@ -78,7 +78,9 @@ export const CLUB_ACTIVITIES: Activity[] = [
       memberCount: 42, nonMemberCount: 13,
       actualStart: '13:00', actualEnd: '17:10', actualLocation: '國際大樓 IB-202',
       highlights: '迎新籌備分組任務與幹部經驗分享', goals: '提前完成迎新企劃分工', others: '回饋踴躍,分工表當日定案',
-      reviewMeeting: true, reviewDate: '2026/06/22', expense: 3300, submittedAt: '2026/06/23',
+      reviewMeeting: true, reviewDate: '2026/06/22', reviewAttendees: 12,
+      reviewTopics: '報到動線壅塞、器材清點流程過久', reviewConclusion: '增設第二報到桌;器材改以清單逐項簽收',
+      expense: 3300, submittedAt: '2026/06/23',
       reflections: [
         { name: '簡妤安', dept: '資工一乙', text: '活動節奏安排得很好,分組任務讓大家自然地互相認識。' },
         { name: '郭承翰', dept: '工管一甲', text: '認識了很多跨系朋友,學長姐的社團介紹也很有幫助。' },
@@ -162,7 +164,9 @@ export const CLUB_ACTIVITIES: Activity[] = [
       memberCount: 96, nonMemberCount: 14,
       actualStart: '18:00', actualEnd: '21:10', actualLocation: '國際大樓 1F 大廳',
       highlights: '迎新破冰、社團介紹', goals: '凝聚新生向心力', others: '順利完成,回收 102 份回饋問卷',
-      reviewMeeting: true, reviewDate: '2026/03/08', expense: 7800, submittedAt: '2026/03/09',
+      reviewMeeting: true, reviewDate: '2026/03/08', reviewAttendees: 15,
+      reviewTopics: '茶會流程時間控管、餐點數量估算', reviewConclusion: '各段活動指定計時人員;餐點依報名數另加一成備量',
+      expense: 7800, submittedAt: '2026/03/09',
       reflections: [
         { name: '江安博', dept: '資工一甲', text: '認識很多新朋友,收穫滿滿,破冰活動的設計讓人很快放鬆下來。' },
         { name: '廖士鋐', dept: '資工一乙', text: '學長姐很親切,活動安排很用心,對社團的運作也更了解了。' },
@@ -182,7 +186,9 @@ export const CLUB_ACTIVITIES: Activity[] = [
       memberCount: 31, nonMemberCount: 2,
       actualStart: '19:00', actualEnd: '21:00', actualLocation: 'TR-309',
       highlights: 'Python 基礎語法與實作練習', goals: '建立社員程式基礎', others: '課後問卷回饋良好',
-      reviewMeeting: true, reviewDate: '2026/04/12', expense: 1200, submittedAt: '2026/04/13',
+      reviewMeeting: true, reviewDate: '2026/04/12', reviewAttendees: 8,
+      reviewTopics: '課程節奏偏快、練習題難度落差', reviewConclusion: '下一堂放慢實作段並增加助教巡場頻率',
+      expense: 1200, submittedAt: '2026/04/13',
       reflections: [
         { name: '許庭瑄', dept: '企管二甲', text: '第一次寫程式,講解很清楚,從變數到迴圈都能跟上。' },
         { name: '高梓睿', dept: '機械一乙', text: '實作範例實用,期待下一堂進階內容。' },
@@ -206,7 +212,9 @@ export const CLUB_ACTIVITIES: Activity[] = [
       memberCount: 58, nonMemberCount: 96,
       actualStart: '09:00', actualEnd: '17:30', actualLocation: '國際大樓 IB-101',
       highlights: '六校聯合競賽、企業參訪攤位', goals: '提升校際交流與實戰經驗', others: '媒體報導兩則',
-      reviewMeeting: true, reviewDate: '2026/05/22', videoLink: 'https://youtu.be/mock-contest-2026',
+      reviewMeeting: true, reviewDate: '2026/05/22', reviewAttendees: 20,
+      reviewTopics: '跨校報名流程、評測系統負載', reviewConclusion: '明年提前兩週開放報名並擴充評測主機',
+      videoLink: 'https://youtu.be/mock-contest-2026',
       expense: 41200, submittedAt: '2026/05/23',
       reflections: [
         { name: '曾威宇', dept: '資工三甲', text: '第一次辦跨校活動,從報名系統到當日動線都要顧,學到完整的流程控管。' },

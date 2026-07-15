@@ -157,6 +157,9 @@ function CloseForm({
   const [others, setOthers] = useState(d?.others ?? '')
   const [reviewMeeting, setReviewMeeting] = useState<boolean>(d?.reviewMeeting ?? false)
   const [reviewDate, setReviewDate] = useState(d?.reviewDate ?? '')
+  const [reviewAttendees, setReviewAttendees] = useState<number | null>(d?.reviewAttendees ?? null)
+  const [reviewTopics, setReviewTopics] = useState(d?.reviewTopics ?? '')
+  const [reviewConclusion, setReviewConclusion] = useState(d?.reviewConclusion ?? '')
   const [videoLink, setVideoLink] = useState(d?.videoLink ?? '')
   const [expense, setExpense] = useState<number | null>(d?.expense ?? null)
 
@@ -244,6 +247,9 @@ function CloseForm({
     others: others.trim(),
     reviewMeeting,
     reviewDate,
+    reviewAttendees: reviewAttendees ?? undefined,
+    reviewTopics: reviewTopics.trim(),
+    reviewConclusion: reviewConclusion.trim(),
     videoLink: videoLink.trim(),
     expense: expense ?? undefined,
     reflections: filledReflects.map(({ name, dept, text }) => ({ name: name.trim(), dept: dept.trim(), text: text.trim() })),
@@ -282,6 +288,9 @@ function CloseForm({
       : !goals.trim() ? '如何達成活動目標'
       : !others.trim() ? '其他執行狀況與成果'
       : reviewMeeting && !reviewDate ? '檢討會日期'
+      : reviewMeeting && reviewAttendees == null ? '與會人數'
+      : reviewMeeting && !reviewTopics.trim() ? '討論事項'
+      : reviewMeeting && !reviewConclusion.trim() ? '內容決議'
       : photos.length === 0 ? '活動照片'
       : expense == null ? '實際支出'
       : null
@@ -323,6 +332,9 @@ function CloseForm({
       others: others.trim(),
       reviewMeeting,
       reviewDate: reviewMeeting ? reviewDate : undefined,
+      reviewAttendees: reviewMeeting ? reviewAttendees! : undefined,
+      reviewTopics: reviewMeeting ? reviewTopics.trim() : undefined,
+      reviewConclusion: reviewMeeting ? reviewConclusion.trim() : undefined,
       videoLink: videoLink.trim() || undefined,
       expense: expense!,
       reflections,
@@ -356,7 +368,8 @@ function CloseForm({
       </div>
 
       <div className="actform-grid" style={{ marginTop: 12 }}>
-        {/* 左欄:一、活動成果調查 */}
+        {/* 左欄:一、活動成果調查 + 二、檢討會議 */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <div className="card" style={{ padding: 24 }}>
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>一、活動成果調查</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 10 }}>
@@ -423,7 +436,12 @@ function CloseForm({
             <div style={label}>其他執行狀況與成果{requiredMark}</div>
             <Input.TextArea rows={4} value={others} onChange={(e) => setOthers(e.target.value)} placeholder="其他成果" />
           </div>
-          <div className="form-grid-2" style={{ marginTop: 12 }}>
+        </div>
+
+        {/* 二、檢討會議:選「是」時與會人數/討論事項/內容決議皆必填 */}
+        <div className="card" style={{ padding: 24 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>二、檢討會議</div>
+          <div className="form-grid-2">
             <div>
               <div style={label}>事後是否召開檢討會{requiredMark}</div>
               <Select
@@ -448,13 +466,49 @@ function CloseForm({
               </div>
             )}
           </div>
+          {reviewMeeting && (
+            <>
+              <div className="form-grid-2" style={{ marginTop: 12 }}>
+                <div>
+                  <div style={label}>與會人數{requiredMark}</div>
+                  <InputNumber
+                    min={1}
+                    precision={0}
+                    style={{ width: '100%' }}
+                    value={reviewAttendees}
+                    onChange={setReviewAttendees}
+                    aria-label="與會人數"
+                  />
+                </div>
+              </div>
+              <div style={{ marginTop: 12 }}>
+                <div style={label}>討論事項{requiredMark}</div>
+                <Input.TextArea
+                  rows={3}
+                  value={reviewTopics}
+                  onChange={(e) => setReviewTopics(e.target.value)}
+                  placeholder="檢討會議討論之事項"
+                />
+              </div>
+              <div style={{ marginTop: 12 }}>
+                <div style={label}>內容決議{requiredMark}</div>
+                <Input.TextArea
+                  rows={3}
+                  value={reviewConclusion}
+                  onChange={(e) => setReviewConclusion(e.target.value)}
+                  placeholder="會議結論與後續改善作法"
+                />
+              </div>
+            </>
+          )}
+        </div>
         </div>
 
-        {/* 右欄:二、學習心得 + 三、附件與經費 */}
+        {/* 右欄:三、學習心得 + 四、附件與經費 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="card" style={{ padding: 24 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 12 }}>
-              <div style={{ fontSize: 15, fontWeight: 600 }}>二、學習心得{requiredMark}</div>
+              <div style={{ fontSize: 15, fontWeight: 600 }}>三、學習心得{requiredMark}</div>
               <div style={{ fontSize: 12, color: 'var(--steel)' }}>至少 {MIN_REFLECTIONS} 位本校學生;填寫後自動增列</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -479,7 +533,7 @@ function CloseForm({
           </div>
 
           <div className="card" style={{ padding: 24 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>三、附件與經費</div>
+            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>四、附件與經費</div>
             <div>
               <div style={label}>
                 活動照片(≥{MIN_PHOTOS} 張,限 JPG/PNG){requiredMark}

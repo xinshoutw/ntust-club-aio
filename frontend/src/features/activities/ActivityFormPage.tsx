@@ -194,9 +194,6 @@ export default function ActivityFormPage() {
   return (
     <div>
       <PageHeader title="活動申請" />
-      <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        核准後辦理,辦理後 <span className="num">1</span> 個月內須完成結案。
-      </div>
 
       <Form
         form={form}
@@ -212,7 +209,7 @@ export default function ActivityFormPage() {
         initialValues={
           editing
             ? {
-                name: editing.name === '(未命名活動)' ? '' : editing.name,
+                name: editing.name === '（未命名活動）' ? '' : editing.name,
                 type: editing.type,
                 isLarge: editing.isLarge,
                 location: editing.location,
@@ -252,14 +249,13 @@ export default function ActivityFormPage() {
                     {activityType === '活動' && (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                         <Form.Item name="isLarge" valuePropName="checked" noStyle>
-                          <Checkbox style={{ whiteSpace: 'nowrap' }}>大型活動</Checkbox>
+                          <Checkbox style={{ whiteSpace: 'nowrap' }}>大活動</Checkbox>
                         </Form.Item>
                         <Popover
                           trigger={['hover', 'click']}
                           content={
                             <div style={{ fontSize: 13, lineHeight: 1.7, maxWidth: 280 }}>
-                              全校性、跨校性等規模較大之活動可勾選申請;經學務處審核認可後,該活動於社團評鑑「行政資料」之計分以
-                              <span className="num"> 3 </span>倍加權。
+                              工作人員或服務對象達 <span className="num">50</span> 人以上、活動連續辦理 <span className="num">2-3</span> 天以上、總時數超過 <span className="num">20</span> 小時、活動經費達 <span className="num">10</span> 萬元以上、需 <span className="num">3</span> 個月以上籌備時間且召開 <span                         className="num">5</span> 次以上籌備會議。
                             </div>
                           }
                         >
@@ -335,7 +331,7 @@ export default function ActivityFormPage() {
               <div className="form-grid-2">
                 <Form.Item
                   name="participantsIn"
-                  label="參加人數(校內)"
+                  label="校內參加人數"
                   rules={[{ required: true, message: '請輸入校內人數' }]}
                   style={{ marginBottom: 0 }}
                 >
@@ -343,23 +339,20 @@ export default function ActivityFormPage() {
                 </Form.Item>
                 <Form.Item
                   name="participantsOut"
-                  label="參加人數(校外)"
+                  label="校外參加人數"
                   rules={[{ required: true, message: '請輸入校外人數' }]}
                   style={{ marginBottom: 0 }}
                 >
                   <InputNumber style={{ width: '100%' }} min={0} precision={0} />
                 </Form.Item>
               </div>
-              <Form.Item name="content" label="活動內容(至多 150 字)" style={{ marginBottom: 0 }}>
+              <Form.Item name="content" label="活動內容（至多 150 字）" style={{ marginBottom: 0 }}>
                 <Input.TextArea rows={6} maxLength={150} showCount placeholder="活動目的、內容、預期效益" />
               </Form.Item>
 
               <div>
                 <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
-                  工作分配 <span style={{ color: '#C13B34' }}>*</span>
-                  <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--steel)', marginLeft: 8 }}>
-                    填寫後自動增列,清空即移除
-                  </span>
+                  <span style={{ color: '#C13B34' }}>*</span> 工作分配
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {works.map((w) => (
@@ -367,7 +360,7 @@ export default function ActivityFormPage() {
                       <Input
                         value={w.task}
                         onChange={(e) => setWork(w.key, { task: e.target.value })}
-                        placeholder="工作項目"
+                        placeholder="項目"
                       />
                       <Input
                         value={w.owner}
@@ -386,7 +379,6 @@ export default function ActivityFormPage() {
             <div className="card" style={{ padding: 24 }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 12 }}>
                 <div style={{ fontSize: 16, fontWeight: 600 }}>經費明細</div>
-                <div style={{ fontSize: 12, color: 'var(--steel)' }}>逐項編列;填寫後自動增列,清空即移除</div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {budget.map((r) => {
@@ -463,9 +455,11 @@ export default function ActivityFormPage() {
                 <p style={{ margin: '4px 0 8px' }}>
                   <InboxOutlined style={{ fontSize: 28, color: 'var(--steel)' }} />
                 </p>
-                <p style={{ fontSize: 13, color: 'var(--steel)', margin: 0 }}>
-                  拖放檔案至此,或點擊選擇(企劃書、估價單;PDF)
+                <p style={{ fontSize: 13, color: 'var(--steel)', margin: 0 }}>拖放 PDF 檔案</p>
+                <p style={{ fontSize: 12, color: 'var(--steel)', margin: '4px 0 0' }}>
+                  總上限 <span className="num">50</span> MB
                 </p>
+                {/*TODO: 加總大小驗證 50MB (管理員設定的)，同時要在介面中提示「已使用 XX/XX MB」*/}
               </Upload.Dragger>
               {files.map((f) => (
                 <div key={f.uid} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 4px 2px', fontSize: 13 }}>

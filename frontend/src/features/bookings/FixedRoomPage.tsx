@@ -154,14 +154,10 @@ export default function FixedRoomPage() {
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'separate', borderSpacing: 4, width: '100%', tableLayout: 'fixed', minWidth: 640, userSelect: 'none' }}>
-              <thead>
-                <tr>
-                  <th style={{ width: 52, fontSize: 11, fontWeight: 500, color: 'var(--steel)', textAlign: 'left' }}>星期</th>
-                  {PERIODS.map((p) => (
-                    <th key={p} className="num" style={{ fontSize: 11, fontWeight: 500, color: 'var(--steel)' }}>{p}</th>
-                  ))}
-                </tr>
-              </thead>
+              {/* 不設表頭:每格按鈕本身已標節次,星期由列首標示 */}
+              <colgroup>
+                <col style={{ width: 52 }} />
+              </colgroup>
               <tbody>
                 {[1, 2, 3, 4, 5, 6, 7].map((dow) => (
                   <tr key={dow}>

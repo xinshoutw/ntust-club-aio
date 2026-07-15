@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { App, Button, Checkbox, DatePicker, Input, InputNumber, Select, Tag } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { HolderOutlined } from '@ant-design/icons'
@@ -41,6 +41,13 @@ export default function SignupBuilderPage() {
   // 拖曳排序:按住把手才啟用 draggable,避免干擾列內輸入框的文字選取
   const [dragKey, setDragKey] = useState<number | null>(null)
   const [handleKey, setHandleKey] = useState<number | null>(null)
+  // 在把手外放開滑鼠時 onMouseUp 不會觸發:全域 pointerup 兜底重設,避免列殘留 draggable
+  useEffect(() => {
+    if (handleKey == null) return
+    const up = () => setHandleKey(null)
+    window.addEventListener('pointerup', up)
+    return () => window.removeEventListener('pointerup', up)
+  }, [handleKey])
   const dropOn = (targetKey: number) => {
     if (dragKey == null || dragKey === targetKey) return
     setFields((fs) => {

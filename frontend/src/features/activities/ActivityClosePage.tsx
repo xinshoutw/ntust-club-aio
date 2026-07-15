@@ -30,7 +30,7 @@ async function isImageFile(f: File): Promise<boolean> {
   const ascii = (from: number, to: number) => String.fromCharCode(...head.slice(from, to))
   if (head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return true // JPEG
   if (head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47) return true // PNG
-  if (ascii(0, 3) === 'GIF') return true
+  if (ascii(0, 4) === 'GIF8') return true
   if (ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') return true
   if (ascii(0, 2) === 'BM') return true // BMP
   if (ascii(0, 4) === 'II*\0' || ascii(0, 4) === 'MM\0*') return true // TIFF

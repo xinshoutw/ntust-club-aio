@@ -163,7 +163,7 @@ export default function BookingOverviewPage() {
               <Select
                 size="small"
                 value={venueView}
-                onChange={openVenue}
+                onChange={setVenueView}
                 options={VENUES.map((v) => ({ value: v.name, label: `${v.name}(${v.capacity} 人)` }))}
                 style={{ minWidth: 190 }}
                 popupMatchSelectWidth={false}

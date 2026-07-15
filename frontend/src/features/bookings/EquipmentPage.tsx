@@ -5,7 +5,7 @@ import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
 import { CLUB_ACTIVITIES } from '../activities/mock'
 import type { Activity } from '../activities/types'
-import { EQUIPMENT, EQUIPMENT_LOANS } from './mock'
+import { EQUIPMENT, EQUIPMENT_LOANS, availableInWindow } from './mock'
 
 // 借用區間緩衝(工作天;system_settings,後台可調)
 const WORKDAY_BUFFER = { before: 2, after: 1 }
@@ -33,8 +33,6 @@ export default function EquipmentPage() {
   const { user } = useAuth()
   const { message } = App.useApp()
   const [form] = Form.useForm()
-  const selectedName = Form.useWatch('equipment', form) as string | undefined
-  const selected = EQUIPMENT.find((e) => e.name === selectedName)
   const mine = EQUIPMENT_LOANS.filter((l) => l.club === user?.club).slice(0, 5)
 
   // 器材借用綁定審核通過之活動,不再自選日期區間
@@ -42,6 +40,11 @@ export default function EquipmentPage() {
   const activityId = Form.useWatch('activity', form) as string | undefined
   const activity = approved.find((a) => a.id === activityId)
   const window = activity ? loanWindow(activity) : null
+
+  // 可借數依所選活動的借用區間動態推導;未選活動前無法判斷
+  const avail = (name: string): number | null => (window ? availableInWindow(name, window.start, window.end) : null)
+  const selectedName = Form.useWatch('equipment', form) as string | undefined
+  const selectedAvail = selectedName ? avail(selectedName) : null
 
   const submit = (values: { equipment: string; qty: number }) => {
     message.success(`已送出「${values.equipment} ×${values.qty}」借用申請(${activity?.name})`)
@@ -64,26 +67,30 @@ export default function EquipmentPage() {
               </tr>
             </thead>
             <tbody>
-              {EQUIPMENT.map((e) => (
-                <tr
-                  key={e.name}
-                  onClick={() => {
-                    if (e.available === 0) return
-                    form.setFieldValue('equipment', e.name)
-                    form.resetFields(['qty'])
-                  }}
-                  style={e.available === 0 ? { background: '#EEF0F3', color: 'var(--muted)', cursor: 'not-allowed' } : { cursor: 'pointer' }}
-                >
-                  <td style={{ fontWeight: 500 }}>{e.name}</td>
-                  <td style={{ color: 'var(--steel)', fontSize: 13 }}>
-                    {e.category}
-                    {e.needsSerial && ' · 序號點交'}
-                  </td>
-                  <td className="r num">
-                    {e.available} / {e.total}
-                  </td>
-                </tr>
-              ))}
+              {EQUIPMENT.map((e) => {
+                const a = avail(e.name)
+                const disabled = a === 0
+                return (
+                  <tr
+                    key={e.name}
+                    onClick={() => {
+                      if (disabled) return
+                      form.setFieldValue('equipment', e.name)
+                      form.resetFields(['qty'])
+                    }}
+                    style={disabled ? { background: '#EEF0F3', color: 'var(--muted)', cursor: 'not-allowed' } : { cursor: 'pointer' }}
+                  >
+                    <td style={{ fontWeight: 500 }}>{e.name}</td>
+                    <td style={{ color: 'var(--steel)', fontSize: 13 }}>
+                      {e.category}
+                      {e.needsSerial && ' · 序號點交'}
+                    </td>
+                    <td className="r num">
+                      {a ?? '—'} / {e.total}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -97,21 +104,17 @@ export default function EquipmentPage() {
             requiredMark
             onValuesChange={(changed) => {
               if ('equipment' in changed) form.resetFields(['qty'])
+              // 換活動=換借用區間,可借數重新推導;原選品項在新區間不可借就清掉
+              if ('activity' in changed) {
+                const name = form.getFieldValue('equipment') as string | undefined
+                const a = approved.find((x) => x.id === changed.activity)
+                const w = a ? loanWindow(a) : null
+                if (name && (!w || availableInWindow(name, w.start, w.end) === 0)) {
+                  form.resetFields(['equipment', 'qty'])
+                }
+              }
             }}
           >
-            <Form.Item name="equipment" label="品項" rules={[{ required: true, message: '請選擇品項' }]}>
-              <Select
-                placeholder="請選擇"
-                options={EQUIPMENT.map((e) => ({
-                  value: e.name,
-                  label: `${e.name}(可借 ${e.available})`,
-                  disabled: e.available === 0,
-                }))}
-              />
-            </Form.Item>
-            <Form.Item name="qty" label="數量" rules={[{ required: true, message: '請輸入數量' }]}>
-              <InputNumber style={{ width: '100%' }} min={1} max={selected?.available ?? 99} precision={0} />
-            </Form.Item>
             <Form.Item
               name="activity"
               label="關聯活動"
@@ -122,7 +125,7 @@ export default function EquipmentPage() {
                     可借用區間 {window.start} – {window.end}
                   </span>
                 ) : (
-                  '借用區間自動推算'
+                  '選擇活動後推算借用區間與可借數量'
                 )
               }
             >
@@ -131,6 +134,23 @@ export default function EquipmentPage() {
                 options={approved.map((a) => ({ value: a.id, label: `${a.name}` }))}
                 notFoundContent="無審核通過之活動"
               />
+            </Form.Item>
+            <Form.Item name="equipment" label="品項" rules={[{ required: true, message: '請選擇品項' }]}>
+              <Select
+                placeholder={window ? '請選擇' : '請先選擇關聯活動'}
+                disabled={!window}
+                options={EQUIPMENT.map((e) => {
+                  const a = avail(e.name)
+                  return {
+                    value: e.name,
+                    label: `${e.name}(可借 ${a ?? '—'})`,
+                    disabled: a === 0,
+                  }
+                })}
+              />
+            </Form.Item>
+            <Form.Item name="qty" label="數量" rules={[{ required: true, message: '請輸入數量' }]}>
+              <InputNumber style={{ width: '100%' }} min={1} max={selectedAvail ?? 99} precision={0} disabled={!window} />
             </Form.Item>
 
             <Form.Item

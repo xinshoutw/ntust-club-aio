@@ -50,22 +50,40 @@ export interface Equipment {
   name: string
   category: '一般' | '電子設備' | '投影布幕' | '帳篷'
   total: number
-  available: number
   needsSerial: boolean
 }
 
 export const EQUIPMENT: Equipment[] = [
-  { name: '帳篷', category: '帳篷', total: 6, available: 6, needsSerial: true },
-  { name: '摺疊桌', category: '一般', total: 25, available: 25, needsSerial: false },
-  { name: '椅子', category: '一般', total: 80, available: 72, needsSerial: false },
-  { name: '紅龍', category: '一般', total: 6, available: 6, needsSerial: false },
-  { name: '電腦單槍投影機', category: '電子設備', total: 5, available: 2, needsSerial: true },
-  { name: '麥克風架', category: '一般', total: 6, available: 6, needsSerial: false },
-  { name: '擴音機 MA101', category: '電子設備', total: 2, available: 1, needsSerial: true },
-  { name: '投影銀幕', category: '投影布幕', total: 5, available: 5, needsSerial: true },
-  { name: '延長線 5M', category: '一般', total: 5, available: 5, needsSerial: false },
-  { name: '推車', category: '一般', total: 4, available: 3, needsSerial: false },
+  { name: '帳篷', category: '帳篷', total: 6, needsSerial: true },
+  { name: '摺疊桌', category: '一般', total: 25, needsSerial: false },
+  { name: '椅子', category: '一般', total: 80, needsSerial: false },
+  { name: '紅龍', category: '一般', total: 6, needsSerial: false },
+  { name: '電腦單槍投影機', category: '電子設備', total: 5, needsSerial: true },
+  { name: '麥克風架', category: '一般', total: 6, needsSerial: false },
+  { name: '擴音機 MA101', category: '電子設備', total: 2, needsSerial: true },
+  { name: '投影銀幕', category: '投影布幕', total: 5, needsSerial: true },
+  { name: '延長線 5M', category: '一般', total: 5, needsSerial: false },
+  { name: '推車', category: '一般', total: 4, needsSerial: false },
 ]
+
+// 可借數為動態推導:總數 − 指定區間內(未歸還且未退回)借用單的重疊數量
+// 須先知道借用區間(由關聯活動起訖推導)才能計算
+export function availableInWindow(name: string, start: string, end: string, excludeId?: string): number {
+  const eq = EQUIPMENT.find((e) => e.name === name)
+  if (!eq) return 0
+  const s = dayjs(start, 'YYYY/MM/DD')
+  const en = dayjs(end, 'YYYY/MM/DD')
+  const used = EQUIPMENT_LOANS.filter(
+    (l) =>
+      l.equipment === name &&
+      l.id !== excludeId &&
+      l.status !== 'returned' &&
+      l.status !== 'rejected' &&
+      !dayjs(l.endDate, 'YYYY/MM/DD').isBefore(s, 'day') &&
+      !dayjs(l.startDate, 'YYYY/MM/DD').isAfter(en, 'day'),
+  ).reduce((sum, l) => sum + l.qty, 0)
+  return Math.max(0, eq.total - used)
+}
 
 // 固定借用=整學期每週固定時段,以星期表示(1=週一 … 7=週日)
 export const DOW_TEXT = ['', '一', '二', '三', '四', '五', '六', '日']

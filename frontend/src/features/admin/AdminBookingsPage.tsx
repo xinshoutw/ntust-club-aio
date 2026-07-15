@@ -6,11 +6,11 @@ import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import {
   CELL,
-  EQUIPMENT,
   EQUIPMENT_LOANS,
   PERIODS,
   VENUES,
   VENUE_BOOKINGS,
+  availableInWindow,
   cellInfo,
   type CellState,
   type EquipmentLoan,
@@ -107,14 +107,14 @@ function BookingReviewModal({
         <div style={detailLabel}>用途</div><div>{item.data.purpose || '—'}</div>
       </div>
 
-      {/* 器材可借數檢核:核准會使該品項可借數不足時提醒 */}
+      {/* 器材可借數檢核:以本單借用區間推導可借數(排除本單自身),不足時提醒 */}
       {item.kind === 'loan' &&
         (() => {
-          const eq = EQUIPMENT.find((e) => e.name === item.data.equipment)
-          if (!eq || item.data.qty <= eq.available) return null
+          const free = availableInWindow(item.data.equipment, item.data.startDate, item.data.endDate, item.data.id)
+          if (item.data.qty <= free) return null
           return (
             <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--paper)', borderRadius: 6, fontSize: 13, color: '#B03A2E' }}>
-              可借數不足:目前「{eq.name}」可借 <span className="num">{eq.available}</span>,本單申請{' '}
+              可借數不足:該區間「{item.data.equipment}」可借 <span className="num">{free}</span>,本單申請{' '}
               <span className="num">{item.data.qty}</span>;核准前請確認歸還排程。
             </div>
           )

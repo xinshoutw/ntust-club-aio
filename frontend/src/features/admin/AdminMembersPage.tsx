@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { App, Button, Pagination, Select } from 'antd'
 import { DownloadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
+import { neutralizeFormula } from '../../lib/csv'
 import { CURRENT_SEMESTER, semesterOptions } from '../../lib/semester'
 import { MEMBERS } from '../members/mock'
 import ClubSelect from './ClubSelect'
@@ -27,8 +28,10 @@ export default function AdminMembersPage() {
       message.error(`${club} 沒有成員可匯出`)
       return
     }
-    // 與社團端匯入格式相容(無標題列);職稱補空字串讓各列欄數一致
-    const text = list.map((m) => [m.name, m.studentId, m.kind, m.title ?? ''].join(',')).join('\n')
+    // 與社團端匯入格式相容(無標題列);職稱補空字串讓各列欄數一致;中和 Excel 公式前綴
+    const text = list
+      .map((m) => [m.name, m.studentId, m.kind, m.title ?? ''].map(neutralizeFormula).join(','))
+      .join('\n')
     const url = URL.createObjectURL(new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' }))
     const a = document.createElement('a')
     a.href = url

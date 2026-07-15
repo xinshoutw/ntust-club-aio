@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { App, Button, Dropdown, Form, Input, Modal, Pagination, Popconfirm, Select, Upload } from 'antd'
 import { DownOutlined, DownloadOutlined, EditOutlined, FilterOutlined, SwapOutlined, UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
+import { neutralizeFormula } from '../../lib/csv'
 import { CURRENT_SEMESTER, semesterOptions } from '../../lib/semester'
 import { MEMBERS, type Member } from './mock'
 
@@ -82,8 +83,10 @@ export default function MembersPage() {
       message.error(`${csvSemester} 沒有成員可匯出`)
       return
     }
-    // 維持匯入相容格式(無標題列、不加引號);職稱補空字串讓各列欄數一致
-    const text = rows.map((m) => [m.name, m.studentId, m.kind, m.title ?? ''].join(',')).join('\n')
+    // 維持匯入相容格式(無標題列、不加引號);職稱補空字串讓各列欄數一致;中和 Excel 公式前綴
+    const text = rows
+      .map((m) => [m.name, m.studentId, m.kind, m.title ?? ''].map(neutralizeFormula).join(','))
+      .join('\n')
     const url = URL.createObjectURL(new Blob(['\uFEFF' + text], { type: 'text/csv;charset=utf-8' }))
     const a = document.createElement('a')
     a.href = url

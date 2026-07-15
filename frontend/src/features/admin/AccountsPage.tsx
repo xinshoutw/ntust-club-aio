@@ -254,8 +254,9 @@ export default function AccountsPage() {
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
           <div>
-
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>姓名</div> {/*  TODO: 要有標記為必填的紅色星號 */}
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
+              <span style={{ color: '#C13B34' }}>*</span> 姓名
+            </div>
             <Input value={newName} onChange={(e) => setNewName(e.target.value)} />
           </div>
           <div>

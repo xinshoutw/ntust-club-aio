@@ -75,9 +75,10 @@ export default function AccountsPage() {
   // 一次性密碼彈窗:目標帳號 + 顯示開關(關閉動畫結束後卸載)
   const [pwTarget, setPwTarget] = useState<{ title: string; account?: string } | null>(null)
   const [pwOpen, setPwOpen] = useState(false)
-  // 權限設定彈窗
+  // 權限設定彈窗:草稿受控,按「儲存」才生效;未存關閉須確認
   const [permTarget, setPermTarget] = useState<Account | null>(null)
   const [permOpen, setPermOpen] = useState(false)
+  const [permDraft, setPermDraft] = useState<string[]>([])
   // 新增帳號彈窗(依分頁角色)
   const [createOpen, setCreateOpen] = useState(false)
   const [newName, setNewName] = useState('')
@@ -164,6 +165,7 @@ export default function AccountsPage() {
                   className="link-btn"
                   onClick={() => {
                     setPermTarget(a)
+                    setPermDraft(a.permKeys ?? [])
                     setPermOpen(true)
                   }}
                 >
@@ -267,27 +269,76 @@ export default function AccountsPage() {
         </div>
       </Modal>
 
-      {/* 權限設定(一般管理員) */}
-      <Modal
-        open={permOpen}
-        afterClose={() => setPermTarget(null)}
-        title={`頁面權限 — ${permTarget?.name ?? ''}`}
-        okText="儲存"
-        cancelText="取消"
-        onOk={() => {
-          setPermOpen(false)
-          message.success(`已更新 ${permTarget?.name} 的頁面權限`)
-        }}
-        onCancel={() => setPermOpen(false)}
-      >
-        {/* key 依帳號重掛:載入該管理員實際權限,且切換對象不殘留上一組勾選 */}
-        <Checkbox.Group
-          key={permTarget?.account ?? 'none'}
-          defaultValue={permTarget?.permKeys ?? []}
-          style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}
-          options={PERMISSION_KEYS.map(([value, label]) => ({ value, label }))}
-        />
-      </Modal>
+      {/* 權限設定(一般管理員):變更的項目以橘框標示,按「儲存」才生效 */}
+      {(() => {
+        const original = permTarget?.permKeys ?? []
+        const permDirty =
+          permDraft.length !== original.length || permDraft.some((k) => !original.includes(k))
+        const closePerm = () => {
+          if (!permDirty) {
+            setPermOpen(false)
+            return
+          }
+          confirmDialog(modal, {
+            title: '尚有未儲存的變更',
+            content: '離開將遺失已調整的權限勾選。',
+            okText: '放棄變更並離開',
+            okButtonProps: { danger: true },
+            cancelText: '留在此頁',
+            onOk: () => setPermOpen(false),
+          })
+        }
+        return (
+          <Modal
+            open={permOpen}
+            afterClose={() => setPermTarget(null)}
+            title={`頁面權限 — ${permTarget?.name ?? ''}`}
+            okText="儲存"
+            cancelText="取消"
+            onOk={() => {
+              setPermOpen(false)
+              message.success(`已更新 ${permTarget?.name} 的頁面權限`)
+            }}
+            onCancel={closePerm}
+            footer={(node) => (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {permDirty && <span style={{ fontSize: 12, color: '#8A5A00' }}>尚未儲存</span>}
+                <div style={{ flex: 1 }} />
+                {node}
+              </div>
+            )}
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
+              {PERMISSION_KEYS.map(([value, label]) => {
+                const changed = permDraft.includes(value) !== original.includes(value)
+                return (
+                  <label
+                    key={value}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      padding: '4px 8px',
+                      borderRadius: 6,
+                      cursor: 'pointer',
+                      border: changed ? '1px solid #d48806' : '1px solid transparent',
+                      boxShadow: changed ? '0 0 0 1px rgba(212, 136, 6, 0.45)' : undefined,
+                    }}
+                  >
+                    <Checkbox
+                      checked={permDraft.includes(value)}
+                      onChange={(e) =>
+                        setPermDraft((d) => (e.target.checked ? [...d, value] : d.filter((k) => k !== value)))
+                      }
+                    />
+                    <span style={{ fontSize: 13 }}>{label}</span>
+                  </label>
+                )
+              })}
+            </div>
+          </Modal>
+        )
+      })()}
 
       {pwTarget && (
         <OneTimePasswordModal

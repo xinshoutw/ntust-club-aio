@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router'
-import { App, Button, Checkbox, DatePicker, Form, Input, InputNumber, Select, TimePicker, Tooltip, Upload } from 'antd'
+import { App, Button, Checkbox, DatePicker, Form, Input, InputNumber, Popover, Select, TimePicker, Upload } from 'antd'
 import type { UploadFile } from 'antd'
 import dayjs from 'dayjs'
-import { FileTextOutlined, InboxOutlined } from '@ant-design/icons'
+import { FileTextOutlined, InboxOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { useAuth } from '../../app/auth'
 import { blurLeavesRow } from '../../lib/form'
@@ -250,11 +250,25 @@ export default function ActivityFormPage() {
                       <Select style={{ flex: 1 }} options={['社課', '活動', '會議'].map((v) => ({ value: v, label: v }))} />
                     </Form.Item>
                     {activityType === '活動' && (
-                      <Tooltip title="大型活動在行政資料能夠獲得較高的評分">
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
                         <Form.Item name="isLarge" valuePropName="checked" noStyle>
-                          <Checkbox style={{ whiteSpace: 'nowrap' }}>大型活動申請</Checkbox>
+                          <Checkbox style={{ whiteSpace: 'nowrap' }}>大型活動</Checkbox>
                         </Form.Item>
-                      </Tooltip>
+                        <Popover
+                          trigger={['hover', 'click']}
+                          content={
+                            <div style={{ fontSize: 13, lineHeight: 1.7, maxWidth: 280 }}>
+                              全校性、跨校性等規模較大之活動可勾選申請;經學務處審核認可後,該活動於社團評鑑「行政資料」之計分以
+                              <span className="num"> 3 </span>倍加權。
+                            </div>
+                          }
+                        >
+                          <InfoCircleOutlined
+                            aria-label="大型活動說明"
+                            style={{ color: 'var(--steel)', fontSize: 14, cursor: 'help' }}
+                          />
+                        </Popover>
+                      </span>
                     )}
                   </div>
                 </Form.Item>

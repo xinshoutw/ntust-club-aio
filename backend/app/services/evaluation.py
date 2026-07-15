@@ -17,7 +17,6 @@ from app.models import (
     EvalAdjustment,
     File,
     SessionAttendance,
-    Signup,
     SignupItem,
     SignupItemSession,
     Violation,
@@ -135,38 +134,28 @@ async def gather_scoring_input(db: AsyncSession, club_id: int, window: EvalWindo
             or 0
         )
 
-    # ad7 負責人會議:該年度場次全出席(且至少一場)才給分
-    total_sessions = await db.scalar(
-        sa.select(sa.func.count())
-        .select_from(SignupItemSession)
-        .join(SignupItem, SignupItemSession.item_id == SignupItem.id)
-        .where(SignupItem.kind == SignupKind.LEADER_MEETING, SignupItem.year == window.year)
-    )
-    attended_sessions = await db.scalar(
-        sa.select(sa.func.count())
-        .select_from(SessionAttendance)
-        .join(SignupItemSession, SessionAttendance.session_id == SignupItemSession.id)
-        .join(SignupItem, SignupItemSession.item_id == SignupItem.id)
-        .where(
-            SignupItem.kind == SignupKind.LEADER_MEETING,
-            SignupItem.year == window.year,
-            SessionAttendance.club_id == club_id,
-            SessionAttendance.attended.is_(True),
+    # ad7/ad8 皆以管理員活動後登錄之「簽到」為準,僅報名不計分(2026-07-15)
+    async def _attended_sessions(kind: SignupKind) -> int:
+        return (
+            await db.scalar(
+                sa.select(sa.func.count())
+                .select_from(SessionAttendance)
+                .join(SignupItemSession, SessionAttendance.session_id == SignupItemSession.id)
+                .join(SignupItem, SignupItemSession.item_id == SignupItem.id)
+                .where(
+                    SignupItem.kind == kind,
+                    SignupItem.year == window.year,
+                    SessionAttendance.club_id == club_id,
+                    SessionAttendance.attended.is_(True),
+                )
+            )
+            or 0
         )
-    )
-    leader_meeting = bool(total_sessions) and attended_sessions == total_sessions
 
-    # ad8 幹訓:該年度有派幹部報名參與
-    cadre = await db.scalar(
-        sa.select(Signup.id)
-        .join(SignupItem, Signup.item_id == SignupItem.id)
-        .where(
-            SignupItem.kind == SignupKind.CADRE_TRAINING,
-            SignupItem.year == window.year,
-            Signup.club_id == club_id,
-        )
-        .limit(1)
-    )
+    # ad7 負責人會議:每場簽到 1.25 分(全學年 4 場滿分,由 scoring 封頂)
+    leader_meeting_sessions = await _attended_sessions(SignupKind.LEADER_MEETING)
+    # ad8 幹訓:任一場次簽到即滿分
+    cadre_attended = await _attended_sessions(SignupKind.CADRE_TRAINING) > 0
 
     violation_count = (
         await db.scalar(
@@ -190,8 +179,8 @@ async def gather_scoring_input(db: AsyncSession, club_id: int, window: EvalWindo
         results=results,
         roster_by_semester=roster,
         has_website=bool(club.website_url),
-        leader_meeting_attended=leader_meeting,
-        cadre_training_attended=cadre is not None,
+        leader_meeting_sessions=leader_meeting_sessions,
+        cadre_training_attended=cadre_attended,
         violation_count=violation_count,
         merit=merit,
     )

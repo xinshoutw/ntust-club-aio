@@ -12,6 +12,8 @@ MIN_PHOTOS = 5
 LARGE_MULTIPLIER = 3
 MERIT_MAX = 5
 PENALTY_MAX = 10
+LEADER_MEETING_POINTS = 1.25  # 負責人會議每場簽到 1.25 分(每學期 2 場、全學年 4 場滿分 5)
+ADMIN_TOTAL_MAX = 100  # 行政資料總分上限(2026-07-15 定案:加分後仍以 100 封頂)
 
 AD_MAX: dict[str, float] = {
     "ad1": 15,
@@ -49,8 +51,8 @@ class ScoringInput:
     results: tuple[ActivityResult, ...] = ()
     roster_by_semester: dict[str, int] | None = None  # 區間內兩學期名單人數
     has_website: bool = False
-    leader_meeting_attended: bool = False
-    cadre_training_attended: bool = False
+    leader_meeting_sessions: int = 0  # 負責人會議已簽到場次(管理員活動後登錄)
+    cadre_training_attended: bool = False  # 幹訓已簽到(僅報名不計)
     violation_count: int = 0  # 未銷案勸導紀錄數
     merit: int = 0  # 表現優良加分(學務處登錄,0–5)
 
@@ -108,8 +110,9 @@ def compute_ad_scores(i: ScoringInput) -> list[AdScore]:
     # ad6 網頁經營:有連結即給滿分(需求方 2026-07-14 簡化,不追蹤更新時間)
     ad6 = AD_MAX["ad6"] if i.has_website else 0
 
-    # ad7/ad8 會議與幹訓:全程參與即給分(出席由學務處登錄)
-    ad7 = AD_MAX["ad7"] if i.leader_meeting_attended else 0
+    # ad7/ad8 會議與幹訓:以管理員活動後登錄之簽到為準,僅報名不計分(2026-07-15)
+    # ad7 每場 1.25 分(每學期 2 場、全學年 4 場滿分);ad8 簽到即滿分
+    ad7 = min(i.leader_meeting_sessions * LEADER_MEETING_POINTS, AD_MAX["ad7"])
     ad8 = AD_MAX["ad8"] if i.cadre_training_attended else 0
 
     # 加減分:表現優良最多 +5;違規記點一次 −1、最多 −10
@@ -133,13 +136,22 @@ def compute_ad_scores(i: ScoringInput) -> list[AdScore]:
         AdScore("ad5", ad5, AD_MAX["ad5"], ad5_note or "無名單資料"),
         AdScore("ad6", ad6, AD_MAX["ad6"], "已設定網頁連結" if i.has_website else "未設定網頁連結"),
         AdScore(
-            "ad7", ad7, AD_MAX["ad7"], "已全程參與" if i.leader_meeting_attended else "無出席紀錄"
+            "ad7",
+            ad7,
+            AD_MAX["ad7"],
+            (
+                f"已簽到 {i.leader_meeting_sessions} 場 × {LEADER_MEETING_POINTS} 分(全學年 4 場)"
+                if i.leader_meeting_sessions > 0
+                else "無簽到紀錄(以管理員活動後登錄之簽到為準)"
+            ),
         ),
         AdScore(
             "ad8",
             ad8,
             AD_MAX["ad8"],
-            "已派幹部全程參與" if i.cadre_training_attended else "無參與紀錄",
+            "幹訓已簽到"
+            if i.cadre_training_attended
+            else "無簽到紀錄(以管理員活動後登錄之簽到為準)",
         ),
         AdScore(
             "adj",
@@ -166,4 +178,5 @@ def apply_overrides(scores: list[AdScore], overrides: dict[str, float | None]) -
 
 
 def total_of(scores: list[FinalScore]) -> float:
-    return sum(s.final for s in scores)
+    """行政資料總分:各項滿分合計恰為 100,加計表現優良後仍以 100 封頂。"""
+    return min(sum(s.final for s in scores), ADMIN_TOTAL_MAX)

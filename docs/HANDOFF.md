@@ -39,9 +39,21 @@
 - 留待接後端自然消解(opus LOW/NOTE,不修):module-level `dayjs()` 快照(跨日長開頁面)、結案實際時間僅 HH:mm 無法表達跨日結束、幹訓簽到 Checkbox 與 `attendedSessions` mock 兩端未接
 - 歷史:後端三輪(opus×2+codex)已完;前端六輪已完(2026-07-14 前)
 
-## ui-polish 分支(等逐項裁決,勿進 dev)
+## ui-polish 已合併進 dev(2026-07-15,merge 758352a)
 
-分支 `ui-polish`(worktree `../club-aio-ui-polish`)7 commit 待裁決,裁決點 5 項(操作說明去留/10:30 提示位置/Drawer vs Modal/成員社團下拉 placeholder/佔位按鈕)——上輪 HANDOFF 詳列,需求方尚未回覆,原文備份在 git 歷史(6453f92 的 HANDOFF)。
+7 個 commit(社團端 14 頁文字精簡、活動申請審核 Drawer、結案/臨時借用/固定借用審核 Modal、成員分頁、列表空狀態)全數併入。5 項裁決結果:
+
+1. 互動提示定調**全留**:主要互動為點列的頁面保留至多一行提示(ActivityListPage 頁尾、ReviewPage 提示皆留,與本輪借用總覽做法一致)
+2. 10:30 歸還規則**只留器材頁**(借用總覽頁尾行已移除)
+3. **維持刻意區分**:活動申請審核=Drawer(三關章軌)、單關審核=Modal
+4. 成員管理社團下拉維持 placeholder(接後端才有 club 欄位)
+5. 「+新增/重設密碼/停用」佔位按鈕保留(接後端啟用)
+
+衝突解決:AdminRoomsPage 的審核 Modal 移植到新「星期×節次」固定借用模型(衝突鍵 room|dow|period、整單擇一文案);AdminViolationsPage 空狀態併入銷案期限欄(colSpan 9);FixedRoomPage 說明行取兩版合併「整學期每週固定使用所選時段;衝突由學務處擇一社團核准」。合併後 build/test(15)/lint 全綠。分支與 worktree(`../club-aio-ui-polish`)未刪,可自行清理。
+
+## 下一步(使用者宣告)
+
+**admin panel 頁面調整與迭代**——現行行政端 14 頁 + 本輪新增檔案管理頁;審核流已統一為點列開 Drawer/Modal(見上)。迭代時注意:結案審核頁(aclose)待做「照片/成果/心得繳交確認」勾選;報名管理已有簽到登錄;固定借用審核已為週次模型。
 
 ## 待裁決(使用者回來看,沿上輪)
 

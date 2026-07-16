@@ -1,24 +1,51 @@
 import { useState } from 'react'
-import { App, Button, Checkbox, DatePicker, Form, Input, Select } from 'antd'
+import dayjs from 'dayjs'
+import { App, Button, Checkbox, DatePicker, Form, Input, Select, Switch } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import AnnouncementModal from '../../components/ui/AnnouncementModal'
+import { confirmDialog } from '../../lib/confirm'
 import { ANNOUNCEMENTS, type Announcement } from '../activities/mock'
 import ClubCascader from './ClubCascader'
 import { CLUB_ATTRIBUTES } from './clubsMock'
 
 export default function AnnouncementsPage() {
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const [form] = Form.useForm()
   const target = Form.useWatch('target', form) as string | undefined
   const takeover = Form.useWatch('takeover', form) as boolean | undefined
   const notify = Form.useWatch('notify', form) as boolean | undefined
+  const [items, setItems] = useState<Announcement[]>(ANNOUNCEMENTS)
   const [viewing, setViewing] = useState<Announcement | null>(null)
   const [viewOpen, setViewOpen] = useState(false)
+  // 蓋板開關已撥到「開」但尚未選截止日:未選日期前蓋板不生效
+  const [takeoverDraft, setTakeoverDraft] = useState(false)
+
+  // 詳情彈窗顯示列表中的最新版本(切換蓋板即時反映);已刪除者退回快照,供關閉動畫期間顯示
+  const shown = viewing ? (items.find((i) => i.id === viewing.id) ?? viewing) : null
 
   const view = (a: Announcement) => {
     setViewing(a)
     setViewOpen(true)
+    setTakeoverDraft(false)
   }
+
+  const setTakeoverUntil = (id: string, until?: string) => {
+    setItems((prev) => prev.map((x) => (x.id === id ? { ...x, takeoverUntil: until } : x)))
+  }
+
+  const confirmDelete = (a: Announcement, fromModal = false) =>
+    confirmDialog(modal, {
+      title: '刪除公告',
+      content: `「${a.title}」刪除後將無法復原`,
+      okText: '確認刪除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: () => {
+        setItems((prev) => prev.filter((x) => x.id !== a.id))
+        if (fromModal) setViewOpen(false)
+        message.success('公告已刪除')
+      },
+    })
 
   return (
     <div>
@@ -92,7 +119,7 @@ export default function AnnouncementsPage() {
 
       <div className="card" style={{ marginTop: 16 }}>
         <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>已發布公告</div>
-        {ANNOUNCEMENTS.map((a) => (
+        {items.map((a) => (
           <div
             key={a.id}
             className="click-tint"
@@ -121,7 +148,7 @@ export default function AnnouncementsPage() {
                 className="link-btn danger"
                 onClick={(e) => {
                   e.stopPropagation()
-                  message.info('刪除公告(接後端後啟用)')
+                  confirmDelete(a)
                 }}
               >
                 刪除
@@ -145,10 +172,50 @@ export default function AnnouncementsPage() {
       </div>
 
       <AnnouncementModal
-        announcement={viewing}
+        announcement={shown}
         open={viewOpen}
         onClose={() => setViewOpen(false)}
         afterClose={() => setViewing(null)}
+        footerExtra={
+          shown && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 13, color: 'var(--steel)' }}>蓋板</span>
+              <Switch
+                checked={!!shown.takeoverUntil || takeoverDraft}
+                onChange={(checked) => {
+                  if (checked) {
+                    // 開啟需先選截止日:未選日期前僅顯示日期欄,蓋板不生效
+                    setTakeoverDraft(true)
+                  } else {
+                    setTakeoverDraft(false)
+                    if (shown.takeoverUntil) setTakeoverUntil(shown.id, undefined)
+                  }
+                }}
+              />
+              {(!!shown.takeoverUntil || takeoverDraft) && (
+                <DatePicker
+                  value={shown.takeoverUntil ? dayjs(shown.takeoverUntil, 'YYYY/MM/DD') : null}
+                  format="YYYY/MM/DD"
+                  placeholder="蓋板截止日期"
+                  onChange={(d) => {
+                    if (d) {
+                      setTakeoverUntil(shown.id, d.format('YYYY/MM/DD'))
+                      setTakeoverDraft(false)
+                    } else {
+                      // 清除日期=蓋板失效,開關留在「開」等待重新選日
+                      setTakeoverUntil(shown.id, undefined)
+                      setTakeoverDraft(true)
+                    }
+                  }}
+                />
+              )}
+              <div style={{ flex: 1 }} />
+              <Button danger onClick={() => confirmDelete(shown, true)}>
+                刪除
+              </Button>
+            </div>
+          )
+        }
       />
     </div>
   )

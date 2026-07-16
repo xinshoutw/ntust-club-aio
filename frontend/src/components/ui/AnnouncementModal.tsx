@@ -1,25 +1,29 @@
+import type { ReactNode } from 'react'
 import { Modal } from 'antd'
 import type { Announcement } from '../../features/activities/mock'
 import Markdown from './Markdown'
 
 // 公告詳情彈窗:兩端共用,點任一公告展開完整內容(markdown)
+// footerExtra:呼叫端注入的控制列(如行政端的蓋板開關/刪除);未提供時不顯示 footer
 export default function AnnouncementModal({
   announcement,
   open,
   onClose,
   afterClose,
+  footerExtra,
 }: {
   announcement: Announcement | null
   open: boolean
   onClose: () => void
   afterClose: () => void
+  footerExtra?: ReactNode
 }) {
   return (
     <Modal
       open={open}
       onCancel={onClose}
       afterClose={afterClose}
-      footer={null}
+      footer={footerExtra ?? null}
       width={560}
       title={
         announcement && (

@@ -3,6 +3,7 @@ import { App, Button, DatePicker, Form, Input, InputNumber, Select, Spin, Tag } 
 import dayjs, { type Dayjs } from 'dayjs'
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
+import AdminEquipmentCard from './AdminEquipmentCard'
 import type { BudgetCategory } from '../../api/clubConfig'
 import {
   evalYearLabel,
@@ -270,10 +271,7 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
 
       <div className="card" style={{ marginTop: 16, padding: 24 }}>
         <div style={sectionTitle}>儲存空間</div>
-        <div style={{ fontSize: 12, color: 'var(--steel)', marginBottom: 12 }}>
-          系統總容量以後端可取得的實際磁碟空間為準(容量不足告警另行處理);此處僅設單一社團配額。
-        </div>
-        <Form.Item name="perClubGib" label="單一社團配額(GiB)" style={{ marginBottom: 0, maxWidth: 280 }}>
+        <Form.Item name="perClubGib" label="單一社團限制 (GiB)" style={{ marginBottom: 0, maxWidth: 280 }}>
           <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
         </Form.Item>
       </div>
@@ -317,6 +315,8 @@ export default function AdminSettingsPage() {
           無法載入系統設定{settingsQuery.error ? `:${settingsQuery.error.message}` : ''}
         </div>
       )}
+      {/* 器材主檔(獨立於 system_settings,各列即時 PATCH) */}
+      <AdminEquipmentCard />
     </div>
   )
 }

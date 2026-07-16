@@ -501,9 +501,9 @@ async def _create_activities(
     # 1. 草稿
     acts["draft"] = _add_activity(
         db, csie, csie_user,
-        name="AI 程式設計社課(九月)", type_=ActivityType.COURSE,
+        name="AI 程式設計社課", type_=ActivityType.COURSE,
         status=ActivityStatus.DRAFT,
-        date_=date(2026, 9, 15), start_time=time(19, 0), end_time=time(21, 0),
+        date_=date(2026, 7, 22), start_time=time(19, 0), end_time=time(21, 0),
         location="S207", content="Python 與生成式 AI 入門,含實作練習。",
         staff_text="講師:張明哲 教授", participants=(30, 0),
         budget=(("印刷費", "講義印製", 500, 0, None),),
@@ -513,7 +513,7 @@ async def _create_activities(
         db, csie, csie_user,
         name="Python 入門社課", type_=ActivityType.COURSE,
         status=ActivityStatus.PENDING_ADVISOR,
-        date_=date(2026, 9, 22), start_time=time(19, 0), end_time=time(21, 0),
+        date_=date(2026, 7, 23), start_time=time(19, 0), end_time=time(21, 0),
         location="S207", content="基礎語法與資料處理,適合零基礎社員。",
         staff_text="講師:顏志明", participants=(25, 0),
         budget=(("印刷費", "教材影印", 300, 0, None),),
@@ -523,7 +523,7 @@ async def _create_activities(
         db, csie, csie_user,
         name="校際程式競賽", type_=ActivityType.EVENT,
         status=ActivityStatus.PENDING_CHIEF,
-        date_=date(2026, 10, 17), end_date=date(2026, 10, 18),
+        date_=date(2026, 7, 28), end_date=date(2026, 7, 29),
         start_time=time(9, 0), end_time=time(17, 0),
         location="國際大樓 IB 廳", content="邀請北區大專院校組隊參賽,推廣程式教育。",
         staff_text="總召:顏志明;裁判:張明哲 教授", participants=(60, 40),
@@ -538,7 +538,7 @@ async def _create_activities(
         db, csie, csie_user,
         name="資安工作坊", type_=ActivityType.EVENT,
         status=ActivityStatus.PENDING_DEAN,
-        date_=date(2026, 11, 21), start_time=time(9, 0), end_time=time(16, 0),
+        date_=date(2026, 7, 30), start_time=time(9, 0), end_time=time(16, 0),
         location="S302/S303", content="CTF 入門與網站滲透測試實作。",
         staff_text="講師:業界資安顧問", participants=(50, 10),
         fund_source="課指組補助",
@@ -552,7 +552,7 @@ async def _create_activities(
         db, csie, csie_user,
         name="新生迎新博覽會", type_=ActivityType.EVENT,
         status=ActivityStatus.APPROVED,
-        date_=date(2026, 9, 12), start_time=time(10, 0), end_time=time(16, 0),
+        date_=date(2026, 7, 25), start_time=time(10, 0), end_time=time(16, 0),
         location="戶外精誠廣場", content="新生社團博覽會攤位,展示系學會年度活動成果。",
         staff_text="攤位:黃冠宇;文宣:吳佩珊", participants=(40, 200),
         fund_source="課指組補助",
@@ -576,7 +576,7 @@ async def _create_activities(
         db, csie, csie_user,
         name="聯合黑客松", type_=ActivityType.EVENT,
         status=ActivityStatus.PENDING_ADVISOR,
-        date_=date(2026, 11, 7), end_date=date(2026, 11, 8),
+        date_=date(2026, 7, 26), end_date=date(2026, 7, 27),
         start_time=time(9, 0), end_time=time(18, 0),
         location="國際大樓 IB 廳", content="與北科、台大聯合舉辦 24 小時黑客松。",
         staff_text="總召:林小芳", participants=(80, 120),
@@ -588,7 +588,7 @@ async def _create_activities(
         db, csie, csie_user,
         name="春季登山健行聯誼", type_=ActivityType.EVENT,
         status=ActivityStatus.REJECTED,
-        date_=date(2026, 8, 8), start_time=time(7, 0), end_time=time(17, 0),
+        date_=date(2026, 5, 10), start_time=time(7, 0), end_time=time(17, 0),
         location="陽明山國家公園", content="與登山社聯合舉辦的健行聯誼活動。",
         staff_text="領隊:陳大文", participants=(20, 5),
         budget=(("交通費", "遊覽車租借", 0, 3000, None),),
@@ -800,7 +800,7 @@ async def _create_bookings(
         VenueBooking(
             club_id=csie.id, venue_id=venue_ids["戶外精誠廣場 1"],
             activity_id=acts["approved_future"].id,
-            date=date(2026, 9, 12), periods=["5", "6", "7"],
+            date=date(2026, 7, 25), periods=["5", "6", "7"],
             purpose="新生迎新博覽會攤位", status=BookingStatus.PENDING,
         )
     )
@@ -839,13 +839,13 @@ async def _create_bookings(
         EquipmentLoan(  # 待審
             club_id=csie.id, equipment_id=equipment["電腦單槍投影機"].id,
             activity_id=acts["approved_future"].id, qty=1,
-            start_date=date(2026, 9, 10), end_date=date(2026, 9, 14),
+            start_date=date(2026, 7, 23), end_date=date(2026, 7, 27),
             purpose="博覽會攤位展示影片", status=LoanStatus.PENDING,
         ),
         EquipmentLoan(  # 已核准(未借出)
             club_id=csie.id, equipment_id=equipment["摺疊桌"].id,
             activity_id=acts["approved_future"].id, qty=10,
-            start_date=date(2026, 9, 10), end_date=date(2026, 9, 14),
+            start_date=date(2026, 7, 23), end_date=date(2026, 7, 27),
             purpose="攤位桌面佈置", status=LoanStatus.APPROVED,
         ),
         EquipmentLoan(  # 借出中(未逾期:區間跨越今天)
@@ -1013,11 +1013,11 @@ def _create_announcements(
         Announcement(
             title="系統暑期維護公告",
             content=(
-                "本系統將於 **2026/08/01(六)00:00–06:00** 進行年度維護,"
+                "本系統將於 **2026/07/28(二)00:00–06:00** 進行年度維護,"
                 "期間暫停服務。\n\n造成不便敬請見諒。"
             ),
             target_type=AnnouncementTarget.ALL,
-            takeover_until=date(2026, 8, 31),
+            takeover_until=date(2026, 7, 31),
             created_by=super_user.id,
         )
     )
@@ -1033,8 +1033,8 @@ async def _create_signups(
     expo = SignupItem(
         name="社團博覽會攤位報名", kind=SignupKind.NORMAL,
         description="新生社團博覽會攤位登記,每社至多 3 名工作人員,含攤位抽籤說明會。",
-        place="戶外精誠廣場", event_at=_dt(2026, 9, 12, 10, 0),
-        signup_start=_dt(2026, 7, 1, 9, 0), signup_end=_dt(2026, 8, 31, 23, 59),
+        place="戶外精誠廣場", event_at=_dt(2026, 7, 31, 10, 0),
+        signup_start=_dt(2026, 7, 1, 9, 0), signup_end=_dt(2026, 7, 28, 23, 59),
         max_participants=3, requires_confirmation=True,
         fields=[
             {"key": "f1", "label": "攤位負責人姓名", "type": "text", "required": True},

@@ -208,5 +208,5 @@ export const EQUIPMENT_LOANS: EquipmentLoan[] = [
   { id: 'EQP-114-0092', club: '資工系學會', equipment: '摺疊桌', qty: 10, activity: '迎新宿營', startDate: '2026/06/12', endDate: '2026/06/15', purpose: '迎新擺攤', status: 'checked_out', checkoutBy: '李工讀', returnDue: '2026/06/16 10:30', borrower: '陳予恩' },
   { id: 'EQP-114-0093', club: '資工系學會', equipment: '電腦單槍投影機', qty: 1, activity: '期末迎新籌備工作坊', startDate: '2026/06/01', endDate: '2026/06/03', purpose: '展演', status: 'returned', serials: ['PJ-003'], borrower: '陳予恩', returnedBy: '林詠晴' },
   { id: 'EQP-114-0095', club: '電機系學會', equipment: '擴音機 MA101', qty: 1, startDate: '2026/06/02', endDate: '2026/06/04', purpose: '晚會彩排', status: 'overdue', checkoutBy: '李工讀', returnDue: '2026/06/05 10:30', borrower: '張書豪' },
-  { id: 'EQP-114-0096', club: '資工系學會', equipment: '帳篷', qty: 2, activity: '新生迎新博覽會', startDate: '2026/09/04', endDate: '2026/09/09', purpose: '園遊會', status: 'pending' },
+  { id: 'EQP-114-0096', club: '資工系學會', equipment: '帳篷', qty: 2, activity: '新生迎新博覽會', startDate: '2026/07/23', endDate: '2026/07/27', purpose: '園遊會', status: 'pending' },
 ]

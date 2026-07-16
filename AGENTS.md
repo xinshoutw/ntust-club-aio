@@ -223,6 +223,7 @@
 - 認證:行政建帳號(argon2id + DB session cookie、密碼歷史、首登強制改密);**SSO 僅預留(`auth_provider`),前端不顯示**
 - Email:aiosmtplib + BackgroundTasks;SMTP 全走 `.env`(暫用開發者 iCloud+ 信箱,relay 未定)
 - 容器:Docker Compose(`compose.yml`);開發只起 db,前後端本機熱重載
+- 本機開發位址統一 IPv4:前端 `http://127.0.0.1:5173`,後端 `http://127.0.0.1:8000`;Vite `/api` 同源代理到後端,不直連 API、不開 CORS
 - 部署:GCE 單台 e2-medium(web/backend/db 同機),前面是既有 edge proxy VM(TLS/白名單,設定見 `../nginx/`,開發者有權限改);網域復用 `clubs.ntust.edu.tw`
 - 上傳:文件 50MB/圖片 10MB/壓縮檔 100MB/維修影片 200MB;成果影片一律外部連結
 - 檔案佈局 `{模組}/{年}/{月}/{uuid}`(月份分類);非競賽採計檔案由行政定期備份後**自系統刪除**(`files.archived_at` 標記),競賽採計檔案保留

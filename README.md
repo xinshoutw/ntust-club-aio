@@ -17,13 +17,13 @@ cp .env.example .env
 # 1. 資料庫
 docker compose up -d db
 
-# 2. 後端(http://localhost:8000,API docs 在 /api/docs)
+# 2. 後端(http://127.0.0.1:8000,API docs 在 /api/docs)
 cd backend
 uv sync
 uv run alembic upgrade head
-uv run uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
-# 3. 前端(http://localhost:5173,/api 代理到 8000)
+# 3. 前端(http://127.0.0.1:5173,/api 代理到 127.0.0.1:8000)
 cd frontend
 pnpm install
 pnpm dev

@@ -35,7 +35,7 @@
 
 ## 下一輪待辦(Task #6 驗證與審查,本輪未執行)
 
-1. **E2E 實跑**:`seed_mock --yes` → `uv run uvicorn app.main:app --reload --port 8000`(127.0.0.1,OrbStack 佔 localhost:8000)+ `pnpm dev`(localhost:5173)→ 實際過主流程:club 登入→活動申請(附件)→admin 三關簽核→結案(照片)→結案審核(繳交確認)→評鑑分數;借用三種+審核;報名(草稿/送出/確認/逐場簽到);公告蓋板;成員 CSV;帳號管理一次性密碼
+1. **E2E 實跑**:`seed_mock --yes` → `uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000` + `pnpm dev`(開 `http://127.0.0.1:5173`)→ 實際過主流程:club 登入→活動申請(附件)→admin 三關簽核→結案(照片)→結案審核(繳交確認)→評鑑分數;借用三種+審核;報名(草稿/送出/確認/逐場簽到);公告蓋板;成員 CSV;帳號管理一次性密碼
 2. **交叉審查**:本輪特例 Fable:codex ≈ 2:1(codex 慣例:`codex e -m gpt-5.6-sol -c 'model_reasoning_effort="xhigh"' --dangerously-bypass-approvals-and-sandbox "..." </dev/null`);審本輪全部 commit(`git log ee23a1c..HEAD`)
 3. **資安**:bandit + 資安審查(auth/上傳/CSRF/權限邊界/一次性密碼流);前端已知點:檔案 URL 走 session cookie 保護
 4. **無障礙/一致性 sweep**:鍵盤、讀屏語意(無 thead 表格)、對比、Modal 聚焦;風格一致性(loading/error 態各頁做法)
@@ -56,6 +56,6 @@
 
 - 本機 DB `docker compose up -d db`;dev 庫=`b8d5e3f61a24` + seed_mock 資料
 - **多 agent 平行作業絕不可 `git stash`**(本輪兩次事故,均已復原)
-- Vite 8 只綁 IPv6(`localhost:5173`);後端一律 `127.0.0.1:8000`
+- 本機開發一律用 IPv4:前端 `127.0.0.1:5173`,後端 `127.0.0.1:8000`;OrbStack 佔用 `localhost:8000`,勿混用 `localhost`
 - 確認彈窗一律 `lib/confirm.ts` 的 `confirmDialog`;Modal 一律 open+afterClose 常駐;前端不顯示單號(稽核除外)
 - Commit 英文、一行為一 commit、禁元描述;文件/回覆繁中;UI 禁 emoji

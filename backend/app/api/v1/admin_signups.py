@@ -30,7 +30,6 @@ from app.schemas.signups import (
 )
 from app.services import audit, notify
 from app.services import signup_service as svc
-from app.services.settings_service import get_setting
 
 router = APIRouter(prefix="/admin/signup-items", tags=["admin"])
 
@@ -76,10 +75,7 @@ async def create_item(
     except ValueError as exc:
         raise validation_error(str(exc)) from None
 
-    # 注意:此 year 供 ad7/ad8 以 eval_window.year 篩選,兩者需對齊(settings_service 註記)
-    year = await get_setting(db, "current_year")
     item = SignupItem(
-        year=year,
         name=body.name,
         kind=body.kind,
         place=body.place,

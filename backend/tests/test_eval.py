@@ -151,11 +151,11 @@ async def test_ad7_ad8_score_only_by_attendance(client, db):
 
     club, user, admin = await setup(client, db)
     meeting = SignupItem(
-        year=EVAL_YEAR, name="社團負責人會議", kind="leader_meeting",
+        name="社團負責人會議", kind="leader_meeting",
         session_based=True, created_by=admin.id,
     )
     training = SignupItem(
-        year=EVAL_YEAR, name="幹部訓練", kind="cadre_training", created_by=admin.id
+        name="幹部訓練", kind="cadre_training", created_by=admin.id
     )
     db.add_all([meeting, training])
     await db.flush()

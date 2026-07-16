@@ -8,8 +8,6 @@ from app.core.semesters import TAIPEI
 from app.models import SessionAttendance, Signup, SignupItem, SignupItemSession
 from tests.conftest import csrf_headers, login, make_club, make_user
 
-YEAR = 116
-
 
 async def seed(client, db):
     club = await make_club(db)
@@ -22,7 +20,6 @@ async def seed(client, db):
 
 async def make_item(db, admin, *, kind="leader_meeting", session_based=True, event_at=None):
     item = SignupItem(
-        year=YEAR,
         name="社團負責人會議" if kind == "leader_meeting" else "幹部訓練",
         kind=kind,
         session_based=session_based,

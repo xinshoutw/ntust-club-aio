@@ -21,7 +21,6 @@ class SignupItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    year: int
     name: str
     description: str
     is_open: bool

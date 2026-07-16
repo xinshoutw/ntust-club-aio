@@ -16,7 +16,6 @@ FIELDS = [
 async def make_item(db, admin_id: int, **kw) -> SignupItem:
     now = datetime.now(UTC)
     defaults = dict(
-        year=114,
         name="社團負責人研習",
         description="",
         is_open=True,

@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import sqlalchemy as sa
 
-from app.models import AuditLog, Signup, SignupEntry, SignupItem
+from app.models import AuditLog, Signup, SignupEntry
 from tests.conftest import csrf_headers, login, make_club, make_user
 
 URL = "/api/v1/admin/signup-items"
@@ -170,15 +170,6 @@ async def test_confirm_flow_for_review_based_item(client, db):
     detail = (await client.get(f"/api/v1/club/signup-items/{item['id']}")).json()["data"]
     assert detail["my_status"] == "signed"
     assert detail["my_signup"]["confirmed"] is True
-
-
-async def test_create_stores_year_from_settings(client, db):
-    """year 取 system_settings current_year(需與 eval_window.year 對齊供 ad7/ad8 篩選)。"""
-    await seed(client, db)
-    resp = await client.post(URL, json=body(), headers=csrf_headers(client))
-    item_id = resp.json()["data"]["id"]
-    item = await db.get(SignupItem, item_id)
-    assert item.year == 114  # DEFAULTS current_year
 
 
 async def test_frontend_permission_key_alias(client, db):

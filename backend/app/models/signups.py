@@ -19,7 +19,7 @@ class SignupItem(Base, TimestampMixin):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    year: Mapped[int] = mapped_column(index=True)  # 民國學年度
+    # 年度不儲存:ad7/ad8 採計以場次日期落在評鑑視窗推導(2026-07-16 第九輪定案)
     name: Mapped[str] = mapped_column(sa.Text)
     description: Mapped[str] = mapped_column(sa.Text, default="")  # 活動描述
     is_open: Mapped[bool] = mapped_column(default=True)  # 管理員可提前關閉

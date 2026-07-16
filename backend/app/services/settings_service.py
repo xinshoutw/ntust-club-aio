@@ -43,8 +43,7 @@ DEFAULTS: dict[str, Any] = {
     # 活動申請附件加總上限(MB;2026-07-16 第八輪)
     "activity_attachment_total_mb": 50,
     # 評鑑視窗(2026-07-14 拍板:預設 116 年,2026/02/01–2027/01/31)
-    # 注意:ad7/ad8 以 signup_items.year == eval_window.year 篩選;
-    # 管理端建報名項目時若用 current_year,兩者必須對齊,否則幹訓/會議餵不進行政分
+    # ad7/ad8 以「場次日期落在視窗」採計(2026-07-16 第九輪,無年度對齊問題)
     "eval_window": {"year": 116, "start": "2026-02-01", "end": "2027-01-31"},
     # 目前學年度(報名等年輪資料寫入時取用)
     "current_year": 114,

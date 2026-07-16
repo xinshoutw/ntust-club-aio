@@ -105,6 +105,7 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
           className="topbar-brand"
           onClick={() => guarded(() => navigate(user?.role === 'admin' ? '/admin' : '/'))}
         >
+          <img src="/logo.svg" alt="" className="topbar-logo" />
           臺科大社團管理系統
         </button>
         <div className="topbar-mobile-title">{mobileTitle}</div>

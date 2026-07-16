@@ -19,6 +19,9 @@
   padding: 0 24px;
 }
 .topbar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
   font-weight: 600;
   font-size: 16px;
   letter-spacing: 0.5px;
@@ -29,6 +32,11 @@
   font-family: inherit;
   color: var(--ink);
   cursor: pointer;
+}
+.topbar-logo {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
 }
 .topbar-mobile-title {
   display: none;

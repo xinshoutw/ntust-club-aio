@@ -25,6 +25,14 @@ _TIMEOUT = 5.0
 
 SYSTEM_NAME = "臺科大社團管理系統"
 SITE_URL = "https://clubs.ntust.edu.tw"
+# webhook 顯示名稱與頭貼(頭貼=前端 public/logo.png,正式站對外可取用;
+# 開發站無法解析時 Discord 僅略過頭貼,不影響訊息)
+WEBHOOK_AVATAR_URL = f"{SITE_URL}/logo.png"
+
+
+def _with_identity(payload: dict[str, Any]) -> dict[str, Any]:
+    """為 webhook payload 補上統一的顯示名稱與頭貼(不覆蓋既有值)。"""
+    return {"username": SYSTEM_NAME, "avatar_url": WEBHOOK_AVATAR_URL, **payload}
 
 # Discord Components V2(需求方指定格式;flags 1<<15 = IS_COMPONENTS_V2)
 IS_COMPONENTS_V2 = 1 << 15
@@ -50,7 +58,7 @@ async def _post_webhook(
         return
     try:
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-            resp = await client.post(url, json=payload, params=params)
+            resp = await client.post(url, json=_with_identity(payload), params=params)
             resp.raise_for_status()
     except Exception:  # noqa: BLE001 - 通知失敗不得影響業務
         logger.exception("discord webhook failed: %s", label)

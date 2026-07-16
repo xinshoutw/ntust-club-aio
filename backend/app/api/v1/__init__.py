@@ -8,6 +8,7 @@ from app.api.v1 import (
     admin_audit,
     admin_bookings,
     admin_clubs,
+    admin_equipment,
     admin_eval,
     admin_files,
     admin_maintenance,
@@ -45,6 +46,7 @@ router.include_router(admin_activities.router)
 router.include_router(admin_announcements.router)
 router.include_router(admin_bookings.router)
 router.include_router(admin_clubs.router)
+router.include_router(admin_equipment.router)
 router.include_router(admin_overdue.router)
 router.include_router(admin_rooms.router)
 router.include_router(admin_eval.router)

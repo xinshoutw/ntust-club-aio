@@ -1,0 +1,342 @@
+"""臨時場地與器材借用審核(/admin,權限鍵 abooking)+ 全校單日場況與逾期列表。"""
+
+from datetime import UTC, date, datetime, timedelta
+
+import sqlalchemy as sa
+
+from app.models import (
+    Activity,
+    ApprovalRecord,
+    AuditLog,
+    Equipment,
+    EquipmentLoan,
+    RoomBookingRequest,
+    RoomBookingSlot,
+    User,
+    Venue,
+    VenueBooking,
+)
+from app.models.enums import (
+    ActivityStatus,
+    ApprovalSubject,
+    EquipmentCategory,
+    VenueCategory,
+)
+from tests.conftest import csrf_headers, login, make_club, make_user
+
+
+async def make_venue(db, name="精誠廣場", *, allow_fixed=False, allow_temp=True):
+    venue = Venue(
+        name=name, capacity=40, category=VenueCategory.OUTDOOR,
+        allow_fixed=allow_fixed, allow_temp=allow_temp,
+    )
+    db.add(venue)
+    await db.commit()
+    await db.refresh(venue)
+    return venue
+
+
+async def make_equipment(db, name="帳篷", *, total_qty=5):
+    eq = Equipment(name=name, category=EquipmentCategory.TENT, total_qty=total_qty)
+    db.add(eq)
+    await db.commit()
+    await db.refresh(eq)
+    return eq
+
+
+async def make_activity(db, club, *, name="迎新宿營", day=date(2026, 3, 10), end_day=None):
+    creator = await db.scalar(sa.select(User.id).order_by(User.id).limit(1))
+    activity = Activity(
+        club_id=club.id, name=name, location="活動中心", type="活動",
+        date=day, end_date=end_day or day, status=ActivityStatus.APPROVED,
+        created_by=creator,
+    )
+    db.add(activity)
+    await db.commit()
+    await db.refresh(activity)
+    return activity
+
+
+async def seed(client, db):
+    await make_user(db, username="bookadmin", role="admin", permissions=["abooking"])
+    await make_user(db, username="other", role="admin", permissions=["aviol"])
+    club = await make_club(db)
+    other_club = await make_club(db, name="吉他社")
+    await login(client, "bookadmin")
+    return club, other_club
+
+
+# ---- 臨時場地借用審核 ----
+
+
+async def test_venue_permission_gate(client, db):
+    club, _ = await seed(client, db)
+    await login(client, "other")
+    assert (await client.get("/api/v1/admin/venue-bookings")).status_code == 403
+    resp = await client.post(
+        "/api/v1/admin/venue-bookings/1/approve", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 403
+    assert (
+        await client.get("/api/v1/admin/bookings/availability", params={"date": "2026-03-05"})
+    ).status_code == 403
+
+
+async def test_venue_list_and_review_flow(client, db):
+    club, other_club = await seed(client, db)
+    venue = await make_venue(db)
+    activity = await make_activity(db, club)
+
+    rows = [
+        VenueBooking(club_id=club.id, venue_id=venue.id, activity_id=activity.id,
+                     date=date(2026, 3, 7), periods=["3", "4"], purpose="擺攤",
+                     status="approved"),
+        VenueBooking(club_id=club.id, venue_id=venue.id, activity_id=activity.id,
+                     date=date(2026, 3, 5), periods=["5"], purpose="彩排"),
+        VenueBooking(club_id=other_club.id, venue_id=venue.id, activity_id=None,
+                     date=date(2026, 3, 6), periods=["7"], purpose="社課"),
+    ]
+    db.add_all(rows)
+    await db.commit()
+    for row in rows:
+        await db.refresh(row)
+    approved_row, pending_a, pending_b = rows
+
+    # 預設:待審佇列在前(借用日升冪),含社團/場地/活動名
+    data = (await client.get("/api/v1/admin/venue-bookings")).json()["data"]
+    assert [d["status"] for d in data] == ["pending", "pending", "approved"]
+    assert data[0]["date"] == "2026-03-05"
+    assert data[0]["club_name"] == "熱舞社"
+    assert data[0]["venue_name"] == "精誠廣場"
+    assert data[0]["activity_name"] == "迎新宿營"
+    assert data[1]["activity_name"] is None
+
+    # 過濾與排序白名單
+    resp = await client.get("/api/v1/admin/venue-bookings", params={"status": "approved"})
+    assert [d["purpose"] for d in resp.json()["data"]] == ["擺攤"]
+    resp = await client.get("/api/v1/admin/venue-bookings", params={"club_id": other_club.id})
+    assert [d["club_name"] for d in resp.json()["data"]] == ["吉他社"]
+    assert (
+        await client.get("/api/v1/admin/venue-bookings", params={"sort": "-date"})
+    ).status_code == 200
+    assert (
+        await client.get("/api/v1/admin/venue-bookings", params={"sort": "hack"})
+    ).status_code == 422
+
+    # 核准:pending → approved;非待審再核 → 409
+    resp = await client.post(
+        f"/api/v1/admin/venue-bookings/{pending_a.id}/approve", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["status"] == "approved"
+    resp = await client.post(
+        f"/api/v1/admin/venue-bookings/{pending_a.id}/approve", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 409
+    resp = await client.post(
+        f"/api/v1/admin/venue-bookings/{approved_row.id}/approve", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 409
+
+    # 退回:原因必填;寫 approval_records 與 audit
+    resp = await client.post(
+        f"/api/v1/admin/venue-bookings/{pending_b.id}/reject",
+        json={"reason": "  "},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    resp = await client.post(
+        f"/api/v1/admin/venue-bookings/{pending_b.id}/reject",
+        json={"reason": "場地當日已有校方活動"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200
+    await db.refresh(pending_b)
+    assert pending_b.status == "rejected"
+
+    records = (
+        await db.scalars(
+            sa.select(ApprovalRecord).where(
+                ApprovalRecord.subject_type == ApprovalSubject.VENUE_BOOKING
+            )
+        )
+    ).all()
+    assert {(r.subject_id, r.decision.value) for r in records} == {
+        (pending_a.id, "approve"),
+        (pending_b.id, "reject"),
+    }
+    assert next(r for r in records if r.subject_id == pending_b.id).reason \
+        == "場地當日已有校方活動"
+    actions = set(await db.scalars(sa.select(AuditLog.action)))
+    assert {"venue_booking_approved", "venue_booking_rejected"} <= actions
+
+    assert (
+        await client.post("/api/v1/admin/venue-bookings/99999/approve",
+                          headers=csrf_headers(client))
+    ).status_code == 404
+
+
+# ---- 器材借用審核 ----
+
+
+async def test_equipment_list_review_and_availability_info(client, db):
+    club, _ = await seed(client, db)
+    eq = await make_equipment(db, total_qty=5)
+    activity = await make_activity(db, club)
+
+    window = dict(start_date=date(2026, 3, 6), end_date=date(2026, 3, 13))
+    rows = [
+        EquipmentLoan(club_id=club.id, equipment_id=eq.id, activity_id=activity.id,
+                      qty=3, purpose="營隊", status="approved", **window),
+        EquipmentLoan(club_id=club.id, equipment_id=eq.id, activity_id=activity.id,
+                      qty=3, purpose="加借", **window),
+    ]
+    db.add_all(rows)
+    await db.commit()
+    for row in rows:
+        await db.refresh(row)
+    approved_loan, pending_loan = rows
+
+    data = (await client.get("/api/v1/admin/equipment-loans")).json()["data"]
+    assert [d["status"] for d in data] == ["pending", "approved"]  # 待審在前
+    pending_out = data[0]
+    assert pending_out["club_name"] == "熱舞社"
+    assert pending_out["equipment_name"] == "帳篷"
+    assert pending_out["activity_name"] == "迎新宿營"
+    assert pending_out["start_date"] == "2026-03-06"
+    # 審核檢核:區間可借數排除本單=總數 5 − 已核准 3 = 2(本單要 3 → 前端紅字警示)
+    assert pending_out["available_excluding_self"] == 2
+    assert data[1]["available_excluding_self"] is None  # 非待審不推導
+
+    # 排序白名單
+    assert (
+        await client.get("/api/v1/admin/equipment-loans", params={"sort": "club"})
+    ).status_code == 200
+    assert (
+        await client.get("/api/v1/admin/equipment-loans", params={"sort": "hack"})
+    ).status_code == 422
+
+    # 可借數不足仍可核准(管理員裁量);非待審 → 409
+    resp = await client.post(
+        f"/api/v1/admin/equipment-loans/{pending_loan.id}/approve", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["status"] == "approved"
+    resp = await client.post(
+        f"/api/v1/admin/equipment-loans/{pending_loan.id}/approve", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 409
+
+    # 退回:原因必填
+    another = EquipmentLoan(club_id=club.id, equipment_id=eq.id, activity_id=activity.id,
+                            qty=1, purpose="再借", **window)
+    db.add(another)
+    await db.commit()
+    await db.refresh(another)
+    resp = await client.post(
+        f"/api/v1/admin/equipment-loans/{another.id}/reject",
+        json={},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    resp = await client.post(
+        f"/api/v1/admin/equipment-loans/{another.id}/reject",
+        json={"reason": "可借數不足"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200
+    await db.refresh(another)
+    assert another.status == "rejected"
+    actions = set(await db.scalars(sa.select(AuditLog.action)))
+    assert {"equipment_loan_approved", "equipment_loan_rejected"} <= actions
+
+    # 權限:無 abooking → 403
+    await login(client, "other")
+    assert (await client.get("/api/v1/admin/equipment-loans")).status_code == 403
+    resp = await client.post(
+        f"/api/v1/admin/equipment-loans/{approved_loan.id}/reject",
+        json={"reason": "x"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 403
+
+
+async def test_equipment_overdue_filter(client, db):
+    """逾期=推導:checked_out 且過了結束日之隔天上班日 10:30。"""
+    club, _ = await seed(client, db)
+    eq = await make_equipment(db, name="麥克風", total_qty=9)
+    activity = await make_activity(db, club)
+    today = datetime.now(UTC).date()
+
+    rows = [
+        # 結束日 10 天前仍未歸還 → 逾期
+        EquipmentLoan(club_id=club.id, equipment_id=eq.id, activity_id=activity.id, qty=1,
+                      start_date=today - timedelta(days=12), end_date=today - timedelta(days=10),
+                      purpose="逾期單", status="checked_out"),
+        # 結束日在未來 → 未逾期
+        EquipmentLoan(club_id=club.id, equipment_id=eq.id, activity_id=activity.id, qty=1,
+                      start_date=today, end_date=today + timedelta(days=5),
+                      purpose="借出中", status="checked_out"),
+        # 已歸還 → 不列入
+        EquipmentLoan(club_id=club.id, equipment_id=eq.id, activity_id=activity.id, qty=1,
+                      start_date=today - timedelta(days=12), end_date=today - timedelta(days=10),
+                      purpose="已歸還", status="returned"),
+    ]
+    db.add_all(rows)
+    await db.commit()
+
+    data = (
+        await client.get("/api/v1/admin/equipment-loans", params={"status": "overdue"})
+    ).json()["data"]
+    assert [d["purpose"] for d in data] == ["逾期單"]
+    assert data[0]["overdue"] is True
+
+    # 一般狀態篩選照舊;未知狀態 → 422
+    data = (
+        await client.get("/api/v1/admin/equipment-loans", params={"status": "checked_out"})
+    ).json()["data"]
+    assert {d["purpose"] for d in data} == {"逾期單", "借出中"}
+    assert (
+        await client.get("/api/v1/admin/equipment-loans", params={"status": "hack"})
+    ).status_code == 422
+
+
+# ---- 全校單日場況 ----
+
+
+async def test_admin_availability_grid_with_booking_ids(client, db):
+    club, other_club = await seed(client, db)
+    venue = await make_venue(db)
+    fixed_venue = await make_venue(db, name="S304", allow_fixed=True, allow_temp=False)
+    activity = await make_activity(db, club)
+    day = date(2026, 3, 5)  # 週四(isoweekday=4)
+
+    pending = VenueBooking(club_id=club.id, venue_id=venue.id, activity_id=activity.id,
+                           date=day, periods=["3"], purpose="彩排")
+    approved = VenueBooking(club_id=other_club.id, venue_id=venue.id, activity_id=None,
+                            date=day, periods=["7"], purpose="社課", status="approved")
+    fixed = RoomBookingRequest(club_id=other_club.id, venue_id=fixed_venue.id,
+                               purpose="社課", status="approved")
+    fixed.slots = [RoomBookingSlot(weekday=4, period="5")]
+    db.add_all([pending, approved, fixed])
+    await db.commit()
+    await db.refresh(pending)
+
+    grid = (
+        await client.get("/api/v1/admin/bookings/availability", params={"date": "2026-03-05"})
+    ).json()["data"]["grid"]
+    # 審核中格帶申請 id(供點格開審核彈窗);已核准不帶
+    assert grid[str(venue.id)]["3"] == {"status": "pending", "booking_id": pending.id}
+    assert grid[str(venue.id)]["7"] == {"status": "temp", "booking_id": None}
+    assert grid[str(fixed_venue.id)]["5"] == {"status": "fixed", "booking_id": None}
+
+    # 不同星期:固定借用不佔用
+    grid = (
+        await client.get("/api/v1/admin/bookings/availability", params={"date": "2026-03-06"})
+    ).json()["data"]["grid"]
+    assert str(fixed_venue.id) not in grid
+
+    # 日期必填/格式驗證
+    assert (
+        await client.get("/api/v1/admin/bookings/availability", params={"date": "bad"})
+    ).status_code == 422

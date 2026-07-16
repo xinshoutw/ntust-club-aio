@@ -75,17 +75,27 @@ async def equipment_available(db: AsyncSession, equipment_id: int, total_qty: in
 
 
 async def equipment_available_in_window(
-    db: AsyncSession, equipment_id: int, total_qty: int, start: date, end: date
+    db: AsyncSession,
+    equipment_id: int,
+    total_qty: int,
+    start: date,
+    end: date,
+    *,
+    exclude_loan_id: int | None = None,
 ) -> int:
-    """指定區間可借數 = total − 區間重疊之未歸還且未退回借用量(pending/approved/checked_out)。"""
-    out = await db.scalar(
-        sa.select(sa.func.coalesce(sa.func.sum(EquipmentLoan.qty), 0)).where(
-            EquipmentLoan.equipment_id == equipment_id,
-            EquipmentLoan.status.notin_([LoanStatus.REJECTED, LoanStatus.RETURNED]),
-            EquipmentLoan.start_date <= end,
-            EquipmentLoan.end_date >= start,
-        )
+    """指定區間可借數 = total − 區間重疊之未歸還且未退回借用量(pending/approved/checked_out)。
+
+    exclude_loan_id:行政端審核檢核時排除本單(避免把待審單自己算進佔用)。
+    """
+    query = sa.select(sa.func.coalesce(sa.func.sum(EquipmentLoan.qty), 0)).where(
+        EquipmentLoan.equipment_id == equipment_id,
+        EquipmentLoan.status.notin_([LoanStatus.REJECTED, LoanStatus.RETURNED]),
+        EquipmentLoan.start_date <= end,
+        EquipmentLoan.end_date >= start,
     )
+    if exclude_loan_id is not None:
+        query = query.where(EquipmentLoan.id != exclude_loan_id)
+    out = await db.scalar(query)
     return max(total_qty - int(out or 0), 0)
 
 
@@ -130,6 +140,18 @@ def is_overdue_in(loan: EquipmentLoan, return_time: str, holidays: set[date]) ->
     if loan.status != LoanStatus.CHECKED_OUT:
         return False
     return datetime.now(UTC) >= overdue_deadline_in(loan.end_date, return_time, holidays)
+
+
+def overdue_threshold_in(now: datetime, return_time: str, holidays: set[date]) -> date:
+    """最晚的已逾期結束日:end_date <= 回傳值 ⟺ 已逾期(以 status=checked_out 為前提)。
+
+    歸還期限對 end_date 單調不減,故存在單一門檻日;供列表端點以 SQL 篩選
+    「逾期」(推導不儲存),避免逐列計算破壞分頁。
+    """
+    cursor = now.astimezone(TAIPEI).date()
+    while overdue_deadline_in(cursor, return_time, holidays) > now:
+        cursor -= timedelta(days=1)
+    return cursor
 
 
 async def load_holidays(db: AsyncSession) -> set[date]:
@@ -190,5 +212,50 @@ async def availability_grid(
             mark(request.venue_id, slot.period, "mine")
         else:
             mark(request.venue_id, slot.period, "fixed")
+
+    return grid
+
+
+async def admin_availability_grid(db: AsyncSession, day: date) -> dict[int, dict[str, dict]]:
+    """行政端全校單日場況:格值 {status, booking_id}。
+
+    - status:pending(審核中臨時借用)/temp(已核准臨時借用)/fixed(已核准固定借用)
+    - booking_id:僅審核中的臨時借用帶申請 id(供點格開審核彈窗);其餘為 None
+    - 無「自己借用」概念;已核准蓋過審核中(與 club 端同權重規則)
+    """
+    grid: dict[int, dict[str, dict]] = {}
+    rank = {"pending": 0, "temp": 1, "fixed": 1}
+
+    def mark(venue_id: int, period: str, status: str, booking_id: int | None = None) -> None:
+        cell = grid.setdefault(venue_id, {})
+        current = cell.get(period)
+        if current is None or rank[status] > rank[current["status"]]:
+            cell[period] = {"status": status, "booking_id": booking_id}
+
+    temp_rows = await db.execute(
+        sa.select(VenueBooking).where(
+            VenueBooking.date == day, VenueBooking.status != BookingStatus.REJECTED
+        )
+    )
+    for booking in temp_rows.scalars():
+        approved = booking.status == BookingStatus.APPROVED
+        for period in booking.periods:
+            mark(
+                booking.venue_id,
+                period,
+                "temp" if approved else "pending",
+                None if approved else booking.id,
+            )
+
+    fixed_rows = await db.execute(
+        sa.select(RoomBookingSlot, RoomBookingRequest.venue_id)
+        .join(RoomBookingRequest, RoomBookingSlot.request_id == RoomBookingRequest.id)
+        .where(
+            RoomBookingSlot.weekday == day.isoweekday(),
+            RoomBookingRequest.status == BookingStatus.APPROVED,
+        )
+    )
+    for slot, venue_id in fixed_rows:
+        mark(venue_id, slot.period, "fixed")
 
     return grid

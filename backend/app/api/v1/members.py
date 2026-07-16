@@ -1,11 +1,13 @@
 """社團端:成員列表(CRUD + CSV 匯入)。
 
-- 學期篩選:以 updated_at 落在該學期區間推導(名單更新時間即 ad5 依據)
-- CSV 格式:姓名,學號,身份[,職稱];身份=社員/幹部/社長/會長/副社長/副會長
+- 名單按學期各自一份快照(club_members.semester);同學號可跨學期出現
+- CSV 格式:姓名,學號,身份[,職稱];身份=社員/幹部/負責人/副負責人
+  (也接受顯示詞 社長/會長/副社長/副會長,映射為標準身份)
 """
 
 import csv
 import io
+from typing import Annotated
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Query
@@ -13,7 +15,6 @@ from fastapi import APIRouter, Query
 from app.api.pagination import Pagination, parse_sort
 from app.core.deps import ClubUser, DbDep
 from app.core.errors import conflict, not_found, validation_error
-from app.core.semesters import semester_bounds
 from app.models import ClubMember
 from app.models.enums import MemberKind
 from app.schemas.clubs import (
@@ -32,17 +33,27 @@ _SORTABLE = {
     "student_id": ClubMember.student_id,
     "kind": ClubMember.kind,
     "title": ClubMember.title,
+    "semester": ClubMember.semester,
     "updated_at": ClubMember.updated_at,
 }
 
-# 匯入「身份」欄:正副社長類直接映射為幹部+職稱
-_LEADER_TITLES = {"社長", "會長", "副社長", "副會長"}
+# 匯入「身份」欄:顯示詞映射為標準身份(社長/會長→負責人;副社長/副會長→副負責人)
+_KIND_ALIASES = {
+    "社員": MemberKind.MEMBER,
+    "幹部": MemberKind.OFFICER,
+    "負責人": MemberKind.PRESIDENT,
+    "社長": MemberKind.PRESIDENT,
+    "會長": MemberKind.PRESIDENT,
+    "副負責人": MemberKind.VICE_PRESIDENT,
+    "副社長": MemberKind.VICE_PRESIDENT,
+    "副會長": MemberKind.VICE_PRESIDENT,
+}
 
 
 def _validate_member(kind: MemberKind, title: str | None) -> str | None:
     if kind == MemberKind.OFFICER and not title:
         raise validation_error("幹部必須填寫職稱")
-    return title if kind == MemberKind.OFFICER else None  # 社員無職稱
+    return title if kind == MemberKind.OFFICER else None  # 僅幹部有職稱
 
 
 @router.get("")
@@ -51,15 +62,14 @@ async def list_members(
     db: DbDep,
     page: Pagination,
     semester: str | None = Query(None, pattern=r"^\d{3}-[12]$"),
-    kind: MemberKind | None = None,
+    kind: Annotated[list[MemberKind] | None, Query()] = None,  # 可重複帶多值(前端多選篩選)
     sort: str | None = None,
 ) -> ApiResponse[list[MemberOut]]:
     query = sa.select(ClubMember).where(ClubMember.club_id == user.club_id)
     if semester:
-        start, end = semester_bounds(semester)
-        query = query.where(ClubMember.updated_at >= start, ClubMember.updated_at < end)
+        query = query.where(ClubMember.semester == semester)
     if kind:
-        query = query.where(ClubMember.kind == kind)
+        query = query.where(ClubMember.kind.in_(kind))
     query = query.order_by(*parse_sort(sort, _SORTABLE, ClubMember.id.asc()))
 
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
@@ -69,22 +79,36 @@ async def list_members(
     )
 
 
+@router.get("/semesters")
+async def list_semesters(user: ClubUser, db: DbDep) -> ApiResponse[list[str]]:
+    """名單有資料的學期(新到舊),供學期下拉。"""
+    rows = await db.scalars(
+        sa.select(sa.distinct(ClubMember.semester))
+        .where(ClubMember.club_id == user.club_id)
+        .order_by(sa.distinct(ClubMember.semester).desc())
+    )
+    return ApiResponse(data=list(rows))
+
+
 @router.post("", status_code=201)
 async def create_member(body: MemberIn, user: ClubUser, db: DbDep) -> ApiResponse[MemberOut]:
     title = _validate_member(body.kind, body.title)
     exists = await db.scalar(
         sa.select(ClubMember.id).where(
-            ClubMember.club_id == user.club_id, ClubMember.student_id == body.student_id
+            ClubMember.club_id == user.club_id,
+            ClubMember.student_id == body.student_id,
+            ClubMember.semester == body.semester,
         )
     )
     if exists:
-        raise conflict("該學號已在名單中")
+        raise conflict("該學號已在該學期名單中")
     member = ClubMember(
         club_id=user.club_id,
         name=body.name,
         student_id=body.student_id,
         kind=body.kind,
         title=title,
+        semester=body.semester,
     )
     db.add(member)
     await db.commit()
@@ -114,10 +138,11 @@ async def update_member(
             sa.select(ClubMember.id).where(
                 ClubMember.club_id == user.club_id,
                 ClubMember.student_id == changed["student_id"],
+                ClubMember.semester == member.semester,
             )
         )
         if dup:
-            raise conflict("該學號已在名單中")
+            raise conflict("該學號已在該學期名單中")
     for field, value in changed.items():
         setattr(member, field, value)
     member.title = _validate_member(member.kind, member.title)
@@ -141,10 +166,13 @@ async def import_members(
     created = updated = 0
     errors: list[str] = []
 
+    # 匯入至指定學期:同學期同學號 upsert,不影響其他學期名單
     existing = {
         m.student_id: m
         for m in await db.scalars(
-            sa.select(ClubMember).where(ClubMember.club_id == user.club_id)
+            sa.select(ClubMember).where(
+                ClubMember.club_id == user.club_id, ClubMember.semester == body.semester
+            )
         )
     }
     seen: set[str] = set()
@@ -168,25 +196,28 @@ async def import_members(
             errors.append(f"第 {line_no} 列:學號 {student_id} 重複出現")
             continue
 
-        if identity in _LEADER_TITLES:
-            kind, title = MemberKind.OFFICER, identity
-        elif identity == "幹部":
-            kind = MemberKind.OFFICER
+        kind = _KIND_ALIASES.get(identity)
+        if kind is None:
+            errors.append(f"第 {line_no} 列:身份「{identity}」無法辨識")
+            continue
+        if kind == MemberKind.OFFICER:
             if not title:
                 errors.append(f"第 {line_no} 列:幹部需填職稱")
                 continue
-        elif identity == "社員":
-            kind, title = MemberKind.MEMBER, None
         else:
-            errors.append(f"第 {line_no} 列:身份「{identity}」無法辨識")
-            continue
+            title = None  # 僅幹部有職稱
 
         seen.add(student_id)
         member = existing.get(student_id)
         if member is None:
             db.add(
                 ClubMember(
-                    club_id=user.club_id, name=name, student_id=student_id, kind=kind, title=title
+                    club_id=user.club_id,
+                    name=name,
+                    student_id=student_id,
+                    kind=kind,
+                    title=title,
+                    semester=body.semester,
                 )
             )
             created += 1

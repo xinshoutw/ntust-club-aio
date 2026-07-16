@@ -7,7 +7,7 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.semesters import semester_bounds, semester_of
+from app.core.semesters import semester_of
 from app.models import (
     Activity,
     ActivityReflection,
@@ -120,21 +120,21 @@ async def gather_scoring_input(db: AsyncSession, club_id: int, window: EvalWindo
         for aid in activity_ids
     )
 
+    # ad5 名單快照按學期保存(club_members.semester),存在即視為該學期有維護名單
     roster: dict[str, int] = {}
     for label in _window_semesters(window):
-        start, end = semester_bounds(label)
         roster[label] = (
             await db.scalar(
                 sa.select(sa.func.count()).where(
                     ClubMember.club_id == club_id,
-                    ClubMember.updated_at >= start,
-                    ClubMember.updated_at < end,
+                    ClubMember.semester == label,
                 )
             )
             or 0
         )
 
-    # ad7/ad8 皆以管理員活動後登錄之「簽到」為準,僅報名不計分(2026-07-15)
+    # ad7/ad8 皆以管理員活動後登錄之「簽到」為準,僅報名不計分(2026-07-15);
+    # 採計範圍=場次日期落在評鑑視窗(推導不儲存,取代 signup_items.year)
     async def _attended_sessions(kind: SignupKind) -> int:
         return (
             await db.scalar(
@@ -144,7 +144,8 @@ async def gather_scoring_input(db: AsyncSession, club_id: int, window: EvalWindo
                 .join(SignupItem, SignupItemSession.item_id == SignupItem.id)
                 .where(
                     SignupItem.kind == kind,
-                    SignupItem.year == window.year,
+                    SignupItemSession.date >= window.start,
+                    SignupItemSession.date <= window.end,
                     SessionAttendance.club_id == club_id,
                     SessionAttendance.attended.is_(True),
                 )

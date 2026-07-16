@@ -33,10 +33,10 @@ class Club(Base, TimestampMixin):
 
 
 class ClubMember(Base, TimestampMixin):
-    """社員名單;updated_at 即行政分 ad5「名單更新」依據。"""
+    """社員名單:按學期各自一份快照(同學號可跨學期出現;2026-07-16 第九輪定案)。"""
 
     __tablename__ = "club_members"
-    __table_args__ = (sa.UniqueConstraint("club_id", "student_id"),)
+    __table_args__ = (sa.UniqueConstraint("club_id", "student_id", "semester"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     club_id: Mapped[int] = mapped_column(sa.ForeignKey("clubs.id", ondelete="CASCADE"))
@@ -44,3 +44,4 @@ class ClubMember(Base, TimestampMixin):
     student_id: Mapped[str] = mapped_column(sa.Text)
     kind: Mapped[MemberKind] = mapped_column(db_enum(MemberKind, "member_kind"))
     title: Mapped[str | None] = mapped_column(sa.Text)  # 幹部必填(應用層)
+    semester: Mapped[str] = mapped_column(sa.Text, index=True)  # 如 114-2

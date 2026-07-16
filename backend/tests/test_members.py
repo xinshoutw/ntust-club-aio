@@ -50,25 +50,37 @@ async def test_member_crud_and_scoping(client, db):
 
     resp = await client.post(
         "/api/v1/club/members",
-        json={"name": "陳大文", "student_id": "B11109001", "kind": "幹部", "title": "總務"},
+        json={
+            "name": "陳大文",
+            "student_id": "B11109001",
+            "kind": "幹部",
+            "title": "總務",
+            "semester": "114-2",
+        },
         headers=csrf_headers(client),
     )
     assert resp.status_code == 201
     member_id = resp.json()["data"]["id"]
 
-    # 幹部缺職稱 → 422;重複學號 → 409
+    # 幹部缺職稱 → 422;同學期重複學號 → 409;跨學期同學號 → 允許(名單按學期快照)
     resp = await client.post(
         "/api/v1/club/members",
-        json={"name": "李小明", "student_id": "B11109002", "kind": "幹部"},
+        json={"name": "李小明", "student_id": "B11109002", "kind": "幹部", "semester": "114-2"},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
     resp = await client.post(
         "/api/v1/club/members",
-        json={"name": "陳大文", "student_id": "B11109001", "kind": "社員"},
+        json={"name": "陳大文", "student_id": "B11109001", "kind": "社員", "semester": "114-2"},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 409
+    resp = await client.post(
+        "/api/v1/club/members",
+        json={"name": "陳大文", "student_id": "B11109001", "kind": "社員", "semester": "114-1"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201
 
     # 行內編輯:改身份為社員 → 職稱自動清空
     resp = await client.patch(
@@ -98,12 +110,17 @@ async def test_member_list_pagination_filter_sort(client, db):
     for i in range(3):
         await client.post(
             "/api/v1/club/members",
-            json={"name": f"社員{i}", "student_id": f"B111090{i:02d}", "kind": "社員"},
+            json={
+                "name": f"社員{i}",
+                "student_id": f"B111090{i:02d}",
+                "kind": "社員",
+                "semester": "114-2",
+            },
             headers=csrf_headers(client),
         )
     await client.post(
         "/api/v1/club/members",
-        json={"name": "社長", "student_id": "B11109099", "kind": "幹部", "title": "社長"},
+        json={"name": "負責人", "student_id": "B11109099", "kind": "負責人", "semester": "114-1"},
         headers=csrf_headers(client),
     )
 
@@ -113,8 +130,12 @@ async def test_member_list_pagination_filter_sort(client, db):
     assert len(body["data"]) == 2
     assert body["data"][0]["student_id"] == "B11109099"
 
-    resp = await client.get("/api/v1/club/members", params={"kind": "幹部"})
-    assert [m["name"] for m in resp.json()["data"]] == ["社長"]
+    resp = await client.get("/api/v1/club/members", params={"kind": "負責人"})
+    assert [m["name"] for m in resp.json()["data"]] == ["負責人"]
+
+    # 學期快照:各學期獨立名單
+    resp = await client.get("/api/v1/club/members", params={"semester": "114-1"})
+    assert [m["name"] for m in resp.json()["data"]] == ["負責人"]
 
     resp = await client.get("/api/v1/club/members", params={"sort": "nope"})
     assert resp.status_code == 422
@@ -125,7 +146,9 @@ async def test_noop_reimport_keeps_updated_at(client, db):
     await setup_club_session(client, db)
     csv_text = "陳大文,B11109001,社長\n李小明,B11109002,社員"
     await client.post(
-        "/api/v1/club/members/import", json={"csv_text": csv_text}, headers=csrf_headers(client)
+        "/api/v1/club/members/import",
+        json={"csv_text": csv_text, "semester": "114-2"},
+        headers=csrf_headers(client),
     )
     before = {
         m.student_id: m.updated_at
@@ -133,7 +156,9 @@ async def test_noop_reimport_keeps_updated_at(client, db):
     }
 
     resp = await client.post(
-        "/api/v1/club/members/import", json={"csv_text": csv_text}, headers=csrf_headers(client)
+        "/api/v1/club/members/import",
+        json={"csv_text": csv_text, "semester": "114-2"},
+        headers=csrf_headers(client),
     )
     result = resp.json()["data"]
     assert (result["created"], result["updated"]) == (0, 0)
@@ -142,11 +167,11 @@ async def test_noop_reimport_keeps_updated_at(client, db):
     after = {m.student_id: m.updated_at for m in await db.scalars(sa.select(ClubMember))}
     assert after == before
 
-    # 行內編輯送未變值亦不動 updated_at
+    # 行內編輯送未變值亦不動 updated_at(社長 → 標準身份 負責人)
     member_id = (await client.get("/api/v1/club/members")).json()["data"][0]["id"]
     await client.patch(
         f"/api/v1/club/members/{member_id}",
-        json={"kind": "幹部", "title": "社長"},
+        json={"kind": "負責人"},
         headers=csrf_headers(client),
     )
     db.expire_all()
@@ -158,7 +183,7 @@ async def test_csv_import_rejects_oversized_fields(client, db):
     await setup_club_session(client, db)
     resp = await client.post(
         "/api/v1/club/members/import",
-        json={"csv_text": f"{'超' * 51},B11109001,社員"},
+        json={"csv_text": f"{'超' * 51},B11109001,社員", "semester": "114-2"},
         headers=csrf_headers(client),
     )
     result = resp.json()["data"]
@@ -170,13 +195,13 @@ async def test_csv_import_upsert_and_errors(client, db):
     await setup_club_session(client, db)
     await client.post(
         "/api/v1/club/members",
-        json={"name": "舊名", "student_id": "B11109001", "kind": "社員"},
+        json={"name": "舊名", "student_id": "B11109001", "kind": "社員", "semester": "114-2"},
         headers=csrf_headers(client),
     )
 
     csv_text = "\n".join(
         [
-            "陳大文,B11109001,社長",  # 既有 → 更新為幹部/社長
+            "陳大文,B11109001,社長",  # 既有 → 更新為負責人(顯示詞映射標準身份)
             "李小明,B11109002,社員",
             "張美麗,B11109003,幹部,美宣",
             "王強,B11109004,幹部",  # 幹部缺職稱 → error
@@ -187,7 +212,7 @@ async def test_csv_import_upsert_and_errors(client, db):
     )
     resp = await client.post(
         "/api/v1/club/members/import",
-        json={"csv_text": csv_text},
+        json={"csv_text": csv_text, "semester": "114-2"},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 200
@@ -198,6 +223,6 @@ async def test_csv_import_upsert_and_errors(client, db):
 
     rows = (await client.get("/api/v1/club/members")).json()["data"]
     by_sid = {m["student_id"]: m for m in rows}
-    assert by_sid["B11109001"]["kind"] == "幹部"
-    assert by_sid["B11109001"]["title"] == "社長"
+    assert by_sid["B11109001"]["kind"] == "負責人"
+    assert by_sid["B11109001"]["title"] is None
     assert by_sid["B11109003"]["title"] == "美宣"

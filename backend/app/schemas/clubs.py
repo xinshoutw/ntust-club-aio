@@ -77,6 +77,7 @@ class MemberOut(BaseModel):
     student_id: str
     kind: MemberKind
     title: str | None
+    semester: str
     updated_at: datetime
 
 
@@ -85,6 +86,7 @@ class MemberIn(BaseModel):
     student_id: str = Field(min_length=1, max_length=20)
     kind: MemberKind
     title: str | None = Field(None, max_length=30)
+    semester: str = Field(pattern=r"^\d{3}-[12]$")
 
 
 class MemberUpdate(BaseModel):
@@ -95,12 +97,14 @@ class MemberUpdate(BaseModel):
 
 
 class MemberImportRequest(BaseModel):
-    """CSV 匯入(貼上文字;檔案上傳由前端讀成文字後同端點)。
+    """CSV 匯入(貼上文字;檔案上傳由前端讀成文字後同端點),整批寫入指定學期。
 
-    格式:姓名,學號,身份[,職稱];身份=社員/幹部/社長/會長/副社長/副會長
+    格式:姓名,學號,身份[,職稱];身份=社員/幹部/負責人/副負責人
+    (也接受顯示詞 社長/會長/副社長/副會長)
     """
 
     csv_text: str = Field(min_length=1, max_length=200_000)
+    semester: str = Field(pattern=r"^\d{3}-[12]$")
 
 
 class MemberImportResult(BaseModel):

@@ -151,13 +151,26 @@ CSIE_MEMBERS: dict[str, list[tuple[str, str, MemberKind, str | None]]] = {
     ],
 }
 
-# 器材主檔(對齊 frontend/src/features/bookings/mock.ts EQUIPMENT 的四樣)
+# 器材主檔(2026-07-17 需求方提供 17 項總數;數量由管理員後台維護)
 # (名稱, 類別, 總數, 需登記序號)
 EQUIPMENT_MASTER: list[tuple[str, EquipmentCategory, int, bool]] = [
     ("帳篷", EquipmentCategory.TENT, 6, True),
     ("摺疊桌", EquipmentCategory.GENERAL, 25, False),
+    ("椅子", EquipmentCategory.GENERAL, 80, False),
+    ("紅龍", EquipmentCategory.GENERAL, 6, False),
     ("電腦單槍投影機", EquipmentCategory.ELECTRONIC, 5, True),
-    ("擴音機 MA101", EquipmentCategory.ELECTRONIC, 2, True),
+    ("麥克風架", EquipmentCategory.GENERAL, 6, False),
+    ("擴音機MA101", EquipmentCategory.ELECTRONIC, 2, True),
+    ("各式音源線", EquipmentCategory.GENERAL, 20, False),
+    ("投影銀幕", EquipmentCategory.SCREEN, 5, True),
+    ("旗桿/旗座組", EquipmentCategory.GENERAL, 10, False),
+    ("擴音器 tw-Hi92", EquipmentCategory.ELECTRONIC, 3, True),
+    ("TRUSS", EquipmentCategory.GENERAL, 3, False),
+    ("酒精", EquipmentCategory.GENERAL, 2, False),
+    ("溫度計", EquipmentCategory.GENERAL, 3, False),
+    ("5M 延長線", EquipmentCategory.GENERAL, 5, False),
+    ("10M 延長線", EquipmentCategory.GENERAL, 2, False),
+    ("15M 延長線", EquipmentCategory.GENERAL, 1, False),
 ]
 
 
@@ -857,7 +870,7 @@ async def _create_bookings(
             serials=["TENT-01", "TENT-02"], borrower_name="顏志明",
         ),
         EquipmentLoan(  # 已歸還(完整借出+歸還點交)
-            club_id=csie.id, equipment_id=equipment["擴音機 MA101"].id,
+            club_id=csie.id, equipment_id=equipment["擴音機MA101"].id,
             activity_id=acts["closed"].id, qty=1,
             start_date=date(2026, 4, 23), end_date=date(2026, 4, 27),
             purpose="宿營團康與營火晚會擴音", status=LoanStatus.RETURNED,

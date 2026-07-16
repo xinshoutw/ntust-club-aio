@@ -11,8 +11,8 @@ async def setup_session(client, db, username="club01", name="熱舞社"):
     return club
 
 
-async def add_member(client, name, sid, kind, title=None):
-    body = {"name": name, "student_id": sid, "kind": kind}
+async def add_member(client, name, sid, kind, title=None, semester="114-2"):
+    body = {"name": name, "student_id": sid, "kind": kind, "semester": semester}
     if title:
         body["title"] = title
     resp = await client.post("/api/v1/club/members", json=body, headers=csrf_headers(client))
@@ -30,7 +30,7 @@ async def test_officer_cert_autofills_from_roster(client, db):
     )
     assert resp.status_code == 422
 
-    await add_member(client, "王小明", "B11101001", "幹部", "社長")
+    await add_member(client, "王小明", "B11101001", "負責人")
     resp = await client.post(
         "/api/v1/club/officer-certificates",
         json={"term": "114-2", "position": "社長或會長"},
@@ -39,8 +39,17 @@ async def test_officer_cert_autofills_from_roster(client, db):
     assert resp.status_code == 201
     assert resp.json()["data"]["applicant_name"] == "王小明"
 
+    # 他學期的負責人不影響本學期比對
+    await add_member(client, "張三", "B11101003", "負責人", semester="114-1")
+    resp = await client.post(
+        "/api/v1/club/officer-certificates",
+        json={"term": "114-2", "position": "社長或會長"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201
+
     # 多位同職位 → 擋
-    await add_member(client, "李大華", "B11101002", "幹部", "會長")
+    await add_member(client, "李大華", "B11101002", "負責人")
     resp = await client.post(
         "/api/v1/club/officer-certificates",
         json={"term": "114-2", "position": "社長或會長"},

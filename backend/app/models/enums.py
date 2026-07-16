@@ -23,6 +23,10 @@ class ClubAttribute(StrEnum):
 
 
 class MemberKind(StrEnum):
+    """標準身份值;正副負責人顯示時依社團名稱末字推導(社→社長、會→會長)。"""
+
+    PRESIDENT = "負責人"
+    VICE_PRESIDENT = "副負責人"
     OFFICER = "幹部"
     MEMBER = "社員"
 

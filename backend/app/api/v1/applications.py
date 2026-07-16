@@ -37,9 +37,10 @@ router = APIRouter(prefix="/club", tags=["applications"])
 
 MAX_EVIDENCE_PER_REQUEST = 5  # 每筆報修佐證檔上限(影片 200MB,防磁碟耗盡)
 
-_POSITION_TITLES: dict[CertPosition, set[str]] = {
-    CertPosition.LEADER: {"社長", "會長"},
-    CertPosition.VICE_LEADER: {"副社長", "副會長"},
+# 職位對應標準身份(2026-07-16 第九輪:正副負責人為一級身份,不再靠職稱字串比對)
+_POSITION_KIND: dict[CertPosition, MemberKind] = {
+    CertPosition.LEADER: MemberKind.PRESIDENT,
+    CertPosition.VICE_LEADER: MemberKind.VICE_PRESIDENT,
 }
 
 
@@ -75,17 +76,16 @@ async def create_cert(
     request: Request,
     background: BackgroundTasks,
 ) -> ApiResponse[OfficerCertOut]:
-    # 姓名由成員名單依職位自動帶出;0 位或多位皆擋(需先整理名單)
-    titles = _POSITION_TITLES[body.position]
-    names = (
-        await db.scalars(
-            sa.select(ClubMember.name).where(
-                ClubMember.club_id == user.club_id,
-                ClubMember.kind == MemberKind.OFFICER,
-                ClubMember.title.in_(titles),
-            )
-        )
-    ).all()
+    # 姓名由成員名單依「學年期 + 職位」自動帶出;0 位或多位皆擋(需先整理名單)
+    query = sa.select(sa.distinct(ClubMember.name)).where(
+        ClubMember.club_id == user.club_id,
+        ClubMember.kind == _POSITION_KIND[body.position],
+    )
+    if "-" in body.term:  # 學期(如 114-1);整學年(114)含兩學期
+        query = query.where(ClubMember.semester == body.term)
+    else:
+        query = query.where(ClubMember.semester.startswith(f"{body.term}-"))
+    names = (await db.scalars(query)).all()
     if len(names) == 0:
         raise validation_error("成員名單中找不到該職位的幹部,請先更新名單")
     if len(names) > 1:

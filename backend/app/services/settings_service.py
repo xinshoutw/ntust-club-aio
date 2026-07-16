@@ -35,8 +35,13 @@ DEFAULTS: dict[str, Any] = {
     "equipment_return_time": "10:30",
     # 器材借用區間緩衝(工作天):活動開始日 −before ~ 活動結束日 +after
     "equipment_workday_buffer": {"before": 2, "after": 1},
-    # 教室固定借用開放窗:預設每年 6 月、1 月受理;manual_open=管理員手動加開
-    "fixed_booking_window": {"open_months": [6, 1], "manual_open": False},
+    # 教室固定借用開放窗:日期區間(2026-07-16 第八輪,取代開放月份+手動加開);
+    # 未設定即不開放,由管理員於系統設定調整
+    "fixed_booking_window": {"open_from": None, "open_until": None},
+    # 上傳上限(MB;architecture.md §3.5 預設值,管理員後台可調)
+    "upload_limits": {"doc": 50, "img": 10, "zip": 100, "video": 200},
+    # 活動申請附件加總上限(MB;2026-07-16 第八輪)
+    "activity_attachment_total_mb": 50,
     # 評鑑視窗(2026-07-14 拍板:預設 116 年,2026/02/01–2027/01/31)
     # 注意:ad7/ad8 以 signup_items.year == eval_window.year 篩選;
     # 管理端建報名項目時若用 current_year,兩者必須對齊,否則幹訓/會議餵不進行政分

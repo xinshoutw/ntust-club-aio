@@ -137,13 +137,13 @@ async def availability(user: ClubUser, db: DbDep, date: date) -> ApiResponse[dic
 
 @router.get("/room-bookings/window")
 async def fixed_window(user: ClubUser, db: DbDep) -> ApiResponse[FixedWindowOut]:
-    """開放窗狀態:預設 6 月/1 月受理,管理員可手動加開(system_settings)。"""
+    """開放窗狀態:系統設定的日期區間(open_from/open_until),期間外不受理。"""
     window = await get_setting(db, "fixed_booking_window")
     return ApiResponse(
         data=FixedWindowOut(
             open=svc.fixed_window_open(window),
-            open_months=list(window.get("open_months", [])),
-            manual_open=bool(window.get("manual_open")),
+            open_from=window.get("open_from"),
+            open_until=window.get("open_until"),
         )
     )
 

@@ -51,19 +51,16 @@ def late_rule_error(periods: list[str]) -> str | None:
 
 
 def fixed_window_open(window: dict, now: datetime | None = None) -> bool:
-    """固定借用開放窗:預設當月在 open_months 或管理員手動加開。
+    """固定借用開放窗:日期區間 open_from/open_until(含頭含尾;台北時區)。
 
-    另支援日期區間 open_from/open_until(2026-07-16 第八輪:系統設定改 RangePicker;
-    設定後以區間為準,含頭含尾)。
+    2026-07-16 第八輪:取代「開放月份+手動加開」;未設定區間即不開放。
     """
     today = (now or datetime.now(UTC)).astimezone(TAIPEI).date()
     open_from = window.get("open_from")
     open_until = window.get("open_until")
-    if open_from and open_until:
-        return date.fromisoformat(open_from) <= today <= date.fromisoformat(open_until)
-    if window.get("manual_open"):
-        return True
-    return today.month in window.get("open_months", [])
+    if not (open_from and open_until):
+        return False
+    return date.fromisoformat(open_from) <= today <= date.fromisoformat(open_until)
 
 
 async def equipment_available(db: AsyncSession, equipment_id: int, total_qty: int) -> int:

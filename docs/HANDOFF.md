@@ -1,96 +1,57 @@
-# Session Handoff(2026-07-15,第五~七輪:規則調整 + ui-polish 合併 + club/admin 改版)
+# Session Handoff(2026-07-16,第八輪:需求方全批回饋 + 後端兩階段落地)
 
 > 給下一個 session 的交接快照。永久性專案知識在三層 `AGENTS.md`(OSA 根/project/club-aio)與 `docs/architecture.md`、`docs/data-model.md`、`docs/design-guide.md`;本檔只記「現在進行到哪、接下來做什麼」。過期即刪。
 
-## 本輪已完成(全部推 dev;決議全文見 AGENTS.md「UI/規則調整決議(2026-07-15 第五輪)」)
+## 本輪已完成(全部逐項 commit;決議全文見 AGENTS.md「UI/規則調整決議(2026-07-16 第八輪)」)
 
-需求方回饋的一整批前端調整,已實作並逐項 commit:
+### 前端(需求方 2026-07-16 全批回饋,14 大項全數實作)
 
-1. 活動申請:日期改起訖區間四欄;「大型活動」改名+InfoCircle 說明卡
-2. 活動結案:「二、檢討會議」獨立 section(是→日期/與會人數/討論事項/內容決議必填);popup 同步
-3. 借用總覽大改版:配色(不開放無方框、固定借用深灰)、審核中不可點、可借直跳臨時借用、19 場地主檔、單日 `<`/`>`/`<<<`/`>>>` 導航、場地×14 天檢視
-4. 固定場地借用重做:週次網格(週一~週日×節次)、10 節上限、晚間連 3 節規則、開放窗 gating(未開放反灰入「其他」)
-5. 臨時/固定借用「用途」必填
-6. 器材借用:綁定審核通過活動推導區間(±工作天緩衝)、紀錄顯示借用人/歸還人
-7. 評鑑:ad7 每場簽到 1.25 分(4 場滿分)、ad8 依簽到、報名管理簽到登錄 UI、行政資料總分上限 100
-8. 郵局紀錄不遮罩;違規 1 個月銷案期限(逾期截止,管理端停用銷案)
-9. 新增後台「檔案管理」頁(空間利用視覺化+大型檔案清單+報修檔刪除)
+1. 需求方本人的 33 檔文案精簡先以其原樣分組 commit(全形標點、移除副標社團名、「最近申請」等)
+2. TODO/FIXME 五處全修(login footer、姓名紅星、附件 50MB 加總+用量提示、結案照片全影像格式、退回預設文案重開不消失)
+3. **confirmDialog helper**(lib/confirm.ts):全站確認彈窗點遮罩=取消;確認型 popup autoFocus 確認鈕+destroyOnHidden
+4. 器材借用:先選關聯活動→區間推導可借數(availableInWindow;逾期未還視為持續佔用)
+5. 全站去單號(僅稽核軌跡保留);稽核 20 筆/頁+三欄篩選;違規/維修排序過濾重做;檔案管理「文字內容」段+報修置首;權限彈窗 dirty 橘框+儲存生效+離開警告;系統設定四項(報名窗移除/固定借用日期區間/手動加開移除/TagListInput 無下拉)
+6. SignupBuilder 七項(含審核制、拖曳排序、報名開始預設今天);公告系統(性質多選/ClubCascader/蓋板+TakeoverOverlay/通知/markdown popup=marked+DOMPurify);ClubSelect 改資料夾式 Cascader;三頁重設計(申請審核=待審佇列+雙欄彈窗、結案審核=完整資料+繳交確認勾選、報名管理=總表+逐人名單彈窗)
 
-驗證:`cd frontend && pnpm test`(15 passed)、`pnpm build` 綠、`pnpm lint` 僅既有警告。
+### 後端(兩階段,皆已在 dev 庫 upgrade head)
 
-## 後端待同步(本輪只改前端 mock;後端仍是 2026-07-14 版規格)
+- **第一階段=第五輪 10 項待同步**(migration `b7d1f04a9c21`):activities 起訖+檢討會議欄、room slots date→weekday+開放窗+10 節+連 3 節、purpose NOT NULL、equipment activity_id 綁定+borrower/returner+可借數 API、19 場地 seed、ad7/ad8 簽到制+cap100+簽到 API、postal 不遮罩、violations 銷案期限、admin files/maintenance/audit API
+- **第二階段=第八輪新需求**(migration `d2a6c9f13b58`):公告(attrs 多選/club_id/takeover_until/notify+Email HTML 模板+Discord Components V2 模板)、clubs.contact_emails、/admin/settings GET/PUT、signup_items 第八輪欄位+審核制+確認 API、/admin/accounts(一次性密碼/argon2id/audit FK SET NULL)、附件加總上限(FOR UPDATE 防競態)、影像格式放寬、大型活動逕行核定、權限鍵別名
+- 實作決策細節見 `data-model.md` §3.x/§3.y 補記
 
-`docs/data-model.md` 內所有「**後端待同步**」標記,彙總:
+### 驗證與審查(本輪)
 
-1. **activities**:`date/end_date` 起訖區間(migration);結案資格與逾期鎖定改以 end_date 推導;ad1「一天一件」以開始日計
-2. **activity_reports**:`review_attendees/review_topics/review_conclusion` 欄位與條件必填驗證
-3. **room_booking_requests/slots**:date→weekday(1–7);開放窗(system_settings 6 月/1 月+管理員手動開關)、每社 10 節、晚間(10,A–D)連 3 節、purpose NOT NULL
-4. **venue_bookings**:purpose NOT NULL
-5. **equipment_loans**:`activity_id` 綁定核准活動、區間推導(工作天緩衝入 system_settings)、`borrower_name/returner_name`
-6. **venues seed**:19 處場地(名稱/容量/類別含「宿舍區」)
-7. **評鑑**:ad7=1.25×簽到場次、ad8=幹訓簽到、總分 cap 100;簽到登錄 API(session_attendance)
-8. **postal**:社團端紀錄回傳完整帳號(移除遮罩)
-9. **violations**:銷案期限推導(+1 月)、逾期禁止 resolve
-10. **檔案管理**:`/admin/files` 空間彙總+大型檔案列表+報修檔刪除 API
+- 前端:tsc 0 錯誤、vitest 15 passed、build 綠、oxlint 0 error
+- 後端:pytest **149 passed**、ruff 全綠、alembic 可逆(downgrade/upgrade 驗證過)
+- 交叉審查四輪:Fable(前端 16 項:3H/4M/9L 全修)、codex gpt-5.6-sol(前端 10 項:有效 7 項全修,3 項為需求方本人刻意調整不改)、opus(後端第二階段 5 項全修)、Fable 資安審查+bandit(0 高/中)
+- 資安:bandit 3 low(dev-secret 預設值/迴圈 continue/enum 誤報);CSV 匯出已中和 Excel 公式注入
 
-## 交叉檢查(本輪已完成)
+## 使用者問題的回覆(本輪已答,詳見 session 最終報告)
 
-- opus 審查一輪:**無 CRITICAL/HIGH**,11 項規格逐項比對全數正確(晚間連 3 節、工作天負向推算、期限當天可銷案等邊界皆過);2 LOW 已修(mock 天數、刪檔連動 usage 聚合)+3 個 UX 微調已修(切場地保留日期窗、今日截止文案、結束日 disabledDate)
-- 留待接後端自然消解(opus LOW/NOTE,不修):module-level `dayjs()` 快照(跨日長開頁面)、結案實際時間僅 HH:mm 無法表達跨日結束、幹訓簽到 Checkbox 與 `attendedSessions` mock 兩端未接
-- 歷史:後端三輪(opus×2+codex)已完;前端六輪已完(2026-07-14 前)
+1. **popup 遮罩問題為何重複發生**:AntD `Modal.confirm` 預設 `maskClosable:false`,每次新增呼叫點都要手動補——已建 `confirmDialog` helper 根治,規範寫入 AGENTS.md
+2. **「固定場地借用手動加開」**=原設計在預設開放月份(6 月/1 月)以外由管理員臨時開放受理的開關;已依指示移除,由「受理期間日期區間」取代
+3. 檔案管理 DB 分類:採納「整個 DB 算一類=文字內容」;報修段置首
 
-## ui-polish 已合併進 dev(2026-07-15,merge 758352a)
+## 剩餘已知待辦
 
-7 個 commit(社團端 14 頁文字精簡、活動申請審核 Drawer、結案/臨時借用/固定借用審核 Modal、成員分頁、列表空狀態)全數併入。5 項裁決結果:
+- **前端接線**(使用者宣告要一起做):全部頁面仍為 mock;後端 API 已齊,接線注意事項:公告 create body 的日期為 ISO 格式(mock 用 YYYY/MM/DD 需轉)、報名 datetime 無時區視為台北、負責人會議簽到後端為逐場登錄(前端 InputNumber 需換算)、`GET /club/equipment?activity_id=` 區間在 meta
+- 權限鍵命名統一(前端 areview/asignup vs 後端 aact/areg 現以別名互通;abooking/aroom/amember 的管理端 router 未做)
+- `signup_items.year`(current_year=114)與 `eval_window.year`(116)不對齊的既有隱患
+- staff panel、viewer panel、首頁導覽頁(Roadmap)
+- 評鑑結果頁重設計規格、Email MJML 模板(待需求方;Email/Discord 現為基礎模板函式 `notify.announcement_email_html`/`announcement_components`)
 
-1. 互動提示定調**全留**:主要互動為點列的頁面保留至多一行提示(ActivityListPage 頁尾、ReviewPage 提示皆留,與本輪借用總覽做法一致)
-2. 10:30 歸還規則**只留器材頁**(借用總覽頁尾行已移除)
-3. **維持刻意區分**:活動申請審核=Drawer(三關章軌)、單關審核=Modal
-4. 成員管理社團下拉維持 placeholder(接後端才有 club 欄位)
-5. 「+新增/重設密碼/停用」佔位按鈕保留(接後端啟用)
+## 待需求方裁決(沿前輪+本輪新增)
 
-衝突解決:AdminRoomsPage 的審核 Modal 移植到新「星期×節次」固定借用模型(衝突鍵 room|dow|period、整單擇一文案);AdminViolationsPage 空狀態併入銷案期限欄(colSpan 9);FixedRoomPage 說明行取兩版合併「整學期每週固定使用所選時段;衝突由學務處擇一社團核准」。合併後 build/test(15)/lint 全綠。分支與 worktree(`../club-aio-ui-polish`)未刪,可自行清理。
-
-## 第六輪 club panel(2026-07-15 稍晚,已完成推 dev)
-
-9 個 commit:總覽改名、Header 設定捷徑、管理項目重構(Email×3/更換密碼/並排/髒欄位橘框+統一儲存)、臨時借用綁核准活動、固定借用拖曳、借用總覽 icon 導航+星期+場地名反白+15 天視窗(−7~+7、不含過去)。決議全文見 AGENTS.md 第六輪。
-交叉檢查:opus 一輪,1 MEDIUM(ClubSettings INITIAL 模組級快照 remount 回歸)+2 LOW+1 NOTE(dayjs customParseFormat 未載入,既有項)——全修。
-
-## 第七輪:admin panel 第一版 + club 補強(2026-07-15,已完成推 dev)
-
-使用者對提案的三項裁決全數執行:①稽核軌跡移出側欄只留帳號選單;②申請審核**不要 Drawer 要 popup**(已改 Modal);③社團帳號併入社團管理(保留功能、簡化頁面)。要點見 AGENTS.md 第七輪決議。
-
-交叉檢查(opus):1 HIGH(系統設定 tags 欄 `open={false}` 使 Enter 無法新增,rc-select 原始碼證實)+2 MEDIUM(手機 Drawer 登出漏未存檔守衛;權限彈窗不載實際權限且跨對象殘留)+5 LOW——全修(7 個 fix commit)。註:opus 提的 Drawer `size={264}` 改 `width` 是 v5 知識,AntD 6 `width` 已棄用、`size` 收數字,維持原寫法。**大型活動類型篩選解讀待需求方確認**:現定義「有大徽章者(申請中或已認可)= 大型活動;被否准=一般活動」。
-
-剩餘已知待辦:
-- 結案審核頁(aclose)「照片/成果/心得繳交確認」勾選(原型:未繳項 0 分)仍未做
-- 評審分組/獎項指派的實際操作(現為唯讀欄位)接後端時做
-- 檔案管理頁的社團篩選/歸檔批次(上輪建議,未拍板)未做
-
-## Roadmap(使用者宣告)
-
-- 之後要做 **staff panel(工讀生)**、**viewer panel(評審)**
-- 首頁未來改**導覽頁**(所有社團+圖片+介紹,右上角登入→dashboard);現行 / = 登入頁為過渡
-
-## 待裁決(使用者回來看,沿上輪)
-
-1. 成員學期歸屬以 `updated_at` 推導;要「名單快照按學期」需加欄位
-2. eval_settings 預設語意=無列即開放
-3. 成果報告表「社課講師」以 staff_text 帶入;PDF 版型加了「課程/活動名稱」列
-4. ad7/ad8 判定已於本輪改為簽到制(上輪疑問已解)
-5. 登入限流:每 IP 每 5 分鐘 10 次失敗
-6. 低風險不修:改密不輪替 session id(僅撤他裝置)
-7. **新增**:固定借用 mock `FIXED_BOOKING_WINDOW.adminOpenNow=true`(7 月能審表單);要看反灰態把它改 false。正式後台需做開放窗開關
-
-## 待需求方提供
-
-- Email 模板;評鑑結果頁(/eval/result)重設計規格
+1. 成員學期歸屬以 updated_at 推導;要「名單快照按學期」需加欄位
+2. 郵局代理人電話仍遮罩(需求只解局號帳號);要全解請告知
+3. 固定借用 10 節上限=「本單+其他審核中申請」合計的解讀
+4. 大型活動類型篩選:「有大徽章者=大型活動;被否准=一般」解讀待確認(沿第七輪)
+5. AdminRoomsPage 退回彈窗:因已預填你的預設文案,聚焦「確認退回」(Enter 直接送);其他退回彈窗(無預設文案)聚焦輸入框——如要統一請告知
 
 ## 環境與慣例提醒
 
-- 本機防火牆擋非 curl 程序對外 443(Python 連 discord 逾時、curl 通);正式 VM 無此問題
-- 本機 DB `docker compose up -d db`;dev DB 已 upgrade head + seed(super/Bootstrap!2026,首登需改密)
+- 本機 DB `docker compose up -d db`;dev 庫已 upgrade 至 `d2a6c9f13b58` + seed(19 場地)
+- 測試打獨立 `club_aio_test` 庫;conftest 已全域靜音 Discord webhook
 - Commit 英文、一行為一 commit、禁元描述;文件/回覆繁中;UI 禁 emoji
 - Vite 8 只綁 IPv6(`localhost:5173`);OrbStack 佔 8000,後端一律 `127.0.0.1:8000`
-- Python 3.14 + uv;測試打獨立 `club_aio_test` 庫(conftest 於 import app 前設 env)
-- frontend/src/features/auth/LoginPage.tsx 有使用者本人未提交的修改(移除忘記密碼+TODO),**勿動勿收進 commit**
+- 確認彈窗一律走 `lib/confirm.ts` 的 `confirmDialog`,勿直呼 `modal.confirm`

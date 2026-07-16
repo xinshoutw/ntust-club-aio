@@ -105,10 +105,10 @@ function CloseReviewModal({
 
   const submitReject = () => {
     if (!reason.trim()) {
-      message.error('退回原因為必填。')
+      message.error('退回原因為必填')
       return
     }
-    message.success(`已退回「${item.name}」結案(通知社團補正)`)
+    message.success(`已退回「${item.name}」結案`)
     closeReject()
     onClose()
   }
@@ -333,7 +333,7 @@ export default function CloseReviewPage() {
           ))}
         {PENDING.length === 0 && (
           <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
-            目前沒有待審結案。
+            目前沒有待審結案
           </div>
         )}
       </div>
@@ -359,7 +359,7 @@ export default function CloseReviewPage() {
             ))}
             {LOCKED.length === 0 && (
               <tr className="no-hover">
-                <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>沒有逾期鎖定的活動。</td>
+                <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>沒有逾期的活動</td>
               </tr>
             )}
           </tbody>

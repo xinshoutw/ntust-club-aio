@@ -318,11 +318,8 @@ export default function MembersPage() {
         onOk={() => importCsv(csvText)}
         okText="匯入"
       >
-        <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 10 }}>
-          每行一人:<span className="num">姓名,學號,身份[,職稱]</span>;可上傳 .csv 或直接貼上。
-        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-          <span style={{ fontSize: 13 }}>匯入至學期</span>
+          <span style={{ fontSize: 13 }}>至學期</span>
           <Select value={csvSemester} onChange={setCsvSemester} style={{ width: 110 }} options={semesterOptions(members.map((m) => m.semester))} />
         </div>
         <Upload
@@ -353,11 +350,8 @@ export default function MembersPage() {
         okText="匯出"
         okButtonProps={{ autoFocus: true }}
       >
-        <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 10 }}>
-          匯出所選學期的成員名單(格式同匯入),可直接匯入至其他學期。
-        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 13 }}>匯出學期</span>
+          <span style={{ fontSize: 13 }}>學期</span>
           <Select value={csvSemester} onChange={setCsvSemester} style={{ width: 110 }} options={semesterOptions(members.map((m) => m.semester))} />
           <span style={{ fontSize: 13, color: 'var(--steel)' }}>
             共 <span className="num">{members.filter((m) => m.semester === csvSemester).length}</span> 人

@@ -47,10 +47,10 @@ function BookingReviewModal({
 
   const submitReject = () => {
     if (!reason.trim()) {
-      message.error('退回原因為必填。')
+      message.error('退回原因為必填')
       return
     }
-    message.success('已退回借用申請(通知社團修正重送)')
+    message.success('已退回借用申請')
     closeReject()
     onClose()
   }
@@ -112,8 +112,8 @@ function BookingReviewModal({
           if (item.data.qty <= free) return null
           return (
             <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--paper)', borderRadius: 6, fontSize: 13, color: '#B03A2E' }}>
-              可借數不足:該區間「{item.data.equipment}」可借 <span className="num">{free}</span>,本單申請{' '}
-              <span className="num">{item.data.qty}</span>;核准前請確認歸還排程。
+              可借數不足：該區間「{item.data.equipment}」可借 <span className="num">{free}</span>，本單申請{' '}
+              <span className="num">{item.data.qty}</span>；核准前請確認歸還排程
             </div>
           )
         })()}
@@ -243,9 +243,6 @@ export default function AdminBookingsPage() {
             </tbody>
           </table>
         </div>
-        <div style={{ marginTop: 10, fontSize: 12, color: 'var(--steel)' }}>
-          點「審核中」格開啟該筆申請的審核彈窗;其餘格僅供檢視。
-        </div>
       </div>
 
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
@@ -264,7 +261,7 @@ export default function AdminBookingsPage() {
             ))}
             {pendingVenues.length === 0 && (
               <tr className="no-hover">
-                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>沒有待審的場地借用。</td>
+                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>沒有待審的場地借用</td>
               </tr>
             )}
           </tbody>
@@ -289,7 +286,7 @@ export default function AdminBookingsPage() {
             ))}
             {pendingLoans.length === 0 && (
               <tr className="no-hover">
-                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>沒有待審的器材借用。</td>
+                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>沒有待審的器材借用</td>
               </tr>
             )}
           </tbody>

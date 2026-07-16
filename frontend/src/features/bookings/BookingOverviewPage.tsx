@@ -142,13 +142,13 @@ export default function BookingOverviewPage() {
           ) : (
             <>
               <Button size="small" icon={<ArrowLeftOutlined />} onClick={() => setVenueView(null)}>
-                單日總覽
+                總覽
               </Button>
               <Select
                 size="small"
                 value={venueView}
                 onChange={setVenueView}
-                options={VENUES.map((v) => ({ value: v.name, label: `${v.name}(${v.capacity} 人)` }))}
+                options={VENUES.map((v) => ({ value: v.name, label: `${v.name} (${v.capacity} 人)` }))}
                 style={{ minWidth: 190 }}
                 popupMatchSelectWidth={false}
               />
@@ -162,7 +162,7 @@ export default function BookingOverviewPage() {
                 />
               </Tooltip>
               <span className="num" style={{ fontSize: 12, color: 'var(--steel)' }}>
-                {venueStart.format('YYYY/MM/DD')} – {venueStart.add(VENUE_DAYS - 1, 'day').format('MM/DD')}
+                {venueStart.format('MM/DD')} – {venueStart.add(VENUE_DAYS - 1, 'day').format('MM/DD')}
               </span>
               <Tooltip title={`後 ${VENUE_DAYS} 天`}>
                 <Button
@@ -172,7 +172,7 @@ export default function BookingOverviewPage() {
                   onClick={() => setVenueStart((s) => s.add(VENUE_DAYS, 'day'))}
                 />
               </Tooltip>
-              <Button size="small" onClick={() => setVenueStart(todayStart)}>今天起</Button>
+              <Button size="small" onClick={() => setVenueStart(todayStart)}>今天</Button>
             </>
           )}
           <div style={{ flex: 1 }} />
@@ -233,7 +233,7 @@ export default function BookingOverviewPage() {
                   return (
                     <tr key={d.format('YYYY/MM/DD')}>
                       <td className="num" style={{ whiteSpace: 'nowrap', paddingRight: 8, fontSize: 12, fontWeight: isToday ? 600 : 400, color: isToday ? 'var(--seal)' : 'var(--ink)' }}>
-                        {d.format('MM/DD')}(週{WEEKDAY[d.day()]})
+                        {d.format('MM/DD')}（{WEEKDAY[d.day()]}）
                       </td>
                       {PERIODS.map((p) => {
                         const info = cellInfo(venueDef.name, d, p, mine)
@@ -255,7 +255,7 @@ export default function BookingOverviewPage() {
 
       {/* 我的借用:單卡整併(固定/臨時/器材),僅顯示自己社團 */}
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>我的借用(進行中)</div>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近借用</div>
         <table className="tb" style={{ minWidth: 680 }}>
           <thead>
             <tr>
@@ -300,7 +300,7 @@ export default function BookingOverviewPage() {
 
       {/* 已歸還:獨立分頁區 */}
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>已歸還</div>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近歸還</div>
         <table className="tb" style={{ minWidth: 560 }}>
           <tbody>
             {returnedPaged.map((l) => (
@@ -315,7 +315,7 @@ export default function BookingOverviewPage() {
             ))}
             {returned.length === 0 && (
               <tr className="no-hover">
-                <td style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無歸還紀錄。</td>
+                <td style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無歸還紀錄</td>
               </tr>
             )}
           </tbody>

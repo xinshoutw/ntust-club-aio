@@ -39,7 +39,7 @@ export default function PostalPage() {
           requiredMark
           onFinish={() => {
             if (!files.length) {
-              message.error('請上傳原存簿影本或新開戶申請表。')
+              message.error('請上傳原存簿影本或新開戶申請表')
               return
             }
             message.success('已送出郵局帳戶異動申請')
@@ -49,7 +49,7 @@ export default function PostalPage() {
         >
           <Form.Item
             name="reasons"
-            label="事由(可複選)"
+            label="事由"
             rules={[{ required: true, message: '請勾選至少一項事由' }]}
           >
             <Checkbox.Group
@@ -59,7 +59,7 @@ export default function PostalPage() {
           </Form.Item>
           <div className="form-grid-2">
             <Form.Item name="accountName" label="存簿戶名" rules={[{ required: true, message: '請輸入戶名' }]} style={{ marginBottom: 0 }}>
-              <Input placeholder="例:資工系學會" />
+              <Input placeholder="資工系學會" />
             </Form.Item>
             {needAccountNo && (
               <Form.Item
@@ -89,7 +89,7 @@ export default function PostalPage() {
               fileList={files}
               beforeUpload={(f) => {
                 if (f.size > 50 * 1024 * 1024) {
-                  message.error('檔案超過 50MB 上限。')
+                  message.error('檔案超過 50MB 上限')
                   return Upload.LIST_IGNORE
                 }
                 return false

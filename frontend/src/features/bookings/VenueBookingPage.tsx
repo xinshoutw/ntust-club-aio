@@ -28,10 +28,10 @@ export default function VenueBookingPage() {
 
   const submit = (values: { venue: string }) => {
     if (!periods.length) {
-      message.error('請選擇至少一個時段。')
+      message.error('請選擇至少一個時段')
       return
     }
-    message.success(`已送出「${values.venue}」借用申請(第 ${periods.join('、')} 節)`)
+    message.success(`已送出「${values.venue}」借用申請（${periods.join('、')}）`)
     form.resetFields()
     setPeriods([])
   }

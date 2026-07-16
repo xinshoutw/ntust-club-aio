@@ -118,7 +118,7 @@ export default function ClubOverviewPage() {
           ))}
           {tracked.length === 0 && (
             <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
-              尚無進行中的申請。
+              尚無進行中的申請
             </div>
           )}
         </div>
@@ -204,7 +204,7 @@ export default function ClubOverviewPage() {
           ))}
           {bookingCount === 0 && (
             <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
-              尚無借用中的場地或器材。
+              尚無借用中的場地或器材
             </div>
           )}
         </div>

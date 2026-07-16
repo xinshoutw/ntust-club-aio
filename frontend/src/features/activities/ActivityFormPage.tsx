@@ -169,8 +169,8 @@ export default function ActivityFormPage() {
       // 草稿不保存附件:避免未送出檔案殘留伺服器(孤兒檔案/個資殘留)
       confirmDialog(modal, {
         title: '附件不會隨草稿保存',
-        content: `已選擇的 ${files.length} 個附件將被捨棄,送出申請時需重新上傳。確定要暫存草稿?`,
-        okText: '捨棄附件並暫存',
+        content: `已選擇的 ${files.length} 個附件將被捨棄，確定要暫存草稿？`,
+        okText: '捨棄並暫存',
         cancelText: '取消',
         onOk: doSave,
       })
@@ -185,11 +185,11 @@ export default function ActivityFormPage() {
     const start = dayjs(`${v.date.format('YYYY/MM/DD')} ${v.startTime.format('HH:mm')}`, 'YYYY/MM/DD HH:mm')
     const end = dayjs(`${v.endDate.format('YYYY/MM/DD')} ${v.endTime.format('HH:mm')}`, 'YYYY/MM/DD HH:mm')
     if (!end.isAfter(start)) {
-      message.error('活動結束時間須晚於開始時間。')
+      message.error('活動結束時間須晚於開始時間')
       return
     }
     if (!works.some((w) => w.task.trim() !== '' && w.owner.trim() !== '')) {
-      message.error('請填寫至少一筆工作分配。')
+      message.error('請填寫至少一筆工作分配')
       return
     }
     persist(buildDraft('pending_advisor'))
@@ -263,7 +263,7 @@ export default function ActivityFormPage() {
                           trigger={['hover', 'click']}
                           content={
                             <div style={{ fontSize: 13, lineHeight: 1.7, maxWidth: 280 }}>
-                              工作人員或服務對象達 <span className="num">50</span> 人以上、活動連續辦理 <span className="num">2-3</span> 天以上、總時數超過 <span className="num">20</span> 小時、活動經費達 <span className="num">10</span> 萬元以上、需 <span className="num">3</span> 個月以上籌備時間且召開 <span                         className="num">5</span> 次以上籌備會議。
+                              工作人員或服務對象達 <span className="num">50</span> 人以上、活動連續辦理 <span className="num">2-3</span> 天以上、總時數超過 <span className="num">20</span> 小時、活動經費達 <span className="num">10</span> 萬元以上、需 <span className="num">3</span> 個月以上籌備時間且召開 <span className="num">5</span> 次以上籌備會議
                             </div>
                           }
                         >

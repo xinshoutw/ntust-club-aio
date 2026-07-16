@@ -12,7 +12,7 @@ export default function LoginPage() {
 
   const submit = () => {
     if (!username.trim() || !password.trim()) {
-      setError('請輸入帳號與密碼。')
+      setError('請輸入帳號與密碼')
       return
     }
     const user = login(username.trim())

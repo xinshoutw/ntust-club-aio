@@ -41,7 +41,7 @@ export default function OverviewPage() {
         <div className="todo-row">
           <StatusPill status="locked" />
           <div style={{ fontSize: 14, lineHeight: 1.6 }}>
-            「程式設計工作坊」應於 <span className="num">2026/05/12</span> 前結案,現已鎖定;請洽課外活動指導組解鎖。
+            「程式設計工作坊」應於 <span className="num">2026/05/12</span> 前結案,現已鎖定;請洽課外活動指導組解鎖
           </div>
           <div className="todo-action">
             <Button size="small" style={{ height: 30 }} onClick={() => navigate('/activities')}>
@@ -52,7 +52,7 @@ export default function OverviewPage() {
         <div className="todo-row">
           <StatusPill status="closing_due" />
           <div style={{ fontSize: 14, lineHeight: 1.6 }}>
-            「迎新宿營」請於 <span className="num">2026/07/28</span> 前完成結案(剩 <span className="num">15</span> 天)。
+            「迎新宿營」請於 <span className="num">2026/07/28</span> 前完成結案(剩 <span className="num">15</span> 天)
           </div>
           <div className="todo-action">
             <Button type="primary" size="small" style={{ height: 30 }} onClick={() => navigate('/activities')}>

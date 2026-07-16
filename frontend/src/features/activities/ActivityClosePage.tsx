@@ -130,7 +130,7 @@ export default function ActivityClosePage() {
       )}
       {!activity && closable.length === 0 && (
         <div className="card" style={{ marginTop: 20, padding: '40px 24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
-          目前沒有可結案的活動(須已核准且活動已結束)。
+          目前沒有可結案的活動
         </div>
       )}
 
@@ -274,8 +274,8 @@ function CloseForm({
       // 與活動申請同慣例:草稿不保存附件
       confirmDialog(modal, {
         title: '照片不會隨草稿保存',
-        content: `已選擇的 ${photos.length} 張照片將被捨棄,送出結案時需重新上傳。確定要暫存草稿?`,
-        okText: '捨棄照片並暫存',
+        content: `已選擇的 ${photos.length} 張照片將被捨棄，確定要暫存草稿？`,
+        okText: '捨棄並暫存',
         cancelText: '取消',
         onOk: doSave,
       })
@@ -303,29 +303,29 @@ function CloseForm({
       : expense == null ? '實際支出'
       : null
     if (missing) {
-      message.error(`請填寫「${missing}」。`)
+      message.error(`請填寫「${missing}」`)
       return
     }
     if (!dayjs(actualEnd, 'HH:mm').isAfter(dayjs(actualStart, 'HH:mm'))) {
-      message.error('實際結束時間須晚於實際開始時間。')
+      message.error('實際結束時間須晚於實際開始時間')
       return
     }
     const video = videoLink.trim()
     if (video && !/^https?:\/\/\S+$/i.test(video)) {
-      message.error('影片連結格式不正確,需為 http(s) 網址。')
+      message.error('影片連結格式不正確')
       return
     }
     const complete = filledReflects.filter((r) => r.name.trim() && r.dept.trim() && r.text.trim())
     if (complete.length < filledReflects.length) {
-      message.error('學習心得每列的姓名、系級與內容皆為必填。')
+      message.error('學習心得每列的姓名、系級與內容皆為必填')
       return
     }
     if (complete.length < MIN_REFLECTIONS) {
-      message.error(`學習心得至少需 ${MIN_REFLECTIONS} 位本校學生。`)
+      message.error(`學習心得至少需 ${MIN_REFLECTIONS} 位本校學生`)
       return
     }
     if (photos.length < MIN_PHOTOS && !videoLink.trim()) {
-      message.warning(`照片未達 ${MIN_PHOTOS} 張且無影片連結,評鑑「照片/影片」該活動將不計分。`)
+      message.warning(`照片未達 ${MIN_PHOTOS} 張且無影片連結，評鑑項目「照片 / 影片」將不計分`)
     }
 
     const reflections = complete.map(({ name, dept, text }) => ({ name: name.trim(), dept: dept.trim(), text: text.trim() }))

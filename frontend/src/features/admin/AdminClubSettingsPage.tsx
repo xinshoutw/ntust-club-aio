@@ -37,11 +37,11 @@ export default function AdminClubSettingsPage() {
     if (wasActive && !active) {
       confirmDialog(modal, {
         title: `停用 ${club} 帳號`,
-        content: '儲存後社團將無法登入,進行中的申請不受影響。',
-        okText: '確認停用並儲存',
+        content: '社團將無法登入，將不會影響進行中的申請',
+        okText: '確認並儲存',
         okButtonProps: { danger: true },
         cancelText: '取消',
-        onOk: () => message.success(`已儲存 ${name} 帳號設定(帳號停用)`),
+        onOk: () => message.success(`已停用 ${name} 帳號`),
       })
       return
     }

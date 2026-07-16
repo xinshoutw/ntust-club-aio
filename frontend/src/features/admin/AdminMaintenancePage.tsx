@@ -82,7 +82,7 @@ export default function AdminMaintenancePage() {
             ))}
             {rows.length === 0 && (
               <tr className="no-hover">
-                <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有維修申請。</td>
+                <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有維修申請</td>
               </tr>
             )}
           </tbody>

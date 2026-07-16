@@ -222,7 +222,7 @@ export default function FixedRoomPage() {
             ))}
             {mine.length === 0 && (
               <tr className="no-hover">
-                <td style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無申請紀錄。</td>
+                <td style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無申請紀錄</td>
               </tr>
             )}
           </tbody>

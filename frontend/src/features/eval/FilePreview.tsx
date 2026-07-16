@@ -47,7 +47,7 @@ function DocView({ file }: { file: EvalFile }) {
     }
   }, [file])
 
-  if (!file.raw) return <Center>示意檔案無實際內容;實際上傳的 .docx 可在此預覽。</Center>
+  if (!file.raw) return <Center>示意檔案無實際內容;實際上傳的 .docx 可在此預覽</Center>
   if (error) return <Center>無法解析此文件(舊版 .doc 僅支援下載):{error}</Center>
   if (html == null) return <Center>解析文件中…</Center>
   return (
@@ -101,10 +101,10 @@ export default function FilePreview({ file, open, onClose, afterClose }: FilePre
             style={{ width: '100%', height: '76vh', border: '1px solid var(--line)', borderRadius: 6 }}
           />
         ) : (
-          <Center>示意檔案無實際內容;實際上傳的 PDF 可在此預覽。</Center>
+          <Center>示意檔案無實際內容;實際上傳的 PDF 可在此預覽</Center>
         ))}
       {file?.type === 'doc' && <DocView file={file} />}
-      {file?.type === 'other' && <Center>此檔案格式不支援預覽(支援圖片、PDF、DOC/DOCX)。</Center>}
+      {file?.type === 'other' && <Center>此檔案格式不支援預覽(支援圖片、PDF、DOC/DOCX)</Center>}
     </Modal>
   )
 }

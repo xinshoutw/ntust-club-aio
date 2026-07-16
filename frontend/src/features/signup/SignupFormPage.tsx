@@ -67,11 +67,11 @@ export default function SignupFormPage() {
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
               <StatusPill status="ended" />
               <div>
-                此活動已於 <span className="num">{item.deadline}</span> 截止報名。
+                此活動已於 <span className="num">{item.deadline}</span> 截止報名
               </div>
             </div>
           ) : (
-            '此報名活動不存在或已下架。'
+            '此報名活動不存在或已刪除'
           )}
         </div>
       </div>

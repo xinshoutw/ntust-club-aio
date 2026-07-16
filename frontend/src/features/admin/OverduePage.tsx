@@ -54,7 +54,7 @@ export default function OverduePage() {
             ))}
             {overdue.length === 0 && (
               <tr className="no-hover">
-                <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有逾期未還的器材。</td>
+                <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有逾期未還的器材</td>
               </tr>
             )}
           </tbody>
@@ -81,7 +81,7 @@ export default function OverduePage() {
             ))}
             {SUSPENSIONS.length === 0 && (
               <tr className="no-hover">
-                <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有停權中的社團。</td>
+                <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有停權中的社團</td>
               </tr>
             )}
           </tbody>

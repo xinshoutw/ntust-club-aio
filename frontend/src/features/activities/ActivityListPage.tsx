@@ -240,7 +240,7 @@ function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPrevi
           {(a.status === 'approved' || a.status === 'locked') && a.closeDeadline && (
             <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 16 }}>
               結案期限 <span className="num">{a.closeDeadline}</span>
-              {a.status === 'locked' ? ',已逾期鎖定,請洽課外活動指導組解鎖。' : `,剩 ${a.closeDaysLeft} 天。`}
+              {a.status === 'locked' ? '，已逾期' : `，剩 ${a.closeDaysLeft} 天`}
             </div>
           )}
         </div>
@@ -479,7 +479,7 @@ export default function ActivityListPage() {
             {paged.length === 0 && (
               <tr className="no-hover">
                 <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 28 }}>
-                  本學期尚無活動。
+                  本學期尚無活動
                 </td>
               </tr>
             )}

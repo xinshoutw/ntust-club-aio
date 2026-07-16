@@ -36,7 +36,7 @@ export default function MaintenancePage() {
           requiredMark
           onFinish={() => {
             if (!files.length) {
-              message.error('請附上損壞照片或影片佐證。')
+              message.error('請附上損壞照片或影片佐證')
               return
             }
             message.success('已送出報修')
@@ -45,12 +45,12 @@ export default function MaintenancePage() {
           }}
         >
           <Form.Item name="location" label="地點" rules={[{ required: true, message: '請輸入地點' }]}>
-            <Input placeholder="例:社團大樓 3F S304 音樂教室" />
+            <Input placeholder="社團大樓 3F S304 音樂教室" />
           </Form.Item>
           <Form.Item name="items" label="損壞項目" rules={[{ required: true, message: '請描述損壞項目' }]}>
-            <Input.TextArea rows={3} placeholder="例:天花板漏水、燈管不亮" />
+            <Input.TextArea rows={3} placeholder="天花板漏水、燈管不亮" />
           </Form.Item>
-          <Form.Item label="佐證照片/影片" required>
+          <Form.Item label="佐證照片 / 影片" required>
             <Upload.Dragger
               multiple
               accept="image/*,video/*"
@@ -59,7 +59,7 @@ export default function MaintenancePage() {
                 const isVideo = f.type.startsWith('video/')
                 const limit = isVideo ? 200 : 10
                 if (f.size > limit * 1024 * 1024) {
-                  message.error(`${isVideo ? '影片' : '照片'}超過 ${limit}MB 上限。`)
+                  message.error(`${isVideo ? '影片' : '照片'}超過 ${limit}MB 上限`)
                   return Upload.LIST_IGNORE
                 }
                 return false
@@ -69,7 +69,7 @@ export default function MaintenancePage() {
               <p style={{ margin: '4px 0 8px' }}>
                 <InboxOutlined style={{ fontSize: 28, color: 'var(--steel)' }} />
               </p>
-              <p style={{ fontSize: 13, color: 'var(--steel)', margin: 0 }}>拖放或點擊選擇(照片、短片 ≤200MB)</p>
+              <p style={{ fontSize: 13, color: 'var(--steel)', margin: 0 }}>拖放或點擊選擇(照片、短片 ≤200MB)</p> {/* TODO: 與活動申請頁面相同 */}
             </Upload.Dragger>
           </Form.Item>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>

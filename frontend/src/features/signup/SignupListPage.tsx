@@ -80,7 +80,7 @@ export default function SignupListPage() {
         })}
         {!items.length && (
           <div className="card" style={{ padding: '40px 24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
-            本學期沒有開放報名的項目。
+            本學期沒有開放報名的項目
           </div>
         )}
       </div>

@@ -30,7 +30,7 @@ export default function AwardDetailPage() {
           返回資料總覽
         </Link>
         <div className="card" style={{ marginTop: 16, padding: '40px 24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
-          找不到此獎項。
+          找不到此獎項
         </div>
       </div>
     )
@@ -73,9 +73,6 @@ export default function AwardDetailPage() {
             </div>
           }
         />
-      </div>
-      <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        依評分細項上傳佐證資料(PDF、Word、圖片)。
       </div>
 
       {groups.map((g) => (

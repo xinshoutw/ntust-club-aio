@@ -5,9 +5,9 @@ import { useAuth } from '../../app/auth'
 import { MEMBERS, type Member } from '../members/mock'
 
 const TERMS = [
-  { value: '114', label: '114學年度' },
-  { value: '114-1', label: '114學年度第1學期' },
-  { value: '114-2', label: '114學年度第2學期' },
+  { value: '114', label: '114 學年度' },
+  { value: '114-1', label: '114 學年度第 1 學期' },
+  { value: '114-2', label: '114 學年度第 2 學期' },
 ]
 
 const POSITION_KIND: Record<string, Member['kind']> = {
@@ -62,18 +62,18 @@ export default function CertificatePage() {
               <Select placeholder="請選擇" options={Object.keys(POSITION_KIND).map((p) => ({ value: p, label: p }))} />
             </Form.Item>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>姓名(自動帶出)</div>
+              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>姓名</div>
               <Input
                 readOnly
                 value={matchState === 'ok' ? uniqueNames[0] : ''}
-                placeholder={matchState === 'idle' ? '選擇學年期與職位後帶出' : ''}
+                placeholder={matchState === 'idle' ? '請選擇學年期與職位' : ''}
                 style={{ background: 'var(--paper)' }}
               />
               {matchState === 'none' && (
-                <div style={{ fontSize: 12, color: '#C13B34', marginTop: 4 }}>該學年期成員名單中找不到此職位,無法送出;請先至成員列表補登。</div>
+                <div style={{ fontSize: 12, color: '#C13B34', marginTop: 4 }}>該學年期「成員名單」中找不到此職位，無法送出。請先至成員列表補上</div>
               )}
               {matchState === 'many' && (
-                <div style={{ fontSize: 12, color: '#C13B34', marginTop: 4 }}>找到多位符合成員,無法送出;請先修正成員名單。</div>
+                <div style={{ fontSize: 12, color: '#C13B34', marginTop: 4 }}>找到多位符合成員，無法送出。請先修正成員名單</div>
               )}
             </div>
           </div>

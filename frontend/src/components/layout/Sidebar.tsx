@@ -29,7 +29,7 @@ export default function Sidebar({ groups, onNavigate }: SidebarProps) {
     e.preventDefault()
     confirmDialog(modal, {
       title: '尚有未儲存的變更',
-      content: '離開此頁將遺失尚未儲存的修改。',
+      content: '離開此頁將遺失尚未儲存的修改',
       okText: '放棄變更並離開',
       okButtonProps: { danger: true },
       cancelText: '留在此頁',

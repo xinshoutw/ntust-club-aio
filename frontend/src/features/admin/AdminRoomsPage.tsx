@@ -38,10 +38,10 @@ function RoomReviewModal({
 
   const submitReject = () => {
     if (!reason.trim()) {
-      message.error('退回原因為必填。')
+      message.error('退回原因為必填')
       return
     }
-    message.success(`已退回 ${item.club} 的固定借用申請(通知社團修正重送)`)
+    message.success(`已退回 ${item.club} 的固定借用申請`)
     closeReject()
     onClose()
   }
@@ -195,7 +195,7 @@ export default function AdminRoomsPage() {
             ))}
             {pending.length === 0 && (
               <tr className="no-hover">
-                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>沒有待審的固定借用。</td>
+                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>沒有待審的固定借用</td>
               </tr>
             )}
           </tbody>

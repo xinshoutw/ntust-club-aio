@@ -245,7 +245,7 @@ export default function AdminFilesPage() {
             {list.length === 0 && (
               <tr className="no-hover">
                 <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 24 }}>
-                  此模組尚無大型檔案。
+                  此模組尚無大型檔案
                 </td>
               </tr>
             )}

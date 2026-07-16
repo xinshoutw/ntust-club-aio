@@ -85,7 +85,7 @@ export default function AdminMembersPage() {
             {list.length === 0 && (
               <tr className="no-hover">
                 <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
-                  {club} 尚未建立成員名單。
+                  {club} 尚未建立成員名單
                 </td>
               </tr>
             )}

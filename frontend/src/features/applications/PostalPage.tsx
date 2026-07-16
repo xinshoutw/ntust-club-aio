@@ -138,7 +138,15 @@ export default function PostalPage() {
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
-          <table className="tb" style={{ minWidth: 520 }}>
+          <table className="tb" aria-label="郵局帳戶異動申請紀錄" style={{ minWidth: 520 }}>
+            <thead>
+              <tr>
+                <th scope="col">事由</th>
+                <th scope="col">帳戶資訊</th>
+                <th scope="col">申請日期</th>
+                <th scope="col">狀態</th>
+              </tr>
+            </thead>
             <tbody>
               {records.map((r) => (
                 <tr key={r.id}>
@@ -159,7 +167,7 @@ export default function PostalPage() {
               )}
               {!listQuery.isPending && !listQuery.isError && records.length === 0 && (
                 <tr className="no-hover">
-                  <td style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>尚無申請紀錄</td>
+                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>尚無申請紀錄</td>
                 </tr>
               )}
             </tbody>

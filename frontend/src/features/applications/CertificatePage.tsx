@@ -109,7 +109,15 @@ export default function CertificatePage() {
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
-          <table className="tb" style={{ minWidth: 480 }}>
+          <table className="tb" aria-label="幹部證明申請紀錄" style={{ minWidth: 480 }}>
+            <thead>
+              <tr>
+                <th scope="col">申請人</th>
+                <th scope="col">學年期</th>
+                <th scope="col">申請日期</th>
+                <th scope="col">狀態</th>
+              </tr>
+            </thead>
             <tbody>
               {records.map((c) => (
                 <tr key={c.id}>
@@ -128,7 +136,7 @@ export default function CertificatePage() {
               )}
               {!listQuery.isPending && !listQuery.isError && records.length === 0 && (
                 <tr className="no-hover">
-                  <td style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>尚無申請紀錄</td>
+                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>尚無申請紀錄</td>
                 </tr>
               )}
             </tbody>

@@ -383,14 +383,23 @@ export default function CloseReviewPage() {
       <Spin spinning={approvedQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>逾期未結案(已鎖定)</div>
-          <table className="tb dense" style={{ minWidth: 640 }}>
+          <table className="tb dense" style={{ minWidth: 640 }} aria-label="逾期未結案活動">
+            <thead>
+              <tr>
+                <th scope="col">社團</th>
+                <th scope="col">活動名稱</th>
+                <th scope="col">結案期限</th>
+                <th scope="col">狀態</th>
+                <th scope="col" aria-label="動作" style={{ width: 90 }} />
+              </tr>
+            </thead>
             <tbody>
               {locked.map((l) => (
                 <tr key={l.id} className="no-hover">
                   <td>{l.club}</td>
                   <td style={{ fontWeight: 500 }}>{l.name}</td>
-                  <td style={{ fontSize: 13, color: 'var(--steel)' }}>
-                    結案期限 <span className="num">{l.closeDeadline ?? '—'}</span>
+                  <td className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>
+                    {l.closeDeadline ?? '—'}
                   </td>
                   <td style={{ width: 110 }}><StatusPill status="locked" /></td>
                   <td className="r" style={{ width: 90 }}>

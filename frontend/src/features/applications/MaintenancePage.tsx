@@ -86,7 +86,14 @@ export default function MaintenancePage() {
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近報修</div>
-          <table className="tb" style={{ minWidth: 620 }}>
+          <table className="tb" aria-label="空間報修紀錄" style={{ minWidth: 620 }}>
+            <thead>
+              <tr>
+                <th scope="col">報修內容</th>
+                <th scope="col">申請日期</th>
+                <th scope="col">狀態</th>
+              </tr>
+            </thead>
             <tbody>
               {records.map((r) => (
                 <tr key={r.id}>
@@ -110,7 +117,7 @@ export default function MaintenancePage() {
               )}
               {!listQuery.isPending && !listQuery.isError && records.length === 0 && (
                 <tr className="no-hover">
-                  <td style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>尚無報修紀錄</td>
+                  <td colSpan={3} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>尚無報修紀錄</td>
                 </tr>
               )}
             </tbody>

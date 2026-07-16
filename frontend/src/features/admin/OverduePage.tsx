@@ -73,7 +73,16 @@ export default function OverduePage() {
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>逾期未還器材</div>
         <Spin spinning={overdueQuery.isPending}>
-          <table className="tb dense" style={{ minWidth: 720 }}>
+          <table className="tb dense" aria-label="逾期未還器材" style={{ minWidth: 720 }}>
+            <thead>
+              <tr>
+                <th scope="col">社團</th>
+                <th scope="col">器材</th>
+                <th scope="col">借用資訊</th>
+                <th scope="col">狀態</th>
+                <th scope="col" className="r">動作</th>
+              </tr>
+            </thead>
             <tbody>
               {overdue.map((l) => (
                 <tr key={l.apiId}>
@@ -118,7 +127,15 @@ export default function OverduePage() {
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
         <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>停權中社團</div>
         <Spin spinning={suspendedQuery.isPending}>
-          <table className="tb" style={{ minWidth: 560 }}>
+          <table className="tb" aria-label="停權中社團" style={{ minWidth: 560 }}>
+            <thead>
+              <tr>
+                <th scope="col">社團</th>
+                <th scope="col">狀態</th>
+                <th scope="col">停權資訊</th>
+                <th scope="col" className="r">動作</th>
+              </tr>
+            </thead>
             <tbody>
               {suspensions.map((s) => (
                 <tr key={s.id}>

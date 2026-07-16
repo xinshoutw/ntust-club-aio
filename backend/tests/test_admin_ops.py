@@ -1,11 +1,11 @@
-"""維修管理列表(排序)與稽核軌跡列表(篩選)。"""
+"""維修管理(列表排序 + 狀態流轉)與稽核軌跡列表(篩選)。"""
 
 from datetime import UTC, datetime, timedelta
 
 import sqlalchemy as sa
 
 from app.models import AuditLog, MaintenanceRequest
-from tests.conftest import login, make_club, make_user
+from tests.conftest import csrf_headers, login, make_club, make_user
 
 # ---- 維修管理 ----
 
@@ -61,6 +61,75 @@ async def test_maintenance_default_order_and_sort(client, db):
 
     resp = await client.get("/api/v1/admin/maintenance", params={"status": "done"})
     assert [d["location"] for d in resp.json()["data"]] == ["社辦 S312"]
+
+
+async def test_maintenance_status_transitions(client, db):
+    """狀態機:待處理 → 處理中 → 已完成(僅單步前進);audit + notify。"""
+    rows = await seed_maintenance(client, db)
+    in_progress, pending, done, _ = rows
+
+    # 待處理 → 處理中(可附處理備註)
+    resp = await client.post(
+        f"/api/v1/admin/maintenance/{pending.id}/status",
+        json={"status": "in_progress", "handle_note": "已通知廠商報價"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    assert data["status"] == "in_progress"
+    assert data["handle_note"] == "已通知廠商報價"
+    assert data["club_name"] == "美術社"
+
+    # 處理中 → 已完成
+    resp = await client.post(
+        f"/api/v1/admin/maintenance/{in_progress.id}/status",
+        json={"status": "done"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["data"]["status"] == "done"
+
+    audit_count = await db.scalar(
+        sa.select(sa.func.count()).where(AuditLog.action == "maintenance_status_updated")
+    )
+    assert audit_count == 2
+
+
+async def test_maintenance_status_rejects_illegal_transitions(client, db):
+    rows = await seed_maintenance(client, db)
+    in_progress, pending, done, _ = rows
+
+    # 跳關(待處理 → 已完成)/回退/原地不動 → 409;未知狀態值 → 422
+    for target, row in (("done", pending), ("pending", in_progress),
+                        ("in_progress", done), ("pending", pending)):
+        resp = await client.post(
+            f"/api/v1/admin/maintenance/{row.id}/status",
+            json={"status": target},
+            headers=csrf_headers(client),
+        )
+        assert resp.status_code == 409, (target, row.id)
+        assert resp.json()["meta"]["code"] == "INVALID_STATUS_TRANSITION"
+
+    resp = await client.post(
+        f"/api/v1/admin/maintenance/{pending.id}/status",
+        json={"status": "fixed"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    assert (
+        await client.post("/api/v1/admin/maintenance/99999/status",
+                          json={"status": "in_progress"}, headers=csrf_headers(client))
+    ).status_code == 404
+
+    # 權限:無 amaint 的管理員 → 403
+    await make_user(db, username="other-admin", role="admin", permissions=["aviol"])
+    await login(client, "other-admin")
+    resp = await client.post(
+        f"/api/v1/admin/maintenance/{pending.id}/status",
+        json={"status": "in_progress"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 403
 
 
 # ---- 稽核軌跡 ----

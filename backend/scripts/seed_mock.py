@@ -620,7 +620,9 @@ async def _create_activities(
         staff_text="主持:林小芳", participants=(35, 5),
         budget=(("膳食費", "茶點與飲料", 1500, 0, None),),
     )
-    # 11. 已核准・已結束・存有結案草稿(照片不隨草稿;鍵名同 CloseSubmitIn)
+    # 11. 已核准・已結束・存有結案草稿(照片不隨草稿)。
+    # close_draft 為前端 opaque JSON,鍵名須與前端 buildDraftReport() 的 camelCase 一致
+    # (曾誤用 snake_case,導致結案頁讀 reflections.name 為 undefined 而整頁白畫面)
     acts["close_draft"] = _add_activity(
         db, csie, csie_user,
         name="暑期程式馬拉松", type_=ActivityType.EVENT,
@@ -631,22 +633,22 @@ async def _create_activities(
         staff_text="總召:黃冠宇", participants=(36, 4),
         budget=(("膳食費", "兩日午餐", 4000, 0, None),),
         close_draft={
-            "member_count": 33,
-            "non_member_count": 4,
-            "actual_start": "09:10",
-            "actual_end": "17:40",
-            "actual_location": "國際大樓 IB-505",
+            "memberCount": 33,
+            "nonMemberCount": 4,
+            "actualStart": "09:10",
+            "actualEnd": "17:40",
+            "actualLocation": "國際大樓 IB-505",
             "highlights": "六組皆完成可展示的專題雛形,含兩組 AI 應用。",
             "goals": "",
             "others": "",
-            "review_meeting": False,
-            "video_url": None,
+            "reviewMeeting": False,
+            "videoLink": "",
             "expense": 3860,
             "reflections": [
                 {
-                    "student_name": "李承翰",
+                    "name": "李承翰",
                     "dept": "資工二",
-                    "body": "首次完整跑完開發流程,收穫很多。",
+                    "text": "首次完整跑完開發流程,收穫很多。",
                 }
             ],
         },

@@ -277,11 +277,11 @@ async def list_announcements(
                 Announcement.target_type == AnnouncementTarget.ALL,
                 sa.and_(
                     Announcement.target_type == AnnouncementTarget.ATTR,
-                    Announcement.target_value == club.attribute.value,
+                    Announcement.attrs.any(club.attribute.value),
                 ),
                 sa.and_(
                     Announcement.target_type == AnnouncementTarget.CLUB,
-                    Announcement.target_value == str(club.id),
+                    Announcement.club_id == club.id,
                 ),
             )
         )

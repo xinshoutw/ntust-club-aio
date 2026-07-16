@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { App, Button, DatePicker, Form, Input, InputNumber, Select, Spin, Tag } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
-import { PlusOutlined } from '@ant-design/icons'
+import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
+import type { BudgetCategory } from '../../api/clubConfig'
 import {
   evalYearLabel,
   useSystemSettings,
@@ -71,6 +72,53 @@ function TagListInput({ value = [], onChange }: { value?: string[]; onChange?: (
   )
 }
 
+// 經費科目編輯:每列名稱 + 提示(選填);末端「新增科目」補一列。受控元件。
+function BudgetCategoriesInput({
+  value = [],
+  onChange,
+}: {
+  value?: BudgetCategory[]
+  onChange?: (next: BudgetCategory[]) => void
+}) {
+  const update = (i: number, patch: Partial<BudgetCategory>) =>
+    onChange?.(value.map((c, idx) => (idx === i ? { ...c, ...patch } : c)))
+  const remove = (i: number) => onChange?.(value.filter((_, idx) => idx !== i))
+  const add = () => onChange?.([...value, { name: '', hint: '' }])
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {value.map((c, i) => (
+        <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <Input
+            value={c.name}
+            onChange={(e) => update(i, { name: e.target.value })}
+            placeholder="項目名稱"
+            style={{ width: 160, flexShrink: 0 }}
+          />
+          <Input
+            value={c.hint}
+            onChange={(e) => update(i, { hint: e.target.value })}
+            placeholder="選填"
+            style={{ flex: 1 }}
+          />
+          <Button
+            type="text"
+            size="small"
+            icon={<DeleteOutlined />}
+            aria-label={`移除 ${c.name || '項目'}`}
+            onClick={() => remove(i)}
+          />
+        </div>
+      ))}
+      <div>
+        <Button size="small" icon={<PlusOutlined />} onClick={add}>
+          新增項目
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 interface FormValues {
   fixedWindow?: [Dayjs, Dayjs] | null
   loanBefore: number
@@ -83,17 +131,24 @@ interface FormValues {
   attachmentTotalMb: number
   maintenanceTotalMb: number
   closePhotoTotalMb: number
-  capacityGib: number
   perClubGib: number
-  reserveGib: number
   evalYear: number
   violItems: string[]
-  budgetCats: string[]
+  budgetCats: BudgetCategory[]
 }
 
 const nonEmptyList = {
   validator: (_: unknown, v?: string[]) =>
     v?.length ? Promise.resolve() : Promise.reject(new Error('至少需保留一項')),
+}
+
+// 經費科目:至少一項且每項名稱非空(名稱空的列送出前需補齊)
+const nonEmptyBudget = {
+  validator: (_: unknown, v?: BudgetCategory[]) => {
+    if (!v?.length) return Promise.reject(new Error('至少需保留一項'))
+    if (v.some((c) => !c.name.trim())) return Promise.reject(new Error('項目名稱不得為空'))
+    return Promise.resolve()
+  },
 }
 
 function SettingsForm({ initial }: { initial: SystemSettings }) {
@@ -116,9 +171,7 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
         attachmentTotalMb: v.attachmentTotalMb,
         maintenanceTotalMb: v.maintenanceTotalMb,
         closePhotoTotalMb: v.closePhotoTotalMb,
-        capacityGib: v.capacityGib,
         perClubGib: v.perClubGib,
-        reserveGib: v.reserveGib,
         evalYear: v.evalYear,
         violItems: v.violItems,
         budgetCats: v.budgetCats,
@@ -153,9 +206,7 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
         attachmentTotalMb: initial.attachmentTotalMb,
         maintenanceTotalMb: initial.maintenanceTotalMb,
         closePhotoTotalMb: initial.closePhotoTotalMb,
-        capacityGib: initial.capacityGib,
         perClubGib: initial.perClubGib,
-        reserveGib: initial.reserveGib,
         evalYear: initial.evalYear,
         violItems: initial.violItems,
         budgetCats: initial.budgetCats,
@@ -218,51 +269,27 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
       </div>
 
       <div className="card" style={{ marginTop: 16, padding: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-          <div style={sectionTitle}>儲存空間</div>
-          <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 14 }}>
-            容量為邏輯值(含資料庫佔用):請先擴充實體磁碟,再調高此處容量
-          </div>
+        <div style={sectionTitle}>儲存空間</div>
+        <div style={{ fontSize: 12, color: 'var(--steel)', marginBottom: 12 }}>
+          系統總容量以後端可取得的實際磁碟空間為準(容量不足告警另行處理);此處僅設單一社團配額。
         </div>
-        <div className="form-grid-2" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-          <Form.Item name="capacityGib" label="系統可用容量(GiB)" style={{ marginBottom: 0 }}>
-            <InputNumber min={1} max={4096} precision={0} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item
-            name="perClubGib"
-            label="單一社團配額(GiB)"
-            style={{ marginBottom: 0 }}
-            dependencies={['capacityGib']}
-            rules={[
-              ({ getFieldValue }) => ({
-                validator: (_, v?: number) =>
-                  v != null && v > getFieldValue('capacityGib')
-                    ? Promise.reject(new Error('不得超過系統可用容量'))
-                    : Promise.resolve(),
-              }),
-            ]}
-          >
-            <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="reserveGib" label="磁碟保留空間(GiB)" style={{ marginBottom: 0 }}>
-            <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
-          </Form.Item>
-        </div>
+        <Form.Item name="perClubGib" label="單一社團配額(GiB)" style={{ marginBottom: 0, maxWidth: 280 }}>
+          <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
+        </Form.Item>
       </div>
 
-      <div className="form-grid-2" style={{ marginTop: 16, alignItems: 'stretch' }}>
-        <div className="card" style={{ padding: 24 }}>
-          <div style={sectionTitle}>違規項目目錄</div>
-          <Form.Item name="violItems" rules={[nonEmptyList]} style={{ marginBottom: 0 }}>
-            <TagListInput />
-          </Form.Item>
-        </div>
-        <div className="card" style={{ padding: 24 }}>
-          <div style={sectionTitle}>經費科目</div>
-          <Form.Item name="budgetCats" rules={[nonEmptyList]} style={{ marginBottom: 0 }}>
-            <TagListInput />
-          </Form.Item>
-        </div>
+      <div className="card" style={{ marginTop: 16, padding: 24 }}>
+        <div style={sectionTitle}>違規項目目錄</div>
+        <Form.Item name="violItems" rules={[nonEmptyList]} style={{ marginBottom: 0 }}>
+          <TagListInput />
+        </Form.Item>
+      </div>
+
+      <div className="card" style={{ marginTop: 16, padding: 24 }}>
+        <div style={sectionTitle}>經費項目</div>
+        <Form.Item name="budgetCats" rules={[nonEmptyBudget]} style={{ marginBottom: 0 }}>
+          <BudgetCategoriesInput />
+        </Form.Item>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>

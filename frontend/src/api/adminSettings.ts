@@ -4,6 +4,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api } from './client'
+import type { BudgetCategory } from './clubConfig'
 
 const DATE_FMT = 'YYYY/MM/DD'
 
@@ -21,12 +22,10 @@ export interface SystemSettings {
   attachmentTotalMb: number // 活動申請附件加總上限(MB)
   maintenanceTotalMb: number // 空間報修佐證加總上限(MB,含影片)
   closePhotoTotalMb: number // 活動結案照片加總上限(MB)
-  capacityGib: number // 系統邏輯容量(GiB,含資料庫佔用;調高前先擴實體磁碟)
-  perClubGib: number // 單一社團配額(GiB)
-  reserveGib: number // filesystem 保留空間(GiB)
+  perClubGib: number // 單一社團配額(GiB);系統總量改用後端實際磁碟空間
   evalYear: number // 評鑑年度(民國年)
   violItems: string[]
-  budgetCats: string[]
+  budgetCats: BudgetCategory[] // 經費科目 {name, hint}
 }
 
 interface SettingsOut {
@@ -37,10 +36,10 @@ interface SettingsOut {
   activity_attachment_total_mb: number
   maintenance_total_mb: number
   close_photo_total_mb: number
-  storage_limits: { capacity_gib: number; per_club_gib: number; reserve_gib: number }
+  storage_limits: { per_club_gib: number }
   eval_window: { year: number; start: string; end: string }
   violation_items: string[]
-  budget_categories: string[]
+  budget_categories: BudgetCategory[]
 }
 
 const toSettings = (s: SettingsOut): SystemSettings => ({
@@ -60,9 +59,7 @@ const toSettings = (s: SettingsOut): SystemSettings => ({
   attachmentTotalMb: s.activity_attachment_total_mb,
   maintenanceTotalMb: s.maintenance_total_mb,
   closePhotoTotalMb: s.close_photo_total_mb,
-  capacityGib: s.storage_limits.capacity_gib,
   perClubGib: s.storage_limits.per_club_gib,
-  reserveGib: s.storage_limits.reserve_gib,
   evalYear: s.eval_window.year,
   violItems: s.violation_items,
   budgetCats: s.budget_categories,
@@ -108,11 +105,7 @@ export function useUpdateSettings() {
           activity_attachment_total_mb: v.attachmentTotalMb,
           maintenance_total_mb: v.maintenanceTotalMb,
           close_photo_total_mb: v.closePhotoTotalMb,
-          storage_limits: {
-            capacity_gib: v.capacityGib,
-            per_club_gib: v.perClubGib,
-            reserve_gib: v.reserveGib,
-          },
+          storage_limits: { per_club_gib: v.perClubGib },
           eval_window: { year: v.evalYear, ...evalWindowOf(v.evalYear) },
           violation_items: v.violItems,
           budget_categories: v.budgetCats,

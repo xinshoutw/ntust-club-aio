@@ -85,7 +85,7 @@ async def list_semesters(user: ClubUser, db: DbDep) -> ApiResponse[list[str]]:
     rows = await db.scalars(
         sa.select(sa.distinct(ClubMember.semester))
         .where(ClubMember.club_id == user.club_id)
-        .order_by(sa.distinct(ClubMember.semester).desc())
+        .order_by(ClubMember.semester.desc())
     )
     return ApiResponse(data=list(rows))
 

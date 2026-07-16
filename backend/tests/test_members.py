@@ -226,3 +226,19 @@ async def test_csv_import_upsert_and_errors(client, db):
     assert by_sid["B11109001"]["kind"] == "負責人"
     assert by_sid["B11109001"]["title"] is None
     assert by_sid["B11109003"]["title"] == "美宣"
+
+
+async def test_list_semesters_distinct_desc(client, db):
+    """學期下拉:去重、新到舊(曾因 ORDER BY DISTINCT 語法錯誤 500)。"""
+    club = await setup_club_session(client, db)
+    db.add_all(
+        [
+            ClubMember(club_id=club.id, name=f"社員{i}", student_id=f"B1110900{i}", kind="社員", semester=s)
+            for i, s in enumerate(["114-1", "114-2", "114-1", "113-2"])
+        ]
+    )
+    await db.commit()
+
+    resp = await client.get("/api/v1/club/members/semesters")
+    assert resp.status_code == 200
+    assert resp.json()["data"] == ["114-2", "114-1", "113-2"]

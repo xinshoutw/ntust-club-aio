@@ -1,39 +1,96 @@
 import { useState } from 'react'
-import dayjs from 'dayjs'
-import { App, Button, Checkbox, DatePicker, Form, Input, Select, Switch } from 'antd'
+import dayjs, { type Dayjs } from 'dayjs'
+import { App, Button, Checkbox, DatePicker, Form, Input, Select, Spin, Switch } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import AnnouncementModal from '../../components/ui/AnnouncementModal'
+import { Pager } from '../../components/ui/tableControls'
 import { confirmDialog } from '../../lib/confirm'
-import { ANNOUNCEMENTS, type Announcement } from '../activities/mock'
+import {
+  resolveClubId,
+  useAdminAnnouncements,
+  useAnnouncementMutations,
+  type AdminAnnouncement,
+  type AnnouncementTarget,
+} from '../../api/announcementsAdmin'
+import { useAdminClubs } from '../../api/adminClubs'
 import ClubCascader from './ClubCascader'
 import { CLUB_ATTRIBUTES } from './clubsMock'
 
+const PAGE_SIZE = 20
+
+interface FormValues {
+  title: string
+  content: string
+  target: AnnouncementTarget
+  attrs?: string[]
+  club?: string
+  takeover?: boolean
+  takeoverUntil?: Dayjs
+  notify?: boolean
+}
+
 export default function AnnouncementsPage() {
   const { message, modal } = App.useApp()
-  const [form] = Form.useForm()
+  const [form] = Form.useForm<FormValues>()
   const target = Form.useWatch('target', form) as string | undefined
   const takeover = Form.useWatch('takeover', form) as boolean | undefined
-  const notify = Form.useWatch('notify', form) as boolean | undefined
-  const [items, setItems] = useState<Announcement[]>(ANNOUNCEMENTS)
-  const [viewing, setViewing] = useState<Announcement | null>(null)
+  const [page, setPage] = useState(1)
+  const [viewing, setViewing] = useState<AdminAnnouncement | null>(null)
   const [viewOpen, setViewOpen] = useState(false)
   // 蓋板開關已撥到「開」但尚未選截止日:未選日期前蓋板不生效
   const [takeoverDraft, setTakeoverDraft] = useState(false)
 
+  const listQuery = useAdminAnnouncements({ page, pageSize: PAGE_SIZE })
+  const items = listQuery.data?.items ?? []
+  const total = listQuery.data?.total ?? 0
+  // 與 ClubCascader 同一份主檔快取:名稱 → id 對照用
+  const clubsQuery = useAdminClubs()
+  const { create, setTakeover, remove } = useAnnouncementMutations()
+
   // 詳情彈窗顯示列表中的最新版本(切換蓋板即時反映);已刪除者退回快照,供關閉動畫期間顯示
   const shown = viewing ? (items.find((i) => i.id === viewing.id) ?? viewing) : null
 
-  const view = (a: Announcement) => {
+  const view = (a: AdminAnnouncement) => {
     setViewing(a)
     setViewOpen(true)
     setTakeoverDraft(false)
   }
 
-  const setTakeoverUntil = (id: string, until?: string) => {
-    setItems((prev) => prev.map((x) => (x.id === id ? { ...x, takeoverUntil: until } : x)))
+  const setTakeoverUntil = (id: number, until?: string) => {
+    setTakeover.mutate(
+      { id, until: until ?? null },
+      { onError: (e) => message.error(e.message) },
+    )
   }
 
-  const confirmDelete = (a: Announcement, fromModal = false) =>
+  const onPublish = (values: FormValues) => {
+    const clubId = values.target === 'club' ? resolveClubId(clubsQuery.data, values.club) : undefined
+    if (values.target === 'club' && clubId == null) {
+      message.error('無法識別所選社團,請重新選擇')
+      return
+    }
+    create.mutate(
+      {
+        title: values.title,
+        content: values.content,
+        target: values.target,
+        attrs: values.attrs,
+        clubId,
+        takeoverUntil: values.takeover && values.takeoverUntil ? values.takeoverUntil.format('YYYY/MM/DD') : undefined,
+        notify: !!values.notify,
+      },
+      {
+        onSuccess: () => {
+          message.success(values.notify ? '公告已發布,並已寄送通知' : '公告已發布')
+          form.resetFields()
+          setPage(1)
+        },
+        onError: (e) => message.error(e.message),
+      },
+    )
+  }
+
+  const confirmDelete = (a: AdminAnnouncement, fromModal = false) =>
     confirmDialog(modal, {
       title: '刪除公告',
       content: `「${a.title}」刪除後將無法復原`,
@@ -41,9 +98,13 @@ export default function AnnouncementsPage() {
       okButtonProps: { danger: true },
       cancelText: '取消',
       onOk: () => {
-        setItems((prev) => prev.filter((x) => x.id !== a.id))
-        if (fromModal) setViewOpen(false)
-        message.success('公告已刪除')
+        remove.mutate(a.id, {
+          onSuccess: () => {
+            if (fromModal) setViewOpen(false)
+            message.success('公告已刪除')
+          },
+          onError: (e) => message.error(e.message),
+        })
       },
     })
 
@@ -52,16 +113,7 @@ export default function AnnouncementsPage() {
       <PageHeader title="發布系統公告" />
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
-        <Form
-          form={form}
-          layout="vertical"
-          requiredMark
-          initialValues={{ target: 'all' }}
-          onFinish={() => {
-            message.success(notify ? '公告已發布,並已寄送通知' : '公告已發布')
-            form.resetFields()
-          }}
-        >
+        <Form form={form} layout="vertical" requiredMark initialValues={{ target: 'all' }} onFinish={onPublish}>
           <Form.Item name="title" label="標題" rules={[{ required: true, message: '請輸入標題' }]}>
             <Input />
           </Form.Item>
@@ -112,67 +164,75 @@ export default function AnnouncementsPage() {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-            <Button type="primary" htmlType="submit">發布</Button>
+            <Button type="primary" htmlType="submit" loading={create.isPending}>發布</Button>
           </div>
         </Form>
       </div>
 
-      <div className="card" style={{ marginTop: 16 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>已發布公告</div>
-        {items.map((a) => (
-          <div
-            key={a.id}
-            className="click-tint"
-            role="button"
-            tabIndex={0}
-            onClick={() => view(a)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                view(a)
-              }
-            }}
-            style={{ padding: '14px 20px', borderTop: '1px solid var(--line)', cursor: 'pointer' }}
-          >
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-              <div style={{ fontSize: 14, fontWeight: 500, flex: 1 }}>{a.title}</div>
-              {a.takeoverUntil && (
-                <span className="num" style={{ fontSize: 12, color: '#8A5A00', background: '#FFF3D6', borderRadius: 4, padding: '1px 6px' }}>
-                  蓋板至 {a.takeoverUntil}
-                </span>
-              )}
-              <span style={{ fontSize: 12, color: 'var(--steel)', background: '#EEF0F3', borderRadius: 4, padding: '1px 6px' }}>{a.scope}</span>
-              <span className="num" style={{ fontSize: 12, color: 'var(--steel)' }}>{a.date}</span>
-              <button
-                type="button"
-                className="link-btn danger"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  confirmDelete(a)
+      <Spin spinning={listQuery.isPending}>
+        <div className="card" style={{ marginTop: 16 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>已發布公告</div>
+          {items.map((a) => (
+            <div
+              key={a.id}
+              className="click-tint"
+              role="button"
+              tabIndex={0}
+              onClick={() => view(a)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  view(a)
+                }
+              }}
+              style={{ padding: '14px 20px', borderTop: '1px solid var(--line)', cursor: 'pointer' }}
+            >
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                <div style={{ fontSize: 14, fontWeight: 500, flex: 1 }}>{a.title}</div>
+                {a.takeoverUntil && (
+                  <span className="num" style={{ fontSize: 12, color: '#8A5A00', background: '#FFF3D6', borderRadius: 4, padding: '1px 6px' }}>
+                    蓋板至 {a.takeoverUntil}
+                  </span>
+                )}
+                <span style={{ fontSize: 12, color: 'var(--steel)', background: '#EEF0F3', borderRadius: 4, padding: '1px 6px' }}>{a.scope}</span>
+                <span className="num" style={{ fontSize: 12, color: 'var(--steel)' }}>{a.date}</span>
+                <button
+                  type="button"
+                  className="link-btn danger"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    confirmDelete(a)
+                  }}
+                >
+                  刪除
+                </button>
+              </div>
+              <div
+                style={{
+                  fontSize: 13,
+                  color: 'var(--steel)',
+                  lineHeight: 1.7,
+                  marginTop: 4,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
                 }}
               >
-                刪除
-              </button>
+                {a.content}
+              </div>
             </div>
-            <div
-              style={{
-                fontSize: 13,
-                color: 'var(--steel)',
-                lineHeight: 1.7,
-                marginTop: 4,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {a.content}
+          ))}
+          {!listQuery.isPending && items.length === 0 && (
+            <div style={{ padding: '18px 20px 22px', fontSize: 13, color: 'var(--steel)', borderTop: '1px solid var(--line)' }}>
+              尚未發布任何公告
             </div>
-          </div>
-        ))}
-      </div>
+          )}
+        </div>
+      </Spin>
+      <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
 
       <AnnouncementModal
-        announcement={shown}
+        announcement={shown && { ...shown, id: String(shown.id) }}
         open={viewOpen}
         onClose={() => setViewOpen(false)}
         afterClose={() => setViewing(null)}
@@ -182,6 +242,7 @@ export default function AnnouncementsPage() {
               <span style={{ fontSize: 13, color: 'var(--steel)' }}>蓋板</span>
               <Switch
                 checked={!!shown.takeoverUntil || takeoverDraft}
+                loading={setTakeover.isPending}
                 onChange={(checked) => {
                   if (checked) {
                     // 開啟需先選截止日:未選日期前僅顯示日期欄,蓋板不生效

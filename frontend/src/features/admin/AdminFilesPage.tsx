@@ -1,84 +1,79 @@
 import { useState } from 'react'
-import { App, Select, Tooltip } from 'antd'
+import { App, Select, Spin, Tooltip } from 'antd'
 import { DeleteOutlined, DownloadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { confirmDialog } from '../../lib/confirm'
+import {
+  fileDownloadUrl,
+  useDeleteFile,
+  useFileUsage,
+  useLargeFiles,
+  useRepairFiles,
+  type ModuleKey,
+  type StoredFile,
+} from '../../api/adminFiles'
 
-// 儲存模組與分類色(已通過 dataviz 六項檢查:lightness/chroma/CVD/contrast,light surface)
-type ModuleKey = 'close' | 'eval' | 'apply' | 'apps' | 'repair'
-const MODULES: Record<ModuleKey, { label: string; color: string }> = {
-  close: { label: '活動結案', color: '#3D74BF' },
-  eval: { label: '評鑑資料', color: '#1F8A55' },
-  apply: { label: '活動申請附件', color: '#A9721B' },
-  apps: { label: '線上申請', color: '#7B5FA8' },
-  repair: { label: '空間報修', color: '#B04A33' },
+// 儲存模組分類色(已通過 dataviz 六項檢查:lightness/chroma/CVD/contrast,light surface)
+const MODULE_COLORS: Record<ModuleKey, string> = {
+  close: '#3D74BF',
+  eval: '#1F8A55',
+  apply: '#A9721B',
+  apps: '#7B5FA8',
+  repair: '#B04A33',
 }
-const OTHER_MODULES = (Object.keys(MODULES) as ModuleKey[]).filter(
-  (k): k is Exclude<ModuleKey, 'repair'> => k !== 'repair',
-)
+// 表單等文字內容存於 DB:整個資料庫算一類納入佔用空間(後端以 pg_database_size 估)
+const DB_TEXT = { label: '文字內容', color: '#4E7D8C' }
 
-// 表單等文字內容存於 DB:整個資料庫算一類納入佔用空間(接後端後以 pg_database_size 取得)
-const DB_TEXT = { label: '文字內容', color: '#4E7D8C', sizeMb: 1.4 * 1024 }
-
-// mock 彙總(接後端後由 API 取):MB;報修不在此列——報修檔案全數列於頁面,彙總由檔案清單即時推導
+// 磁碟容量上限(部署主機規格,非後端資料;調整部署時同步改這裡)
 const CAPACITY_MB = 50 * 1024
-const BASE_USAGE: Record<Exclude<ModuleKey, 'repair'>, { sizeMb: number; count: number }> = {
-  close: { sizeMb: 6.2 * 1024, count: 1482 },
-  eval: { sizeMb: 3.1 * 1024, count: 356 },
-  apply: { sizeMb: 2.4 * 1024, count: 512 },
-  apps: { sizeMb: 1.9 * 1024, count: 803 },
-}
-
-interface StoredFile {
-  id: string
-  name: string
-  module: ModuleKey
-  club: string
-  sizeMb: number
-  date: string
-  archived?: boolean // 已歸檔=行政已備份,可自系統清理
-}
-
-// 非報修模組取單檔最大的前幾筆;報修檔案全數列出(檔案大、迭代快,清理空間的主要對象)
-const INITIAL_FILES: StoredFile[] = [
-  { id: 'f1', name: 'S304 天花板漏水_現場影片.mp4', module: 'repair', club: '資工系學會', sizeMb: 186, date: '2026/06/16' },
-  { id: 'f2', name: '練團室 隔音棉脫落_影片.mp4', module: 'repair', club: '熱音社', sizeMb: 142, date: '2026/05/28', archived: true },
-  { id: 'f3', name: 'S207 窗戶卡死_影片.mov', module: 'repair', club: '美術社', sizeMb: 121, date: '2026/06/18' },
-  { id: 'f4', name: '校際程式競賽_成果照片.zip', module: 'close', club: '資工系學會', sizeMb: 96, date: '2026/05/23' },
-  { id: 'f5', name: '一宿 B2 燈具閃爍_影片.mp4', module: 'repair', club: '登山社', sizeMb: 88, date: '2026/04/30', archived: true },
-  { id: 'f6', name: '迎新宿營_活動照片.zip', module: 'close', club: '資工系學會', sizeMb: 74, date: '2026/06/30' },
-  { id: 'f7', name: '最佳社團獎_營運資料.pdf', module: 'eval', club: '電機系學會', sizeMb: 48, date: '2026/06/12' },
-  { id: 'f8', name: '資訊週_企劃書.pdf', module: 'apply', club: '資工系學會', sizeMb: 32, date: '2026/07/05' },
-  { id: 'f9', name: '社團博覽會_場地配置圖.pdf', module: 'apply', club: '學生會', sizeMb: 27, date: '2026/06/02' },
-  { id: 'f10', name: '財務管理辦法_佐證.pdf', module: 'eval', club: '資工系學會', sizeMb: 21, date: '2026/06/02' },
-  { id: 'f11', name: '新生迎新茶會_成果照片.zip', module: 'close', club: '資工系學會', sizeMb: 19, date: '2026/03/09', archived: true },
-  { id: 'f13', name: '社辦 冷氣滴水_照片.jpg', module: 'repair', club: '棋藝社', sizeMb: 6, date: '2026/07/08' },
-  { id: 'f12', name: '郵局帳戶異動_存簿影本.pdf', module: 'apps', club: '資工系學會', sizeMb: 4, date: '2026/06/12' },
-  { id: 'f14', name: '器材室 門鎖故障_照片.jpg', module: 'repair', club: '熱舞社', sizeMb: 3, date: '2026/07/12' },
-]
 
 const fmtSize = (mb: number): string => (mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`)
 const pct = (n: number, d: number): string => `${Math.round((n / d) * 100)}%`
 
+function DownloadButton({ file, message }: { file: StoredFile; message: ReturnType<typeof App.useApp>['message'] }) {
+  if (file.archived) {
+    return (
+      <Tooltip title="已歸檔:檔案已由行政備份後離線保存">
+        <span style={{ color: 'var(--muted)', padding: '0 7px' }}>
+          <DownloadOutlined />
+        </span>
+      </Tooltip>
+    )
+  }
+  return (
+    <button
+      type="button"
+      className="link-btn"
+      aria-label={`下載 ${file.name}`}
+      onClick={() => {
+        window.open(fileDownloadUrl(file.id), '_blank')
+        message.success(`已開始下載「${file.name}」`)
+      }}
+    >
+      <DownloadOutlined />
+    </button>
+  )
+}
+
 export default function AdminFilesPage() {
   const { message, modal } = App.useApp()
-  const [files, setFiles] = useState(INITIAL_FILES)
   const [moduleFilter, setModuleFilter] = useState<Exclude<ModuleKey, 'repair'> | 'all'>('all')
 
-  const repairFiles = files.filter((f) => f.module === 'repair')
-  // 報修彙總由檔案清單推導(全數列於頁面),刪檔即時反映於比例條;其餘模組為 mock 彙總
-  const usage: Record<ModuleKey, { sizeMb: number; count: number }> = {
-    ...BASE_USAGE,
-    repair: { sizeMb: repairFiles.reduce((s, f) => s + f.sizeMb, 0), count: repairFiles.length },
-  }
+  const usageQuery = useFileUsage()
+  const repairQuery = useRepairFiles()
+  const largeQuery = useLargeFiles(moduleFilter)
+  const deleteFile = useDeleteFile()
 
-  const usedMb = Object.values(usage).reduce((s, u) => s + u.sizeMb, 0) + DB_TEXT.sizeMb
-  const totalCount = Object.values(usage).reduce((s, u) => s + u.count, 0)
-  // 大型檔案不含報修(報修有專屬區)
-  const largeList = files.filter((f) => f.module !== 'repair' && (moduleFilter === 'all' || f.module === moduleFilter))
+  const usage = usageQuery.data
+  const repairFiles = repairQuery.data ?? []
+  const largeList = largeQuery.data ?? []
 
-  // 段落順序:有空間報修檔案時報修排第一(檔案大、迭代快);歸零則整段自比例條與圖例移除
-  const moduleOrder: ModuleKey[] = repairFiles.length > 0 ? ['repair', ...OTHER_MODULES] : OTHER_MODULES
+  // 模組順序由 API 決定(有報修檔案時 repair 排第一);報修歸零時整段自比例條與圖例移除
+  const modules = (usage?.modules ?? []).filter((m) => m.key !== 'repair' || m.count > 0)
+  const usedMb = usage?.totalMb ?? 0
+  const totalCount = (usage?.modules ?? []).reduce((s, m) => s + m.count, 0)
+  const repairUsage = usage?.modules.find((m) => m.key === 'repair')
+  const otherModules = (usage?.modules ?? []).filter((m) => m.key !== 'repair')
 
   // 報修檔案可直接刪除(影音佔用大、迭代快);其餘模組依歸檔政策由系統管理
   const askDelete = (f: StoredFile) => {
@@ -89,8 +84,10 @@ export default function AdminFilesPage() {
       okButtonProps: { danger: true },
       cancelText: '取消',
       onOk: () => {
-        setFiles((fs) => fs.filter((x) => x.id !== f.id))
-        message.success(`已刪除「${f.name}」(${fmtSize(f.sizeMb)})`)
+        deleteFile.mutate(f.id, {
+          onSuccess: () => message.success(`已刪除「${f.name}」(${fmtSize(f.sizeMb)})`),
+          onError: (e) => message.error(e.message),
+        })
       },
     })
   }
@@ -107,85 +104,94 @@ export default function AdminFilesPage() {
       />
 
       {/* 空間利用:數字 + 依模組分段的比例條(hover 顯示明細) */}
-      <div className="card" style={{ marginTop: 20, padding: '20px 24px' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 24, flexWrap: 'wrap' }}>
-          <div>
-            <div style={{ fontSize: 12, color: 'var(--steel)' }}>已用空間</div>
-            <div style={{ lineHeight: 1.15, marginTop: 2 }}>
-              <span className="num" style={{ fontSize: 30, fontWeight: 600 }}>{fmtSize(usedMb)}</span>
-              <span className="num" style={{ fontSize: 14, color: 'var(--steel)' }}> / {fmtSize(CAPACITY_MB)}({pct(usedMb, CAPACITY_MB)})</span>
+      <Spin spinning={usageQuery.isPending}>
+        <div className="card" style={{ marginTop: 20, padding: '20px 24px' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 24, flexWrap: 'wrap' }}>
+            <div>
+              <div style={{ fontSize: 12, color: 'var(--steel)' }}>已用空間</div>
+              <div style={{ lineHeight: 1.15, marginTop: 2 }}>
+                <span className="num" style={{ fontSize: 30, fontWeight: 600 }}>{fmtSize(usedMb)}</span>
+                <span className="num" style={{ fontSize: 14, color: 'var(--steel)' }}> / {fmtSize(CAPACITY_MB)}({pct(usedMb, CAPACITY_MB)})</span>
+              </div>
+            </div>
+            <div style={{ flex: 1 }} />
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: 12, color: 'var(--steel)' }}>可用空間</div>
+              <div className="num" style={{ fontSize: 18, fontWeight: 600, marginTop: 2 }}>{fmtSize(CAPACITY_MB - usedMb)}</div>
             </div>
           </div>
-          <div style={{ flex: 1 }} />
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 12, color: 'var(--steel)' }}>可用空間</div>
-            <div className="num" style={{ fontSize: 18, fontWeight: 600, marginTop: 2 }}>{fmtSize(CAPACITY_MB - usedMb)}</div>
+
+          <div style={{ display: 'flex', gap: 2, marginTop: 16, height: 20, borderRadius: 4, overflow: 'hidden' }}>
+            {modules
+              .filter((m) => m.sizeMb > 0)
+              .map((m) => (
+                <Tooltip
+                  key={m.key}
+                  title={
+                    <span style={{ fontSize: 13 }}>
+                      {m.label} · {fmtSize(m.sizeMb)}({pct(m.sizeMb, CAPACITY_MB)})· {m.count.toLocaleString()} 個檔案
+                    </span>
+                  }
+                >
+                  <div
+                    role="img"
+                    aria-label={`${m.label} ${fmtSize(m.sizeMb)}`}
+                    style={{ width: `${(m.sizeMb / CAPACITY_MB) * 100}%`, background: MODULE_COLORS[m.key], minWidth: 6 }}
+                  />
+                </Tooltip>
+              ))}
+            {usage && (
+              <Tooltip
+                title={
+                  <span style={{ fontSize: 13 }}>
+                    {DB_TEXT.label}(表單等資料庫內容)· {fmtSize(usage.dbSizeMb)}({pct(usage.dbSizeMb, CAPACITY_MB)})
+                  </span>
+                }
+              >
+                <div
+                  role="img"
+                  aria-label={`${DB_TEXT.label} ${fmtSize(usage.dbSizeMb)}`}
+                  style={{ width: `${(usage.dbSizeMb / CAPACITY_MB) * 100}%`, background: DB_TEXT.color, minWidth: 6 }}
+                />
+              </Tooltip>
+            )}
+            <div role="img" aria-label={`可用 ${fmtSize(CAPACITY_MB - usedMb)}`} style={{ flex: 1, background: '#EEF0F3' }} />
+          </div>
+
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 12 }}>
+            {modules.map((m) => (
+              <span key={m.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--steel)' }}>
+                <span style={{ width: 10, height: 10, borderRadius: 3, background: MODULE_COLORS[m.key] }} />
+                {m.label}
+                <span className="num">{fmtSize(m.sizeMb)}</span>
+              </span>
+            ))}
+            {usage && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--steel)' }}>
+                <span style={{ width: 10, height: 10, borderRadius: 3, background: DB_TEXT.color }} />
+                {DB_TEXT.label}
+                <span className="num">{fmtSize(usage.dbSizeMb)}</span>
+              </span>
+            )}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--steel)' }}>
+              <span style={{ width: 10, height: 10, borderRadius: 3, background: '#EEF0F3', border: '1px solid rgba(31,36,48,.12)' }} />
+              可用
+            </span>
           </div>
         </div>
-
-        <div style={{ display: 'flex', gap: 2, marginTop: 16, height: 20, borderRadius: 4, overflow: 'hidden' }}>
-          {moduleOrder.map((k) => (
-            <Tooltip
-              key={k}
-              title={
-                <span style={{ fontSize: 13 }}>
-                  {MODULES[k].label} · {fmtSize(usage[k].sizeMb)}({pct(usage[k].sizeMb, CAPACITY_MB)})· {usage[k].count.toLocaleString()} 個檔案
-                </span>
-              }
-            >
-              <div
-                role="img"
-                aria-label={`${MODULES[k].label} ${fmtSize(usage[k].sizeMb)}`}
-                style={{ width: `${(usage[k].sizeMb / CAPACITY_MB) * 100}%`, background: MODULES[k].color, minWidth: 6 }}
-              />
-            </Tooltip>
-          ))}
-          <Tooltip
-            title={
-              <span style={{ fontSize: 13 }}>
-                {DB_TEXT.label}(表單等資料庫內容)· {fmtSize(DB_TEXT.sizeMb)}({pct(DB_TEXT.sizeMb, CAPACITY_MB)})
-              </span>
-            }
-          >
-            <div
-              role="img"
-              aria-label={`${DB_TEXT.label} ${fmtSize(DB_TEXT.sizeMb)}`}
-              style={{ width: `${(DB_TEXT.sizeMb / CAPACITY_MB) * 100}%`, background: DB_TEXT.color, minWidth: 6 }}
-            />
-          </Tooltip>
-          <div role="img" aria-label={`可用 ${fmtSize(CAPACITY_MB - usedMb)}`} style={{ flex: 1, background: '#EEF0F3' }} />
-        </div>
-
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 12 }}>
-          {moduleOrder.map((k) => (
-            <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--steel)' }}>
-              <span style={{ width: 10, height: 10, borderRadius: 3, background: MODULES[k].color }} />
-              {MODULES[k].label}
-              <span className="num">{fmtSize(usage[k].sizeMb)}</span>
-            </span>
-          ))}
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--steel)' }}>
-            <span style={{ width: 10, height: 10, borderRadius: 3, background: DB_TEXT.color }} />
-            {DB_TEXT.label}
-            <span className="num">{fmtSize(DB_TEXT.sizeMb)}</span>
-          </span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--steel)' }}>
-            <span style={{ width: 10, height: 10, borderRadius: 3, background: '#EEF0F3', border: '1px solid rgba(31,36,48,.12)' }} />
-            可用
-          </span>
-        </div>
-      </div>
+      </Spin>
 
       {/* 空間報修:檔案大且迭代最快,全數列出、可直接刪除;歸零時整個 section 消失 */}
       {repairFiles.length > 0 && (
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px 8px', flexWrap: 'wrap' }}>
-            <span style={{ width: 10, height: 10, borderRadius: 3, background: MODULES.repair.color }} />
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: MODULE_COLORS.repair }} />
             <div style={{ fontSize: 15, fontWeight: 600 }}>空間報修</div>
             <div style={{ fontSize: 12, color: 'var(--steel)' }}>檔案大、迭代快,可直接刪除釋放空間</div>
             <div style={{ flex: 1 }} />
             <span style={{ fontSize: 12, color: 'var(--steel)' }}>
-              共 <span className="num">{repairFiles.length}</span> 個 · <span className="num">{fmtSize(usage.repair.sizeMb)}</span>
+              共 <span className="num">{repairFiles.length}</span> 個 ·{' '}
+              <span className="num">{fmtSize(repairUsage?.sizeMb ?? repairFiles.reduce((s, f) => s + f.sizeMb, 0))}</span>
             </span>
           </div>
           <table className="tb" style={{ minWidth: 680 }}>
@@ -208,14 +214,7 @@ export default function AdminFilesPage() {
                   <td className="num" style={{ fontSize: 13 }}>{f.date}</td>
                   <td style={{ fontSize: 13, color: 'var(--steel)' }}>{f.archived ? '已歸檔' : '使用中'}</td>
                   <td className="r" style={{ whiteSpace: 'nowrap' }}>
-                    <button
-                      type="button"
-                      className="link-btn"
-                      aria-label={`下載 ${f.name}`}
-                      onClick={() => message.info(`下載「${f.name}」(接後端後啟用)`)}
-                    >
-                      <DownloadOutlined />
-                    </button>
+                    <DownloadButton file={f} message={message} />
                     <button
                       type="button"
                       className="link-btn danger"
@@ -244,62 +243,57 @@ export default function AdminFilesPage() {
             style={{ minWidth: 140 }}
             options={[
               { value: 'all', label: '全部模組' },
-              ...OTHER_MODULES.map((k) => ({ value: k, label: MODULES[k].label })),
+              ...otherModules.map((m) => ({ value: m.key as Exclude<ModuleKey, 'repair'>, label: m.label })),
             ]}
           />
         </div>
-        <table className="tb" style={{ minWidth: 760 }}>
-          <thead>
-            <tr>
-              <th>檔名</th>
-              <th>模組</th>
-              <th>社團</th>
-              <th className="r">大小</th>
-              <th>上傳日期</th>
-              <th>狀態</th>
-              <th className="r">動作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {largeList.map((f) => (
-              <tr key={f.id}>
-                <td style={{ fontWeight: 500 }}>{f.name}</td>
-                <td>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-                    <span style={{ width: 9, height: 9, borderRadius: 3, background: MODULES[f.module].color }} />
-                    {MODULES[f.module].label}
-                  </span>
-                </td>
-                <td style={{ fontSize: 13, color: 'var(--steel)' }}>{f.club}</td>
-                <td className="r num" style={{ fontSize: 13 }}>{fmtSize(f.sizeMb)}</td>
-                <td className="num" style={{ fontSize: 13 }}>{f.date}</td>
-                <td style={{ fontSize: 13, color: 'var(--steel)' }}>{f.archived ? '已歸檔' : '使用中'}</td>
-                <td className="r" style={{ whiteSpace: 'nowrap' }}>
-                  <button
-                    type="button"
-                    className="link-btn"
-                    aria-label={`下載 ${f.name}`}
-                    onClick={() => message.info(`下載「${f.name}」(接後端後啟用)`)}
-                  >
-                    <DownloadOutlined />
-                  </button>
-                  <Tooltip title="競賽採計與流程檔案依歸檔政策由系統管理">
-                    <span style={{ color: 'var(--muted)', padding: '0 7px' }}>
-                      <DeleteOutlined />
+        <Spin spinning={largeQuery.isPending}>
+          <table className="tb" style={{ minWidth: 760 }}>
+            <thead>
+              <tr>
+                <th>檔名</th>
+                <th>模組</th>
+                <th>社團</th>
+                <th className="r">大小</th>
+                <th>上傳日期</th>
+                <th>狀態</th>
+                <th className="r">動作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {largeList.map((f) => (
+                <tr key={f.id}>
+                  <td style={{ fontWeight: 500 }}>{f.name}</td>
+                  <td>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                      <span style={{ width: 9, height: 9, borderRadius: 3, background: MODULE_COLORS[f.module] }} />
+                      {usage?.modules.find((m) => m.key === f.module)?.label ?? f.module}
                     </span>
-                  </Tooltip>
-                </td>
-              </tr>
-            ))}
-            {largeList.length === 0 && (
-              <tr className="no-hover">
-                <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 24 }}>
-                  此模組尚無大型檔案
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+                  </td>
+                  <td style={{ fontSize: 13, color: 'var(--steel)' }}>{f.club}</td>
+                  <td className="r num" style={{ fontSize: 13 }}>{fmtSize(f.sizeMb)}</td>
+                  <td className="num" style={{ fontSize: 13 }}>{f.date}</td>
+                  <td style={{ fontSize: 13, color: 'var(--steel)' }}>{f.archived ? '已歸檔' : '使用中'}</td>
+                  <td className="r" style={{ whiteSpace: 'nowrap' }}>
+                    <DownloadButton file={f} message={message} />
+                    <Tooltip title="競賽採計與流程檔案依歸檔政策由系統管理">
+                      <span style={{ color: 'var(--muted)', padding: '0 7px' }}>
+                        <DeleteOutlined />
+                      </span>
+                    </Tooltip>
+                  </td>
+                </tr>
+              ))}
+              {!largeQuery.isPending && largeList.length === 0 && (
+                <tr className="no-hover">
+                  <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 24 }}>
+                    此模組尚無大型檔案
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </Spin>
       </div>
     </div>
   )

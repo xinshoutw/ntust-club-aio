@@ -304,6 +304,9 @@ export default function AdminSettingsPage() {
   return (
     <div>
       <PageHeader title="系統設定" />
+      {/* 器材主檔各列即時 PATCH(獨立於 system_settings);置於設定表單前,
+          讓表單的「儲存」按鈕留在整頁最底,不被下方卡片夾在中間 */}
+      <AdminEquipmentCard />
       {settingsQuery.isPending ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
           <Spin />
@@ -315,8 +318,6 @@ export default function AdminSettingsPage() {
           無法載入系統設定{settingsQuery.error ? `:${settingsQuery.error.message}` : ''}
         </div>
       )}
-      {/* 器材主檔(獨立於 system_settings,各列即時 PATCH) */}
-      <AdminEquipmentCard />
     </div>
   )
 }

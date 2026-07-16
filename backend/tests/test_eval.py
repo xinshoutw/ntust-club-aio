@@ -289,12 +289,12 @@ async def test_eval_upload_dedup_survives_concurrent_sessions(db):
     club = await make_club(db)
     user = await make_user(db, username="club01", club_id=club.id)
 
-    def file_row(i: int) -> File:
+    def file_row(i: int, subject_id: int = 1) -> File:
         return File(
             club_id=club.id,
             uploaded_by=user.id,
             subject_type="eval_upload",
-            subject_id=1,
+            subject_id=subject_id,  # rubric_item_id(逐年唯一)
             slot="o1",
             original_name=f"same{i}.png",
             size=10,
@@ -305,7 +305,8 @@ async def test_eval_upload_dedup_survives_concurrent_sessions(db):
 
     dup_query = sa.select(File.id).where(
         File.club_id == club.id,
-        File.slot == "o1",
+        File.subject_type == "eval_upload",
+        File.subject_id == 1,
         File.sha256 == "same-content-hash",
         File.archived_at.is_(None),
     )
@@ -321,12 +322,17 @@ async def test_eval_upload_dedup_survives_concurrent_sessions(db):
         with pytest.raises(IntegrityError):  # API 層由全域 handler 轉 409
             await s2.commit()
 
-    # partial index 僅涵蓋 eval_upload:其他模組同 club/slot/sha 不受限
+    # 逐年唯一:隔年同 item_key(不同 rubric_item_id=subject_id)同內容不受擋
     async with async_session_factory() as s3:
-        other = file_row(3)
-        other.subject_type = "maintenance"
-        s3.add(other)
+        s3.add(file_row(3, subject_id=2))
         await s3.commit()
+
+    # partial index 僅涵蓋 eval_upload:其他模組同 club/subject/sha 不受限
+    async with async_session_factory() as s4:
+        other = file_row(4)
+        other.subject_type = "maintenance"
+        s4.add(other)
+        await s4.commit()
 
 
 async def test_locked_award_files_cannot_be_deleted_via_other_award(client, db):

@@ -184,7 +184,7 @@ async def save_upload(
     subject_type: str | None = None,
     subject_id: int | None = None,
     slot: str | None = None,
-    reject_duplicate_in_club_slot: bool = False,
+    dedup: str | None = None,  # None=不去重、"slot"=同 slot 跨單據(照片)、"subject"=同單據(評鑑)
 ) -> File:
     """串流驗證並落盤;回傳已 add(未 commit)的 File 列,隨呼叫端交易一起提交。"""
     ext = _extension(upload.filename or "")
@@ -270,11 +270,17 @@ async def save_upload(
             raise _insufficient(_SYSTEM_FULL)
 
         sha256 = hasher.hexdigest()
-        if reject_duplicate_in_club_slot:
+        if dedup is not None:
+            # slot=同 slot 跨單據(結案照片跨活動);subject=同一單據內(評鑑逐 rubric item)
+            scope = (
+                File.slot == slot
+                if dedup == "slot"
+                else sa.and_(File.subject_type == subject_type, File.subject_id == subject_id)
+            )
             dup = await db.scalar(
                 sa.select(File.id).where(
                     File.club_id == club_id,
-                    File.slot == slot,
+                    scope,
                     File.sha256 == sha256,
                     File.archived_at.is_(None),
                 )

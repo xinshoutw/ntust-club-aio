@@ -256,7 +256,7 @@ async def upload_photo(
         subject_type=svc.PHOTO_SUBJECT,
         subject_id=activity.id,
         slot=svc.PHOTO_SLOT,
-        reject_duplicate_in_club_slot=True,  # SHA-256 跨活動拒重複
+        dedup="slot",  # SHA-256 跨活動拒重複(同 slot=report_photo)
     )
     await db.commit()
     return ApiResponse(data=FileOut.model_validate(row))

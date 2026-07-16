@@ -22,12 +22,13 @@ class File(Base, TimestampMixin):
             unique=True,
             postgresql_where=sa.text("archived_at IS NULL AND slot = 'report_photo'"),
         ),
-        # 評鑑上傳同槽位去重的 DB 層收口:save_upload 的先查後寫在兩個
-        # session 併發時會一起通過,唯一索引攔下第二筆(slot=rubric item_key)
+        # 評鑑上傳去重的 DB 層收口:併發先查後寫由此攔下第二筆。
+        # 以 subject_id(rubric_item_id,逐年唯一)為範圍——不可用 slot=item_key,
+        # item_key 跨年度重複,會誤擋隔年同內容的合法上傳
         sa.Index(
-            "uq_files_club_eval_slot_sha",
+            "uq_files_club_eval_subject_sha",
             "club_id",
-            "slot",
+            "subject_id",
             "sha256",
             unique=True,
             postgresql_where=sa.text("archived_at IS NULL AND subject_type = 'eval_upload'"),

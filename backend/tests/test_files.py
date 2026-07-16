@@ -105,7 +105,7 @@ async def test_duplicate_photo_rejected_within_club(db):
             uploaded_by=user.id,
             club_id=club_id,
             slot="report_photo",
-            reject_duplicate_in_club_slot=True,
+            dedup="slot",
         )
 
     await upload(club_a.id, "photo1.jpg")

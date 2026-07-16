@@ -179,8 +179,9 @@ async def upload_eval_file(
         subject_type="eval_upload",
         subject_id=item.id,
         slot=item.item_key,
-        # 同槽位內容去重(SHA-256):前端 session 內已擋,跨 session 由此攔下
-        reject_duplicate_in_club_slot=True,
+        # 同 rubric item 內容去重(SHA-256):前端 session 內已擋,跨 session 由此攔下;
+        # 以 subject_id(逐年唯一)為範圍,不跨年度誤擋
+        dedup="subject",
     )
     upload = EvalUpload(
         year=window.year, club_id=user.club_id, rubric_item_id=item.id, file_id=saved.id

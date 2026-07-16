@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { App, Button, Checkbox, DatePicker, Input, InputNumber, Select, Tag } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { HolderOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { FIELD_TYPE_LABEL, type FieldType, type SignupKind } from '../signup/types'
 import KindBadge from '../signup/KindBadge'
+import { useSignupItemMutations } from '../../api/adminSignups'
 import './builder.css'
 
 interface BuilderField {
@@ -21,22 +23,20 @@ const requiredMark = <span style={{ color: '#C13B34' }}> *</span>
 
 export default function SignupBuilderPage() {
   const { message } = App.useApp()
-  const [name, setName] = useState('社團幹訓')
+  const navigate = useNavigate()
+  const { create } = useSignupItemMutations()
+  const [name, setName] = useState('')
   // 評鑑對幹訓/負責人會議有特別採計,建立時即標記類型
   const [kind, setKind] = useState<SignupKind>('normal')
-  const [cap, setCap] = useState<number | null>(5)
-  const [eventTime, setEventTime] = useState<Dayjs | null>(dayjs('2026/09/20 09:00', 'YYYY/MM/DD HH:mm'))
+  const [cap, setCap] = useState<number | null>(null)
+  const [place, setPlace] = useState('')
+  const [eventTime, setEventTime] = useState<Dayjs | null>(null)
   const [signupStart, setSignupStart] = useState<Dayjs | null>(dayjs()) // 報名開始預設今天
   const [signupEnd, setSignupEnd] = useState<Dayjs | null>(null)
   const [needsReview, setNeedsReview] = useState(false) // 審核制:報名送出後須管理員核准
-  const [description, setDescription] = useState('說明描述')
-  const [fields, setFields] = useState<BuilderField[]>([
-    { key: 1, label: '聯絡電話', type: 'text', required: true, options: [] },
-    { key: 2, label: '膳食需求', type: 'select', required: true, options: ['葷', '素'] },
-    { key: 3, label: '是否攜帶筆電', type: 'radio', required: false, options: ['是', '否'] },
-    { key: 4, label: '備註', type: 'textarea', required: false, options: [] },
-  ])
-  const [nextKey, setNextKey] = useState(5)
+  const [description, setDescription] = useState('')
+  const [fields, setFields] = useState<BuilderField[]>([])
+  const [nextKey, setNextKey] = useState(1)
 
   // 拖曳排序:pointer 事件自製(HTML5 DnD 到 drop 才換位、ghost 突兀且不支援觸控);
   // 按住把手即開始,掃過其他列的中線就即時重排,放開結束
@@ -124,13 +124,41 @@ export default function SignupBuilderPage() {
     if (missing.length === 0 && signupStart && signupEnd && !signupEnd.isAfter(signupStart)) {
       missing.push(['signupEnd', '報名截止須晚於報名開始'])
     }
-    if (missing.length) {
+    if (missing.length || !eventTime || !signupStart || !signupEnd || cap == null) {
       setErrs(new Set(missing.map(([k]) => k)))
-      message.error(missing[0][1])
+      if (missing.length) message.error(missing[0][1])
+      return
+    }
+    // 自訂欄位:未命名者不送出(與預覽一致);選項型欄位至少需一個選項(後端同樣驗證)
+    const named = fields.filter((f) => f.label.trim())
+    const noOptions = named.find((f) => OPTION_TYPES.includes(f.type) && f.options.length === 0)
+    if (noOptions) {
+      message.error(`「${noOptions.label.trim()}」為選項型欄位,請至少新增一個選項`)
       return
     }
     setErrs(new Set())
-    message.success('已發布')
+    create.mutate(
+      {
+        name: name.trim(),
+        kind,
+        place: place.trim() || undefined,
+        description: description.trim(),
+        eventAt: eventTime.format('YYYY/MM/DD HH:mm'),
+        signupStart: signupStart.format('YYYY/MM/DD HH:mm'),
+        signupEnd: signupEnd.format('YYYY/MM/DD HH:mm'),
+        maxParticipants: cap,
+        requiresConfirmation: needsReview,
+        // 陣列順序=顯示順序(拖曳排序後整包送)
+        fields: named.map((f) => ({ label: f.label.trim(), type: f.type, required: f.required, options: f.options })),
+      },
+      {
+        onSuccess: () => {
+          message.success('已發布')
+          navigate('/admin/signups')
+        },
+        onError: (e) => message.error(e.message),
+      },
+    )
   }
 
   return (
@@ -138,10 +166,7 @@ export default function SignupBuilderPage() {
       <PageHeader
         title="活動建立"
         extra={
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Button onClick={() => message.success('已儲存草稿')}>儲存草稿</Button>
-            <Button type="primary" onClick={publish}>發布</Button>
-          </div>
+          <Button type="primary" loading={create.isPending} onClick={publish}>發布</Button>
         }
       />
 
@@ -176,7 +201,7 @@ export default function SignupBuilderPage() {
               </label>
               <label>
                 <div style={fieldLabel}>地點</div>
-                <Input defaultValue="國際大樓 IB-101" />
+                <Input value={place} onChange={(e) => setPlace(e.target.value)} placeholder="例:國際大樓 IB-101" />
               </label>
               <label>
                 <div style={fieldLabel}>活動時間{requiredMark}</div>

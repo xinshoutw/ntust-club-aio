@@ -1,80 +1,24 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { App, Button, Checkbox, InputNumber, Modal, Tooltip } from 'antd'
+import { App, Button, Checkbox, InputNumber, Modal, Spin, Tooltip } from 'antd'
 import { DownloadOutlined, RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { downloadCsv } from '../../lib/csv'
 import KindBadge from '../signup/KindBadge'
-import { SIGNUP_ITEMS } from '../signup/mock'
-import type { SignupItem } from '../signup/types'
+import {
+  useAdminSignupItems,
+  useRegistrations,
+  useSignupItemMutations,
+  type AdminSignupItem,
+  type Registration,
+} from '../../api/adminSignups'
 
 // 簽到:活動結束後由管理員登錄,評鑑僅採計簽到(僅報名不計分)
 // 負責人會議為場次制(每學期 2 場、全學年 4 場),登錄已出席場次數
-interface Participant {
-  name: string
-  studentId: string
-  dept: string
-  answers: Record<string, string> // key=自訂欄位 key
-}
-
-interface Registration {
-  club: string
-  participants: Participant[]
-  confirmed: boolean
-  attended?: boolean
-  attendedSessions?: number
-}
-
-const REGISTRATIONS: Record<string, Registration[]> = {
-  'cadre-training': [
-    {
-      club: '資工系學會',
-      confirmed: true,
-      participants: [
-        { name: '陳予恩', studentId: 'B11209001', dept: '資工三', answers: { phone: '0912-345-678', meal: '葷', laptop: '是' } },
-        { name: '林詠晴', studentId: 'B11305012', dept: '企管二', answers: { phone: '0987-654-321', meal: '素', laptop: '否', note: '需素食便當' } },
-      ],
-    },
-    {
-      club: '電機系學會',
-      confirmed: false,
-      participants: [
-        { name: '張書豪', studentId: 'B11207033', dept: '電機三', answers: { phone: '0911-222-333', meal: '葷', laptop: '是' } },
-        { name: '黃郁婷', studentId: 'B11307021', dept: '電機二', answers: { phone: '0922-333-444', meal: '葷', laptop: '否' } },
-        { name: '劉冠廷', studentId: 'B11207045', dept: '電機三', answers: { phone: '0933-444-555', meal: '素', laptop: '是' } },
-      ],
-    },
-  ],
-  'leader-meeting': [
-    {
-      club: '電機系學會',
-      confirmed: true,
-      attendedSessions: 2,
-      participants: [{ name: '張書豪', studentId: 'B11207033', dept: '電機三', answers: { phone: '0911-222-333' } }],
-    },
-  ],
-  evaluation: [
-    {
-      club: '電機系學會',
-      confirmed: true,
-      participants: [{ name: '張書豪', studentId: 'B11207033', dept: '電機三', answers: {} }],
-    },
-  ],
-  'cadre-camp': [
-    {
-      club: '資工系學會',
-      confirmed: true,
-      attended: true,
-      participants: [
-        { name: '陳予恩', studentId: 'B11209001', dept: '資工三', answers: {} },
-        { name: '張佑群', studentId: 'B11209033', dept: '資工三', answers: {} },
-      ],
-    },
-  ],
-}
-
 const LEADER_SESSIONS_TOTAL = 4
+
+const answerText = (v: unknown): string => (Array.isArray(v) ? v.join('、') : v == null ? '' : String(v))
 
 // 單一報名活動的管理彈窗:名單、報名確認、簽到登錄、匯出
 function ManageModal({
@@ -83,14 +27,16 @@ function ManageModal({
   onClose,
   afterClose,
 }: {
-  item: SignupItem
+  item: AdminSignupItem
   open: boolean
   onClose: () => void
   afterClose: () => void
 }) {
   const { message } = App.useApp()
-  const regs = REGISTRATIONS[item.id] ?? []
-  const totalPeople = regs.reduce((s, r) => s + r.participants.length, 0)
+  const regsQuery = useRegistrations(item.id)
+  const regs = regsQuery.data ?? []
+  const totalPeople = regs.reduce((s, r) => s + r.count, 0)
+  const { confirm, markAttendance } = useSignupItemMutations()
 
   // 逐人匯出:固定欄位+該活動全部自訂欄位(依欄位順序)
   const exportCsv = () => {
@@ -103,15 +49,35 @@ function ManageModal({
       ...regs.flatMap((r) =>
         r.participants.map((p) => [
           r.club,
-          p.name,
-          p.studentId,
-          p.dept,
-          ...item.fields.map((f) => p.answers[f.key] ?? ''),
+          answerText(p.name),
+          answerText(p.studentId),
+          answerText(p.dept),
+          ...item.fields.map((f) => answerText(p[f.key])),
           r.confirmed ? '已確認' : '待確認',
         ]),
       ),
     ])
     message.success(`已匯出 ${totalPeople} 名參加人`)
+  }
+
+  const onConfirm = (r: Registration) => {
+    confirm.mutate(
+      { itemId: item.id, clubId: r.clubId },
+      {
+        onSuccess: () => message.success(`已確認 ${r.club} 報名`),
+        onError: (e) => message.error(e.message),
+      },
+    )
+  }
+
+  const onMark = (r: Registration, attended: boolean) => {
+    markAttendance.mutate(
+      { itemId: item.id, clubId: r.clubId, attended },
+      {
+        onSuccess: () => message.success(`${r.club} ${attended ? '已簽到' : '取消簽到'}`),
+        onError: (e) => message.error(e.message),
+      },
+    )
   }
 
   return (
@@ -145,83 +111,91 @@ function ManageModal({
         </Button>
       </div>
 
-      <div style={{ marginTop: 12, border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden' }}>
-        {regs.map((r) => (
-          <div key={r.club} style={{ padding: '10px 14px', borderTop: '1px solid var(--line)', marginTop: -1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <div style={{ fontSize: 14, flex: 1, minWidth: 140 }}>{r.club}</div>
-            <div className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>{r.participants.length} 人</div>
-            {/* 簽到:評鑑僅採計簽到;負責人會議登錄出席場次 */}
-            {item.kind === 'leader_meeting' ? (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--steel)' }}>
-                簽到
-                <InputNumber
-                  size="small"
-                  min={0}
-                  max={LEADER_SESSIONS_TOTAL}
-                  precision={0}
-                  defaultValue={r.attendedSessions ?? 0}
-                  style={{ width: 56 }}
-                  aria-label={`${r.club} 簽到場次`}
-                  onChange={(v) => message.success(`已登錄 ${r.club} 簽到 ${v ?? 0} 場`)}
-                />
-                / {LEADER_SESSIONS_TOTAL} 場
-              </span>
-            ) : item.status === 'ended' ? (
-              <Checkbox
-                defaultChecked={r.attended}
-                onChange={(e) => message.success(`${r.club} ${e.target.checked ? '已簽到' : '取消簽到'}`)}
-              >
-                簽到
-              </Checkbox>
-            ) : (
-              <Tooltip title="活動結束後開放登錄簽到">
-                <Checkbox disabled>簽到</Checkbox>
-              </Tooltip>
-            )}
-            {r.confirmed ? (
-              <StatusPill status="approved" />
-            ) : (
-              <Button size="small" style={{ height: 28 }} onClick={() => message.success(`已確認 ${r.club} 報名`)}>
-                確認報名
-              </Button>
-            )}
+      <Spin spinning={regsQuery.isPending}>
+        <div style={{ marginTop: 12, border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden' }}>
+          {regs.map((r) => (
+            <div key={r.clubId} style={{ padding: '10px 14px', borderTop: '1px solid var(--line)', marginTop: -1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: 14, flex: 1, minWidth: 140 }}>{r.club}</div>
+                <div className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>{r.count} 人</div>
+                {/* 簽到:評鑑僅採計簽到;負責人會議登錄出席場次 */}
+                {item.sessionBased ? (
+                  <Tooltip title="場次制簽到需逐場登錄;後端尚未提供場次列表 API,暫無法於此登錄">
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--steel)' }}>
+                      簽到
+                      <InputNumber
+                        size="small"
+                        min={0}
+                        max={LEADER_SESSIONS_TOTAL}
+                        precision={0}
+                        value={r.attendedSessions}
+                        style={{ width: 56 }}
+                        aria-label={`${r.club} 簽到場次`}
+                        disabled
+                      />
+                      / {LEADER_SESSIONS_TOTAL} 場
+                    </span>
+                  </Tooltip>
+                ) : item.eventEnded ? (
+                  <Checkbox
+                    checked={r.attendedSessions > 0}
+                    disabled={markAttendance.isPending}
+                    onChange={(e) => onMark(r, e.target.checked)}
+                  >
+                    簽到
+                  </Checkbox>
+                ) : (
+                  <Tooltip title="活動結束後開放登錄簽到">
+                    <Checkbox disabled>簽到</Checkbox>
+                  </Tooltip>
+                )}
+                {r.confirmed ? (
+                  <StatusPill status="approved" />
+                ) : (
+                  <Button size="small" style={{ height: 28 }} loading={confirm.isPending} onClick={() => onConfirm(r)}>
+                    確認報名
+                  </Button>
+                )}
+              </div>
+              {/* 逐人明細:姓名/學號/系級+自訂欄位回答 */}
+              <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {r.participants.map((p, i) => (
+                  <div key={i} style={{ fontSize: 12, color: 'var(--steel)', lineHeight: 1.7 }}>
+                    <span style={{ color: 'var(--ink)', fontWeight: 500 }}>{answerText(p.name)}</span>
+                    <span className="num"> {answerText(p.studentId)}</span> · {answerText(p.dept)}
+                    {item.fields
+                      .filter((f) => answerText(p[f.key]))
+                      .map((f) => (
+                        <span key={f.key}> · {f.label}:{answerText(p[f.key])}</span>
+                      ))}
+                  </div>
+                ))}
+              </div>
             </div>
-            {/* 逐人明細:姓名/學號/系級+自訂欄位回答 */}
-            <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {r.participants.map((p) => (
-                <div key={p.studentId} style={{ fontSize: 12, color: 'var(--steel)', lineHeight: 1.7 }}>
-                  <span style={{ color: 'var(--ink)', fontWeight: 500 }}>{p.name}</span>
-                  <span className="num"> {p.studentId}</span> · {p.dept}
-                  {item.fields
-                    .filter((f) => p.answers[f.key])
-                    .map((f) => (
-                      <span key={f.key}> · {f.label}:{p.answers[f.key]}</span>
-                    ))}
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-        {regs.length === 0 && (
-          <div style={{ padding: '16px 14px', fontSize: 13, color: 'var(--steel)' }}>尚無社團報名</div>
-        )}
-      </div>
+          ))}
+          {!regsQuery.isPending && regs.length === 0 && (
+            <div style={{ padding: '16px 14px', fontSize: 13, color: 'var(--steel)' }}>尚無社團報名</div>
+          )}
+        </div>
+      </Spin>
     </Modal>
   )
 }
 
 export default function SignupManagePage() {
   const navigate = useNavigate()
-  const [selected, setSelected] = useState<SignupItem | null>(null)
+  const [selected, setSelected] = useState<AdminSignupItem | null>(null)
   const [open, setOpen] = useState(false)
 
-  const openItem = (item: SignupItem) => {
+  const listQuery = useAdminSignupItems()
+  const items = listQuery.data ?? []
+
+  const openItem = (item: AdminSignupItem) => {
     setSelected(item)
     setOpen(true)
   }
 
-  const openCount = SIGNUP_ITEMS.filter((i) => i.status === 'open').length
+  const openCount = items.filter((i) => i.status === 'open').length
 
   return (
     <div>
@@ -239,23 +213,21 @@ export default function SignupManagePage() {
         }
       />
 
-      <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-        <table className="tb dense" style={{ minWidth: 720 }}>
-          <thead>
-            <tr>
-              <th>活動</th>
-              <th>截止</th>
-              <th className="r">已報名</th>
-              <th className="r">每社上限</th>
-              <th>狀態</th>
-              <th aria-label="開啟" style={{ width: 32 }} />
-            </tr>
-          </thead>
-          <tbody>
-            {SIGNUP_ITEMS.map((item) => {
-              const regs = REGISTRATIONS[item.id] ?? []
-              const pendingConfirm = regs.filter((r) => !r.confirmed).length
-              return (
+      <Spin spinning={listQuery.isPending}>
+        <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+          <table className="tb dense" style={{ minWidth: 720 }}>
+            <thead>
+              <tr>
+                <th>活動</th>
+                <th>截止</th>
+                <th className="r">已報名</th>
+                <th className="r">每社上限</th>
+                <th>狀態</th>
+                <th aria-label="開啟" style={{ width: 32 }} />
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
                 <tr key={item.id} onClick={() => openItem(item)} style={{ cursor: 'pointer' }}>
                   <td>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -265,20 +237,27 @@ export default function SignupManagePage() {
                   </td>
                   <td className="num" style={{ fontSize: 13 }}>{item.deadline}</td>
                   <td className="r num">
-                    {regs.length} 社團
-                    {pendingConfirm > 0 && (
-                      <span style={{ color: '#8A5A00', fontSize: 12 }}>(待確認 {pendingConfirm})</span>
+                    {item.clubsCount} 社團
+                    {item.pendingCount > 0 && (
+                      <span style={{ color: '#8A5A00', fontSize: 12 }}>(待確認 {item.pendingCount})</span>
                     )}
                   </td>
                   <td className="r num">{item.maxParticipants} 人</td>
                   <td style={{ width: 90 }}><StatusPill status={item.status} /></td>
                   <td className="r"><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>
                 </tr>
-              )
-            })}
-          </tbody>
-        </table>
-      </div>
+              ))}
+              {!listQuery.isPending && items.length === 0 && (
+                <tr className="no-hover">
+                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
+                    尚未建立報名活動
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Spin>
 
       {/* Modal 常駐至關閉動畫結束(afterClose)才卸載 */}
       {selected && (

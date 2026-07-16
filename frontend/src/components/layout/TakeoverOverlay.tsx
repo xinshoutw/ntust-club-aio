@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 import { CloseOutlined } from '@ant-design/icons'
 import Markdown from '../ui/Markdown'
-import { ANNOUNCEMENTS } from '../../features/activities/mock'
+import { useAnnouncements } from '../../api/announcements'
 
 // 每次登入清空(auth.login),讓蓋板於下次登入再次顯示
 export const TAKEOVER_DISMISSED_KEY = 'club-aio.takeover.dismissed'
@@ -22,8 +22,10 @@ function readDismissed(): string[] {
 export default function TakeoverOverlay() {
   const [dismissed, setDismissed] = useState<string[]>(readDismissed)
   const [closable, setClosable] = useState(false)
+  // 僅社團端渲染(AppShell 已依角色守衛),與總覽/鈴鐺共用同一查詢
+  const { data } = useAnnouncements()
 
-  const active = ANNOUNCEMENTS.filter(
+  const active = (data?.announcements ?? []).filter(
     (a) =>
       a.takeoverUntil &&
       !dayjs().isAfter(dayjs(a.takeoverUntil, 'YYYY/MM/DD'), 'day') &&

@@ -4,17 +4,15 @@ import { App, Badge, Drawer, Dropdown, Popover } from 'antd'
 import { confirmDialog } from '../../lib/confirm'
 import { BellOutlined, DownOutlined, HistoryOutlined, LogoutOutlined, MenuOutlined, SettingOutlined } from '@ant-design/icons'
 import { useAuth } from '../../app/auth'
+import { useAnnouncements } from '../../api/announcements'
 import { UnsavedProvider, useHasUnsaved } from '../../app/unsaved'
 import type { NavGroup } from '../../lib/nav'
 import Sidebar from './Sidebar'
 import TakeoverOverlay from './TakeoverOverlay'
 import './shell.css'
 
-const NOTIFICATIONS = [
-  { title: '「迎新宿營」結案期限剩 15 天', time: '2026/07/13 09:00' },
-  { title: '您申請的 S304 教室(節次 3、4)已核准', time: '2026/06/16 14:20' },
-  { title: '114-2 社團評鑑報名開始', time: '2026/06/18 10:00' },
-]
+// 鈴鐺顯示最新公告/通知(社團端);工讀生/評審/行政端通知來源待各端 API
+const BELL_COUNT = 5
 
 interface AppShellProps {
   nav: NavGroup[]
@@ -38,6 +36,9 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [notifRead, setNotifRead] = useState(false)
+  // 公告即通知來源:與總覽/蓋板共用同一查詢,非社團角色不打 /club/* API
+  const announcementsQuery = useAnnouncements(user?.role === 'club')
+  const notifications = (announcementsQuery.data?.announcements ?? []).slice(0, BELL_COUNT)
 
   // 有未儲存變更時,任何 shell 導航先確認
   const guarded = (go: () => void) => {
@@ -113,10 +114,10 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
           onOpenChange={(open) => open && setNotifRead(true)}
           content={
             <div style={{ width: 300 }}>
-              {NOTIFICATIONS.map((n) => (
-                <div key={n.title} style={{ padding: '10px 4px', borderBottom: '1px solid var(--line)' }}>
+              {notifications.map((n) => (
+                <div key={n.id} style={{ padding: '10px 4px', borderBottom: '1px solid var(--line)' }}>
                   <div style={{ fontSize: 13, fontWeight: 500 }}>{n.title}</div>
-                  <div className="num" style={{ fontSize: 12, color: 'var(--steel)', marginTop: 2 }}>{n.time}</div>
+                  <div className="num" style={{ fontSize: 12, color: 'var(--steel)', marginTop: 2 }}>{n.date}</div>
                 </div>
               ))}
               <div style={{ padding: '8px 4px 2px', fontSize: 12, color: 'var(--steel)', textAlign: 'center' }}>沒有更多通知</div>
@@ -124,7 +125,7 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
           }
         >
           <button type="button" className="topbar-icon-btn" aria-label="通知">
-            <Badge dot={!notifRead} offset={[-2, 2]}>
+            <Badge dot={notifications.length > 0 && !notifRead} offset={[-2, 2]}>
               <BellOutlined style={{ fontSize: 18 }} />
             </Badge>
           </button>

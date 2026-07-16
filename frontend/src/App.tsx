@@ -1,7 +1,8 @@
-import { Navigate, Route, Routes, useLocation } from 'react-router'
+import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router'
 import { useMemo, type ReactNode } from 'react'
 import { useAuth, type Role } from './app/auth'
 import { buildAdminNav, buildClubNav } from './lib/nav'
+import { canAccessAdminPath } from './lib/permissions'
 import { useFixedWindow } from './api/bookings'
 import { usePendingActivityTotal, usePendingCloseTotal } from './api/adminActivities'
 import { homeOf } from './lib/home'
@@ -69,15 +70,34 @@ function ClubShell() {
   return <AppShell nav={nav} />
 }
 
-// 行政端側欄徽章=申請/結案待審數(共用審核頁查詢;無權限或查詢失敗即不顯示)
+// 行政端側欄徽章=申請/結案待審數(共用審核頁查詢);
+// 側欄項目與徽章查詢皆依 permissions 過濾,受限管理員不再看到整排 403 頁
 function AdminShell() {
-  const pendingReview = usePendingActivityTotal()
-  const pendingClose = usePendingCloseTotal()
+  const { user } = useAuth()
+  const pendingReview = usePendingActivityTotal(canAccessAdminPath(user, '/admin/review'))
+  const pendingClose = usePendingCloseTotal(canAccessAdminPath(user, '/admin/close-review'))
   const nav = useMemo(
-    () => buildAdminNav(pendingReview.data, pendingClose.data),
-    [pendingReview.data, pendingClose.data],
+    () => buildAdminNav(user, pendingReview.data, pendingClose.data),
+    [user, pendingReview.data, pendingClose.data],
   )
   return <AppShell nav={nav} badgeLabel="行政後台" />
+}
+
+// admin 子路由的權限 gate:無權限時就地說明,不悄悄導走(避免誤會系統壞掉)
+function AdminPermissionGate() {
+  const { user } = useAuth()
+  const location = useLocation()
+  if (!canAccessAdminPath(user, location.pathname)) {
+    return (
+      <div className="card" style={{ marginTop: 20, padding: 32, textAlign: 'center' }}>
+        <div style={{ fontSize: 15, fontWeight: 600 }}>您沒有此頁面的存取權限</div>
+        <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 8 }}>
+          如需使用此功能,請聯絡系統管理員調整帳號權限
+        </div>
+      </div>
+    )
+  }
+  return <Outlet />
 }
 
 // 首登強制改密頁:需已登入,但不受 mustChangePassword 導轉限制
@@ -149,25 +169,27 @@ export default function App() {
           </RequireRole>
         }
       >
-        <Route index element={<AdminHomePage />} />
-        <Route path="review" element={<ReviewPage />} />
-        <Route path="close-review" element={<CloseReviewPage />} />
-        <Route path="signups" element={<SignupManagePage />} />
-        <Route path="signup-items/new" element={<SignupBuilderPage />} />
-        <Route path="announcements" element={<AnnouncementsPage />} />
-        <Route path="bookings" element={<AdminBookingsPage />} />
-        <Route path="rooms" element={<AdminRoomsPage />} />
-        <Route path="club-overview" element={<ClubOverviewPage />} />
-        <Route path="members" element={<AdminMembersPage />} />
-        <Route path="club-settings" element={<AdminClubSettingsPage />} />
-        <Route path="overdue" element={<OverduePage />} />
-        <Route path="eval" element={<AdminEvalPage />} />
-        <Route path="accounts" element={<AccountsPage />} />
-        <Route path="maintenance" element={<AdminMaintenancePage />} />
-        <Route path="violations" element={<AdminViolationsPage />} />
-        <Route path="files" element={<AdminFilesPage />} />
-        <Route path="settings" element={<AdminSettingsPage />} />
-        <Route path="audit" element={<AuditPage />} />
+        <Route element={<AdminPermissionGate />}>
+          <Route index element={<AdminHomePage />} />
+          <Route path="review" element={<ReviewPage />} />
+          <Route path="close-review" element={<CloseReviewPage />} />
+          <Route path="signups" element={<SignupManagePage />} />
+          <Route path="signup-items/new" element={<SignupBuilderPage />} />
+          <Route path="announcements" element={<AnnouncementsPage />} />
+          <Route path="bookings" element={<AdminBookingsPage />} />
+          <Route path="rooms" element={<AdminRoomsPage />} />
+          <Route path="club-overview" element={<ClubOverviewPage />} />
+          <Route path="members" element={<AdminMembersPage />} />
+          <Route path="club-settings" element={<AdminClubSettingsPage />} />
+          <Route path="overdue" element={<OverduePage />} />
+          <Route path="eval" element={<AdminEvalPage />} />
+          <Route path="accounts" element={<AccountsPage />} />
+          <Route path="maintenance" element={<AdminMaintenancePage />} />
+          <Route path="violations" element={<AdminViolationsPage />} />
+          <Route path="files" element={<AdminFilesPage />} />
+          <Route path="settings" element={<AdminSettingsPage />} />
+          <Route path="audit" element={<AuditPage />} />
+        </Route>
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

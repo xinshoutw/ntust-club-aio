@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import type { FixedWindow } from '../api/bookings'
+import type { SessionUser } from '../api/auth'
+import { canAccessAdminPath } from './permissions'
 import {
   AppstoreOutlined,
   AuditOutlined,
@@ -114,9 +116,14 @@ export function buildClubNav(window?: FixedWindow): NavGroup[] {
   ]
 }
 
-// 側欄徽章=待審數(shell 以共用 query 提供;查詢中/失敗不顯示)
-export function buildAdminNav(pendingReview?: number, pendingClose?: number): NavGroup[] {
-  return [
+// 側欄徽章=待審數(shell 以共用 query 提供;查詢中/失敗不顯示)。
+// 依 permissions 過濾:受限管理員只看得到自己可用的項目(路由另有 gate)
+export function buildAdminNav(
+  user: SessionUser | null,
+  pendingReview?: number,
+  pendingClose?: number,
+): NavGroup[] {
+  const groups: NavGroup[] = [
   {
     items: [{ key: 'a-home', label: '總覽', path: '/admin', icon: <DashboardOutlined /> }],
   },
@@ -191,4 +198,7 @@ export function buildAdminNav(pendingReview?: number, pendingClose?: number): Na
     ],
   },
   ]
+  return groups
+    .map((g) => ({ ...g, items: g.items.filter((i) => canAccessAdminPath(user, i.path)) }))
+    .filter((g) => g.items.length > 0)
 }

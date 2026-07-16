@@ -25,7 +25,7 @@ export default function OverduePage() {
       <PageHeader
         title="逾期追蹤與停權"
         extra={
-          <Button danger style={{ height: 36 }} onClick={() => setSuspendOpen(true)}>
+          <Button danger onClick={() => setSuspendOpen(true)}>
             停權社團…
           </Button>
         }

@@ -233,7 +233,7 @@ export default function SignupManagePage() {
           </>
         }
         extra={
-          <Button type="primary" style={{ height: 36 }} onClick={() => navigate('/admin/signup-items/new')}>
+          <Button type="primary" onClick={() => navigate('/admin/signup-items/new')}>
             + 建立活動
           </Button>
         }

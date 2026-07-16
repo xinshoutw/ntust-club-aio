@@ -227,7 +227,7 @@ export default function AccountsPage() {
       <PageHeader
         title="帳號管理"
         extra={
-          <Button type="primary" style={{ height: 36 }} onClick={() => setCreateOpen(true)}>
+          <Button type="primary" onClick={() => setCreateOpen(true)}>
             + 新增{roleLabel}
           </Button>
         }

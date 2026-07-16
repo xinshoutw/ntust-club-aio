@@ -59,9 +59,9 @@ export default function AdminEvalPage() {
         extra={
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <ClubSelect width={190} />
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 12, color: 'var(--steel)' }}>採用總分</div>
-              <div style={{ lineHeight: 1.2 }}>
+            <div style={{ textAlign: 'right', height: 40, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <div style={{ fontSize: 12, color: 'var(--steel)', lineHeight: 1.1 }}>採用總分</div>
+              <div style={{ lineHeight: 1.1 }}>
                 <span className="num" style={{ fontSize: 22, fontWeight: 600 }}>{total}</span>
                 <span className="num" style={{ fontSize: 12, color: 'var(--steel)' }}> / 100</span>
               </div>

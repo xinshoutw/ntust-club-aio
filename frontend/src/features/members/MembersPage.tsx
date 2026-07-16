@@ -134,7 +134,6 @@ export default function MembersPage() {
               options={semesterOptions(members.map((m) => m.semester), true)}
             />
             <Button
-              style={{ height: 36 }}
               icon={<UploadOutlined />}
               onClick={() => {
                 setCsvSemester(pageSemester)
@@ -144,7 +143,6 @@ export default function MembersPage() {
               匯入 CSV
             </Button>
             <Button
-              style={{ height: 36 }}
               icon={<DownloadOutlined />}
               onClick={() => {
                 setCsvSemester(pageSemester)
@@ -155,7 +153,6 @@ export default function MembersPage() {
             </Button>
             <Button
               type="primary"
-              style={{ height: 36 }}
               onClick={() => {
                 form.setFieldsValue({ semester: pageSemester })
                 setAddOpen(true)

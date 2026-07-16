@@ -65,9 +65,9 @@ export default function AwardDetailPage() {
             </>
           }
           extra={
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 12, color: 'var(--steel)' }}>上傳進度</div>
-              <div className="num" style={{ fontSize: 20, fontWeight: 600, lineHeight: 1.2 }}>
+            <div style={{ textAlign: 'right', height: 40, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <div style={{ fontSize: 12, color: 'var(--steel)', lineHeight: 1.1 }}>上傳進度</div>
+              <div className="num" style={{ fontSize: 20, fontWeight: 600, lineHeight: 1.1 }}>
                 {progress.done}/{progress.total}
               </div>
             </div>

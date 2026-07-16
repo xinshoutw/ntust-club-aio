@@ -53,7 +53,7 @@ export default function AdminMembersPage() {
               style={{ width: 120 }}
               options={semesterOptions(all.map((m) => m.semester), true)}
             />
-            <Button style={{ height: 36 }} icon={<DownloadOutlined />} onClick={exportCsv}>
+            <Button icon={<DownloadOutlined />} onClick={exportCsv}>
               匯出 CSV
             </Button>
             <ClubSelect />

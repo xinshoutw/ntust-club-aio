@@ -54,10 +54,10 @@ export default function EvalDocsPage() {
           </>
         }
         extra={
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 12, color: 'var(--steel)' }}>行政資料總分</div>
-            <div style={{ lineHeight: 1.2 }}>
-              <span className="num" style={{ fontSize: 24, fontWeight: 600 }}>{total}</span>
+          <div style={{ textAlign: 'right', height: 40, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{ fontSize: 12, color: 'var(--steel)', lineHeight: 1.1 }}>行政資料總分</div>
+            <div style={{ lineHeight: 1.1 }}>
+              <span className="num" style={{ fontSize: 22, fontWeight: 600 }}>{total}</span>
               <span className="num" style={{ fontSize: 13, color: 'var(--steel)' }}> / 100</span>
             </div>
           </div>

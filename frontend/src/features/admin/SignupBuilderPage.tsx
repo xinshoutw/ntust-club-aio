@@ -98,8 +98,8 @@ export default function SignupBuilderPage() {
         title="活動建立"
         extra={
           <div style={{ display: 'flex', gap: 10 }}>
-            <Button style={{ height: 36 }} onClick={() => message.success('已儲存草稿')}>儲存草稿</Button>
-            <Button type="primary" style={{ height: 36 }} onClick={publish}>發布</Button>
+            <Button onClick={() => message.success('已儲存草稿')}>儲存草稿</Button>
+            <Button type="primary" onClick={publish}>發布</Button>
           </div>
         }
       />

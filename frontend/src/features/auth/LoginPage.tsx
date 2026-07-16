@@ -1,8 +1,44 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Button, Input } from 'antd'
+import { Button, Input, Popover } from 'antd'
+import { InfoCircleOutlined } from '@ant-design/icons'
 import { homeOf } from '../../lib/home'
 import { useAuth } from '../../app/auth'
+
+const COPYRIGHT_START_YEAR = 2026
+
+/** © 2026;跨年後自動變 © 2026-{今年} */
+function copyrightSpan(year: number): string {
+  return year > COPYRIGHT_START_YEAR ? `${COPYRIGHT_START_YEAR}-${year}` : `${COPYRIGHT_START_YEAR}`
+}
+
+const maintainerInfo = (
+  <div style={{ fontSize: 13, lineHeight: 2.2 }}>
+    <div>網頁維護：資訊工程系 黃宥維</div>
+    <div>
+      快速聯絡：Discord{' '}
+      <a
+        href="https://discord.com/users/810822763601461318"
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          background: 'var(--paper)',
+          border: '1px solid var(--line)',
+          borderRadius: 4,
+          padding: '1px 6px',
+        }}
+      >
+        xinshoutw
+      </a>
+    </div>
+    <div>
+      聯絡信箱：
+      <a className="num" href="mailto:B11315009@mail.ntust.edu.tw">
+        B11315009@mail.ntust.edu.tw
+      </a>
+    </div>
+  </div>
+)
 
 export default function LoginPage() {
   const { login } = useAuth()
@@ -80,8 +116,20 @@ export default function LoginPage() {
           </Button>
         </form>
       </div>
-      <div style={{ marginTop: 28, fontSize: 12, color: 'var(--steel)' }}>
-        © 國立臺灣科技大學 課外活動指導組 · <span className="num">clubs.ntust.edu.tw</span>
+      <div style={{ marginTop: 28, fontSize: 12, color: 'var(--steel)', display: 'flex', alignItems: 'center', gap: 2 }}>
+        <span>
+          Copyright © <span className="num">{copyrightSpan(new Date().getFullYear())}</span> 國立臺灣科技大學
+        </span>
+        <Popover content={maintainerInfo} trigger="click" placement="top">
+          <Button
+            type="text"
+            size="small"
+            shape="circle"
+            icon={<InfoCircleOutlined />}
+            aria-label="網頁維護資訊"
+            style={{ color: 'var(--steel)' }}
+          />
+        </Popover>
       </div>
     </div>
   )

@@ -4,7 +4,7 @@ import { App, Badge, Drawer, Dropdown, Popover } from 'antd'
 import { confirmDialog } from '../../lib/confirm'
 import { BellOutlined, DownOutlined, HistoryOutlined, LogoutOutlined, MenuOutlined, SettingOutlined } from '@ant-design/icons'
 import { useAuth } from '../../app/auth'
-import { useAnnouncements } from '../../api/announcements'
+import { useAnnouncements, useMarkAnnouncementsRead } from '../../api/announcements'
 import { UnsavedProvider, useHasUnsaved } from '../../app/unsaved'
 import type { NavGroup } from '../../lib/nav'
 import Sidebar from './Sidebar'
@@ -35,10 +35,12 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [notifRead, setNotifRead] = useState(false)
   // 公告即通知來源:與總覽/蓋板共用同一查詢,非社團角色不打 /club/* API
   const announcementsQuery = useAnnouncements(user?.role === 'club')
   const notifications = (announcementsQuery.data?.announcements ?? []).slice(0, BELL_COUNT)
+  // 未讀狀態由後端水位線提供(跨裝置);開啟面板即標記已讀
+  const hasUnread = (announcementsQuery.data?.announcements ?? []).some((n) => n.unread)
+  const markRead = useMarkAnnouncementsRead()
 
   // 有未儲存變更時,任何 shell 導航先確認
   const guarded = (go: () => void) => {
@@ -111,13 +113,23 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
         <Popover
           trigger="click"
           placement="bottomRight"
-          onOpenChange={(open) => open && setNotifRead(true)}
+          onOpenChange={(open) => {
+            if (open && hasUnread) markRead.mutate()
+          }}
           content={
             <div style={{ width: 300 }}>
               {notifications.map((n) => (
-                <div key={n.id} style={{ padding: '10px 4px', borderBottom: '1px solid var(--line)' }}>
-                  <div style={{ fontSize: 13, fontWeight: 500 }}>{n.title}</div>
-                  <div className="num" style={{ fontSize: 12, color: 'var(--steel)', marginTop: 2 }}>{n.date}</div>
+                <div key={n.id} style={{ padding: '10px 4px', borderBottom: '1px solid var(--line)', display: 'flex', gap: 8 }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 500 }}>{n.title}</div>
+                    <div className="num" style={{ fontSize: 12, color: 'var(--steel)', marginTop: 2 }}>{n.date}</div>
+                  </div>
+                  {n.unread && (
+                    <span
+                      aria-label="未讀"
+                      style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--seal)', marginTop: 6, flexShrink: 0 }}
+                    />
+                  )}
                 </div>
               ))}
               <div style={{ padding: '8px 4px 2px', fontSize: 12, color: 'var(--steel)', textAlign: 'center' }}>沒有更多通知</div>
@@ -125,7 +137,7 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
           }
         >
           <button type="button" className="topbar-icon-btn" aria-label="通知">
-            <Badge dot={notifications.length > 0 && !notifRead} offset={[-2, 2]}>
+            <Badge dot={hasUnread} offset={[-2, 2]}>
               <BellOutlined style={{ fontSize: 18 }} />
             </Badge>
           </button>

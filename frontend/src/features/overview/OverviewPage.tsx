@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { Button, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
@@ -6,7 +6,7 @@ import StatusPill from '../../components/ui/StatusPill'
 import Markdown from '../../components/ui/Markdown'
 import AnnouncementModal from '../../components/ui/AnnouncementModal'
 import QueryError from '../../components/ui/QueryError'
-import { useAnnouncements, type Announcement } from '../../api/announcements'
+import { useAnnouncements, useMarkAnnouncementsRead, type Announcement } from '../../api/announcements'
 import { useOverviewActivities, type TrackedItem } from '../../api/overview'
 import { useCertificates, useMaintenanceList, usePostalList } from '../../api/applications'
 import './overview.css'
@@ -47,6 +47,14 @@ export default function OverviewPage() {
   const announcementsQuery = useAnnouncements()
   const announcements = announcementsQuery.data?.announcements ?? []
   const announcementTotal = announcementsQuery.data?.total ?? 0
+
+  // 公告顯示於本頁:進入頁面即視為已讀(鈴鐺紅點熄滅);標記後查詢刷新使 unread 歸零
+  const markRead = useMarkAnnouncementsRead()
+  const { mutate: markReadMutate } = markRead
+  const hasUnread = announcements.some((a) => a.unread)
+  useEffect(() => {
+    if (hasUnread) markReadMutate()
+  }, [hasUnread, markReadMutate])
 
   const activitiesQuery = useOverviewActivities()
   const todos = activitiesQuery.data?.todos ?? []

@@ -12,6 +12,7 @@ export interface Announcement {
   scope: string
   takeoverUntil?: string
   dismissed?: boolean // 本社已勾「不再顯示」(蓋板不再出現)
+  unread?: boolean // 晚於已讀水位線(鈴鐺紅點依據)
 }
 
 interface AnnouncementOut {
@@ -22,6 +23,7 @@ interface AnnouncementOut {
   takeover_until: string | null
   created_at: string
   dismissed: boolean
+  unread: boolean
 }
 
 const toAnnouncement = (a: AnnouncementOut): Announcement => ({
@@ -33,6 +35,7 @@ const toAnnouncement = (a: AnnouncementOut): Announcement => ({
   scope: a.is_auto ? '通知' : '公告',
   takeoverUntil: a.takeover_until ? dayjs(a.takeover_until).format('YYYY/MM/DD') : undefined,
   dismissed: a.dismissed,
+  unread: a.unread,
 })
 
 // 三處共用近 20 筆:蓋板需涵蓋仍在期限內、但已非最新的公告
@@ -56,6 +59,15 @@ export function useDismissAnnouncement() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => api<null>(`/club/announcements/${id}/dismiss`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: announcementKeys.list }),
+  })
+}
+
+/** 公告全部標為已讀(水位線前移):開啟鈴鐺或進入總覽時呼叫 */
+export function useMarkAnnouncementsRead() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api<null>('/club/announcements/read', { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries({ queryKey: announcementKeys.list }),
   })
 }

@@ -133,3 +133,4 @@ class AnnouncementOut(BaseModel):
     is_auto: bool
     takeover_until: date | None  # 蓋板截止;前端據此於期限內每次登入顯示蓋板
     created_at: datetime
+    dismissed: bool = False  # 本社已勾「不再顯示」(蓋板不再出現;列表仍可見)

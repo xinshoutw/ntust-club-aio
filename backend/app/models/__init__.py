@@ -25,7 +25,14 @@ from app.models.evaluation import (
 )
 from app.models.facilities import Equipment, Holiday, SystemSetting, Venue
 from app.models.files import File
-from app.models.misc import Announcement, AuditLog, EmailLog, LegacyIdMap, Violation
+from app.models.misc import (
+    Announcement,
+    AnnouncementDismissal,
+    AuditLog,
+    EmailLog,
+    LegacyIdMap,
+    Violation,
+)
 from app.models.signups import (
     SessionAttendance,
     Signup,
@@ -43,6 +50,7 @@ __all__ = [
     "ActivityReflection",
     "ActivityReport",
     "Announcement",
+    "AnnouncementDismissal",
     "ApprovalRecord",
     "AuditLog",
     "Award",

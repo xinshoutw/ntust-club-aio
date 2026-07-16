@@ -2,12 +2,14 @@
 
 import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Request, UploadFile
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.api.pagination import Pagination
 from app.core.deps import ClubUser, DbDep, client_ip
 from app.core.errors import not_found, validation_error
 from app.models import (
     Announcement,
+    AnnouncementDismissal,
     Club,
     ClubMember,
     File,
@@ -278,30 +280,65 @@ async def list_violations(
 # ---- 公告(社團端)----
 
 
+def _announcement_visible(club: Club) -> sa.ColumnElement[bool]:
+    """本社可見的公告(全體/性質命中/指定本社)。"""
+    return sa.or_(
+        Announcement.target_type == AnnouncementTarget.ALL,
+        sa.and_(
+            Announcement.target_type == AnnouncementTarget.ATTR,
+            Announcement.attrs.any(club.attribute.value),
+        ),
+        sa.and_(
+            Announcement.target_type == AnnouncementTarget.CLUB,
+            Announcement.club_id == club.id,
+        ),
+    )
+
+
 @router.get("/announcements")
 async def list_announcements(
     user: ClubUser, db: DbDep, page: Pagination
 ) -> ApiResponse[list[AnnouncementOut]]:
     club = await db.get(Club, user.club_id)
     query = (
-        sa.select(Announcement)
-        .where(
-            sa.or_(
-                Announcement.target_type == AnnouncementTarget.ALL,
-                sa.and_(
-                    Announcement.target_type == AnnouncementTarget.ATTR,
-                    Announcement.attrs.any(club.attribute.value),
-                ),
-                sa.and_(
-                    Announcement.target_type == AnnouncementTarget.CLUB,
-                    Announcement.club_id == club.id,
-                ),
-            )
+        sa.select(Announcement, AnnouncementDismissal.club_id.is_not(None))
+        .outerjoin(
+            AnnouncementDismissal,
+            sa.and_(
+                AnnouncementDismissal.announcement_id == Announcement.id,
+                AnnouncementDismissal.club_id == club.id,
+            ),
         )
+        .where(_announcement_visible(club))
         .order_by(Announcement.id.desc())
     )
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
-    rows = await db.scalars(query.offset(page.offset).limit(page.page_size))
-    return ApiResponse(
-        data=[AnnouncementOut.model_validate(r) for r in rows], meta=page.meta(total or 0)
+    rows = (await db.execute(query.offset(page.offset).limit(page.page_size))).all()
+    data = []
+    for ann, dismissed in rows:
+        out = AnnouncementOut.model_validate(ann)
+        out.dismissed = dismissed
+        data.append(out)
+    return ApiResponse(data=data, meta=page.meta(total or 0))
+
+
+@router.post("/announcements/{announcement_id}/dismiss")
+async def dismiss_announcement(
+    announcement_id: int, user: ClubUser, db: DbDep
+) -> ApiResponse[None]:
+    """蓋板公告「不再顯示」:登記後該公告不再於登入時蓋板(冪等)。"""
+    club = await db.get(Club, user.club_id)
+    visible = await db.scalar(
+        sa.select(Announcement.id).where(
+            Announcement.id == announcement_id, _announcement_visible(club)
+        )
     )
+    if visible is None:
+        raise not_found("公告不存在")
+    await db.execute(
+        pg_insert(AnnouncementDismissal)
+        .values(announcement_id=announcement_id, club_id=club.id)
+        .on_conflict_do_nothing()
+    )
+    await db.commit()
+    return ApiResponse(data=None)

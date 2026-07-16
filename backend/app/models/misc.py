@@ -33,6 +33,19 @@ class Announcement(Base, TimestampMixin):
     created_by: Mapped[int] = mapped_column(sa.ForeignKey("users.id"))
 
 
+class AnnouncementDismissal(Base, TimestampMixin):
+    """蓋板公告「不再顯示」:社團勾選後該公告不再於登入時蓋板(跨裝置,DB 持久)。"""
+
+    __tablename__ = "announcement_dismissals"
+
+    announcement_id: Mapped[int] = mapped_column(
+        sa.ForeignKey("announcements.id", ondelete="CASCADE"), primary_key=True
+    )
+    club_id: Mapped[int] = mapped_column(
+        sa.ForeignKey("clubs.id", ondelete="CASCADE"), primary_key=True
+    )
+
+
 class Violation(Base, TimestampMixin):
     """違規勸導;未銷案筆數餵行政分減分。佐證照片走 files。"""
 

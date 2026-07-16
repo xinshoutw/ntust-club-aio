@@ -202,6 +202,42 @@ async def test_announcements_targeting(client, db):
     # 蓋板截止一併給前端(蓋板顯示邏輯在 client)
     assert rows[0]["takeover_until"] == "2026-12-31"
     assert rows[2]["takeover_until"] is None
+    assert all(a["dismissed"] is False for a in rows)
+
+
+async def test_announcement_dismiss(client, db):
+    """蓋板「不再顯示」:登記後 dismissed=True(冪等);他社公告 404。"""
+    club = await setup_session(client, db)
+    admin = await make_user(db, username="admin01", role="admin")
+    other = await make_club(db, name="吉他社")
+
+    mine = Announcement(
+        title="給熱舞社",
+        content="x",
+        target_type="club",
+        club_id=club.id,
+        takeover_until=date(2026, 12, 31),
+        created_by=admin.id,
+    )
+    others = Announcement(
+        title="給吉他社", content="x", target_type="club", club_id=other.id, created_by=admin.id
+    )
+    db.add_all([mine, others])
+    await db.commit()
+
+    url = f"/api/v1/club/announcements/{mine.id}/dismiss"
+    assert (await client.post(url, headers=csrf_headers(client))).status_code == 200
+    # 冪等:重複登記不報錯
+    assert (await client.post(url, headers=csrf_headers(client))).status_code == 200
+
+    rows = (await client.get("/api/v1/club/announcements")).json()["data"]
+    assert {a["title"]: a["dismissed"] for a in rows} == {"給熱舞社": True}
+
+    # 不可見的公告(指定他社)不得登記
+    resp = await client.post(
+        f"/api/v1/club/announcements/{others.id}/dismiss", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 404
 
 
 async def test_maintenance_evidence_capped(client, db, monkeypatch):

@@ -210,6 +210,21 @@
 - **DB 指令**:`uv run python scripts/reset_db.py --yes`(清空→head→基礎 seed+superadmin 一次性密碼);`scripts/seed_mock.py --yes`(reset 後灌全模組 mock,帳密印出)
 - **接線慣例**:`src/api/{domain}.ts` 集中 snake↔camel 與日期(ISO↔YYYY/MM/DD)轉換、query keys、mutation onSuccess invalidate;分頁 `apiPaged`+`qs`;**範本=api/members.ts + MembersPage**;auth 走 session cookie(`/auth/me` 開機恢復、首登強制改密頁 `/change-password`、staff/viewer 導 `/coming-soon`)
 
+## UI/規則調整決議(2026-07-17 第十輪:需求方連續回饋,前後端已落地)
+
+- **品牌**:`frontend/public/logo.svg`(NTUST 藍 #005bac)為 favicon 與 header 最左側圖示;`logo.png` 供 Discord webhook 頭貼(`notify._with_identity` 為每則加 `username`+`avatar_url=SITE_URL/logo.png`,開發站無法解析時 Discord 略過頭貼)
+- **登入頁**:全高 wrapper 補 `box-sizing:border-box`(content-box + padding 造成整頁捲軸);版權「Copyright © 2026 國立臺灣科技大學」,跨年自動變 `2026-{今年}`;右側 InfoCircle popover(維護者/Discord 連結/mailto)
+- **公告**:蓋板「不再顯示」持久化到 DB(`announcement_dismissals(announcement_id,club_id)` cascade;`POST /club/announcements/{id}/dismiss` 冪等、不可見公告 404);鈴鐺已讀改**水位線** `clubs.announcements_read_at`(created_at 晚於水位線=未讀;`POST /club/announcements/read` 用 DB now() 前移;開鈴鐺或進總覽即標已讀);蓋板右上倒數環轉滿變 X;總覽公告預覽渲染 markdown 並鉗兩行(grid item 補 `min-width:0`、`.md-body` 加 `overflow-wrap:anywhere` 防爆寬)
+- **活動申請**:草稿可**部分填寫**(至少一欄;`activities.date/end_date` 改 nullable + status-scoped CHECK `ck_activities_draft_partial_only`;`ActivityIn` 放寬必填、`_require_complete()` 於 submit 與非草稿 update 檢核並列缺漏);**Python 3.14 lazy annotation 坑**:欄位名 `date` 會遮蔽 `datetime.date`,`Mapped[date|None]` 被解析成 SQL OR 而靜默 NOT NULL,pydantic 直接 TypeError → model/schema 一律用 `dt.date` 別名
+- **活動結案**:照片改「**送出結案時才上傳、不進草稿**」——前端 `PhotoBag` 暫存(預覽 URL + SHA-256 去重 + 加總上限),送出時逐張 upload,失敗 `Promise.allSettled` 回滾已上傳者(避免孤兒 + 後端 slot 去重擋重送);結案草稿 `close_draft` 是**前端 opaque camelCase JSON**(鍵名須同 `buildDraftReport()`,seed 曾誤用 snake_case 使 reflections.name 為 undefined→整頁白畫面;前端 hydrate 一律補空字串防護)
+- **借用場況**:availability grid 每格改 `{status, club}`,本社**已核准**才 mine、審核中(含本社臨時、**pending 固定借用**)一律 pending、他社已核准 temp/fixed;占用格 hover Tooltip 顯示「社團名・狀態」;新增 `GET /club/bookings/availability-range`(區間逐日,上限 31 天,起訖顛倒 422)取代單一場地 15 天檢視的逐日 15 請求;最近借用/器材清單改依 date/start_date 降冪
+- **上傳上限**:從「依檔案類型」改為「**依申請性質給加總上限**」(活動申請 15MB、空間報修 100MB、結案照片 10MB;`system_settings` 三個 `*_total_mb`);共用 `files.total_uploaded()`,各上傳端點鎖列 + 預檢 + 串流後結算超額回滾;前端常數全移除,改讀 **`GET /club/config`**(`useClubConfig()`;後端仍權威)
+- **儲存配額**:移除邏輯容量 `capacity_gib` 與保留空間 `reserve_gib`,系統總量改用**實際磁碟可用空間** `shutil.disk_usage(upload_root).free`(容量不足告警之後人為介入);per-club 配額保留;`/admin/files/usage` 回磁碟 total/free
+- **經費科目**:`budget_categories` 改 **`[{name, hint}]`**(hint 由後台維護,社團填申請選到該科目時顯示),移出前端硬編碼;系統設定頁改 name+hint 逐列編輯器
+- **器材**:**移除類別欄**(`equipment.category` + enum 刪除,migration `33e4dcd04463`);點交方式改由既有 `needs_serial` 表達(**一般 / 依序點交**);新增 `/admin/equipment` super CRUD(list/create/patch,刪除=停用保外鍵),系統設定頁「器材主檔」逐列即時 PATCH;器材主檔 17 項(seed)
+- **系統設定頁**:器材主檔卡片置於設定表單**之前**,讓表單「儲存」按鈕留在整頁最底
+- **新 migration(皆可逆)**:`4290719adc82`(announcement_dismissals)、`007931f1afc7`(announcements_read_at)、`ccb5bc27926e`(活動部分草稿)、`33e4dcd04463`(移除器材類別)
+
 ## Roadmap(需求方 2026-07-15 宣告)
 
 - 未來還有 **staff panel(工讀生端)** 與 **viewer panel(評審端)** 要實作(頁面清單見上方功能模組)

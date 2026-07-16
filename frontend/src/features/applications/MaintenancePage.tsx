@@ -7,7 +7,9 @@ import StatusPill from '../../components/ui/StatusPill'
 import { IMAGE_ACCEPT, isImageFile, isVideoFile } from '../../lib/uploads'
 import { useMaintenanceList, useMaintenanceMutations } from '../../api/applications'
 
-// 影片 200MB / 圖片 10MB(architecture.md);魔術位元組驗證,加總上限取單檔最大值
+// 佐證加總上限 100MB(2026-07-17 改依申請性質給總量;後端 system_settings 為權威值);
+// 單檔仍過型別 magic-byte 與各自單檔上界(影片 200MB / 圖片 10MB,architecture.md)
+const MAX_EVIDENCE_TOTAL_BYTES = 100 * 1024 * 1024
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 
@@ -73,7 +75,7 @@ export default function MaintenancePage() {
               accept={`${IMAGE_ACCEPT},video/*`}
               hint="拖放圖片或影片檔案"
               validate={validateEvidence}
-              maxTotalBytes={MAX_VIDEO_BYTES}
+              maxTotalBytes={MAX_EVIDENCE_TOTAL_BYTES}
               maxCount={5}
             />
           </Form.Item>

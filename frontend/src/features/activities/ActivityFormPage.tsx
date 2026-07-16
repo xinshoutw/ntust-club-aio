@@ -74,8 +74,8 @@ interface FormValues {
   content?: string
 }
 
-// 附件加總上限(接後端後改讀 system_settings 的管理員設定值)
-const MAX_ATTACHMENT_TOTAL_BYTES = 50 * 1024 * 1024
+// 活動申請附件加總上限(2026-07-17 改依申請性質給總量;後端 system_settings 為權威值)
+const MAX_ATTACHMENT_TOTAL_BYTES = 15 * 1024 * 1024
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e))
 

@@ -81,6 +81,8 @@ interface FormValues {
   zipMb: number
   videoMb: number
   attachmentTotalMb: number
+  maintenanceTotalMb: number
+  closePhotoTotalMb: number
   capacityGib: number
   perClubGib: number
   reserveGib: number
@@ -112,6 +114,8 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
         zipMb: v.zipMb,
         videoMb: v.videoMb,
         attachmentTotalMb: v.attachmentTotalMb,
+        maintenanceTotalMb: v.maintenanceTotalMb,
+        closePhotoTotalMb: v.closePhotoTotalMb,
         capacityGib: v.capacityGib,
         perClubGib: v.perClubGib,
         reserveGib: v.reserveGib,
@@ -147,6 +151,8 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
         zipMb: initial.zipMb,
         videoMb: initial.videoMb,
         attachmentTotalMb: initial.attachmentTotalMb,
+        maintenanceTotalMb: initial.maintenanceTotalMb,
+        closePhotoTotalMb: initial.closePhotoTotalMb,
         capacityGib: initial.capacityGib,
         perClubGib: initial.perClubGib,
         reserveGib: initial.reserveGib,
@@ -177,24 +183,34 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
             <Form.Item name="closeLockMonths" label="活動結案期限(結束後 N 個月未結案即鎖定)">
               <InputNumber min={1} max={6} precision={0} style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item name="attachmentTotalMb" label="活動申請附件加總上限(MB)">
+            <Form.Item name="evalYear" label="評鑑年度" style={{ marginBottom: 0 }}>
+              <Select options={evalYears.map((y) => ({ value: y, label: evalYearLabel(y) }))} />
+            </Form.Item>
+          </div>
+          <div style={{ ...sectionTitle, marginTop: 20 }}>各申請性質的附件加總上限(MB)</div>
+          <div className="form-grid-2">
+            <Form.Item name="attachmentTotalMb" label="活動申請附件" style={{ marginBottom: 0 }}>
+              <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item name="maintenanceTotalMb" label="空間報修佐證(含影片)" style={{ marginBottom: 0 }}>
+              <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item name="closePhotoTotalMb" label="活動結案照片" style={{ marginBottom: 0 }}>
               <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
             </Form.Item>
           </div>
-          <Form.Item name="evalYear" label="評鑑年度">
-            <Select options={evalYears.map((y) => ({ value: y, label: evalYearLabel(y) }))} />
-          </Form.Item>
+          <div style={{ ...sectionTitle, marginTop: 20 }}>單檔上限(型別驗證上界,MB)</div>
           <div className="form-grid-2">
-            <Form.Item name="docMb" label="文件上限(MB)" style={{ marginBottom: 0 }}>
+            <Form.Item name="docMb" label="文件單檔" style={{ marginBottom: 0 }}>
               <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item name="imgMb" label="圖片上限(MB)" style={{ marginBottom: 0 }}>
+            <Form.Item name="imgMb" label="圖片單檔" style={{ marginBottom: 0 }}>
               <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item name="zipMb" label="壓縮檔上限(MB)" style={{ marginBottom: 0 }}>
+            <Form.Item name="zipMb" label="壓縮檔單檔" style={{ marginBottom: 0 }}>
               <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item name="videoMb" label="維修影片上限(MB)" style={{ marginBottom: 0 }}>
+            <Form.Item name="videoMb" label="影片單檔" style={{ marginBottom: 0 }}>
               <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
             </Form.Item>
           </div>

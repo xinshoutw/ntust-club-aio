@@ -164,7 +164,7 @@ export default function ReviewPage() {
         {/* 其他狀態(他關審核中/已核准/已退回):供查閱與追蹤 */}
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>其他狀態</div>
-          <table className="tb dense" style={{ minWidth: 800 }}>
+          <table className="tb dense" style={{ minWidth: 800 }} aria-label="其他狀態的活動申請">
             <thead>
               <tr>
                 <th>
@@ -223,7 +223,19 @@ export default function ReviewPage() {
                   style={{ cursor: 'pointer', ...(current?.id === item.id && open ? { background: 'var(--seal-tint)' } : {}) }}
                 >
                   <td>{item.club}</td>
-                  <td style={{ fontWeight: 500 }}>{item.name}</td>
+                  <td style={{ fontWeight: 500 }}>
+                    <button
+                      type="button"
+                      className="row-open-btn"
+                      aria-label={`開啟「${item.name || '未命名活動'}」詳情`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openItem(item)
+                      }}
+                    >
+                      {item.name}
+                    </button>
+                  </td>
                   <td>
                     {item.type}
                     <LargeBadge applied={item.isLarge} approved={item.largeApproved} />

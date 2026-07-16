@@ -375,7 +375,20 @@ export default function ActivityListPage() {
 
   const row = (a: ClubActivity, actions: React.ReactNode) => (
     <tr key={a.id} onClick={() => onRowClick(a)} style={{ cursor: 'pointer' }}>
-      <td style={{ fontWeight: 500 }}>{a.name}</td>
+      <td style={{ fontWeight: 500 }}>
+        {/* 鍵盤入口:與整列 onClick 同動作;stopPropagation 避免雙觸發 */}
+        <button
+          type="button"
+          className="row-open-btn"
+          aria-label={`開啟「${a.name || '未命名活動'}」詳情`}
+          onClick={(e) => {
+            e.stopPropagation()
+            onRowClick(a)
+          }}
+        >
+          {a.name || '(未命名)'}
+        </button>
+      </td>
       <td>
         {a.type}
         <LargeBadge applied={a.isLarge} approved={a.largeApproved} />
@@ -420,7 +433,17 @@ export default function ActivityListPage() {
             <div style={{ fontSize: 15, fontWeight: 600, padding: '14px 20px 6px' }}>
               草稿 <span className="num" style={{ fontSize: 12, background: '#EEF0F3', color: 'var(--steel)', borderRadius: 999, padding: '1px 8px' }}>{drafts.length}</span>
             </div>
-            <table className="tb" style={{ minWidth: 760 }}>
+            <table className="tb" style={{ minWidth: 760 }} aria-label="草稿活動">
+              <thead>
+                <tr>
+                  <th scope="col">名稱</th>
+                  <th scope="col">類型</th>
+                  <th scope="col">日期</th>
+                  <th scope="col" className="r">經費(自籌/擬請)</th>
+                  <th scope="col">狀態</th>
+                  <th scope="col" className="r">動作</th>
+                </tr>
+              </thead>
               <tbody>
                 {drafts.map((a) =>
                   row(
@@ -462,7 +485,7 @@ export default function ActivityListPage() {
         )}
 
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <table className="tb" style={{ minWidth: 760 }}>
+          <table className="tb" style={{ minWidth: 760 }} aria-label="活動列表">
             <thead>
               <tr>
                 <th>{sortHeader('名稱', 'name')}</th>
@@ -508,7 +531,7 @@ export default function ActivityListPage() {
                     </span>
                   ) : a.status === 'approved' ? (
                     <Tooltip title="活動結束後才可結案">
-                      <span style={{ fontSize: 12, color: 'var(--muted)' }}>未開始/進行中</span>
+                      <span style={{ fontSize: 12, color: 'var(--steel)' }}>未開始/進行中</span>
                     </Tooltip>
                   ) : null,
                 ),

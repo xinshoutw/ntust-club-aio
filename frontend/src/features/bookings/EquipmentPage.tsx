@@ -69,7 +69,7 @@ export default function EquipmentPage() {
         <div className="card" style={{ overflowX: 'auto' }}>
           <Spin spinning={equipmentQuery.isPending}>
             <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>器材一覽</div>
-            <table className="tb" style={{ minWidth: 480 }}>
+            <table className="tb" aria-label="器材一覽" style={{ minWidth: 480 }}>
               <thead>
                 <tr>
                   <th>品項</th>
@@ -82,21 +82,39 @@ export default function EquipmentPage() {
                   const a = loanWindow ? e.available : null
                   // 未選關聯活動(a===null)前不可點選帶入;可借 0 也不可點
                   const disabled = a === null || a === 0
+                  const pick = () => {
+                    form.setFieldValue('equipment', e.id)
+                    form.resetFields(['qty'])
+                  }
                   return (
                     <tr
                       key={e.id}
                       onClick={() => {
-                        if (disabled) return
-                        form.setFieldValue('equipment', e.id)
-                        form.resetFields(['qty'])
+                        if (!disabled) pick()
                       }}
                       style={
                         a === 0
-                          ? { background: '#EEF0F3', color: 'var(--muted)', cursor: 'not-allowed' }
+                          ? { background: '#EEF0F3', color: 'var(--steel)', cursor: 'not-allowed' }
                           : { cursor: disabled ? 'default' : 'pointer' }
                       }
                     >
-                      <td style={{ fontWeight: 500 }}>{e.name}</td>
+                      <td style={{ fontWeight: 500 }}>
+                        {disabled ? (
+                          e.name
+                        ) : (
+                          <button
+                            type="button"
+                            className="row-open-btn"
+                            aria-label={`將「${e.name || '未命名品項'}」帶入借用申請表單`}
+                            onClick={(ev) => {
+                              ev.stopPropagation()
+                              pick()
+                            }}
+                          >
+                            {e.name}
+                          </button>
+                        )}
+                      </td>
                       <td style={{ color: 'var(--steel)', fontSize: 13 }}>
                         {e.category}
                         {e.needsSerial && ' · 序號點交'}
@@ -202,7 +220,16 @@ export default function EquipmentPage() {
       <Spin spinning={recentQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近借用</div>
-          <table className="tb" style={{ minWidth: 760 }}>
+          <table className="tb" aria-label="最近借用" style={{ minWidth: 760 }}>
+            <thead>
+              <tr>
+                <th scope="col">品項</th>
+                <th scope="col">借用期間</th>
+                <th scope="col">活動/用途</th>
+                <th scope="col">借用/歸還人</th>
+                <th scope="col">狀態</th>
+              </tr>
+            </thead>
             <tbody>
               {recent.map((l) => (
                 <tr key={l.id}>
@@ -232,7 +259,7 @@ export default function EquipmentPage() {
               )}
               {!recentQuery.isError && !recentQuery.isPending && recent.length === 0 && (
                 <tr className="no-hover">
-                  <td style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無借用紀錄</td>
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無借用紀錄</td>
                 </tr>
               )}
             </tbody>

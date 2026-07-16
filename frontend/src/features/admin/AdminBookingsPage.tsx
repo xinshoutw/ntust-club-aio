@@ -107,7 +107,7 @@ export default function AdminBookingsPage() {
         </div>
         <Spin spinning={venuesQuery.isPending || gridQuery.isPending}>
           <div style={{ overflowX: 'auto', marginTop: 12 }}>
-            <table style={{ borderCollapse: 'separate', borderSpacing: 3, width: '100%', tableLayout: 'fixed', minWidth: 720 }}>
+            <table aria-label="場地借用情形" style={{ borderCollapse: 'separate', borderSpacing: 3, width: '100%', tableLayout: 'fixed', minWidth: 720 }}>
               <thead>
                 <tr>
                   <th style={{ fontSize: 11, fontWeight: 500, color: 'var(--steel)', width: 176, textAlign: 'left', paddingRight: 8 }}>場地(容納人數)</th>
@@ -174,12 +174,34 @@ export default function AdminBookingsPage() {
       <Spin spinning={venueQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>場地</div>
-          <table className="tb dense" style={{ minWidth: 720 }}>
+          <table className="tb dense" aria-label="待審場地借用" style={{ minWidth: 720 }}>
+            <thead>
+              <tr>
+                <th>社團</th>
+                <th>場地</th>
+                <th>日期</th>
+                <th>時段與用途</th>
+                <th>狀態</th>
+                <th aria-label="開啟" style={{ width: 32 }} />
+              </tr>
+            </thead>
             <tbody>
               {pendingVenues.map((v) => (
                 <tr key={v.id} onClick={() => openReview({ kind: 'venue', data: v })} style={{ cursor: 'pointer' }}>
                   <td>{v.club}</td>
-                  <td style={{ fontWeight: 500 }}>{v.venue}</td>
+                  <td style={{ fontWeight: 500 }}>
+                    <button
+                      type="button"
+                      className="row-open-btn"
+                      aria-label={`開啟 ${v.club} 借用「${v.venue || '未命名場地'}」的審核`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openReview({ kind: 'venue', data: v })
+                      }}
+                    >
+                      {v.venue || '未命名場地'}
+                    </button>
+                  </td>
                   <td className="num" style={{ fontSize: 13 }}>{v.date}</td>
                   <td style={{ fontSize: 13, color: 'var(--steel)' }}>第 {v.periods.join('、')} 節 · {v.purpose}</td>
                   <td style={{ width: 90 }}><StatusPill status={v.status} /></td>
@@ -207,7 +229,17 @@ export default function AdminBookingsPage() {
       <Spin spinning={loanQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>器材</div>
-          <table className="tb dense" style={{ minWidth: 720 }}>
+          <table className="tb dense" aria-label="待審器材借用" style={{ minWidth: 720 }}>
+            <thead>
+              <tr>
+                <th>社團</th>
+                <th>器材與數量</th>
+                <th>借用期間</th>
+                <th>活動與用途</th>
+                <th>狀態</th>
+                <th aria-label="開啟" style={{ width: 32 }} />
+              </tr>
+            </thead>
             <tbody>
               {pendingLoans.map((l) => {
                 // 該區間可借數不足:數量紅字提示(是否核准由管理員裁量)
@@ -216,7 +248,17 @@ export default function AdminBookingsPage() {
                   <tr key={l.id} onClick={() => openReview({ kind: 'loan', data: l })} style={{ cursor: 'pointer' }}>
                     <td>{l.club}</td>
                     <td style={{ fontWeight: 500 }}>
-                      {l.equipment}{' '}
+                      <button
+                        type="button"
+                        className="row-open-btn"
+                        aria-label={`開啟 ${l.club} 借用「${l.equipment || '未命名器材'}」的審核`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openReview({ kind: 'loan', data: l })
+                        }}
+                      >
+                        {l.equipment || '未命名器材'}
+                      </button>{' '}
                       {short ? (
                         <Tooltip title={`該區間可借 ${l.availableExcludingSelf}`}>
                           <span className="num" style={{ color: '#B03A2E', fontWeight: 600 }}>×{l.qty}</span>

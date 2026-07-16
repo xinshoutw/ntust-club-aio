@@ -179,7 +179,7 @@ export default function AdminRoomsPage() {
 
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-          <table className="tb dense" style={{ minWidth: 760 }}>
+          <table className="tb dense" aria-label="待審教室固定借用" style={{ minWidth: 760 }}>
             <thead>
               <tr>
                 <th>社團</th>
@@ -201,7 +201,20 @@ export default function AdminRoomsPage() {
                   style={{ cursor: 'pointer' }}
                 >
                   <td>{r.club}</td>
-                  <td style={{ fontWeight: 500 }}>{r.room}</td>
+                  <td style={{ fontWeight: 500 }}>
+                    <button
+                      type="button"
+                      className="row-open-btn"
+                      aria-label={`開啟 ${r.club} 借用「${r.room || '未命名教室'}」的審核`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSelected(r)
+                        setOpen(true)
+                      }}
+                    >
+                      {r.room || '未命名教室'}
+                    </button>
+                  </td>
                   <td style={{ fontSize: 13 }}>
                     {r.entries.flatMap((e) =>
                       e.periods.map((p) => {

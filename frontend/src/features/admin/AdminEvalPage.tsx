@@ -116,7 +116,7 @@ export default function AdminEvalPage() {
       ) : (
         <>
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-        <table className="tb" style={{ minWidth: 780 }}>
+        <table className="tb" style={{ minWidth: 780 }} aria-label="行政分評分項目">
           <thead>
             <tr>
               <th>評分項目</th>
@@ -192,7 +192,7 @@ export default function AdminEvalPage() {
       {/* 各社團行政分總覽:點列切換上方審核對象 */}
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
         <div style={{ fontSize: 14, fontWeight: 600, padding: '14px 20px 6px' }}>各社團行政分</div>
-        <table className="tb">
+        <table className="tb" aria-label="各社團行政分">
           <thead>
             <tr>
               <th>社團</th>
@@ -207,7 +207,19 @@ export default function AdminEvalPage() {
                 onClick={() => setClub(c.clubName)}
                 style={{ cursor: 'pointer', fontWeight: c.clubName === club ? 600 : undefined }}
               >
-                <td>{c.clubName}</td>
+                <td>
+                  <button
+                    type="button"
+                    className="row-open-btn"
+                    aria-label={`切換審核社團為「${c.clubName || '未命名社團'}」`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setClub(c.clubName)
+                    }}
+                  >
+                    {c.clubName}
+                  </button>
+                </td>
                 <td>{c.attribute}</td>
                 <td className="r num">{c.total}</td>
               </tr>

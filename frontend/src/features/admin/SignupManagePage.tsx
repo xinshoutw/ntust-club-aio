@@ -337,7 +337,7 @@ export default function SignupManagePage() {
 
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-          <table className="tb dense" style={{ minWidth: 720 }}>
+          <table className="tb dense" style={{ minWidth: 720 }} aria-label="報名活動列表">
             <thead>
               <tr>
                 <th>活動</th>
@@ -353,7 +353,18 @@ export default function SignupManagePage() {
                 <tr key={item.id} onClick={() => openItem(item)} style={{ cursor: 'pointer' }}>
                   <td>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 500 }}>{item.name}</span>
+                      <button
+                        type="button"
+                        className="row-open-btn"
+                        style={{ fontWeight: 500 }}
+                        aria-label={`開啟「${item.name || '未命名活動'}」報名管理`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openItem(item)
+                        }}
+                      >
+                        {item.name}
+                      </button>
                       <KindBadge kind={item.kind} />
                     </span>
                   </td>

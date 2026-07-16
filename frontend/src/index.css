@@ -124,6 +124,29 @@ body {
 .click-tint:hover {
   background-color: var(--seal-tint) !important;
 }
+.click-tint:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+/* 可點表格列的鍵盤入口:名稱欄放真按鈕,整列 click 僅作滑鼠增強
+   (tr 不設 role=button,保住 table/row 讀屏語意) */
+.row-open-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.row-open-btn:hover {
+  color: var(--seal);
+}
+.row-open-btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
 
 /* 非單一控件的區塊(照片區等)送出驗證未過時的紅框;搭配常駐透明邊框避免版面位移 */
 .area-error {

@@ -232,7 +232,7 @@ export default function BookingOverviewPage() {
             {gridError ? (
               <QueryError compact title="場地借用情形載入失敗" error={gridError.error} onRetry={gridError.retry} />
             ) : !venueDef ? (
-              <table style={{ borderCollapse: 'separate', borderSpacing: 3, width: '100%', tableLayout: 'fixed', minWidth: 720 }}>
+              <table aria-label="各場地單日借用情形" style={{ borderCollapse: 'separate', borderSpacing: 3, width: '100%', tableLayout: 'fixed', minWidth: 720 }}>
                 <thead>
                   <tr>
                     <th style={{ ...thStyle, width: 176, textAlign: 'left', paddingRight: 8 }}>場地</th>
@@ -271,7 +271,7 @@ export default function BookingOverviewPage() {
                 </tbody>
               </table>
             ) : (
-              <table style={{ borderCollapse: 'separate', borderSpacing: 3, width: '100%', tableLayout: 'fixed', minWidth: 720 }}>
+              <table aria-label={`${venueDef.name} ${VENUE_DAYS} 天借用情形`} style={{ borderCollapse: 'separate', borderSpacing: 3, width: '100%', tableLayout: 'fixed', minWidth: 720 }}>
                 <thead>
                   <tr>
                     <th style={{ ...thStyle, width: 110, textAlign: 'left', paddingRight: 8 }}>日期</th>
@@ -312,7 +312,7 @@ export default function BookingOverviewPage() {
       <Spin spinning={listsPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近借用</div>
-          <table className="tb" style={{ minWidth: 680 }}>
+          <table className="tb" aria-label="最近借用" style={{ minWidth: 680 }}>
             <thead>
               <tr>
                 <th style={{ width: 90 }}>類別</th>
@@ -367,7 +367,15 @@ export default function BookingOverviewPage() {
         {/* 已歸還:獨立分頁區(後端列表無狀態篩選,自全量資料切分後前端分頁) */}
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近歸還</div>
-          <table className="tb" style={{ minWidth: 560 }}>
+          <table className="tb" aria-label="最近歸還" style={{ minWidth: 560 }}>
+            <thead>
+              <tr>
+                <th scope="col">品項</th>
+                <th scope="col">借用期間</th>
+                <th scope="col">用途</th>
+                <th scope="col">狀態</th>
+              </tr>
+            </thead>
             <tbody>
               {returnedPaged.map((l) => (
                 <tr key={l.id}>
@@ -388,7 +396,7 @@ export default function BookingOverviewPage() {
               )}
               {!loansQuery.isError && returned.length === 0 && (
                 <tr className="no-hover">
-                  <td style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無歸還紀錄</td>
+                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無歸還紀錄</td>
                 </tr>
               )}
             </tbody>

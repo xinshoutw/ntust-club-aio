@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { App, Button, Dropdown, Modal, Popconfirm, Select, Spin, Tooltip } from 'antd'
 import { DownloadOutlined, EllipsisOutlined, FileTextOutlined, LinkOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import { FilterButton, Pager, SortButton } from '../../components/ui/tableControls'
 import StatusPill from '../../components/ui/StatusPill'
 import LargeBadge from '../../components/ui/LargeBadge'
@@ -71,10 +72,12 @@ function ActualValue({ actual, planned }: { actual: React.ReactNode; planned: st
   )
 }
 
-function PreviewModal({ a, detail, loading, open, onClose, afterClose, onEdit, onGoClose, onPreviewFile }: {
+function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, afterClose, onEdit, onGoClose, onPreviewFile }: {
   a: ClubActivity | null
   detail: ClubActivityDetail | undefined
   loading: boolean
+  error?: unknown
+  onRetry?: () => void
   open: boolean
   onClose: () => void
   afterClose: () => void
@@ -142,6 +145,12 @@ function PreviewModal({ a, detail, loading, open, onClose, afterClose, onEdit, o
       }
     >
       <Spin spinning={loading}>
+      {/* 詳情載入失敗:整塊改為錯誤呈現,避免結案資料/附件被誤看成不存在 */}
+      {error != null ? (
+        <div style={{ marginTop: 10 }}>
+          <QueryError compact title="活動詳情載入失敗" error={error} onRetry={onRetry} />
+        </div>
+      ) : (
       <div style={{ display: 'grid', gridTemplateColumns: rep ? 'minmax(0, 1fr) minmax(0, 1fr)' : '1fr', gap: 32, marginTop: 10, alignItems: 'start' }}>
         {/* 左欄:申請資料、經費、檔案 */}
         <div>
@@ -301,6 +310,7 @@ function PreviewModal({ a, detail, loading, open, onClose, afterClose, onEdit, o
           </div>
         )}
       </div>
+      )}
       </Spin>
     </Modal>
   )
@@ -400,6 +410,11 @@ export default function ActivityListPage() {
       />
 
       <Spin spinning={draftsQuery.isPending || listQuery.isPending}>
+        {draftsQuery.isError && (
+          <div style={{ marginTop: 20 }}>
+            <QueryError title="草稿載入失敗" error={draftsQuery.error} onRetry={() => void draftsQuery.refetch()} />
+          </div>
+        )}
         {drafts.length > 0 && (
           <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
             <div style={{ fontSize: 15, fontWeight: 600, padding: '14px 20px 6px' }}>
@@ -498,7 +513,14 @@ export default function ActivityListPage() {
                   ) : null,
                 ),
               )}
-              {paged.length === 0 && (
+              {listQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={6}>
+                    <QueryError compact title="活動列表載入失敗" error={listQuery.error} onRetry={() => void listQuery.refetch()} />
+                  </td>
+                </tr>
+              )}
+              {paged.length === 0 && !listQuery.isError && (
                 <tr className="no-hover">
                   <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 28 }}>
                     本學期尚無活動
@@ -514,6 +536,8 @@ export default function ActivityListPage() {
         a={preview}
         detail={detailQuery.data}
         loading={preview != null && detailQuery.isPending}
+        error={detailQuery.error}
+        onRetry={() => void detailQuery.refetch()}
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
         afterClose={() => setPreview(null)}

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router'
 import dayjs, { type Dayjs } from 'dayjs'
 import { App, Button, DatePicker, Form, Input, Select, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import {
   PERIODS,
@@ -156,7 +157,14 @@ export default function VenueBookingPage() {
                   <td style={{ width: 110 }}><StatusPill status={v.status} /></td>
                 </tr>
               ))}
-              {!recentQuery.isPending && recent.length === 0 && (
+              {recentQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={4}>
+                    <QueryError compact title="申請紀錄載入失敗" error={recentQuery.error} onRetry={() => recentQuery.refetch()} />
+                  </td>
+                </tr>
+              )}
+              {!recentQuery.isError && !recentQuery.isPending && recent.length === 0 && (
                 <tr className="no-hover">
                   <td style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無申請紀錄</td>
                 </tr>

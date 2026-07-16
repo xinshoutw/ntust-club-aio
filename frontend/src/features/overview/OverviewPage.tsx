@@ -4,6 +4,7 @@ import { Button, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import AnnouncementModal from '../../components/ui/AnnouncementModal'
+import QueryError from '../../components/ui/QueryError'
 import { useAnnouncements, type Announcement } from '../../api/announcements'
 import { useOverviewActivities, type TrackedItem } from '../../api/overview'
 import { useCertificates, useMaintenanceList, usePostalList } from '../../api/applications'
@@ -127,7 +128,12 @@ export default function OverviewPage() {
               </div>
             </div>
           ))}
-          {!loading && todos.length === 0 && <EmptyRow text="目前沒有待辦事項" />}
+          {activitiesQuery.isError && (
+            <div style={{ borderTop: '1px solid var(--line)' }}>
+              <QueryError compact title="待辦事項載入失敗" error={activitiesQuery.error} onRetry={() => activitiesQuery.refetch()} />
+            </div>
+          )}
+          {!loading && !activitiesQuery.isError && todos.length === 0 && <EmptyRow text="目前沒有待辦事項" />}
         </div>
 
         <div className="overview-grid">
@@ -176,12 +182,22 @@ export default function OverviewPage() {
                 </div>
               </div>
             ))}
-            {!loading && announcements.length === 0 && <EmptyRow text="目前沒有公告" />}
+            {announcementsQuery.isError && (
+              <div style={{ borderTop: '1px solid var(--line)' }}>
+                <QueryError compact title="公告載入失敗" error={announcementsQuery.error} onRetry={() => announcementsQuery.refetch()} />
+              </div>
+            )}
+            {!loading && !announcementsQuery.isError && announcements.length === 0 && <EmptyRow text="目前沒有公告" />}
           </div>
 
           <div className="card">
             <CardTitle title="進行中申請" count={tracked.length} />
-            {categories
+            {activitiesQuery.isError && (
+              <div style={{ borderTop: '1px solid var(--line)' }}>
+                <QueryError compact title="申請進度載入失敗" error={activitiesQuery.error} onRetry={() => activitiesQuery.refetch()} />
+              </div>
+            )}
+            {!activitiesQuery.isError && categories
               .filter((cat) => tracked.some((t) => t.category === cat))
               .map((cat) => (
                 <Fragment key={cat}>
@@ -208,7 +224,7 @@ export default function OverviewPage() {
                     ))}
                 </Fragment>
               ))}
-            {!loading && tracked.length === 0 && <EmptyRow text="目前沒有進行中的申請" />}
+            {!loading && !activitiesQuery.isError && tracked.length === 0 && <EmptyRow text="目前沒有進行中的申請" />}
           </div>
         </div>
       </Spin>

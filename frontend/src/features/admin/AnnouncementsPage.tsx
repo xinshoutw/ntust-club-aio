@@ -3,6 +3,7 @@ import dayjs, { type Dayjs } from 'dayjs'
 import { App, Button, Checkbox, DatePicker, Form, Input, Select, Spin, Switch } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import AnnouncementModal from '../../components/ui/AnnouncementModal'
+import QueryError from '../../components/ui/QueryError'
 import { Pager } from '../../components/ui/tableControls'
 import { confirmDialog } from '../../lib/confirm'
 import {
@@ -222,7 +223,12 @@ export default function AnnouncementsPage() {
               </div>
             </div>
           ))}
-          {!listQuery.isPending && items.length === 0 && (
+          {listQuery.isError && (
+            <div style={{ borderTop: '1px solid var(--line)' }}>
+              <QueryError compact title="公告載入失敗" error={listQuery.error} onRetry={() => listQuery.refetch()} />
+            </div>
+          )}
+          {!listQuery.isPending && !listQuery.isError && items.length === 0 && (
             <div style={{ padding: '18px 20px 22px', fontSize: 13, color: 'var(--steel)', borderTop: '1px solid var(--line)' }}>
               尚未發布任何公告
             </div>

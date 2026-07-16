@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { App, Button, Form, Input, Select, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import {
   DOW_TEXT,
@@ -73,6 +74,18 @@ export default function FixedRoomPage() {
         <PageHeader title="固定場地借用" />
         <div className="card" style={{ marginTop: 20, padding: '48px 24px', textAlign: 'center' }}>
           <Spin />
+        </div>
+      </div>
+    )
+  }
+
+  // 開放窗查詢失敗不可誤判為「未開放申請」,顯示錯誤與重試
+  if (windowQuery.isError) {
+    return (
+      <div>
+        <PageHeader title="固定場地借用" />
+        <div style={{ marginTop: 20 }}>
+          <QueryError title="受理期間載入失敗" error={windowQuery.error} onRetry={() => windowQuery.refetch()} />
         </div>
       </div>
     )
@@ -263,7 +276,14 @@ export default function FixedRoomPage() {
                   <td style={{ width: 110 }}><StatusPill status={r.status} /></td>
                 </tr>
               ))}
-              {!recentQuery.isPending && recent.length === 0 && (
+              {recentQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={3}>
+                    <QueryError compact title="申請紀錄載入失敗" error={recentQuery.error} onRetry={() => recentQuery.refetch()} />
+                  </td>
+                </tr>
+              )}
+              {!recentQuery.isError && !recentQuery.isPending && recent.length === 0 && (
                 <tr className="no-hover">
                   <td style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無申請紀錄</td>
                 </tr>

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { App, Button, Checkbox, Form, Input, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import AttachmentArea, { type BagFile } from '../../components/ui/AttachmentArea'
+import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { IMAGE_ACCEPT, isImageFile, isPdfFile } from '../../lib/uploads'
 import { usePostalList, usePostalMutations } from '../../api/applications'
@@ -149,7 +150,14 @@ export default function PostalPage() {
                   <td style={{ width: 100 }}><StatusPill status={r.status} /></td>
                 </tr>
               ))}
-              {!listQuery.isPending && records.length === 0 && (
+              {listQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={4}>
+                    <QueryError compact title="申請紀錄載入失敗" error={listQuery.error} onRetry={() => listQuery.refetch()} />
+                  </td>
+                </tr>
+              )}
+              {!listQuery.isPending && !listQuery.isError && records.length === 0 && (
                 <tr className="no-hover">
                   <td style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>尚無申請紀錄</td>
                 </tr>

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { App, Form, Input, Modal, Spin, Tooltip } from 'antd'
 import dayjs from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { FilterButton, SortButton, useSort } from '../../components/ui/tableControls'
 import { useAdminViolations, useResolveViolation, type AdminViolation } from '../../api/adminViolations'
@@ -152,7 +153,19 @@ export default function AdminViolationsPage() {
                   </td>
                 </tr>
               ))}
-              {!listQuery.isPending && rows.length === 0 && (
+              {listQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={8}>
+                    <QueryError
+                      compact
+                      title="違規勸導紀錄載入失敗"
+                      error={listQuery.error}
+                      onRetry={() => listQuery.refetch()}
+                    />
+                  </td>
+                </tr>
+              )}
+              {!listQuery.isPending && !listQuery.isError && rows.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={8} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有違規勸導紀錄</td>
                 </tr>

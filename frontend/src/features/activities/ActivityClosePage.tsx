@@ -4,6 +4,7 @@ import { App, Button, DatePicker, Input, InputNumber, Select, Spin, TimePicker, 
 import dayjs, { type Dayjs } from 'dayjs'
 import { RightOutlined, UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import { blurLeavesRow } from '../../lib/form'
 import { IMAGE_ACCEPT, fmtMB, isImageFile, sha256 } from '../../lib/uploads'
 import {
@@ -77,8 +78,15 @@ export default function ActivityClosePage() {
         }
       />
 
+      {/* 清單載入失敗:下拉與列表同源,一併以錯誤呈現(避免誤看成「沒有可結案的活動」) */}
+      {!activity && approvedQuery.isError && (
+        <div style={{ marginTop: 20 }}>
+          <QueryError title="可結案活動載入失敗" error={approvedQuery.error} onRetry={() => void approvedQuery.refetch()} />
+        </div>
+      )}
+
       {/* 未選活動:直接列出可結案的活動供點選 */}
-      {!activity && (
+      {!activity && !approvedQuery.isError && (
         <Spin spinning={approvedQuery.isPending}>
           {closable.length > 0 && (
             <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -128,6 +136,10 @@ export default function ActivityClosePage() {
       {activity &&
         (detailQuery.data ? (
           <CloseForm key={activity.id} activity={activity} detail={detailQuery.data} onDone={() => navigate('/activities')} />
+        ) : detailQuery.isError ? (
+          <div style={{ marginTop: 20 }}>
+            <QueryError title="活動資料載入失敗" error={detailQuery.error} onRetry={() => void detailQuery.refetch()} />
+          </div>
         ) : (
           <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
             <Spin />

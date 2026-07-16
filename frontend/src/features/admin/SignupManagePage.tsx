@@ -4,6 +4,7 @@ import { App, Button, Checkbox, DatePicker, Input, Modal, Spin, Tooltip } from '
 import { DeleteOutlined, DownloadOutlined, RightOutlined } from '@ant-design/icons'
 import type { Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { confirmDialog } from '../../lib/confirm'
 import { downloadCsv } from '../../lib/csv'
@@ -187,7 +188,12 @@ function ManageModal({
                 ))}
               </div>
             )}
-            {!sessionsQuery.isPending && sessions.length === 0 && (
+            {sessionsQuery.isError && (
+              <div style={{ marginBottom: 8 }}>
+                <QueryError compact title="場次載入失敗" error={sessionsQuery.error} onRetry={() => sessionsQuery.refetch()} />
+              </div>
+            )}
+            {!sessionsQuery.isPending && !sessionsQuery.isError && sessions.length === 0 && (
               <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 8 }}>尚未建立場次,新增場次後即可逐場登錄簽到</div>
             )}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -286,7 +292,10 @@ function ManageModal({
               </div>
             </div>
           ))}
-          {!regsQuery.isPending && regs.length === 0 && (
+          {regsQuery.isError && (
+            <QueryError compact title="報名名單載入失敗" error={regsQuery.error} onRetry={() => regsQuery.refetch()} />
+          )}
+          {!regsQuery.isPending && !regsQuery.isError && regs.length === 0 && (
             <div style={{ padding: '16px 14px', fontSize: 13, color: 'var(--steel)' }}>尚無社團報名</div>
           )}
         </div>
@@ -360,7 +369,14 @@ export default function SignupManagePage() {
                   <td className="r"><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>
                 </tr>
               ))}
-              {!listQuery.isPending && items.length === 0 && (
+              {listQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={6}>
+                    <QueryError compact title="活動列表載入失敗" error={listQuery.error} onRetry={() => listQuery.refetch()} />
+                  </td>
+                </tr>
+              )}
+              {!listQuery.isPending && !listQuery.isError && items.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
                     尚未建立報名活動

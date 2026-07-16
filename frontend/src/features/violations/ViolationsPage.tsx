@@ -2,6 +2,7 @@ import { useState } from 'react'
 import dayjs from 'dayjs'
 import { Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Pager } from '../../components/ui/tableControls'
 import { useViolations } from '../../api/violations'
@@ -69,7 +70,14 @@ export default function ViolationsPage() {
                   </tr>
                 )
               })}
-              {!listQuery.isPending && violations.length === 0 && (
+              {listQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={5}>
+                    <QueryError compact title="違規勸導紀錄載入失敗" error={listQuery.error} onRetry={() => listQuery.refetch()} />
+                  </td>
+                </tr>
+              )}
+              {!listQuery.isError && !listQuery.isPending && violations.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
                     沒有違規勸導紀錄

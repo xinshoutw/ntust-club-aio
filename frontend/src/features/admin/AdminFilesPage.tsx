@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { App, Select, Spin, Tooltip } from 'antd'
 import { DeleteOutlined, DownloadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import { confirmDialog } from '../../lib/confirm'
 import {
   fileDownloadUrl,
@@ -97,14 +98,26 @@ export default function AdminFilesPage() {
       <PageHeader
         title="檔案管理"
         sub={
-          <>
-            共 <span className="num">{totalCount.toLocaleString()}</span> 個檔案
-          </>
+          // usage 查詢失敗時不顯示「共 0 個檔案」誤導字樣(主體已呈現錯誤與重試)
+          !usageQuery.isError && (
+            <>
+              共 <span className="num">{totalCount.toLocaleString()}</span> 個檔案
+            </>
+          )
         }
       />
 
-      {/* 空間利用:數字 + 依模組分段的比例條(hover 顯示明細) */}
+      {/* 空間利用:數字 + 依模組分段的比例條(hover 顯示明細);查詢失敗顯示錯誤而非 0/— 彙總 */}
       <Spin spinning={usageQuery.isPending}>
+        {usageQuery.isError ? (
+          <div style={{ marginTop: 20 }}>
+            <QueryError
+              title="空間使用資訊載入失敗"
+              error={usageQuery.error}
+              onRetry={() => usageQuery.refetch()}
+            />
+          </div>
+        ) : (
         <div className="card" style={{ marginTop: 20, padding: '20px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 24, flexWrap: 'wrap' }}>
             <div>
@@ -179,10 +192,19 @@ export default function AdminFilesPage() {
             </span>
           </div>
         </div>
+        )}
       </Spin>
 
-      {/* 空間報修:檔案大且迭代最快,全數列出、可直接刪除;歸零時整個 section 消失 */}
-      {repairFiles.length > 0 && (
+      {/* 空間報修:檔案大且迭代最快,全數列出、可直接刪除;歸零時整個 section 消失(查詢失敗時顯示錯誤,不可誤判為無報修檔案) */}
+      {repairQuery.isError ? (
+        <div style={{ marginTop: 16 }}>
+          <QueryError
+            title="報修檔案載入失敗"
+            error={repairQuery.error}
+            onRetry={() => repairQuery.refetch()}
+          />
+        </div>
+      ) : repairFiles.length > 0 && (
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px 8px', flexWrap: 'wrap' }}>
             <span style={{ width: 10, height: 10, borderRadius: 3, background: MODULE_COLORS.repair }} />
@@ -284,7 +306,19 @@ export default function AdminFilesPage() {
                   </td>
                 </tr>
               ))}
-              {!largeQuery.isPending && largeList.length === 0 && (
+              {largeQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={7}>
+                    <QueryError
+                      compact
+                      title="大型檔案載入失敗"
+                      error={largeQuery.error}
+                      onRetry={() => largeQuery.refetch()}
+                    />
+                  </td>
+                </tr>
+              )}
+              {!largeQuery.isPending && !largeQuery.isError && largeList.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 24 }}>
                     此模組尚無大型檔案

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { App, Button, Checkbox, Input, Modal, Spin, Tabs } from 'antd'
 import { confirmDialog } from '../../lib/confirm'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import OneTimePasswordModal from './OneTimePasswordModal'
 import {
   USERNAME_HINT,
@@ -199,8 +200,23 @@ export default function AccountsPage() {
     </td>
   )
 
+  // 查詢失敗顯示錯誤與重試;空狀態僅在非錯誤時呈現,避免「查詢失敗=空表」誤導
+  const errorRow = (colSpan: number) =>
+    accountsQuery.isError && (
+      <tr className="no-hover">
+        <td colSpan={colSpan}>
+          <QueryError
+            compact
+            title="帳號列表載入失敗"
+            error={accountsQuery.error}
+            onRetry={() => accountsQuery.refetch()}
+          />
+        </td>
+      </tr>
+    )
+
   const emptyRow = (colSpan: number) =>
-    !accountsQuery.isPending && (
+    !accountsQuery.isPending && !accountsQuery.isError && (
       <tr className="no-hover">
         <td colSpan={colSpan} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
           尚無{roleLabel}帳號
@@ -239,6 +255,7 @@ export default function AccountsPage() {
             )}
           </tr>
         ))}
+        {errorRow(6)}
         {admins.length === 0 && emptyRow(6)}
       </tbody>
     </table>
@@ -258,6 +275,7 @@ export default function AccountsPage() {
             {actions(a)}
           </tr>
         ))}
+        {errorRow(4)}
         {staff.length === 0 && emptyRow(4)}
       </tbody>
     </table>
@@ -280,6 +298,7 @@ export default function AccountsPage() {
             {actions(a)}
           </tr>
         ))}
+        {errorRow(6)}
         {viewers.length === 0 && emptyRow(6)}
       </tbody>
     </table>

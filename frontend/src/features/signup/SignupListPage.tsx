@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Button, Modal, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Pager } from '../../components/ui/tableControls'
 import { useSignupItem, useSignupItems, type SignupItem } from '../../api/signups'
@@ -41,6 +42,9 @@ export default function SignupListPage() {
 
       <Spin spinning={listQuery.isPending}>
         <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {listQuery.isError && (
+            <QueryError title="報名活動載入失敗" error={listQuery.error} onRetry={() => listQuery.refetch()} />
+          )}
           {items.map((item) => {
             const clickable = item.accepting || hasRecord(item)
             const info = [item.eventAt, item.place, `每社名額上限 ${item.maxParticipants} 人`]
@@ -84,7 +88,7 @@ export default function SignupListPage() {
               </div>
             )
           })}
-          {!listQuery.isPending && !items.length && (
+          {!listQuery.isPending && !listQuery.isError && !items.length && (
             <div className="card" style={{ padding: '40px 24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
               目前沒有報名活動
             </div>
@@ -104,6 +108,8 @@ export default function SignupListPage() {
           <div style={{ padding: '24px 0', textAlign: 'center' }}>
             <Spin />
           </div>
+        ) : recordQuery.isError ? (
+          <QueryError compact title="報名紀錄載入失敗" error={recordQuery.error} onRetry={() => recordQuery.refetch()} />
         ) : recordQuery.data ? (
           <SubmissionRecord item={recordQuery.data} />
         ) : null}

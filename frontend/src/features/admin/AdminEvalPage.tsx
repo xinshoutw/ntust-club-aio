@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { App, Button, Input, InputNumber, Modal, Tooltip } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import type { AdKey } from '../eval/scoring'
 import { AD_LABELS } from '../eval/types'
 import {
@@ -27,8 +28,10 @@ const MODE_TITLE: Record<AdjustMode['kind'], string> = {
 export default function AdminEvalPage() {
   const { message } = App.useApp()
   const { club, clubId, setClub } = useAdminClub()
-  const { data: clubs } = useAdminEvalClubs()
-  const { data: detail } = useAdminEvalDetail(clubId)
+  const clubsQuery = useAdminEvalClubs()
+  const clubs = clubsQuery.data
+  const detailQuery = useAdminEvalDetail(clubId)
+  const detail = detailQuery.data
   const { override, revert, merit } = useAdminEvalMutations(clubId)
 
   const [mode, setMode] = useState<AdjustMode | null>(null)
@@ -98,6 +101,20 @@ export default function AdminEvalPage() {
         }
       />
 
+      {clubsQuery.isError || detailQuery.isError ? (
+        // 核心 clubs/scores 查詢失敗:整頁主體以錯誤說明取代,避免誤呈現空表與「—」
+        <div style={{ marginTop: 20 }}>
+          <QueryError
+            title="行政分資料載入失敗"
+            error={clubsQuery.error ?? detailQuery.error}
+            onRetry={() => {
+              if (clubsQuery.isError) void clubsQuery.refetch()
+              if (detailQuery.isError) void detailQuery.refetch()
+            }}
+          />
+        </div>
+      ) : (
+        <>
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         <table className="tb" style={{ minWidth: 780 }}>
           <thead>
@@ -198,6 +215,8 @@ export default function AdminEvalPage() {
           </tbody>
         </table>
       </div>
+        </>
+      )}
 
       <Modal
         open={open}

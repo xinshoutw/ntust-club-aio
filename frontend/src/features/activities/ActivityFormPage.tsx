@@ -5,6 +5,7 @@ import { confirmDialog } from '../../lib/confirm'
 import dayjs from 'dayjs'
 import { FileTextOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import AttachmentArea, { type BagFile } from '../../components/ui/AttachmentArea'
 import { fmtMB, isPdfFile } from '../../lib/uploads'
 import { blurLeavesRow } from '../../lib/form'
@@ -91,6 +92,17 @@ export default function ActivityFormPage() {
       return (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
           <Spin />
+        </div>
+      )
+    }
+    // 載入失敗留在原頁顯示錯誤與重試,不導回列表(導走會被誤認為活動不存在)
+    if (detailQuery.isError) {
+      return (
+        <div>
+          <PageHeader title="活動申請" />
+          <div style={{ marginTop: 20 }}>
+            <QueryError title="活動資料載入失敗" error={detailQuery.error} onRetry={() => void detailQuery.refetch()} />
+          </div>
         </div>
       )
     }

@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { App, Select, Spin } from 'antd'
 import dayjs from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { SortButton, useSort } from '../../components/ui/tableControls'
 import {
@@ -101,7 +102,19 @@ export default function AdminMaintenancePage() {
                   </td>
                 </tr>
               ))}
-              {!listQuery.isPending && rows.length === 0 && (
+              {listQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={5}>
+                    <QueryError
+                      compact
+                      title="維修申請載入失敗"
+                      error={listQuery.error}
+                      onRetry={() => listQuery.refetch()}
+                    />
+                  </td>
+                </tr>
+              )}
+              {!listQuery.isPending && !listQuery.isError && rows.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有維修申請</td>
                 </tr>

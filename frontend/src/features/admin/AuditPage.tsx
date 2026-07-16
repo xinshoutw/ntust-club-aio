@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import { FilterButton, Pager } from '../../components/ui/tableControls'
 import { ACTION_OPTIONS, ROLE_OPTIONS, actionKeyOf, roleKeyOf, useAuditLogs } from '../../api/adminAudit'
 
@@ -105,7 +106,14 @@ export default function AuditPage() {
                   <td style={{ fontSize: 13, color: 'var(--steel)' }}>{l.detail}</td>
                 </tr>
               ))}
-              {!listQuery.isPending && logs.length === 0 && (
+              {listQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={5}>
+                    <QueryError compact title="稽核紀錄載入失敗" error={listQuery.error} onRetry={() => listQuery.refetch()} />
+                  </td>
+                </tr>
+              )}
+              {!listQuery.isPending && !listQuery.isError && logs.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>無符合篩選條件的紀錄</td>
                 </tr>

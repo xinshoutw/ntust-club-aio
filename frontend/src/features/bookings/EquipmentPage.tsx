@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { App, Button, Form, Input, InputNumber, Select, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import {
   useBookingMutations,
@@ -106,6 +107,13 @@ export default function EquipmentPage() {
                     </tr>
                   )
                 })}
+                {equipmentQuery.isError && (
+                  <tr className="no-hover">
+                    <td colSpan={3}>
+                      <QueryError compact title="器材一覽載入失敗" error={equipmentQuery.error} onRetry={() => equipmentQuery.refetch()} />
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </Spin>
@@ -215,7 +223,14 @@ export default function EquipmentPage() {
                   <td style={{ width: 110 }}><StatusPill status={l.status} /></td>
                 </tr>
               ))}
-              {!recentQuery.isPending && recent.length === 0 && (
+              {recentQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={5}>
+                    <QueryError compact title="借用紀錄載入失敗" error={recentQuery.error} onRetry={() => recentQuery.refetch()} />
+                  </td>
+                </tr>
+              )}
+              {!recentQuery.isError && !recentQuery.isPending && recent.length === 0 && (
                 <tr className="no-hover">
                   <td style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無借用紀錄</td>
                 </tr>

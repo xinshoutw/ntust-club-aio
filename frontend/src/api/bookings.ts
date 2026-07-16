@@ -320,6 +320,10 @@ export function useAvailabilityDays(dates: Dayjs[]) {
     })),
     combine: (results) => ({
       isPending: results.some((r) => r.isPending),
+      isError: results.some((r) => r.isError),
+      error: results.find((r) => r.isError)?.error,
+      // 只重抓失敗的日期(成功者沿用快取)
+      refetchErrored: () => results.filter((r) => r.isError).forEach((r) => void r.refetch()),
       byDate: Object.fromEntries(
         results.map((r, i) => [toIso(dates[i]), r.data]),
       ) as Record<string, AvailabilityGrid | undefined>,

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { App, Button, Form, Input, Modal, Popconfirm, Select, Spin, Upload } from 'antd'
 import { DownOutlined, DownloadOutlined, EditOutlined, UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import { FilterButton, Pager, SortButton } from '../../components/ui/tableControls'
 import { neutralizeFormula } from '../../lib/csv'
 import { MEMBER_KINDS, kindLabel, type MemberKind } from '../../lib/roles'
@@ -285,7 +286,14 @@ export default function MembersPage() {
                   </td>
                 </tr>
               ))}
-              {!listQuery.isPending && members.length === 0 && (
+              {listQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={7}>
+                    <QueryError compact title="成員名單載入失敗" error={listQuery.error} onRetry={() => listQuery.refetch()} />
+                  </td>
+                </tr>
+              )}
+              {!listQuery.isError && !listQuery.isPending && members.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
                     尚未建立成員名單

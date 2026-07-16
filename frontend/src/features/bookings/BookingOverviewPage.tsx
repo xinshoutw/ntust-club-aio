@@ -10,6 +10,7 @@ import {
   RightOutlined,
 } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import { Pager } from '../../components/ui/tableControls'
 import StatusPill from '../../components/ui/StatusPill'
 import {
@@ -113,6 +114,10 @@ export default function BookingOverviewPage() {
   const returned = loans.filter((l) => l.status === 'returned')
   const returnedPaged = returned.slice((returnedPage - 1) * RETURNED_PAGE, returnedPage * RETURNED_PAGE)
   const listsPending = roomsQuery.isPending || venueBookingsQuery.isPending || loansQuery.isPending
+  const listsErrored = [roomsQuery, venueBookingsQuery, loansQuery].filter((q) => q.isError)
+  const retryLists = () => {
+    for (const q of listsErrored) void q.refetch()
+  }
 
   const book = (venueId: number, date: Dayjs, period: string) =>
     navigate(`/bookings/venue?venue=${venueId}&date=${date.format('YYYY/MM/DD')}&period=${period}`)
@@ -123,6 +128,15 @@ export default function BookingOverviewPage() {
   }
 
   const gridPending = venueDef ? rangeQuery.isPending : venuesQuery.isPending || dayQuery.isPending
+  // 場況圖來源查詢失敗時整卡顯示錯誤,不畫預設色格
+  // (15 天檢視走逐日並行查詢:任一日失敗即整卡錯誤,重試只補抓失敗的日期)
+  const gridError = venuesQuery.isError
+    ? { error: venuesQuery.error, retry: () => void venuesQuery.refetch() }
+    : !venueDef && dayQuery.isError
+      ? { error: dayQuery.error, retry: () => void dayQuery.refetch() }
+      : venueDef && rangeQuery.isError
+        ? { error: rangeQuery.error, retry: rangeQuery.refetchErrored }
+        : null
 
   const thStyle: React.CSSProperties = { fontSize: 11, fontWeight: 500, color: 'var(--steel)' }
 
@@ -215,7 +229,9 @@ export default function BookingOverviewPage() {
 
         <Spin spinning={gridPending}>
           <div style={{ overflowX: 'auto', marginTop: 12 }}>
-            {!venueDef ? (
+            {gridError ? (
+              <QueryError compact title="場地借用情形載入失敗" error={gridError.error} onRetry={gridError.retry} />
+            ) : !venueDef ? (
               <table style={{ borderCollapse: 'separate', borderSpacing: 3, width: '100%', tableLayout: 'fixed', minWidth: 720 }}>
                 <thead>
                   <tr>
@@ -332,7 +348,14 @@ export default function BookingOverviewPage() {
                   <td><StatusPill status={l.status} /></td>
                 </tr>
               ))}
-              {!listsPending && rooms.length === 0 && venueBookings.length === 0 && active.length === 0 && (
+              {listsErrored.length > 0 && (
+                <tr className="no-hover">
+                  <td colSpan={4}>
+                    <QueryError compact title="借用紀錄載入失敗" error={listsErrored[0]?.error} onRetry={retryLists} />
+                  </td>
+                </tr>
+              )}
+              {listsErrored.length === 0 && !listsPending && rooms.length === 0 && venueBookings.length === 0 && active.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無借用紀錄</td>
                 </tr>
@@ -356,7 +379,14 @@ export default function BookingOverviewPage() {
                   <td style={{ width: 100 }}><StatusPill status="returned" /></td>
                 </tr>
               ))}
-              {returned.length === 0 && (
+              {loansQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={4}>
+                    <QueryError compact title="歸還紀錄載入失敗" error={loansQuery.error} onRetry={() => loansQuery.refetch()} />
+                  </td>
+                </tr>
+              )}
+              {!loansQuery.isError && returned.length === 0 && (
                 <tr className="no-hover">
                   <td style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無歸還紀錄</td>
                 </tr>

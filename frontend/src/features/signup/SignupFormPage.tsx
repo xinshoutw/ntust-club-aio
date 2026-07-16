@@ -2,6 +2,7 @@ import { Link, useNavigate, useParams } from 'react-router'
 import { App, Button, Checkbox, Form, Input, Radio, Select, Spin } from 'antd'
 import { LeftOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { useSignupItem, useSignupMutations, type Participant } from '../../api/signups'
 import type { SignupField } from './types'
@@ -51,6 +52,18 @@ export default function SignupFormPage() {
         <BackLink />
         <div className="card" style={{ marginTop: 12, padding: '48px 24px', textAlign: 'center' }}>
           <Spin />
+        </div>
+      </div>
+    )
+  }
+
+  // 查詢失敗(網路/伺服器錯誤)顯示錯誤與重試;僅查詢成功但無資料才視為「不存在」
+  if (itemQuery.isError) {
+    return (
+      <div>
+        <BackLink />
+        <div style={{ marginTop: 12 }}>
+          <QueryError title="報名活動載入失敗" error={itemQuery.error} onRetry={() => itemQuery.refetch()} />
         </div>
       </div>
     )

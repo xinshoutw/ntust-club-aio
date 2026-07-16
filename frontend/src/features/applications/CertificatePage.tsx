@@ -1,5 +1,6 @@
 import { App, Button, Form, Input, Select, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
 import { kindLabel, type MemberKind } from '../../lib/roles'
@@ -25,16 +26,18 @@ export default function CertificatePage() {
   // 依學年期 + 職位自動帶出成員(名單預覽);0 或 >1 位皆不可送出,送出時後端再驗證
   const namesQuery = useOfficerNames(term, position)
   const uniqueNames = namesQuery.data ?? []
-  const matchState: 'idle' | 'loading' | 'ok' | 'none' | 'many' =
+  const matchState: 'idle' | 'loading' | 'ok' | 'none' | 'many' | 'error' =
     !term || !position
       ? 'idle'
-      : namesQuery.isPending
-        ? 'loading'
-        : uniqueNames.length === 1
-          ? 'ok'
-          : uniqueNames.length === 0
-            ? 'none'
-            : 'many'
+      : namesQuery.isError
+        ? 'error'
+        : namesQuery.isPending
+          ? 'loading'
+          : uniqueNames.length === 1
+            ? 'ok'
+            : uniqueNames.length === 0
+              ? 'none'
+              : 'many'
 
   const listQuery = useCertificates()
   const records = listQuery.data?.records ?? []
@@ -90,6 +93,9 @@ export default function CertificatePage() {
               {matchState === 'many' && (
                 <div style={{ fontSize: 12, color: '#C13B34', marginTop: 4 }}>找到多位符合成員，無法送出。請先修正成員名單</div>
               )}
+              {matchState === 'error' && (
+                <QueryError compact title="成員名單載入失敗" error={namesQuery.error} onRetry={() => namesQuery.refetch()} />
+              )}
             </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
@@ -113,7 +119,14 @@ export default function CertificatePage() {
                   <td style={{ width: 100 }}><StatusPill status={c.status} /></td>
                 </tr>
               ))}
-              {!listQuery.isPending && records.length === 0 && (
+              {listQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={4}>
+                    <QueryError compact title="申請紀錄載入失敗" error={listQuery.error} onRetry={() => listQuery.refetch()} />
+                  </td>
+                </tr>
+              )}
+              {!listQuery.isPending && !listQuery.isError && records.length === 0 && (
                 <tr className="no-hover">
                   <td style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>尚無申請紀錄</td>
                 </tr>

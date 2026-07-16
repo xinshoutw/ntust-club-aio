@@ -18,6 +18,7 @@ from app.core.errors import conflict, forbidden, not_found, validation_error
 from app.models import Activity, ApprovalRecord, Club
 from app.models.enums import (
     ActivityStatus,
+    ActivityType,
     ApprovalDecision,
     ApprovalSubject,
     UserRole,
@@ -38,7 +39,9 @@ _STAGE_BY_STATUS = {
     ActivityStatus.PENDING_DEAN: ("approve_dean", "dean"),
 }
 
-_REVIEW_KEYS = ("aact", "approve_advisor", "approve_chief", "approve_dean")
+# aact=既有後端鍵、areview=前端權限彈窗鍵(尚未統一,任一即通過)
+_REVIEW_PAGE_KEYS = ("aact", "areview")
+_REVIEW_KEYS = (*_REVIEW_PAGE_KEYS, "approve_advisor", "approve_chief", "approve_dean")
 
 
 async def _reviewer(user: CurrentUser) -> CurrentUser:
@@ -65,7 +68,7 @@ def _require_stage_key(user, key: str) -> None:
 
 def _visible_statuses(user) -> set[ActivityStatus] | None:
     """受限關卡帳號只看得到自己關卡相關的狀態;None=不限(super 或持審核頁權限)。"""
-    if user.is_super or "aact" in user.permissions:
+    if user.is_super or any(k in user.permissions for k in _REVIEW_PAGE_KEYS):
         return None
     visible: set[ActivityStatus] = set()
     if "approve_advisor" in user.permissions:
@@ -230,7 +233,13 @@ async def approve(
             missing = [i for i in activity.budget_items if i.approved_subsidy is None]
             if missing:
                 raise validation_error("尚有經費項目未核定金額")
-        if activity.is_large:
+        # 大型活動認可:實心=已認可(含未申請但管理員逕行核定,2026-07-15 第七輪)
+        if body.is_large_approved:
+            if activity.type != ActivityType.EVENT:
+                raise validation_error("僅類型為「活動」的案件可認定為大型活動")
+            activity.is_large = True  # 未申請由管理員逕行核定
+            activity.is_large_approved = True
+        elif activity.is_large:
             activity.is_large_approved = (
                 body.is_large_approved if body.is_large_approved is not None else False
             )

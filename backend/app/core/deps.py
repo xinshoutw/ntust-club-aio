@@ -91,13 +91,16 @@ async def require_club(user: CurrentUser) -> User:
 ClubUser = Annotated[User, Depends(require_club)]
 
 
-def require_permission(key: str):
-    """管理員頁面權限鍵(aact/aclose/…)或簽核關卡鍵(approve_advisor/…);super 全通。"""
+def require_permission(*keys: str):
+    """管理員頁面權限鍵(aact/aclose/…)或簽核關卡鍵(approve_advisor/…);super 全通。
+
+    可傳多鍵=任一即通過(前後端權限鍵名尚未統一時的別名,如 areg/asignup)。
+    """
 
     async def dep(user: CurrentUser) -> User:
         if user.role != UserRole.ADMIN:
             raise forbidden()
-        if not user.is_super and key not in user.permissions:
+        if not user.is_super and not any(k in user.permissions for k in keys):
             raise forbidden()
         return user
 

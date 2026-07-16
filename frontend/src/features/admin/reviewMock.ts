@@ -1,7 +1,7 @@
 import type { StatusKey } from '../../lib/status'
 
 export interface ReviewItem {
-  id: string
+  id: string // 後端接線後=數字字串(String(activity.id));mock 為 ACT-… 形式(彈窗僅供查看)
   club: string
   name: string
   type: '社課' | '活動' | '會議'
@@ -10,6 +10,7 @@ export interface ReviewItem {
   date: string
   requested: number
   status: StatusKey
+  fundSource?: string // 第一關認定的經費來源(後端 fund_source)
   // 行政端社團總覽會以社團端活動 mock 組出唯讀檢視,部分欄位可能缺漏(彈窗以 — 呈現)
   detail?: {
     timeRange?: string
@@ -19,6 +20,7 @@ export interface ReviewItem {
     submittedAt?: string
     submittedBy?: string
     attachments: string[]
+    attachmentFiles?: { id: string; name: string; url: string }[] // 後端接線後提供可下載連結
     budget: { id: number; category: string; description: string; selfFund: number; requested: number; approved: number }[]
   }
 }

@@ -132,7 +132,8 @@ async def list_activities(
     club_id: int | None = Query(None),
 ) -> ApiResponse[list[ActivityOut]]:
     query = (
-        sa.select(Activity)
+        sa.select(Activity, Club.name)
+        .join(Club, Activity.club_id == Club.id)
         .where(Activity.status != ActivityStatus.DRAFT)  # 草稿不進審核視野
         .options(sa.orm.selectinload(Activity.budget_items))
         .order_by(Activity.id.desc())
@@ -145,12 +146,13 @@ async def list_activities(
     if club_id:
         query = query.where(Activity.club_id == club_id)
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
-    rows = (await db.scalars(query.offset(page.offset).limit(page.page_size))).all()
+    rows = (await db.execute(query.offset(page.offset).limit(page.page_size))).all()
     lock_months = await get_setting(db, "close_lock_months")
     data = []
-    for activity in rows:
+    for activity, club_name in rows:
         out = ActivityOut.model_validate(activity)
         svc.decorate(out, activity, lock_months)
+        out.club_name = club_name
         data.append(out)
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
@@ -178,6 +180,8 @@ async def get_activity(
     lock_months = await get_setting(db, "close_lock_months")
     out = ActivityDetailOut.model_validate(activity)
     svc.decorate(out, activity, lock_months)
+    club = await db.get(Club, activity.club_id)
+    out.club_name = club.name if club else ""
     out.photos = [
         FileOut.model_validate(f) for f in await svc.activity_files(db, activity, svc.PHOTO_SLOT)
     ]

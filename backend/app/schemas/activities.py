@@ -155,6 +155,7 @@ class ActivityOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    club_id: int
     name: str
     type: ActivityType
     is_large: bool
@@ -179,8 +180,10 @@ class ActivityOut(BaseModel):
     approved_total: int | None = None
     semester: str = ""
     close_locked: bool = False
+    close_deadline: date | None = None  # 結案期限=活動結束日+N 個月(推導不儲存)
     can_close: bool = False
     has_close_draft: bool = False
+    club_name: str = ""  # 行政端填(社團端看自己,免帶)
 
 
 class ActivityDetailOut(ActivityOut):

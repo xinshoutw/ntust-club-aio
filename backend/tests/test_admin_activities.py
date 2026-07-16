@@ -192,6 +192,21 @@ async def test_stage_only_account_visibility_is_scoped(client, db):
     assert (await client.get(f"/api/v1/admin/activities/{aid}")).status_code == 200
 
 
+async def test_admin_list_includes_club_name_and_close_deadline(client, db):
+    club = await seed(client, db)
+    aid = await submit_activity(client, db)
+
+    await login(client, "advisor")
+    listing = (await client.get("/api/v1/admin/activities")).json()
+    row = next(r for r in listing["data"] if r["id"] == aid)
+    assert row["club_id"] == club.id
+    assert row["club_name"] == club.name
+    assert row["close_deadline"]  # 推導:活動結束日 + 鎖定月數
+
+    detail = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]
+    assert detail["club_name"] == club.name
+
+
 async def test_unlock_requires_actual_lock(client, db):
     await seed(client, db)
     recent = (date.today() - timedelta(days=2)).isoformat()

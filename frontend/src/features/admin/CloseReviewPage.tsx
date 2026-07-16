@@ -1,79 +1,21 @@
-import { useState } from 'react'
-import { App, Button, Checkbox, Input, Modal } from 'antd'
+import { useMemo, useState } from 'react'
+import { App, Button, Checkbox, Input, Modal, Skeleton, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
-
-interface PendingClose {
-  id: string
-  club: string
-  name: string
-  date: string
-  submittedAt: string
-  approvedBudget: number // 核定補助
-  expense: number // 實際支出
-  photos: number
-  videoLink?: string
-  actualLocation: string
-  actualAttendees: number
-  highlights: string // 活動重點
-  goals: string // 達成目標
-  others?: string // 其他成果
-  reflections: { name: string; dept: string; text: string }[]
-  reviewMeeting?: { date: string; attendees: number; topics: string; conclusion: string }
-}
-
-const PENDING: PendingClose[] = [
-  {
-    id: 'ACT-114-0014',
-    club: '攝影社',
-    name: '期末影展',
-    date: '2026/06/10',
-    submittedAt: '2026/06/18 20:41',
-    approvedBudget: 20000,
-    expense: 19500,
-    photos: 8,
-    videoLink: 'https://youtu.be/demo114',
-    actualLocation: '學生活動中心',
-    actualAttendees: 96,
-    highlights: '展出 42 件社員作品,含期末專題「城市光影」系列;開幕導覽 2 場。',
-    goals: '參觀人次 96(目標 80);社員全數完成至少 1 件參展作品。',
-    others: '與美術社合辦閉幕座談,建立跨社合作管道。',
-    reflections: [
-      { name: '陳予恩', dept: '資工三', text: '第一次負責佈展動線,學會用觀眾視角規劃展場,也體會到燈光對作品呈現的影響。' },
-      { name: '林詠晴', dept: '企管二', text: '售票與導覽的排班讓我練習到跨組協調,若能提前一週彩排會更從容。' },
-      { name: '張佑群', dept: '資工三', text: '負責攝影紀錄,學到活動紀實與作品拍攝的差異,下次想嘗試短片形式。' },
-    ],
-    reviewMeeting: { date: '2026/06/12', attendees: 9, topics: '動線與售票流程檢討', conclusion: '入場改雙櫃台,明年提前兩週宣傳' },
-  },
-  {
-    id: 'ACT-114-0016',
-    club: '國際志工社',
-    name: '社區服務日',
-    date: '2026/06/08',
-    submittedAt: '2026/06/20 09:12',
-    approvedBudget: 6000,
-    expense: 6200,
-    photos: 4,
-    actualLocation: '古亭社區活動中心',
-    actualAttendees: 25,
-    highlights: '為社區長者舉辦手機教學與健康量測,服務 25 位長者。',
-    goals: '完成 3 小時服務時數;建立與里辦公室的長期合作。',
-    reflections: [
-      { name: '王思晴', dept: '化工二', text: '教長輩用通訊軟體比想像中需要耐心,拆步驟講解才有效。' },
-      { name: '李承翰', dept: '機械三', text: '量測站的動線一開始混亂,調整成單向排隊後順很多。' },
-      { name: '張晉安', dept: '資工二', text: '第一次全程用台語服務,發現語言親近感對長輩很重要。' },
-      { name: '陳雅婷', dept: '應外一', text: '準備的教材字體太小,現場臨時放大重印,學到受眾優先。' },
-    ],
-  },
-]
-
-const LOCKED = [
-  { id: 'ACT-114-0012', club: '資工系學會', name: '程式設計工作坊', deadline: '2026/05/12' },
-]
+import { useAuth } from '../../app/auth'
+import { fmtMoney } from '../activities/types'
+import {
+  canActOnClose,
+  useAdminActivities,
+  useAdminActivityDetail,
+  useAdminActivityMutations,
+  type AdminActivity,
+} from '../../api/adminActivities'
 
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 
-// 繳交確認:輔導老師逐項確認;未確認之項目評鑑以 0 分計(原型規則)
+// 繳交確認:輔導老師逐項確認;未確認之項目評鑑以 0 分計(原型規則)。
+// 後端 close-approve 尚無 body 可落庫勾選狀態:僅作前端覆核提示(gap,待後端補)
 const SUBMISSION_CHECKS = [
   { key: 'photos', label: '活動照片' },
   { key: 'report', label: '成果報告表' },
@@ -81,26 +23,50 @@ const SUBMISSION_CHECKS = [
 ] as const
 type CheckKey = (typeof SUBMISSION_CHECKS)[number]['key']
 
-// 結案審核彈窗:輔導老師單關;成果概況+繳交確認,核准或退回(退回原因必填)
+// 結案審核彈窗:輔導老師單關;完整結案資料(GET /admin/activities/{id})+繳交確認,
+// 核准或退回(退回原因必填)
 function CloseReviewModal({
   item,
   open,
   onClose,
   afterClose,
 }: {
-  item: PendingClose
+  item: AdminActivity
   open: boolean
   onClose: () => void
   afterClose: () => void
 }) {
   const { message } = App.useApp()
+  const { user } = useAuth()
+  const detailQuery = useAdminActivityDetail(item.activityId)
+  const { closeApprove, closeReject } = useAdminActivityMutations()
   const [rejectOpen, setRejectOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [checks, setChecks] = useState<Record<CheckKey, boolean>>({ photos: true, report: true, reflections: true })
 
-  const closeReject = () => {
+  const detail = detailQuery.data
+  const report = detail?.report
+  const photos = detail?.photos ?? []
+  const canReview = item.status === 'closing_pending_advisor' && canActOnClose(user)
+
+  const closeReject_ = () => {
     setRejectOpen(false)
     setReason('')
+  }
+
+  const submitApprove = () => {
+    closeApprove.mutate(item.activityId, {
+      onSuccess: () => {
+        const missing = SUBMISSION_CHECKS.filter((c) => !checks[c.key]).map((c) => c.label)
+        message.success(
+          missing.length
+            ? `已核准「${item.name}」結案(${missing.join('、')}未繳,該項以 0 分計)`
+            : `已核准「${item.name}」結案`,
+        )
+        onClose()
+      },
+      onError: (e) => message.error(e.message),
+    })
   }
 
   const submitReject = () => {
@@ -108,13 +74,25 @@ function CloseReviewModal({
       message.error('退回原因為必填')
       return
     }
-    message.success(`已退回「${item.name}」結案`)
-    closeReject()
-    onClose()
+    closeReject.mutate(
+      { id: item.activityId, reason: reason.trim() },
+      {
+        onSuccess: () => {
+          message.success(`已退回「${item.name}」結案`)
+          closeReject_()
+          onClose()
+        },
+        onError: (e) => message.error(e.message),
+      },
+    )
   }
 
-  const overBudget = item.expense > item.approvedBudget
-  const photoShort = item.photos < 5 && !item.videoLink
+  const approvedBudget = item.approvedTotal ?? 0
+  // 實際支出含自籌:與「自籌+核定補助」的總經費比較才可比(僅比核定補助幾乎必超)
+  const totalBudget = item.selfFundTotal + approvedBudget
+  const overBudget = !!report && report.expense > totalBudget
+  const photoShort = !!detail && photos.length < 5 && !report?.videoUrl
+  const dateRange = item.endDate !== item.date ? `${item.date} – ${item.endDate}` : item.date
 
   return (
     <Modal
@@ -125,118 +103,161 @@ function CloseReviewModal({
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 26 }}>
           <span style={{ fontSize: 16, fontWeight: 600 }}>{item.name}</span>
-          <StatusPill status="closing_pending_advisor" />
+          <StatusPill status={item.status} />
         </div>
       }
       footer={
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
-          <Button danger style={{ height: 38 }} onClick={() => setRejectOpen(true)}>退回</Button>
-          <Button
-            type="primary"
-            autoFocus
-            style={{ height: 38 }}
-            onClick={() => {
-              const missing = SUBMISSION_CHECKS.filter((c) => !checks[c.key]).map((c) => c.label)
-              message.success(
-                missing.length
-                  ? `已核准「${item.name}」結案(${missing.join('、')}未繳,該項以 0 分計)`
-                  : `已核准「${item.name}」結案`,
-              )
-              onClose()
-            }}
-          >
-            核准結案
-          </Button>
-        </div>
+        canReview ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
+            <Button danger style={{ height: 38 }} disabled={closeApprove.isPending} onClick={() => setRejectOpen(true)}>
+              退回
+            </Button>
+            <Button
+              type="primary"
+              autoFocus
+              style={{ height: 38 }}
+              disabled={!report}
+              loading={closeApprove.isPending}
+              onClick={submitApprove}
+            >
+              核准結案
+            </Button>
+          </div>
+        ) : (
+          <div style={{ fontSize: 12, color: 'var(--steel)' }}>
+            {item.status === 'closing_pending_advisor' ? '無結案簽核權限，僅供查看' : '僅供查看'}
+          </div>
+        )
       }
     >
-      <div style={{ display: 'grid', gridTemplateColumns: '88px 1fr', gap: '9px 12px', fontSize: 13, marginTop: 4 }}>
-        <div style={detailLabel}>社團</div><div>{item.club}</div>
-        <div style={detailLabel}>活動日期</div><div className="num">{item.date}</div>
-        <div style={detailLabel}>實際地點</div><div>{item.actualLocation}</div>
-        <div style={detailLabel}>實際人數</div><div className="num">{item.actualAttendees} 人</div>
-        <div style={detailLabel}>送件</div><div className="num">{item.submittedAt}</div>
-        <div style={detailLabel}>經費</div>
-        <div>
-          核定 <span className="num">${item.approvedBudget.toLocaleString()}</span> · 實支{' '}
-          <span className="num" style={overBudget ? { color: '#B03A2E', fontWeight: 500 } : undefined}>
-            ${item.expense.toLocaleString()}
-          </span>
-          {overBudget && <span style={{ color: '#B03A2E', fontSize: 12 }}>(超出核定)</span>}
-        </div>
-        <div style={detailLabel}>成果</div>
-        <div>
-          照片 <span className="num" style={photoShort ? { color: '#B03A2E' } : undefined}>{item.photos}</span> 張
-          {item.videoLink ? (
-            <>
-              {' '}·{' '}
-              <a href={item.videoLink} target="_blank" rel="noopener noreferrer">影片連結</a>
-            </>
-          ) : (
-            ' · 無影片連結'
+      {detailQuery.isPending ? (
+        <Skeleton active paragraph={{ rows: 8 }} style={{ marginTop: 12 }} />
+      ) : detailQuery.isError ? (
+        <div style={{ marginTop: 16, fontSize: 13, color: '#B03A2E' }}>載入失敗:{detailQuery.error.message}</div>
+      ) : !report ? (
+        <div style={{ marginTop: 16, fontSize: 13, color: 'var(--steel)' }}>此活動尚無結案資料</div>
+      ) : (
+        <>
+          <div style={{ display: 'grid', gridTemplateColumns: '88px 1fr', gap: '9px 12px', fontSize: 13, marginTop: 4 }}>
+            <div style={detailLabel}>社團</div><div>{item.club}</div>
+            <div style={detailLabel}>活動日期</div><div className="num">{dateRange}</div>
+            <div style={detailLabel}>實際時間</div>
+            <div className="num">{report.actualStart}–{report.actualEnd}</div>
+            <div style={detailLabel}>實際地點</div><div>{report.actualLocation}</div>
+            <div style={detailLabel}>實際人數</div>
+            <div>
+              社員 <span className="num">{report.memberCount}</span> · 非社員{' '}
+              <span className="num">{report.nonMemberCount}</span>
+            </div>
+            <div style={detailLabel}>送件</div><div className="num">{report.submittedAt}</div>
+            <div style={detailLabel}>經費</div>
+            <div>
+              核定補助 <span className="num">{fmtMoney(approvedBudget)}</span> · 自籌{' '}
+              <span className="num">{fmtMoney(item.selfFundTotal)}</span> · 實支{' '}
+              <span className="num" style={overBudget ? { color: '#B03A2E', fontWeight: 500 } : undefined}>
+                {fmtMoney(report.expense)}
+              </span>
+              {overBudget && <span style={{ color: '#B03A2E', fontSize: 12 }}>(超出核定總經費)</span>}
+            </div>
+            <div style={detailLabel}>成果</div>
+            <div>
+              照片 <span className="num" style={photoShort ? { color: '#B03A2E' } : undefined}>{photos.length}</span> 張
+              {report.videoUrl ? (
+                <>
+                  {' '}·{' '}
+                  <a href={report.videoUrl} target="_blank" rel="noopener noreferrer">影片連結</a>
+                </>
+              ) : (
+                ' · 無影片連結'
+              )}
+              {' '}· 心得 <span className="num">{report.reflections.length}</span> 人
+              {photoShort && <div style={{ color: '#B03A2E', fontSize: 12 }}>照片未達 5 張且無影片連結,成果照片項不計分</div>}
+            </div>
+            <div style={detailLabel}>活動重點</div><div style={{ lineHeight: 1.7 }}>{report.highlights}</div>
+            <div style={detailLabel}>達成目標</div><div style={{ lineHeight: 1.7 }}>{report.goals}</div>
+            {report.others && (
+              <>
+                <div style={detailLabel}>其他成果</div><div style={{ lineHeight: 1.7 }}>{report.others}</div>
+              </>
+            )}
+            {report.reviewMeeting && (
+              <>
+                <div style={detailLabel}>檢討會議</div>
+                <div style={{ lineHeight: 1.7 }}>
+                  <span className="num">{report.reviewDate}</span> · 與會{' '}
+                  <span className="num">{report.reviewAttendees}</span> 人
+                  <div style={{ fontSize: 12, color: 'var(--steel)' }}>討論:{report.reviewTopics}</div>
+                  <div style={{ fontSize: 12, color: 'var(--steel)' }}>決議:{report.reviewConclusion}</div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* 照片縮圖:點擊開原圖(GET /files/{id}) */}
+          {photos.length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>活動照片</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {photos.map((p) => (
+                  <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer" title={p.name}>
+                    <img
+                      src={p.url}
+                      alt={p.name}
+                      loading="lazy"
+                      width={96}
+                      height={72}
+                      style={{ width: 96, height: 72, objectFit: 'cover', borderRadius: 6, display: 'block' }}
+                    />
+                  </a>
+                ))}
+              </div>
+            </div>
           )}
-          {' '}· 心得 <span className="num">{item.reflections.length}</span> 人
-          {photoShort && <div style={{ color: '#B03A2E', fontSize: 12 }}>照片未達 5 張且無影片連結,成果照片項不計分</div>}
-        </div>
-        <div style={detailLabel}>活動重點</div><div style={{ lineHeight: 1.7 }}>{item.highlights}</div>
-        <div style={detailLabel}>達成目標</div><div style={{ lineHeight: 1.7 }}>{item.goals}</div>
-        {item.others && (
-          <>
-            <div style={detailLabel}>其他成果</div><div style={{ lineHeight: 1.7 }}>{item.others}</div>
-          </>
-        )}
-        {item.reviewMeeting && (
-          <>
-            <div style={detailLabel}>檢討會議</div>
-            <div style={{ lineHeight: 1.7 }}>
-              <span className="num">{item.reviewMeeting.date}</span> · 與會{' '}
-              <span className="num">{item.reviewMeeting.attendees}</span> 人
-              <div style={{ fontSize: 12, color: 'var(--steel)' }}>討論:{item.reviewMeeting.topics}</div>
-              <div style={{ fontSize: 12, color: 'var(--steel)' }}>決議:{item.reviewMeeting.conclusion}</div>
-            </div>
-          </>
-        )}
-      </div>
 
-      {/* 學習心得全文:審核者須核實內容 */}
-      <div style={{ marginTop: 16 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>學習心得</div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto' }}>
-          {item.reflections.map((r) => (
-            <div key={`${r.name}-${r.dept}`} style={{ padding: '8px 12px', background: 'var(--paper)', borderRadius: 6, fontSize: 13 }}>
-              <span style={{ fontWeight: 500 }}>{r.name}</span>
-              <span style={{ color: 'var(--steel)', fontSize: 12 }}>({r.dept})</span>
-              <div style={{ lineHeight: 1.7, marginTop: 2 }}>{r.text}</div>
+          {/* 學習心得全文:審核者須核實內容 */}
+          <div style={{ marginTop: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>學習心得</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto' }}>
+              {report.reflections.map((r, i) => (
+                <div key={i} style={{ padding: '8px 12px', background: 'var(--paper)', borderRadius: 6, fontSize: 13 }}>
+                  <span style={{ fontWeight: 500 }}>{r.name}</span>
+                  <span style={{ color: 'var(--steel)', fontSize: 12 }}>({r.dept})</span>
+                  <div style={{ lineHeight: 1.7, marginTop: 2 }}>{r.text}</div>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
 
-      {/* 繳交確認:未勾選之項目評鑑以 0 分計 */}
-      <div style={{ marginTop: 16, padding: '12px 14px', background: 'var(--paper)', borderRadius: 6 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>繳交確認(未確認項目評鑑以 0 分計)</div>
-        <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
-          {SUBMISSION_CHECKS.map((c) => (
-            <Checkbox
-              key={c.key}
-              checked={checks[c.key]}
-              onChange={(e) => setChecks((prev) => ({ ...prev, [c.key]: e.target.checked }))}
-            >
-              {c.label}
-            </Checkbox>
-          ))}
-        </div>
-      </div>
+          {/* 繳交確認:未勾選之項目評鑑以 0 分計 */}
+          {canReview && (
+            <div style={{ marginTop: 16, padding: '12px 14px', background: 'var(--paper)', borderRadius: 6 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>繳交確認(未確認項目評鑑以 0 分計)</div>
+              <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+                {SUBMISSION_CHECKS.map((c) => (
+                  <Checkbox
+                    key={c.key}
+                    checked={checks[c.key]}
+                    onChange={(e) => setChecks((prev) => ({ ...prev, [c.key]: e.target.checked }))}
+                  >
+                    {c.label}
+                  </Checkbox>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
 
       <Modal
         open={rejectOpen}
         title="退回結案"
         okText="確認退回"
         destroyOnHidden
+        confirmLoading={closeReject.isPending}
         okButtonProps={{ danger: true }}
         cancelText="取消"
         onOk={submitReject}
-        onCancel={closeReject}
+        onCancel={closeReject_}
       >
         <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 8 }}>
           退回原因(必填,將顯示於社團的活動列表)
@@ -255,12 +276,31 @@ function CloseReviewModal({
 
 export default function CloseReviewPage() {
   const { message } = App.useApp()
-  const [selected, setSelected] = useState<PendingClose | null>(null)
+  const [selected, setSelected] = useState<AdminActivity | null>(null)
   const [open, setOpen] = useState(false)
 
-  const openItem = (p: PendingClose) => {
+  const pendingQuery = useAdminActivities({ status: 'closing_pending_advisor' })
+  const approvedQuery = useAdminActivities({ status: 'approved' })
+  const { unlock } = useAdminActivityMutations()
+
+  // 送件早的在前(以活動建立時間近似;結案送件時間僅詳情提供)
+  const pending = useMemo(
+    () => [...(pendingQuery.data ?? [])].sort((a, b) => a.submittedAt.localeCompare(b.submittedAt)),
+    [pendingQuery.data],
+  )
+  // 逾期鎖定為推導狀態:後端無 locked 查詢參數,自已核准中篩 close_locked
+  const locked = useMemo(() => (approvedQuery.data ?? []).filter((i) => i.closeLocked), [approvedQuery.data])
+
+  const openItem = (p: AdminActivity) => {
     setSelected(p)
     setOpen(true)
+  }
+
+  const doUnlock = (l: AdminActivity) => {
+    unlock.mutate(l.activityId, {
+      onSuccess: () => message.success(`已解鎖「${l.name}」,社團可補送結案`),
+      onError: (e) => message.error(e.message),
+    })
   }
 
   return (
@@ -269,17 +309,16 @@ export default function CloseReviewPage() {
         title="結案審核"
         sub={
           <>
-            待審 <span className="num">{PENDING.length}</span> 件 · 逾期鎖定 <span className="num">{LOCKED.length}</span> 件
+            待審 <span className="num">{pending.length}</span> 件 · 逾期鎖定 <span className="num">{locked.length}</span> 件
           </>
         }
       />
 
       {/* 待審佇列:送件早的在前 */}
-      <div className="card" style={{ marginTop: 20 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 6px' }}>待審結案</div>
-        {[...PENDING]
-          .sort((a, b) => a.submittedAt.localeCompare(b.submittedAt))
-          .map((p) => (
+      <Spin spinning={pendingQuery.isPending}>
+        <div className="card" style={{ marginTop: 20 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 6px' }}>待審結案</div>
+          {pending.map((p) => (
             <div
               key={p.id}
               className="click-tint"
@@ -306,18 +345,12 @@ export default function CloseReviewPage() {
               <div style={{ flex: '1 1 240px', minWidth: 0 }}>
                 <div style={{ fontSize: 14, fontWeight: 500 }}>{p.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 2 }}>
-                  {p.club} · 活動 <span className="num">{p.date}</span> · 送件 <span className="num">{p.submittedAt}</span>
-                </div>
-              </div>
-              <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                <div style={{ fontSize: 12, color: 'var(--steel)' }}>成果</div>
-                <div className="num" style={{ fontSize: 13, marginTop: 2 }}>
-                  照片 {p.photos} · 心得 {p.reflections.length}
+                  {p.club} · 活動 <span className="num">{p.date}</span>
                 </div>
               </div>
               <div style={{ textAlign: 'right', whiteSpace: 'nowrap', minWidth: 84 }}>
-                <div style={{ fontSize: 12, color: 'var(--steel)' }}>實際支出</div>
-                <div className="num" style={{ fontSize: 13, marginTop: 2 }}>${p.expense.toLocaleString()}</div>
+                <div style={{ fontSize: 12, color: 'var(--steel)' }}>核定補助</div>
+                <div className="num" style={{ fontSize: 13, marginTop: 2 }}>{fmtMoney(p.approvedTotal ?? 0)}</div>
               </div>
               <Button
                 type="primary"
@@ -332,40 +365,50 @@ export default function CloseReviewPage() {
               </Button>
             </div>
           ))}
-        {PENDING.length === 0 && (
-          <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
-            目前沒有待審結案
-          </div>
-        )}
-      </div>
+          {pending.length === 0 && (
+            <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
+              {pendingQuery.isError ? `載入失敗:${pendingQuery.error.message}` : '目前沒有待審結案'}
+            </div>
+          )}
+        </div>
+      </Spin>
 
-      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>逾期未結案(已鎖定)</div>
-        <table className="tb dense" style={{ minWidth: 640 }}>
-          <tbody>
-            {LOCKED.map((l) => (
-              <tr key={l.id} className="no-hover">
-                <td>{l.club}</td>
-                <td style={{ fontWeight: 500 }}>{l.name}</td>
-                <td style={{ fontSize: 13, color: 'var(--steel)' }}>
-                  結案期限 <span className="num">{l.deadline}</span>
-                </td>
-                <td style={{ width: 110 }}><StatusPill status="locked" /></td>
-                <td className="r" style={{ width: 90 }}>
-                  <Button size="small" style={{ height: 28 }} onClick={() => message.success(`已解鎖「${l.name}」,社團可補送結案`)}>
-                    解鎖
-                  </Button>
-                </td>
-              </tr>
-            ))}
-            {LOCKED.length === 0 && (
-              <tr className="no-hover">
-                <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>沒有逾期的活動</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <Spin spinning={approvedQuery.isPending}>
+        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>逾期未結案(已鎖定)</div>
+          <table className="tb dense" style={{ minWidth: 640 }}>
+            <tbody>
+              {locked.map((l) => (
+                <tr key={l.id} className="no-hover">
+                  <td>{l.club}</td>
+                  <td style={{ fontWeight: 500 }}>{l.name}</td>
+                  <td style={{ fontSize: 13, color: 'var(--steel)' }}>
+                    結案期限 <span className="num">{l.closeDeadline ?? '—'}</span>
+                  </td>
+                  <td style={{ width: 110 }}><StatusPill status="locked" /></td>
+                  <td className="r" style={{ width: 90 }}>
+                    <Button
+                      size="small"
+                      style={{ height: 28 }}
+                      loading={unlock.isPending && unlock.variables === l.activityId}
+                      onClick={() => doUnlock(l)}
+                    >
+                      解鎖
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+              {!approvedQuery.isPending && locked.length === 0 && (
+                <tr className="no-hover">
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
+                    {approvedQuery.isError ? `載入失敗:${approvedQuery.error.message}` : '沒有逾期的活動'}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Spin>
 
       {/* Modal 常駐至關閉動畫結束(afterClose)才卸載 */}
       {selected && (

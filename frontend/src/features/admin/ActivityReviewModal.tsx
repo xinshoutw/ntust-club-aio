@@ -92,8 +92,9 @@ export default function ActivityReviewModal({
   const [rejectOpen, setRejectOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  // 大型活動:社團申請或管理員逕行核定;認可後行政分才享 ×3 加權
-  const [largeApproved, setLargeApproved] = useState(item.largeApproved ?? !!item.isLarge)
+  // 大型活動:社團申請或管理員逕行核定;認可後行政分才享 ×3 加權。
+  // 未處理的申請預設不勾(空心=待處理),認可須管理員明確勾選,避免順手核准即誤放 ×3
+  const [largeApproved, setLargeApproved] = useState(item.largeApproved ?? false)
   // 經費來源:有申請補助的案件由第一關認定(後端必填)
   const [fundSource, setFundSource] = useState(item.fundSource ?? '')
   const d = item.detail
@@ -101,14 +102,13 @@ export default function ActivityReviewModal({
   const [approvals, setApprovals] = useState<Record<number, number>>(() =>
     Object.fromEntries((d?.budget ?? []).map((b) => [b.id, b.approved])),
   )
-  // 接線頁面開彈窗時詳情可能尚未載入:detail 到位後一次性回填(不重複,避免蓋掉編輯中內容)
+  // 接線頁面開彈窗時詳情可能尚未載入:budget 到位後一次性回填核定金額。
+  // 只補 approvals——fundSource/largeApproved 列表列已帶,且可能已被使用者編輯,不得覆寫
   const seeded = useRef(!!item.detail)
   useEffect(() => {
     if (seeded.current || !item.detail) return
     seeded.current = true
     setApprovals(Object.fromEntries(item.detail.budget.map((b) => [b.id, b.approved])))
-    setFundSource(item.fundSource ?? '')
-    setLargeApproved(item.largeApproved ?? !!item.isLarge)
   }, [item])
 
   // 「本關」:接 API 的頁面(有 onApprove)依登入者簽核鍵推導;mock 展示維持第一關可簽
@@ -203,6 +203,8 @@ export default function ActivityReviewModal({
               type="primary"
               autoFocus
               style={{ height: 38 }}
+              // 接線頁面詳情未載入前不可核准(經費逐項核定要靠 detail 的 budget)
+              disabled={!!onApprove && !item.detail}
               loading={submitting && !rejectOpen}
               onClick={() => void submitApprove()}
             >

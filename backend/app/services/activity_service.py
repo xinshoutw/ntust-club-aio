@@ -78,6 +78,7 @@ def decorate(out, activity: Activity, lock_months: int) -> None:
     out.approved_total = sum(approved) if approved else None
     out.semester = semester_of(activity.date)
     out.close_locked = is_close_locked(activity, lock_months)
+    out.close_deadline = add_months(activity.end_date or activity.date, lock_months)
     out.can_close = can_close(activity, lock_months)
     out.has_close_draft = activity.close_draft is not None
 

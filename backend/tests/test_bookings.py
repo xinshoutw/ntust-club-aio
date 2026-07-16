@@ -11,7 +11,7 @@ from app.models import (
     SystemSetting,
     Venue,
 )
-from app.models.enums import ActivityStatus, EquipmentCategory, VenueCategory
+from app.models.enums import ActivityStatus, VenueCategory
 from app.services.booking_service import next_workday, overdue_deadline
 from tests.conftest import csrf_headers, login, make_club, make_user
 
@@ -31,8 +31,8 @@ async def make_venue(db, name="S304 音樂教室", *, allow_fixed=True, allow_te
     return venue
 
 
-async def make_equipment(db, name="帳篷", *, total_qty=5, category=EquipmentCategory.TENT, **kw):
-    eq = Equipment(name=name, category=category, total_qty=total_qty, **kw)
+async def make_equipment(db, name="帳篷", *, total_qty=5, **kw):
+    eq = Equipment(name=name, total_qty=total_qty, **kw)
     db.add(eq)
     await db.commit()
     await db.refresh(eq)

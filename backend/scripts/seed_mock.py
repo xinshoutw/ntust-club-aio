@@ -79,7 +79,6 @@ from app.models.enums import (
     BookingStatus,
     CertPosition,
     ClubAttribute,
-    EquipmentCategory,
     LoanStatus,
     MaintenanceStatus,
     MemberKind,
@@ -151,26 +150,26 @@ CSIE_MEMBERS: dict[str, list[tuple[str, str, MemberKind, str | None]]] = {
     ],
 }
 
-# 器材主檔(2026-07-17 需求方提供 17 項總數;數量由管理員後台維護)
-# (名稱, 類別, 總數, 需登記序號)
-EQUIPMENT_MASTER: list[tuple[str, EquipmentCategory, int, bool]] = [
-    ("帳篷", EquipmentCategory.TENT, 6, True),
-    ("摺疊桌", EquipmentCategory.GENERAL, 25, False),
-    ("椅子", EquipmentCategory.GENERAL, 80, False),
-    ("紅龍", EquipmentCategory.GENERAL, 6, False),
-    ("電腦單槍投影機", EquipmentCategory.ELECTRONIC, 5, True),
-    ("麥克風架", EquipmentCategory.GENERAL, 6, False),
-    ("擴音機MA101", EquipmentCategory.ELECTRONIC, 2, True),
-    ("各式音源線", EquipmentCategory.GENERAL, 20, False),
-    ("投影銀幕", EquipmentCategory.SCREEN, 5, True),
-    ("旗桿/旗座組", EquipmentCategory.GENERAL, 10, False),
-    ("擴音器 tw-Hi92", EquipmentCategory.ELECTRONIC, 3, True),
-    ("TRUSS", EquipmentCategory.GENERAL, 3, False),
-    ("酒精", EquipmentCategory.GENERAL, 2, False),
-    ("溫度計", EquipmentCategory.GENERAL, 3, False),
-    ("5M 延長線", EquipmentCategory.GENERAL, 5, False),
-    ("10M 延長線", EquipmentCategory.GENERAL, 2, False),
-    ("15M 延長線", EquipmentCategory.GENERAL, 1, False),
+# 器材主檔(2026-07-17 需求方提供 17 項總數;數量與點交方式由管理員後台維護)
+# (名稱, 總數, 依序點交);依序點交=需登記序號逐台清點
+EQUIPMENT_MASTER: list[tuple[str, int, bool]] = [
+    ("帳篷", 6, True),
+    ("摺疊桌", 25, False),
+    ("椅子", 80, False),
+    ("紅龍", 6, False),
+    ("電腦單槍投影機", 5, True),
+    ("麥克風架", 6, False),
+    ("擴音機MA101", 2, True),
+    ("各式音源線", 20, False),
+    ("投影銀幕", 5, True),
+    ("旗桿/旗座組", 10, False),
+    ("擴音器 tw-Hi92", 3, True),
+    ("TRUSS", 3, False),
+    ("酒精", 2, False),
+    ("溫度計", 3, False),
+    ("5M 延長線", 5, False),
+    ("10M 延長線", 2, False),
+    ("15M 延長線", 1, False),
 ]
 
 
@@ -371,10 +370,8 @@ def _create_members(db: AsyncSession, csie: Club) -> None:
 
 def _create_equipment(db: AsyncSession) -> dict[str, Equipment]:
     rows = {
-        name: Equipment(
-            name=name, category=category, total_qty=qty, needs_serial=serial, sort=i
-        )
-        for i, (name, category, qty, serial) in enumerate(EQUIPMENT_MASTER, 1)
+        name: Equipment(name=name, total_qty=qty, needs_serial=serial, sort=i)
+        for i, (name, qty, serial) in enumerate(EQUIPMENT_MASTER, 1)
     }
     for row in rows.values():
         db.add(row)

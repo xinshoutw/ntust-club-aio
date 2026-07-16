@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime, timedelta
 import sqlalchemy as sa
 
 from app.models import Activity, AuditLog, Equipment, EquipmentLoan, User
-from app.models.enums import ActivityStatus, EquipmentCategory
+from app.models.enums import ActivityStatus
 from app.services import notify
 from tests.conftest import csrf_headers, login, make_club, make_user
 
@@ -29,7 +29,7 @@ async def make_checked_out_loan(db, club, *, status="checked_out", eq_name="å¸³ç
         date=date(2026, 3, 10), end_date=date(2026, 3, 10),
         status=ActivityStatus.APPROVED, created_by=creator,
     )
-    eq = Equipment(name=eq_name, category=EquipmentCategory.TENT, total_qty=5)
+    eq = Equipment(name=eq_name, total_qty=5)
     db.add_all([activity, eq])
     await db.flush()
     today = datetime.now(UTC).date()

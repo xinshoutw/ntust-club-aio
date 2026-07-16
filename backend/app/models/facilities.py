@@ -6,7 +6,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, db_enum
-from app.models.enums import EquipmentCategory, VenueCategory
+from app.models.enums import VenueCategory
 
 
 class Venue(Base, TimestampMixin):
@@ -31,11 +31,9 @@ class Equipment(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(sa.Text, unique=True)
-    category: Mapped[EquipmentCategory] = mapped_column(
-        db_enum(EquipmentCategory, "equipment_category")
-    )
     total_qty: Mapped[int] = mapped_column(default=0)
-    needs_serial: Mapped[bool] = mapped_column(default=False)  # 點交需登記序號
+    # 點交方式:False=一般、True=依序點交(需登記序號);2026-07-17 移除類別後為唯一分類欄
+    needs_serial: Mapped[bool] = mapped_column(default=False)
     sort: Mapped[int] = mapped_column(default=0)
     is_active: Mapped[bool] = mapped_column(default=True)
 

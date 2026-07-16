@@ -33,9 +33,8 @@ class EquipmentOut(BaseModel):
 
     id: int
     name: str
-    category: str
     total_qty: int
-    needs_serial: bool
+    needs_serial: bool  # False=一般、True=依序點交(2026-07-17 移除類別後為唯一分類)
     available: int = 0  # 推導(帶 activity_id 查詢時=該活動借用區間內的可借數)
 
 

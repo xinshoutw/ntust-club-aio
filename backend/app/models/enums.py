@@ -38,13 +38,6 @@ class VenueCategory(StrEnum):
     DORM = "宿舍區"  # 2026-07-15 場地主檔定案新增(一宿 B2)
 
 
-class EquipmentCategory(StrEnum):
-    GENERAL = "一般"
-    ELECTRONIC = "電子設備"
-    SCREEN = "投影布幕"
-    TENT = "帳篷"
-
-
 class ActivityType(StrEnum):
     COURSE = "社課"
     EVENT = "活動"

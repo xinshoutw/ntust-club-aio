@@ -19,7 +19,6 @@ from app.models import (
 from app.models.enums import (
     ActivityStatus,
     ApprovalSubject,
-    EquipmentCategory,
     VenueCategory,
 )
 from tests.conftest import csrf_headers, login, make_club, make_user
@@ -37,7 +36,7 @@ async def make_venue(db, name="精誠廣場", *, allow_fixed=False, allow_temp=T
 
 
 async def make_equipment(db, name="帳篷", *, total_qty=5):
-    eq = Equipment(name=name, category=EquipmentCategory.TENT, total_qty=total_qty)
+    eq = Equipment(name=name, total_qty=total_qty)
     db.add(eq)
     await db.commit()
     await db.refresh(eq)

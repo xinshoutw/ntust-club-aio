@@ -1,4 +1,7 @@
-"""器材主檔維護 schema(行政端 CRUD;2026-07-17)。"""
+"""器材主檔維護 schema(行政端 CRUD;2026-07-17)。
+
+點交方式以 needs_serial 表達:False=一般、True=依序點交(移除類別後為唯一分類)。
+"""
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -8,7 +11,6 @@ class EquipmentMasterOut(BaseModel):
 
     id: int
     name: str
-    category: str
     total_qty: int
     needs_serial: bool
     is_active: bool
@@ -16,7 +18,6 @@ class EquipmentMasterOut(BaseModel):
 
 class EquipmentIn(BaseModel):
     name: str = Field(min_length=1, max_length=50)
-    category: str
     total_qty: int = Field(ge=0, le=100_000)
     needs_serial: bool = False
 
@@ -30,10 +31,9 @@ class EquipmentIn(BaseModel):
 
 
 class EquipmentUpdateIn(BaseModel):
-    """部分更新:只改有帶的欄位(數量、名稱、類別、序號登記、啟用)。"""
+    """部分更新:只改有帶的欄位(數量、名稱、點交方式、啟用)。"""
 
     name: str | None = Field(None, min_length=1, max_length=50)
-    category: str | None = None
     total_qty: int | None = Field(None, ge=0, le=100_000)
     needs_serial: bool | None = None
     is_active: bool | None = None

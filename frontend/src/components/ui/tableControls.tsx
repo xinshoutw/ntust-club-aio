@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Dropdown } from 'antd'
+import type { CSSProperties } from 'react'
+import { Dropdown, Pagination } from 'antd'
 import { FilterOutlined, SwapOutlined } from '@ant-design/icons'
 
 // 手刻表格的排序/篩選控制:點標題切換 升冪→降冪→無;漏斗圖示開多選篩選
@@ -32,6 +33,34 @@ export function SortButton<K extends string>({
     <button type="button" className="link-btn" style={{ padding: 0, fontWeight: 500 }} onClick={() => onToggle(sortKey)}>
       {label} <SwapOutlined rotate={90} style={{ fontSize: 11, color: sort?.key === sortKey ? 'var(--seal)' : undefined }} />
     </button>
+  )
+}
+
+// 全站統一分頁:置中、無數字頁碼鈕(simple 模式=上一頁/可輸入跳頁的「x / y」/下一頁),只有一頁也顯示
+export function Pager({
+  page,
+  pageSize,
+  total,
+  onChange,
+  style,
+}: {
+  page: number
+  pageSize: number
+  total: number
+  onChange: (page: number) => void
+  style?: CSSProperties
+}) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 14px', ...style }}>
+      <Pagination
+        simple
+        current={page}
+        pageSize={pageSize}
+        total={Math.max(total, 1)}
+        onChange={onChange}
+        showSizeChanger={false}
+      />
+    </div>
   )
 }
 

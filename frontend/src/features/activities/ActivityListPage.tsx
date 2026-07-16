@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { App, Button, Dropdown, Modal, Pagination, Select, Tooltip } from 'antd'
+import { App, Button, Dropdown, Modal, Select, Tooltip } from 'antd'
 import { DownloadOutlined, EllipsisOutlined, FileTextOutlined, FilterOutlined, LinkOutlined, SwapOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
+import { Pager } from '../../components/ui/tableControls'
 import StatusPill from '../../components/ui/StatusPill'
 import LargeBadge from '../../components/ui/LargeBadge'
 import { STATUS } from '../../lib/status'
@@ -486,11 +487,7 @@ export default function ActivityListPage() {
           </tbody>
         </table>
       </div>
-      {rest.length > PAGE_SIZE && (
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 14 }}>
-          <Pagination current={page} pageSize={PAGE_SIZE} total={rest.length} onChange={setPage} showSizeChanger={false} />
-        </div>
-      )}
+      <Pager page={page} pageSize={PAGE_SIZE} total={rest.length} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
       <PreviewModal
         a={preview}
         open={previewOpen}

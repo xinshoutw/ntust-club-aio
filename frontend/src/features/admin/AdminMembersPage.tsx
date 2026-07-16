@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
-import { App, Button, Pagination, Select } from 'antd'
+import { App, Button, Select } from 'antd'
 import { DownloadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
+import { Pager } from '../../components/ui/tableControls'
 import { neutralizeFormula } from '../../lib/csv'
 import { CURRENT_SEMESTER, semesterOptions } from '../../lib/semester'
 import { MEMBERS } from '../members/mock'
@@ -92,11 +93,7 @@ export default function AdminMembersPage() {
           </tbody>
         </table>
       </div>
-      {list.length > PAGE_SIZE && (
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 14 }}>
-          <Pagination current={page} pageSize={PAGE_SIZE} total={list.length} onChange={setPage} showSizeChanger={false} />
-        </div>
-      )}
+      <Pager page={page} pageSize={PAGE_SIZE} total={list.length} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
     </div>
   )
 }

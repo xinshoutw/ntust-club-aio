@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { App, Button, Dropdown, Form, Input, Modal, Pagination, Popconfirm, Select, Upload } from 'antd'
+import { App, Button, Dropdown, Form, Input, Modal, Popconfirm, Select, Upload } from 'antd'
 import { DownOutlined, DownloadOutlined, EditOutlined, FilterOutlined, SwapOutlined, UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
+import { Pager } from '../../components/ui/tableControls'
 import { neutralizeFormula } from '../../lib/csv'
 import { CURRENT_SEMESTER, semesterOptions } from '../../lib/semester'
 import { MEMBERS, type Member } from './mock'
@@ -271,11 +272,7 @@ export default function MembersPage() {
           </tbody>
         </table>
       </div>
-      {view.length > PAGE_SIZE && (
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 14 }}>
-          <Pagination current={page} pageSize={PAGE_SIZE} total={view.length} onChange={setPage} showSizeChanger={false} />
-        </div>
-      )}
+      <Pager page={page} pageSize={PAGE_SIZE} total={view.length} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
 
       <Modal
         open={addOpen}

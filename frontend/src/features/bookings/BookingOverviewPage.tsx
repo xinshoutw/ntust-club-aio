@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import dayjs, { type Dayjs } from 'dayjs'
-import { Button, DatePicker, Pagination, Select, Tooltip } from 'antd'
+import { Button, DatePicker, Select, Tooltip } from 'antd'
 import {
   ArrowLeftOutlined,
   DoubleLeftOutlined,
@@ -10,6 +10,7 @@ import {
   RightOutlined,
 } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
+import { Pager } from '../../components/ui/tableControls'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
 import { CELL, EQUIPMENT_LOANS, PERIODS, ROOM_REQUESTS, VENUE_BOOKINGS, VENUES, cellInfo, roomEntryText, type CellState } from './mock'
@@ -320,11 +321,7 @@ export default function BookingOverviewPage() {
             )}
           </tbody>
         </table>
-        {returned.length > RETURNED_PAGE && (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 14px' }}>
-            <Pagination current={returnedPage} pageSize={RETURNED_PAGE} total={returned.length} onChange={setReturnedPage} showSizeChanger={false} />
-          </div>
-        )}
+        <Pager page={returnedPage} pageSize={RETURNED_PAGE} total={returned.length} onChange={setReturnedPage} style={{ padding: '10px 0 14px' }} />
       </div>
     </div>
   )

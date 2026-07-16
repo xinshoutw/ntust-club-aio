@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Pagination } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
-import { FilterButton } from '../../components/ui/tableControls'
+import { FilterButton, Pager } from '../../components/ui/tableControls'
 
 const PAGE_SIZE = 20
 
@@ -115,16 +114,7 @@ export default function AuditPage() {
             )}
           </tbody>
         </table>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', padding: '12px 20px 16px' }}>
-          <Pagination
-            current={page}
-            pageSize={PAGE_SIZE}
-            total={filtered.length}
-            onChange={setPage}
-            showSizeChanger={false}
-            hideOnSinglePage
-          />
-        </div>
+        <Pager page={page} pageSize={PAGE_SIZE} total={filtered.length} onChange={setPage} />
       </div>
     </div>
   )

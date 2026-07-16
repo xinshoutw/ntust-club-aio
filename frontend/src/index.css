@@ -163,6 +163,8 @@ body {
 .md-body {
   font-size: 13px;
   line-height: 1.8;
+  /* 長英數/URL 必要時斷行,防撐破容器 */
+  overflow-wrap: anywhere;
 }
 .md-body p,
 .md-body ul,

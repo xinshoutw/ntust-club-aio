@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router'
 import { Button, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
+import Markdown from '../../components/ui/Markdown'
 import AnnouncementModal from '../../components/ui/AnnouncementModal'
 import QueryError from '../../components/ui/QueryError'
 import { useAnnouncements, type Announcement } from '../../api/announcements'
@@ -167,18 +168,8 @@ export default function OverviewPage() {
                     {a.date}
                   </span>
                 </div>
-                <div
-                  style={{
-                    fontSize: 13,
-                    color: 'var(--steel)',
-                    lineHeight: 1.7,
-                    marginTop: 6,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  {a.content}
+                <div className="announcement-preview">
+                  <Markdown source={a.content} />
                 </div>
               </div>
             ))}

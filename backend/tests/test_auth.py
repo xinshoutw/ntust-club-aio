@@ -201,6 +201,27 @@ async def test_session_sliding_renewal(client, db):
     assert any(c.startswith("csrf_token=") and "Max-Age=604800" in c for c in cookies)
 
 
+async def test_upload_precheck_gate(client, db):
+    """nginx auth_request 用的 pre-body 驗證:未登入 401、CSRF 錯 403、通過 204。"""
+    await make_user(db, username="club01")
+    assert (await client.get("/api/v1/auth/precheck")).status_code == 401
+
+    await login(client, "club01")
+    assert (await client.get("/api/v1/auth/precheck")).status_code == 403  # 缺 CSRF
+    resp = await client.get("/api/v1/auth/precheck", headers={"X-CSRF-Token": "bogus"})
+    assert resp.status_code == 403
+    resp = await client.get("/api/v1/auth/precheck", headers=csrf_headers(client))
+    assert resp.status_code == 204
+
+
+async def test_upload_precheck_blocks_unfinished_password_change(client, db):
+    await make_user(db, username="fresh", must_change_password=True)
+    await login(client, "fresh")
+    resp = await client.get("/api/v1/auth/precheck", headers=csrf_headers(client))
+    assert resp.status_code == 403
+    assert resp.json()["meta"]["code"] == "PASSWORD_CHANGE_REQUIRED"
+
+
 async def test_validation_error_does_not_echo_input(client, db):
     """422 detail 不回傳 input/url:巨型或敏感輸入不得在錯誤回應中二次外洩。"""
     resp = await client.post(

@@ -1,14 +1,17 @@
+import secrets
+
 from fastapi import APIRouter, Request, Response
 
 from app.core.deps import (
     CSRF_COOKIE,
+    CSRF_HEADER,
     SESSION_COOKIE,
     AuthDep,
     DbDep,
     client_ip,
     set_auth_cookies,
 )
-from app.core.errors import AppError, rate_limited
+from app.core.errors import AppError, forbidden, rate_limited
 from app.core.rate_limit import login_limiter
 from app.models import Club, User
 from app.schemas.auth import ChangePasswordRequest, LoginRequest, UserOut
@@ -56,6 +59,20 @@ async def logout(
     response.delete_cookie(SESSION_COOKIE, path="/")
     response.delete_cookie(CSRF_COOKIE, path="/")
     return ApiResponse()
+
+
+@router.get("/precheck", include_in_schema=False)
+async def upload_precheck(auth: AuthDep, request: Request) -> Response:
+    """nginx auth_request 子請求(部署層 pre-body 防護):在後端讀取 multipart
+    body 前驗證 session/CSRF/首登改密,未通過即拒絕、暫存檔不落地。
+    子請求為 GET(get_auth 不驗 CSRF),但原請求是上傳,故此處一律驗。"""
+    session, user = auth
+    token = request.headers.get(CSRF_HEADER, "")
+    if not token or not secrets.compare_digest(token, session.csrf_token):
+        raise forbidden("CSRF 驗證失敗,請重新整理頁面", code="CSRF_FAILED")
+    if user.must_change_password:
+        raise forbidden("首次登入請先變更密碼", code="PASSWORD_CHANGE_REQUIRED")
+    return Response(status_code=204)
 
 
 @router.get("/me")

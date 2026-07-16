@@ -2,7 +2,7 @@
 
 > 給下一個 session 的交接快照。永久性專案知識在三層 `AGENTS.md` 與 `docs/architecture.md`、`docs/data-model.md`、`docs/design-guide.md`;本檔只記「現在進行到哪、接下來做什麼」。過期即刪。
 
-## 本輪已完成(Task #6:18 個 commit,`44406f0..HEAD`)
+## 本輪已完成(Task #6:21 個 commit,`44406f0..HEAD`)
 
 第九輪交接列的 Task #6 待辦(E2E、交叉審查、資安、無障礙 sweep)已全數執行。Codex 第一輪唯讀審查的分級與證據見 `docs/TASK6_REVIEW_HANDOFF.md`(仍保留供對照);本輪把其中已確認的 finding 全部修掉並補測試。
 
@@ -28,15 +28,24 @@
 - **A11Y-04** `fix(a11y): raise information-bearing muted text to steel`:承載資訊的 `--muted` 改 `--steel`;disabled/裝飾維持 muted。
 - **A11Y-05** `fix(a11y): keyboard reordering for signup builder fields`:拖曳把手改可聚焦 button,方向鍵上/下移(重用 reorder 邏輯)。
 
+### 第二輪交叉審查(codex gpt-5.6-sol xhigh)後補修
+
+Codex 對全 changeset 的唯讀審查判「需修正後再合入」,兩個 MEDIUM 均已修:
+
+- **CR-01** `fix(eval): scope upload dedup to the rubric item`:評鑑去重原以 `slot=item_key` 為鍵,`item_key` 跨年度重複(`award_rubric_items` 逐年版本化),前一年檔案仍 active 時隔年同內容合法上傳會被誤擋。索引與共用去重改以 `subject_id`(rubric_item_id,逐年唯一)為範圍;`save_upload(dedup="slot"|"subject")` 讓結案照片維持跨活動去重、評鑑改逐 item。migration `a9c2e51d7f43` 已就地改為 `uq_files_club_eval_subject_sha`(未推 origin,本機 down/up 重建過)。
+- **CR-02** `fix(admin): gate club-overview sub-sections by permission`:`/admin/club-overview`(route 由 amember gate)各區塊查 activities/rooms/bookings/maintenance 不同權限端點,amember-only admin 每區塊 403。各 sub-query 改依 permission `enabled`,無權限區塊顯示「您的權限無法檢視此區塊」而非整排載入失敗。
+
+Codex 的其餘項均驗為無問題(1m body 上限對現有 JSON 足夠、上傳白名單無漏、precheck 邏輯正確、其餘 route mapping 一致)。
+
 ## 驗證現況(全綠)
 
-- 後端:`timeout 240 uv run pytest -q` **187 passed**(~86s)、`ruff check .` 全綠、alembic up/down/up 於 dev 庫驗證過
+- 後端:`timeout 240 uv run pytest -q` **187 passed**(~83s)、`ruff check .` 全綠、alembic up/down/up 於 dev 庫驗證過(含 CR-01 索引重建)
 - 前端:`pnpm exec tsc -b` 0 錯、`pnpm test` 35 passed、`pnpm lint` 僅 6 個既有 fast-refresh warning、`pnpm build` 綠(chunk size 與 DOMPurify 既有 warning)
 - Bandit:0 High / 0 Medium / 10 Low(均為既有 dev secret/固定 seed 密碼/固定 argv subprocess/enum string 誤報,無新增)
 - **HTTP E2E(8000 功能層)**:22 項全過(public/未登入 401/錯 CSRF 403、權限矩陣 restricted admin 403、club options 開放、eval overview、precheck 403/204)
 - **部署層 E2E(8080 compose 全棧)**:login 8k→413、一般 JSON 1m→413、小 body 到後端、未登入上傳各尺寸→401、SPA CSP `frame-src 'self'`、nosniff、API `X-Frame-Options DENY`、login rate limit→429 皆驗過;`nginx -t` 通過
 - security-audit 產物:`/Users/xinshou/security-audit-skill/club-aio/run-1/`{`findings.json`(validator PASS,4 finding=3 medium/1 low)、`REPORT.md`、`FINDINGS-DETAIL.md`}
-- 交叉審查:opus ×2(資安修正 + findings 產物)判「可合入」;opus 提的兩個 Medium——(1) 活動照片去重併發**經查為誤報**(既有 `uq_files_club_report_photo_sha` 已收口,opus 只看到新的 eval index)、(2) 上傳鎖持有窗過長**已修**(`perf(files)` commit)
+- 交叉審查:opus ×2(資安修正 + findings 產物)+ codex ×1(全 changeset)。opus 兩個 Medium——(1) 活動照片去重併發**經查為誤報**(既有 `uq_files_club_report_photo_sha` 已收口,opus 只看到新的 eval index)、(2) 上傳鎖持有窗過長**已修**(`perf(files)`)。codex 兩個 Medium(CR-01 eval 跨年度去重、CR-02 club-overview 權限)**均已修**;其餘驗為無問題
 
 ## 已跑驗證的環境狀態
 

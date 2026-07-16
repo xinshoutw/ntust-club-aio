@@ -1,32 +1,47 @@
 import { useEffect, useRef, useState } from 'react'
-import { App, Button, Input, Switch } from 'antd'
+import { App, Button, Input, Spin, Switch } from 'antd'
 import { confirmDialog } from '../../lib/confirm'
 import PageHeader from '../../components/ui/PageHeader'
 import { useUnsavedGuard } from '../../app/unsaved'
-import { CLUB_PROFILE } from '../club-settings/mock'
+import { useAdminClubDetail, useAdminClubMutations, type AdminClubDetail } from '../../api/adminClubs'
 import ClubSelect from './ClubSelect'
 import OneTimePasswordModal from './OneTimePasswordModal'
-import { CLUBS_MASTER } from './clubsMock'
 import { useAdminClub } from './clubContext'
 
 const label: React.CSSProperties = { color: 'var(--steel)' }
 
+interface FormState {
+  name: string
+  account: string
+  active: boolean
+}
+
+const advisorText = (d: AdminClubDetail | undefined): string => {
+  if (!d?.advisorName) return '—'
+  return [d.advisorName, d.advisorDept, d.advisorExt ? `分機 ${d.advisorExt}` : null]
+    .filter(Boolean)
+    .join(' · ')
+}
+
 // 行政端管理項目:社團自行維護的內容唯讀;可改名稱/帳號、重設密碼、啟停用
 export default function AdminClubSettingsPage() {
-  const { club, setClub } = useAdminClub()
+  const { club, clubId, setClub } = useAdminClub()
   const { message, modal } = App.useApp()
-  const master = CLUBS_MASTER.find((c) => c.name === club)
+  const detailQuery = useAdminClubDetail(clubId)
+  const detail = detailQuery.data
+  const { update, resetPassword } = useAdminClubMutations()
 
-  // 已儲存基準:dirty 與「上次儲存值」比較,儲存成功即更新基準
-  const [saved, setSaved] = useState(() => ({ name: club, account: master?.account ?? '', active: master?.active ?? true }))
-  const [name, setName] = useState(saved.name)
-  const [account, setAccount] = useState(saved.account)
-  const [active, setActive] = useState(saved.active)
+  // 已儲存基準:與 form 一同以詳情初始化的快照(不直接派生自 detailQuery.data——
+  // 切換社團當下新社團詳情尚未載入會使派生值變 null、dirty 誤判為 false,繞過切換確認)
+  const [saved, setSaved] = useState<FormState | null>(null)
+  const [form, setForm] = useState<FormState | null>(null)
   const [nameError, setNameError] = useState(false)
+  // 一次性密碼:API 回傳後才開彈窗;關閉動畫結束即卸載(明碼不留存)
+  const [pw, setPw] = useState<{ password: string; account?: string } | null>(null)
   const [pwOpen, setPwOpen] = useState(false)
-  const [pwMounted, setPwMounted] = useState(false)
 
-  const dirty = name !== saved.name || account !== saved.account || active !== saved.active
+  const dirty =
+    !!form && !!saved && (form.name !== saved.name || form.account !== saved.account || form.active !== saved.active)
   // 未儲存離開警告:側欄/頂欄導航由 shell 攔截,關閉分頁由 beforeunload 攔截
   useUnsavedGuard(dirty)
   const dirtyRef = useRef(dirty)
@@ -36,18 +51,14 @@ export default function AdminClubSettingsPage() {
   const [lastClub, setLastClub] = useState(club)
   useEffect(() => {
     if (club === lastClub) return
-    const resetTo = (c: string) => {
-      const m = CLUBS_MASTER.find((x) => x.name === c)
-      const base = { name: c, account: m?.account ?? '', active: m?.active ?? true }
-      setSaved(base)
-      setName(base.name)
-      setAccount(base.account)
-      setActive(base.active)
+    const resetTo = () => {
+      setSaved(null)
+      setForm(null)
       setNameError(false)
-      setLastClub(c)
+      setLastClub(club)
     }
     if (!dirtyRef.current) {
-      resetTo(club)
+      resetTo()
       return
     }
     confirmDialog(modal, {
@@ -56,24 +67,60 @@ export default function AdminClubSettingsPage() {
       okText: '放棄變更並切換',
       okButtonProps: { danger: true },
       cancelText: '留在此頁',
-      onOk: () => resetTo(club),
+      onOk: resetTo,
       onCancel: () => setClub(lastClub),
     })
   }, [club, lastClub, modal, setClub])
 
+  // 詳情載入後初始化基準與編輯值;切換社團(兩者歸 null)後以新社團詳情重新初始化
+  useEffect(() => {
+    if (form === null && detail && club === lastClub) {
+      const base = { name: detail.name, account: detail.username ?? '', active: detail.isActive }
+      setSaved(base)
+      setForm(base)
+    }
+  }, [form, detail, club, lastClub])
+
   // 開關本身不警告;切到「停用」後按「儲存」才確認(需求方 2026-07-16)
   const save = () => {
-    // 社團名稱強制以「社」或「會」結尾(社長/會長身份顯示依此推導),無例外
-    if (!/[社會]$/.test(name.trim())) {
+    if (!form || !saved || clubId == null) return
+    const name = form.name.trim()
+    // 社團名稱強制以「社」或「會」結尾(社長/會長身份顯示依此推導),無例外;後端亦驗證
+    if (!/[社會]$/.test(name)) {
       setNameError(true)
       message.error('社團名稱必須以「社」或「會」結尾')
       return
     }
-    const doSave = () => {
-      setSaved({ name: name.trim(), account, active })
-      message.success(active ? `已儲存 ${name.trim()} 帳號設定` : `已停用 ${name.trim()} 帳號`)
+    if (!dirty) {
+      message.info('內容未變更')
+      return
     }
-    if (saved.active && !active) {
+    const doSave = () => {
+      update.mutate(
+        {
+          id: clubId,
+          // 僅送有變更的欄位(undefined 不會進 JSON body)
+          name: name !== saved.name ? name : undefined,
+          username: form.account.trim() !== saved.account ? form.account.trim() : undefined,
+          isActive: form.active !== saved.active ? form.active : undefined,
+        },
+        {
+          onSuccess: (res) => {
+            const base = { name: res.name, account: res.username ?? '', active: res.isActive }
+            setSaved(base)
+            setForm(base)
+            message.success(res.isActive ? `已儲存 ${res.name} 帳號設定` : `已停用 ${res.name} 帳號`)
+            // 名稱變更:跨頁選取以名稱續存,同步更新(先動 lastClub 避免切換確認誤觸發)
+            if (res.name !== club) {
+              setLastClub(res.name)
+              setClub(res.name)
+            }
+          },
+          onError: (e) => message.error(e.message),
+        },
+      )
+    }
+    if (saved.active && !form.active) {
       confirmDialog(modal, {
         title: `停用 ${club} 帳號`,
         content: '社團將無法登入，將不會影響進行中的申請',
@@ -87,6 +134,27 @@ export default function AdminClubSettingsPage() {
     doSave()
   }
 
+  // 重設密碼:一次性明碼由後端產生(重設當下即生效、撤銷 session),
+  // 故改為先確認再打 API,回傳明碼以彈窗一次性顯示(關閉即消失)
+  const doResetPassword = () => {
+    if (clubId == null) return
+    confirmDialog(modal, {
+      title: `重設 ${club} 的密碼`,
+      content: '將產生一次性密碼並登出該帳號所有裝置;社團下次登入須立即更改密碼',
+      okText: '確認重設',
+      cancelText: '取消',
+      onOk: () => {
+        resetPassword.mutate(clubId, {
+          onSuccess: (password) => {
+            setPw({ password, account: detail?.username ?? undefined })
+            setPwOpen(true)
+          },
+          onError: (e) => message.error(e.message),
+        })
+      },
+    })
+  }
+
   return (
     <div>
       <PageHeader title="管理項目" extra={<ClubSelect />} />
@@ -94,74 +162,100 @@ export default function AdminClubSettingsPage() {
       <div className="form-grid-2" style={{ marginTop: 20, alignItems: 'stretch' }}>
         <div className="card" style={{ padding: 24 }}>
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>社團資料</div>
-          <div style={{ display: 'grid', gridTemplateColumns: '104px 1fr', gap: '10px 12px', fontSize: 13 }}>
-            <div style={label}>指導老師</div><div>張教授 · 資訊工程系 · 分機 <span className="num">6000</span></div>
-            <div style={label}>網頁連結</div>
-            <div>{CLUB_PROFILE.url ? <a href={CLUB_PROFILE.url} target="_blank" rel="noopener noreferrer">{CLUB_PROFILE.url}</a> : '—'}</div>
-            <div style={label}>簡介</div><div style={{ lineHeight: 1.7 }}>{CLUB_PROFILE.intro || '—'}</div>
-            <div style={label}>聯絡 Email</div><div className="num">{CLUB_PROFILE.emails.filter(Boolean).join('、') || '—'}</div>
-            <div style={label}>Discord Webhook</div><div>{'已設定' /* mock:實值不顯示 */}</div>
-          </div>
+          <Spin spinning={clubId != null && detailQuery.isPending}>
+            <div style={{ display: 'grid', gridTemplateColumns: '104px 1fr', gap: '10px 12px', fontSize: 13 }}>
+              <div style={label}>指導老師</div><div>{advisorText(detail)}</div>
+              <div style={label}>網頁連結</div>
+              <div>
+                {detail?.websiteUrl ? (
+                  <a href={detail.websiteUrl} target="_blank" rel="noopener noreferrer">{detail.websiteUrl}</a>
+                ) : (
+                  '—'
+                )}
+              </div>
+              <div style={label}>簡介</div><div style={{ lineHeight: 1.7 }}>{detail?.intro || '—'}</div>
+              <div style={label}>聯絡 Email</div>
+              <div className="num">{detail?.contactEmails.filter(Boolean).join('、') || '—'}</div>
+              <div style={label}>Discord Webhook</div>
+              <div>{detail ? (detail.discordWebhookSet ? '已設定' : '未設定') : '—'}</div>
+            </div>
+            {detailQuery.isError && (
+              <div style={{ fontSize: 13, color: '#B03A2E', marginTop: 12 }}>載入失敗:{detailQuery.error.message}</div>
+            )}
+          </Spin>
         </div>
 
         <div className="card" style={{ padding: 24 }}>
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>帳號與狀態</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div className={name !== saved.name ? 'field-dirty' : undefined}>
-              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>社團名稱</div>
-              <Input
-                value={name}
-                status={nameError ? 'error' : undefined}
-                onChange={(e) => {
-                  setNameError(false)
-                  setName(e.target.value)
-                }}
-              />
-              {nameError && (
-                <div style={{ fontSize: 12, color: '#C13B34', marginTop: 4 }}>社團名稱必須以「社」或「會」結尾</div>
+          {form && saved ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div className={form.name !== saved.name ? 'field-dirty' : undefined}>
+                <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>社團名稱</div>
+                <Input
+                  value={form.name}
+                  status={nameError ? 'error' : undefined}
+                  onChange={(e) => {
+                    setNameError(false)
+                    setForm({ ...form, name: e.target.value })
+                  }}
+                />
+                {nameError && (
+                  <div style={{ fontSize: 12, color: '#C13B34', marginTop: 4 }}>社團名稱必須以「社」或「會」結尾</div>
+                )}
+              </div>
+              <div className={form.account !== saved.account ? 'field-dirty' : undefined}>
+                <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>社團帳號</div>
+                <Input
+                  className="num"
+                  value={form.account}
+                  disabled={detail?.username == null}
+                  placeholder={detail?.username == null ? '該社團尚未建立帳號' : undefined}
+                  onChange={(e) => setForm({ ...form, account: e.target.value })}
+                />
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 500 }}>帳號狀態</span>
+                <Switch checked={form.active} onChange={(v) => setForm({ ...form, active: v })} />
+                <span style={{ fontSize: 13, color: form.active ? '#1F6B45' : '#B03A2E' }}>
+                  {form.active ? '啟用中' : '已停用'}
+                </span>
+                {form.active !== saved.active && <span style={{ fontSize: 12, color: '#d48806' }}>未儲存</span>}
+              </div>
+              {detail?.suspendedUntil && (
+                <div style={{ fontSize: 12, color: '#B03A2E' }}>
+                  停權中至 <span className="num">{detail.suspendedUntil}</span>
+                  {detail.suspendReason ? ` · ${detail.suspendReason}` : ''}
+                </div>
               )}
+              {/* 重設密碼獨立生效(不需儲存),與儲存鈕相鄰 */}
+              <div style={{ display: 'flex', gap: 10, marginTop: 4, justifyContent: 'flex-end' }}>
+                <Button
+                  disabled={detail?.username == null}
+                  loading={resetPassword.isPending}
+                  onClick={doResetPassword}
+                >
+                  重設密碼
+                </Button>
+                <Button type="primary" loading={update.isPending} onClick={save}>儲存</Button>
+              </div>
             </div>
-            <div className={account !== saved.account ? 'field-dirty' : undefined}>
-              <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>社團帳號</div>
-              <Input className="num" value={account} onChange={(e) => setAccount(e.target.value)} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 13, fontWeight: 500 }}>帳號狀態</span>
-              <Switch checked={active} onChange={setActive} />
-              <span style={{ fontSize: 13, color: active ? '#1F6B45' : '#B03A2E' }}>{active ? '啟用中' : '已停用'}</span>
-              {active !== saved.active && (
-                <span style={{ fontSize: 12, color: '#d48806' }}>未儲存</span>
-              )}
-            </div>
-            {/* 重設密碼獨立生效(不需儲存),與儲存鈕相鄰 */}
-            <div style={{ display: 'flex', gap: 10, marginTop: 4, justifyContent: 'flex-end' }}>
-              <Button
-                onClick={() => {
-                  setPwMounted(true)
-                  setPwOpen(true)
-                }}
-              >
-                重設密碼
-              </Button>
-              <Button type="primary" onClick={save}>儲存</Button>
-            </div>
-          </div>
+          ) : (
+            <Spin spinning={clubId != null && detailQuery.isPending}>
+              <div style={{ minHeight: 120 }} />
+            </Spin>
+          )}
         </div>
       </div>
 
-      {/* 每次掛載重新產生一組密碼;關閉動畫結束後卸載 */}
-      {pwMounted && (
+      {/* 一次性明碼僅此回應可見;關閉動畫結束後卸載,不再顯示 */}
+      {pw && (
         <OneTimePasswordModal
           title={`重設密碼 — ${club}`}
-          okLabel="確認重設"
+          account={pw.account}
+          password={pw.password}
           open={pwOpen}
-          onOk={() => {
-            // 僅按「確認重設」才生效;Esc/點遮罩=取消不重設
-            message.success(`已重設 ${club} 的密碼`)
-            setPwOpen(false)
-          }}
           onClose={() => setPwOpen(false)}
-          afterClose={() => setPwMounted(false)}
+          afterClose={() => setPw(null)}
         />
       )}
     </div>

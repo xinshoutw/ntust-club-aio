@@ -1,91 +1,33 @@
 import { useState } from 'react'
-import { Modal } from 'antd'
+import { Modal, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import type { StatusKey } from '../../lib/status'
-import { CLUB_ACTIVITIES, TRACKED, type TrackedApplication } from '../activities/mock'
-import { budgetTotals, type Activity } from '../activities/types'
-import { CERTIFICATE_RECORDS, MAINTENANCE_RECORDS } from '../applications/mock'
-import { EQUIPMENT_LOANS, ROOM_REQUESTS, VENUE_BOOKINGS, roomEntryText } from '../bookings/mock'
-import { CLUB_PROFILE } from '../club-settings/mock'
+import { roomEntryText } from '../bookings/mock'
+import { useAdminClubDetail } from '../../api/adminClubs'
+import { useAdminBookingMutations } from '../../api/adminBookings'
+import { useAdminActivityDetail, useAdminActivityMutations } from '../../api/adminActivities'
+import {
+  useAdminClubActivities,
+  useAdminClubMaintenance,
+  useAdminClubRoomBookings,
+  useAdminClubVenueBookings,
+  useAdminEquipmentLoanList,
+  type AdminMaintenanceRow,
+} from '../../api/adminClubOverview'
 import ActivityReviewModal from './ActivityReviewModal'
 import BookingReviewModal, { type BookingReviewItem } from './BookingReviewModal'
 import ClubSelect from './ClubSelect'
-import { CLUBS_MASTER } from './clubsMock'
 import { useAdminClub } from './clubContext'
-import { REVIEW_ITEMS, type ReviewItem } from './reviewMock'
 
 const label: React.CSSProperties = { color: 'var(--steel)' }
 
-// 線上申請(空間報修/幹部證明)無專屬審核彈窗,以唯讀詳情呈現
+// 線上申請(空間報修)無專屬審核彈窗,以唯讀詳情呈現;
+// 幹部證明尚無 admin 端點,暫不列入(後端補齊後再接)
 interface Detail {
   title: string
   status: StatusKey
   rows: [string, React.ReactNode][]
-}
-
-// 審核 mock 未涵蓋的活動:以社團端活動資料組出唯讀審核檢視(狀態沿用追蹤列)
-function activityReviewView(a: Activity, status: StatusKey): ReviewItem {
-  return {
-    id: a.id,
-    club: a.club,
-    name: a.name,
-    type: a.type,
-    isLarge: a.isLarge,
-    largeApproved: a.largeApproved,
-    date: a.date,
-    requested: budgetTotals(a.budget).requested,
-    status,
-    detail: {
-      timeRange: a.timeRange ? `${a.date}${a.endDate ? ` – ${a.endDate}` : ''} ${a.timeRange}` : undefined,
-      location: a.location,
-      participantsIn: a.participantsIn,
-      participantsOut: a.participantsOut,
-      submittedAt: a.submittedAt,
-      submittedBy: a.submittedBy,
-      attachments: (a.attachments ?? []).map((f) => f.name),
-      // mock 無核定金額紀錄,核定欄以擬請值示意
-      budget: a.budget.map((b) => ({
-        id: b.id,
-        category: b.category,
-        description: b.description,
-        selfFund: b.selfFund,
-        requested: b.requestedSubsidy,
-        approved: b.approvedSubsidy ?? b.requestedSubsidy,
-      })),
-    },
-  }
-}
-
-function onlineDetail(t: TrackedApplication): Detail {
-  const mnt = MAINTENANCE_RECORDS.find((m) => m.id === t.id)
-  if (mnt) {
-    return {
-      title: t.name,
-      status: mnt.status,
-      rows: [
-        ['類別', '空間報修'],
-        ['地點', mnt.location],
-        ['報修項目', mnt.items],
-        ['申請日', <span className="num" key="d">{mnt.date}</span>],
-        ...(mnt.handleNote ? ([['處理備註', mnt.handleNote]] as [string, React.ReactNode][]) : []),
-      ],
-    }
-  }
-  const cert = CERTIFICATE_RECORDS.find((c) => c.id === t.id)
-  if (cert) {
-    return {
-      title: t.name,
-      status: cert.status,
-      rows: [
-        ['類別', '幹部證明'],
-        ['申請對象', cert.holder],
-        ['學年期', cert.term],
-        ['申請日', <span className="num" key="d">{cert.date}</span>],
-      ],
-    }
-  }
-  return { title: t.name, status: t.status, rows: [['類別', t.category]] }
 }
 
 function clickableRow(onClick: () => void): React.HTMLAttributes<HTMLDivElement> {
@@ -102,56 +44,93 @@ function clickableRow(onClick: () => void): React.HTMLAttributes<HTMLDivElement>
   }
 }
 
+function LoadError({ queries }: { queries: { isError: boolean; error: Error | null }[] }) {
+  const failed = queries.find((q) => q.isError)
+  if (!failed) return null
+  return (
+    <div style={{ padding: '12px 20px', borderTop: '1px solid var(--line)', fontSize: 13, color: '#B03A2E' }}>
+      載入失敗:{failed.error?.message ?? '請稍後再試'}
+    </div>
+  )
+}
+
 // 行政端社團總覽:比照社團端總覽,檢視所選社團的申請進度與借用中項目;
 // 點擊項目開與各專屬審核介面相同的彈窗(待審核者可直接核准/退回,其餘唯讀)
 export default function ClubOverviewPage() {
-  const { club } = useAdminClub()
-  const master = CLUBS_MASTER.find((c) => c.name === club)
-  const [review, setReview] = useState<ReviewItem | null>(null)
+  const { clubId } = useAdminClub()
+  const detailQuery = useAdminClubDetail(clubId)
+  const activitiesQuery = useAdminClubActivities(clubId)
+  const roomsQuery = useAdminClubRoomBookings(clubId)
+  const venuesQuery = useAdminClubVenueBookings(clubId)
+  const loansQuery = useAdminEquipmentLoanList({ clubId })
+  const maintQuery = useAdminClubMaintenance(clubId)
+  const actMutations = useAdminActivityMutations()
+  const bookingMutations = useAdminBookingMutations()
+
+  // 點活動列 → 取完整詳情(經費/附件)→ 詳情到位即開審核彈窗
+  const [reviewId, setReviewId] = useState<number | null>(null)
   const [reviewOpen, setReviewOpen] = useState(false)
+  const reviewQuery = useAdminActivityDetail(reviewId ?? undefined)
+  const reviewItem = reviewQuery.data
+
   const [booking, setBooking] = useState<BookingReviewItem | null>(null)
   const [bookingOpen, setBookingOpen] = useState(false)
+  const [bookingApiId, setBookingApiId] = useState<number | null>(null)
   const [detail, setDetail] = useState<Detail | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
 
-  const openReview = (item: ReviewItem) => {
-    setReview(item)
+  const info = detailQuery.data
+
+  const openActivity = (id: number) => {
+    setReviewId(id)
     setReviewOpen(true)
   }
-  const openBooking = (item: BookingReviewItem) => {
+
+  const openBooking = (item: BookingReviewItem, apiId: number) => {
     setBooking(item)
+    setBookingApiId(apiId)
     setBookingOpen(true)
   }
-  const openDetail = (d: Detail) => {
-    setDetail(d)
+
+  const openMaintenance = (m: AdminMaintenanceRow) => {
+    setDetail({
+      title: `空間報修 — ${m.location}`,
+      status: m.status,
+      rows: [
+        ['類別', '空間報修'],
+        ['地點', m.location],
+        ['報修項目', m.items],
+        ['申請日', <span className="num" key="d">{m.createdAt}</span>],
+        ...(m.handleNote ? ([['處理備註', m.handleNote]] as [string, React.ReactNode][]) : []),
+      ],
+    })
     setDetailOpen(true)
   }
 
-  const openTracked = (t: TrackedApplication) => {
-    // 借用類:同 id 對照借用 mock,開借用審核彈窗
-    if (t.category === '借用') {
-      const room = ROOM_REQUESTS.find((r) => r.id === t.id)
-      if (room) return openBooking({ kind: 'room', data: room })
-      const venue = VENUE_BOOKINGS.find((v) => v.id === t.id)
-      if (venue) return openBooking({ kind: 'venue', data: venue })
-      const loan = EQUIPMENT_LOANS.find((l) => l.id === t.id)
-      if (loan) return openBooking({ kind: 'loan', data: loan })
-    }
-    if (t.category === '線上申請') return openDetail(onlineDetail(t))
-    // 活動:以名稱+社團對照審核 mock;未涵蓋者以社團端活動資料組出唯讀檢視
-    const found = REVIEW_ITEMS.find((r) => r.name === t.name && r.club === club)
-    if (found) return openReview(found)
-    const activity = CLUB_ACTIVITIES.find((a) => a.name === t.name && a.club === club)
-    if (activity) return openReview(activityReviewView(activity, t.status))
-    openReview({ id: t.id, club, name: t.name, type: '活動', date: '—', requested: 0, status: t.status })
-  }
+  // 借用審核動作:依類別打對應 admin API(mutation 成功即 invalidate 借用整域)
+  const approveBooking = (item: BookingReviewItem, apiId: number): Promise<unknown> =>
+    item.kind === 'venue'
+      ? bookingMutations.approveVenue.mutateAsync(apiId)
+      : item.kind === 'loan'
+        ? bookingMutations.approveLoan.mutateAsync(apiId)
+        : bookingMutations.approveRoom.mutateAsync(apiId)
+  const rejectBooking = (item: BookingReviewItem, apiId: number, reason: string): Promise<unknown> =>
+    item.kind === 'venue'
+      ? bookingMutations.rejectVenue.mutateAsync({ id: apiId, reason })
+      : item.kind === 'loan'
+        ? bookingMutations.rejectLoan.mutateAsync({ id: apiId, reason })
+        : bookingMutations.rejectRoom.mutateAsync({ id: apiId, reason })
 
-  // mock 僅資工系學會有完整平時資料;其餘社團顯示空狀態
-  const tracked = club === '資工系學會' ? TRACKED : []
-  const rooms = ROOM_REQUESTS.filter((r) => r.club === club)
-  const venues = VENUE_BOOKINGS.filter((v) => v.club === club)
-  const loans = EQUIPMENT_LOANS.filter((l) => l.club === club && l.status !== 'returned')
+  const activities = activitiesQuery.data ?? []
+  const maintenance = (maintQuery.data ?? []).filter((m) => m.status !== 'done')
+  const trackedCount = activities.length + maintenance.length
+  const rooms = (roomsQuery.data ?? []).filter((r) => r.status !== 'rejected')
+  const venues = (venuesQuery.data ?? []).filter((v) => v.status !== 'rejected')
+  const loans = (loansQuery.data ?? []).filter((l) => l.status !== 'returned' && l.status !== 'rejected')
   const bookingCount = rooms.length + venues.length + loans.length
+
+  const trackedLoading = activitiesQuery.isPending || maintQuery.isPending
+  const bookingLoading = roomsQuery.isPending || venuesQuery.isPending || loansQuery.isPending
 
   const rowStyle: React.CSSProperties = {
     display: 'flex',
@@ -168,25 +147,30 @@ export default function ClubOverviewPage() {
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>基本資料</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '96px 1fr', gap: '9px 12px', fontSize: 13 }}>
-          <div style={label}>性質</div><div>{master?.attribute ?? '—'}</div>
-          <div style={label}>帳號</div>
-          <div className="num">
-            {master?.account ?? '—'}
-            {master && !master.active && <span style={{ color: '#B03A2E', marginLeft: 8 }}>(已停用)</span>}
+        <Spin spinning={clubId != null && detailQuery.isPending}>
+          <div style={{ display: 'grid', gridTemplateColumns: '96px 1fr', gap: '9px 12px', fontSize: 13 }}>
+            <div style={label}>性質</div><div>{info?.attribute ?? '—'}</div>
+            <div style={label}>帳號</div>
+            <div className="num">
+              {info?.username ?? '—'}
+              {info && !info.isActive && <span style={{ color: '#B03A2E', marginLeft: 8 }}>(已停用)</span>}
+            </div>
+            <div style={label}>網頁連結</div>
+            <div>
+              {info?.websiteUrl ? (
+                <a href={info.websiteUrl} target="_blank" rel="noopener noreferrer">{info.websiteUrl}</a>
+              ) : (
+                '—'
+              )}
+            </div>
+            <div style={label}>簡介</div><div style={{ lineHeight: 1.7 }}>{info?.intro || '—'}</div>
+            <div style={label}>聯絡 Email</div>
+            <div className="num">{info?.contactEmails.filter(Boolean).join('、') || '—'}</div>
           </div>
-          <div style={label}>網頁連結</div>
-          <div>
-            {CLUB_PROFILE.url ? (
-              <a href={CLUB_PROFILE.url} target="_blank" rel="noopener noreferrer">{CLUB_PROFILE.url}</a>
-            ) : (
-              '—'
-            )}
-          </div>
-          <div style={label}>簡介</div><div style={{ lineHeight: 1.7 }}>{CLUB_PROFILE.intro || '—'}</div>
-          <div style={label}>聯絡 Email</div>
-          <div className="num">{CLUB_PROFILE.emails.filter(Boolean).join('、') || '—'}</div>
-        </div>
+          {detailQuery.isError && (
+            <div style={{ fontSize: 13, color: '#B03A2E', marginTop: 12 }}>載入失敗:{detailQuery.error.message}</div>
+          )}
+        </Spin>
       </div>
 
       <div className="overview-grid">
@@ -194,19 +178,31 @@ export default function ClubOverviewPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 20px 12px' }}>
             <div style={{ fontSize: 15, fontWeight: 600 }}>進行中申請</div>
             <span className="num" style={{ fontSize: 12, background: '#EEF0F3', color: 'var(--steel)', borderRadius: 999, padding: '1px 8px' }}>
-              {tracked.length}
+              {trackedCount}
             </span>
+            {trackedLoading && clubId != null && <Spin size="small" />}
           </div>
-          {tracked.map((t) => (
-            <div key={t.id} className="click-tint" style={rowStyle} {...clickableRow(() => openTracked(t))}>
+          {activities.map((a) => (
+            <div key={`act-${a.id}`} className="click-tint" style={rowStyle} {...clickableRow(() => openActivity(a.id))}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 14 }}>{t.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--steel)' }}>{t.category}</div>
+                <div style={{ fontSize: 14 }}>{a.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--steel)' }}>活動申請</div>
               </div>
-              <StatusPill status={t.status} />
+              {reviewId === a.id && reviewQuery.isPending && <Spin size="small" />}
+              <StatusPill status={a.status} />
             </div>
           ))}
-          {tracked.length === 0 && (
+          {maintenance.map((m) => (
+            <div key={`mnt-${m.id}`} className="click-tint" style={rowStyle} {...clickableRow(() => openMaintenance(m))}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14 }}>空間報修 {m.location}</div>
+                <div style={{ fontSize: 12, color: 'var(--steel)' }}>線上申請</div>
+              </div>
+              <StatusPill status={m.status} />
+            </div>
+          ))}
+          <LoadError queries={[activitiesQuery, maintQuery, reviewQuery]} />
+          {!trackedLoading && trackedCount === 0 && (
             <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
               尚無進行中的申請
             </div>
@@ -219,13 +215,14 @@ export default function ClubOverviewPage() {
             <span className="num" style={{ fontSize: 12, background: '#EEF0F3', color: 'var(--steel)', borderRadius: 999, padding: '1px 8px' }}>
               {bookingCount}
             </span>
+            {bookingLoading && clubId != null && <Spin size="small" />}
           </div>
           {rooms.map((r) => (
             <div
-              key={r.id}
+              key={`room-${r.id}`}
               className="click-tint"
               style={rowStyle}
-              {...clickableRow(() => openBooking({ kind: 'room', data: r }))}
+              {...clickableRow(() => openBooking({ kind: 'room', data: r }, r.apiId))}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14 }}>{r.room}</div>
@@ -236,10 +233,10 @@ export default function ClubOverviewPage() {
           ))}
           {venues.map((v) => (
             <div
-              key={v.id}
+              key={`ven-${v.id}`}
               className="click-tint"
               style={rowStyle}
-              {...clickableRow(() => openBooking({ kind: 'venue', data: v }))}
+              {...clickableRow(() => openBooking({ kind: 'venue', data: v }, v.apiId))}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14 }}>{v.venue}</div>
@@ -250,10 +247,10 @@ export default function ClubOverviewPage() {
           ))}
           {loans.map((l) => (
             <div
-              key={l.id}
+              key={`loan-${l.id}`}
               className="click-tint"
               style={rowStyle}
-              {...clickableRow(() => openBooking({ kind: 'loan', data: l }))}
+              {...clickableRow(() => openBooking({ kind: 'loan', data: l }, l.apiId))}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14 }}>{l.equipment} <span className="num">×{l.qty}</span></div>
@@ -262,7 +259,8 @@ export default function ClubOverviewPage() {
               <StatusPill status={l.status} />
             </div>
           ))}
-          {bookingCount === 0 && (
+          <LoadError queries={[roomsQuery, venuesQuery, loansQuery]} />
+          {!bookingLoading && bookingCount === 0 && (
             <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
               尚無借用中的場地或器材
             </div>
@@ -271,24 +269,35 @@ export default function ClubOverviewPage() {
       </div>
 
       {/* 活動申請審核彈窗(與申請審核頁同版面);常駐待關閉動畫結束(afterClose)才卸載 */}
-      {review && (
+      {reviewId != null && reviewItem && (
         <ActivityReviewModal
-          key={review.id}
-          item={review}
+          key={reviewItem.id}
+          item={reviewItem}
           open={reviewOpen}
           onClose={() => setReviewOpen(false)}
-          afterClose={() => setReview(null)}
+          afterClose={() => setReviewId(null)}
+          onApprove={(p) =>
+            actMutations.approve.mutateAsync({
+              id: reviewItem.activityId,
+              fundSource: p.fundSource || undefined,
+              budget: p.budget,
+              isLargeApproved: reviewItem.type === '活動' ? p.largeApproved : undefined,
+            })
+          }
+          onReject={(reason) => actMutations.reject.mutateAsync({ id: reviewItem.activityId, reason })}
         />
       )}
 
       {/* 借用審核彈窗(與臨時場地器材審核頁同版面):審核中可核准/退回,其餘唯讀 */}
-      {booking && (
+      {booking && bookingApiId != null && (
         <BookingReviewModal
           key={booking.data.id}
           item={booking}
           open={bookingOpen}
           onClose={() => setBookingOpen(false)}
           afterClose={() => setBooking(null)}
+          onApprove={() => approveBooking(booking, bookingApiId)}
+          onReject={(reason) => rejectBooking(booking, bookingApiId, reason)}
         />
       )}
 

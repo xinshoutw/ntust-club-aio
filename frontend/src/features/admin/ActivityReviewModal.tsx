@@ -1,15 +1,28 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { App, Button, Checkbox, Input, InputNumber, Modal } from 'antd'
 import StatusPill from '../../components/ui/StatusPill'
 import LargeBadge from '../../components/ui/LargeBadge'
 import StampTrail, { type StampStage } from '../../components/ui/StampTrail'
 import { fmtMoney } from '../activities/types'
+import { useAuth } from '../../app/auth'
+import { canActOn, stageOfStatus } from '../../api/adminActivities'
 import type { ReviewItem } from './reviewMock'
 
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 
-// 章軌由單據狀態推導;登入者(mock)為輔導老師,僅本關可簽核
-function stagesOf(status: ReviewItem['status']): StampStage[] {
+// 章軌由單據狀態推導;無申請補助=輔導老師單關即核准(後端規則),只畫一顆章
+function stagesOf(status: ReviewItem['status'], singleStage: boolean): StampStage[] {
+  if (singleStage) {
+    const state: StampStage['state'] =
+      status === 'pending_advisor'
+        ? 'current'
+        : status === 'rejected'
+          ? 'rejected'
+          : status === 'draft'
+            ? 'todo'
+            : 'done'
+    return [{ char: '輔', label: '輔導老師', state, note: noteOf(state) }]
+  }
   const mk = (advisor: StampStage['state'], chief: StampStage['state'], dean: StampStage['state']): StampStage[] => [
     { char: '輔', label: '輔導老師', state: advisor, note: noteOf(advisor) },
     { char: '組', label: '組長', state: chief, note: noteOf(chief) },
@@ -49,43 +62,111 @@ function noteOf(state: StampStage['state']): string | undefined {
   }
 }
 
+/** 第一關核准送出的內容:經費來源、逐項核定金額、大型活動認可 */
+export interface ActivityApprovePayload {
+  fundSource: string
+  budget: { itemId: number; approvedSubsidy: number }[]
+  largeApproved: boolean
+}
+
 // 活動申請審核彈窗(申請審核頁與行政端社團總覽共用):
-// 章軌、基本資料、經費逐項核定、大型活動認可;待本關者可核准/退回,其餘唯讀
+// 章軌、基本資料、經費來源與逐項核定、大型活動認可;待本關者可核准/退回,其餘唯讀
+// onApprove/onReject:接 API 的頁面傳入 mutateAsync 回呼(成功 message+關彈窗、失敗 message.error)
 export default function ActivityReviewModal({
   item,
   open,
   onClose,
   afterClose,
+  onApprove,
+  onReject,
 }: {
   item: ReviewItem
   open: boolean
   onClose: () => void
   afterClose: () => void
+  onApprove?: (payload: ActivityApprovePayload) => Promise<unknown>
+  onReject?: (reason: string) => Promise<unknown>
 }) {
   const { message } = App.useApp()
+  const { user } = useAuth()
   const [rejectOpen, setRejectOpen] = useState(false)
   const [reason, setReason] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   // 大型活動:社團申請或管理員逕行核定;認可後行政分才享 ×3 加權
   const [largeApproved, setLargeApproved] = useState(item.largeApproved ?? !!item.isLarge)
+  // 經費來源:有申請補助的案件由第一關認定(後端必填)
+  const [fundSource, setFundSource] = useState(item.fundSource ?? '')
   const d = item.detail
   // 核定金額:controlled,依預算列 id 管理
   const [approvals, setApprovals] = useState<Record<number, number>>(() =>
     Object.fromEntries((d?.budget ?? []).map((b) => [b.id, b.approved])),
   )
+  // 接線頁面開彈窗時詳情可能尚未載入:detail 到位後一次性回填(不重複,避免蓋掉編輯中內容)
+  const seeded = useRef(!!item.detail)
+  useEffect(() => {
+    if (seeded.current || !item.detail) return
+    seeded.current = true
+    setApprovals(Object.fromEntries(item.detail.budget.map((b) => [b.id, b.approved])))
+    setFundSource(item.fundSource ?? '')
+    setLargeApproved(item.largeApproved ?? !!item.isLarge)
+  }, [item])
 
-  const canReview = item.status === 'pending_advisor'
-  const requestedTotal = d?.budget.reduce((s, b) => s + b.requested, 0) ?? 0
+  // 「本關」:接 API 的頁面(有 onApprove)依登入者簽核鍵推導;mock 展示維持第一關可簽
+  const canReview = onApprove ? canActOn(user, item.status) : item.status === 'pending_advisor'
+  // 經費來源/逐項核定/大型認可僅第一關(輔導老師)可編輯;組長/學務長關唯讀核准
+  const isFirstStage = item.status === 'pending_advisor'
+  const canEdit = canReview && isFirstStage
+  const requestedTotal = d?.budget.reduce((s, b) => s + b.requested, 0) ?? item.requested
   const approvedTotal = d?.budget.reduce((s, b) => s + (approvals[b.id] ?? 0), 0) ?? 0
+  const singleStage = requestedTotal === 0 // 無補助 → 輔導老師單關即核准
+  const nextStageNote =
+    isFirstStage && !singleStage ? ',送組長關' : item.status === 'pending_chief' ? ',送學務長關' : ''
 
   const closeReject = () => {
     setRejectOpen(false)
     setReason('')
   }
 
-  const submitReject = () => {
+  const submitApprove = async () => {
+    const largeNote = isFirstStage && item.type === '活動' ? `(大型活動${largeApproved ? '已認可' : '未認可'})` : ''
+    if (onApprove) {
+      if (isFirstStage && requestedTotal > 0 && !fundSource.trim()) {
+        message.error('有申請補助的案件必須認定經費來源')
+        return
+      }
+      setSubmitting(true)
+      try {
+        await onApprove({
+          fundSource: fundSource.trim(),
+          budget: (d?.budget ?? []).map((b) => ({ itemId: b.id, approvedSubsidy: approvals[b.id] ?? 0 })),
+          largeApproved,
+        })
+      } catch (e) {
+        message.error(e instanceof Error ? e.message : '操作失敗')
+        return
+      } finally {
+        setSubmitting(false)
+      }
+    }
+    message.success(`已核准「${item.name}」${largeNote}${nextStageNote}`)
+    onClose()
+  }
+
+  const submitReject = async () => {
     if (!reason.trim()) {
       message.error('退回原因為必填')
       return
+    }
+    if (onReject) {
+      setSubmitting(true)
+      try {
+        await onReject(reason.trim())
+      } catch (e) {
+        message.error(e instanceof Error ? e.message : '操作失敗')
+        return
+      } finally {
+        setSubmitting(false)
+      }
     }
     message.success(`已退回「${item.name}」`)
     closeReject()
@@ -93,6 +174,8 @@ export default function ActivityReviewModal({
   }
 
   const hasBudget = !!d && d.budget.length > 0
+  // 接線資料帶可下載連結;mock 僅檔名
+  const files = d?.attachmentFiles
 
   return (
     <Modal
@@ -104,34 +187,35 @@ export default function ActivityReviewModal({
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 26 }}>
           <span style={{ fontSize: 16, fontWeight: 600 }}>{item.name}</span>
           {/* 本關可簽核時,徽章即時反映下方「認可為大型活動」勾選 */}
-          <LargeBadge applied={item.isLarge} approved={canReview ? largeApproved : item.largeApproved} />
+          <LargeBadge applied={item.isLarge} approved={canEdit ? largeApproved : item.largeApproved} />
           <StatusPill status={item.status} />
           <span style={{ flex: 1 }} />
-          <StampTrail stages={stagesOf(item.status)} />
+          <StampTrail stages={stagesOf(item.status, singleStage)} />
         </div>
       }
       footer={
         canReview ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
-            <Button danger style={{ height: 38 }} onClick={() => setRejectOpen(true)}>
+            <Button danger style={{ height: 38 }} disabled={submitting} onClick={() => setRejectOpen(true)}>
               退回
             </Button>
             <Button
               type="primary"
               autoFocus
               style={{ height: 38 }}
-              onClick={() => {
-                const largeNote = item.type === '活動' ? `(大型活動${largeApproved ? '已認可' : '未認可'})` : ''
-                message.success(`已核准「${item.name}」${largeNote},送組長關`)
-                onClose()
-              }}
+              loading={submitting && !rejectOpen}
+              onClick={() => void submitApprove()}
             >
-              核准,送組長關
+              核准{nextStageNote}
             </Button>
           </div>
         ) : (
           <div style={{ fontSize: 12, color: 'var(--steel)' }}>
-            {item.status === 'rejected' ? '此申請已退回社團修正' : '非本關卡待審單據，僅供查看'}
+            {item.status === 'rejected'
+              ? '此申請已退回社團修正'
+              : stageOfStatus(item.status)
+                ? '非本關卡待審單據，僅供查看'
+                : '僅供查看'}
           </div>
         )
       }
@@ -164,16 +248,25 @@ export default function ActivityReviewModal({
             </div>
             <div style={detailLabel}>附件</div>
             <div>
-              {d?.attachments.length
-                ? d.attachments.map((f, i) => (
-                    <span key={f}>
+              {files?.length
+                ? files.map((f, i) => (
+                    <span key={f.id}>
                       {i > 0 && ' · '}
-                      <button type="button" className="link-btn" style={{ color: 'var(--focus)', padding: 0 }}>
-                        {f}
-                      </button>
+                      <a href={f.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--focus)' }}>
+                        {f.name}
+                      </a>
                     </span>
                   ))
-                : '—'}
+                : d?.attachments.length
+                  ? d.attachments.map((f, i) => (
+                      <span key={f}>
+                        {i > 0 && ' · '}
+                        <button type="button" className="link-btn" style={{ color: 'var(--focus)', padding: 0 }}>
+                          {f}
+                        </button>
+                      </span>
+                    ))
+                  : '—'}
             </div>
           </div>
 
@@ -181,7 +274,7 @@ export default function ActivityReviewModal({
             <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--paper)', borderRadius: 6 }}>
               <Checkbox
                 checked={largeApproved}
-                disabled={!canReview}
+                disabled={!canEdit}
                 onChange={(e) => setLargeApproved(e.target.checked)}
               >
                 認可為大型活動(評鑑行政分 ×3 加權)
@@ -198,8 +291,22 @@ export default function ActivityReviewModal({
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
               <div style={{ fontSize: 14, fontWeight: 600 }}>經費明細 — 逐項核定</div>
               <div style={{ fontSize: 12, color: 'var(--steel)' }}>
-                {canReview ? '核定金額由本關填寫' : '核定金額(唯讀)'}
+                {canEdit ? '核定金額由本關填寫' : '核定金額(唯讀)'}
               </div>
+            </div>
+            {/* 經費來源:有申請補助時第一關必填認定 */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 13 }}>
+              <span style={{ color: 'var(--steel)', whiteSpace: 'nowrap' }}>經費來源</span>
+              {canEdit ? (
+                <Input
+                  size="small"
+                  value={fundSource}
+                  onChange={(e) => setFundSource(e.target.value)}
+                  placeholder="例:課指組補助、學生會費"
+                />
+              ) : (
+                <span>{item.fundSource || '—'}</span>
+              )}
             </div>
             <table className="tb dense">
               <thead>
@@ -220,7 +327,7 @@ export default function ActivityReviewModal({
                     <td className="r num">{b.selfFund.toLocaleString()}</td>
                     <td className="r num">{b.requested.toLocaleString()}</td>
                     <td style={{ paddingRight: 0 }}>
-                      {canReview ? (
+                      {canEdit ? (
                         <InputNumber
                           size="small"
                           style={{ width: '100%' }}
@@ -258,9 +365,10 @@ export default function ActivityReviewModal({
         title="退回申請"
         okText="確認退回"
         destroyOnHidden
+        confirmLoading={submitting}
         okButtonProps={{ danger: true }}
         cancelText="取消"
-        onOk={submitReject}
+        onOk={() => void submitReject()}
         onCancel={closeReject}
       >
         <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 8 }}>

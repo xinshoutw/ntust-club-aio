@@ -15,9 +15,11 @@ export function genPassword(): string {
 }
 
 // 一次性密碼彈窗:預設隱藏、可複製;帳號之後仍可查看,密碼關閉後不再顯示
+// password 由呼叫端傳入(接後端後=API 回傳的一次性明碼);未傳入時退回本地產生(mock 頁沿用)
 export default function OneTimePasswordModal({
   title,
   account,
+  password,
   open,
   onClose,
   afterClose,
@@ -26,6 +28,7 @@ export default function OneTimePasswordModal({
 }: {
   title: string
   account?: string
+  password?: string
   open: boolean
   onClose: () => void
   afterClose: () => void
@@ -34,11 +37,12 @@ export default function OneTimePasswordModal({
   onOk?: () => void
 }) {
   const { message } = App.useApp()
-  const [password] = useState(genPassword)
+  const [generated] = useState(genPassword)
+  const shown = password ?? generated
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(password)
+      await navigator.clipboard.writeText(shown)
       message.success('已複製密碼')
     } catch {
       message.error('複製失敗！請按下顯示密碼後手動複製')
@@ -61,7 +65,7 @@ export default function OneTimePasswordModal({
       )}
       <div style={{ display: 'flex', gap: 8, marginTop: account ? 10 : 8, alignItems: 'center' }}>
         <span style={{ color: 'var(--steel)', width: 40, fontSize: 13 }}>密碼</span>
-        <Input.Password value={password} readOnly className="num" />
+        <Input.Password value={shown} readOnly className="num" />
         <Button icon={<CopyOutlined />} onClick={copy}>複製</Button>
       </div>
       <div style={{ fontSize: 12, color: '#8A5A00', marginTop: 10, lineHeight: 1.7 }}>

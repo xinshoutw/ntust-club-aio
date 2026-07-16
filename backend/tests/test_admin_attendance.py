@@ -144,3 +144,51 @@ async def test_non_session_item_auto_creates_default_session(client, db):
         sa.select(sa.func.count()).where(SignupItemSession.item_id == item.id)
     )
     assert total == 1
+
+
+async def test_session_crud_and_listing(client, db):
+    """場次建立/列表(含各社出席)/刪除;非場次制不可建場次。"""
+    club, admin = await seed(client, db)  # 已以 regadmin 登入
+    item = await make_item(db, admin)  # leader_meeting, session_based
+
+    resp = await client.post(
+        f"/api/v1/admin/signup-items/{item.id}/sessions",
+        json={"name": "第1場", "date": "2026-03-01"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201
+    session_id = resp.json()["data"]["id"]
+    assert resp.json()["data"]["semester"] == "114-2"
+
+    # 報名後登錄該場出席,列表帶出 attendance
+    db.add(Signup(item_id=item.id, club_id=club.id))
+    await db.commit()
+    resp = await client.put(
+        f"/api/v1/admin/signup-items/{item.id}/attendance",
+        json={"club_id": club.id, "attended": True, "session_id": session_id},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200
+
+    resp = await client.get(f"/api/v1/admin/signup-items/{item.id}/sessions")
+    data = resp.json()["data"]
+    assert [x["id"] for x in data] == [session_id]
+    assert data[0]["attendance"] == [{"club_id": club.id, "attended": True}]
+
+    # 刪除場次(出席隨 CASCADE 移除)
+    resp = await client.delete(
+        f"/api/v1/admin/signup-items/{item.id}/sessions/{session_id}",
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200
+    resp = await client.get(f"/api/v1/admin/signup-items/{item.id}/sessions")
+    assert resp.json()["data"] == []
+
+    # 非場次制活動不可建場次
+    normal = await make_item(db, admin, kind="normal", session_based=False)
+    resp = await client.post(
+        f"/api/v1/admin/signup-items/{normal.id}/sessions",
+        json={"name": "場次", "date": "2026-03-01"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 409

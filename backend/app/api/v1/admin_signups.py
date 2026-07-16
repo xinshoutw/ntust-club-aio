@@ -20,7 +20,7 @@ from app.core.errors import conflict, not_found, validation_error
 from app.core.semesters import TAIPEI, semester_of
 from app.models import Club, SessionAttendance, Signup, SignupEntry, SignupItem, SignupItemSession
 from app.models.enums import SignupKind
-from app.schemas.admin import AttendanceIn
+from app.schemas.admin import AttendanceIn, SessionAttendanceOut, SessionIn, SessionOut
 from app.schemas.common import ApiResponse
 from app.schemas.signups import (
     AdminSignupItemOut,
@@ -241,6 +241,85 @@ async def confirm_registration(
 
 
 # ---- 簽到登錄(2026-07-15 定案) ----
+
+
+# ---- 場次(負責人會議逐場簽到;2026-07-16 第九輪) ----
+
+
+@router.get("/{item_id}/sessions")
+async def list_sessions(item_id: int, user: RegAdmin, db: DbDep) -> ApiResponse[list[SessionOut]]:
+    item = await db.get(SignupItem, item_id)
+    if item is None:
+        raise not_found("找不到報名活動")
+    sessions = (
+        await db.scalars(
+            sa.select(SignupItemSession)
+            .where(SignupItemSession.item_id == item.id)
+            .order_by(SignupItemSession.date, SignupItemSession.id)
+        )
+    ).all()
+    rows = (
+        await db.scalars(
+            sa.select(SessionAttendance).where(
+                SessionAttendance.session_id.in_([x.id for x in sessions] or [0])
+            )
+        )
+    ).all()
+    by_session: dict[int, list[SessionAttendanceOut]] = {}
+    for row in rows:
+        by_session.setdefault(row.session_id, []).append(
+            SessionAttendanceOut(club_id=row.club_id, attended=row.attended)
+        )
+    data = []
+    for x in sessions:
+        out = SessionOut.model_validate(x)
+        out.attendance = by_session.get(x.id, [])
+        data.append(out)
+    return ApiResponse(data=data)
+
+
+@router.post("/{item_id}/sessions", status_code=201)
+async def create_session(
+    item_id: int, body: SessionIn, user: RegAdmin, db: DbDep, request: Request
+) -> ApiResponse[SessionOut]:
+    item = await db.get(SignupItem, item_id)
+    if item is None:
+        raise not_found("找不到報名活動")
+    if not item.session_based:
+        raise conflict("非場次制活動不需建立場次")
+    session = SignupItemSession(
+        item_id=item.id, name=body.name, date=body.date, semester=semester_of(body.date)
+    )
+    db.add(session)
+    audit.record(
+        db,
+        action="signup_session_created",
+        user=user,
+        detail=f"item={item.id} {body.name} {body.date}",
+        ip=client_ip(request),
+    )
+    await db.commit()
+    await db.refresh(session)
+    return ApiResponse(data=SessionOut.model_validate(session))
+
+
+@router.delete("/{item_id}/sessions/{session_id}")
+async def delete_session(
+    item_id: int, session_id: int, user: RegAdmin, db: DbDep, request: Request
+) -> ApiResponse[None]:
+    session = await db.get(SignupItemSession, session_id)
+    if session is None or session.item_id != item_id:
+        raise not_found("找不到場次")
+    await db.delete(session)  # session_attendance 隨 FK CASCADE 一併刪除
+    audit.record(
+        db,
+        action="signup_session_deleted",
+        user=user,
+        detail=f"item={item_id} session={session_id}",
+        ip=client_ip(request),
+    )
+    await db.commit()
+    return ApiResponse()
 
 
 @router.put("/{item_id}/attendance")

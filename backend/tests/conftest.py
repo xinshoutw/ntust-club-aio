@@ -35,6 +35,25 @@ async def _database():
         )
         if not exists:
             await conn.execute(sa.text(f'CREATE DATABASE "{TEST_DB}"'))
+        # 防鎖死(2026-07-16):
+        # 1) 先掃掉別的(當掉/併跑)測試行程殘留的連線,否則 drop_all/TRUNCATE 會永遠等鎖
+        await conn.execute(
+            sa.text(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                "WHERE datname = :n AND pid <> pg_backend_pid()"
+            ),
+            {"n": TEST_DB},
+        )
+        # 2) 測試庫層級的鎖等待/語句上限:再發生競爭時數秒內報錯,而不是無聲卡死
+        await conn.execute(sa.text(f'ALTER DATABASE "{TEST_DB}" SET lock_timeout = \'5s\''))
+        await conn.execute(
+            sa.text(f'ALTER DATABASE "{TEST_DB}" SET statement_timeout = \'30s\'')
+        )
+        await conn.execute(
+            sa.text(
+                f'ALTER DATABASE "{TEST_DB}" SET idle_in_transaction_session_timeout = \'60s\''
+            )
+        )
     await admin.dispose()
 
     global _ALL_TABLES

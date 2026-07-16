@@ -90,10 +90,10 @@ function DetailModal({
 
   const submitReject = () => {
     if (!reason.trim()) {
-      message.error('退回原因為必填。')
+      message.error('退回原因為必填')
       return
     }
-    message.success(`已退回「${item.name}」(通知社團修正重送)`)
+    message.success(`已退回「${item.name}」`)
     closeReject()
     onClose()
   }
@@ -137,7 +137,7 @@ function DetailModal({
           </div>
         ) : (
           <div style={{ fontSize: 12, color: 'var(--steel)' }}>
-            {item.status === 'rejected' ? '此申請已退回社團修正。' : '非本關卡待審單據,僅供查看。'}
+            {item.status === 'rejected' ? '此申請已退回社團修正' : '非本關卡待審單據，僅供查看'}
           </div>
         )
       }
@@ -193,7 +193,7 @@ function DetailModal({
                 認可為大型活動(評鑑行政分 ×3 加權)
               </Checkbox>
               {item.isLarge && (
-                <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>社團已申請認定為大型活動。</div>
+                <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>社團已申請認定為大型活動</div>
               )}
             </div>
           )}
@@ -335,7 +335,7 @@ export default function ReviewPage() {
   return (
     <div>
       <PageHeader
-        title="活動申請審核"
+        title="申請審核"
         sub={
           <>
             待本關 <span className="num">{queue.length}</span> 件
@@ -406,7 +406,7 @@ export default function ReviewPage() {
         ))}
         {queue.length === 0 && (
           <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
-            沒有待本關簽核的申請。
+            沒有待本關簽核的申請
           </div>
         )}
       </div>
@@ -462,7 +462,7 @@ export default function ReviewPage() {
             ))}
             {rows.length === 0 && (
               <tr className="no-hover">
-                <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>無符合篩選條件的申請。</td>
+                <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>無符合篩選條件的申請</td>
               </tr>
             )}
           </tbody>

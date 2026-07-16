@@ -204,12 +204,8 @@ function ManageModal({
           </div>
         ))}
         {regs.length === 0 && (
-          <div style={{ padding: '16px 14px', fontSize: 13, color: 'var(--steel)' }}>尚無社團報名。</div>
+          <div style={{ padding: '16px 14px', fontSize: 13, color: 'var(--steel)' }}>尚無社團報名</div>
         )}
-      </div>
-
-      <div style={{ marginTop: 10, fontSize: 12, color: 'var(--steel)' }}>
-        評鑑僅採計「簽到」:活動結束後在此登錄,僅報名未簽到不計分。
       </div>
     </Modal>
   )
@@ -230,7 +226,7 @@ export default function SignupManagePage() {
   return (
     <div>
       <PageHeader
-        title="報名管理"
+        title="活動管理"
         sub={
           <>
             開放中 <span className="num">{openCount}</span> 項
@@ -238,7 +234,7 @@ export default function SignupManagePage() {
         }
         extra={
           <Button type="primary" style={{ height: 36 }} onClick={() => navigate('/admin/signup-items/new')}>
-            + 報名活動建立
+            + 建立活動
           </Button>
         }
       />

@@ -46,7 +46,7 @@ export interface NavGroup {
 const fixedBookingOpen = isFixedBookingOpen()
 const FIXED_BOOKING_ITEM: NavItem = {
   key: 'booking-fixed',
-  label: '固定場地借用',
+  label: '固定場地',
   path: '/bookings/fixed',
   icon: <ScheduleOutlined />,
 }
@@ -76,7 +76,7 @@ export const CLUB_NAV: NavGroup[] = [
     items: [
       { key: 'booking-overview', label: '借用總覽', path: '/bookings', icon: <CalendarOutlined /> },
       ...(fixedBookingOpen ? [FIXED_BOOKING_ITEM] : []),
-      { key: 'booking-venue', label: '臨時場地借用', path: '/bookings/venue', icon: <EnvironmentOutlined /> },
+      { key: 'booking-venue', label: '臨時場地', path: '/bookings/venue', icon: <EnvironmentOutlined /> },
       { key: 'booking-equipment', label: '器材借用', path: '/bookings/equipment', icon: <AppstoreOutlined /> },
     ],
   },
@@ -85,7 +85,7 @@ export const CLUB_NAV: NavGroup[] = [
     items: [
       { key: 'signup', label: '線上報名', path: '/signup', icon: <FlagOutlined /> },
       { key: 'maintenance', label: '空間報修', path: '/maintenance', icon: <ToolOutlined /> },
-      { key: 'postal', label: '郵局帳戶異動', path: '/postal', icon: <BankOutlined /> },
+      { key: 'postal', label: '郵局帳戶', path: '/postal', icon: <BankOutlined /> },
       { key: 'certificate', label: '幹部證明', path: '/certificates', icon: <IdcardOutlined /> },
     ],
   },
@@ -99,7 +99,7 @@ export const CLUB_NAV: NavGroup[] = [
   {
     label: '其他',
     items: [
-      { key: 'violations', label: '違規勸導紀錄', path: '/violations', icon: <WarningOutlined /> },
+      { key: 'violations', label: '違規勸導', path: '/violations', icon: <WarningOutlined /> },
       ...(fixedBookingOpen
         ? []
         : [{ ...FIXED_BOOKING_ITEM, disabled: true, disabledHint: '未開放申請;固定借用預設於每年 6 月、1 月受理' }]),
@@ -116,7 +116,7 @@ export const ADMIN_NAV: NavGroup[] = [
     items: [
       {
         key: 'a-review',
-        label: '活動申請審核',
+        label: '申請審核',
         path: '/admin/review',
         icon: <AuditOutlined />,
         // ponytail: mock 期由假資料推導;接後端後改為共用 query
@@ -128,8 +128,8 @@ export const ADMIN_NAV: NavGroup[] = [
   {
     label: '報名管理',
     items: [
-      { key: 'a-signup', label: '報名管理', path: '/admin/signups', icon: <FlagOutlined /> },
-      { key: 'a-builder', label: '報名活動建立', path: '/admin/signup-items/new', icon: <PlusSquareOutlined /> },
+      { key: 'a-signup', label: '活動管理', path: '/admin/signups', icon: <FlagOutlined /> },
+      { key: 'a-builder', label: '活動建立', path: '/admin/signup-items/new', icon: <PlusSquareOutlined /> },
     ],
   },
   {

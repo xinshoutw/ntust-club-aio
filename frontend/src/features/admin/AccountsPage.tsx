@@ -6,9 +6,9 @@ import OneTimePasswordModal from './OneTimePasswordModal'
 
 // 頁面權限鍵(與後端 permissions 對齊;super 不受限)
 const PERMISSION_KEYS = [
-  ['areview', '活動申請審核'],
+  ['areview', '申請審核'],
   ['aclose', '結案審核'],
-  ['asignup', '報名管理'],
+  ['asignup', '活動管理'],
   ['aannounce', '發布公告'],
   ['abooking', '臨時場地器材借用審核'],
   ['aroom', '教室固定借用審核'],
@@ -32,7 +32,7 @@ interface Account {
 
 const ADMINS: Account[] = [
   { name: '王組長', account: 'admin_wang', active: true, scope: '最高權限', perms: '全部' },
-  { name: '李承辦', account: 'admin_lee', active: true, scope: '一般', perms: '活動審核、結案審核、報名管理', permKeys: ['areview', 'aclose', 'asignup'] },
+  { name: '李承辦', account: 'admin_lee', active: true, scope: '一般', perms: '活動審核、結案審核、活動管理', permKeys: ['areview', 'aclose', 'asignup'] },
   { name: '陳助理', account: 'admin_chen', active: true, scope: '一般', perms: '借用審核、維修、違規、社團管理', permKeys: ['abooking', 'aroom', 'amaint', 'aviol', 'amember'] },
   { name: '學務長', account: 'dean', active: true, scope: '受限(僅簽核)', perms: '學務長簽核關', permKeys: [] },
 ]
@@ -108,8 +108,8 @@ export default function AccountsPage() {
     if (a.active) {
       confirmDialog(modal, {
         title: `停權 ${a.name}`,
-        content: '停權後無法登入,可隨時恢復。',
-        okText: '確認停權',
+        content: '停權後無法登入，可隨時恢復',
+        okText: '確認',
         okButtonProps: { danger: true },
         cancelText: '取消',
         onOk: () => message.success(`已停權 ${a.name}`),
@@ -121,7 +121,7 @@ export default function AccountsPage() {
 
   const createAccount = () => {
     if (!newName.trim()) {
-      message.error('請輸入姓名。')
+      message.error('請輸入姓名')
       return
     }
     const account = newAccount.trim() || `${tab === 'admins' ? 'admin' : tab === 'staff' ? 'staff' : 'viewer'}_${newName.trim().toLowerCase()}`
@@ -202,9 +202,6 @@ export default function AccountsPage() {
 
   const viewersTable = (
     <>
-      <div style={{ fontSize: 13, color: 'var(--steel)', padding: '0 20px 8px' }}>
-        評審對社團匿名呈現(依組內排序顯示為評審A、評審B);分組與獎項指派接後端後在此調整。
-      </div>
       <table className="tb" style={{ minWidth: 760 }}>
         <thead>
           <tr><th>評審</th><th>帳號</th><th>負責獎項</th><th>分組</th><th>狀態</th><th className="r">動作</th></tr>
@@ -289,7 +286,7 @@ export default function AccountsPage() {
           }
           confirmDialog(modal, {
             title: '尚有未儲存的變更',
-            content: '離開將遺失已調整的權限勾選。',
+            content: '離開將會遺失所做的權限調整',
             okText: '放棄變更並離開',
             okButtonProps: { danger: true },
             cancelText: '留在此頁',

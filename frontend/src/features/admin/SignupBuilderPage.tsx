@@ -29,7 +29,7 @@ export default function SignupBuilderPage() {
   const [signupStart, setSignupStart] = useState<Dayjs | null>(dayjs()) // 報名開始預設今天
   const [signupEnd, setSignupEnd] = useState<Dayjs | null>(null)
   const [needsReview, setNeedsReview] = useState(false) // 審核制:報名送出後須管理員核准
-  const [description, setDescription] = useState('各社團幹部(至少 3 人)參加,含團隊帶領與活動企劃課程。')
+  const [description, setDescription] = useState('說明描述')
   const [fields, setFields] = useState<BuilderField[]>([
     { key: 1, label: '聯絡電話', type: 'text', required: true, options: [] },
     { key: 2, label: '膳食需求', type: 'select', required: true, options: ['葷', '素'] },
@@ -95,7 +95,7 @@ export default function SignupBuilderPage() {
   return (
     <div>
       <PageHeader
-        title="報名活動建立"
+        title="活動建立"
         extra={
           <div style={{ display: 'flex', gap: 10 }}>
             <Button style={{ height: 36 }} onClick={() => message.success('已儲存草稿')}>儲存草稿</Button>

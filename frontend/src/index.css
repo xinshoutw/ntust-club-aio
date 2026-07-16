@@ -125,6 +125,11 @@ body {
   background-color: var(--seal-tint) !important;
 }
 
+/* 非單一控件的區塊(照片區等)送出驗證未過時的紅框;搭配常駐透明邊框避免版面位移 */
+.area-error {
+  border-color: #c13b34 !important;
+}
+
 /* 已修改未儲存的欄位:橘黃色外框(box-shadow 避免與 AntD 邊框樣式打架) */
 .field-dirty :is(.ant-input-outlined, .ant-input-affix-wrapper-outlined) {
   border-color: #d48806;

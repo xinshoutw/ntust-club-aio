@@ -22,12 +22,14 @@ export default function VenueBookingPage() {
   const qDate = rawDate && dayjs(rawDate, 'YYYY/MM/DD', true).isValid() ? rawDate : undefined
   const qPeriod = params.get('period')
   const [periods, setPeriods] = useState<string[]>(() => (qPeriod && PERIODS.includes(qPeriod) ? [qPeriod] : []))
+  const [periodsError, setPeriodsError] = useState(false)
   const mine = VENUE_BOOKINGS.filter((v) => v.club === user?.club).slice(0, 5)
   // 借用需綁定審核通過之活動(與器材借用一致)
   const approved = CLUB_ACTIVITIES.filter((a) => a.club === user?.club && a.status === 'approved')
 
   const submit = (values: { venue: string }) => {
     if (!periods.length) {
+      setPeriodsError(true)
       message.error('請選擇至少一個時段')
       return
     }
@@ -84,12 +86,23 @@ export default function VenueBookingPage() {
           <div style={{ fontSize: 13, fontWeight: 500, margin: '18px 0 8px' }}>
             時段 <span style={{ color: '#C13B34' }}>*</span>
           </div>
-          <div style={{ background: 'var(--paper)', borderRadius: 8, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div
+            className={periodsError ? 'area-error' : undefined}
+            style={{ background: 'var(--paper)', borderRadius: 8, padding: '10px 12px', border: '1px solid transparent', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}
+          >
             <Form.Item name="date" rules={[{ required: true, message: '請選擇日期' }]} style={{ marginBottom: 0, flexShrink: 0 }}>
               <DatePicker format="YYYY/MM/DD" placeholder="日期" style={{ width: 140 }} />
             </Form.Item>
             <div style={{ flex: 1, minWidth: 280 }}>
-              <PeriodPicker size="small" nowrap value={periods} onChange={setPeriods} />
+              <PeriodPicker
+                size="small"
+                nowrap
+                value={periods}
+                onChange={(next) => {
+                  setPeriodsError(false)
+                  setPeriods(next)
+                }}
+              />
             </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>

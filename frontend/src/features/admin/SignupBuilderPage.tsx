@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { App, Button, Checkbox, DatePicker, Input, InputNumber, Select, Tag } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { HolderOutlined } from '@ant-design/icons'
@@ -38,27 +38,47 @@ export default function SignupBuilderPage() {
   ])
   const [nextKey, setNextKey] = useState(5)
 
-  // 拖曳排序:按住把手才啟用 draggable,避免干擾列內輸入框的文字選取
+  // 拖曳排序:pointer 事件自製(HTML5 DnD 到 drop 才換位、ghost 突兀且不支援觸控);
+  // 按住把手即開始,掃過其他列的中線就即時重排,放開結束
   const [dragKey, setDragKey] = useState<number | null>(null)
-  const [handleKey, setHandleKey] = useState<number | null>(null)
-  // 在把手外放開滑鼠時 onMouseUp 不會觸發:全域 pointerup 兜底重設,避免列殘留 draggable
+  const listRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    if (handleKey == null) return
-    const up = () => setHandleKey(null)
+    if (dragKey == null) return
+    const move = (ev: PointerEvent) => {
+      const rows = [...(listRef.current?.querySelectorAll<HTMLElement>('[data-field-key]') ?? [])]
+      const over = rows.find((r) => {
+        const rect = r.getBoundingClientRect()
+        return ev.clientY >= rect.top && ev.clientY <= rect.bottom
+      })
+      if (!over) return
+      const overKey = Number(over.dataset.fieldKey)
+      if (overKey === dragKey) return
+      const rect = over.getBoundingClientRect()
+      // 越過目標列中線才換位,避免列高不同時來回抖動
+      const after = ev.clientY > rect.top + rect.height / 2
+      setFields((fs) => {
+        const from = fs.findIndex((f) => f.key === dragKey)
+        const to = fs.findIndex((f) => f.key === overKey)
+        if (from < 0 || to < 0) return fs
+        let insert = to + (after ? 1 : 0)
+        if (insert > from) insert -= 1
+        if (insert === from) return fs
+        const next = [...fs]
+        const [moved] = next.splice(from, 1)
+        next.splice(insert, 0, moved)
+        return next
+      })
+    }
+    const up = () => setDragKey(null)
+    window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
-    return () => window.removeEventListener('pointerup', up)
-  }, [handleKey])
-  const dropOn = (targetKey: number) => {
-    if (dragKey == null || dragKey === targetKey) return
-    setFields((fs) => {
-      const next = [...fs]
-      const from = next.findIndex((f) => f.key === dragKey)
-      const to = next.findIndex((f) => f.key === targetKey)
-      const [moved] = next.splice(from, 1)
-      next.splice(to, 0, moved)
-      return next
-    })
-  }
+    window.addEventListener('pointercancel', up)
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+    }
+  }, [dragKey])
 
   const update = (key: number, patch: Partial<BuilderField>) =>
     setFields((fs) => fs.map((f) => (f.key === key ? { ...f, ...patch } : f)))
@@ -83,12 +103,33 @@ export default function SignupBuilderPage() {
     )
   }
 
+  // 發布驗證未過的欄位集合:對應欄位標紅框,修改該欄即解除
+  const [errs, setErrs] = useState<ReadonlySet<string>>(new Set())
+  const errOf = (k: string) => (errs.has(k) ? ('error' as const) : undefined)
+  const clearErr = (k: string) =>
+    setErrs((s) => {
+      if (!s.has(k)) return s
+      const n = new Set(s)
+      n.delete(k)
+      return n
+    })
+
   const publish = () => {
-    if (!name.trim()) return void message.error('請輸入活動名稱')
-    if (!eventTime) return void message.error('請選擇活動時間')
-    if (cap == null || cap < 1) return void message.error('名額上限為必填,最少 1 名')
-    if (!signupStart || !signupEnd) return void message.error('請選擇報名開始與截止時間')
-    if (!signupEnd.isAfter(signupStart)) return void message.error('報名截止須晚於報名開始')
+    const missing: [key: string, msg: string][] = []
+    if (!name.trim()) missing.push(['name', '請輸入活動名稱'])
+    if (!eventTime) missing.push(['eventTime', '請選擇活動時間'])
+    if (cap == null || cap < 1) missing.push(['cap', '名額上限為必填,最少 1 名'])
+    if (!signupStart) missing.push(['signupStart', '請選擇報名開始時間'])
+    if (!signupEnd) missing.push(['signupEnd', '請選擇報名截止時間'])
+    if (missing.length === 0 && signupStart && signupEnd && !signupEnd.isAfter(signupStart)) {
+      missing.push(['signupEnd', '報名截止須晚於報名開始'])
+    }
+    if (missing.length) {
+      setErrs(new Set(missing.map(([k]) => k)))
+      message.error(missing[0][1])
+      return
+    }
+    setErrs(new Set())
     message.success('已發布')
   }
 
@@ -111,7 +152,14 @@ export default function SignupBuilderPage() {
             <div className="form-grid-2">
               <label style={{ gridColumn: '1 / -1' }}>
                 <div style={fieldLabel}>活動名稱{requiredMark}</div>
-                <Input value={name} onChange={(e) => setName(e.target.value)} />
+                <Input
+                  value={name}
+                  status={errOf('name')}
+                  onChange={(e) => {
+                    clearErr('name')
+                    setName(e.target.value)
+                  }}
+                />
               </label>
               <label>
                 <div style={fieldLabel}>活動類型{requiredMark}</div>
@@ -136,13 +184,26 @@ export default function SignupBuilderPage() {
                   showTime={{ format: 'HH:mm' }}
                   style={{ width: '100%' }}
                   format="YYYY/MM/DD HH:mm"
+                  status={errOf('eventTime')}
                   value={eventTime}
-                  onChange={setEventTime}
+                  onChange={(v) => {
+                    clearErr('eventTime')
+                    setEventTime(v)
+                  }}
                 />
               </label>
               <label>
                 <div style={fieldLabel}>名額上限{requiredMark}</div>
-                <InputNumber style={{ width: '100%' }} min={1} value={cap} onChange={setCap} />
+                <InputNumber
+                  style={{ width: '100%' }}
+                  min={1}
+                  status={errOf('cap')}
+                  value={cap}
+                  onChange={(v) => {
+                    clearErr('cap')
+                    setCap(v)
+                  }}
+                />
               </label>
               <label>
                 <div style={fieldLabel}>報名開始{requiredMark}</div>
@@ -150,8 +211,12 @@ export default function SignupBuilderPage() {
                   showTime={{ format: 'HH:mm' }}
                   style={{ width: '100%' }}
                   format="YYYY/MM/DD HH:mm"
+                  status={errOf('signupStart')}
                   value={signupStart}
-                  onChange={setSignupStart}
+                  onChange={(v) => {
+                    clearErr('signupStart')
+                    setSignupStart(v)
+                  }}
                 />
               </label>
               <label>
@@ -160,8 +225,12 @@ export default function SignupBuilderPage() {
                   showTime={{ format: 'HH:mm' }}
                   style={{ width: '100%' }}
                   format="YYYY/MM/DD HH:mm"
+                  status={errOf('signupEnd')}
                   value={signupEnd}
-                  onChange={setSignupEnd}
+                  onChange={(v) => {
+                    clearErr('signupEnd')
+                    setSignupEnd(v)
+                  }}
                 />
               </label>
               <div style={{ gridColumn: '1 / -1' }}>
@@ -185,27 +254,25 @@ export default function SignupBuilderPage() {
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
               <div style={{ fontSize: 16, fontWeight: 600 }}>資訊調查</div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+            <div
+              ref={listRef}
+              style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12, userSelect: dragKey != null ? 'none' : undefined }}
+            >
               {fields.map((f) => (
                 <div
                   key={f.key}
+                  data-field-key={f.key}
                   className="builder-field"
-                  draggable={handleKey === f.key}
-                  onDragStart={() => setDragKey(f.key)}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={() => dropOn(f.key)}
-                  onDragEnd={() => {
-                    setDragKey(null)
-                    setHandleKey(null)
-                  }}
-                  style={dragKey === f.key ? { opacity: 0.45 } : undefined}
+                  style={dragKey === f.key ? { opacity: 0.45, boxShadow: '0 2px 10px rgba(31,36,48,.18)' } : undefined}
                 >
                   <div className="builder-field-main">
                     <HolderOutlined
-                      style={{ color: 'var(--muted)', cursor: 'grab' }}
+                      style={{ color: 'var(--muted)', cursor: dragKey === f.key ? 'grabbing' : 'grab', touchAction: 'none' }}
                       aria-label="拖曳排序"
-                      onMouseDown={() => setHandleKey(f.key)}
-                      onMouseUp={() => setHandleKey(null)}
+                      onPointerDown={(e) => {
+                        e.preventDefault()
+                        setDragKey(f.key)
+                      }}
                     />
                     <Input
                       value={f.label}

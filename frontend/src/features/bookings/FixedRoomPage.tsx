@@ -50,6 +50,7 @@ export default function FixedRoomPage() {
   const [slots, setSlots] = useState<ReadonlySet<string>>(new Set())
   // 拖曳批量選取(與 PeriodPicker 同手感):按下起點決定「選取/取消」,掃過即套用
   const [dragTo, setDragTo] = useState<boolean | null>(null)
+  const [slotsError, setSlotsError] = useState(false)
   const slotsRef = useRef(slots)
   slotsRef.current = slots
   const mine = ROOM_REQUESTS.filter((r) => r.club === user?.club).slice(0, 5)
@@ -75,6 +76,7 @@ export default function FixedRoomPage() {
   const apply = (key: string, to: boolean) => {
     const has = slotsRef.current.has(key)
     if (to === has) return
+    setSlotsError(false)
     setSlots((s) => {
       const next = new Set(s)
       if (to) {
@@ -88,16 +90,19 @@ export default function FixedRoomPage() {
 
   const submit = () => {
     if (slots.size === 0) {
+      setSlotsError(true)
       message.error('請至少選擇一個時段')
       return
     }
     if (slots.size > MAX_PERIODS) {
+      setSlotsError(true)
       message.error(`每社團固定借用至多 ${MAX_PERIODS} 節，目前已選 ${slots.size} 節`)
       return
     }
     for (let dow = 1; dow <= 7; dow++) {
       const err = lateRuleError(dow, PERIODS.filter((p) => slots.has(`${dow}|${p}`)))
       if (err) {
+        setSlotsError(true)
         message.error(err)
         return
       }
@@ -137,7 +142,7 @@ export default function FixedRoomPage() {
               已選 {slots.size} / {MAX_PERIODS} 節
             </span>
           </div>
-          <div style={{ overflowX: 'auto' }}>
+          <div className={slotsError ? 'area-error' : undefined} style={{ overflowX: 'auto', border: '1px solid transparent', borderRadius: 6 }}>
             <table style={{ borderCollapse: 'separate', borderSpacing: 4, width: '100%', tableLayout: 'fixed', minWidth: 640, userSelect: 'none' }}>
               {/* 不設表頭:每格按鈕本身已標節次,星期由列首標示 */}
               <colgroup>

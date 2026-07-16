@@ -63,6 +63,7 @@ export default function ActivityFormPage() {
   const [form] = Form.useForm()
   const activityType = Form.useWatch('type', form)
   const [files, setFiles] = useState<BagFile[]>([])
+  const [worksError, setWorksError] = useState(false)
 
   // 編輯模式:僅草稿與被退回件可編輯,整筆預填
   const editing = id ? CLUB_ACTIVITIES.find((a) => a.id === id && (a.status === 'draft' || a.status === 'rejected')) : undefined
@@ -87,6 +88,7 @@ export default function ActivityFormPage() {
 
   // 輸入時只增列;空列的移除延後到 blur(避免打字中列被吃掉)
   const setWork = (key: number, patch: Partial<Omit<WorkRow, 'key'>>) => {
+    setWorksError(false)
     setWorks((ws) => {
       const next = ws.map((w) => (w.key === key ? { ...w, ...patch } : w))
       if (!isWorkEmpty(next[next.length - 1])) {
@@ -188,6 +190,7 @@ export default function ActivityFormPage() {
       return
     }
     if (!works.some((w) => w.task.trim() !== '' && w.owner.trim() !== '')) {
+      setWorksError(true)
       message.error('請填寫至少一筆工作分配')
       return
     }
@@ -366,17 +369,22 @@ export default function ActivityFormPage() {
                     <div key={w.key} onBlur={(e) => blurLeavesRow(e) && compactWorks()} style={{ display: 'flex', gap: 8 }}>
                       <Input
                         value={w.task}
+                        status={worksError ? 'error' : undefined}
                         onChange={(e) => setWork(w.key, { task: e.target.value })}
                         placeholder="項目"
                       />
                       <Input
                         value={w.owner}
+                        status={worksError ? 'error' : undefined}
                         onChange={(e) => setWork(w.key, { owner: e.target.value })}
                         placeholder="負責人"
                       />
                     </div>
                   ))}
                 </div>
+                {worksError && (
+                  <div style={{ fontSize: 12, color: '#C13B34', marginTop: 4 }}>請填寫至少一筆工作分配</div>
+                )}
               </div>
             </div>
           </div>

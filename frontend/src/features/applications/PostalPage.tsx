@@ -17,6 +17,7 @@ export default function PostalPage() {
   const { message } = App.useApp()
   const [form] = Form.useForm()
   const [files, setFiles] = useState<BagFile[]>([])
+  const [filesError, setFilesError] = useState(false)
   const reasons: string[] = Form.useWatch('reasons', form) ?? []
 
   const disabled = (r: string) =>
@@ -39,6 +40,7 @@ export default function PostalPage() {
           requiredMark
           onFinish={() => {
             if (!files.length) {
+              setFilesError(true)
               message.error('請上傳原存簿影本或新開戶申請表')
               return
             }
@@ -86,7 +88,11 @@ export default function PostalPage() {
           <Form.Item label="原存簿影本/新開戶申請表" required style={{ margin: '16px 0 0' }}>
             <AttachmentArea
               value={files}
-              onChange={setFiles}
+              onChange={(next) => {
+                setFilesError(false)
+                setFiles(next)
+              }}
+              error={filesError}
               accept={`.pdf,${IMAGE_ACCEPT}`}
               hint="拖放或點擊選擇(PDF 或影像)"
               validate={async (f) => ((await isPdfFile(f)) || (await isImageFile(f)) ? null : '不是有效的 PDF 或影像檔')}

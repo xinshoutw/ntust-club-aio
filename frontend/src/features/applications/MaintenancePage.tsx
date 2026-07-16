@@ -34,6 +34,7 @@ export default function MaintenancePage() {
   const { message } = App.useApp()
   const [form] = Form.useForm()
   const [files, setFiles] = useState<BagFile[]>([])
+  const [filesError, setFilesError] = useState(false)
 
   return (
     <div>
@@ -46,6 +47,7 @@ export default function MaintenancePage() {
           requiredMark
           onFinish={() => {
             if (!files.length) {
+              setFilesError(true)
               message.error('請附上損壞照片或影片佐證')
               return
             }
@@ -63,7 +65,11 @@ export default function MaintenancePage() {
           <Form.Item label="佐證照片 / 影片" required>
             <AttachmentArea
               value={files}
-              onChange={setFiles}
+              onChange={(next) => {
+                setFilesError(false)
+                setFiles(next)
+              }}
+              error={filesError}
               accept={`${IMAGE_ACCEPT},video/*`}
               hint="拖放或點擊選擇(照片 ≤10MB、短片 ≤200MB)"
               validate={validateEvidence}

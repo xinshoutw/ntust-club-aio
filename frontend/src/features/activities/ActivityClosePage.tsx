@@ -152,7 +152,20 @@ function CloseForm({
   const [reviewTopics, setReviewTopics] = useState(d?.reviewTopics ?? '')
   const [reviewConclusion, setReviewConclusion] = useState(d?.reviewConclusion ?? '')
   const [videoLink, setVideoLink] = useState(d?.videoLink ?? '')
-  const [expense, setExpense] = useState<number | null>(d?.expense ?? null)
+  // 自籌與擬請皆為 0 → 實際支出自動預填 0(仍可修改)
+  const budgetTotal = activity.budget.reduce((s, b) => s + b.selfFund + b.requestedSubsidy, 0)
+  const [expense, setExpense] = useState<number | null>(d?.expense ?? (budgetTotal === 0 ? 0 : null))
+
+  // 送出驗證未過的欄位集合:對應欄位標紅框,修改該欄即解除
+  const [errors, setErrors] = useState<ReadonlySet<string>>(new Set())
+  const err = (k: string) => (errors.has(k) ? ('error' as const) : undefined)
+  const clearErr = (k: string) =>
+    setErrors((s) => {
+      if (!s.has(k)) return s
+      const n = new Set(s)
+      n.delete(k)
+      return n
+    })
 
   const keyRef = useRef(0)
   const nextKey = () => ++keyRef.current
@@ -218,6 +231,7 @@ function CloseForm({
           releaseFile(ef)
           return
         }
+        clearErr('photos')
         setPhotos((ps) => [...ps, ef])
       } catch (e) {
         message.error(`照片處理失敗:${e instanceof Error ? e.message : String(e)}`)
@@ -267,45 +281,51 @@ function CloseForm({
   }
 
   const submit = () => {
-    // 除影片連結外全必填
-    const missing =
-      memberCount == null ? '實際社員人數'
-      : nonMemberCount == null ? '實際非社員人數'
-      : !actualStart ? '實際開始時間'
-      : !actualEnd ? '實際結束時間'
-      : !actualLocation.trim() ? '實際地點'
-      : !highlights.trim() ? '活動重點'
-      : !goals.trim() ? '如何達成活動目標'
-      : !others.trim() ? '其他執行狀況與成果'
-      : reviewMeeting && !reviewDate ? '檢討會日期'
-      : reviewMeeting && reviewAttendees == null ? '與會人數'
-      : reviewMeeting && !reviewTopics.trim() ? '討論事項'
-      : reviewMeeting && !reviewConclusion.trim() ? '內容決議'
-      : photos.length === 0 ? '活動照片'
-      : expense == null ? '實際支出'
-      : null
-    if (missing) {
-      message.error(`請填寫「${missing}」`)
-      return
-    }
-    if (!dayjs(actualEnd, 'HH:mm').isAfter(dayjs(actualStart, 'HH:mm'))) {
-      message.error('實際結束時間須晚於實際開始時間')
-      return
-    }
-    const video = videoLink.trim()
-    if (video && !/^https?:\/\/\S+$/i.test(video)) {
-      message.error('影片連結格式不正確')
-      return
+    // 除影片連結外全必填:一次收集所有缺漏欄位,全部標紅框,訊息提示第一項
+    const missing: [key: string, msg: string][] = []
+    if (memberCount == null) missing.push(['memberCount', '請填寫「實際社員人數」'])
+    if (nonMemberCount == null) missing.push(['nonMemberCount', '請填寫「實際非社員人數」'])
+    if (!actualStart) missing.push(['actualStart', '請填寫「實際開始時間」'])
+    if (!actualEnd) missing.push(['actualEnd', '請填寫「實際結束時間」'])
+    if (!actualLocation.trim()) missing.push(['actualLocation', '請填寫「實際地點」'])
+    if (!highlights.trim()) missing.push(['highlights', '請填寫「活動重點」'])
+    if (!goals.trim()) missing.push(['goals', '請填寫「如何達成活動目標」'])
+    if (!others.trim()) missing.push(['others', '請填寫「其他執行狀況與成果」'])
+    if (reviewMeeting) {
+      if (!reviewDate) missing.push(['reviewDate', '請填寫「檢討會日期」'])
+      if (reviewAttendees == null) missing.push(['reviewAttendees', '請填寫「與會人數」'])
+      if (!reviewTopics.trim()) missing.push(['reviewTopics', '請填寫「討論事項」'])
+      if (!reviewConclusion.trim()) missing.push(['reviewConclusion', '請填寫「內容決議」'])
     }
     const complete = filledReflects.filter((r) => r.name.trim() && r.dept.trim() && r.text.trim())
     if (complete.length < filledReflects.length) {
-      message.error('學習心得每列的姓名、系級與內容皆為必填')
+      missing.push(['reflections', '學習心得每列的姓名、系級與內容皆為必填'])
+    } else if (complete.length < MIN_REFLECTIONS) {
+      missing.push(['reflections', `學習心得至少需 ${MIN_REFLECTIONS} 位本校學生`])
+    }
+    if (photos.length === 0) missing.push(['photos', '請上傳「活動照片」'])
+    if (expense == null) missing.push(['expense', '請填寫「實際支出」'])
+    if (missing.length === 0) {
+      if (!dayjs(actualEnd, 'HH:mm').isAfter(dayjs(actualStart, 'HH:mm'))) {
+        missing.push(['actualEnd', '實際結束時間須晚於實際開始時間'])
+      }
+      const video = videoLink.trim()
+      if (video && !/^https?:\/\/\S+$/i.test(video)) {
+        missing.push(['videoLink', '影片連結格式不正確'])
+      }
+    }
+    if (missing.length) {
+      setErrors(new Set(missing.map(([k]) => k)))
+      message.error(missing[0][1])
+      // 捲動到第一個紅框欄位
+      setTimeout(() => {
+        document
+          .querySelector('.ant-input-status-error, .ant-input-number-status-error, .ant-picker-status-error, .area-error')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 0)
       return
     }
-    if (complete.length < MIN_REFLECTIONS) {
-      message.error(`學習心得至少需 ${MIN_REFLECTIONS} 位本校學生`)
-      return
-    }
+    setErrors(new Set())
     if (photos.length < MIN_PHOTOS && !videoLink.trim()) {
       message.warning(`照片未達 ${MIN_PHOTOS} 張且無影片連結，評鑑項目「照片 / 影片」將不計分`)
     }
@@ -369,8 +389,12 @@ function CloseForm({
                 min={0}
                 precision={0}
                 style={{ width: '100%' }}
+                status={err('memberCount')}
                 value={memberCount}
-                onChange={setMemberCount}
+                onChange={(v) => {
+                  clearErr('memberCount')
+                  setMemberCount(v)
+                }}
                 placeholder={activity.participantsIn != null ? String(activity.participantsIn) : undefined}
                 aria-label="實際社員人數"
               />
@@ -381,8 +405,12 @@ function CloseForm({
                 min={0}
                 precision={0}
                 style={{ width: '100%' }}
+                status={err('nonMemberCount')}
                 value={nonMemberCount}
-                onChange={setNonMemberCount}
+                onChange={(v) => {
+                  clearErr('nonMemberCount')
+                  setNonMemberCount(v)
+                }}
                 placeholder={activity.participantsOut != null ? String(activity.participantsOut) : undefined}
                 aria-label="實際非社員人數"
               />
@@ -393,9 +421,13 @@ function CloseForm({
                 style={{ width: '100%' }}
                 format={{ format: 'HH:mm', type: 'mask' }}
                 needConfirm={false}
+                status={err('actualStart')}
                 placeholder={plannedStart || undefined}
                 value={toTime(actualStart)}
-                onChange={(_, ts) => setActualStart((ts as string) || '')}
+                onChange={(_, ts) => {
+                  clearErr('actualStart')
+                  setActualStart((ts as string) || '')
+                }}
               />
             </div>
             <div>
@@ -404,27 +436,66 @@ function CloseForm({
                 style={{ width: '100%' }}
                 format={{ format: 'HH:mm', type: 'mask' }}
                 needConfirm={false}
+                status={err('actualEnd')}
                 placeholder={plannedEnd || undefined}
                 value={toTime(actualEnd)}
-                onChange={(_, ts) => setActualEnd((ts as string) || '')}
+                onChange={(_, ts) => {
+                  clearErr('actualEnd')
+                  setActualEnd((ts as string) || '')
+                }}
               />
             </div>
           </div>
           <div style={{ marginTop: 12 }}>
             <div style={label}>實際地點{requiredMark}</div>
-            <Input value={actualLocation} onChange={(e) => setActualLocation(e.target.value)} placeholder={activity.location} />
+            <Input
+              status={err('actualLocation')}
+              value={actualLocation}
+              onChange={(e) => {
+                clearErr('actualLocation')
+                setActualLocation(e.target.value)
+              }}
+              placeholder={activity.location}
+            />
           </div>
           <div style={{ marginTop: 12 }}>
             <div style={label}>活動重點{requiredMark}</div>
-            <Input.TextArea rows={4} value={highlights} onChange={(e) => setHighlights(e.target.value)} placeholder="本次活動重點" />
+            <Input.TextArea
+              rows={4}
+              status={err('highlights')}
+              value={highlights}
+              onChange={(e) => {
+                clearErr('highlights')
+                setHighlights(e.target.value)
+              }}
+              placeholder="本次活動重點"
+            />
           </div>
           <div style={{ marginTop: 12 }}>
             <div style={label}>如何達成活動目標{requiredMark}</div>
-            <Input.TextArea rows={4} value={goals} onChange={(e) => setGoals(e.target.value)} placeholder="說明達成目標之方式" />
+            <Input.TextArea
+              rows={4}
+              status={err('goals')}
+              value={goals}
+              onChange={(e) => {
+                clearErr('goals')
+                setGoals(e.target.value)
+              }}
+              placeholder="說明達成目標之方式"
+            />
           </div>
           <div style={{ marginTop: 12 }}>
             <div style={label}>其他執行狀況與成果{requiredMark}</div>
-            <Input.TextArea rows={4} value={others} onChange={(e) => setOthers(e.target.value)} placeholder="其他成果" />
+            <Input.TextArea
+              rows={4}
+              status={err('others')}
+              value={others}
+              onChange={(e) => {
+                clearErr('others')
+                setOthers(e.target.value)
+              }}
+              placeholder="其他成果"
+            />
           </div>
         </div>
 
@@ -450,8 +521,12 @@ function CloseForm({
                 <DatePicker
                   style={{ width: '100%' }}
                   format="YYYY/MM/DD"
+                  status={err('reviewDate')}
                   value={reviewDate ? dayjs(reviewDate, 'YYYY/MM/DD') : null}
-                  onChange={(_, ds) => setReviewDate((ds as string) || '')}
+                  onChange={(_, ds) => {
+                    clearErr('reviewDate')
+                    setReviewDate((ds as string) || '')
+                  }}
                 />
               </div>
             )}
@@ -465,8 +540,12 @@ function CloseForm({
                     min={1}
                     precision={0}
                     style={{ width: '100%' }}
+                    status={err('reviewAttendees')}
                     value={reviewAttendees}
-                    onChange={setReviewAttendees}
+                    onChange={(v) => {
+                      clearErr('reviewAttendees')
+                      setReviewAttendees(v)
+                    }}
                     aria-label="與會人數"
                   />
                 </div>
@@ -475,8 +554,12 @@ function CloseForm({
                 <div style={label}>討論事項{requiredMark}</div>
                 <Input.TextArea
                   rows={3}
+                  status={err('reviewTopics')}
                   value={reviewTopics}
-                  onChange={(e) => setReviewTopics(e.target.value)}
+                  onChange={(e) => {
+                    clearErr('reviewTopics')
+                    setReviewTopics(e.target.value)
+                  }}
                   placeholder="檢討會議討論之事項"
                 />
               </div>
@@ -484,8 +567,12 @@ function CloseForm({
                 <div style={label}>內容決議{requiredMark}</div>
                 <Input.TextArea
                   rows={3}
+                  status={err('reviewConclusion')}
                   value={reviewConclusion}
-                  onChange={(e) => setReviewConclusion(e.target.value)}
+                  onChange={(e) => {
+                    clearErr('reviewConclusion')
+                    setReviewConclusion(e.target.value)
+                  }}
                   placeholder="會議結論與後續改善作法"
                 />
               </div>
@@ -507,10 +594,23 @@ function CloseForm({
                   onBlur={(e) => blurLeavesRow(e) && compactReflects()}
                   style={{ display: 'grid', gridTemplateColumns: '104px 104px 1fr', gap: 8, alignItems: 'start' }}
                 >
-                  <Input value={r.name} onChange={(e) => setReflect(r.key, { name: e.target.value })} placeholder="姓名" aria-label="姓名" />
-                  <Input value={r.dept} onChange={(e) => setReflect(r.key, { dept: e.target.value })} placeholder="系級" aria-label="系級" />
+                  <Input
+                    value={r.name}
+                    status={errors.has('reflections') && !r.name.trim() ? 'error' : undefined}
+                    onChange={(e) => setReflect(r.key, { name: e.target.value })}
+                    placeholder="姓名"
+                    aria-label="姓名"
+                  />
+                  <Input
+                    value={r.dept}
+                    status={errors.has('reflections') && !r.dept.trim() ? 'error' : undefined}
+                    onChange={(e) => setReflect(r.key, { dept: e.target.value })}
+                    placeholder="系級"
+                    aria-label="系級"
+                  />
                   <Input.TextArea
                     value={r.text}
+                    status={errors.has('reflections') && !r.text.trim() ? 'error' : undefined}
                     onChange={(e) => setReflect(r.key, { text: e.target.value })}
                     placeholder="學習心得內容"
                     aria-label="學習心得內容"
@@ -527,7 +627,10 @@ function CloseForm({
               <div style={label}>
                 活動照片(≥{MIN_PHOTOS} 張){requiredMark}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <div
+                className={errors.has('photos') ? 'area-error' : undefined}
+                style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: 6, margin: -6, border: '1px solid transparent', borderRadius: 6 }}
+              >
                 {photos.map((p) => (
                   <span key={p.id} style={{ position: 'relative', display: 'inline-flex' }}>
                     <img src={p.url} alt={p.name} title={p.name} style={{ width: 52, height: 40, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--line)' }} />
@@ -569,11 +672,31 @@ function CloseForm({
             <div className="form-grid-2" style={{ marginTop: 12 }}>
               <div>
                 <div style={label}>影片連結</div>
-                <Input value={videoLink} onChange={(e) => setVideoLink(e.target.value)} placeholder="YouTube 等" />
+                <Input
+                  status={err('videoLink')}
+                  value={videoLink}
+                  onChange={(e) => {
+                    clearErr('videoLink')
+                    setVideoLink(e.target.value)
+                  }}
+                  placeholder="YouTube 等"
+                />
               </div>
               <div>
                 <div style={label}>實際支出{requiredMark}</div>
-                <InputNumber min={0} precision={0} style={{ width: '100%' }} className="num-right" value={expense} onChange={setExpense} placeholder="元" />
+                <InputNumber
+                  min={0}
+                  precision={0}
+                  style={{ width: '100%' }}
+                  className="num-right"
+                  status={err('expense')}
+                  value={expense}
+                  onChange={(v) => {
+                    clearErr('expense')
+                    setExpense(v)
+                  }}
+                  placeholder="元"
+                />
               </div>
             </div>
           </div>

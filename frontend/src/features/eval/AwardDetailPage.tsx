@@ -7,7 +7,7 @@ import { useAuth } from '../../app/auth'
 import { fmtMB, isImageFile, sha256 } from '../../lib/uploads'
 import { AWARDS, slotFiles, uploadProgress } from './store'
 import { releaseFile, toEvalFile } from './files'
-import { fileTypeOf, type Award, type AwardKey, type EvalFile } from './types'
+import { fileTypeOf, type AwardDef, type AwardKey, type EvalFile } from './types'
 import FilePreview from './FilePreview'
 
 // 圖片一律含 HEIC/HEIF 等特規格式;文件收 PDF/Word
@@ -15,7 +15,7 @@ const ACCEPT = '.pdf,.doc,.docx,image/*,.heic,.heif,.avif'
 const MAX_FILE_BYTES = 50 * 1024 * 1024
 
 // 同一獎項底下所有槽位已上傳檔案的 hash(跨槽位去重)
-const awardHashes = (award: Award): Set<string> => {
+const awardHashes = (award: AwardDef): Set<string> => {
   const set = new Set<string>()
   for (const slot of award.slots) {
     for (const f of slotFiles(award.key, slot.key)) if (f.hash) set.add(f.hash)

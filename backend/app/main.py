@@ -94,7 +94,9 @@ async def validation_exception_handler(
     detail = [
         {k: v for k, v in err.items() if k not in {"input", "url"}} for err in exc.errors()
     ]
-    return _envelope(422, "輸入驗證失敗", {"code": "VALIDATION", "detail": jsonable_encoder(detail)})
+    return _envelope(
+        422, "輸入驗證失敗", {"code": "VALIDATION", "detail": jsonable_encoder(detail)}
+    )
 
 
 @app.exception_handler(IntegrityError)

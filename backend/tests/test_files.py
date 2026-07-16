@@ -323,6 +323,42 @@ async def test_download_scoped_to_own_club(client, db):
     assert (await client.get(f"/api/v1/files/{uuid.uuid4()}")).status_code == 404
 
 
+async def test_inline_pdf_allows_same_origin_framing_only(client, db):
+    """授權成功的 inline PDF 放寬為 SAMEORIGIN(FilePreview iframe);其餘維持 DENY。"""
+    club = await make_club(db)
+    owner = await make_user(db, username="club01", club_id=club.id)
+    pdf = await file_service.save_upload(
+        db,
+        fake_upload("plan.pdf", b"%PDF-1.7 test content"),
+        policy=file_service.DOCUMENT,
+        module="activities",
+        uploaded_by=owner.id,
+        club_id=club.id,
+    )
+    png = await file_service.save_upload(
+        db,
+        fake_upload("photo.png", PNG_BYTES),
+        policy=file_service.IMAGE,
+        module="reports",
+        uploaded_by=owner.id,
+        club_id=club.id,
+    )
+    await db.commit()
+
+    await login(client, "club01")
+    resp = await client.get(f"/api/v1/files/{pdf.id}")
+    assert resp.status_code == 200
+    assert resp.headers["x-frame-options"] == "SAMEORIGIN"
+    assert "frame-ancestors 'self'" in resp.headers["content-security-policy"]
+
+    # 圖片與一般 API 回應不放寬
+    resp = await client.get(f"/api/v1/files/{png.id}")
+    assert resp.headers["x-frame-options"] == "DENY"
+    resp = await client.get("/api/v1/auth/me")
+    assert resp.headers["x-frame-options"] == "DENY"
+    assert "frame-ancestors 'none'" in resp.headers["content-security-policy"]
+
+
 async def test_archived_file_returns_410(client, db):
     club = await make_club(db)
     owner = await make_user(db, username="club01", club_id=club.id)

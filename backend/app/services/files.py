@@ -322,12 +322,18 @@ async def file_response(db: AsyncSession, file_id: uuid.UUID, user: User) -> Fil
     if not disk.is_file():
         raise not_found("找不到檔案")
     disposition = "inline" if file.mime in _INLINE_MIMES else "attachment"
-    return FileResponse(
+    response = FileResponse(
         disk,
         media_type=file.mime,
         filename=file.original_name,
         content_disposition_type=disposition,
     )
+    if disposition == "inline" and file.mime == "application/pdf":
+        # 前端 FilePreview 以 iframe 內嵌 PDF:僅授權成功的 inline PDF 放寬為同源,
+        # 其餘 API 回應維持全域 DENY/none(middleware 只補缺漏、不覆寫)
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'self'"
+    return response
 
 
 async def delete_file(db: AsyncSession, file: File) -> Path:

@@ -1,14 +1,16 @@
 import { useState } from 'react'
 import { App, Button, DatePicker, Form, Input, InputNumber, Select, Tag } from 'antd'
+import { PlusOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { BUDGET_CATEGORIES } from '../activities/types'
 import { VIOL_ITEMS } from '../violations/mock'
 
 const sectionTitle: React.CSSProperties = { fontSize: 15, fontWeight: 600, marginBottom: 14 }
 
-// 純 tag 輸入(無下拉選單):輸入後 Enter/逗號/頓號/失焦即新增
-// (Select mode="tags" 會彈出下拉且 open={false} 會壞掉 Enter,需求方指定移除下拉)
+// AntD 原生「可編輯標籤」模式(官方 Tag 範例):closable Tag + 虛線「新增」Tag,
+// 點擊變成小輸入框,Enter/失焦即新增(需求方:用內建元素、不要下拉、不要自製風格)
 function TagListInput({ value = [], onChange }: { value?: string[]; onChange?: (next: string[]) => void }) {
+  const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState('')
 
   const commit = (raw: string) => {
@@ -16,10 +18,11 @@ function TagListInput({ value = [], onChange }: { value?: string[]; onChange?: (
     const parts = [...new Set(raw.split(/[,、]/).map((s) => s.trim()))].filter((s) => s && !value.includes(s))
     if (parts.length) onChange?.([...value, ...parts])
     setDraft('')
+    setAdding(false)
   }
 
   return (
-    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
       {value.map((item) => (
         <Tag
           key={item}
@@ -33,22 +36,31 @@ function TagListInput({ value = [], onChange }: { value?: string[]; onChange?: (
           {item}
         </Tag>
       ))}
-      <Input
-        size="small"
-        style={{ width: 180 }}
-        placeholder="輸入後按 Enter 新增"
-        value={draft}
-        onChange={(e) => {
-          // 打出逗號/頓號當下即成 tag(對齊原 tokenSeparators 行為)
-          if (/[,、]$/.test(e.target.value)) commit(e.target.value)
-          else setDraft(e.target.value)
-        }}
-        onPressEnter={(e) => {
-          e.preventDefault()
-          commit(draft)
-        }}
-        onBlur={() => draft.trim() && commit(draft)}
-      />
+      {adding ? (
+        <Input
+          size="small"
+          autoFocus
+          style={{ width: 140 }}
+          value={draft}
+          onChange={(e) => {
+            // 打出逗號/頓號當下即成 tag(對齊原 tokenSeparators 行為)
+            if (/[,、]$/.test(e.target.value)) commit(e.target.value)
+            else setDraft(e.target.value)
+          }}
+          onPressEnter={(e) => {
+            e.preventDefault()
+            commit(draft)
+          }}
+          onBlur={() => (draft.trim() ? commit(draft) : setAdding(false))}
+        />
+      ) : (
+        <Tag
+          onClick={() => setAdding(true)}
+          style={{ margin: 0, fontSize: 13, padding: '2px 8px', background: 'transparent', borderStyle: 'dashed', cursor: 'pointer' }}
+        >
+          <PlusOutlined style={{ fontSize: 11 }} /> 新增
+        </Tag>
+      )}
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { App, Button, DatePicker, Form, Input, Modal } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { EQUIPMENT_LOANS } from '../bookings/mock'
+import ClubCascader from './ClubCascader'
 
 interface Suspension {
   club: string
@@ -109,8 +110,8 @@ export default function OverduePage() {
             form.resetFields()
           }}
         >
-          <Form.Item name="club" label="社團" rules={[{ required: true, message: '請輸入社團名稱' }]}>
-            <Input autoFocus />
+          <Form.Item name="club" label="社團" rules={[{ required: true, message: '請選擇社團' }]}>
+            <ClubCascader width="100%" placeholder="請選擇" />
           </Form.Item>
           <Form.Item name="until" label="停權至" rules={[{ required: true, message: '請選擇日期' }]}>
             <DatePicker style={{ width: '100%' }} format="YYYY/MM/DD" />

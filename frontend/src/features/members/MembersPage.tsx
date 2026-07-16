@@ -130,7 +130,7 @@ export default function MembersPage() {
     update.mutate(
       { id, ...patch },
       {
-        onSuccess: () => message.success('已自動儲存'),
+        onSuccess: () => message.success('已儲存'),
         onError: (e) => message.error(e.message),
       },
     )

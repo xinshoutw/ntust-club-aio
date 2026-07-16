@@ -76,9 +76,11 @@ def decorate(out, activity: Activity, lock_months: int) -> None:
     out.requested_total = sum(i.requested_subsidy for i in items)
     approved = [i.approved_subsidy for i in items if i.approved_subsidy is not None]
     out.approved_total = sum(approved) if approved else None
-    out.semester = semester_of(activity.date)
+    # 部分填寫的草稿可能無日期;日期推導欄位留空
+    out.semester = semester_of(activity.date) if activity.date else ""
     out.close_locked = is_close_locked(activity, lock_months)
-    out.close_deadline = add_months(activity.end_date or activity.date, lock_months)
+    base = activity.end_date or activity.date
+    out.close_deadline = add_months(base, lock_months) if base else None
     out.can_close = can_close(activity, lock_months)
     out.has_close_draft = activity.close_draft is not None
 

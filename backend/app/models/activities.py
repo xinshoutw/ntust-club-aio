@@ -1,3 +1,4 @@
+import datetime as dt
 from datetime import date, datetime, time
 from typing import Any
 
@@ -19,6 +20,12 @@ class Activity(Base, TimestampMixin):
     __table_args__ = (
         sa.Index("ix_activities_club_status", "club_id", "status"),
         sa.Index("ix_activities_date", "date"),
+        # 草稿可部分填寫(2026-07-17);非草稿列的完整性仍由 DB 收口
+        sa.CheckConstraint(
+            "status = 'draft' OR (date IS NOT NULL AND end_date IS NOT NULL"
+            " AND name <> '' AND location <> '')",
+            name="draft_partial_only",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -30,8 +37,11 @@ class Activity(Base, TimestampMixin):
     is_large: Mapped[bool] = mapped_column(default=False)  # 僅 type=活動 可勾
     is_large_approved: Mapped[bool | None] = mapped_column()  # 管理員認可後行政分才享 ×3
     # 起訖區間(2026-07-15:單日改時間區間;未跨日 end_date=date;學期歸屬與 ad1 皆以開始日推導)
-    date: Mapped[date] = mapped_column(sa.Date)  # 活動開始日
-    end_date: Mapped[date] = mapped_column(sa.Date)  # 活動結束日
+    # 僅草稿可為 NULL(見 CheckConstraint;submit 端點另檢核必填)。
+    # dt.date:lazy annotation 下欄位名 date 遮蔽 datetime.date,
+    # `date | None` 會被解析成 InstrumentedAttribute 的 SQL OR,靜默推成 NOT NULL
+    date: Mapped[dt.date | None] = mapped_column(sa.Date)  # 活動開始日
+    end_date: Mapped[dt.date | None] = mapped_column(sa.Date)  # 活動結束日
     start_time: Mapped[time | None] = mapped_column(sa.Time)  # 開始時間屬 date
     end_time: Mapped[time | None] = mapped_column(sa.Time)  # 結束時間屬 end_date
     participants_in: Mapped[int] = mapped_column(default=0)  # 校內人數

@@ -1,3 +1,4 @@
+import datetime as dt
 import uuid
 from datetime import date, datetime, time
 from typing import Any
@@ -22,31 +23,59 @@ class BudgetItemOut(BudgetItemIn):
 
 
 class ActivityIn(BaseModel):
-    name: str = Field(min_length=1, max_length=100)
-    type: ActivityType
+    """申請表單。草稿允許部分填寫(至少一欄有內容);必填完整性由 submit 端點檢核。"""
+
+    name: str = Field("", max_length=100)
+    type: ActivityType = ActivityType.COURSE  # 前端預設社課
     is_large: bool = False
-    date: date  # 開始日期
-    end_date: date | None = None  # 結束日期;未跨日可省略(= date)
-    start_time: time
-    end_time: time
-    location: str = Field(min_length=1, max_length=100)
+    # dt.date:欄位名 date 帶預設值後成為 class attribute,會遮蔽 datetime.date(lazy annotation)
+    date: dt.date | None = None  # 開始日期
+    end_date: dt.date | None = None  # 結束日期;未跨日可省略(= date)
+    start_time: time | None = None
+    end_time: time | None = None
+    location: str = Field("", max_length=100)
     content: str = Field("", max_length=150)
-    participants_in: int = Field(ge=0, le=100_000)
-    participants_out: int = Field(ge=0, le=100_000)
+    participants_in: int = Field(0, ge=0, le=100_000)
+    participants_out: int = Field(0, ge=0, le=100_000)
     staff_text: str = Field("", max_length=2000)
     budget_items: list[BudgetItemIn] = Field(default_factory=list, max_length=50)
 
     @model_validator(mode="after")
     def _check(self):
+        self.name = self.name.strip()
+        self.location = self.location.strip()
         if self.end_date is None:
             self.end_date = self.date  # 未跨日 end_date=date(2026-07-15)
-        if self.end_date < self.date:
+        # 填了的欄位仍須自洽;未填者留待 submit 檢核
+        if self.date and self.end_date and self.end_date < self.date:
             raise ValueError("結束日期不得早於開始日期")
-        if self.end_date == self.date and self.end_time <= self.start_time:
+        if (
+            self.date
+            and self.end_date == self.date
+            and self.start_time
+            and self.end_time
+            and self.end_time <= self.start_time
+        ):
             raise ValueError("結束時間必須晚於開始時間")
         if self.is_large and self.type != ActivityType.EVENT:
             raise ValueError("僅類型為「活動」可申請大型活動")
+        if not self._has_any():
+            raise ValueError("請至少填寫一個欄位")
         return self
+
+    def _has_any(self) -> bool:
+        return bool(
+            self.name
+            or self.location
+            or self.content.strip()
+            or self.staff_text.strip()
+            or self.date
+            or self.start_time
+            or self.end_time
+            or self.participants_in
+            or self.participants_out
+            or self.budget_items
+        )
 
 
 class FileOut(BaseModel):
@@ -160,8 +189,8 @@ class ActivityOut(BaseModel):
     type: ActivityType
     is_large: bool
     is_large_approved: bool | None
-    date: date
-    end_date: date
+    date: date | None  # 草稿可部分填寫,僅 draft 可能為 None
+    end_date: date | None
     start_time: time | None
     end_time: time | None
     location: str

@@ -74,6 +74,24 @@ def _to_out(activity: Activity, lock_months: int) -> ActivityOut:
     return out
 
 
+def _require_complete(activity: Activity) -> None:
+    """送審前的必填檢核:草稿允許部分填寫,完整性在狀態轉移時收口。"""
+    missing = [
+        label
+        for label, ok in (
+            ("活動名稱", bool(activity.name.strip())),
+            ("開始日期", activity.date is not None),
+            ("結束日期", activity.end_date is not None),
+            ("開始時間", activity.start_time is not None),
+            ("結束時間", activity.end_time is not None),
+            ("活動地點", bool(activity.location.strip())),
+        )
+        if not ok
+    ]
+    if missing:
+        raise validation_error(f"送出前請先完成:{'、'.join(missing)}")
+
+
 @router.get("")
 async def list_activities(
     user: ClubUser,
@@ -107,7 +125,9 @@ async def list_activities(
 @router.get("/semesters")
 async def list_semesters(user: ClubUser, db: DbDep) -> ApiResponse[list[str]]:
     dates = await db.scalars(
-        sa.select(Activity.date).where(Activity.club_id == user.club_id).distinct()
+        sa.select(Activity.date)
+        .where(Activity.club_id == user.club_id, Activity.date.is_not(None))
+        .distinct()
     )
     labels = sorted({semester_of(d) for d in dates}, reverse=True)
     return ApiResponse(data=labels)
@@ -172,6 +192,8 @@ async def update_activity(
     for field, value in body.model_dump(exclude={"budget_items"}).items():
         setattr(activity, field, value)
     svc.replace_budget_items(activity, body.budget_items)
+    if activity.status != ActivityStatus.DRAFT:
+        _require_complete(activity)  # 退回件僅能存完整資料(部分填寫只屬草稿)
     await db.commit()
     activity = await svc.get_own_activity(db, user, activity_id)
     lock_months = await get_setting(db, "close_lock_months")
@@ -205,6 +227,7 @@ async def submit_activity(
     activity = await svc.get_own_activity(db, user, activity_id)
     if activity.status not in _EDITABLE:
         raise conflict("此活動已送審或已核准")
+    _require_complete(activity)
     activity.status = ActivityStatus.PENDING_ADVISOR
     club = await _club_of(db, user)
     audit.record(

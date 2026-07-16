@@ -397,3 +397,53 @@ async def test_attachment_total_cap(client, db):
     assert len(detail["attachments"]) == 1
     on_disk = [p for p in settings.upload_dir.rglob("*") if p.is_file()]
     assert len(on_disk) == 1  # 超限檔案已清掉
+
+
+async def test_partial_draft_and_submit_completeness(client, db):
+    """草稿允許部分填寫(至少一欄);送審時檢核必填並列出缺漏。"""
+    await setup_session(client, db)
+
+    # 全空 → 422
+    resp = await client.post(
+        "/api/v1/club/activities",
+        json={"name": "", "location": ""},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+
+    # 只填名稱即可暫存
+    resp = await client.post(
+        "/api/v1/club/activities", json={"name": "迎新茶會"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 201, resp.text
+    draft = resp.json()["data"]
+    assert draft["status"] == "draft"
+    assert draft["date"] is None
+    assert draft["semester"] == ""
+
+    # 送審 → 列出缺漏欄位
+    resp = await client.post(
+        f"/api/v1/club/activities/{draft['id']}/submit", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 422
+    msg = resp.json()["error"]
+    assert "開始日期" in msg and "活動地點" in msg and "活動名稱" not in msg
+
+    # 補齊後可送審
+    resp = await client.put(
+        f"/api/v1/club/activities/{draft['id']}", json=payload(), headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+    resp = await client.post(
+        f"/api/v1/club/activities/{draft['id']}/submit", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["status"] == "pending_advisor"
+
+    # 填了的欄位仍須自洽:起訖顛倒即擋(草稿也不收壞資料)
+    resp = await client.post(
+        "/api/v1/club/activities",
+        json={"name": "壞日期", "date": "2026-06-20", "end_date": "2026-06-19"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422

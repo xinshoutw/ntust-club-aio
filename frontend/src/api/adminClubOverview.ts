@@ -57,10 +57,11 @@ const overviewKeys = {
 
 // 薄殼列表(只讀 id/name/status;完整形狀在 adminActivities.ts):
 // 與 useAdminActivities 分開實作是為了 clubId 未定時的 enabled 擋載
-export function useAdminClubActivities(clubId: number | null) {
+// canView:呼叫端依 permissions 決定;無權限的區塊不發 API(避免整排 403)
+export function useAdminClubActivities(clubId: number | null, canView = true) {
   return useQuery({
     queryKey: overviewKeys.activities(clubId ?? 0),
-    enabled: clubId != null,
+    enabled: clubId != null && canView,
     // 端點不支援多狀態篩選:抓齊該社全部申請後於前端留下進行中的
     queryFn: () =>
       fetchAllPages<ActivityListOut>('/admin/activities', { club_id: clubId }).then((rows) =>
@@ -147,10 +148,10 @@ const toEquipmentLoan = (l: AdminEquipmentLoanOut): AdminEquipmentLoan => ({
   availableExcludingSelf: l.available_excluding_self ?? undefined,
 })
 
-export function useAdminClubRoomBookings(clubId: number | null) {
+export function useAdminClubRoomBookings(clubId: number | null, canView = true) {
   return useQuery({
     queryKey: overviewKeys.roomBookings(clubId ?? 0),
-    enabled: clubId != null,
+    enabled: clubId != null && canView,
     queryFn: () =>
       fetchAllPages<AdminRoomBookingOut>('/admin/room-bookings', { club_id: clubId }).then((rows) =>
         rows.map(toRoomRequest),
@@ -158,10 +159,10 @@ export function useAdminClubRoomBookings(clubId: number | null) {
   })
 }
 
-export function useAdminClubVenueBookings(clubId: number | null) {
+export function useAdminClubVenueBookings(clubId: number | null, canView = true) {
   return useQuery({
     queryKey: overviewKeys.venueBookings(clubId ?? 0),
-    enabled: clubId != null,
+    enabled: clubId != null && canView,
     queryFn: () =>
       fetchAllPages<AdminVenueBookingOut>('/admin/venue-bookings', { club_id: clubId }).then((rows) =>
         rows.map(toVenueBooking),
@@ -175,10 +176,10 @@ export interface LoanListParams {
 }
 
 /** 器材借用列表:社團總覽帶 clubId;逾期追蹤頁帶 status=overdue */
-export function useAdminEquipmentLoanList(p: LoanListParams) {
+export function useAdminEquipmentLoanList(p: LoanListParams, canView = true) {
   return useQuery({
     queryKey: overviewKeys.equipmentLoans(p),
-    enabled: p.clubId !== null, // null=社團主檔尚未載入;undefined=不以社團篩選
+    enabled: p.clubId !== null && canView, // null=社團主檔尚未載入;undefined=不以社團篩選
     queryFn: () =>
       fetchAllPages<AdminEquipmentLoanOut>('/admin/equipment-loans', {
         club_id: p.clubId,
@@ -207,10 +208,10 @@ interface AdminMaintenanceOut {
   created_at: string
 }
 
-export function useAdminClubMaintenance(clubId: number | null) {
+export function useAdminClubMaintenance(clubId: number | null, canView = true) {
   return useQuery({
     queryKey: overviewKeys.maintenance(clubId ?? 0),
-    enabled: clubId != null,
+    enabled: clubId != null && canView,
     queryFn: () =>
       fetchAllPages<AdminMaintenanceOut>('/admin/maintenance', { club_id: clubId }).then((rows) =>
         rows.map(

@@ -19,8 +19,18 @@ import ActivityReviewModal from './ActivityReviewModal'
 import BookingReviewModal, { type BookingReviewItem } from './BookingReviewModal'
 import ClubSelect from './ClubSelect'
 import { useAdminClub } from './clubContext'
+import { useAuth } from '../../app/auth'
+import { canAccessAdminPath } from '../../lib/permissions'
 
 const label: React.CSSProperties = { color: 'var(--steel)' }
+
+function NoPermission() {
+  return (
+    <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
+      您的權限無法檢視此區塊
+    </div>
+  )
+}
 
 // 線上申請(空間報修)無專屬審核彈窗,以唯讀詳情呈現;
 // 幹部證明尚無 admin 端點,暫不列入(後端補齊後再接)
@@ -58,12 +68,21 @@ function LoadError({ queries }: { queries: { isError: boolean; error: Error | nu
 // 點擊項目開與各專屬審核介面相同的彈窗(待審核者可直接核准/退回,其餘唯讀)
 export default function ClubOverviewPage() {
   const { clubId } = useAdminClub()
+  const { user } = useAuth()
+  // 各區塊資料來自不同 admin 端點,權限鍵各異;受限 admin 不發無權限的 query
+  // (否則整排 403 顯示成載入失敗),改以權限提示取代
+  const canActivities =
+    canAccessAdminPath(user, '/admin/review') || canAccessAdminPath(user, '/admin/close-review')
+  const canMaint = canAccessAdminPath(user, '/admin/maintenance')
+  const canRooms = canAccessAdminPath(user, '/admin/rooms')
+  const canBookings = canAccessAdminPath(user, '/admin/bookings')
+
   const detailQuery = useAdminClubDetail(clubId)
-  const activitiesQuery = useAdminClubActivities(clubId)
-  const roomsQuery = useAdminClubRoomBookings(clubId)
-  const venuesQuery = useAdminClubVenueBookings(clubId)
-  const loansQuery = useAdminEquipmentLoanList({ clubId })
-  const maintQuery = useAdminClubMaintenance(clubId)
+  const activitiesQuery = useAdminClubActivities(clubId, canActivities)
+  const roomsQuery = useAdminClubRoomBookings(clubId, canRooms)
+  const venuesQuery = useAdminClubVenueBookings(clubId, canBookings)
+  const loansQuery = useAdminEquipmentLoanList({ clubId }, canBookings)
+  const maintQuery = useAdminClubMaintenance(clubId, canMaint)
   const actMutations = useAdminActivityMutations()
   const bookingMutations = useAdminBookingMutations()
 
@@ -182,6 +201,7 @@ export default function ClubOverviewPage() {
             </span>
             {trackedLoading && clubId != null && <Spin size="small" />}
           </div>
+          {!canActivities && !canMaint && <NoPermission />}
           {activities.map((a) => (
             <div key={`act-${a.id}`} className="click-tint" style={rowStyle} {...clickableRow(() => openActivity(a.id))}>
               <div style={{ flex: 1, minWidth: 0 }}>
@@ -202,7 +222,7 @@ export default function ClubOverviewPage() {
             </div>
           ))}
           <LoadError queries={[activitiesQuery, maintQuery, reviewQuery]} />
-          {!trackedLoading && trackedCount === 0 && (
+          {(canActivities || canMaint) && !trackedLoading && trackedCount === 0 && (
             <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
               尚無進行中的申請
             </div>
@@ -217,6 +237,7 @@ export default function ClubOverviewPage() {
             </span>
             {bookingLoading && clubId != null && <Spin size="small" />}
           </div>
+          {!canRooms && !canBookings && <NoPermission />}
           {rooms.map((r) => (
             <div
               key={`room-${r.id}`}
@@ -260,7 +281,7 @@ export default function ClubOverviewPage() {
             </div>
           ))}
           <LoadError queries={[roomsQuery, venuesQuery, loansQuery]} />
-          {!bookingLoading && bookingCount === 0 && (
+          {(canRooms || canBookings) && !bookingLoading && bookingCount === 0 && (
             <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
               尚無借用中的場地或器材
             </div>

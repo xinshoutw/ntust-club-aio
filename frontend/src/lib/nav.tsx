@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { REVIEW_ITEMS } from '../features/admin/reviewMock'
-import { isFixedBookingOpen } from '../features/bookings/mock'
+import type { FixedWindow } from '../api/bookings'
 import {
   AppstoreOutlined,
   AuditOutlined,
@@ -42,8 +42,6 @@ export interface NavGroup {
   items: NavItem[]
 }
 
-// 固定場地借用僅於管理員開放期間可用;未開放時反灰並移至「其他」
-const fixedBookingOpen = isFixedBookingOpen()
 const FIXED_BOOKING_ITEM: NavItem = {
   key: 'booking-fixed',
   label: '固定場地',
@@ -51,61 +49,71 @@ const FIXED_BOOKING_ITEM: NavItem = {
   icon: <ScheduleOutlined />,
 }
 
-// 社團端資訊架構(2026-07-13 需求方重整版,非設計稿的舊版)
-export const CLUB_NAV: NavGroup[] = [
-  {
-    items: [{ key: 'overview', label: '總覽', path: '/', icon: <HomeOutlined /> }],
-  },
-  {
-    label: '活動管理',
-    items: [
-      { key: 'act-new', label: '活動申請', path: '/activities/new', icon: <FormOutlined /> },
-      { key: 'act-close', label: '活動結案', path: '/activities/close', icon: <FileDoneOutlined /> },
-      { key: 'act-list', label: '活動列表', path: '/activities', icon: <UnorderedListOutlined /> },
-    ],
-  },
-  {
-    label: '社團管理',
-    items: [
-      { key: 'members', label: '成員列表', path: '/members', icon: <TeamOutlined /> },
-      { key: 'club-settings', label: '管理項目', path: '/club-settings', icon: <SettingOutlined /> },
-    ],
-  },
-  {
-    label: '空間與器材借用',
-    items: [
-      { key: 'booking-overview', label: '借用總覽', path: '/bookings', icon: <CalendarOutlined /> },
-      ...(fixedBookingOpen ? [FIXED_BOOKING_ITEM] : []),
-      { key: 'booking-venue', label: '臨時場地', path: '/bookings/venue', icon: <EnvironmentOutlined /> },
-      { key: 'booking-equipment', label: '器材借用', path: '/bookings/equipment', icon: <AppstoreOutlined /> },
-    ],
-  },
-  {
-    label: '線上申請',
-    items: [
-      { key: 'signup', label: '線上報名', path: '/signup', icon: <FlagOutlined /> },
-      { key: 'maintenance', label: '空間報修', path: '/maintenance', icon: <ToolOutlined /> },
-      { key: 'postal', label: '郵局帳戶', path: '/postal', icon: <BankOutlined /> },
-      { key: 'certificate', label: '幹部證明', path: '/certificates', icon: <IdcardOutlined /> },
-    ],
-  },
-  {
-    label: '社團評鑑',
-    items: [
-      { key: 'eval-docs', label: '資料總覽', path: '/eval', icon: <FolderOpenOutlined /> },
-      { key: 'eval-result', label: '評鑑結果', path: '/eval/result', icon: <TrophyOutlined /> },
-    ],
-  },
-  {
-    label: '其他',
-    items: [
-      { key: 'violations', label: '違規勸導', path: '/violations', icon: <WarningOutlined /> },
-      ...(fixedBookingOpen
-        ? []
-        : [{ ...FIXED_BOOKING_ITEM, disabled: true, disabledHint: '未開放申請;固定借用預設於每年 6 月、1 月受理' }]),
-    ],
-  },
-]
+// 社團端資訊架構(2026-07-13 需求方重整版,非設計稿的舊版)。
+// 固定場地借用開放窗由後端系統設定提供(GET /club/room-bookings/window),
+// nav 因此無法再是模組層級常數:改為 builder,由 App 的 ClubShell 以 useFixedWindow() 查詢後組合;
+// 未開放(或查詢未完成)時項目反灰並移至「其他」。
+export function buildClubNav(window?: FixedWindow): NavGroup[] {
+  const fixedBookingOpen = window?.open ?? false
+  const closedHint =
+    window?.openFrom && window.openUntil
+      ? `未開放申請;受理期間 ${window.openFrom} – ${window.openUntil}`
+      : '目前未開放申請'
+  return [
+    {
+      items: [{ key: 'overview', label: '總覽', path: '/', icon: <HomeOutlined /> }],
+    },
+    {
+      label: '活動管理',
+      items: [
+        { key: 'act-new', label: '活動申請', path: '/activities/new', icon: <FormOutlined /> },
+        { key: 'act-close', label: '活動結案', path: '/activities/close', icon: <FileDoneOutlined /> },
+        { key: 'act-list', label: '活動列表', path: '/activities', icon: <UnorderedListOutlined /> },
+      ],
+    },
+    {
+      label: '社團管理',
+      items: [
+        { key: 'members', label: '成員列表', path: '/members', icon: <TeamOutlined /> },
+        { key: 'club-settings', label: '管理項目', path: '/club-settings', icon: <SettingOutlined /> },
+      ],
+    },
+    {
+      label: '空間與器材借用',
+      items: [
+        { key: 'booking-overview', label: '借用總覽', path: '/bookings', icon: <CalendarOutlined /> },
+        ...(fixedBookingOpen ? [FIXED_BOOKING_ITEM] : []),
+        { key: 'booking-venue', label: '臨時場地', path: '/bookings/venue', icon: <EnvironmentOutlined /> },
+        { key: 'booking-equipment', label: '器材借用', path: '/bookings/equipment', icon: <AppstoreOutlined /> },
+      ],
+    },
+    {
+      label: '線上申請',
+      items: [
+        { key: 'signup', label: '線上報名', path: '/signup', icon: <FlagOutlined /> },
+        { key: 'maintenance', label: '空間報修', path: '/maintenance', icon: <ToolOutlined /> },
+        { key: 'postal', label: '郵局帳戶', path: '/postal', icon: <BankOutlined /> },
+        { key: 'certificate', label: '幹部證明', path: '/certificates', icon: <IdcardOutlined /> },
+      ],
+    },
+    {
+      label: '社團評鑑',
+      items: [
+        { key: 'eval-docs', label: '資料總覽', path: '/eval', icon: <FolderOpenOutlined /> },
+        { key: 'eval-result', label: '評鑑結果', path: '/eval/result', icon: <TrophyOutlined /> },
+      ],
+    },
+    {
+      label: '其他',
+      items: [
+        { key: 'violations', label: '違規勸導', path: '/violations', icon: <WarningOutlined /> },
+        ...(fixedBookingOpen
+          ? []
+          : [{ ...FIXED_BOOKING_ITEM, disabled: true, disabledHint: closedHint }]),
+      ],
+    },
+  ]
+}
 
 export const ADMIN_NAV: NavGroup[] = [
   {

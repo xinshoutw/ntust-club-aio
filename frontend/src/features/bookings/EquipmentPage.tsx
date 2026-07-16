@@ -1,54 +1,63 @@
-import { App, Button, Form, Input, InputNumber, Select } from 'antd'
-import dayjs, { type Dayjs } from 'dayjs'
+import { useEffect } from 'react'
+import { App, Button, Form, Input, InputNumber, Select, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
-import { useAuth } from '../../app/auth'
-import { CLUB_ACTIVITIES } from '../activities/mock'
-import type { Activity } from '../activities/types'
-import { EQUIPMENT, EQUIPMENT_LOANS, availableInWindow } from './mock'
-
-// 借用區間緩衝(工作天;system_settings,後台可調)
-const WORKDAY_BUFFER = { before: 2, after: 1 }
-
-// mock 僅排除週末;正式依政府行事曆(後端 holidays 服務)
-function addWorkdays(d: Dayjs, n: number): Dayjs {
-  let cur = d
-  const step = n > 0 ? 1 : -1
-  let left = Math.abs(n)
-  while (left > 0) {
-    cur = cur.add(step, 'day')
-    if (cur.day() !== 0 && cur.day() !== 6) left -= 1
-  }
-  return cur
-}
-
-// 借用區間 = 活動開始日 −2 個工作天 ~ 活動結束日 +1 個工作天
-function loanWindow(a: Activity): { start: string; end: string } {
-  const start = addWorkdays(dayjs(a.date, 'YYYY/MM/DD'), -WORKDAY_BUFFER.before)
-  const end = addWorkdays(dayjs(a.endDate ?? a.date, 'YYYY/MM/DD'), WORKDAY_BUFFER.after)
-  return { start: start.format('YYYY/MM/DD'), end: end.format('YYYY/MM/DD') }
-}
+import {
+  useBookingMutations,
+  useEquipmentList,
+  useEquipmentLoans,
+} from '../../api/bookings'
+import { useActivityList } from '../../api/activities'
 
 export default function EquipmentPage() {
-  const { user } = useAuth()
   const { message } = App.useApp()
   const [form] = Form.useForm()
-  const mine = EQUIPMENT_LOANS.filter((l) => l.club === user?.club).slice(0, 5)
 
-  // 器材借用綁定審核通過之活動,不再自選日期區間
-  const approved = CLUB_ACTIVITIES.filter((a) => a.club === user?.club && a.status === 'approved')
-  const activityId = Form.useWatch('activity', form) as string | undefined
-  const activity = approved.find((a) => a.id === activityId)
-  const window = activity ? loanWindow(activity) : null
+  // 器材借用綁定審核通過之活動,不再自選日期區間;
+  // 可借數與借用區間由後端依所選活動推導(GET /club/equipment?activity_id=)
+  const activitiesQuery = useActivityList({ status: 'approved' })
+  const approved = activitiesQuery.data ?? []
+  const activityId = Form.useWatch('activity', form) as number | undefined
+  const equipmentQuery = useEquipmentList(activityId)
+  const items = equipmentQuery.data?.items ?? []
+  // 換活動時沿用舊列表避免表格閃空,但可借數在新活動資料就緒前一律視為未知(顯示 —)
+  const loanWindow = activityId != null && !equipmentQuery.isPlaceholderData ? equipmentQuery.data?.window ?? null : null
 
-  // 可借數依所選活動的借用區間動態推導;未選活動前無法判斷
-  const avail = (name: string): number | null => (window ? availableInWindow(name, window.start, window.end) : null)
-  const selectedName = Form.useWatch('equipment', form) as string | undefined
-  const selectedAvail = selectedName ? avail(selectedName) : null
+  const recentQuery = useEquipmentLoans({ page: 1, pageSize: 5 })
+  const recent = recentQuery.data?.rows ?? []
+  const { createEquipmentLoan } = useBookingMutations()
 
-  const submit = (values: { equipment: string; qty: number }) => {
-    message.success(`已送出「${values.equipment} ×${values.qty}」借用申請(${activity?.name})`)
-    form.resetFields()
+  const selectedId = Form.useWatch('equipment', form) as number | undefined
+  const selectedAvail = loanWindow != null && selectedId != null ? items.find((e) => e.id === selectedId)?.available ?? null : null
+
+  // 換活動=換借用區間,可借數重新推導:原選品項在新區間不可借就清掉(資料就緒後檢查)
+  useEffect(() => {
+    if (!loanWindow) return
+    const id = form.getFieldValue('equipment') as number | undefined
+    if (id == null) return
+    const item = items.find((e) => e.id === id)
+    if (!item || item.available === 0) form.resetFields(['equipment'])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [equipmentQuery.data])
+
+  const submit = (values: { activity: number; equipment: number; qty: number; purpose: string }) => {
+    const equipmentName = items.find((e) => e.id === values.equipment)?.name ?? ''
+    const activityName = approved.find((a) => a.id === values.activity)?.name ?? ''
+    createEquipmentLoan.mutate(
+      {
+        equipmentId: values.equipment,
+        activityId: values.activity,
+        qty: values.qty,
+        purpose: values.purpose,
+      },
+      {
+        onSuccess: () => {
+          message.success(`已送出「${equipmentName} ×${values.qty}」借用申請(${activityName})`)
+          form.resetFields()
+        },
+        onError: (e) => message.error(e.message),
+      },
+    )
   }
 
   return (
@@ -57,47 +66,49 @@ export default function EquipmentPage() {
 
       <div className="overview-grid" style={{ marginTop: 20 }}>
         <div className="card" style={{ overflowX: 'auto' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>器材一覽</div>
-          <table className="tb" style={{ minWidth: 480 }}>
-            <thead>
-              <tr>
-                <th>品項</th>
-                <th>類別</th>
-                <th className="r">可借 / 總數</th>
-              </tr>
-            </thead>
-            <tbody>
-              {EQUIPMENT.map((e) => {
-                const a = avail(e.name)
-                // 未選關聯活動(a===null)前不可點選帶入;可借 0 也不可點
-                const disabled = a === null || a === 0
-                return (
-                  <tr
-                    key={e.name}
-                    onClick={() => {
-                      if (disabled) return
-                      form.setFieldValue('equipment', e.name)
-                      form.resetFields(['qty'])
-                    }}
-                    style={
-                      a === 0
-                        ? { background: '#EEF0F3', color: 'var(--muted)', cursor: 'not-allowed' }
-                        : { cursor: disabled ? 'default' : 'pointer' }
-                    }
-                  >
-                    <td style={{ fontWeight: 500 }}>{e.name}</td>
-                    <td style={{ color: 'var(--steel)', fontSize: 13 }}>
-                      {e.category}
-                      {e.needsSerial && ' · 序號點交'}
-                    </td>
-                    <td className="r num">
-                      {a ?? '—'} / {e.total}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
+          <Spin spinning={equipmentQuery.isPending}>
+            <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>器材一覽</div>
+            <table className="tb" style={{ minWidth: 480 }}>
+              <thead>
+                <tr>
+                  <th>品項</th>
+                  <th>類別</th>
+                  <th className="r">可借 / 總數</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((e) => {
+                  const a = loanWindow ? e.available : null
+                  // 未選關聯活動(a===null)前不可點選帶入;可借 0 也不可點
+                  const disabled = a === null || a === 0
+                  return (
+                    <tr
+                      key={e.id}
+                      onClick={() => {
+                        if (disabled) return
+                        form.setFieldValue('equipment', e.id)
+                        form.resetFields(['qty'])
+                      }}
+                      style={
+                        a === 0
+                          ? { background: '#EEF0F3', color: 'var(--muted)', cursor: 'not-allowed' }
+                          : { cursor: disabled ? 'default' : 'pointer' }
+                      }
+                    >
+                      <td style={{ fontWeight: 500 }}>{e.name}</td>
+                      <td style={{ color: 'var(--steel)', fontSize: 13 }}>
+                        {e.category}
+                        {e.needsSerial && ' · 序號點交'}
+                      </td>
+                      <td className="r num">
+                        {a ?? '—'} / {e.totalQty}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </Spin>
         </div>
 
         <div className="card" style={{ padding: 24 }}>
@@ -109,16 +120,8 @@ export default function EquipmentPage() {
             requiredMark
             onValuesChange={(changed) => {
               if ('equipment' in changed) form.resetFields(['qty'])
-              // 換活動=換借用區間,可借數重新推導:數量一律重填;原選品項在新區間不可借就清掉
-              if ('activity' in changed) {
-                form.resetFields(['qty'])
-                const name = form.getFieldValue('equipment') as string | undefined
-                const a = approved.find((x) => x.id === changed.activity)
-                const w = a ? loanWindow(a) : null
-                if (name && (!w || availableInWindow(name, w.start, w.end) === 0)) {
-                  form.resetFields(['equipment'])
-                }
-              }
+              // 換活動=換借用區間:數量一律重填(原選品項的清除待新資料就緒後於 effect 處理)
+              if ('activity' in changed) form.resetFields(['qty'])
             }}
           >
             <Form.Item
@@ -126,9 +129,9 @@ export default function EquipmentPage() {
               label="關聯活動"
               rules={[{ required: true, message: '請選擇活動' }]}
               extra={
-                window ? (
+                loanWindow ? (
                   <span className="num">
-                    可借用區間 {window.start} – {window.end}
+                    可借用區間 {loanWindow.start} – {loanWindow.end}
                   </span>
                 ) : (
                   '選擇活動後推算借用區間與可借數量'
@@ -137,18 +140,19 @@ export default function EquipmentPage() {
             >
               <Select
                 placeholder="請選擇活動"
-                options={approved.map((a) => ({ value: a.id, label: `${a.name}` }))}
+                loading={activitiesQuery.isPending}
+                options={approved.map((a) => ({ value: a.id, label: a.name }))}
                 notFoundContent="無審核通過之活動"
               />
             </Form.Item>
             <Form.Item name="equipment" label="品項" rules={[{ required: true, message: '請選擇品項' }]}>
               <Select
-                placeholder={window ? '請選擇' : '請先選擇關聯活動'}
-                disabled={!window}
-                options={EQUIPMENT.map((e) => {
-                  const a = avail(e.name)
+                placeholder={loanWindow ? '請選擇' : '請先選擇關聯活動'}
+                disabled={!loanWindow}
+                options={items.map((e) => {
+                  const a = loanWindow ? e.available : null
                   return {
-                    value: e.name,
+                    value: e.id,
                     label: `${e.name}(可借 ${a ?? '—'})`,
                     disabled: a === 0,
                   }
@@ -169,7 +173,7 @@ export default function EquipmentPage() {
                 },
               ]}
             >
-              <InputNumber style={{ width: '100%' }} min={1} max={selectedAvail ?? 99} precision={0} disabled={!window} />
+              <InputNumber style={{ width: '100%' }} min={1} max={selectedAvail ?? 99} precision={0} disabled={!loanWindow} />
             </Form.Item>
 
             <Form.Item
@@ -180,41 +184,46 @@ export default function EquipmentPage() {
               <Input placeholder="簡述說明" />
             </Form.Item>
 
-            <Button type="primary" htmlType="submit" block>
+            <Button type="primary" htmlType="submit" block loading={createEquipmentLoan.isPending}>
               送出申請
             </Button>
           </Form>
         </div>
       </div>
 
-      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近借用</div>
-        <table className="tb" style={{ minWidth: 760 }}>
-          <tbody>
-            {mine.map((l) => (
-              <tr key={l.id}>
-                <td style={{ fontWeight: 500 }}>
-                  {l.equipment} <span className="num">×{l.qty}</span>
-                  {l.serials?.length ? (
-                    <span className="num" style={{ color: 'var(--steel)', fontSize: 12 }}> ({l.serials.join('、')})</span>
-                  ) : null}
-                </td>
-                <td className="num" style={{ fontSize: 13 }}>{l.startDate} – {l.endDate}</td>
-                <td style={{ color: 'var(--steel)', fontSize: 13 }}>
-                  {l.status === 'checked_out' && l.returnDue ? `歸還期限 ${l.returnDue}` : l.activity ?? l.purpose}
-                </td>
-                <td style={{ color: 'var(--steel)', fontSize: 13, whiteSpace: 'nowrap' }}>
-                  {l.borrower && <>借用 {l.borrower}</>}
-                  {l.borrower && l.returnedBy && ' · '}
-                  {l.returnedBy && <>歸還 {l.returnedBy}</>}
-                  {!l.borrower && !l.returnedBy && '—'}
-                </td>
-                <td style={{ width: 110 }}><StatusPill status={l.status} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Spin spinning={recentQuery.isPending}>
+        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近借用</div>
+          <table className="tb" style={{ minWidth: 760 }}>
+            <tbody>
+              {recent.map((l) => (
+                <tr key={l.id}>
+                  <td style={{ fontWeight: 500 }}>
+                    {l.equipmentName} <span className="num">×{l.qty}</span>
+                    {l.serials?.length ? (
+                      <span className="num" style={{ color: 'var(--steel)', fontSize: 12 }}> ({l.serials.join('、')})</span>
+                    ) : null}
+                  </td>
+                  <td className="num" style={{ fontSize: 13 }}>{l.startDate} – {l.endDate}</td>
+                  <td style={{ color: 'var(--steel)', fontSize: 13 }}>{l.activityName ?? l.purpose}</td>
+                  <td style={{ color: 'var(--steel)', fontSize: 13, whiteSpace: 'nowrap' }}>
+                    {l.borrower && <>借用 {l.borrower}</>}
+                    {l.borrower && l.returnedBy && ' · '}
+                    {l.returnedBy && <>歸還 {l.returnedBy}</>}
+                    {!l.borrower && !l.returnedBy && '—'}
+                  </td>
+                  <td style={{ width: 110 }}><StatusPill status={l.status} /></td>
+                </tr>
+              ))}
+              {!recentQuery.isPending && recent.length === 0 && (
+                <tr className="no-hover">
+                  <td style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無借用紀錄</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Spin>
     </div>
   )
 }

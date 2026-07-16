@@ -1,41 +1,74 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import dayjs from 'dayjs'
-import { App, Button, DatePicker, Form, Input, Select } from 'antd'
+import dayjs, { type Dayjs } from 'dayjs'
+import { App, Button, DatePicker, Form, Input, Select, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
-import { useAuth } from '../../app/auth'
-import { CLUB_ACTIVITIES } from '../activities/mock'
-import { PERIODS, VENUE_BOOKINGS, VENUES } from './mock'
+import {
+  PERIODS,
+  useBookingMutations,
+  useVenueBookings,
+  useVenues,
+  venueLabel,
+} from '../../api/bookings'
+import { useActivityList } from '../../api/activities'
 import PeriodPicker from './PeriodPicker'
 
 export default function VenueBookingPage() {
-  const { user } = useAuth()
   const { message } = App.useApp()
   const [form] = Form.useForm()
   // 借用總覽格子點入時自動帶入場地、日期、時段
   const [params] = useSearchParams()
-  const qVenue = params.get('venue')
-  const prefillVenue = VENUES.some((v) => v.allowTemp && v.name === qVenue) ? qVenue ?? undefined : undefined
+  const qVenueId = Number(params.get('venue'))
   const rawDate = params.get('date')
   // 嚴格驗證 query 日期(非嚴格 parse 會把 2026/99/99 正規化成別的日期)
   const qDate = rawDate && dayjs(rawDate, 'YYYY/MM/DD', true).isValid() ? rawDate : undefined
   const qPeriod = params.get('period')
   const [periods, setPeriods] = useState<string[]>(() => (qPeriod && PERIODS.includes(qPeriod) ? [qPeriod] : []))
   const [periodsError, setPeriodsError] = useState(false)
-  const mine = VENUE_BOOKINGS.filter((v) => v.club === user?.club).slice(0, 5)
-  // 借用需綁定審核通過之活動(與器材借用一致)
-  const approved = CLUB_ACTIVITIES.filter((a) => a.club === user?.club && a.status === 'approved')
 
-  const submit = (values: { venue: string }) => {
+  const venuesQuery = useVenues()
+  const venues = venuesQuery.data ?? []
+  const tempVenues = venues.filter((v) => v.allowTemp)
+  // 借用需綁定審核通過之活動(與器材借用一致;共用活動域查詢)
+  const activitiesQuery = useActivityList({ status: 'approved' })
+  const approved = activitiesQuery.data ?? []
+  const recentQuery = useVenueBookings({ page: 1, pageSize: 5 })
+  const recent = recentQuery.data?.rows ?? []
+  const { createVenueBooking } = useBookingMutations()
+
+  // 場地主檔為非同步載入,query 帶入的場地待資料就緒後再驗證回填
+  useEffect(() => {
+    if (!Number.isInteger(qVenueId) || qVenueId <= 0) return
+    if (form.getFieldValue('venue') != null) return
+    if (tempVenues.some((v) => v.id === qVenueId)) form.setFieldValue('venue', qVenueId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [venuesQuery.data])
+
+  const submit = (values: { venue: number; activity: number; purpose: string; date: Dayjs }) => {
     if (!periods.length) {
       setPeriodsError(true)
       message.error('請選擇至少一個時段')
       return
     }
-    message.success(`已送出「${values.venue}」借用申請（${periods.join('、')}）`)
-    form.resetFields()
-    setPeriods([])
+    const venueName = tempVenues.find((v) => v.id === values.venue)?.name ?? ''
+    createVenueBooking.mutate(
+      {
+        venueId: values.venue,
+        activityId: values.activity,
+        date: values.date,
+        periods,
+        purpose: values.purpose,
+      },
+      {
+        onSuccess: () => {
+          message.success(`已送出「${venueName}」借用申請（${periods.join('、')}）`)
+          form.resetFields()
+          setPeriods([])
+        },
+        onError: (e) => message.error(e.message),
+      },
+    )
   }
 
   return (
@@ -48,16 +81,14 @@ export default function VenueBookingPage() {
           layout="vertical"
           onFinish={submit}
           requiredMark
-          initialValues={{ venue: prefillVenue, date: qDate ? dayjs(qDate, 'YYYY/MM/DD') : undefined }}
+          initialValues={{ date: qDate ? dayjs(qDate, 'YYYY/MM/DD') : undefined }}
         >
           <div className="form-grid-2">
             <Form.Item name="venue" label="場地" rules={[{ required: true, message: '請選擇場地' }]} style={{ marginBottom: 0 }}>
               <Select
                 placeholder="請選擇"
-                options={VENUES.filter((v) => v.allowTemp).map((v) => ({
-                  value: v.name,
-                  label: `${v.name} (${v.capacity} 人)`,
-                }))}
+                loading={venuesQuery.isPending}
+                options={tempVenues.map((v) => ({ value: v.id, label: venueLabel(v) }))}
               />
             </Form.Item>
 
@@ -69,7 +100,8 @@ export default function VenueBookingPage() {
             >
               <Select
                 placeholder="請選擇活動"
-                options={approved.map((a) => ({ value: a.id, label: `${a.name}` }))}
+                loading={activitiesQuery.isPending}
+                options={approved.map((a) => ({ value: a.id, label: a.name }))}
                 notFoundContent="無審核通過之活動"
               />
             </Form.Item>
@@ -106,26 +138,33 @@ export default function VenueBookingPage() {
             </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-            <Button type="primary" htmlType="submit">送出申請</Button>
+            <Button type="primary" htmlType="submit" loading={createVenueBooking.isPending}>送出申請</Button>
           </div>
         </Form>
       </div>
 
-      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
-        <table className="tb" style={{ minWidth: 560 }}>
-          <tbody>
-            {mine.map((v) => (
-              <tr key={v.id}>
-                <td style={{ fontWeight: 500 }}>{v.venue}</td>
-                <td className="num" style={{ fontSize: 13 }}>{v.date}</td>
-                <td style={{ color: 'var(--steel)', fontSize: 13 }}>第 {v.periods.join('、')} 節</td>
-                <td style={{ width: 110 }}><StatusPill status={v.status} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      <Spin spinning={recentQuery.isPending}>
+        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
+          <table className="tb" style={{ minWidth: 560 }}>
+            <tbody>
+              {recent.map((v) => (
+                <tr key={v.id}>
+                  <td style={{ fontWeight: 500 }}>{v.venueName}</td>
+                  <td className="num" style={{ fontSize: 13 }}>{v.date}</td>
+                  <td style={{ color: 'var(--steel)', fontSize: 13 }}>第 {v.periods.join('、')} 節</td>
+                  <td style={{ width: 110 }}><StatusPill status={v.status} /></td>
+                </tr>
+              ))}
+              {!recentQuery.isPending && recent.length === 0 && (
+                <tr className="no-hover">
+                  <td style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無申請紀錄</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Spin>
     </div>
   )
 }

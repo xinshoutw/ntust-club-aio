@@ -1,9 +1,9 @@
 import { Link, useNavigate, useParams } from 'react-router'
-import { App, Button, Checkbox, Form, Input, Radio, Select } from 'antd'
+import { App, Button, Checkbox, Form, Input, Radio, Select, Spin } from 'antd'
 import { LeftOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
-import { SIGNUP_ITEMS } from './mock'
+import { useSignupItem, useSignupMutations, type Participant } from '../../api/signups'
 import type { SignupField } from './types'
 import SubmissionRecord from './SubmissionRecord'
 
@@ -24,20 +24,42 @@ function dynamicControl(field: SignupField) {
   }
 }
 
+function BackLink() {
+  return (
+    <Link to="/signup" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+      <LeftOutlined style={{ fontSize: 12 }} />
+      返回線上報名
+    </Link>
+  )
+}
+
 export default function SignupFormPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { message } = App.useApp()
   const [form] = Form.useForm()
-  const item = SIGNUP_ITEMS.find((s) => s.id === id)
+  const itemId = Number(id)
+  const isValidId = Number.isInteger(itemId) && itemId > 0
+  const itemQuery = useSignupItem(isValidId ? itemId : undefined)
+  const item = itemQuery.data
+  const { saveDraft, submit } = useSignupMutations()
 
-  if (item?.submission) {
+  // 無效 id 時查詢停用(永遠 pending),直接落到「不存在」畫面
+  if (isValidId && itemQuery.isPending) {
     return (
       <div>
-        <Link to="/signup" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-          <LeftOutlined style={{ fontSize: 12 }} />
-          返回線上報名
-        </Link>
+        <BackLink />
+        <div className="card" style={{ marginTop: 12, padding: '48px 24px', textAlign: 'center' }}>
+          <Spin />
+        </div>
+      </div>
+    )
+  }
+
+  if (item?.mySignup) {
+    return (
+      <div>
+        <BackLink />
         <div style={{ marginTop: 12 }}>
           <PageHeader title={`${item.name} — 報名紀錄`} />
         </div>
@@ -49,13 +71,10 @@ export default function SignupFormPage() {
     )
   }
 
-  if (!item || item.status !== 'open') {
+  if (!item || !item.accepting) {
     return (
       <div>
-        <Link to="/signup" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-          <LeftOutlined style={{ fontSize: 12 }} />
-          返回線上報名
-        </Link>
+        <BackLink />
         <div style={{ marginTop: 12 }}>
           <PageHeader title={item ? `${item.name} — 報名` : '找不到報名活動'} />
         </div>
@@ -67,7 +86,7 @@ export default function SignupFormPage() {
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
               <StatusPill status="ended" />
               <div>
-                此活動已於 <span className="num">{item.deadline}</span> 截止報名
+                此活動{item.deadline ? <>已於 <span className="num">{item.deadline}</span> 截止報名</> : '未開放報名'}
               </div>
             </div>
           ) : (
@@ -78,17 +97,41 @@ export default function SignupFormPage() {
     )
   }
 
-  const onFinish = () => {
-    message.success('已送出報名')
-    navigate('/signup')
+  // 後端拒絕未知 answers key:以目前欄位定義過濾(防草稿殘留已被管理員移除的舊欄位)
+  const pickKnown = (participants: Participant[]): Participant[] => {
+    const known = new Set(item.fields.map((f) => f.key))
+    return participants.map((p) =>
+      Object.fromEntries(Object.entries(p ?? {}).filter(([key]) => known.has(key))),
+    )
+  }
+
+  const onSaveDraft = () => {
+    const participants = (form.getFieldsValue().participants ?? []) as Participant[]
+    saveDraft.mutate(
+      { id: item.id, participants: pickKnown(participants) },
+      {
+        onSuccess: () => message.success('已儲存草稿'),
+        onError: (e) => message.error(e.message),
+      },
+    )
+  }
+
+  const onFinish = (values: { participants: Participant[] }) => {
+    submit.mutate(
+      { id: item.id, participants: pickKnown(values.participants) },
+      {
+        onSuccess: () => {
+          message.success('已送出報名')
+          navigate('/signup')
+        },
+        onError: (e) => message.error(e.message),
+      },
+    )
   }
 
   return (
     <div>
-      <Link to="/signup" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-        <LeftOutlined style={{ fontSize: 12 }} />
-        返回線上報名
-      </Link>
+      <BackLink />
       <div style={{ marginTop: 12 }}>
         <PageHeader title={`${item.name} — 報名`} />
       </div>
@@ -100,10 +143,10 @@ export default function SignupFormPage() {
           </div>
         )}
         <div className="form-grid-2" style={{ gap: '12px 24px' }}>
-          {item.time && (
+          {item.eventAt && (
             <div>
               <div style={{ fontSize: 12, color: 'var(--steel)' }}>活動時間</div>
-              <div className="num" style={{ fontSize: 13, marginTop: 3 }}>{item.time}</div>
+              <div className="num" style={{ fontSize: 13, marginTop: 3 }}>{item.eventAt}</div>
             </div>
           )}
           {item.place && (
@@ -114,7 +157,7 @@ export default function SignupFormPage() {
           )}
           <div>
             <div style={{ fontSize: 12, color: 'var(--steel)' }}>截止日</div>
-            <div className="num" style={{ fontSize: 13, marginTop: 3 }}>{item.deadline}</div>
+            <div className="num" style={{ fontSize: 13, marginTop: 3 }}>{item.deadline ?? '—'}</div>
           </div>
           <div>
             <div style={{ fontSize: 12, color: 'var(--steel)' }}>名額</div>
@@ -125,7 +168,14 @@ export default function SignupFormPage() {
         </div>
       </div>
 
-      <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ participants: [{}] }} requiredMark>
+      {/* 草稿存 DB 跨裝置續填:載入時以草稿內容預填 */}
+      <Form
+        form={form}
+        layout="vertical"
+        onFinish={onFinish}
+        initialValues={{ participants: item.myDraft?.length ? item.myDraft : [{}] }}
+        requiredMark
+      >
         <Form.List name="participants">
           {(fields, { add, remove }) => (
             <>
@@ -143,30 +193,6 @@ export default function SignupFormPage() {
                     )}
                   </div>
                   <div className="form-grid-2">
-                    <Form.Item
-                      name={[f.name, 'name']}
-                      label="姓名"
-                      rules={[{ required: true, message: '請輸入姓名' }]}
-                      style={{ marginBottom: 0 }}
-                    >
-                      <Input />
-                    </Form.Item>
-                    <Form.Item
-                      name={[f.name, 'studentId']}
-                      label="學號"
-                      rules={[{ required: true, message: '請輸入學號' }]}
-                      style={{ marginBottom: 0 }}
-                    >
-                      <Input className="num" />
-                    </Form.Item>
-                    <Form.Item
-                      name={[f.name, 'dept']}
-                      label="系級"
-                      rules={[{ required: true, message: '請輸入系級' }]}
-                      style={{ marginBottom: 0 }}
-                    >
-                      <Input />
-                    </Form.Item>
                     {item.fields.map((fieldDef) => (
                       <Form.Item
                         key={fieldDef.key}
@@ -178,6 +204,11 @@ export default function SignupFormPage() {
                         {dynamicControl(fieldDef)}
                       </Form.Item>
                     ))}
+                    {!item.fields.length && (
+                      <div style={{ fontSize: 13, color: 'var(--steel)', gridColumn: '1 / -1' }}>
+                        本活動無需填寫資料,送出即完成報名。
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
@@ -214,14 +245,10 @@ export default function SignupFormPage() {
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
           <Button onClick={() => navigate('/signup')}>取消</Button>
-          <Button
-            onClick={() => {
-              message.success('已儲存草稿(本機示意,接後端後保存)')
-            }}
-          >
+          <Button onClick={onSaveDraft} loading={saveDraft.isPending}>
             儲存草稿
           </Button>
-          <Button type="primary" htmlType="submit">
+          <Button type="primary" htmlType="submit" loading={submit.isPending}>
             送出報名
           </Button>
         </div>

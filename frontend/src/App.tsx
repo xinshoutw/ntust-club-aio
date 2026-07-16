@@ -1,7 +1,8 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router'
-import type { ReactNode } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { useAuth, type Role } from './app/auth'
-import { ADMIN_NAV, CLUB_NAV } from './lib/nav'
+import { ADMIN_NAV, buildClubNav } from './lib/nav'
+import { useFixedWindow } from './api/bookings'
 import { homeOf } from './lib/home'
 import AppShell from './components/layout/AppShell'
 import LoginPage from './features/auth/LoginPage'
@@ -59,6 +60,14 @@ function RequireRole({ roles, children }: { roles: Role[]; children: ReactNode }
   return children
 }
 
+// 社團端側欄的「固定場地」依後端開放窗顯示/反灰(nav 原為模組常數,改由查詢結果組合);
+// 查詢未完成前先視為未開放,載入後自動更新
+function ClubShell() {
+  const windowQuery = useFixedWindow()
+  const nav = useMemo(() => buildClubNav(windowQuery.data), [windowQuery.data])
+  return <AppShell nav={nav} />
+}
+
 // 首登強制改密頁:需已登入,但不受 mustChangePassword 導轉限制
 function RequireAuth({ children }: { children: ReactNode }) {
   const { user, booting } = useAuth()
@@ -91,7 +100,7 @@ export default function App() {
       <Route
         element={
           <RequireRole roles={['club']}>
-            <AppShell nav={CLUB_NAV} />
+            <ClubShell />
           </RequireRole>
         }
       >

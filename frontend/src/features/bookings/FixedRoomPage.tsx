@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
-import { App, Button, Form, Input, Select } from 'antd'
+import { App, Button, Form, Input, Select, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
-import { useAuth } from '../../app/auth'
 import {
   DOW_TEXT,
   PERIODS,
-  ROOM_REQUESTS,
-  VENUES,
-  isFixedBookingOpen,
   roomEntryText,
-} from './mock'
+  useBookingMutations,
+  useFixedWindow,
+  useRoomBookings,
+  useVenues,
+  venueLabel,
+} from '../../api/bookings'
 
 const MAX_PERIODS = 10 // 每社團至多 10 節(1 節 = 1 小時)
 const LATE = new Set(['10', 'A', 'B', 'C', 'D']) // 晚間時段:需至少連續 3 節起借
@@ -43,7 +44,6 @@ function lateRuleError(dow: number, periods: string[]): string | null {
 }
 
 export default function FixedRoomPage() {
-  const { user } = useAuth()
   const { message } = App.useApp()
   const [form] = Form.useForm()
   // 已選時段:'dow|period'(dow 1=週一 … 7=週日)
@@ -53,7 +53,13 @@ export default function FixedRoomPage() {
   const [slotsError, setSlotsError] = useState(false)
   const slotsRef = useRef(slots)
   slotsRef.current = slots
-  const mine = ROOM_REQUESTS.filter((r) => r.club === user?.club).slice(0, 5)
+
+  // 開放窗由後端提供(與側欄共用同一查詢);未開放時直接輸入網址也只顯示說明
+  const windowQuery = useFixedWindow()
+  const venuesQuery = useVenues()
+  const recentQuery = useRoomBookings({ page: 1, pageSize: 5 })
+  const { createRoomBooking } = useBookingMutations()
+  const recent = recentQuery.data?.rows ?? []
 
   useEffect(() => {
     const up = () => setDragTo(null)
@@ -61,13 +67,29 @@ export default function FixedRoomPage() {
     return () => window.removeEventListener('mouseup', up)
   }, [])
 
-  // 僅於管理員開放期間可用;未開放時側欄反灰,直接輸入網址也只顯示說明
-  if (!isFixedBookingOpen()) {
+  if (windowQuery.isPending) {
+    return (
+      <div>
+        <PageHeader title="固定場地借用" />
+        <div className="card" style={{ marginTop: 20, padding: '48px 24px', textAlign: 'center' }}>
+          <Spin />
+        </div>
+      </div>
+    )
+  }
+
+  const window_ = windowQuery.data
+  if (!window_?.open) {
     return (
       <div>
         <PageHeader title="固定場地借用" />
         <div className="card" style={{ marginTop: 20, padding: '48px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: 15, fontWeight: 600 }}>目前未開放申請</div>
+          {window_?.openFrom && window_.openUntil && (
+            <div className="num" style={{ fontSize: 13, color: 'var(--steel)', marginTop: 8 }}>
+              受理期間 {window_.openFrom} – {window_.openUntil}
+            </div>
+          )}
         </div>
       </div>
     )
@@ -88,7 +110,7 @@ export default function FixedRoomPage() {
     })
   }
 
-  const submit = () => {
+  const submit = (values: { room: number; note: string }) => {
     if (slots.size === 0) {
       setSlotsError(true)
       message.error('請至少選擇一個時段')
@@ -107,9 +129,24 @@ export default function FixedRoomPage() {
         return
       }
     }
-    message.success(`已送出固定借用申請`)
-    form.resetFields()
-    setSlots(new Set())
+    createRoomBooking.mutate(
+      {
+        venueId: values.room,
+        purpose: values.note,
+        slots: [...slots].map((key) => {
+          const [dow, period] = key.split('|')
+          return { weekday: Number(dow), period }
+        }),
+      },
+      {
+        onSuccess: () => {
+          message.success('已送出固定借用申請')
+          form.resetFields()
+          setSlots(new Set())
+        },
+        onError: (e) => message.error(e.message),
+      },
+    )
   }
 
   return (
@@ -122,10 +159,10 @@ export default function FixedRoomPage() {
             <Form.Item name="room" label="場地" rules={[{ required: true, message: '請選擇場地' }]} style={{ marginBottom: 0 }}>
               <Select
                 placeholder="請選擇"
-                options={VENUES.filter((v) => v.allowFixed).map((v) => ({
-                  value: v.name,
-                  label: `${v.name} (${v.capacity} 人)`,
-                }))}
+                loading={venuesQuery.isPending}
+                options={(venuesQuery.data ?? [])
+                  .filter((v) => v.allowFixed)
+                  .map((v) => ({ value: v.id, label: venueLabel(v) }))}
               />
             </Form.Item>
             <Form.Item name="note" label="用途" rules={[{ required: true, message: '請輸入用途' }]} style={{ marginBottom: 0 }}>
@@ -207,32 +244,34 @@ export default function FixedRoomPage() {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-            <Button type="primary" htmlType="submit">送出申請</Button>
+            <Button type="primary" htmlType="submit" loading={createRoomBooking.isPending}>送出申請</Button>
           </div>
         </Form>
       </div>
 
-      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
-        <table className="tb" style={{ minWidth: 560 }}>
-          <tbody>
-            {mine.map((r) => (
-              <tr key={r.id}>
-                <td style={{ fontWeight: 500 }}>{r.room}</td>
-                <td style={{ color: 'var(--steel)', fontSize: 13 }}>
-                  {r.entries.map(roomEntryText).join('、')}
-                </td>
-                <td style={{ width: 110 }}><StatusPill status={r.status} /></td>
-              </tr>
-            ))}
-            {mine.length === 0 && (
-              <tr className="no-hover">
-                <td style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無申請紀錄</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <Spin spinning={recentQuery.isPending}>
+        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
+          <table className="tb" style={{ minWidth: 560 }}>
+            <tbody>
+              {recent.map((r) => (
+                <tr key={r.id}>
+                  <td style={{ fontWeight: 500 }}>{r.venueName}</td>
+                  <td style={{ color: 'var(--steel)', fontSize: 13 }}>
+                    {r.entries.map(roomEntryText).join('、')}
+                  </td>
+                  <td style={{ width: 110 }}><StatusPill status={r.status} /></td>
+                </tr>
+              ))}
+              {!recentQuery.isPending && recent.length === 0 && (
+                <tr className="no-hover">
+                  <td style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無申請紀錄</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Spin>
     </div>
   )
 }

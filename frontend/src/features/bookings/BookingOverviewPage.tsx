@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import dayjs, { type Dayjs } from 'dayjs'
-import { Button, DatePicker, Select, Tooltip } from 'antd'
+import { Button, DatePicker, Select, Spin, Tooltip } from 'antd'
 import {
   ArrowLeftOutlined,
   DoubleLeftOutlined,
@@ -12,8 +12,21 @@ import {
 import PageHeader from '../../components/ui/PageHeader'
 import { Pager } from '../../components/ui/tableControls'
 import StatusPill from '../../components/ui/StatusPill'
-import { useAuth } from '../../app/auth'
-import { CELL, EQUIPMENT_LOANS, PERIODS, ROOM_REQUESTS, VENUE_BOOKINGS, VENUES, cellInfo, roomEntryText, type CellState } from './mock'
+import {
+  PERIODS,
+  roomEntryText,
+  useAllEquipmentLoans,
+  useAllRoomBookings,
+  useAllVenueBookings,
+  useAvailability,
+  useAvailabilityDays,
+  useVenues,
+  venueLabel,
+  type AvailabilityGrid,
+  type AvailabilityState,
+  type Venue,
+} from '../../api/bookings'
+import { CELL, type CellState } from './mock'
 
 const RETURNED_PAGE = 10
 const VENUE_DAYS = 15 // 單一場地檢視:選擇日 −7 ~ +7 共 15 天(不含過去,不足往未來補)
@@ -21,31 +34,34 @@ const VENUE_DAYS = 15 // 單一場地檢視:選擇日 −7 ~ +7 共 15 天(不�
 const LEGEND: CellState[] = ['free', 'reviewing', 'temp', 'fixed', 'mine']
 const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
 
-const today0 = dayjs()
+// 後端場況狀態 → 色格狀態;未佔用格依場地開放旗標補 可借/不開放
+const STATE_OF: Record<AvailabilityState, CellState> = {
+  pending: 'reviewing',
+  temp: 'temp',
+  fixed: 'fixed',
+  mine: 'mine',
+}
+
+function cellState(venue: Venue, grid: AvailabilityGrid | undefined, period: string): CellState {
+  const s = grid?.[String(venue.id)]?.[period]
+  if (s) return STATE_OF[s]
+  return venue.allowTemp ? 'free' : 'closed'
+}
 
 // 單一場地格:可借才可點(直接前往臨時場地借用);審核中不可點;不開放不畫方框
-function Cell({ info, label, onBook }: { info: { state: CellState; club?: string }; label: string; onBook: () => void }) {
-  const base: React.CSSProperties = { width: '100%', height: 24, borderRadius: 4, background: CELL[info.state].bg, display: 'block' }
-  const el =
-    info.state === 'closed' ? (
-      <div role="img" aria-label={label} style={base} />
-    ) : info.state === 'free' ? (
+function Cell({ state, label, onBook }: { state: CellState; label: string; onBook: () => void }) {
+  const base: React.CSSProperties = { width: '100%', height: 24, borderRadius: 4, background: CELL[state].bg, display: 'block' }
+  if (state === 'free') {
+    return (
       <button
         type="button"
         aria-label={`${label},點擊前往臨時場地借用`}
         onClick={onBook}
         style={{ ...base, border: 'none', padding: 0, cursor: 'pointer' }}
       />
-    ) : (
-      <div role="img" aria-label={label} style={base} />
     )
-  return info.club ? (
-    <Tooltip title={<span style={{ fontSize: 14 }}>{info.club}</span>} mouseEnterDelay={0}>
-      {el}
-    </Tooltip>
-  ) : (
-    el
-  )
+  }
+  return <div role="img" aria-label={label} style={base} />
 }
 
 function Legend() {
@@ -62,34 +78,51 @@ function Legend() {
 }
 
 export default function BookingOverviewPage() {
-  const { user } = useAuth()
   const navigate = useNavigate()
-  const mine = user?.club
   const [returnedPage, setReturnedPage] = useState(1)
   const [gridDate, setGridDate] = useState<Dayjs>(() => dayjs())
   // 場地檢視:點場地名稱進入,以當時檢視日為中心 −7~+7 共 15 天;後端不提供過去場況,
   // 起始日不得早於今天,被截掉的天數往未來補(顯示天數固定)
-  const [venueView, setVenueView] = useState<string | null>(null)
+  const [venueView, setVenueView] = useState<number | null>(null)
   const [venueStart, setVenueStart] = useState<Dayjs>(() => dayjs().startOf('day'))
   const todayStart = dayjs().startOf('day')
   const clampStart = (d: Dayjs) => (d.isBefore(todayStart, 'day') ? todayStart : d)
 
-  const rooms = ROOM_REQUESTS.filter((r) => r.club === mine)
-  const venues = VENUE_BOOKINGS.filter((v) => v.club === mine)
-  const active = EQUIPMENT_LOANS.filter((l) => l.club === mine && l.status !== 'returned')
-  const returned = EQUIPMENT_LOANS.filter((l) => l.club === mine && l.status === 'returned')
+  const venuesQuery = useVenues()
+  const venues = venuesQuery.data ?? []
+  const venueDef = venueView != null ? venues.find((v) => v.id === venueView) : undefined
+
+  // 單日全場地 / 單一場地 15 天(逐日並行查詢,見 api/bookings.useAvailabilityDays)
+  const dayQuery = useAvailability(gridDate)
+  const venueDates = useMemo(
+    () => Array.from({ length: VENUE_DAYS }, (_, i) => venueStart.add(i, 'day')),
+    [venueStart],
+  )
+  const rangeQuery = useAvailabilityDays(venueDef ? venueDates : [])
+
+  const roomsQuery = useAllRoomBookings()
+  const venueBookingsQuery = useAllVenueBookings()
+  const loansQuery = useAllEquipmentLoans()
+  // 「我的借用」只列進行中:退回/歸還/過期(場地日期已過)的紀錄由各借用頁近 5 筆呈現
+  const rooms = (roomsQuery.data ?? []).filter((r) => r.status === 'pending' || r.status === 'approved')
+  const venueBookings = (venueBookingsQuery.data ?? []).filter(
+    (v) => v.status === 'pending' || (v.status === 'approved' && !dayjs(v.date, 'YYYY/MM/DD').isBefore(todayStart, 'day')),
+  )
+  const loans = loansQuery.data ?? []
+  const active = loans.filter((l) => l.status !== 'returned' && l.status !== 'rejected')
+  const returned = loans.filter((l) => l.status === 'returned')
   const returnedPaged = returned.slice((returnedPage - 1) * RETURNED_PAGE, returnedPage * RETURNED_PAGE)
+  const listsPending = roomsQuery.isPending || venueBookingsQuery.isPending || loansQuery.isPending
 
-  const book = (venue: string, date: Dayjs, period: string) =>
-    navigate(`/bookings/venue?venue=${encodeURIComponent(venue)}&date=${date.format('YYYY/MM/DD')}&period=${period}`)
+  const book = (venueId: number, date: Dayjs, period: string) =>
+    navigate(`/bookings/venue?venue=${venueId}&date=${date.format('YYYY/MM/DD')}&period=${period}`)
 
-  const openVenue = (name: string) => {
-    setVenueView(name)
+  const openVenue = (id: number) => {
+    setVenueView(id)
     setVenueStart(clampStart(gridDate.startOf('day').subtract(7, 'day')))
   }
 
-  const venueDef = venueView ? VENUES.find((v) => v.name === venueView) : undefined
-  const venueRows = Array.from({ length: VENUE_DAYS }, (_, i) => venueStart.add(i, 'day'))
+  const gridPending = venueDef ? rangeQuery.isPending : venuesQuery.isPending || dayQuery.isPending
 
   const thStyle: React.CSSProperties = { fontSize: 11, fontWeight: 500, color: 'var(--steel)' }
 
@@ -149,7 +182,7 @@ export default function BookingOverviewPage() {
                 size="small"
                 value={venueView}
                 onChange={setVenueView}
-                options={VENUES.map((v) => ({ value: v.name, label: `${v.name} (${v.capacity} 人)` }))}
+                options={venues.map((v) => ({ value: v.id, label: venueLabel(v) }))}
                 style={{ minWidth: 190 }}
                 popupMatchSelectWidth={false}
               />
@@ -180,149 +213,159 @@ export default function BookingOverviewPage() {
           <Legend />
         </div>
 
-        <div style={{ overflowX: 'auto', marginTop: 12 }}>
-          {!venueDef ? (
-            <table style={{ borderCollapse: 'separate', borderSpacing: 3, width: '100%', tableLayout: 'fixed', minWidth: 720 }}>
-              <thead>
-                <tr>
-                  <th style={{ ...thStyle, width: 176, textAlign: 'left', paddingRight: 8 }}>場地</th>
-                  {PERIODS.map((p) => (
-                    <th key={p} className="num" style={thStyle}>{p}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {VENUES.map((v) => (
-                  <tr key={v.name}>
-                    <td style={{ whiteSpace: 'nowrap', paddingRight: 8 }}>
-                      <button
-                        type="button"
-                        className="venue-btn"
-                        aria-label={`檢視 ${v.name} ${VENUE_DAYS} 天場況`}
-                        onClick={() => openVenue(v.name)}
-                      >
-                        {v.name}
-                      </button>
-                      <span className="num" style={{ fontSize: 11, color: 'var(--steel)', marginLeft: 5 }}>{v.capacity}</span>
-                    </td>
-                    {PERIODS.map((p) => {
-                      const info = cellInfo(v.name, gridDate, p, mine)
-                      const label = `${v.name} 第${p}節:${CELL[info.state].label}${info.club ? `(${info.club})` : ''}`
-                      return (
-                        <td key={p}>
-                          <Cell info={info} label={label} onBook={() => book(v.name, gridDate, p)} />
-                        </td>
-                      )
-                    })}
+        <Spin spinning={gridPending}>
+          <div style={{ overflowX: 'auto', marginTop: 12 }}>
+            {!venueDef ? (
+              <table style={{ borderCollapse: 'separate', borderSpacing: 3, width: '100%', tableLayout: 'fixed', minWidth: 720 }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...thStyle, width: 176, textAlign: 'left', paddingRight: 8 }}>場地</th>
+                    {PERIODS.map((p) => (
+                      <th key={p} className="num" style={thStyle}>{p}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <table style={{ borderCollapse: 'separate', borderSpacing: 3, width: '100%', tableLayout: 'fixed', minWidth: 720 }}>
-              <thead>
-                <tr>
-                  <th style={{ ...thStyle, width: 110, textAlign: 'left', paddingRight: 8 }}>日期</th>
-                  {PERIODS.map((p) => (
-                    <th key={p} className="num" style={thStyle}>{p}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {venueRows.map((d) => {
-                  const isToday = d.isSame(today0, 'day')
-                  return (
-                    <tr key={d.format('YYYY/MM/DD')}>
-                      <td className="num" style={{ whiteSpace: 'nowrap', paddingRight: 8, fontSize: 12, fontWeight: isToday ? 600 : 400, color: isToday ? 'var(--seal)' : 'var(--ink)' }}>
-                        {d.format('MM/DD')}（{WEEKDAY[d.day()]}）
+                </thead>
+                <tbody>
+                  {venues.map((v) => (
+                    <tr key={v.id}>
+                      <td style={{ whiteSpace: 'nowrap', paddingRight: 8 }}>
+                        <button
+                          type="button"
+                          className="venue-btn"
+                          aria-label={`檢視 ${v.name} ${VENUE_DAYS} 天場況`}
+                          onClick={() => openVenue(v.id)}
+                        >
+                          {v.name}
+                        </button>
+                        {v.capacity != null && (
+                          <span className="num" style={{ fontSize: 11, color: 'var(--steel)', marginLeft: 5 }}>{v.capacity}</span>
+                        )}
                       </td>
                       {PERIODS.map((p) => {
-                        const info = cellInfo(venueDef.name, d, p, mine)
-                        const label = `${d.format('MM/DD')} 第${p}節:${CELL[info.state].label}${info.club ? `(${info.club})` : ''}`
+                        const state = cellState(v, dayQuery.data, p)
+                        const label = `${v.name} 第${p}節:${CELL[state].label}`
                         return (
                           <td key={p}>
-                            <Cell info={info} label={label} onBook={() => book(venueDef.name, d, p)} />
+                            <Cell state={state} label={label} onBook={() => book(v.id, gridDate, p)} />
                           </td>
                         )
                       })}
                     </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-
-      {/* 我的借用:單卡整併(固定/臨時/器材),僅顯示自己社團 */}
-      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近借用</div>
-        <table className="tb" style={{ minWidth: 680 }}>
-          <thead>
-            <tr>
-              <th style={{ width: 90 }}>類別</th>
-              <th>內容</th>
-              <th>時間</th>
-              <th style={{ width: 110 }}>狀態</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rooms.map((r) => (
-              <tr key={r.id}>
-                <td style={{ color: 'var(--steel)', fontSize: 13 }}>固定場地</td>
-                <td style={{ fontWeight: 500 }}>{r.room}</td>
-                <td style={{ color: 'var(--steel)', fontSize: 13 }}>
-                  每週 {r.entries.map(roomEntryText).join('、')}
-                </td>
-                <td><StatusPill status={r.status} /></td>
-              </tr>
-            ))}
-            {venues.map((v) => (
-              <tr key={v.id}>
-                <td style={{ color: 'var(--steel)', fontSize: 13 }}>臨時場地</td>
-                <td style={{ fontWeight: 500 }}>{v.venue}<span style={{ color: 'var(--steel)', fontWeight: 400, fontSize: 13 }}> · {v.purpose}</span></td>
-                <td className="num" style={{ color: 'var(--steel)', fontSize: 13 }}>{v.date} 第 {v.periods.join('、')} 節</td>
-                <td><StatusPill status={v.status} /></td>
-              </tr>
-            ))}
-            {active.map((l) => (
-              <tr key={l.id}>
-                <td style={{ color: 'var(--steel)', fontSize: 13 }}>器材</td>
-                <td style={{ fontWeight: 500 }}>{l.equipment} <span className="num">×{l.qty}</span></td>
-                <td className="num" style={{ color: 'var(--steel)', fontSize: 13 }}>
-                  {l.status === 'checked_out' && l.returnDue ? `歸還期限 ${l.returnDue}` : `${l.startDate} – ${l.endDate}`}
-                </td>
-                <td><StatusPill status={l.status} /></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* 已歸還:獨立分頁區 */}
-      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近歸還</div>
-        <table className="tb" style={{ minWidth: 560 }}>
-          <tbody>
-            {returnedPaged.map((l) => (
-              <tr key={l.id}>
-                <td style={{ fontWeight: 500 }}>
-                  {l.equipment} <span className="num">×{l.qty}</span>
-                </td>
-                <td className="num" style={{ fontSize: 13 }}>{l.startDate} – {l.endDate}</td>
-                <td style={{ color: 'var(--steel)', fontSize: 13 }}>{l.purpose}</td>
-                <td style={{ width: 100 }}><StatusPill status="returned" /></td>
-              </tr>
-            ))}
-            {returned.length === 0 && (
-              <tr className="no-hover">
-                <td style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無歸還紀錄</td>
-              </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <table style={{ borderCollapse: 'separate', borderSpacing: 3, width: '100%', tableLayout: 'fixed', minWidth: 720 }}>
+                <thead>
+                  <tr>
+                    <th style={{ ...thStyle, width: 110, textAlign: 'left', paddingRight: 8 }}>日期</th>
+                    {PERIODS.map((p) => (
+                      <th key={p} className="num" style={thStyle}>{p}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {venueDates.map((d) => {
+                    const isToday = d.isSame(todayStart, 'day')
+                    const grid = rangeQuery.byDate[d.format('YYYY-MM-DD')]
+                    return (
+                      <tr key={d.format('YYYY/MM/DD')}>
+                        <td className="num" style={{ whiteSpace: 'nowrap', paddingRight: 8, fontSize: 12, fontWeight: isToday ? 600 : 400, color: isToday ? 'var(--seal)' : 'var(--ink)' }}>
+                          {d.format('MM/DD')}（{WEEKDAY[d.day()]}）
+                        </td>
+                        {PERIODS.map((p) => {
+                          const state = cellState(venueDef, grid, p)
+                          const label = `${d.format('MM/DD')} 第${p}節:${CELL[state].label}`
+                          return (
+                            <td key={p}>
+                              <Cell state={state} label={label} onBook={() => book(venueDef.id, d, p)} />
+                            </td>
+                          )
+                        })}
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             )}
-          </tbody>
-        </table>
-        <Pager page={returnedPage} pageSize={RETURNED_PAGE} total={returned.length} onChange={setReturnedPage} style={{ padding: '10px 0 14px' }} />
+          </div>
+        </Spin>
       </div>
+
+      {/* 我的借用:單卡整併(固定/臨時/器材),後端僅回傳本社資料 */}
+      <Spin spinning={listsPending}>
+        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近借用</div>
+          <table className="tb" style={{ minWidth: 680 }}>
+            <thead>
+              <tr>
+                <th style={{ width: 90 }}>類別</th>
+                <th>內容</th>
+                <th>時間</th>
+                <th style={{ width: 110 }}>狀態</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rooms.map((r) => (
+                <tr key={`room-${r.id}`}>
+                  <td style={{ color: 'var(--steel)', fontSize: 13 }}>固定場地</td>
+                  <td style={{ fontWeight: 500 }}>{r.venueName}</td>
+                  <td style={{ color: 'var(--steel)', fontSize: 13 }}>
+                    每週 {r.entries.map(roomEntryText).join('、')}
+                  </td>
+                  <td><StatusPill status={r.status} /></td>
+                </tr>
+              ))}
+              {venueBookings.map((v) => (
+                <tr key={`venue-${v.id}`}>
+                  <td style={{ color: 'var(--steel)', fontSize: 13 }}>臨時場地</td>
+                  <td style={{ fontWeight: 500 }}>{v.venueName}<span style={{ color: 'var(--steel)', fontWeight: 400, fontSize: 13 }}> · {v.purpose}</span></td>
+                  <td className="num" style={{ color: 'var(--steel)', fontSize: 13 }}>{v.date} 第 {v.periods.join('、')} 節</td>
+                  <td><StatusPill status={v.status} /></td>
+                </tr>
+              ))}
+              {active.map((l) => (
+                <tr key={`loan-${l.id}`}>
+                  <td style={{ color: 'var(--steel)', fontSize: 13 }}>器材</td>
+                  <td style={{ fontWeight: 500 }}>{l.equipmentName} <span className="num">×{l.qty}</span></td>
+                  <td className="num" style={{ color: 'var(--steel)', fontSize: 13 }}>{l.startDate} – {l.endDate}</td>
+                  <td><StatusPill status={l.status} /></td>
+                </tr>
+              ))}
+              {!listsPending && rooms.length === 0 && venueBookings.length === 0 && active.length === 0 && (
+                <tr className="no-hover">
+                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無借用紀錄</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* 已歸還:獨立分頁區(後端列表無狀態篩選,自全量資料切分後前端分頁) */}
+        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近歸還</div>
+          <table className="tb" style={{ minWidth: 560 }}>
+            <tbody>
+              {returnedPaged.map((l) => (
+                <tr key={l.id}>
+                  <td style={{ fontWeight: 500 }}>
+                    {l.equipmentName} <span className="num">×{l.qty}</span>
+                  </td>
+                  <td className="num" style={{ fontSize: 13 }}>{l.startDate} – {l.endDate}</td>
+                  <td style={{ color: 'var(--steel)', fontSize: 13 }}>{l.purpose}</td>
+                  <td style={{ width: 100 }}><StatusPill status="returned" /></td>
+                </tr>
+              ))}
+              {returned.length === 0 && (
+                <tr className="no-hover">
+                  <td style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無歸還紀錄</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          <Pager page={returnedPage} pageSize={RETURNED_PAGE} total={returned.length} onChange={setReturnedPage} style={{ padding: '10px 0 14px' }} />
+        </div>
+      </Spin>
     </div>
   )
 }

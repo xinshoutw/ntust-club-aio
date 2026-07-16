@@ -1,8 +1,9 @@
 import { Navigate, Route, Routes, useLocation } from 'react-router'
 import { useMemo, type ReactNode } from 'react'
 import { useAuth, type Role } from './app/auth'
-import { ADMIN_NAV, buildClubNav } from './lib/nav'
+import { buildAdminNav, buildClubNav } from './lib/nav'
 import { useFixedWindow } from './api/bookings'
+import { usePendingActivityTotal, usePendingCloseTotal } from './api/adminActivities'
 import { homeOf } from './lib/home'
 import AppShell from './components/layout/AppShell'
 import LoginPage from './features/auth/LoginPage'
@@ -66,6 +67,17 @@ function ClubShell() {
   const windowQuery = useFixedWindow()
   const nav = useMemo(() => buildClubNav(windowQuery.data), [windowQuery.data])
   return <AppShell nav={nav} />
+}
+
+// 行政端側欄徽章=申請/結案待審數(共用審核頁查詢;無權限或查詢失敗即不顯示)
+function AdminShell() {
+  const pendingReview = usePendingActivityTotal()
+  const pendingClose = usePendingCloseTotal()
+  const nav = useMemo(
+    () => buildAdminNav(pendingReview.data, pendingClose.data),
+    [pendingReview.data, pendingClose.data],
+  )
+  return <AppShell nav={nav} badgeLabel="行政後台" />
 }
 
 // 首登強制改密頁:需已登入,但不受 mustChangePassword 導轉限制
@@ -132,7 +144,7 @@ export default function App() {
           <RequireRole roles={['admin']}>
             {/* 行政端共用「選擇社團」狀態,跨頁同步 */}
             <AdminClubProvider>
-              <AppShell nav={ADMIN_NAV} badgeLabel="行政後台" />
+              <AdminShell />
             </AdminClubProvider>
           </RequireRole>
         }

@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { REVIEW_ITEMS } from '../features/admin/reviewMock'
 import type { FixedWindow } from '../api/bookings'
 import {
   AppstoreOutlined,
@@ -115,7 +114,9 @@ export function buildClubNav(window?: FixedWindow): NavGroup[] {
   ]
 }
 
-export const ADMIN_NAV: NavGroup[] = [
+// 側欄徽章=待審數(shell 以共用 query 提供;查詢中/失敗不顯示)
+export function buildAdminNav(pendingReview?: number, pendingClose?: number): NavGroup[] {
+  return [
   {
     items: [{ key: 'a-home', label: '總覽', path: '/admin', icon: <DashboardOutlined /> }],
   },
@@ -127,10 +128,15 @@ export const ADMIN_NAV: NavGroup[] = [
         label: '申請審核',
         path: '/admin/review',
         icon: <AuditOutlined />,
-        // ponytail: mock 期由假資料推導;接後端後改為共用 query
-        badge: REVIEW_ITEMS.filter((i) => i.status === 'pending_advisor').length,
+        badge: pendingReview || undefined,
       },
-      { key: 'a-close', label: '結案審核', path: '/admin/close-review', icon: <FileDoneOutlined />, badge: 2 },
+      {
+        key: 'a-close',
+        label: '結案審核',
+        path: '/admin/close-review',
+        icon: <FileDoneOutlined />,
+        badge: pendingClose || undefined,
+      },
     ],
   },
   {
@@ -184,4 +190,5 @@ export const ADMIN_NAV: NavGroup[] = [
       { key: 'a-files', label: '檔案管理', path: '/admin/files', icon: <FolderOpenOutlined /> },
     ],
   },
-]
+  ]
+}

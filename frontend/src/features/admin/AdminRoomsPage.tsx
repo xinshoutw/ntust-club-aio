@@ -1,9 +1,17 @@
 import { useState } from 'react'
-import { App, Button, Input, Modal } from 'antd'
+import { App, Button, Input, Modal, Spin } from 'antd'
 import { RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
-import { DOW_TEXT, ROOM_REQUESTS, type RoomRequest } from '../bookings/mock'
+import { Pager } from '../../components/ui/tableControls'
+import { DOW_TEXT } from '../bookings/mock'
+import {
+  useAdminBookingMutations,
+  usePendingRoomBookings,
+  type AdminRoomRequest,
+} from '../../api/adminBookings'
+
+const PAGE_SIZE = 50
 
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 
@@ -19,13 +27,14 @@ function RoomReviewModal({
   onClose,
   afterClose,
 }: {
-  item: RoomRequest
+  item: AdminRoomRequest
   isConflict: (dow: number, period: string) => boolean
   open: boolean
   onClose: () => void
   afterClose: () => void
 }) {
   const { message } = App.useApp()
+  const { approveRoom, rejectRoom } = useAdminBookingMutations()
   const [rejectOpen, setRejectOpen] = useState(false)
   const [reason, setReason] = useState(DEFAULT_REJECT_REASON)
   const hasConflict = item.entries.some((e) => e.periods.some((p) => isConflict(e.dow, p)))
@@ -36,14 +45,32 @@ function RoomReviewModal({
     setReason(DEFAULT_REJECT_REASON)
   }
 
+  const submitApprove = () => {
+    approveRoom.mutate(item.apiId, {
+      onSuccess: () => {
+        message.success(`已核准 ${item.club} 的固定借用申請`)
+        onClose()
+      },
+      onError: (e) => message.error(e.message),
+    })
+  }
+
   const submitReject = () => {
     if (!reason.trim()) {
       message.error('退回原因為必填')
       return
     }
-    message.success(`已退回 ${item.club} 的固定借用申請`)
-    closeReject()
-    onClose()
+    rejectRoom.mutate(
+      { id: item.apiId, reason: reason.trim() },
+      {
+        onSuccess: () => {
+          message.success(`已退回 ${item.club} 的固定借用申請`)
+          closeReject()
+          onClose()
+        },
+        onError: (e) => message.error(e.message),
+      },
+    )
   }
 
   return (
@@ -60,15 +87,8 @@ function RoomReviewModal({
       }
       footer={
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
-          <Button danger style={{ height: 38 }} onClick={() => setRejectOpen(true)}>退回</Button>
-          <Button
-            type="primary"
-            style={{ height: 38 }}
-            onClick={() => {
-              message.success(`已核准 ${item.club} 的固定借用申請`)
-              onClose()
-            }}
-          >
+          <Button danger style={{ height: 38 }} disabled={approveRoom.isPending} onClick={() => setRejectOpen(true)}>退回</Button>
+          <Button type="primary" style={{ height: 38 }} loading={approveRoom.isPending} onClick={submitApprove}>
             核准
           </Button>
         </div>
@@ -102,6 +122,7 @@ function RoomReviewModal({
         title="退回借用申請"
         okText="確認退回"
         destroyOnHidden
+        confirmLoading={rejectRoom.isPending}
         okButtonProps={{ danger: true, autoFocus: true }}
         cancelText="取消"
         onOk={submitReject}
@@ -119,26 +140,31 @@ function RoomReviewModal({
 }
 
 export default function AdminRoomsPage() {
-  const [selected, setSelected] = useState<RoomRequest | null>(null)
+  const [selected, setSelected] = useState<AdminRoomRequest | null>(null)
   const [open, setOpen] = useState(false)
-  const pending = ROOM_REQUESTS.filter((r) => r.status === 'pending')
+  const [page, setPage] = useState(1)
 
-  // 標出互相衝突的時段(同教室每週同星期同節次);衝突時擇一社團核准,不做部分同意
+  const listQuery = usePendingRoomBookings({ page, pageSize: PAGE_SIZE })
+  const pending = listQuery.data?.requests ?? []
+  const total = listQuery.data?.total ?? 0
+
+  // 標出互相衝突的時段(同場地每週同星期同節次);衝突時擇一社團核准,不做部分同意
   const conflictKeys = new Set<string>()
-  const seen = new Map<string, string>()
+  const seen = new Map<string, number>()
   for (const r of pending) {
     for (const e of r.entries) {
       for (const p of e.periods) {
-        const key = `${r.room}|${e.dow}|${p}`
-        if (seen.has(key) && seen.get(key) !== r.id) {
+        const key = `${r.venueId}|${e.dow}|${p}`
+        if (seen.has(key) && seen.get(key) !== r.apiId) {
           conflictKeys.add(key)
         } else {
-          seen.set(key, r.id)
+          seen.set(key, r.apiId)
         }
       }
     }
   }
-  const isConflict = (room: string) => (dow: number, period: string) => conflictKeys.has(`${room}|${dow}|${period}`)
+  const isConflict = (venueId: number) => (dow: number, period: string) =>
+    conflictKeys.has(`${venueId}|${dow}|${period}`)
 
   return (
     <div>
@@ -146,68 +172,78 @@ export default function AdminRoomsPage() {
         title="教室固定借用"
         sub={
           <>
-            待審 <span className="num">{pending.length}</span> 件
+            待審 <span className="num">{total}</span> 件
           </>
         }
       />
 
-      <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-        <table className="tb dense" style={{ minWidth: 760 }}>
-          <thead>
-            <tr>
-              <th>社團</th>
-              <th>教室</th>
-              <th>每週時段</th>
-              <th>用途</th>
-              <th>狀態</th>
-              <th aria-label="開啟" style={{ width: 32 }} />
-            </tr>
-          </thead>
-          <tbody>
-            {pending.map((r) => (
-              <tr
-                key={r.id}
-                onClick={() => {
-                  setSelected(r)
-                  setOpen(true)
-                }}
-                style={{ cursor: 'pointer' }}
-              >
-                <td>{r.club}</td>
-                <td style={{ fontWeight: 500 }}>{r.room}</td>
-                <td style={{ fontSize: 13 }}>
-                  {r.entries.flatMap((e) =>
-                    e.periods.map((p) => {
-                      const conflict = conflictKeys.has(`${r.room}|${e.dow}|${p}`)
-                      return (
-                        <span key={`${e.dow}-${p}`} className="num" style={{ color: conflict ? '#C13B34' : undefined, fontWeight: conflict ? 500 : undefined, marginRight: 8, display: 'inline-block' }}>
-                          週{DOW_TEXT[e.dow]} 第{p}節
-                          {conflict && <span style={{ fontSize: 12 }}>(衝突)</span>}
-                        </span>
-                      )
-                    }),
-                  )}
-                </td>
-                <td style={{ fontSize: 13, color: 'var(--steel)' }}>{r.note}</td>
-                <td><StatusPill status={r.status} /></td>
-                <td className="r"><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>
+      <Spin spinning={listQuery.isPending}>
+        <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+          <table className="tb dense" style={{ minWidth: 760 }}>
+            <thead>
+              <tr>
+                <th>社團</th>
+                <th>教室</th>
+                <th>每週時段</th>
+                <th>用途</th>
+                <th>狀態</th>
+                <th aria-label="開啟" style={{ width: 32 }} />
               </tr>
-            ))}
-            {pending.length === 0 && (
-              <tr className="no-hover">
-                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>沒有待審的固定借用</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {pending.map((r) => (
+                <tr
+                  key={r.id}
+                  onClick={() => {
+                    setSelected(r)
+                    setOpen(true)
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <td>{r.club}</td>
+                  <td style={{ fontWeight: 500 }}>{r.room}</td>
+                  <td style={{ fontSize: 13 }}>
+                    {r.entries.flatMap((e) =>
+                      e.periods.map((p) => {
+                        const conflict = conflictKeys.has(`${r.venueId}|${e.dow}|${p}`)
+                        return (
+                          <span key={`${e.dow}-${p}`} className="num" style={{ color: conflict ? '#C13B34' : undefined, fontWeight: conflict ? 500 : undefined, marginRight: 8, display: 'inline-block' }}>
+                            週{DOW_TEXT[e.dow]} 第{p}節
+                            {conflict && <span style={{ fontSize: 12 }}>(衝突)</span>}
+                          </span>
+                        )
+                      }),
+                    )}
+                  </td>
+                  <td style={{ fontSize: 13, color: 'var(--steel)' }}>{r.note}</td>
+                  <td><StatusPill status={r.status} /></td>
+                  <td className="r"><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>
+                </tr>
+              ))}
+              {listQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={6} style={{ textAlign: 'center', color: '#B03A2E', padding: 24 }}>
+                    載入失敗:{listQuery.error.message}
+                  </td>
+                </tr>
+              )}
+              {!listQuery.isPending && !listQuery.isError && pending.length === 0 && (
+                <tr className="no-hover">
+                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>沒有待審的固定借用</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} />
+        </div>
+      </Spin>
 
       {/* Modal 常駐至關閉動畫結束(afterClose)才卸載 */}
       {selected && (
         <RoomReviewModal
           key={selected.id}
           item={selected}
-          isConflict={isConflict(selected.room)}
+          isConflict={isConflict(selected.venueId)}
           open={open}
           onClose={() => setOpen(false)}
           afterClose={() => setSelected(null)}

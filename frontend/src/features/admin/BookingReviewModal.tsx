@@ -10,9 +10,10 @@ import {
   type VenueBooking,
 } from '../bookings/mock'
 
+// data 允許 API 層的擴充欄位(availableExcludingSelf);mock 物件(欄位缺省)同樣相容
 export type BookingReviewItem =
   | { kind: 'venue'; data: VenueBooking }
-  | { kind: 'loan'; data: EquipmentLoan }
+  | { kind: 'loan'; data: EquipmentLoan & { availableExcludingSelf?: number } }
   | { kind: 'room'; data: RoomRequest }
 
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
@@ -29,20 +30,26 @@ const isRoomConflict = (room: RoomRequest, dow: number, period: string): boolean
 
 // 場地/器材借用審核彈窗(臨時場地器材審核頁與行政端社團總覽共用):
 // 審核中顯示核准/退回(退回原因必填),其他狀態唯讀;含器材可借數檢核與固定借用衝突標示
+// onApprove/onReject:接 API 的頁面傳入 mutateAsync 回呼(成功 message+關彈窗、失敗 message.error)
 export default function BookingReviewModal({
   item,
   open,
   onClose,
   afterClose,
+  onApprove,
+  onReject,
 }: {
   item: BookingReviewItem
   open: boolean
   onClose: () => void
   afterClose: () => void
+  onApprove?: () => Promise<unknown>
+  onReject?: (reason: string) => Promise<unknown>
 }) {
   const { message } = App.useApp()
   const [rejectOpen, setRejectOpen] = useState(false)
   const [reason, setReason] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const canReview = item.data.status === 'pending'
   const title =
     item.kind === 'venue' ? item.data.venue : item.kind === 'room' ? item.data.room : `${item.data.equipment} ×${item.data.qty}`
@@ -56,10 +63,37 @@ export default function BookingReviewModal({
     setReason('')
   }
 
-  const submitReject = () => {
+  const submitApprove = async () => {
+    if (onApprove) {
+      setSubmitting(true)
+      try {
+        await onApprove()
+      } catch (e) {
+        message.error(e instanceof Error ? e.message : '操作失敗')
+        return
+      } finally {
+        setSubmitting(false)
+      }
+    }
+    message.success('已核准借用申請')
+    onClose()
+  }
+
+  const submitReject = async () => {
     if (!reason.trim()) {
       message.error('退回原因為必填')
       return
+    }
+    if (onReject) {
+      setSubmitting(true)
+      try {
+        await onReject(reason.trim())
+      } catch (e) {
+        message.error(e instanceof Error ? e.message : '操作失敗')
+        return
+      } finally {
+        setSubmitting(false)
+      }
     }
     message.success('已退回借用申請')
     closeReject()
@@ -81,14 +115,12 @@ export default function BookingReviewModal({
       footer={
         canReview ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Button danger style={{ height: 38 }} onClick={() => setRejectOpen(true)}>退回</Button>
+            <Button danger style={{ height: 38 }} disabled={submitting} onClick={() => setRejectOpen(true)}>退回</Button>
             <Button
               type="primary"
               style={{ height: 38 }}
-              onClick={() => {
-                message.success('已核准借用申請')
-                onClose()
-              }}
+              loading={submitting && !rejectOpen}
+              onClick={() => void submitApprove()}
             >
               核准
             </Button>
@@ -154,11 +186,14 @@ export default function BookingReviewModal({
         )}
       </div>
 
-      {/* 器材可借數檢核:以本單借用區間推導可借數(排除本單自身),不足時提醒;僅審核中需要 */}
+      {/* 器材可借數檢核:以本單借用區間推導可借數(排除本單自身),不足時提醒;僅審核中需要
+          API 資料帶 availableExcludingSelf(後端推導);mock 資料退回前端推導 */}
       {item.kind === 'loan' &&
         canReview &&
         (() => {
-          const free = availableInWindow(item.data.equipment, item.data.startDate, item.data.endDate, item.data.id)
+          const free =
+            item.data.availableExcludingSelf ??
+            availableInWindow(item.data.equipment, item.data.startDate, item.data.endDate, item.data.id)
           if (item.data.qty <= free) return null
           return (
             <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--paper)', borderRadius: 6, fontSize: 13, color: '#B03A2E' }}>
@@ -179,9 +214,10 @@ export default function BookingReviewModal({
         title="退回借用申請"
         okText="確認退回"
         destroyOnHidden
+        confirmLoading={submitting}
         okButtonProps={{ danger: true }}
         cancelText="取消"
-        onOk={submitReject}
+        onOk={() => void submitReject()}
         onCancel={closeReject}
       >
         <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 8 }}>退回原因(必填,通知社團)</div>

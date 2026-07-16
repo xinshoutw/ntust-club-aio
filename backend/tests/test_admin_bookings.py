@@ -66,6 +66,22 @@ async def seed(client, db):
     return club, other_club
 
 
+# ---- 場地主檔 ----
+
+
+async def test_admin_venues_lists_active_only(client, db):
+    await seed(client, db)
+    venue = await make_venue(db)
+    inactive = await make_venue(db, name="停用場地")
+    inactive.is_active = False
+    await db.commit()
+
+    data = (await client.get("/api/v1/admin/venues")).json()["data"]
+    assert [v["id"] for v in data] == [venue.id]
+    assert data[0]["name"] == venue.name
+    assert data[0]["capacity"] == 40
+
+
 # ---- 臨時場地借用審核 ----
 
 
@@ -73,6 +89,7 @@ async def test_venue_permission_gate(client, db):
     club, _ = await seed(client, db)
     await login(client, "other")
     assert (await client.get("/api/v1/admin/venue-bookings")).status_code == 403
+    assert (await client.get("/api/v1/admin/venues")).status_code == 403
     resp = await client.post(
         "/api/v1/admin/venue-bookings/1/approve", headers=csrf_headers(client)
     )

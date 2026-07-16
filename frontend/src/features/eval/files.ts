@@ -1,5 +1,8 @@
 // 檔案工具與 mock 檔案產生器(無其他 feature 依賴,避免循環匯入)
+import { isPdfFile, sha256 } from '../../lib/uploads'
 import { fileTypeOf, type EvalFile } from './types'
+
+export { sha256 }
 
 let fileSeq = 0
 const nextFileId = () => `f${++fileSeq}`
@@ -39,15 +42,10 @@ export const mockPdf = (name: string, uploadedAt: string): EvalFile => ({
 // 結案送出時由表單資料生成的成果報告/心得彙整(mock 以空白 PDF 代替)
 export const generatedPdf = (name: string): EvalFile => mockPdf(name, todayStr())
 
-// 副檔名只當提示;宣稱 PDF 的檔案驗魔術位元組,冒名檔降級為 other(不進 iframe 預覽)
-async function isPdfContent(f: File): Promise<boolean> {
-  const head = new Uint8Array(await f.slice(0, 5).arrayBuffer())
-  return String.fromCharCode(...head) === '%PDF-'
-}
-
 export async function toEvalFile(f: File, hash?: string): Promise<EvalFile> {
+  // 副檔名只當提示;宣稱 PDF 的檔案驗魔術位元組,冒名檔降級為 other(不進 iframe 預覽)
   let type = fileTypeOf(f.name)
-  if (type === 'pdf' && !(await isPdfContent(f))) type = 'other'
+  if (type === 'pdf' && !(await isPdfFile(f))) type = 'other'
   return {
     id: nextFileId(),
     name: f.name,
@@ -63,11 +61,6 @@ export async function toEvalFile(f: File, hash?: string): Promise<EvalFile> {
 // 上傳檔移除/捨棄時釋放 object URL(mock 檔為 data URL,不受影響)
 export function releaseFile(f: EvalFile): void {
   if (f.url.startsWith('blob:')) URL.revokeObjectURL(f.url)
-}
-
-export async function sha256(f: File): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', await f.arrayBuffer())
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
 // 觸發瀏覽器下載(blob/data URL 皆可)

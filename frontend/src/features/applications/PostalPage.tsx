@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { App, Button, Checkbox, Form, Input, Upload } from 'antd'
-import type { UploadFile } from 'antd'
-import { InboxOutlined } from '@ant-design/icons'
+import { App, Button, Checkbox, Form, Input } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
+import AttachmentArea, { type BagFile } from '../../components/ui/AttachmentArea'
 import StatusPill from '../../components/ui/StatusPill'
+import { IMAGE_ACCEPT, isImageFile, isPdfFile } from '../../lib/uploads'
 
 const REASONS = ['更換郵局存簿代理人', '新開戶', '帳戶印鑑章變更', '帳簿遺失', '存簿密碼異動', '結清銷戶']
 // 互斥組合(依承辦邏輯先行判斷,待確認)
@@ -16,7 +16,7 @@ const CONFLICTS: [string, string][] = [
 export default function PostalPage() {
   const { message } = App.useApp()
   const [form] = Form.useForm()
-  const [files, setFiles] = useState<UploadFile[]>([])
+  const [files, setFiles] = useState<BagFile[]>([])
   const reasons: string[] = Form.useWatch('reasons', form) ?? []
 
   const disabled = (r: string) =>
@@ -84,24 +84,15 @@ export default function PostalPage() {
             )}
           </div>
           <Form.Item label="原存簿影本/新開戶申請表" required style={{ margin: '16px 0 0' }}>
-            <Upload.Dragger
-              accept=".pdf,image/*"
-              fileList={files}
-              beforeUpload={(f) => {
-                if (f.size > 50 * 1024 * 1024) {
-                  message.error('檔案超過 50MB 上限')
-                  return Upload.LIST_IGNORE
-                }
-                return false
-              }}
-              onChange={({ fileList }) => setFiles(fileList)}
+            <AttachmentArea
+              value={files}
+              onChange={setFiles}
+              accept={`.pdf,${IMAGE_ACCEPT}`}
+              hint="拖放或點擊選擇(PDF 或影像)"
+              validate={async (f) => ((await isPdfFile(f)) || (await isImageFile(f)) ? null : '不是有效的 PDF 或影像檔')}
+              maxTotalBytes={50 * 1024 * 1024}
               maxCount={1}
-            >
-              <p style={{ margin: '4px 0 8px' }}>
-                <InboxOutlined style={{ fontSize: 28, color: 'var(--steel)' }} />
-              </p>
-              <p style={{ fontSize: 13, color: 'var(--steel)', margin: 0 }}>拖放或點擊選擇(PDF 或影像)</p>
-            </Upload.Dragger>
+            />
           </Form.Item>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
             <Button type="primary" htmlType="submit">送出申請</Button>

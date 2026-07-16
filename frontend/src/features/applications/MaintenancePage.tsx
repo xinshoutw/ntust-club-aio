@@ -1,10 +1,20 @@
 import { useState } from 'react'
-import { App, Button, Form, Input, Upload } from 'antd'
-import type { UploadFile } from 'antd'
-import { InboxOutlined } from '@ant-design/icons'
+import { App, Button, Form, Input } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
+import AttachmentArea, { type BagFile } from '../../components/ui/AttachmentArea'
 import StatusPill from '../../components/ui/StatusPill'
+import { IMAGE_ACCEPT, isImageFile, isVideoFile } from '../../lib/uploads'
 import type { StatusKey } from '../../lib/status'
+
+// 影片 200MB / 圖片 10MB(architecture.md);魔術位元組驗證,加總上限取單檔最大值
+const MAX_VIDEO_BYTES = 200 * 1024 * 1024
+const MAX_IMAGE_BYTES = 10 * 1024 * 1024
+
+async function validateEvidence(f: File): Promise<string | null> {
+  if (await isImageFile(f)) return f.size <= MAX_IMAGE_BYTES ? null : '照片超過 10 MB 上限'
+  if (await isVideoFile(f)) return f.size <= MAX_VIDEO_BYTES ? null : '影片超過 200 MB 上限'
+  return '不是有效的照片或影片檔'
+}
 
 interface MaintenanceRecord {
   id: string
@@ -23,7 +33,7 @@ const RECORDS: MaintenanceRecord[] = [
 export default function MaintenancePage() {
   const { message } = App.useApp()
   const [form] = Form.useForm()
-  const [files, setFiles] = useState<UploadFile[]>([])
+  const [files, setFiles] = useState<BagFile[]>([])
 
   return (
     <div>
@@ -51,26 +61,14 @@ export default function MaintenancePage() {
             <Input.TextArea rows={3} placeholder="天花板漏水、燈管不亮" />
           </Form.Item>
           <Form.Item label="佐證照片 / 影片" required>
-            <Upload.Dragger
-              multiple
-              accept="image/*,video/*"
-              fileList={files}
-              beforeUpload={(f) => {
-                const isVideo = f.type.startsWith('video/')
-                const limit = isVideo ? 200 : 10
-                if (f.size > limit * 1024 * 1024) {
-                  message.error(`${isVideo ? '影片' : '照片'}超過 ${limit}MB 上限`)
-                  return Upload.LIST_IGNORE
-                }
-                return false
-              }}
-              onChange={({ fileList }) => setFiles(fileList)}
-            >
-              <p style={{ margin: '4px 0 8px' }}>
-                <InboxOutlined style={{ fontSize: 28, color: 'var(--steel)' }} />
-              </p>
-              <p style={{ fontSize: 13, color: 'var(--steel)', margin: 0 }}>拖放或點擊選擇(照片、短片 ≤200MB)</p> {/* TODO: 與活動申請頁面相同 */}
-            </Upload.Dragger>
+            <AttachmentArea
+              value={files}
+              onChange={setFiles}
+              accept={`${IMAGE_ACCEPT},video/*`}
+              hint="拖放或點擊選擇(照片 ≤10MB、短片 ≤200MB)"
+              validate={validateEvidence}
+              maxTotalBytes={MAX_VIDEO_BYTES}
+            />
           </Form.Item>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
             <Button type="primary" htmlType="submit">送出報修</Button>

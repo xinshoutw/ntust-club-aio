@@ -55,6 +55,7 @@ export const AD_LABELS: Record<AdKey, { group: string; name: string }> = {
 
 const EXT_TYPE: Record<string, EvalFileType> = {
   jpg: 'image', jpeg: 'image', png: 'image', gif: 'image', webp: 'image', bmp: 'image', svg: 'image',
+  tif: 'image', tiff: 'image', heic: 'image', heif: 'image', avif: 'image',
   pdf: 'pdf',
   doc: 'doc', docx: 'doc',
 }

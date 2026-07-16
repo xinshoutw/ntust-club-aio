@@ -1,11 +1,12 @@
 import { useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router'
-import { App, Button, Checkbox, DatePicker, Form, Input, InputNumber, Popover, Select, TimePicker, Upload } from 'antd'
+import { App, Button, Checkbox, DatePicker, Form, Input, InputNumber, Popover, Select, TimePicker } from 'antd'
 import { confirmDialog } from '../../lib/confirm'
-import type { UploadFile } from 'antd'
 import dayjs from 'dayjs'
-import { FileTextOutlined, InboxOutlined, InfoCircleOutlined } from '@ant-design/icons'
+import { InfoCircleOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
+import AttachmentArea, { type BagFile } from '../../components/ui/AttachmentArea'
+import { isPdfFile } from '../../lib/uploads'
 import { useAuth } from '../../app/auth'
 import { blurLeavesRow } from '../../lib/form'
 import { CLUB_ACTIVITIES, addDraft, nextActivityId, replaceActivity } from './mock'
@@ -52,9 +53,7 @@ const isWorkEmpty = (w: WorkRow) => w.task.trim() === '' && w.owner.trim() === '
 const UNNAMED_ACTIVITY = '（未命名活動）'
 
 // 附件加總上限(接後端後改讀 system_settings 的管理員設定值)
-const MAX_ATTACHMENT_TOTAL_MB = 50
-const MAX_ATTACHMENT_TOTAL_BYTES = MAX_ATTACHMENT_TOTAL_MB * 1024 * 1024
-const totalBytes = (fs: UploadFile[]) => fs.reduce((sum, f) => sum + (f.size ?? 0), 0)
+const MAX_ATTACHMENT_TOTAL_BYTES = 50 * 1024 * 1024
 
 export default function ActivityFormPage() {
   const navigate = useNavigate()
@@ -63,7 +62,7 @@ export default function ActivityFormPage() {
   const { message, modal } = App.useApp()
   const [form] = Form.useForm()
   const activityType = Form.useWatch('type', form)
-  const [files, setFiles] = useState<UploadFile[]>([])
+  const [files, setFiles] = useState<BagFile[]>([])
 
   // 編輯模式:僅草稿與被退回件可編輯,整筆預填
   const editing = id ? CLUB_ACTIVITIES.find((a) => a.id === id && (a.status === 'draft' || a.status === 'rejected')) : undefined
@@ -451,47 +450,14 @@ export default function ActivityFormPage() {
 
             <div className="card" style={{ padding: 24 }}>
               <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 14 }}>附件</div>
-              <Upload.Dragger
-                multiple
+              <AttachmentArea
+                value={files}
+                onChange={setFiles}
                 accept=".pdf"
-                fileList={files}
-                beforeUpload={() => false}
-                onChange={({ fileList }) => {
-                  // 加總大小驗證:多檔逐一觸發 onChange,超限起拒收後續檔(同 key 提示只跳一次)
-                  if (totalBytes(fileList) > MAX_ATTACHMENT_TOTAL_BYTES) {
-                    message.error({ content: `附件合計超過 ${MAX_ATTACHMENT_TOTAL_MB} MB 上限`, key: 'attach-limit' })
-                    return
-                  }
-                  setFiles(fileList)
-                }}
-                showUploadList={false}
-                style={{ background: 'transparent' }}
-              >
-                <p style={{ margin: '4px 0 8px' }}>
-                  <InboxOutlined style={{ fontSize: 28, color: 'var(--steel)' }} />
-                </p>
-                <p style={{ fontSize: 13, color: 'var(--steel)', margin: 0 }}>拖放 PDF 檔案</p>
-                <p style={{ fontSize: 12, color: 'var(--steel)', margin: '4px 0 0' }}>
-                  已使用 <span className="num">{(totalBytes(files) / 1024 / 1024).toFixed(1)}/{MAX_ATTACHMENT_TOTAL_MB}</span> MB
-                </p>
-              </Upload.Dragger>
-              {files.map((f) => (
-                <div key={f.uid} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 4px 2px', fontSize: 13 }}>
-                  <FileTextOutlined style={{ color: 'var(--steel)' }} />
-                  <span style={{ fontWeight: 500 }}>{f.name}</span>
-                  <span className="num" style={{ fontSize: 12, color: 'var(--steel)' }}>
-                    {f.size != null ? `${(f.size / 1024 / 1024).toFixed(1)} MB` : ''}
-                  </span>
-                  <div style={{ flex: 1 }} />
-                  <button
-                    type="button"
-                    className="link-btn danger"
-                    onClick={() => setFiles((fs) => fs.filter((x) => x.uid !== f.uid))}
-                  >
-                    移除
-                  </button>
-                </div>
-              ))}
+                hint="拖放 PDF 檔案"
+                validate={async (f) => ((await isPdfFile(f)) ? null : '不是有效的 PDF 檔')}
+                maxTotalBytes={MAX_ATTACHMENT_TOTAL_BYTES}
+              />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>

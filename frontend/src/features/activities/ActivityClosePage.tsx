@@ -6,7 +6,8 @@ import dayjs, { type Dayjs } from 'dayjs'
 import { RightOutlined, UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { blurLeavesRow } from '../../lib/form'
-import { generatedPdf, releaseFile, sha256, toEvalFile } from '../eval/files'
+import { IMAGE_ACCEPT, fmtMB, isImageFile, sha256 } from '../../lib/uploads'
+import { generatedPdf, releaseFile, toEvalFile } from '../eval/files'
 import { allPhotoHashes, resultOf } from '../eval/store'
 import type { EvalFile } from '../eval/types'
 import { CLUB_ACTIVITIES } from './mock'
@@ -22,25 +23,6 @@ const isReflectEmpty = (r: ReflectRow) => !r.name.trim() && !r.dept.trim() && !r
 const MIN_REFLECTIONS = 3
 const MIN_PHOTOS = 5
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024 // 圖片上限 10MB(architecture.md)
-
-// 副檔名/accept 擋不住改名檔:驗常見影像魔術位元組(JPEG/PNG/GIF/WebP/BMP/TIFF/HEIC/AVIF)
-async function isImageFile(f: File): Promise<boolean> {
-  const head = new Uint8Array(await f.slice(0, 12).arrayBuffer())
-  if (head.length < 12) return false
-  const ascii = (from: number, to: number) => String.fromCharCode(...head.slice(from, to))
-  if (head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return true // JPEG
-  if (head[0] === 0x89 && head[1] === 0x50 && head[2] === 0x4e && head[3] === 0x47) return true // PNG
-  if (ascii(0, 4) === 'GIF8') return true
-  if (ascii(0, 4) === 'RIFF' && ascii(8, 12) === 'WEBP') return true
-  if (ascii(0, 2) === 'BM') return true // BMP
-  if (ascii(0, 4) === 'II*\0' || ascii(0, 4) === 'MM\0*') return true // TIFF
-  // ISO BMFF(HEIC/HEIF/AVIF):offset 4 起為 'ftyp' + 品牌
-  if (ascii(4, 8) === 'ftyp') {
-    const brand = ascii(8, 12)
-    return ['heic', 'heix', 'heif', 'hevc', 'mif1', 'msf1', 'avif', 'avis'].includes(brand)
-  }
-  return false
-}
 
 const label: React.CSSProperties = { fontSize: 13, fontWeight: 500, marginBottom: 6 }
 const requiredMark = <span style={{ color: '#C13B34' }}> *</span>
@@ -565,7 +547,7 @@ function CloseForm({
                   </span>
                 ))}
                 <Upload
-                  accept="image/*,.heic,.heif"
+                  accept={IMAGE_ACCEPT}
                   multiple
                   showUploadList={false}
                   beforeUpload={(f) => {
@@ -578,6 +560,10 @@ function CloseForm({
                 <span className="num" style={{ fontSize: 12, color: photos.length >= MIN_PHOTOS ? '#1F6B45' : 'var(--steel)' }}>
                   {photos.length} 張
                 </span>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 6 }}>
+                已使用 <span className="num">{fmtMB(photos.reduce((s, p) => s + p.size, 0))}</span> MB(單檔上限{' '}
+                <span className="num">{Math.round(MAX_PHOTO_BYTES / 1024 / 1024)}</span> MB)
               </div>
             </div>
             <div className="form-grid-2" style={{ marginTop: 12 }}>

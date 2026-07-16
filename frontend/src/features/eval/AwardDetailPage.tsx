@@ -4,12 +4,24 @@ import { App, Button, Upload } from 'antd'
 import { LeftOutlined, UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { useAuth } from '../../app/auth'
+import { fmtMB, isImageFile, sha256 } from '../../lib/uploads'
 import { AWARDS, slotFiles, uploadProgress } from './store'
 import { releaseFile, toEvalFile } from './files'
-import type { AwardKey, EvalFile } from './types'
+import { fileTypeOf, type Award, type AwardKey, type EvalFile } from './types'
 import FilePreview from './FilePreview'
 
-const ACCEPT = '.pdf,.doc,.docx,.jpg,.jpeg,.png,.webp'
+// 圖片一律含 HEIC/HEIF 等特規格式;文件收 PDF/Word
+const ACCEPT = '.pdf,.doc,.docx,image/*,.heic,.heif,.avif'
+const MAX_FILE_BYTES = 50 * 1024 * 1024
+
+// 同一獎項底下所有槽位已上傳檔案的 hash(跨槽位去重)
+const awardHashes = (award: Award): Set<string> => {
+  const set = new Set<string>()
+  for (const slot of award.slots) {
+    for (const f of slotFiles(award.key, slot.key)) if (f.hash) set.add(f.hash)
+  }
+  return set
+}
 
 // 獎項詳細頁:評分細項 → 上傳槽位(狀態、即時預覽)
 export default function AwardDetailPage() {
@@ -40,7 +52,21 @@ export default function AwardDetailPage() {
   const groups = [...new Set(award.slots.map((s) => s.group))]
 
   const addFiles = async (slotKey: string, f: File) => {
-    slotFiles(award.key, slotKey).push(await toEvalFile(f))
+    if (f.size > MAX_FILE_BYTES) {
+      message.error(`「${f.name}」超過單檔 50 MB 上限`)
+      return
+    }
+    // 宣稱是圖片的檔案驗魔術位元組(PDF 的降級檢查在 toEvalFile)
+    if (fileTypeOf(f.name) === 'image' && !(await isImageFile(f))) {
+      message.error(`「${f.name}」不是有效的圖片檔`)
+      return
+    }
+    const hash = await sha256(f)
+    if (awardHashes(award).has(hash)) {
+      message.error(`「${f.name}」與已上傳的檔案內容相同,已拒絕重複上傳`)
+      return
+    }
+    slotFiles(award.key, slotKey).push(await toEvalFile(f, hash))
     message.success(`已上傳「${f.name}」`)
     force()
   }
@@ -92,6 +118,12 @@ export default function AwardDetailPage() {
                     <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 3, lineHeight: 1.7 }}>
                       {slot.hints.join(';')}
                     </div>
+                    {files.length > 0 && (
+                      <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 6 }}>
+                        已使用 <span className="num">{fmtMB(files.reduce((s, f) => s + f.size, 0))}</span> MB(單檔上限{' '}
+                        <span className="num">50</span> MB)
+                      </div>
+                    )}
                     {files.length > 0 && (
                       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
                         {files.map((f) => (

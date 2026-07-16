@@ -1,13 +1,19 @@
-import { useMemo, useState } from 'react'
-import { App, Button, Form, Input, Modal, Popconfirm, Select, Upload } from 'antd'
+import { useState } from 'react'
+import { App, Button, Form, Input, Modal, Popconfirm, Select, Spin, Upload } from 'antd'
 import { DownOutlined, DownloadOutlined, EditOutlined, UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { FilterButton, Pager, SortButton } from '../../components/ui/tableControls'
 import { neutralizeFormula } from '../../lib/csv'
-import { MEMBER_KINDS, kindLabel, parseKind } from '../../lib/roles'
-import { CURRENT_SEMESTER, semesterOptions } from '../../lib/semester'
+import { MEMBER_KINDS, kindLabel, type MemberKind } from '../../lib/roles'
+import { CURRENT_SEMESTER } from '../../lib/semester'
 import { useAuth } from '../../app/auth'
-import { MEMBERS, type Member } from './mock'
+import {
+  fetchAllMembers,
+  useMemberMutations,
+  useMemberSemesters,
+  useMembers,
+  type Member,
+} from '../../api/members'
 
 const PAGE_SIZE = 50
 
@@ -15,113 +21,120 @@ export default function MembersPage() {
   const { message } = App.useApp()
   const { user } = useAuth()
   // 身份顯示依社團名稱末字推導(社→社長、會→會長);儲存值一律為標準身份
-  const label = (k: Member['kind']) => kindLabel(k, user?.club)
-  const kindOptions = MEMBER_KINDS.map((k) => ({ value: k, label: kindLabel(k, user?.club) }))
-  const [members, setMembers] = useState<Member[]>(MEMBERS)
+  const label = (k: MemberKind) => kindLabel(k, user?.club)
+  const kindOptions = MEMBER_KINDS.map((k) => ({ value: k, label: label(k) }))
+
   const [addOpen, setAddOpen] = useState(false)
   const [csvOpen, setCsvOpen] = useState(false)
   const [csvText, setCsvText] = useState('')
   const [exportOpen, setExportOpen] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [csvSemester, setCsvSemester] = useState<string>(CURRENT_SEMESTER)
   const [semester, setSemester] = useState<string>(CURRENT_SEMESTER)
   const [page, setPage] = useState(1)
   const [sort, setSort] = useState<{ key: 'kind' | 'title'; dir: 1 | -1 } | null>(null)
-  // 篩選值為顯示詞(社長/會長依社團名稱推導)
+  // 篩選值為顯示詞(社長/會長依社團名稱推導),查詢時轉回標準身份
   const [kindFilter, setKindFilter] = useState<string[]>([])
   const [editing, setEditing] = useState<{ id: number; field: 'kind' | 'title' } | null>(null)
   const [form] = Form.useForm()
   const kind = Form.useWatch('kind', form)
 
-  const nextId = () => Math.max(0, ...members.map((m) => m.id)) + 1
+  const semestersQuery = useMemberSemesters()
+  // 學期下拉:名單既有學期 + 當前學期(可能尚無資料)
+  const semesters = [...new Set([CURRENT_SEMESTER, ...(semestersQuery.data ?? [])])].sort().reverse()
+  const semesterOpts = semesters.map((s) => ({ value: s, label: s }))
+  const kinds = kindFilter.length
+    ? MEMBER_KINDS.filter((k) => kindFilter.includes(label(k)))
+    : undefined
+
+  const listQuery = useMembers({
+    semester: semester === 'all' ? undefined : semester,
+    kinds,
+    sort: sort ? `${sort.dir === -1 ? '-' : ''}${sort.key}` : undefined,
+    page,
+    pageSize: PAGE_SIZE,
+  })
+  const members = listQuery.data?.members ?? []
+  const total = listQuery.data?.total ?? 0
+
+  const { create, update, remove, importCsv } = useMemberMutations()
+
   // 頁面目前顯示的學期(「全部學期」時退回當前學期),作為各對話框的預設
   const pageSemester = semester === 'all' ? CURRENT_SEMESTER : semester
 
-  const onAdd = (values: { name: string; studentId: string; kind: Member['kind']; title?: string; semester: string }) => {
-    setMembers((ms) => [...ms, { id: nextId(), updatedAt: '—(未儲存)', ...values }])
-    setAddOpen(false)
-    form.resetFields()
-    message.success('已新增社員')
+  const onAdd = (values: { name: string; studentId: string; kind: MemberKind; title?: string; semester: string }) => {
+    create.mutate(values, {
+      onSuccess: () => {
+        setAddOpen(false)
+        form.resetFields()
+        message.success('已新增社員')
+      },
+      onError: (e) => message.error(e.message),
+    })
   }
 
-  // CSV:姓名,學號,身份[,職稱];身份留空視為社員,無法辨識的列略過並提示
-  const importCsv = (text: string) => {
-    const rows = text
-      .split(/\r?\n/)
-      .map((l) => l.trim())
-      .filter(Boolean)
-      .map((l) => l.split(/[,\t]/).map((c) => c.trim()))
-    const valid: Member[] = []
-    const skipped: number[] = []
-    let base = nextId()
-    rows.forEach((cols, i) => {
-      const [name, studentId, k, title] = cols
-      const memberKind = (k ?? '').trim() === '' ? '社員' : parseKind(k)
-      if (!name || !studentId || !memberKind) {
-        skipped.push(i + 1)
+  const doImport = () => {
+    if (!csvText.trim()) {
+      message.error('請先選擇檔案或貼上內容;格式:姓名,學號,身份[,職稱]')
+      return
+    }
+    importCsv.mutate(
+      { csvText, semester: csvSemester },
+      {
+        onSuccess: (result) => {
+          if (result.errors.length) {
+            message.warning(`已匯入 ${result.created + result.updated} 筆;${result.errors[0]} 等 ${result.errors.length} 項問題`)
+          } else if (result.created + result.updated === 0) {
+            message.info('內容與名單相同,未有變更')
+          } else {
+            message.success(`已匯入 ${result.created + result.updated} 名社員至 ${csvSemester}`)
+          }
+          setCsvOpen(false)
+          setCsvText('')
+        },
+        onError: (e) => message.error(e.message),
+      },
+    )
+  }
+
+  const exportCsv = async () => {
+    setExporting(true)
+    try {
+      const rows = await fetchAllMembers(csvSemester)
+      if (!rows.length) {
+        message.error(`${csvSemester} 沒有成員可匯出`)
         return
       }
-      valid.push({
-        id: base++,
-        name,
-        studentId,
-        kind: memberKind,
-        title: memberKind === '幹部' ? title || undefined : undefined,
-        semester: csvSemester,
-        updatedAt: '—(未儲存)',
-      })
-    })
-    if (!valid.length) {
-      message.error('沒有可匯入的資料;格式:姓名,學號,身份[,職稱]')
-      return
+      // 維持匯入相容格式(無標題列、不加引號);身份以顯示詞輸出(匯入可回讀);
+      // 職稱補空字串讓各列欄數一致;中和 Excel 公式前綴
+      const text = rows
+        .map((m) => [m.name, m.studentId, label(m.kind), m.title ?? ''].map(neutralizeFormula).join(','))
+        .join('\n')
+      const url = URL.createObjectURL(new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' }))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `成員名單_${csvSemester}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+      setExportOpen(false)
+      message.success(`已匯出 ${rows.length} 名成員(${csvSemester})`)
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : '匯出失敗')
+    } finally {
+      setExporting(false)
     }
-    if (skipped.length) {
-      message.warning(`第 ${skipped.join('、')} 行缺欄位或身份無法辨識,已略過`)
-    }
-    setMembers((ms) => [...ms, ...valid])
-    setCsvOpen(false)
-    setCsvText('')
-    message.success(`已匯入 ${valid.length} 名社員至 ${csvSemester}`)
   }
 
-  const exportCsv = () => {
-    const rows = members.filter((m) => m.semester === csvSemester)
-    if (!rows.length) {
-      message.error(`${csvSemester} 沒有成員可匯出`)
-      return
-    }
-    // 維持匯入相容格式(無標題列、不加引號);身份以顯示詞輸出(parseKind 可回讀);
-    // 職稱補空字串讓各列欄數一致;中和 Excel 公式前綴
-    const text = rows
-      .map((m) => [m.name, m.studentId, label(m.kind), m.title ?? ''].map(neutralizeFormula).join(','))
-      .join('\n')
-    const url = URL.createObjectURL(new Blob(['\uFEFF' + text], { type: 'text/csv;charset=utf-8' }))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `成員名單_${csvSemester}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-    setExportOpen(false)
-    message.success(`已匯出 ${rows.length} 名成員(${csvSemester})`)
+  const patchMember = (id: number, patch: { kind?: MemberKind; title?: string | null }) => {
+    update.mutate(
+      { id, ...patch },
+      {
+        onSuccess: () => message.success('已自動儲存'),
+        onError: (e) => message.error(e.message),
+      },
+    )
   }
 
-  const update = (id: number, patch: Partial<Member>) => {
-    setMembers((ms) => ms.map((m) => (m.id === id ? { ...m, ...patch, updatedAt: '剛剛' } : m)))
-    message.success('已自動儲存')
-  }
-
-  const view = useMemo(() => {
-    // 篩選與排序都以顯示詞為準(與畫面所見一致)
-    const shown = (m: Member, key: 'kind' | 'title') => (key === 'kind' ? label(m.kind) : (m.title ?? ''))
-    let list = members.filter((m) => semester === 'all' || m.semester === semester)
-    if (kindFilter.length) list = list.filter((m) => kindFilter.includes(label(m.kind)))
-    if (sort) {
-      list = [...list].sort((a, b) => sort.dir * shown(a, sort.key).localeCompare(shown(b, sort.key), 'zh-Hant'))
-    }
-    return list
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [members, semester, kindFilter, sort, user?.club])
-
-  const paged = view.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
   const toggleSort = (key: 'kind' | 'title') =>
     setSort((s) => (s?.key === key ? (s.dir === 1 ? { key, dir: -1 } : null) : { key, dir: 1 }))
 
@@ -129,7 +142,7 @@ export default function MembersPage() {
     <div>
       <PageHeader
         title="成員列表"
-        sub={ <> 共 <span className="num">{view.length}</span> 人 </> }
+        sub={ <> 共 <span className="num">{total}</span> 人 </> }
         extra={
           <div style={{ display: 'flex', gap: 8 }}>
             <Select
@@ -139,7 +152,7 @@ export default function MembersPage() {
                 setPage(1)
               }}
               style={{ width: 120 }}
-              options={semesterOptions(members.map((m) => m.semester), true)}
+              options={[{ value: 'all', label: '全部學期' }, ...semesterOpts]}
             />
             <Button
               icon={<UploadOutlined />}
@@ -172,108 +185,123 @@ export default function MembersPage() {
         }
       />
 
-      <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-        <table className="tb" style={{ minWidth: 680 }}>
-          <thead>
-            <tr>
-              <th>姓名</th>
-              <th>學號</th>
-              <th>
-                <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                  <SortButton label="身份" sortKey="kind" sort={sort} onToggle={toggleSort} />
-                  <FilterButton
-                    options={MEMBER_KINDS.map((k) => kindLabel(k, user?.club))}
-                    selected={kindFilter}
-                    onChange={(next) => {
-                      setKindFilter(next)
-                      setPage(1)
-                    }}
-                    label="篩選身份"
-                  />
-                </span>
-              </th>
-              <th>
-                <SortButton label="職稱" sortKey="title" sort={sort} onToggle={toggleSort} />
-              </th>
-              <th>學期</th>
-              <th>更新時間</th>
-              <th className="r">動作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paged.map((m) => (
-              <tr key={m.id}>
-                <td style={{ fontWeight: 500 }}>{m.name}</td>
-                <td className="num" style={{ color: 'var(--steel)' }}>{m.studentId}</td>
-                <td>
-                  {editing?.id === m.id && editing.field === 'kind' ? (
-                    <Select
-                      size="small"
-                      autoFocus
-                      defaultOpen
-                      value={m.kind}
-                      style={{ width: 150 }}
-                      options={kindOptions}
-                      onChange={(v) => {
-                        // 職稱僅幹部有;換成其他身份一律清除,避免殘留舊職稱
-                        update(m.id, { kind: v, ...(v === '幹部' ? {} : { title: undefined }) })
-                        setEditing(null)
+      <Spin spinning={listQuery.isPending}>
+        <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+          <table className="tb" style={{ minWidth: 680 }}>
+            <thead>
+              <tr>
+                <th>姓名</th>
+                <th>學號</th>
+                <th>
+                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                    <SortButton label="身份" sortKey="kind" sort={sort} onToggle={toggleSort} />
+                    <FilterButton
+                      options={MEMBER_KINDS.map((k) => label(k))}
+                      selected={kindFilter}
+                      onChange={(next) => {
+                        setKindFilter(next)
+                        setPage(1)
                       }}
-                      onBlur={() => setEditing(null)}
+                      label="篩選身份"
                     />
-                  ) : (
-                    <button type="button" className="link-btn" style={{ padding: 0, color: 'var(--ink)' }} onClick={() => setEditing({ id: m.id, field: 'kind' })}>
-                      {label(m.kind)} <DownOutlined style={{ fontSize: 10, color: 'var(--steel)' }} />
-                    </button>
-                  )}
-                </td>
-                <td>
-                  {editing?.id === m.id && editing.field === 'title' ? (
-                    <Input
-                      size="small"
-                      autoFocus
-                      defaultValue={m.title}
-                      style={{ width: 120 }}
-                      onBlur={(e) => {
-                        update(m.id, { title: e.target.value.trim() || undefined })
-                        setEditing(null)
-                      }}
-                      onPressEnter={(e) => {
-                        update(m.id, { title: (e.target as HTMLInputElement).value.trim() || undefined })
-                        setEditing(null)
-                      }}
-                    />
-                  ) : m.kind !== '幹部' ? (
-                    <span style={{ color: 'var(--muted)' }}>—</span>
-                  ) : (
-                    <button type="button" className="link-btn" style={{ padding: 0, color: 'var(--ink)' }} onClick={() => setEditing({ id: m.id, field: 'title' })}>
-                      {m.title ?? '(未填)'} <EditOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />
-                    </button>
-                  )}
-                </td>
-                <td className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.semester}</td>
-                <td className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.updatedAt}</td>
-                <td className="r">
-                  <Popconfirm
-                    title={`移除 ${m.name}?`}
-                    okText="移除"
-                    okButtonProps={{ danger: true }}
-                    cancelText="取消"
-                    onConfirm={() => setMembers((ms) => ms.filter((x) => x.id !== m.id))}
-                  >
-                    <Button size="small" danger>移除</Button>
-                  </Popconfirm>
-                </td>
+                  </span>
+                </th>
+                <th>
+                  <SortButton label="職稱" sortKey="title" sort={sort} onToggle={toggleSort} />
+                </th>
+                <th>學期</th>
+                <th>更新時間</th>
+                <th className="r">動作</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <Pager page={page} pageSize={PAGE_SIZE} total={view.length} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
+            </thead>
+            <tbody>
+              {members.map((m: Member) => (
+                <tr key={m.id}>
+                  <td style={{ fontWeight: 500 }}>{m.name}</td>
+                  <td className="num" style={{ color: 'var(--steel)' }}>{m.studentId}</td>
+                  <td>
+                    {editing?.id === m.id && editing.field === 'kind' ? (
+                      <Select
+                        size="small"
+                        autoFocus
+                        defaultOpen
+                        value={m.kind}
+                        style={{ width: 150 }}
+                        options={kindOptions}
+                        onChange={(v) => {
+                          // 職稱僅幹部有;換成其他身份一律清除,避免殘留舊職稱
+                          patchMember(m.id, { kind: v, ...(v === '幹部' ? {} : { title: null }) })
+                          setEditing(null)
+                        }}
+                        onBlur={() => setEditing(null)}
+                      />
+                    ) : (
+                      <button type="button" className="link-btn" style={{ padding: 0, color: 'var(--ink)' }} onClick={() => setEditing({ id: m.id, field: 'kind' })}>
+                        {label(m.kind)} <DownOutlined style={{ fontSize: 10, color: 'var(--steel)' }} />
+                      </button>
+                    )}
+                  </td>
+                  <td>
+                    {editing?.id === m.id && editing.field === 'title' ? (
+                      <Input
+                        size="small"
+                        autoFocus
+                        defaultValue={m.title}
+                        style={{ width: 120 }}
+                        onBlur={(e) => {
+                          patchMember(m.id, { title: e.target.value.trim() || null })
+                          setEditing(null)
+                        }}
+                        onPressEnter={(e) => {
+                          patchMember(m.id, { title: (e.target as HTMLInputElement).value.trim() || null })
+                          setEditing(null)
+                        }}
+                      />
+                    ) : m.kind !== '幹部' ? (
+                      <span style={{ color: 'var(--muted)' }}>—</span>
+                    ) : (
+                      <button type="button" className="link-btn" style={{ padding: 0, color: 'var(--ink)' }} onClick={() => setEditing({ id: m.id, field: 'title' })}>
+                        {m.title ?? '(未填)'} <EditOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />
+                      </button>
+                    )}
+                  </td>
+                  <td className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.semester}</td>
+                  <td className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.updatedAt}</td>
+                  <td className="r">
+                    <Popconfirm
+                      title={`移除 ${m.name}?`}
+                      okText="移除"
+                      okButtonProps={{ danger: true }}
+                      cancelText="取消"
+                      onConfirm={() =>
+                        remove.mutate(m.id, {
+                          onSuccess: () => message.success('已移除'),
+                          onError: (e) => message.error(e.message),
+                        })
+                      }
+                    >
+                      <Button size="small" danger>移除</Button>
+                    </Popconfirm>
+                  </td>
+                </tr>
+              ))}
+              {!listQuery.isPending && members.length === 0 && (
+                <tr className="no-hover">
+                  <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
+                    尚未建立成員名單
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Spin>
+      <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
 
       <Modal
         open={addOpen}
         title="新增社員"
+        confirmLoading={create.isPending}
         onCancel={() => {
           setAddOpen(false)
           form.resetFields()
@@ -289,7 +317,7 @@ export default function MembersPage() {
             <Input className="num" />
           </Form.Item>
           <Form.Item name="semester" label="學期" rules={[{ required: true }]}>
-            <Select options={semesterOptions(members.map((m) => m.semester))} />
+            <Select options={semesterOpts} />
           </Form.Item>
           <Form.Item name="kind" label="身份" rules={[{ required: true }]}>
             <Select options={kindOptions} />
@@ -305,20 +333,21 @@ export default function MembersPage() {
       <Modal
         open={csvOpen}
         title="匯入社員(CSV)"
+        confirmLoading={importCsv.isPending}
         onCancel={() => setCsvOpen(false)}
-        onOk={() => importCsv(csvText)}
+        onOk={doImport}
         okText="匯入"
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
           <span style={{ fontSize: 13 }}>至學期</span>
-          <Select value={csvSemester} onChange={setCsvSemester} style={{ width: 110 }} options={semesterOptions(members.map((m) => m.semester))} />
+          <Select value={csvSemester} onChange={setCsvSemester} style={{ width: 110 }} options={semesterOpts} />
         </div>
         <Upload
           accept=".csv,.txt"
           maxCount={1}
           showUploadList={false}
           beforeUpload={(f) => {
-            f.text().then(setCsvText)
+            void f.text().then(setCsvText)
             return false
           }}
         >
@@ -336,17 +365,15 @@ export default function MembersPage() {
         open={exportOpen}
         title="匯出社員(CSV)"
         destroyOnHidden
+        confirmLoading={exporting}
         onCancel={() => setExportOpen(false)}
-        onOk={exportCsv}
+        onOk={() => void exportCsv()}
         okText="匯出"
         okButtonProps={{ autoFocus: true }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 13 }}>學期</span>
-          <Select value={csvSemester} onChange={setCsvSemester} style={{ width: 110 }} options={semesterOptions(members.map((m) => m.semester))} />
-          <span style={{ fontSize: 13, color: 'var(--steel)' }}>
-            共 <span className="num">{members.filter((m) => m.semester === csvSemester).length}</span> 人
-          </span>
+          <Select value={csvSemester} onChange={setCsvSemester} style={{ width: 110 }} options={semesterOpts} />
         </div>
       </Modal>
     </div>

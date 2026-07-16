@@ -170,16 +170,26 @@ async def overdue_deadline(db: AsyncSession, end_date: date, return_time: str) -
 async def availability_grid(
     db: AsyncSession, day: date, own_club_id: int | None
 ) -> dict[int, dict[str, str]]:
-    """場地 × 節次 → 狀態:pending(審核中)/temp(臨時借用)/fixed(固定借用)/mine(自己)。
+    """單日場況(區間版的特例);格式見 availability_grids。"""
+    return (await availability_grids(db, day, day, own_club_id))[day]
+
+
+async def availability_grids(
+    db: AsyncSession, start: date, end: date, own_club_id: int | None
+) -> dict[date, dict[int, dict[str, str]]]:
+    """逐日場況:日 → 場地 × 節次 → 狀態:pending(審核中)/temp(臨時)/fixed(固定)/mine(自己)。
 
     - 只回傳被佔用/審核中的格子;其餘由前端依 venue 開放旗標補 available/closed
     - 固定借用為每週固定時段(weekday 對應);只顯示已核准,審核中的固定借用不顯示
     - 審核中僅顯示臨時借用(2026-07-15)
+    - 區間一次撈(單一場地 15 天檢視原逐日 15 請求,2026-07-17 改批次)
     """
-    grid: dict[int, dict[str, str]] = {}
+    grids: dict[date, dict[int, dict[str, str]]] = {
+        start + timedelta(days=i): {} for i in range((end - start).days + 1)
+    }
 
-    def mark(venue_id: int, period: str, status: str) -> None:
-        cell = grid.setdefault(venue_id, {})
+    def mark(day: date, venue_id: int, period: str, status: str) -> None:
+        cell = grids[day].setdefault(venue_id, {})
         # mine 優先顯示;已核准蓋過審核中
         rank = {"pending": 0, "temp": 1, "fixed": 1, "mine": 2}
         if period not in cell or rank[status] > rank[cell[period]]:
@@ -187,33 +197,37 @@ async def availability_grid(
 
     temp_rows = await db.execute(
         sa.select(VenueBooking).where(
-            VenueBooking.date == day, VenueBooking.status != BookingStatus.REJECTED
+            VenueBooking.date >= start,
+            VenueBooking.date <= end,
+            VenueBooking.status != BookingStatus.REJECTED,
         )
     )
     for booking in temp_rows.scalars():
         for period in booking.periods:
             if booking.club_id == own_club_id:
-                mark(booking.venue_id, period, "mine")
+                mark(booking.date, booking.venue_id, period, "mine")
             elif booking.status == BookingStatus.APPROVED:
-                mark(booking.venue_id, period, "temp")
+                mark(booking.date, booking.venue_id, period, "temp")
             else:
-                mark(booking.venue_id, period, "pending")
+                mark(booking.date, booking.venue_id, period, "pending")
 
-    fixed_rows = await db.execute(
-        sa.select(RoomBookingSlot, RoomBookingRequest)
-        .join(RoomBookingRequest, RoomBookingSlot.request_id == RoomBookingRequest.id)
-        .where(
-            RoomBookingSlot.weekday == day.isoweekday(),
-            RoomBookingRequest.status == BookingStatus.APPROVED,
+    fixed_rows = (
+        await db.execute(
+            sa.select(RoomBookingSlot, RoomBookingRequest)
+            .join(RoomBookingRequest, RoomBookingSlot.request_id == RoomBookingRequest.id)
+            .where(RoomBookingRequest.status == BookingStatus.APPROVED)
         )
-    )
-    for slot, request in fixed_rows:
-        if request.club_id == own_club_id:
-            mark(request.venue_id, slot.period, "mine")
-        else:
-            mark(request.venue_id, slot.period, "fixed")
+    ).all()
+    for day in grids:
+        for slot, request in fixed_rows:
+            if slot.weekday != day.isoweekday():
+                continue
+            if request.club_id == own_club_id:
+                mark(day, request.venue_id, slot.period, "mine")
+            else:
+                mark(day, request.venue_id, slot.period, "fixed")
 
-    return grid
+    return grids
 
 
 async def admin_availability_grid(db: AsyncSession, day: date) -> dict[int, dict[str, dict]]:

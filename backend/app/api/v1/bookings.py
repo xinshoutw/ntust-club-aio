@@ -132,6 +132,24 @@ async def availability(user: ClubUser, db: DbDep, date: date) -> ApiResponse[dic
     return ApiResponse(data={"date": date.isoformat(), "grid": grid})
 
 
+MAX_AVAILABILITY_SPAN_DAYS = 31  # 單一場地 15 天檢視用;上限防範圍濫用
+
+
+@router.get("/bookings/availability-range")
+async def availability_range(
+    user: ClubUser, db: DbDep, start: date, end: date
+) -> ApiResponse[dict]:
+    """區間逐日場況(單一場地多天檢視):取代前端逐日並行請求。"""
+    if end < start:
+        raise validation_error("結束日期不得早於開始日期")
+    if (end - start).days + 1 > MAX_AVAILABILITY_SPAN_DAYS:
+        raise validation_error(f"查詢區間最多 {MAX_AVAILABILITY_SPAN_DAYS} 天")
+    grids = await svc.availability_grids(db, start, end, user.club_id)
+    return ApiResponse(
+        data={"days": [{"date": d.isoformat(), "grid": g} for d, g in grids.items()]}
+    )
+
+
 # ---- 教室固定借用 ----
 
 

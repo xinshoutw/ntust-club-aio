@@ -402,6 +402,68 @@ async def test_availability_grid_statuses(client, db):
     assert str(fixed_venue.id) not in grid
 
 
+async def test_availability_range(client, db):
+    """區間逐日場況:臨時只佔當日、固定每週同星期;區間驗證。"""
+    club = await setup_session(client, db)
+    venue = await make_venue(db, name="精誠廣場", allow_fixed=False, allow_temp=True)
+    fixed_venue = await make_venue(db, name="S304")
+    await open_fixed_window(db)
+    activity = await make_activity(db, club)
+
+    await client.post(
+        "/api/v1/club/venue-bookings",
+        json={
+            "venue_id": venue.id,
+            "activity_id": activity.id,
+            "date": "2026-03-05",  # 週四
+            "periods": ["3"],
+            "purpose": "擺攤",
+        },
+        headers=csrf_headers(client),
+    )
+    resp = await client.post(
+        "/api/v1/club/room-bookings",
+        json={
+            "venue_id": fixed_venue.id,
+            "purpose": "社課",
+            "slots": [{"weekday": 4, "period": "5"}],
+        },
+        headers=csrf_headers(client),
+    )
+    rid = resp.json()["data"]["id"]
+    await db.execute(
+        sa.update(RoomBookingRequest).where(RoomBookingRequest.id == rid).values(status="approved")
+    )
+    await db.commit()
+
+    days = (
+        await client.get(
+            "/api/v1/club/bookings/availability-range",
+            params={"start": "2026-03-04", "end": "2026-03-12"},
+        )
+    ).json()["data"]["days"]
+    by_date = {d["date"]: d["grid"] for d in days}
+    assert list(by_date) == [f"2026-03-{i:02d}" for i in range(4, 13)]  # 連續、含頭尾
+    assert by_date["2026-03-05"][str(venue.id)]["3"] == "mine"  # 臨時只佔當日
+    assert str(venue.id) not in by_date["2026-03-06"]
+    # 固定每週同星期(3/5、3/12 皆週四);自己社的固定借用顯示 mine;其他日不佔
+    assert by_date["2026-03-05"][str(fixed_venue.id)]["5"] == "mine"
+    assert by_date["2026-03-12"][str(fixed_venue.id)]["5"] == "mine"
+    assert str(fixed_venue.id) not in by_date["2026-03-06"]
+
+    # 區間驗證:起訖顛倒、超出上限
+    resp = await client.get(
+        "/api/v1/club/bookings/availability-range",
+        params={"start": "2026-03-05", "end": "2026-03-04"},
+    )
+    assert resp.status_code == 422
+    resp = await client.get(
+        "/api/v1/club/bookings/availability-range",
+        params={"start": "2026-03-01", "end": "2026-04-15"},
+    )
+    assert resp.status_code == 422
+
+
 # ---- 器材借用(綁定審核通過活動,區間推導) ----
 
 

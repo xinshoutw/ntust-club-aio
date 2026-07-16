@@ -103,11 +103,11 @@ async def validation_exception_handler(
 async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:
     # UNIQUE/FK 競態(如雙擊送出):約束擋下的第二筆回 409,不是 500
     logger.warning("integrity conflict on %s %s", request.method, request.url.path)
-    return _envelope(409, "資料狀態已變更或重複送出,請重新整理後再試", {"code": "CONFLICT"})
+    return _envelope(409, "資料狀態已變更或重複送出，請重新整理後再試", {"code": "CONFLICT"})
 
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     # 內部細節只進 log,不回傳給使用者
     logger.exception("unhandled error on %s %s", request.method, request.url.path)
-    return _envelope(500, "伺服器內部錯誤,請稍後再試", {"code": "INTERNAL"})
+    return _envelope(500, "伺服器內部錯誤，請稍後再試", {"code": "INTERNAL"})

@@ -5,7 +5,8 @@ export interface ApiResponse<T> {
   meta?: Record<string, unknown> | null
 }
 
-const BASE = '/api/v1'
+// 匯出供組完整檔案下載/預覽 URL(api/activities.ts fileUrl 等)
+export const API_BASE = '/api/v1'
 
 const UNSAFE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
@@ -47,6 +48,12 @@ export async function apiPaged<T>(path: string, init: RequestInit = {}): Promise
   return { data: body.data as T, total: meta.total ?? 0 }
 }
 
+/** 需要自訂 meta 的端點(如器材可借數查詢回傳推導借用區間):回傳 data + meta */
+export async function apiWithMeta<T, M>(path: string, init: RequestInit = {}): Promise<{ data: T; meta: M | null }> {
+  const body = await request<T>(path, init)
+  return { data: body.data as T, meta: (body.meta ?? null) as M | null }
+}
+
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const body = await request<T>(path, init)
   // data 可為 null:呼叫端以 api<T | null> 表達可空端點
@@ -66,7 +73,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResp
     headers.set('X-CSRF-Token', csrfToken())
   }
 
-  const res = await fetch(`${BASE}${path}`, {
+  const res = await fetch(`${API_BASE}${path}`, {
     credentials: 'same-origin',
     ...init,
     headers,

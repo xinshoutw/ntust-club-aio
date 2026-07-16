@@ -69,8 +69,9 @@ export interface Activity {
   attachments?: EvalFile[] // 申請附件(企劃書、估價單等,可預覽/下載)
 }
 
+// 與後端 system_settings.budget_categories 預設一致(後端逐項驗證科目)
 export const BUDGET_CATEGORIES = [
-  '指導老師/教練費',
+  '指導老師、教練費',
   '保險費',
   '交通費',
   '膳食費',
@@ -83,7 +84,7 @@ export const BUDGET_CATEGORIES = [
 
 // 選定科目時顯示於該列下方的提示
 export const BUDGET_HINTS: Record<string, string> = {
-  '指導老師/教練費': '請在下方加註講師相關專業工作背景',
+  '指導老師、教練費': '請在下方加註講師相關專業工作背景',
   保險費: '保額上限為新台幣 100 萬元，申請學校補助要保人為國立臺灣科技大學',
   交通費: '若租賃遊覽車請於結案時上傳行照、駕照及租賃契約',
   雜支: '請在下方註明細項內容',

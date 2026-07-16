@@ -1,18 +1,25 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { App, Button, DatePicker, Input, InputNumber, Select, TimePicker, Upload } from 'antd'
-import { confirmDialog } from '../../lib/confirm'
+import { App, Button, DatePicker, Input, InputNumber, Select, Spin, TimePicker, Upload } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { RightOutlined, UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { blurLeavesRow } from '../../lib/form'
 import { IMAGE_ACCEPT, fmtMB, isImageFile, sha256 } from '../../lib/uploads'
-import { generatedPdf, releaseFile, toEvalFile } from '../eval/files'
-import { allPhotoHashes, resultOf } from '../eval/store'
-import type { EvalFile } from '../eval/types'
-import { CLUB_ACTIVITIES } from './mock'
-import type { Activity, Reflection } from './types'
-import { TIME_RANGE_SEP, canClose, dateRangeText } from './utils'
+import {
+  deleteActivityPhoto,
+  saveCloseDraft,
+  submitClose,
+  uploadActivityPhoto,
+  useActivityDetail,
+  useActivityList,
+  useInvalidateActivities,
+  type ClubActivity,
+  type ClubActivityDetail,
+  type CloseSubmitInput,
+} from '../../api/activities'
+import type { Reflection } from './types'
+import { TIME_RANGE_SEP, dateRangeText } from './utils'
 import './actform.css'
 
 interface ReflectRow extends Reflection {
@@ -27,6 +34,8 @@ const MAX_PHOTO_BYTES = 10 * 1024 * 1024 // 圖片上限 10MB(architecture.md)
 const label: React.CSSProperties = { fontSize: 13, fontWeight: 500, marginBottom: 6 }
 const requiredMark = <span style={{ color: '#C13B34' }}> *</span>
 
+const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e))
+
 const toTime = (s?: string): Dayjs | null => {
   if (!s) return null
   const t = dayjs(s, 'HH:mm')
@@ -39,17 +48,19 @@ const plannedTimes = (tr?: string): [string, string] => {
   return [a, b]
 }
 
-// 活動結案(側欄頁):選擇已核准之活動 → 成果調查(預填申請值)+ 心得 ≥3 + 照片/影片/支出
+// 活動結案(側欄頁):選擇可結案(已核准且已結束)之活動 → 成果調查(預填申請值)+ 心得 ≥3 + 照片/影片/支出
 // 除影片連結外全必填;送出後由輔導老師審核,結案通過始計入評鑑行政分
 export default function ActivityClosePage() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
-  const { message, modal } = App.useApp()
 
-  // 已核准且活動已結束才可結案
-  const closable = CLUB_ACTIVITIES.filter(canClose)
-  const selectedId = params.get('id')
+  // 已核准清單由伺服器 status 參數縮小,結案資格(已結束且未鎖定)採後端推導欄位 can_close
+  const approvedQuery = useActivityList({ status: 'approved' })
+  const closable = (approvedQuery.data ?? []).filter((a) => a.canClose)
+  const rawId = params.get('id')
+  const selectedId = rawId ? Number(rawId) : undefined
   const activity = closable.find((a) => a.id === selectedId)
+  const detailQuery = useActivityDetail(activity?.id)
 
   return (
     <div>
@@ -60,81 +71,84 @@ export default function ActivityClosePage() {
             style={{ width: 380 }}
             placeholder="選擇已核准之活動"
             value={activity?.id}
-            onChange={(id) => setParams({ id }, { replace: true })}
+            onChange={(id) => setParams({ id: String(id) }, { replace: true })}
             options={closable.map((a) => ({ value: a.id, label: `${a.name}(${dateRangeText(a)})` }))}
           />
         }
       />
 
       {/* 未選活動:直接列出可結案的活動供點選 */}
-      {!activity && closable.length > 0 && (
-        <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {closable.map((a) => (
-            <div
-              key={a.id}
-              className="card click-tint"
-              role="button"
-              tabIndex={0}
-              onClick={() => setParams({ id: a.id }, { replace: true })}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  setParams({ id: a.id }, { replace: true })
-                }
-              }}
-              style={{ padding: '16px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}
-            >
-              <div style={{ flex: 1, minWidth: 220 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 15, fontWeight: 500 }}>{a.name}</span>
-                  {a.closeDraft && (
-                    <span style={{ fontSize: 11, color: 'var(--steel)', border: '1px solid var(--line)', borderRadius: 4, padding: '0 4px' }}>
-                      結案草稿
-                    </span>
-                  )}
+      {!activity && (
+        <Spin spinning={approvedQuery.isPending}>
+          {closable.length > 0 && (
+            <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {closable.map((a) => (
+                <div
+                  key={a.id}
+                  className="card click-tint"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setParams({ id: String(a.id) }, { replace: true })}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      setParams({ id: String(a.id) }, { replace: true })
+                    }
+                  }}
+                  style={{ padding: '16px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}
+                >
+                  <div style={{ flex: 1, minWidth: 220 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 15, fontWeight: 500 }}>{a.name}</span>
+                      {a.hasCloseDraft && (
+                        <span style={{ fontSize: 11, color: 'var(--steel)', border: '1px solid var(--line)', borderRadius: 4, padding: '0 4px' }}>
+                          結案草稿
+                        </span>
+                      )}
+                    </div>
+                    <div className="num" style={{ fontSize: 12, color: 'var(--steel)', marginTop: 3 }}>
+                      {dateRangeText(a)}
+                      {a.timeRange ? ` ${a.timeRange}` : ''}
+                      {a.location ? ` · ${a.location}` : ''}
+                    </div>
+                  </div>
+                  <RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />
                 </div>
-                <div className="num" style={{ fontSize: 12, color: 'var(--steel)', marginTop: 3 }}>
-                  {dateRangeText(a)}
-                  {a.timeRange ? ` ${a.timeRange}` : ''}
-                  {a.location ? ` · ${a.location}` : ''}
-                </div>
-              </div>
-              {a.closeDeadline && (
-                <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                  <div style={{ fontSize: 12, color: 'var(--steel)' }}>結案期限</div>
-                  <div className="num" style={{ fontSize: 13, marginTop: 2 }}>{a.closeDeadline}</div>
-                </div>
-              )}
-              <RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />
+              ))}
             </div>
-          ))}
-        </div>
-      )}
-      {!activity && closable.length === 0 && (
-        <div className="card" style={{ marginTop: 20, padding: '40px 24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
-          目前沒有可結案的活動
-        </div>
+          )}
+          {!approvedQuery.isPending && closable.length === 0 && (
+            <div className="card" style={{ marginTop: 20, padding: '40px 24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
+              目前沒有可結案的活動
+            </div>
+          )}
+        </Spin>
       )}
 
-      {activity && (
-        <CloseForm key={activity.id} activity={activity} onDone={() => navigate('/activities')} message={message} modal={modal} />
-      )}
+      {activity &&
+        (detailQuery.data ? (
+          <CloseForm key={activity.id} activity={activity} detail={detailQuery.data} onDone={() => navigate('/activities')} />
+        ) : (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
+            <Spin />
+          </div>
+        ))}
     </div>
   )
 }
 
 function CloseForm({
   activity,
+  detail,
   onDone,
-  message,
-  modal,
 }: {
-  activity: Activity
+  activity: ClubActivity
+  detail: ClubActivityDetail
   onDone: () => void
-  message: ReturnType<typeof App.useApp>['message']
-  modal: ReturnType<typeof App.useApp>['modal']
 }) {
-  const d = activity.closeDraft
+  const { message } = App.useApp()
+  const invalidate = useInvalidateActivities()
+  const d = detail.closeDraft
   const [plannedStart, plannedEnd] = plannedTimes(activity.timeRange)
 
   const [memberCount, setMemberCount] = useState<number | null>(d?.memberCount ?? null)
@@ -142,7 +156,7 @@ function CloseForm({
   // 實際時間/地點:預填申請時的預估值(草稿優先),placeholder 亦顯示預估值
   const [actualStart, setActualStart] = useState<string>(d?.actualStart ?? plannedStart)
   const [actualEnd, setActualEnd] = useState<string>(d?.actualEnd ?? plannedEnd)
-  const [actualLocation, setActualLocation] = useState<string>(d?.actualLocation ?? activity.location ?? '')
+  const [actualLocation, setActualLocation] = useState<string>(d?.actualLocation ?? activity.location)
   const [highlights, setHighlights] = useState(d?.highlights ?? '')
   const [goals, setGoals] = useState(d?.goals ?? '')
   const [others, setOthers] = useState(d?.others ?? '')
@@ -153,8 +167,9 @@ function CloseForm({
   const [reviewConclusion, setReviewConclusion] = useState(d?.reviewConclusion ?? '')
   const [videoLink, setVideoLink] = useState(d?.videoLink ?? '')
   // 自籌與擬請皆為 0 → 實際支出自動預填 0(仍可修改)
-  const budgetTotal = activity.budget.reduce((s, b) => s + b.selfFund + b.requestedSubsidy, 0)
+  const budgetTotal = activity.selfFundTotal + activity.requestedTotal
   const [expense, setExpense] = useState<number | null>(d?.expense ?? (budgetTotal === 0 ? 0 : null))
+  const [busy, setBusy] = useState<'draft' | 'submit' | null>(null)
 
   // 送出驗證未過的欄位集合:對應欄位標紅框,修改該欄即解除
   const [errors, setErrors] = useState<ReadonlySet<string>>(new Set())
@@ -174,24 +189,67 @@ function CloseForm({
     const blanks = Math.max(1, MIN_REFLECTIONS - saved.length)
     return [...saved, ...Array.from({ length: blanks }, () => ({ key: nextKey(), name: '', dept: '', text: '' }))]
   })
-  const [photos, setPhotos] = useState<EvalFile[]>([])
-  const photoQueue = useRef(Promise.resolve())
-  // 本頁已收照片的 hash(同步維護,不受 render 時序影響)
-  const photoHashes = useRef(new Set<string>())
-  const photosRef = useRef<EvalFile[]>([])
-  photosRef.current = photos
-  const submittedRef = useRef(false)
-  const mountedRef = useRef(true)
 
-  // 未送出而離開(取消/暫存/換活動/側欄導航)一律於卸載時釋放照片 object URL;
-  // 送出後照片已轉入評鑑 store,不得釋放
-  useEffect(
-    () => () => {
-      mountedRef.current = false
-      if (!submittedRef.current) photosRef.current.forEach(releaseFile)
-    },
-    [],
-  )
+  // 照片即時上傳至後端(照片不隨草稿,獨立於結案草稿保存);
+  // 頁內去重以 SHA-256 先擋,跨活動重複由後端以 sha256 拒絕(409)
+  const photos = detail.photos
+  const photoQueue = useRef(Promise.resolve())
+  const sessionHashes = useRef(new Set<string>())
+  const hashByFileId = useRef(new Map<string, string>())
+  const [uploading, setUploading] = useState(0)
+  const [removing, setRemoving] = useState<ReadonlySet<string>>(new Set())
+
+  const addPhoto = (f: File) => {
+    setUploading((n) => n + 1)
+    photoQueue.current = photoQueue.current.then(async () => {
+      try {
+        if (f.size > MAX_PHOTO_BYTES) {
+          message.error(`「${f.name}」超過 10MB 上限,請壓縮後再上傳`)
+          return
+        }
+        if (!(await isImageFile(f))) {
+          message.error(`「${f.name}」不是有效的圖片檔`)
+          return
+        }
+        const hash = await sha256(f)
+        if (sessionHashes.current.has(hash)) {
+          message.error(`「${f.name}」與已上傳的照片內容相同,已拒絕重複上傳`)
+          return
+        }
+        const uploaded = await uploadActivityPhoto(activity.id, f)
+        sessionHashes.current.add(hash)
+        hashByFileId.current.set(uploaded.id, hash)
+        clearErr('photos')
+        invalidate()
+      } catch (e) {
+        message.error(`「${f.name}」上傳失敗:${errMsg(e)}`)
+      } finally {
+        setUploading((n) => n - 1)
+      }
+    })
+  }
+
+  const removePhoto = async (fileId: string) => {
+    if (removing.has(fileId)) return
+    setRemoving((s) => new Set(s).add(fileId))
+    try {
+      await deleteActivityPhoto(activity.id, fileId)
+      const hash = hashByFileId.current.get(fileId)
+      if (hash) {
+        sessionHashes.current.delete(hash)
+        hashByFileId.current.delete(fileId)
+      }
+      invalidate()
+    } catch (e) {
+      message.error(errMsg(e))
+    } finally {
+      setRemoving((s) => {
+        const n = new Set(s)
+        n.delete(fileId)
+        return n
+      })
+    }
+  }
 
   // 自動增列:填寫尾列即補一列;blur 離開列時移除空列(保底 3 列)
   const setReflect = (key: number, patch: Partial<Reflection>) => {
@@ -208,40 +266,9 @@ function CloseForm({
       return next
     })
 
-  const addPhoto = (f: File) => {
-    photoQueue.current = photoQueue.current.then(async () => {
-      try {
-        if (f.size > MAX_PHOTO_BYTES) {
-          message.error(`「${f.name}」超過 10MB 上限,請壓縮後再上傳`)
-          return
-        }
-        if (!(await isImageFile(f))) {
-          message.error(`「${f.name}」不是有效的圖片檔`)
-          return
-        }
-        const hash = await sha256(f)
-        if (allPhotoHashes().has(hash) || photoHashes.current.has(hash)) {
-          message.error(`「${f.name}」與已上傳的照片內容相同,已拒絕重複上傳`)
-          return
-        }
-        photoHashes.current.add(hash)
-        const ef = await toEvalFile(f, hash)
-        if (!mountedRef.current) {
-          // 表單已卸載(處理中就離開):立即釋放,不殘留
-          releaseFile(ef)
-          return
-        }
-        clearErr('photos')
-        setPhotos((ps) => [...ps, ef])
-      } catch (e) {
-        message.error(`照片處理失敗:${e instanceof Error ? e.message : String(e)}`)
-      }
-    })
-  }
-
   const filledReflects = reflects.filter((r) => !isReflectEmpty(r))
 
-  const buildDraftReport = (): NonNullable<Activity['closeDraft']> => ({
+  const buildDraftReport = (): NonNullable<ClubActivityDetail['closeDraft']> => ({
     memberCount: memberCount ?? undefined,
     nonMemberCount: nonMemberCount ?? undefined,
     actualStart,
@@ -260,27 +287,26 @@ function CloseForm({
     reflections: filledReflects.map(({ name, dept, text }) => ({ name: name.trim(), dept: dept.trim(), text: text.trim() })),
   })
 
-  const saveDraft = () => {
-    const doSave = () => {
-      activity.closeDraft = buildDraftReport()
+  // 草稿寫 DB 跨裝置續填;照片已即時上傳,不受草稿影響
+  const saveDraft = async () => {
+    setBusy('draft')
+    try {
+      await saveCloseDraft(activity.id, buildDraftReport())
+      invalidate()
       message.success('已暫存結案草稿')
       onDone()
+    } catch (e) {
+      message.error(errMsg(e))
+    } finally {
+      setBusy(null)
     }
-    if (photos.length > 0) {
-      // 與活動申請同慣例:草稿不保存附件
-      confirmDialog(modal, {
-        title: '照片不會隨草稿保存',
-        content: `已選擇的 ${photos.length} 張照片將被捨棄，確定要暫存草稿？`,
-        okText: '捨棄並暫存',
-        cancelText: '取消',
-        onOk: doSave,
-      })
-      return
-    }
-    doSave()
   }
 
-  const submit = () => {
+  const submit = async () => {
+    if (uploading > 0) {
+      message.error('照片上傳中,請稍候再送出')
+      return
+    }
     // 除影片連結外全必填:一次收集所有缺漏欄位,全部標紅框,訊息提示第一項
     const missing: [key: string, msg: string][] = []
     if (memberCount == null) missing.push(['memberCount', '請填寫「實際社員人數」'])
@@ -330,8 +356,7 @@ function CloseForm({
       message.warning(`照片未達 ${MIN_PHOTOS} 張且無影片連結，評鑑項目「照片 / 影片」將不計分`)
     }
 
-    const reflections = complete.map(({ name, dept, text }) => ({ name: name.trim(), dept: dept.trim(), text: text.trim() }))
-    activity.report = {
+    const body: CloseSubmitInput = {
       memberCount: memberCount!,
       nonMemberCount: nonMemberCount!,
       actualStart,
@@ -347,22 +372,20 @@ function CloseForm({
       reviewConclusion: reviewMeeting ? reviewConclusion.trim() : undefined,
       videoLink: videoLink.trim() || undefined,
       expense: expense!,
-      reflections,
-      submittedAt: dayjs().format('YYYY/MM/DD'),
+      reflections: complete.map(({ name, dept, text }) => ({ name: name.trim(), dept: dept.trim(), text: text.trim() })),
     }
-    delete activity.closeDraft
-    activity.status = 'closing_pending_advisor'
-
-    // 結案產物餵評鑑行政分:照片/影片連結(ad2)、成果報告(ad3)、心得彙整(ad4)
-    const r = resultOf(activity.id)
-    r.photos = [...r.photos, ...photos]
-    r.videoLink = videoLink.trim()
-    r.report = generatedPdf(`${activity.name}_成果報告`)
-    r.feedback = generatedPdf(`${activity.name}_心得(${reflections.length}人)`)
-
-    submittedRef.current = true
-    message.success('結案已送出,等待審核')
-    onDone()
+    setBusy('submit')
+    try {
+      // 送出 → closing_pending_advisor;成果報告/心得 PDF 由後端依模板於下載時生成
+      await submitClose(activity.id, body)
+      invalidate()
+      message.success('結案已送出,等待審核')
+      onDone()
+    } catch (e) {
+      message.error(errMsg(e))
+    } finally {
+      setBusy(null)
+    }
   }
 
   return (
@@ -370,11 +393,6 @@ function CloseForm({
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 12, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
         <span style={{ fontWeight: 500, color: 'var(--ink)' }}>{activity.name}</span>
         <span className="num">{dateRangeText(activity)}</span>
-        {activity.closeDeadline && (
-          <span>
-            結案期限 <span className="num">{activity.closeDeadline}</span>
-          </span>
-        )}
       </div>
 
       <div className="actform-grid" style={{ marginTop: 12 }}>
@@ -395,7 +413,7 @@ function CloseForm({
                   clearErr('memberCount')
                   setMemberCount(v)
                 }}
-                placeholder={activity.participantsIn != null ? String(activity.participantsIn) : undefined}
+                placeholder={String(activity.participantsIn)}
                 aria-label="實際社員人數"
               />
             </div>
@@ -411,7 +429,7 @@ function CloseForm({
                   clearErr('nonMemberCount')
                   setNonMemberCount(v)
                 }}
-                placeholder={activity.participantsOut != null ? String(activity.participantsOut) : undefined}
+                placeholder={String(activity.participantsOut)}
                 aria-label="實際非社員人數"
               />
             </div>
@@ -632,18 +650,14 @@ function CloseForm({
                 style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: 6, margin: -6, border: '1px solid transparent', borderRadius: 6 }}
               >
                 {photos.map((p) => (
-                  <span key={p.id} style={{ position: 'relative', display: 'inline-flex' }}>
+                  <span key={p.id} style={{ position: 'relative', display: 'inline-flex', opacity: removing.has(p.id) ? 0.5 : 1 }}>
                     <img src={p.url} alt={p.name} title={p.name} style={{ width: 52, height: 40, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--line)' }} />
                     <button
                       type="button"
                       className="link-btn danger"
                       aria-label={`移除 ${p.name}`}
                       style={{ position: 'absolute', top: -6, right: -6, background: '#fff', border: '1px solid var(--line)', borderRadius: '50%', width: 16, height: 16, lineHeight: '12px', padding: 0, fontSize: 11 }}
-                      onClick={() => {
-                        releaseFile(p)
-                        if (p.hash) photoHashes.current.delete(p.hash)
-                        setPhotos((ps) => ps.filter((x) => x.id !== p.id))
-                      }}
+                      onClick={() => void removePhoto(p.id)}
                     >
                       ×
                     </button>
@@ -658,7 +672,7 @@ function CloseForm({
                     return false
                   }}
                 >
-                  <Button icon={<UploadOutlined />}>選擇照片</Button>
+                  <Button icon={<UploadOutlined />} loading={uploading > 0}>選擇照片</Button>
                 </Upload>
                 <span className="num" style={{ fontSize: 12, color: photos.length >= MIN_PHOTOS ? '#1F6B45' : 'var(--steel)' }}>
                   {photos.length} 張
@@ -702,9 +716,9 @@ function CloseForm({
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-            <Button onClick={onDone}>取消</Button>
-            <Button onClick={saveDraft}>儲存草稿</Button>
-            <Button type="primary" onClick={submit}>送出結案</Button>
+            <Button onClick={onDone} disabled={busy != null}>取消</Button>
+            <Button loading={busy === 'draft'} disabled={busy === 'submit'} onClick={() => void saveDraft()}>儲存草稿</Button>
+            <Button type="primary" loading={busy === 'submit'} disabled={busy === 'draft'} onClick={() => void submit()}>送出結案</Button>
           </div>
         </div>
       </div>

@@ -1,37 +1,41 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { App, Button, Dropdown, Modal, Select, Tooltip } from 'antd'
+import { App, Button, Dropdown, Modal, Popconfirm, Select, Spin, Tooltip } from 'antd'
 import { DownloadOutlined, EllipsisOutlined, FileTextOutlined, LinkOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { FilterButton, Pager, SortButton } from '../../components/ui/tableControls'
 import StatusPill from '../../components/ui/StatusPill'
 import LargeBadge from '../../components/ui/LargeBadge'
 import { STATUS } from '../../lib/status'
-import { semesterOf, semesterOptions } from '../../lib/semester'
-import { resultOf } from '../eval/store'
+import { semesterOptions } from '../../lib/semester'
 import { downloadEvalFile, downloadPhotosZip } from '../eval/files'
 import type { EvalFile } from '../eval/types'
 import FilePreview from '../eval/FilePreview'
-import { CLUB_ACTIVITIES } from './mock'
-import { budgetTotals, fmtMoney, type Activity } from './types'
-import { TIME_RANGE_SEP, canClose, dateRangeText } from './utils'
+import {
+  activityReflectionsPdf,
+  activityReportPdf,
+  useActivityDetail,
+  useActivityList,
+  useActivityMutations,
+  useActivitySemesters,
+  type ClubActivity,
+  type ClubActivityDetail,
+} from '../../api/activities'
+import { fmtMoney } from './types'
+import { TIME_RANGE_SEP, dateRangeText } from './utils'
 
 const PAGE_SIZE = 20
 type SortKey = 'name' | 'type' | 'date' | 'budget' | 'status'
 
-function money(a: Activity): string {
-  const t = budgetTotals(a.budget)
-  if (t.self === 0 && t.requested === 0) return '–'
-  return `${fmtMoney(t.self)} / ${fmtMoney(t.requested)}`
+function money(a: ClubActivity): string {
+  if (a.selfFundTotal === 0 && a.requestedTotal === 0) return '–'
+  return `${fmtMoney(a.selfFundTotal)} / ${fmtMoney(a.requestedTotal)}`
 }
 
-function sortValue(a: Activity, key: SortKey): string | number {
-  if (key === 'budget') {
-    const t = budgetTotals(a.budget)
-    return t.self + t.requested
-  }
+function sortValue(a: ClubActivity, key: SortKey): string | number {
+  if (key === 'budget') return a.selfFundTotal + a.requestedTotal
   if (key === 'status') return STATUS[a.status].label
-  return a[key] ?? ''
+  return a[key]
 }
 
 // 檔名可點預覽,右側附下載鈕
@@ -67,33 +71,42 @@ function ActualValue({ actual, planned }: { actual: React.ReactNode; planned: st
   )
 }
 
-function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPreviewFile }: { a: Activity | null; open: boolean; onClose: () => void; afterClose: () => void; onEdit: () => void; onGoClose: () => void; onPreviewFile: (f: EvalFile) => void }) {
+function PreviewModal({ a, detail, loading, open, onClose, afterClose, onEdit, onGoClose, onPreviewFile }: {
+  a: ClubActivity | null
+  detail: ClubActivityDetail | undefined
+  loading: boolean
+  open: boolean
+  onClose: () => void
+  afterClose: () => void
+  onEdit: () => void
+  onGoClose: () => void
+  onPreviewFile: (f: EvalFile) => void
+}) {
   if (!a) return null
-  const t = budgetTotals(a.budget)
   const editable = a.status === 'draft' || a.status === 'rejected'
-  const r = resultOf(a.id)
-  const rep = (a.status === 'closed' || a.status === 'closing_pending_advisor') ? a.report : undefined
+  const rep = a.status === 'closed' || a.status === 'closing_pending_advisor' ? detail?.report : undefined
+  const photos = detail?.photos ?? []
+  const attachments = detail?.attachments ?? []
+  const budget = detail?.budget ?? []
 
-  // 與申請值比對:相同就不顯示實際值;比較前正規化分隔符,申請未填則一律視為變動並以「未填」呈現
+  // 與申請值比對:相同就不顯示實際值;比較前正規化分隔符
   const normTime = (tr: string) => tr.split(TIME_RANGE_SEP).map((s) => s.trim()).join('–')
   const actualTime = rep ? `${rep.actualStart}–${rep.actualEnd}` : ''
   const timeChanged = !!rep && normTime(actualTime) !== normTime(a.timeRange ?? '')
-  const locationChanged = !!rep && rep.actualLocation !== (a.location ?? '')
-  const plannedCountsMissing = a.participantsIn == null && a.participantsOut == null
-  const plannedCountsText = plannedCountsMissing ? '未填' : `校內 ${a.participantsIn ?? 0} · 校外 ${a.participantsOut ?? 0}`
-  const countChanged =
-    !!rep && (plannedCountsMissing || rep.memberCount !== (a.participantsIn ?? 0) || rep.nonMemberCount !== (a.participantsOut ?? 0))
+  const locationChanged = !!rep && rep.actualLocation !== a.location
+  const plannedCountsText = `校內 ${a.participantsIn} · 校外 ${a.participantsOut}`
+  const countChanged = !!rep && (rep.memberCount !== a.participantsIn || rep.nonMemberCount !== a.participantsOut)
 
   const downloadItems = [
-    { key: 'photos', label: '下載照片檔', disabled: r.photos.length === 0 },
-    { key: 'feedback', label: '下載學習心得檔案', disabled: !r.feedback },
-    { key: 'report', label: '下載活動成果報告', disabled: !r.report },
+    { key: 'photos', label: '下載照片檔', disabled: photos.length === 0 },
+    { key: 'feedback', label: '下載學習心得檔案', disabled: !rep },
+    { key: 'report', label: '下載活動成果報告', disabled: !rep },
   ]
   const onDownload = ({ key }: { key: string }) => {
-    // 照片打包成 zip(僅 archive);成果報告/心得之後依需求方模板於下載時動態生成 PDF
-    if (key === 'photos') void downloadPhotosZip(`${a.name}_照片`, r.photos)
-    if (key === 'feedback' && r.feedback) downloadEvalFile(r.feedback)
-    if (key === 'report' && r.report) downloadEvalFile(r.report)
+    // 照片打包成 zip(僅 archive);成果報告/心得由後端依需求方模板於下載時動態生成 PDF
+    if (key === 'photos') void downloadPhotosZip(`${a.name}_照片`, photos)
+    if (key === 'feedback' && rep) downloadEvalFile(activityReflectionsPdf(a, rep.submittedAt))
+    if (key === 'report' && rep) downloadEvalFile(activityReportPdf(a, rep.submittedAt))
   }
 
   return (
@@ -123,11 +136,12 @@ function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPrevi
           <Button type="primary" onClick={onEdit}>
             {a.status === 'rejected' ? '編輯重送' : '繼續編輯'}
           </Button>
-        ) : canClose(a) ? (
+        ) : a.canClose ? (
           <Button type="primary" onClick={onGoClose}>前往結案</Button>
         ) : null
       }
     >
+      <Spin spinning={loading}>
       <div style={{ display: 'grid', gridTemplateColumns: rep ? 'minmax(0, 1fr) minmax(0, 1fr)' : '1fr', gap: 32, marginTop: 10, alignItems: 'start' }}>
         {/* 左欄:申請資料、經費、檔案 */}
         <div>
@@ -143,42 +157,34 @@ function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPrevi
                 a.timeRange && <span className="num">{a.timeRange}</span>
               )}
             </div>
-            {(a.location || locationChanged) && (
-              <>
-                <div style={{ color: 'var(--steel)' }}>地點</div>
-                <div>
-                  {locationChanged && rep ? (
-                    <ActualValue actual={rep.actualLocation} planned={a.location ?? '未填'} />
-                  ) : (
-                    a.location ?? '—'
-                  )}
-                </div>
-              </>
-            )}
-            {(a.participantsIn != null || a.participantsOut != null || countChanged) && (
-              <>
-                <div style={{ color: 'var(--steel)' }}>人數</div>
-                <div>
-                  {countChanged && rep ? (
-                    <ActualValue actual={`社員 ${rep.memberCount} · 非社員 ${rep.nonMemberCount}`} planned={plannedCountsText} />
-                  ) : (
-                    <span className="num">{plannedCountsText}</span>
-                  )}
-                </div>
-              </>
-            )}
+            <div style={{ color: 'var(--steel)' }}>地點</div>
+            <div>
+              {locationChanged && rep ? (
+                <ActualValue actual={rep.actualLocation} planned={a.location || '未填'} />
+              ) : (
+                a.location || '—'
+              )}
+            </div>
+            <div style={{ color: 'var(--steel)' }}>人數</div>
+            <div>
+              {countChanged && rep ? (
+                <ActualValue actual={`社員 ${rep.memberCount} · 非社員 ${rep.nonMemberCount}`} planned={plannedCountsText} />
+              ) : (
+                <span className="num">{plannedCountsText}</span>
+              )}
+            </div>
             {a.content && (<><div style={{ color: 'var(--steel)' }}>內容</div><div style={{ lineHeight: 1.7 }}>{a.content}</div></>)}
-            {a.works && a.works.length > 0 && (
+            {a.works.length > 0 && (
               <>
                 <div style={{ color: 'var(--steel)' }}>工作分配</div>
                 <div style={{ lineHeight: 1.7 }}>{a.works.map((w) => [w.task, w.owner].filter(Boolean).join(':')).join('、')}</div>
               </>
             )}
-            {a.attachments && a.attachments.length > 0 && (
+            {attachments.length > 0 && (
               <>
                 <div style={{ color: 'var(--steel)' }}>附件</div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {a.attachments.map((f) => (
+                  {attachments.map((f) => (
                     <FileChip key={f.id} f={f} onPreview={onPreviewFile} />
                   ))}
                 </div>
@@ -189,11 +195,11 @@ function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPrevi
           <SectionTitle>
             經費
             <span style={{ fontWeight: 400, color: 'var(--steel)', marginLeft: 8, fontSize: 12 }}>
-              {money(a) === '–' ? '無申請經費' : <>自籌 <span className="num">{fmtMoney(t.self)}</span> · 擬請 <span className="num">{fmtMoney(t.requested)}</span></>}
+              {money(a) === '–' ? '無申請經費' : <>自籌 <span className="num">{fmtMoney(a.selfFundTotal)}</span> · 擬請 <span className="num">{fmtMoney(a.requestedTotal)}</span></>}
               {rep && <> · 實際支出 <span className="num">{fmtMoney(rep.expense)}</span></>}
             </span>
           </SectionTitle>
-          {a.budget.map((b) => (
+          {budget.map((b) => (
             <div key={b.id} style={{ display: 'flex', gap: 8, fontSize: 13, padding: '5px 0', borderBottom: '1px solid var(--line)' }}>
               <span style={{ width: 110, color: 'var(--steel)' }}>{b.category}</span>
               <span style={{ flex: 1 }}>{b.description}</span>
@@ -201,19 +207,19 @@ function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPrevi
             </div>
           ))}
 
-          {a.rejectReason && (
+          {detail?.rejectReason && (
             <div style={{ background: 'var(--paper)', borderRadius: 6, padding: '10px 12px', fontSize: 13, lineHeight: 1.7, marginTop: 16 }}>
               <span style={{ fontWeight: 500, color: '#B03A2E' }}>退回原因</span>
-              <span style={{ color: 'var(--steel)' }}> — {a.rejectReason.by} · <span className="num">{a.rejectReason.date}</span>:</span>
-              {a.rejectReason.text}
+              <span style={{ color: 'var(--steel)' }}> — {detail.rejectReason.by} · <span className="num">{detail.rejectReason.date}</span>:</span>
+              {detail.rejectReason.text}
             </div>
           )}
 
-          {rep && r.photos.length > 0 && (
+          {rep && photos.length > 0 && (
             <>
-              <SectionTitle>活動照片(<span className="num">{r.photos.length}</span> 張)</SectionTitle>
+              <SectionTitle>活動照片(<span className="num">{photos.length}</span> 張)</SectionTitle>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {r.photos.map((p) => (
+                {photos.map((p) => (
                   <button key={p.id} type="button" className="link-btn" style={{ padding: 0 }} aria-label={`預覽 ${p.name}`} onClick={() => onPreviewFile(p)}>
                     <img src={p.url} alt={p.name} title={p.name} style={{ width: 104, height: 78, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--line)', display: 'block' }} />
                   </button>
@@ -222,26 +228,25 @@ function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPrevi
             </>
           )}
 
-          {rep && (r.report || r.feedback || r.videoLink) && (
+          {rep && (
             <>
               <SectionTitle>結案檔案</SectionTitle>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                {r.report && <FileChip f={r.report} onPreview={onPreviewFile} />}
-                {r.feedback && <FileChip f={r.feedback} onPreview={onPreviewFile} />}
-                {r.videoLink && (
+                <FileChip f={activityReportPdf(a, rep.submittedAt)} onPreview={onPreviewFile} />
+                <FileChip f={activityReflectionsPdf(a, rep.submittedAt)} onPreview={onPreviewFile} />
+                {rep.videoLink && (
                   <span style={{ fontSize: 13 }}>
                     <LinkOutlined style={{ color: 'var(--steel)', marginRight: 6 }} />
-                    <a href={r.videoLink} target="_blank" rel="noopener noreferrer">{r.videoLink}</a>
+                    <a href={rep.videoLink} target="_blank" rel="noopener noreferrer">{rep.videoLink}</a>
                   </span>
                 )}
               </div>
             </>
           )}
 
-          {(a.status === 'approved' || a.status === 'locked') && a.closeDeadline && (
-            <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 16 }}>
-              結案期限 <span className="num">{a.closeDeadline}</span>
-              {a.status === 'locked' ? '，已逾期' : `，剩 ${a.closeDaysLeft} 天`}
+          {a.status === 'locked' && (
+            <div style={{ fontSize: 13, color: '#A3341F', marginTop: 16 }}>
+              已逾結案期限並鎖定,請洽學務處申請解鎖
             </div>
           )}
         </div>
@@ -296,6 +301,7 @@ function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPrevi
           </div>
         )}
       </div>
+      </Spin>
     </Modal>
   )
 }
@@ -303,23 +309,32 @@ function PreviewModal({ a, open, onClose, afterClose, onEdit, onGoClose, onPrevi
 export default function ActivityListPage() {
   const navigate = useNavigate()
   const { message } = App.useApp()
-  const semOptions = semesterOptions(CLUB_ACTIVITIES.filter((a) => a.status !== 'draft').map((a) => semesterOf(a.date)))
-  const [semester, setSemester] = useState(semOptions[0].value)
+  const [semesterSel, setSemesterSel] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 } | null>(null)
   const [typeFilter, setTypeFilter] = useState<string[]>([])
   // 以顯示標籤篩選:三個申請關卡共用「申請待審核」,避免選單出現重複項
   const [statusFilter, setStatusFilter] = useState<string[]>([])
-  const [preview, setPreview] = useState<Activity | null>(null)
+  const [preview, setPreview] = useState<ClubActivity | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
   const [filePreview, setFilePreview] = useState<EvalFile | null>(null)
   const [filePreviewOpen, setFilePreviewOpen] = useState(false)
 
-  const act = (label: string, a: Activity) => message.info(`「${label}」尚未接上後端(${a.name})`)
+  // 學期下拉:資料既有學期 + 當前學期,預設最新
+  const semestersQuery = useActivitySemesters()
+  const semOptions = semesterOptions(semestersQuery.data ?? [])
+  const semester = semesterSel ?? semOptions[0].value
 
-  const drafts = CLUB_ACTIVITIES.filter((a) => a.status === 'draft')
+  // 草稿不分學期,獨立區置頂;主列表依學期(伺服器端 semester/status 參數縮小範圍,
+  // 排序/多選篩選/分頁因單社資料量小維持前端處理,保留既有 UX)
+  const draftsQuery = useActivityList({ status: 'draft' })
+  const listQuery = useActivityList({ semester })
+  const drafts = draftsQuery.data ?? []
+  const detailQuery = useActivityDetail(preview?.id)
+  const { submit, remove } = useActivityMutations()
+
   const rest = useMemo(() => {
-    let list = CLUB_ACTIVITIES.filter((a) => a.status !== 'draft' && semesterOf(a.date) === semester)
+    let list = (listQuery.data ?? []).filter((a) => a.status !== 'draft')
     if (typeFilter.length) list = list.filter((a) => typeFilter.includes(a.type))
     if (statusFilter.length) list = list.filter((a) => statusFilter.includes(STATUS[a.status].label))
     if (sort) {
@@ -330,7 +345,7 @@ export default function ActivityListPage() {
       })
     }
     return list
-  }, [semester, sort, typeFilter, statusFilter])
+  }, [listQuery.data, sort, typeFilter, statusFilter])
 
   const paged = rest.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
   const toggleSort = (key: SortKey) =>
@@ -340,15 +355,15 @@ export default function ActivityListPage() {
     <SortButton label={label} sortKey={key} sort={sort} onToggle={toggleSort} />
   )
 
-  const statusLabels = [...new Set(CLUB_ACTIVITIES.filter((a) => a.status !== 'draft').map((a) => STATUS[a.status].label))]
+  const statusLabels = [...new Set((listQuery.data ?? []).filter((a) => a.status !== 'draft').map((a) => STATUS[a.status].label))]
 
   // 點列一律開活動詳情預覽;結案走列上的動作鈕(或預覽內「前往結案」)
-  const onRowClick = (a: Activity) => {
+  const onRowClick = (a: ClubActivity) => {
     setPreview(a)
     setPreviewOpen(true)
   }
 
-  const row = (a: Activity, actions: React.ReactNode) => (
+  const row = (a: ClubActivity, actions: React.ReactNode) => (
     <tr key={a.id} onClick={() => onRowClick(a)} style={{ cursor: 'pointer' }}>
       <td style={{ fontWeight: 500 }}>{a.name}</td>
       <td>
@@ -375,7 +390,7 @@ export default function ActivityListPage() {
           <Select
             value={semester}
             onChange={(v) => {
-              setSemester(v)
+              setSemesterSel(v)
               setPage(1)
             }}
             style={{ width: 110 }}
@@ -384,92 +399,121 @@ export default function ActivityListPage() {
         }
       />
 
-      {drafts.length > 0 && (
-        <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '14px 20px 6px' }}>
-            草稿 <span className="num" style={{ fontSize: 12, background: '#EEF0F3', color: 'var(--steel)', borderRadius: 999, padding: '1px 8px' }}>{drafts.length}</span>
+      <Spin spinning={draftsQuery.isPending || listQuery.isPending}>
+        {drafts.length > 0 && (
+          <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+            <div style={{ fontSize: 15, fontWeight: 600, padding: '14px 20px 6px' }}>
+              草稿 <span className="num" style={{ fontSize: 12, background: '#EEF0F3', color: 'var(--steel)', borderRadius: 999, padding: '1px 8px' }}>{drafts.length}</span>
+            </div>
+            <table className="tb" style={{ minWidth: 760 }}>
+              <tbody>
+                {drafts.map((a) =>
+                  row(
+                    a,
+                    <span style={{ display: 'inline-flex', gap: 6 }}>
+                      <Button
+                        size="small"
+                        type="primary"
+                        loading={submit.isPending && submit.variables === a.id}
+                        onClick={() =>
+                          submit.mutate(a.id, {
+                            onSuccess: () => message.success('已送出申請'),
+                            onError: (e) => message.error(e.message),
+                          })
+                        }
+                      >
+                        送出
+                      </Button>
+                      <Popconfirm
+                        title={`刪除草稿「${a.name}」?`}
+                        okText="刪除"
+                        okButtonProps={{ danger: true }}
+                        cancelText="取消"
+                        onConfirm={() =>
+                          remove.mutate(a.id, {
+                            onSuccess: () => message.success('已刪除草稿'),
+                            onError: (e) => message.error(e.message),
+                          })
+                        }
+                      >
+                        <Button size="small" danger>刪除</Button>
+                      </Popconfirm>
+                    </span>,
+                  ),
+                )}
+              </tbody>
+            </table>
           </div>
+        )}
+
+        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <table className="tb" style={{ minWidth: 760 }}>
+            <thead>
+              <tr>
+                <th>{sortHeader('名稱', 'name')}</th>
+                <th>
+                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                    {sortHeader('類型', 'type')}
+                    <FilterButton
+                      options={['社課', '活動', '會議']}
+                      selected={typeFilter}
+                      onChange={(next) => { setTypeFilter(next); setPage(1) }}
+                      label="篩選類型"
+                    />
+                  </span>
+                </th>
+                <th>{sortHeader('日期', 'date')}</th>
+                <th className="r">{sortHeader('經費(自籌/擬請)', 'budget')}</th>
+                <th>
+                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                    {sortHeader('狀態', 'status')}
+                    <FilterButton
+                      options={statusLabels}
+                      selected={statusFilter}
+                      onChange={(next) => { setStatusFilter(next); setPage(1) }}
+                      label="篩選狀態"
+                    />
+                  </span>
+                </th>
+                <th className="r">動作</th>
+              </tr>
+            </thead>
             <tbody>
-              {drafts.map((a) =>
+              {paged.map((a) =>
                 row(
                   a,
-                  <span style={{ display: 'inline-flex', gap: 6 }}>
-                    <Button size="small" type="primary" onClick={() => act('送出', a)}>送出</Button>
-                    <Button size="small" danger onClick={() => act('刪除', a)}>刪除</Button>
-                  </span>,
+                  a.canClose ? (
+                    <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                      {a.hasCloseDraft && (
+                        <Tooltip title="已暫存結案草稿">
+                          <span style={{ fontSize: 11, color: 'var(--steel)', border: '1px solid var(--line)', borderRadius: 4, padding: '0 4px' }}>草稿</span>
+                        </Tooltip>
+                      )}
+                      <Button size="small" type="primary" onClick={() => navigate(`/activities/close?id=${a.id}`)}>結案</Button>
+                    </span>
+                  ) : a.status === 'approved' ? (
+                    <Tooltip title="活動結束後才可結案">
+                      <span style={{ fontSize: 12, color: 'var(--muted)' }}>未開始/進行中</span>
+                    </Tooltip>
+                  ) : null,
                 ),
+              )}
+              {paged.length === 0 && (
+                <tr className="no-hover">
+                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 28 }}>
+                    本學期尚無活動
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
         </div>
-      )}
-
-      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-        <table className="tb" style={{ minWidth: 760 }}>
-          <thead>
-            <tr>
-              <th>{sortHeader('名稱', 'name')}</th>
-              <th>
-                <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                  {sortHeader('類型', 'type')}
-                  <FilterButton
-                    options={['社課', '活動', '會議']}
-                    selected={typeFilter}
-                    onChange={(next) => { setTypeFilter(next); setPage(1) }}
-                    label="篩選類型"
-                  />
-                </span>
-              </th>
-              <th>{sortHeader('日期', 'date')}</th>
-              <th className="r">{sortHeader('經費(自籌/擬請)', 'budget')}</th>
-              <th>
-                <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                  {sortHeader('狀態', 'status')}
-                  <FilterButton
-                    options={statusLabels}
-                    selected={statusFilter}
-                    onChange={(next) => { setStatusFilter(next); setPage(1) }}
-                    label="篩選狀態"
-                  />
-                </span>
-              </th>
-              <th className="r">動作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paged.map((a) =>
-              row(
-                a,
-                canClose(a) ? (
-                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    {a.closeDraft && (
-                      <Tooltip title="已暫存結案草稿">
-                        <span style={{ fontSize: 11, color: 'var(--steel)', border: '1px solid var(--line)', borderRadius: 4, padding: '0 4px' }}>草稿</span>
-                      </Tooltip>
-                    )}
-                    <Button size="small" type="primary" onClick={() => navigate(`/activities/close?id=${a.id}`)}>結案</Button>
-                  </span>
-                ) : a.status === 'approved' ? (
-                  <Tooltip title="活動結束後才可結案">
-                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>未開始/進行中</span>
-                  </Tooltip>
-                ) : null,
-              ),
-            )}
-            {paged.length === 0 && (
-              <tr className="no-hover">
-                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 28 }}>
-                  本學期尚無活動
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      </Spin>
       <Pager page={page} pageSize={PAGE_SIZE} total={rest.length} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
       <PreviewModal
         a={preview}
+        detail={detailQuery.data}
+        loading={preview != null && detailQuery.isPending}
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
         afterClose={() => setPreview(null)}

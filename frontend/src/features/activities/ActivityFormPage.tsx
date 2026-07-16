@@ -1,17 +1,27 @@
 import { useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router'
-import { App, Button, Checkbox, DatePicker, Form, Input, InputNumber, Popover, Select, TimePicker } from 'antd'
+import { App, Button, Checkbox, DatePicker, Form, Input, InputNumber, Popconfirm, Popover, Select, Spin, TimePicker } from 'antd'
 import { confirmDialog } from '../../lib/confirm'
 import dayjs from 'dayjs'
-import { InfoCircleOutlined } from '@ant-design/icons'
+import { FileTextOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import AttachmentArea, { type BagFile } from '../../components/ui/AttachmentArea'
-import { isPdfFile } from '../../lib/uploads'
-import { useAuth } from '../../app/auth'
+import { fmtMB, isPdfFile } from '../../lib/uploads'
 import { blurLeavesRow } from '../../lib/form'
-import { CLUB_ACTIVITIES, addDraft, nextActivityId, replaceActivity } from './mock'
+import type { EvalFile } from '../eval/types'
+import {
+  createActivity,
+  deleteActivityAttachment,
+  submitActivity,
+  updateActivity,
+  uploadActivityAttachment,
+  useActivityDetail,
+  useInvalidateActivities,
+  type ActivityInput,
+  type ClubActivityDetail,
+} from '../../api/activities'
 import { TIME_RANGE_SEP } from './utils'
-import { BUDGET_CATEGORIES, BUDGET_HINTS, fmtMoney, type Activity } from './types'
+import { BUDGET_CATEGORIES, BUDGET_HINTS, fmtMoney } from './types'
 import './actform.css'
 
 // '18:00–21:00'(容忍 -/—)→ [開始, 結束] TimePicker 值
@@ -49,27 +59,64 @@ interface WorkRow {
 
 const isWorkEmpty = (w: WorkRow) => w.task.trim() === '' && w.owner.trim() === ''
 
-// 未命名草稿的預設名稱:寫入與編輯預填比對共用,避免全形/半形不一致
-const UNNAMED_ACTIVITY = '（未命名活動）'
+interface FormValues {
+  name: string
+  type: ActivityInput['type']
+  isLarge?: boolean
+  location: string
+  date: dayjs.Dayjs
+  endDate: dayjs.Dayjs
+  startTime: dayjs.Dayjs
+  endTime: dayjs.Dayjs
+  participantsIn: number
+  participantsOut: number
+  content?: string
+}
 
 // 附件加總上限(接後端後改讀 system_settings 的管理員設定值)
 const MAX_ATTACHMENT_TOTAL_BYTES = 50 * 1024 * 1024
 
+const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e))
+
+// 編輯模式由外層取得詳情並確認狀態(僅草稿與被退回件可編輯),表單一律以完整資料掛載
 export default function ActivityFormPage() {
-  const navigate = useNavigate()
   const { id } = useParams()
-  const { user } = useAuth()
+  const idNum = id != null ? Number(id) : undefined
+  const isValidId = idNum == null || Number.isInteger(idNum)
+  const detailQuery = useActivityDetail(isValidId ? idNum : undefined)
+
+  if (idNum != null) {
+    if (!isValidId) return <Navigate to="/activities" replace />
+    if (detailQuery.isPending) {
+      return (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
+          <Spin />
+        </div>
+      )
+    }
+    const detail = detailQuery.data
+    if (!detail || (detail.status !== 'draft' && detail.status !== 'rejected')) {
+      return <Navigate to="/activities" replace />
+    }
+    return <ActivityForm key={detail.id} editing={detail} />
+  }
+  return <ActivityForm />
+}
+
+function ActivityForm({ editing }: { editing?: ClubActivityDetail }) {
+  const navigate = useNavigate()
   const { message, modal } = App.useApp()
-  const [form] = Form.useForm()
+  const invalidate = useInvalidateActivities()
+  const [form] = Form.useForm<FormValues>()
   const activityType = Form.useWatch('type', form)
   const [files, setFiles] = useState<BagFile[]>([])
+  // 既有附件(編輯重送保留,可逐一移除;新選檔於送出時上傳)
+  const [existing, setExisting] = useState<EvalFile[]>(editing?.attachments ?? [])
   const [worksError, setWorksError] = useState(false)
-
-  // 編輯模式:僅草稿與被退回件可編輯,整筆預填
-  const editing = id ? CLUB_ACTIVITIES.find((a) => a.id === id && (a.status === 'draft' || a.status === 'rejected')) : undefined
+  const [busy, setBusy] = useState<'draft' | 'submit' | null>(null)
 
   // 自動增列:保證尾端永遠有一列空白;清空的列自動移除
-  const workKeyRef = useRef((editing?.works?.length ?? 0) + 2)
+  const workKeyRef = useRef((editing?.works.length ?? 0) + 2)
   const [works, setWorks] = useState<WorkRow[]>(() => {
     const base = (editing?.works ?? []).map((w, i) => ({ key: i + 1, ...w }))
     return [...base, { key: base.length + 1, task: '', owner: '' }]
@@ -128,78 +175,126 @@ export default function ActivityFormPage() {
     { self: 0, requested: 0 },
   )
 
-  const buildDraft = (status: Activity['status']): Activity => {
-    const v = form.getFieldsValue()
-    const filledWorks = works.filter((w) => !isWorkEmpty(w))
-    return {
-      id: editing?.id ?? nextActivityId(),
-      name: (v.name as string)?.trim() || UNNAMED_ACTIVITY,
-      club: user?.club ?? '',
-      type: (v.type as Activity['type']) ?? '社課',
-      date: v.date ? v.date.format('YYYY/MM/DD') : '—',
-      endDate: v.endDate ? v.endDate.format('YYYY/MM/DD') : undefined,
-      timeRange: v.startTime && v.endTime ? `${v.startTime.format('HH:mm')}–${v.endTime.format('HH:mm')}` : undefined,
-      location: v.location,
-      participantsIn: v.participantsIn ?? undefined,
-      participantsOut: v.participantsOut ?? undefined,
-      content: (v.content as string)?.trim() || undefined,
-      works: filledWorks.length ? filledWorks.map((w) => ({ task: w.task.trim(), owner: w.owner.trim() })) : undefined,
-      // 編輯重送保留原有附件(mock 不落地新選檔;真實上傳接後端時處理)
-      attachments: editing?.attachments,
-      isLarge: v.type === '活動' ? !!v.isLarge : undefined,
-      status,
-      budget: filledBudget.map((r, i) => ({
-        id: i + 1,
-        category: r.category,
-        description: r.description,
-        selfFund: r.selfFund ?? 0,
-        requestedSubsidy: r.requestedSubsidy ?? 0,
-      })),
+  const buildInput = (v: FormValues): ActivityInput => ({
+    name: v.name.trim(),
+    type: v.type,
+    isLarge: v.type === '活動' ? !!v.isLarge : false,
+    date: v.date.format('YYYY/MM/DD'),
+    endDate: v.endDate.format('YYYY/MM/DD'),
+    startTime: v.startTime.format('HH:mm'),
+    endTime: v.endTime.format('HH:mm'),
+    location: v.location.trim(),
+    content: (v.content ?? '').trim(),
+    participantsIn: v.participantsIn,
+    participantsOut: v.participantsOut,
+    works: works.filter((w) => !isWorkEmpty(w)).map((w) => ({ task: w.task.trim(), owner: w.owner.trim() })),
+    budget: filledBudget.map((r) => ({
+      category: r.category,
+      description: r.description.trim(),
+      selfFund: r.selfFund ?? 0,
+      requestedSubsidy: r.requestedSubsidy ?? 0,
+    })),
+  })
+
+  const checkTimes = (v: FormValues): boolean => {
+    const start = dayjs(`${v.date.format('YYYY/MM/DD')} ${v.startTime.format('HH:mm')}`, 'YYYY/MM/DD HH:mm')
+    const end = dayjs(`${v.endDate.format('YYYY/MM/DD')} ${v.endTime.format('HH:mm')}`, 'YYYY/MM/DD HH:mm')
+    if (!end.isAfter(start)) {
+      message.error('活動結束時間須晚於開始時間')
+      return false
     }
+    return true
   }
 
-  const persist = (a: Activity) => (editing ? replaceActivity(a) : addDraft(a))
-
-  const saveDraft = () => {
-    const doSave = () => {
-      persist(buildDraft('draft'))
-      message.success('已暫存草稿')
-      navigate('/activities')
+  const saveDraft = async () => {
+    // 後端 ActivityIn 對草稿同樣要求完整基本資料,先過表單驗證
+    let v: FormValues
+    try {
+      v = await form.validateFields()
+    } catch {
+      message.error('草稿也需填妥基本資料,請先完成必填欄位')
+      return
+    }
+    if (!checkTimes(v)) return
+    const input = buildInput(v)
+    const doSave = async () => {
+      setBusy('draft')
+      try {
+        if (editing) await updateActivity(editing.id, input)
+        else await createActivity(input)
+        invalidate()
+        message.success(editing?.status === 'rejected' ? '已儲存修改' : '已暫存草稿')
+        navigate('/activities')
+      } catch (e) {
+        message.error(errMsg(e))
+      } finally {
+        setBusy(null)
+      }
     }
     if (files.length > 0) {
-      // 草稿不保存附件:避免未送出檔案殘留伺服器(孤兒檔案/個資殘留)
+      // 草稿不保存新選附件:避免未送出檔案殘留伺服器(孤兒檔案/個資殘留)
       confirmDialog(modal, {
         title: '附件不會隨草稿保存',
         content: `已選擇的 ${files.length} 個附件將被捨棄，確定要暫存草稿？`,
         okText: '捨棄並暫存',
         cancelText: '取消',
-        onOk: doSave,
+        onOk: () => {
+          void doSave()
+        },
       })
       return
     }
-    doSave()
+    void doSave()
   }
 
-  const onFinish = () => {
-    // 起訖為必填,通過 Form 驗證後必有值;僅需檢查先後順序
-    const v = form.getFieldsValue()
-    const start = dayjs(`${v.date.format('YYYY/MM/DD')} ${v.startTime.format('HH:mm')}`, 'YYYY/MM/DD HH:mm')
-    const end = dayjs(`${v.endDate.format('YYYY/MM/DD')} ${v.endTime.format('HH:mm')}`, 'YYYY/MM/DD HH:mm')
-    if (!end.isAfter(start)) {
-      message.error('活動結束時間須晚於開始時間')
-      return
-    }
+  const onFinish = async (v: FormValues) => {
+    if (!checkTimes(v)) return
     if (!works.some((w) => w.task.trim() !== '' && w.owner.trim() !== '')) {
       setWorksError(true)
       message.error('請填寫至少一筆工作分配')
       return
     }
-    persist(buildDraft('pending_advisor'))
-    message.success('已送出申請')
-    navigate('/activities')
+    const input = buildInput(v)
+    setBusy('submit')
+    try {
+      // 後端介面:先存草稿(POST/PUT)→ 逐檔上傳附件 → POST submit 送審
+      const saved = editing ? await updateActivity(editing.id, input) : await createActivity(input)
+      for (const b of [...files]) {
+        try {
+          await uploadActivityAttachment(saved.id, b.file)
+          setFiles((prev) => prev.filter((x) => x.key !== b.key))
+        } catch (e) {
+          invalidate()
+          message.error(`附件「${b.file.name}」上傳失敗:${errMsg(e)};申請已存為草稿,請補齊附件後再送出`)
+          navigate(`/activities/${saved.id}/edit`)
+          return
+        }
+      }
+      await submitActivity(saved.id)
+      invalidate()
+      message.success('已送出申請')
+      navigate('/activities')
+    } catch (e) {
+      invalidate() // 建立/更新可能已成功,讓列表刷新
+      message.error(errMsg(e))
+    } finally {
+      setBusy(null)
+    }
   }
 
-  if (id && !editing) return <Navigate to="/activities" replace />
+  const removeExisting = async (f: EvalFile) => {
+    if (!editing) return
+    try {
+      await deleteActivityAttachment(editing.id, f.id)
+      setExisting((xs) => xs.filter((x) => x.id !== f.id))
+      invalidate()
+      message.success('已移除附件')
+    } catch (e) {
+      message.error(errMsg(e))
+    }
+  }
+
+  const existingBytes = existing.reduce((s, f) => s + f.size, 0)
 
   return (
     <div>
@@ -208,8 +303,9 @@ export default function ActivityFormPage() {
       <Form
         form={form}
         layout="vertical"
-        onFinish={onFinish}
+        onFinish={(v) => void onFinish(v)}
         requiredMark
+        scrollToFirstError
         onValuesChange={(changed) => {
           // 單日活動居多:選開始日期時,結束日期未填就自動帶同一天
           if ('date' in changed && changed.date && !form.getFieldValue('endDate')) {
@@ -219,20 +315,17 @@ export default function ActivityFormPage() {
         initialValues={
           editing
             ? {
-                name: editing.name === UNNAMED_ACTIVITY ? '' : editing.name,
+                name: editing.name,
                 type: editing.type,
                 isLarge: editing.isLarge,
                 location: editing.location,
-                date: editing.date !== '—' ? dayjs(editing.date, 'YYYY/MM/DD') : undefined,
-                endDate: (() => {
-                  const d = editing.endDate ?? (editing.date !== '—' ? editing.date : undefined)
-                  return d ? dayjs(d, 'YYYY/MM/DD') : undefined
-                })(),
+                date: dayjs(editing.date, 'YYYY/MM/DD'),
+                endDate: dayjs(editing.endDate, 'YYYY/MM/DD'),
                 startTime: parseTimeRange(editing.timeRange)[0],
                 endTime: parseTimeRange(editing.timeRange)[1],
                 participantsIn: editing.participantsIn,
                 participantsOut: editing.participantsOut,
-                content: editing.content,
+                content: editing.content || undefined,
               }
             : { type: '社課' }
         }
@@ -458,19 +551,42 @@ export default function ActivityFormPage() {
 
             <div className="card" style={{ padding: 24 }}>
               <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 14 }}>附件</div>
+              {existing.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', marginBottom: 12 }}>
+                  {existing.map((f) => (
+                    <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 4px', fontSize: 13 }}>
+                      <FileTextOutlined style={{ color: 'var(--steel)' }} />
+                      <span style={{ fontWeight: 500 }}>{f.name}</span>
+                      <span className="num" style={{ fontSize: 12, color: 'var(--steel)' }}>{fmtMB(f.size)} MB</span>
+                      <div style={{ flex: 1 }} />
+                      <Popconfirm
+                        title={`移除附件「${f.name}」?`}
+                        okText="移除"
+                        okButtonProps={{ danger: true }}
+                        cancelText="取消"
+                        onConfirm={() => void removeExisting(f)}
+                      >
+                        <button type="button" className="link-btn danger">移除</button>
+                      </Popconfirm>
+                    </div>
+                  ))}
+                </div>
+              )}
               <AttachmentArea
                 value={files}
                 onChange={setFiles}
                 accept=".pdf"
                 hint="拖放 PDF 檔案"
                 validate={async (f) => ((await isPdfFile(f)) ? null : '不是有效的 PDF 檔')}
-                maxTotalBytes={MAX_ATTACHMENT_TOTAL_BYTES}
+                maxTotalBytes={Math.max(0, MAX_ATTACHMENT_TOTAL_BYTES - existingBytes)}
               />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
-              <Button onClick={saveDraft}>暫存草稿</Button>
-              <Button type="primary" htmlType="submit">
+              <Button loading={busy === 'draft'} disabled={busy === 'submit'} onClick={() => void saveDraft()}>
+                暫存草稿
+              </Button>
+              <Button type="primary" htmlType="submit" loading={busy === 'submit'} disabled={busy === 'draft'}>
                 送出申請
               </Button>
             </div>

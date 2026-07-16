@@ -1,61 +1,57 @@
-# Session Handoff(2026-07-16,第九輪:需求方全批回饋落地 + 前後端全面接線)
+# Session Handoff(2026-07-17,Task #6:驗證與審查修正落地)
 
-> 給下一個 session 的交接快照。永久性專案知識在三層 `AGENTS.md`(OSA 根/project/club-aio)與 `docs/architecture.md`、`docs/data-model.md`、`docs/design-guide.md`;本檔只記「現在進行到哪、接下來做什麼」。過期即刪。
+> 給下一個 session 的交接快照。永久性專案知識在三層 `AGENTS.md` 與 `docs/architecture.md`、`docs/data-model.md`、`docs/design-guide.md`;本檔只記「現在進行到哪、接下來做什麼」。過期即刪。
 
-## 本輪已完成(約 45 個 commit,決議全文見 AGENTS.md「第九輪」段)
+## 本輪已完成(Task #6:18 個 commit,`44406f0..HEAD`)
 
-### 前端 UI(需求方 2026-07-16 第九輪清單全數)
+第九輪交接列的 Task #6 待辦(E2E、交叉審查、資安、無障礙 sweep)已全數執行。Codex 第一輪唯讀審查的分級與證據見 `docs/TASK6_REVIEW_HANDOFF.md`(仍保留供對照);本輪把其中已確認的 finding 全部修掉並補測試。
 
-需求方本人 33 檔文案精簡+改名已原樣分組 commit。其餘:PageHeader 等高(minHeight 40);全站分頁統一 `Pager`(simple 置中、可輸入跳頁、一頁也顯示);`.click-tint` hover 全站一致;排序僅 icon 變色(收斂到 SortButton);上傳統一 `lib/uploads.ts`+`AttachmentArea`(SHA-256 去重、容量標示、HEIC/HEIF 全開,報修 TODO 用它修掉);送出紅框機制(errors Set,結案整頁/工作分配/借用時段/上傳區/報名建立)+自籌擬請皆 0 自動實支 0;成員身份標準值 負責人/副負責人/幹部/社員 + 依社團名末字推導社長/會長,**社團名稱強制社/會結尾**;SignupBuilder 拖曳改 pointer 即時重排;公告 popup 蓋板開關+刪除;admin 社團總覽 popup 重用 ActivityReviewModal/BookingReviewModal(待審可直接核准/退回);admin 管理項目 unsaved guard;檔案管理報修專屬區塊;TagListInput 改 AntD 官方可編輯標籤。
+### 資安(4 finding,均已修 + 測試)
 
-### 後端(pytest 173 passed、ruff 全綠;dev 庫已 upgrade 至 `b8d5e3f61a24`)
+- **SEC-01(Medium 越權)**`fix(admin): scope aclose-only accounts`:`aclose` 不再等於全視野;`_FULL_VIEW_KEYS=("aact","areview")`,aclose 沿用結案狀態集合。加 negative test:aclose-only 帳號 list/detail 看不到申請中/退回件。
+- **SEC-02(Medium 可用性)**`fix(web): scope request body limits per route class`:nginx 全域 body 上限 256m→1m,login 8k,僅五個上傳白名單保留 256m;422 detail 剝除 input/url。
+- **SEC-03(Medium 磁碟耗盡)**`feat(files): enforce storage quotas` + `feat(admin): manage storage limits` + `perf(files): hold quota lock only for final accounting`:`save_upload()` 共用配額收口(pg advisory xact lock 只覆蓋串流後結算、預檢+逐塊 best-effort、reserve hard stop、flush 失敗刪 dest);`system_settings.storage_limits`(40/2/10 GiB,super 可調);`/admin/files/usage` 回 capacity/remaining,前端廢除 50GB 常數。
+- **SEC-04(Low)**`feat(web): validate session before reading upload bodies`:nginx `auth_request` → `GET /auth/precheck`(無 body 驗 session/CSRF/首登)先於讀 body;`fix(web): auth_request subrequest tolerate large bodies`(E2E 於 8080 發現的 500 bug:precheck 子請求須給 256m,否則 >1m body 讓子請求 413→auth_request 轉 500)。
 
-- 四支可逆 migration:signup year 廢除(ad7/8 改場次日期落在評鑑視窗推導)、member_kind 四值、club_members.semester 快照(UNIQUE 含 semester)、activity_reports 繳交確認三欄
-- admin routers 補齊:`/admin/clubs`(主檔/改名(驗社/會結尾)/啟停/一次性密碼/成員唯讀)、`/admin/venue-bookings`、`/admin/equipment-loans`(status=overdue 推導、可借數排除本單)、`/admin/room-bookings`、`/admin/bookings/availability`、`/admin/venues`、逾期提醒+停權、公告蓋板 PATCH、維修狀態單步流轉、場次 CRUD(負責人會議逐場簽到)
-- 結案審核繳交確認落庫,未確認項 ad2–4 以 0 分計;aclose 帳號可讀審核列表;eval 上傳跨 session 去重;`UserOut.club_name`;幹部證明改 kind×semester 比對
-- **DB 指令**:`uv run python scripts/reset_db.py --yes`(還原初始:基礎主檔+superadmin 一次性密碼);`uv run python scripts/seed_mock.py --yes`(全模組 mock,deterministic)
+### 功能/權限
 
-### 前端接線(全部完成,mock 已退場;範本=`api/members.ts`+MembersPage)
+- **FUNC-01** `fix(files): allow same-origin framing for inline PDF`:SPA CSP `frame-src 'self'`;僅授權 inline PDF 回應放寬 `X-Frame-Options SAMEORIGIN`/`frame-ancestors 'self'`,其餘 API 維持 DENY/none。
+- **FUNC-02** `fix(auth): re-send session cookies on sliding renewal`:DB 續期時重送 session/CSRF cookies(共用 `core.deps.set_auth_cookies`),否則瀏覽器 cookie 仍在原登入第七天消失。
+- **FUNC-04** `fix(eval): enforce upload dedup with partial unique index`:`files` 加 `(club_id,slot,sha256) WHERE active eval_upload` partial unique index(migration `a9c2e51d7f43`),先查後寫的併發競態由 DB 收口;活動照片沿用既有 `uq_files_club_report_photo_sha`,兩者互補無漏。
+- **AUTHZ-UI-01** `feat(admin): gate admin UI by permission keys` + `feat(admin): club option endpoint readable by any admin`:`lib/permissions.ts` 路由↔權限鍵對照,側欄/首頁卡/header 依 permissions 過濾 + 共用 route gate;`GET /admin/clubs/options`(僅 id/name/attribute,任何 admin 可讀)取代 amember-gated 主檔給跨頁選擇器。
+- **FUNC-03** `fix(ui): surface query failures instead of empty states`:共用 `QueryError`(訊息 + refetch 重試);~25 頁的列表/詳情 query 失敗改顯示錯誤而非空表/找不到/永久 spinner;`useAvailabilityDays` 補 `isError/refetchErrored`。
 
-- auth:session cookie、`/auth/me` 開機恢復、首登強制改密 `/change-password`、staff/viewer → `/coming-soon`
-- club 端 12 頁 + admin 端 15 頁全接真 API(慣例見 AGENTS.md「接線慣例」);唯一例外:**EvalResultPage 仍 mock(待需求方規格)**
-- 側欄:固定借用開放窗與 admin 待審徽章皆由 query 驅動(`buildClubNav`/`buildAdminNav`)
+### 無障礙
 
-### 測試防鎖死(重要)
+- **A11Y-01/02** `fix(a11y): keyboard entry for clickable table rows` + `column headers and empty-row colSpans`:可點列名稱欄改真 `<button className="row-open-btn">`(tr 不加 role/tabIndex),`.click-tint` 補 focus ring;缺 thead 的表補 `<th scope="col">` + `aria-label`,空/錯誤列 colSpan 對齊。
+- **A11Y-03** `fix(a11y): takeover announcement uses a real modal dialog`:`TakeoverOverlay` 改用 AntD `Modal`(焦點管理內建),保留 5 秒規則(條件 closable)、`mask={{closable:false}}`、`keyboard={false}`。
+- **A11Y-04** `fix(a11y): raise information-bearing muted text to steel`:承載資訊的 `--muted` 改 `--steel`;disabled/裝飾維持 muted。
+- **A11Y-05** `fix(a11y): keyboard reordering for signup builder fields`:拖曳把手改可聚焦 button,方向鍵上/下移(重用 reorder 邏輯)。
 
-- 多 agent 併跑曾把共用 `club_aio_test` 鎖死(TRUNCATE 互鎖+殭屍連線)。已根治:conftest 開跑先 `pg_terminate_backend` 清殘留、測試庫設 lock/statement/idle timeout、pytest-timeout 每測試 30s 上限
-- **跑測試務必包 timeout**(如 `timeout 240 uv run pytest -q`),且不要同時開兩個 pytest
-- **前端 `pnpm exec tsc --noEmit` 是空檢查**(根 tsconfig 為 solution-style):必須用 `pnpm exec tsc -b`(`pnpm build` 內含)
+## 驗證現況(全綠)
 
-## 驗證現況
+- 後端:`timeout 240 uv run pytest -q` **187 passed**(~86s)、`ruff check .` 全綠、alembic up/down/up 於 dev 庫驗證過
+- 前端:`pnpm exec tsc -b` 0 錯、`pnpm test` 35 passed、`pnpm lint` 僅 6 個既有 fast-refresh warning、`pnpm build` 綠(chunk size 與 DOMPurify 既有 warning)
+- Bandit:0 High / 0 Medium / 10 Low(均為既有 dev secret/固定 seed 密碼/固定 argv subprocess/enum string 誤報,無新增)
+- **HTTP E2E(8000 功能層)**:22 項全過(public/未登入 401/錯 CSRF 403、權限矩陣 restricted admin 403、club options 開放、eval overview、precheck 403/204)
+- **部署層 E2E(8080 compose 全棧)**:login 8k→413、一般 JSON 1m→413、小 body 到後端、未登入上傳各尺寸→401、SPA CSP `frame-src 'self'`、nosniff、API `X-Frame-Options DENY`、login rate limit→429 皆驗過;`nginx -t` 通過
+- security-audit 產物:`/Users/xinshou/security-audit-skill/club-aio/run-1/`{`findings.json`(validator PASS,4 finding=3 medium/1 low)、`REPORT.md`、`FINDINGS-DETAIL.md`}
+- 交叉審查:opus ×2(資安修正 + findings 產物)判「可合入」;opus 提的兩個 Medium——(1) 活動照片去重併發**經查為誤報**(既有 `uq_files_club_report_photo_sha` 已收口,opus 只看到新的 eval index)、(2) 上傳鎖持有窗過長**已修**(`perf(files)` commit)
 
-- 後端:`pytest -q` **173 passed**(~60s)、ruff 全綠、alembic up/down/up 驗證過
-- 前端:`tsc -b` 0 錯、vitest 35 passed、build 綠、oxlint 僅既有 3 個 fast-refresh 警告
-- seed_mock 後 API smoke 通過(登入/檔案下載/審核視野/eval overview);**尚未做瀏覽器實測**
+## 已跑驗證的環境狀態
 
-## 下一輪待辦(Task #6 驗證與審查,本輪未執行)
+- dev 庫 `club_aio` 已 `alembic upgrade head`(= `a9c2e51d7f43`)+ `seed_mock` 資料(deterministic)
+- **compose 全棧目前仍在 8080 運行**(`club-aio-{db,backend,web}-1`);不需要時 `docker compose down`(保留 db:`docker compose stop backend web`)。web/backend 映像已 build 為 `:local`
+- 本機開發位址仍 IPv4:前端 `127.0.0.1:5173`、後端 `127.0.0.1:8000`
 
-1. **E2E 實跑**:`seed_mock --yes` → `uv run uvicorn app.main:app --reload --host 127.0.0.1 --port 8000` + `pnpm dev`(開 `http://127.0.0.1:5173`)→ 實際過主流程:club 登入→活動申請(附件)→admin 三關簽核→結案(照片)→結案審核(繳交確認)→評鑑分數;借用三種+審核;報名(草稿/送出/確認/逐場簽到);公告蓋板;成員 CSV;帳號管理一次性密碼
-2. **交叉審查**:本輪特例 Fable:codex ≈ 2:1(codex 慣例:`codex e -m gpt-5.6-sol -c 'model_reasoning_effort="xhigh"' --dangerously-bypass-approvals-and-sandbox "..." </dev/null`);審本輪全部 commit(`git log ee23a1c..HEAD`)
-3. **資安**:bandit + 資安審查(auth/上傳/CSRF/權限邊界/一次性密碼流);前端已知點:檔案 URL 走 session cookie 保護
-4. **無障礙/一致性 sweep**:鍵盤、讀屏語意(無 thead 表格)、對比、Modal 聚焦;風格一致性(loading/error 態各頁做法)
-5. mock 帳密(seed_mock 印出):`super`/Super@12345、`admin_lee`(areview/aclose/asignup)、`admin_chen`(abooking/aroom/amaint/aviol/amember)、`dean`(approve_dean)皆 Admin@12345;`staff_lee`/Staff@12345、`viewer01`/Viewer@12345;14 社團帳號皆 Club@12345(csie_club 資料最豐)
+## 下一輪待辦 / 待需求方
 
-## 已知 gap / 待需求方(下一輪處理或提問)
-
-- **郵局局號帳號改為恆必填**(接線時對齊後端);原「新開戶時隱藏」條件已移除——待需求方確認
-- 報名列表「未開始」項顯示為「已截止」(DTO 未帶 signup_start,小修)
-- is_eval 競賽報名:builder 無法建立、無獎項勾選 UI(不可達,待評鑑報名功能定案)
-- `GET /admin/eval/clubs` 逐社全量重算(社團數大時效能債);admin activities 前端 fetchAll(資料成長需後端排序/分頁)
-- 幹部證明無 admin 端點(社團總覽線上申請區不列);評審「負責獎項/分組」佔位 —(評審指派未做);檔案頁 50GB 上限為前端常數;送件時間以 created_at 近似
-- 器材審核彈窗在社團總覽開啟時不顯示固定借用衝突標示(專屬審核頁有)
-- 沿前輪待裁決:成員學期快照已做(定案);郵局代理人電話仍遮罩;固定借用 10 節=「本單+審核中」合計解讀;大型活動篩選解讀;AdminRoomsPage 退回彈窗聚焦差異
-- Roadmap:staff/viewer panel、首頁導覽頁、EvalResultPage 規格、Email MJML 模板
+- `docs/TASK6_REVIEW_HANDOFF.md` §6 的可延後 debt 尚未做:`<Spin>`→Skeleton 集中替換、非狀態 error 誤用 `#B03A2E`→`#C13B34` 機械取代、`AdminRoomsPage` 道歉文案與 `OneTimePasswordModal` 驚嘆號、`seed_mock --yes` 補 `ENV=dev` guard、`c7e...` migration downgrade 資料損失語意、inner nginx 信任網段收窄
+- EvalResultPage 仍刻意 mock(待需求方規格);staff/viewer panel、首頁導覽頁、Email MJML 模板未動
+- 上線切換清單(edge proxy,`architecture.md` §6.5)於 2026-09 執行;GCE Persistent Disk 擴容仍屬基礎設施操作(面板只調邏輯容量)
 
 ## 環境與慣例提醒
 
-- 本機 DB `docker compose up -d db`;dev 庫=`b8d5e3f61a24` + seed_mock 資料
-- **多 agent 平行作業絕不可 `git stash`**(本輪兩次事故,均已復原)
-- 本機開發一律用 IPv4:前端 `127.0.0.1:5173`,後端 `127.0.0.1:8000`;OrbStack 佔用 `localhost:8000`,勿混用 `localhost`
-- 確認彈窗一律 `lib/confirm.ts` 的 `confirmDialog`;Modal 一律 open+afterClose 常駐;前端不顯示單號(稽核除外)
-- Commit 英文、一行為一 commit、禁元描述;文件/回覆繁中;UI 禁 emoji
+- **多 agent 平行作業絕不可 `git stash`**;跑測試務必包 timeout 且不同時開兩個 pytest
+- 前端 `pnpm exec tsc --noEmit` 是空檢查(solution-style tsconfig),必須 `pnpm exec tsc -b`
+- 確認彈窗一律 `lib/confirm.ts`;Modal 一律 open+afterClose 常駐;前端不顯示單號(稽核除外);Commit 英文一行為一 commit、禁元描述;UI 禁 emoji

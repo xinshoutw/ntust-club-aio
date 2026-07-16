@@ -24,11 +24,8 @@ const MODULE_COLORS: Record<ModuleKey, string> = {
 // 表單等文字內容存於 DB:整個資料庫算一類納入佔用空間(後端以 pg_database_size 估)
 const DB_TEXT = { label: '文字內容', color: '#4E7D8C' }
 
-// 磁碟容量上限(部署主機規格,非後端資料;調整部署時同步改這裡)
-const CAPACITY_MB = 50 * 1024
-
 const fmtSize = (mb: number): string => (mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`)
-const pct = (n: number, d: number): string => `${Math.round((n / d) * 100)}%`
+const pct = (n: number, d: number): string => (d > 0 ? `${Math.round((n / d) * 100)}%` : '—')
 
 function DownloadButton({ file, message }: { file: StoredFile; message: ReturnType<typeof App.useApp>['message'] }) {
   if (file.archived) {
@@ -71,6 +68,9 @@ export default function AdminFilesPage() {
   // 模組順序由 API 決定(有報修檔案時 repair 排第一);報修歸零時整段自比例條與圖例移除
   const modules = (usage?.modules ?? []).filter((m) => m.key !== 'repair' || m.count > 0)
   const usedMb = usage?.totalMb ?? 0
+  // 容量/剩餘量由後端依 storage_limits 計算(管理員於系統設定調整,非前端常數)
+  const capacityMb = usage?.capacityMb ?? 0
+  const remainingMb = usage?.remainingMb ?? 0
   const totalCount = (usage?.modules ?? []).reduce((s, m) => s + m.count, 0)
   const repairUsage = usage?.modules.find((m) => m.key === 'repair')
   const otherModules = (usage?.modules ?? []).filter((m) => m.key !== 'repair')
@@ -111,13 +111,13 @@ export default function AdminFilesPage() {
               <div style={{ fontSize: 12, color: 'var(--steel)' }}>已用空間</div>
               <div style={{ lineHeight: 1.15, marginTop: 2 }}>
                 <span className="num" style={{ fontSize: 30, fontWeight: 600 }}>{fmtSize(usedMb)}</span>
-                <span className="num" style={{ fontSize: 14, color: 'var(--steel)' }}> / {fmtSize(CAPACITY_MB)}({pct(usedMb, CAPACITY_MB)})</span>
+                <span className="num" style={{ fontSize: 14, color: 'var(--steel)' }}> / {usage ? fmtSize(capacityMb) : '—'}({pct(usedMb, capacityMb)})</span>
               </div>
             </div>
             <div style={{ flex: 1 }} />
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 12, color: 'var(--steel)' }}>可用空間</div>
-              <div className="num" style={{ fontSize: 18, fontWeight: 600, marginTop: 2 }}>{fmtSize(CAPACITY_MB - usedMb)}</div>
+              <div className="num" style={{ fontSize: 18, fontWeight: 600, marginTop: 2 }}>{usage ? fmtSize(remainingMb) : '—'}</div>
             </div>
           </div>
 
@@ -129,14 +129,14 @@ export default function AdminFilesPage() {
                   key={m.key}
                   title={
                     <span style={{ fontSize: 13 }}>
-                      {m.label} · {fmtSize(m.sizeMb)}({pct(m.sizeMb, CAPACITY_MB)})· {m.count.toLocaleString()} 個檔案
+                      {m.label} · {fmtSize(m.sizeMb)}({pct(m.sizeMb, capacityMb)})· {m.count.toLocaleString()} 個檔案
                     </span>
                   }
                 >
                   <div
                     role="img"
                     aria-label={`${m.label} ${fmtSize(m.sizeMb)}`}
-                    style={{ width: `${(m.sizeMb / CAPACITY_MB) * 100}%`, background: MODULE_COLORS[m.key], minWidth: 6 }}
+                    style={{ width: `${capacityMb > 0 ? (m.sizeMb / capacityMb) * 100 : 0}%`, background: MODULE_COLORS[m.key], minWidth: 6 }}
                   />
                 </Tooltip>
               ))}
@@ -144,18 +144,18 @@ export default function AdminFilesPage() {
               <Tooltip
                 title={
                   <span style={{ fontSize: 13 }}>
-                    {DB_TEXT.label}(表單等資料庫內容)· {fmtSize(usage.dbSizeMb)}({pct(usage.dbSizeMb, CAPACITY_MB)})
+                    {DB_TEXT.label}(表單等資料庫內容)· {fmtSize(usage.dbSizeMb)}({pct(usage.dbSizeMb, capacityMb)})
                   </span>
                 }
               >
                 <div
                   role="img"
                   aria-label={`${DB_TEXT.label} ${fmtSize(usage.dbSizeMb)}`}
-                  style={{ width: `${(usage.dbSizeMb / CAPACITY_MB) * 100}%`, background: DB_TEXT.color, minWidth: 6 }}
+                  style={{ width: `${capacityMb > 0 ? (usage.dbSizeMb / capacityMb) * 100 : 0}%`, background: DB_TEXT.color, minWidth: 6 }}
                 />
               </Tooltip>
             )}
-            <div role="img" aria-label={`可用 ${fmtSize(CAPACITY_MB - usedMb)}`} style={{ flex: 1, background: '#EEF0F3' }} />
+            <div role="img" aria-label={`可用 ${fmtSize(remainingMb)}`} style={{ flex: 1, background: '#EEF0F3' }} />
           </div>
 
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 12 }}>

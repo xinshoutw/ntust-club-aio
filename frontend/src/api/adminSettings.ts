@@ -19,6 +19,9 @@ export interface SystemSettings {
   zipMb: number
   videoMb: number
   attachmentTotalMb: number // 活動申請附件加總上限(MB)
+  capacityGib: number // 系統邏輯容量(GiB,含資料庫佔用;調高前先擴實體磁碟)
+  perClubGib: number // 單一社團配額(GiB)
+  reserveGib: number // filesystem 保留空間(GiB)
   evalYear: number // 評鑑年度(民國年)
   violItems: string[]
   budgetCats: string[]
@@ -30,6 +33,7 @@ interface SettingsOut {
   close_lock_months: number
   upload_limits: { doc: number; img: number; zip: number; video: number }
   activity_attachment_total_mb: number
+  storage_limits: { capacity_gib: number; per_club_gib: number; reserve_gib: number }
   eval_window: { year: number; start: string; end: string }
   violation_items: string[]
   budget_categories: string[]
@@ -50,6 +54,9 @@ const toSettings = (s: SettingsOut): SystemSettings => ({
   zipMb: s.upload_limits.zip,
   videoMb: s.upload_limits.video,
   attachmentTotalMb: s.activity_attachment_total_mb,
+  capacityGib: s.storage_limits.capacity_gib,
+  perClubGib: s.storage_limits.per_club_gib,
+  reserveGib: s.storage_limits.reserve_gib,
   evalYear: s.eval_window.year,
   violItems: s.violation_items,
   budgetCats: s.budget_categories,
@@ -93,6 +100,11 @@ export function useUpdateSettings() {
           close_lock_months: v.closeLockMonths,
           upload_limits: { doc: v.docMb, img: v.imgMb, zip: v.zipMb, video: v.videoMb },
           activity_attachment_total_mb: v.attachmentTotalMb,
+          storage_limits: {
+            capacity_gib: v.capacityGib,
+            per_club_gib: v.perClubGib,
+            reserve_gib: v.reserveGib,
+          },
           eval_window: { year: v.evalYear, ...evalWindowOf(v.evalYear) },
           violation_items: v.violItems,
           budget_categories: v.budgetCats,

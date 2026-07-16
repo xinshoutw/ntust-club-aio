@@ -81,6 +81,9 @@ interface FormValues {
   zipMb: number
   videoMb: number
   attachmentTotalMb: number
+  capacityGib: number
+  perClubGib: number
+  reserveGib: number
   evalYear: number
   violItems: string[]
   budgetCats: string[]
@@ -109,6 +112,9 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
         zipMb: v.zipMb,
         videoMb: v.videoMb,
         attachmentTotalMb: v.attachmentTotalMb,
+        capacityGib: v.capacityGib,
+        perClubGib: v.perClubGib,
+        reserveGib: v.reserveGib,
         evalYear: v.evalYear,
         violItems: v.violItems,
         budgetCats: v.budgetCats,
@@ -141,6 +147,9 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
         zipMb: initial.zipMb,
         videoMb: initial.videoMb,
         attachmentTotalMb: initial.attachmentTotalMb,
+        capacityGib: initial.capacityGib,
+        perClubGib: initial.perClubGib,
+        reserveGib: initial.reserveGib,
         evalYear: initial.evalYear,
         violItems: initial.violItems,
         budgetCats: initial.budgetCats,
@@ -189,6 +198,39 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
               <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
             </Form.Item>
           </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 16, padding: 24 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
+          <div style={sectionTitle}>儲存空間</div>
+          <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 14 }}>
+            容量為邏輯值(含資料庫佔用):請先擴充實體磁碟,再調高此處容量
+          </div>
+        </div>
+        <div className="form-grid-2" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+          <Form.Item name="capacityGib" label="系統可用容量(GiB)" style={{ marginBottom: 0 }}>
+            <InputNumber min={1} max={4096} precision={0} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item
+            name="perClubGib"
+            label="單一社團配額(GiB)"
+            style={{ marginBottom: 0 }}
+            dependencies={['capacityGib']}
+            rules={[
+              ({ getFieldValue }) => ({
+                validator: (_, v?: number) =>
+                  v != null && v > getFieldValue('capacityGib')
+                    ? Promise.reject(new Error('不得超過系統可用容量'))
+                    : Promise.resolve(),
+              }),
+            ]}
+          >
+            <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item name="reserveGib" label="磁碟保留空間(GiB)" style={{ marginBottom: 0 }}>
+            <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
+          </Form.Item>
         </div>
       </div>
 

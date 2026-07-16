@@ -8,6 +8,7 @@ approved →(活動結束後)close → closing_pending_advisor → closed;退回
 """
 
 from datetime import UTC, datetime
+from pathlib import Path
 from urllib.parse import quote
 
 import sqlalchemy as sa
@@ -15,8 +16,9 @@ from fastapi import APIRouter, BackgroundTasks, Query, Request, Response, Upload
 from starlette.concurrency import run_in_threadpool
 
 from app.api.pagination import Pagination, parse_sort
+from app.core.config import settings
 from app.core.deps import ClubUser, DbDep, client_ip
-from app.core.errors import conflict, not_found, validation_error
+from app.core.errors import AppError, conflict, not_found, validation_error
 from app.core.semesters import semester_of, semester_range
 from app.models import (
     Activity,
@@ -287,6 +289,29 @@ async def upload_attachment(
     activity = await svc.get_own_activity(db, user, activity_id)
     if activity.status not in _EDITABLE:
         raise conflict("僅草稿或退回件可上傳附件")
+    # 鎖活動列:同活動的並發上傳序列化,加總上限檢核才不會被雙寫繞過
+    await db.execute(
+        sa.select(Activity.id).where(Activity.id == activity.id).with_for_update()
+    )
+
+    # 附件加總上限(2026-07-16 第八輪;預設 50MB,system_settings 可調)
+    cap_mb = int(await get_setting(db, "activity_attachment_total_mb"))
+    cap = cap_mb * 1024 * 1024
+    existing = int(
+        await db.scalar(
+            sa.select(sa.func.coalesce(sa.func.sum(File.size), 0)).where(
+                File.subject_type == svc.PHOTO_SUBJECT,
+                File.subject_id == activity.id,
+                File.slot == svc.ATTACHMENT_SLOT,
+                File.archived_at.is_(None),
+            )
+        )
+        or 0
+    )
+    over_cap = AppError(413, "FILE_TOO_LARGE", f"附件加總超過 {cap_mb}MB 上限")
+    if existing >= cap:
+        raise over_cap
+
     row = await file_service.save_upload(
         db,
         file,
@@ -298,6 +323,10 @@ async def upload_attachment(
         subject_id=activity.id,
         slot=svc.ATTACHMENT_SLOT,
     )
+    if existing + row.size > cap:
+        # 未 commit,DB 列隨交易回滾;磁碟檔需自行清掉
+        (Path(settings.upload_dir) / row.path).unlink(missing_ok=True)
+        raise over_cap
     await db.commit()
     return ApiResponse(data=FileOut.model_validate(row))
 

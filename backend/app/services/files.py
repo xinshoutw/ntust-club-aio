@@ -22,6 +22,7 @@ from app.core.config import settings
 from app.core.errors import AppError, not_found
 from app.models import File, User
 from app.models.enums import UserRole
+from app.services.settings_service import get_setting
 
 _CHUNK = 1024 * 1024
 _MB = 1024 * 1024
@@ -33,6 +34,35 @@ def _sniff_jpg(head: bytes) -> bool:
 
 def _sniff_png(head: bytes) -> bool:
     return head.startswith(b"\x89PNG\r\n\x1a\n")
+
+
+def _sniff_gif(head: bytes) -> bool:
+    return head.startswith(b"GIF8")
+
+
+def _sniff_webp(head: bytes) -> bool:
+    return len(head) >= 12 and head.startswith(b"RIFF") and head[8:12] == b"WEBP"
+
+
+def _sniff_bmp(head: bytes) -> bool:
+    return head.startswith(b"BM")
+
+
+def _sniff_tiff(head: bytes) -> bool:
+    return head.startswith(b"II*\x00") or head.startswith(b"MM\x00*")
+
+
+# ISO BMFF 品牌(HEIC/HEIF/AVIF;對齊前端 ActivityClosePage.isImageFile)
+_HEIF_BRANDS = frozenset({b"heic", b"heix", b"heif", b"hevc", b"mif1", b"msf1"})
+_AVIF_BRANDS = frozenset({b"avif", b"avis"})
+
+
+def _sniff_heif(head: bytes) -> bool:
+    return len(head) >= 12 and head[4:8] == b"ftyp" and head[8:12] in _HEIF_BRANDS
+
+
+def _sniff_avif(head: bytes) -> bool:
+    return len(head) >= 12 and head[4:8] == b"ftyp" and head[8:12] in _AVIF_BRANDS
 
 
 def _sniff_pdf(head: bytes) -> bool:
@@ -56,6 +86,14 @@ _SIGNATURES = {
     ".jpg": (_sniff_jpg, "image/jpeg"),
     ".jpeg": (_sniff_jpg, "image/jpeg"),
     ".png": (_sniff_png, "image/png"),
+    ".gif": (_sniff_gif, "image/gif"),
+    ".webp": (_sniff_webp, "image/webp"),
+    ".bmp": (_sniff_bmp, "image/bmp"),
+    ".tif": (_sniff_tiff, "image/tiff"),
+    ".tiff": (_sniff_tiff, "image/tiff"),
+    ".heic": (_sniff_heif, "image/heic"),
+    ".heif": (_sniff_heif, "image/heif"),
+    ".avif": (_sniff_avif, "image/avif"),
     ".pdf": (_sniff_pdf, "application/pdf"),
     ".docx": (
         _sniff_zip,
@@ -73,13 +111,34 @@ class UploadPolicy:
     name: str
     extensions: frozenset[str]
     max_size: int
+    settings_key: str | None = None  # system_settings upload_limits 的鍵;None=固定上限
 
 
-# 上傳上限(architecture.md §3.5 定案)
-IMAGE = UploadPolicy("image", frozenset({".jpg", ".jpeg", ".png"}), 10 * _MB)
-DOCUMENT = UploadPolicy("document", frozenset({".pdf", ".doc", ".docx"}), 50 * _MB)
-ARCHIVE = UploadPolicy("archive", frozenset({".zip"}), 100 * _MB)
-VIDEO = UploadPolicy("video", frozenset({".mp4", ".mov"}), 200 * _MB)
+# 上傳上限(architecture.md §3.5 定案的預設;實際上限走 system_settings upload_limits)
+# 影像放寬為所有常見格式(2026-07-16 第八輪,對齊前端 isImageFile)
+IMAGE = UploadPolicy(
+    "image",
+    frozenset(
+        {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tif", ".tiff",
+         ".heic", ".heif", ".avif"}
+    ),
+    10 * _MB,
+    settings_key="img",
+)
+DOCUMENT = UploadPolicy(
+    "document", frozenset({".pdf", ".doc", ".docx"}), 50 * _MB, settings_key="doc"
+)
+ARCHIVE = UploadPolicy("archive", frozenset({".zip"}), 100 * _MB, settings_key="zip")
+VIDEO = UploadPolicy("video", frozenset({".mp4", ".mov"}), 200 * _MB, settings_key="video")
+
+
+async def _policy_max_size(db: AsyncSession, policy: UploadPolicy) -> int:
+    """實際上限:管理員後台可調(upload_limits);查無值回退政策常數。"""
+    if policy.settings_key is None:
+        return policy.max_size
+    limits = await get_setting(db, "upload_limits")
+    mb = limits.get(policy.settings_key) if isinstance(limits, dict) else None
+    return int(mb) * _MB if mb else policy.max_size
 
 
 def _extension(filename: str) -> str:
@@ -108,6 +167,7 @@ async def save_upload(
             f"僅接受 {'/'.join(sorted(e.lstrip('.') for e in policy.extensions))} 檔案",
         )
     sniff, mime = _SIGNATURES[ext]
+    max_size = await _policy_max_size(db, policy)
 
     file_id = uuid.uuid4()
     now = datetime.now(UTC)
@@ -127,10 +187,8 @@ async def save_upload(
                         raise AppError(415, "UNSUPPORTED_FILE_TYPE", "檔案內容與副檔名不符")
                     first = False
                 size += len(chunk)
-                if size > policy.max_size:
-                    raise AppError(
-                        413, "FILE_TOO_LARGE", f"檔案超過 {policy.max_size // _MB}MB 上限"
-                    )
+                if size > max_size:
+                    raise AppError(413, "FILE_TOO_LARGE", f"檔案超過 {max_size // _MB}MB 上限")
                 hasher.update(chunk)
                 out.write(chunk)
         if first:  # 空檔案
@@ -185,7 +243,8 @@ def can_access(file: File, user: User) -> bool:
     return False
 
 
-_INLINE_MIMES = {"image/jpeg", "image/png", "application/pdf"}
+# 瀏覽器可原生預覽的類型;其餘(bmp/tiff/heic 等支援度不一)一律下載
+_INLINE_MIMES = {"image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"}
 
 
 async def file_response(db: AsyncSession, file_id: uuid.UUID, user: User) -> FileResponse:

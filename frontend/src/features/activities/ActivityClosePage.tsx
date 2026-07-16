@@ -197,7 +197,14 @@ function CloseForm({
   const keyRef = useRef(0)
   const nextKey = () => ++keyRef.current
   const [reflects, setReflects] = useState<ReflectRow[]>(() => {
-    const saved = (d?.reflections ?? []).map((r) => ({ ...r, key: nextKey() }))
+    // 草稿為 opaque JSON;缺欄位一律補空字串,避免任何列 name/dept/text 為 undefined
+    // 時 isReflectEmpty 的 .trim() 直接讓整頁白畫面(結案草稿曾因此崩潰)
+    const saved = (d?.reflections ?? []).map((r) => ({
+      key: nextKey(),
+      name: r?.name ?? '',
+      dept: r?.dept ?? '',
+      text: r?.text ?? '',
+    }))
     const blanks = Math.max(1, MIN_REFLECTIONS - saved.length)
     return [...saved, ...Array.from({ length: blanks }, () => ({ key: nextKey(), name: '', dept: '', text: '' }))]
   })

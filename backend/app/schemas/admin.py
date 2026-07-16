@@ -174,6 +174,14 @@ class AdminClubOut(BaseModel):
     suspended_until: date | None
 
 
+class ClubOptionOut(BaseModel):
+    """最小社團選項(任何管理員可讀):跨頁社團選擇器用,不含敏感欄位。"""
+
+    id: int
+    name: str
+    attribute: str  # ClubCascader 第一層=性質資料夾
+
+
 class AdminClubDetailOut(AdminClubOut):
     """單一社團:社團自管資料唯讀呈現 + 帳號與停權資訊。
 

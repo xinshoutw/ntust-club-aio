@@ -12,7 +12,7 @@ import {
   type AdminAnnouncement,
   type AnnouncementTarget,
 } from '../../api/announcementsAdmin'
-import { useAdminClubs } from '../../api/adminClubs'
+import { useClubOptions } from '../../api/adminClubs'
 import ClubCascader from './ClubCascader'
 import { CLUB_ATTRIBUTES } from './clubsMock'
 
@@ -43,8 +43,8 @@ export default function AnnouncementsPage() {
   const listQuery = useAdminAnnouncements({ page, pageSize: PAGE_SIZE })
   const items = listQuery.data?.items ?? []
   const total = listQuery.data?.total ?? 0
-  // 與 ClubCascader 同一份主檔快取:名稱 → id 對照用
-  const clubsQuery = useAdminClubs()
+  // 與 ClubCascader 同一份選項快取(任何管理員可讀):名稱 → id 對照用
+  const clubsQuery = useClubOptions()
   const { create, setTakeover, remove } = useAnnouncementMutations()
 
   // 詳情彈窗顯示列表中的最新版本(切換蓋板即時反映);已刪除者退回快照,供關閉動畫期間顯示

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { useAdminClubs } from '../../api/adminClubs'
+import { useClubOptions } from '../../api/adminClubs'
 
 // 行政端「選擇社團」跨頁同步:社團總覽/成員管理/管理項目/行政分審核共用同一選取,
 // 寫入 sessionStorage 讓重新整理也保留;接後端後另補 ?club= URL 參數。
@@ -18,7 +18,8 @@ interface AdminClubValue {
 const AdminClubContext = createContext<AdminClubValue | null>(null)
 
 export function AdminClubProvider({ children }: { children: ReactNode }) {
-  const { data: clubs, isFetching } = useAdminClubs()
+  // 最小選項端點:所有管理員可讀,provider 不再因 amember 權限而 403
+  const { data: clubs, isFetching } = useClubOptions()
   const [club, setClubState] = useState<string>(() => sessionStorage.getItem(STORAGE_KEY) ?? '')
 
   // 主檔載入後校正:續存名稱不存在(首次進入/社團被改名)→ 退回第一個社團。

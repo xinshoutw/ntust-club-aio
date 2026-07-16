@@ -13,13 +13,13 @@ import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Query, Request
 
 from app.api.pagination import Pagination, parse_sort
-from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
+from app.core.deps import CurrentUser, DbDep, client_ip, require_permission, require_role
 from app.core.errors import conflict, not_found, validation_error
 from app.core.security import generate_password, hash_password
 from app.models import Club, ClubMember, PasswordHistory, Session, User
 from app.models.enums import MemberKind, UserRole
 from app.schemas.accounts import PasswordResetOut
-from app.schemas.admin import AdminClubDetailOut, AdminClubOut, AdminClubUpdate
+from app.schemas.admin import AdminClubDetailOut, AdminClubOut, AdminClubUpdate, ClubOptionOut
 from app.schemas.clubs import MemberOut
 from app.schemas.common import ApiResponse
 from app.services import audit
@@ -27,6 +27,8 @@ from app.services import audit
 router = APIRouter(prefix="/admin/clubs", tags=["admin"])
 
 ClubAdmin = Annotated[CurrentUser, Depends(require_permission("amember"))]
+# 最小社團選項對「任何管理員」開放(公告/行政分審核等獨立權限頁也要選社團)
+AnyAdmin = Annotated[CurrentUser, Depends(require_role(UserRole.ADMIN))]
 
 # 全站強制規定(2026-07-16):社團名稱必須以「社」或「會」結尾
 _NAME_SUFFIXES = ("社", "會")
@@ -100,6 +102,18 @@ async def list_clubs(user: ClubAdmin, db: DbDep) -> ApiResponse[list[AdminClubOu
         for club, username in rows
     ]
     return ApiResponse(data=data)
+
+
+@router.get("/options")
+async def club_options(user: AnyAdmin, db: DbDep) -> ApiResponse[list[ClubOptionOut]]:
+    """最小社團選項(僅 id/name/attribute):任何管理員可讀,供跨頁社團選擇器。
+
+    不得為此放寬含帳號、停權等敏感欄位的完整主檔(list_clubs 仍限 amember)。
+    """
+    rows = await db.scalars(sa.select(Club).order_by(Club.attribute, Club.name, Club.id))
+    return ApiResponse(
+        data=[ClubOptionOut(id=c.id, name=c.name, attribute=c.attribute.value) for c in rows]
+    )
 
 
 @router.get("/{club_id}")

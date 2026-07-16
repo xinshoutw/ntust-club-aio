@@ -84,6 +84,7 @@ export interface AdminMemberParams {
 export const adminClubKeys = {
   all: ['adminClubs'] as const,
   list: ['adminClubs', 'list'] as const,
+  options: ['adminClubs', 'options'] as const,
   detail: (id: number) => ['adminClubs', 'detail', id] as const,
   members: (id: number, p: AdminMemberParams) => ['adminClubs', 'members', id, p] as const,
   suspended: ['adminClubs', 'suspended'] as const,
@@ -100,6 +101,22 @@ export function useAdminClubs() {
     queryKey: adminClubKeys.list,
     queryFn: fetchAdminClubs,
     staleTime: 5 * 60_000, // 主檔異動低頻;所有主檔 mutation 皆會 invalidate 整域
+  })
+}
+
+// ---- 最小社團選項(任何管理員可讀;跨頁選擇器共用,完整主檔仍限 amember) ----
+
+export interface ClubOption {
+  id: number
+  name: string
+  attribute: string
+}
+
+export function useClubOptions() {
+  return useQuery({
+    queryKey: adminClubKeys.options,
+    queryFn: () => api<ClubOption[]>('/admin/clubs/options'),
+    staleTime: 5 * 60_000, // 同上;主檔 mutation invalidate 整域時一併更新
   })
 }
 

@@ -34,6 +34,23 @@ async def test_permission_gate(client, db):
     assert resp.status_code == 403
 
 
+async def test_club_options_open_to_any_admin(client, db):
+    """最小選項端點:非 amember 的管理員也可讀,但只回 id/name/attribute。"""
+    club, _, _ = await seed(client, db)
+
+    await login(client, "other")  # 僅 aviol
+    resp = await client.get(f"{URL}/options")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert {c["name"] for c in data} == {"熱舞社", "吉他社"}
+    row = next(c for c in data if c["id"] == club.id)
+    assert set(row) == {"id", "name", "attribute"}  # 不含帳號/停權等敏感欄位
+
+    # 非 admin 不可讀
+    await login(client, "club01")
+    assert (await client.get(f"{URL}/options")).status_code == 403
+
+
 async def test_list_and_detail(client, db):
     club, _, no_account = await seed(client, db)
     await db.execute(

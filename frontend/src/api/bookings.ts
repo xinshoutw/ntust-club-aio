@@ -55,9 +55,8 @@ export const venueLabel = (v: Venue): string => (v.capacity ? `${v.name} (${v.ca
 export interface EquipmentItem {
   id: number
   name: string
-  category: string
   totalQty: number
-  needsSerial: boolean
+  needsSerial: boolean // False=一般、True=依序點交(2026-07-17 移除類別)
   available: number
 }
 
@@ -76,7 +75,6 @@ export interface EquipmentList {
 interface EquipmentOut {
   id: number
   name: string
-  category: string
   total_qty: number
   needs_serial: boolean
   available: number
@@ -85,7 +83,6 @@ interface EquipmentOut {
 const toEquipment = (e: EquipmentOut): EquipmentItem => ({
   id: e.id,
   name: e.name,
-  category: e.category,
   totalQty: e.total_qty,
   needsSerial: e.needs_serial,
   available: e.available,

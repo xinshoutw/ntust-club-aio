@@ -73,7 +73,7 @@ export default function EquipmentPage() {
               <thead>
                 <tr>
                   <th>品項</th>
-                  <th>類別</th>
+                  <th>點交方式</th>
                   <th className="r">可借 / 總數</th>
                 </tr>
               </thead>
@@ -115,9 +115,12 @@ export default function EquipmentPage() {
                           </button>
                         )}
                       </td>
-                      <td style={{ color: 'var(--steel)', fontSize: 13 }}>
-                        {e.category}
-                        {e.needsSerial && ' · 序號點交'}
+                      <td style={{ fontSize: 13 }}>
+                        {e.needsSerial ? (
+                          <span style={{ color: 'var(--seal)' }}>依序點交</span>
+                        ) : (
+                          <span style={{ color: 'var(--steel)' }}>一般</span>
+                        )}
                       </td>
                       <td className="r num">
                         {a ?? '—'} / {e.totalQty}

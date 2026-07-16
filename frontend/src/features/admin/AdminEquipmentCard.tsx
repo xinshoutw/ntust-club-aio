@@ -3,14 +3,13 @@ import { App, Button, Input, InputNumber, Select, Spin, Switch } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import QueryError from '../../components/ui/QueryError'
 import {
-  EQUIPMENT_CATEGORIES,
+  HANDOVER_OPTIONS,
   useAdminEquipment,
   useEquipmentMutations,
   type EquipmentItem,
 } from '../../api/adminEquipment'
 
 const sectionTitle: React.CSSProperties = { fontSize: 15, fontWeight: 600, marginBottom: 14 }
-const catOptions = EQUIPMENT_CATEGORIES.map((c) => ({ value: c, label: c }))
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 // 每列欄位變更即各自 PATCH(數量/名稱/類別/序號登記/啟用);新增於底部一列
@@ -38,11 +37,11 @@ function EquipmentRow({ item }: { item: EquipmentItem }) {
         aria-label="器材名稱"
       />
       <Select
-        value={item.category}
-        onChange={(v) => patch({ category: v })}
-        options={catOptions}
+        value={item.needsSerial}
+        onChange={(v) => patch({ needsSerial: v })}
+        options={HANDOVER_OPTIONS}
         style={{ width: 110, flexShrink: 0 }}
-        aria-label="類別"
+        aria-label="點交方式"
       />
       <InputNumber
         value={item.totalQty}
@@ -66,7 +65,7 @@ function AddEquipment() {
   const { message } = App.useApp()
   const { create } = useEquipmentMutations()
   const [name, setName] = useState('')
-  const [category, setCategory] = useState<string>(EQUIPMENT_CATEGORIES[0])
+  const [needsSerial, setNeedsSerial] = useState(false)
   const [qty, setQty] = useState<number | null>(null)
 
   const add = () => {
@@ -75,11 +74,12 @@ function AddEquipment() {
       return
     }
     create.mutate(
-      { name: name.trim(), category, totalQty: qty ?? 0, needsSerial: false },
+      { name: name.trim(), totalQty: qty ?? 0, needsSerial },
       {
         onSuccess: () => {
           message.success('已新增器材')
           setName('')
+          setNeedsSerial(false)
           setQty(null)
         },
         onError: (e) => message.error(errMsg(e)),
@@ -95,7 +95,7 @@ function AddEquipment() {
         placeholder="新增器材名稱"
         style={{ flex: 1, minWidth: 120 }}
       />
-      <Select value={category} onChange={setCategory} options={catOptions} style={{ width: 110, flexShrink: 0 }} />
+      <Select value={needsSerial} onChange={setNeedsSerial} options={HANDOVER_OPTIONS} style={{ width: 110, flexShrink: 0 }} />
       <InputNumber value={qty} min={0} precision={0} placeholder="總數" style={{ width: 90, flexShrink: 0 }} onChange={setQty} />
       <Button icon={<PlusOutlined />} loading={create.isPending} onClick={add} style={{ flexShrink: 0 }}>
         新增
@@ -111,9 +111,6 @@ export default function AdminEquipmentCard() {
   return (
     <div className="card" style={{ marginTop: 16, padding: 24 }}>
       <div style={sectionTitle}>器材主檔</div>
-      <div style={{ fontSize: 12, color: 'var(--steel)', marginBottom: 12 }}>
-        設定各器材的總數;停用的器材不再開放借用,但保留既有借用紀錄。
-      </div>
       {query.isError ? (
         <QueryError title="器材主檔載入失敗" error={query.error} onRetry={() => void query.refetch()} />
       ) : (

@@ -5,16 +5,14 @@ import { api } from './client'
 export interface EquipmentItem {
   id: number
   name: string
-  category: string
   totalQty: number
-  needsSerial: boolean
+  needsSerial: boolean // False=一般、True=依序點交
   isActive: boolean
 }
 
 interface EquipmentOut {
   id: number
   name: string
-  category: string
   total_qty: number
   needs_serial: boolean
   is_active: boolean
@@ -23,13 +21,16 @@ interface EquipmentOut {
 const toItem = (o: EquipmentOut): EquipmentItem => ({
   id: o.id,
   name: o.name,
-  category: o.category,
   totalQty: o.total_qty,
   needsSerial: o.needs_serial,
   isActive: o.is_active,
 })
 
-export const EQUIPMENT_CATEGORIES = ['一般', '電子設備', '投影布幕', '帳篷'] as const
+// 點交方式(取代原「類別」;2026-07-17):一般 / 依序點交(needs_serial)
+export const HANDOVER_OPTIONS = [
+  { value: false, label: '一般' },
+  { value: true, label: '依序點交' },
+]
 
 const keys = { all: ['adminEquipment'] as const }
 
@@ -42,7 +43,6 @@ export function useAdminEquipment() {
 
 export interface EquipmentInput {
   name: string
-  category: string
   totalQty: number
   needsSerial: boolean
 }
@@ -57,7 +57,6 @@ export function useEquipmentMutations() {
         method: 'POST',
         body: JSON.stringify({
           name: b.name,
-          category: b.category,
           total_qty: b.totalQty,
           needs_serial: b.needsSerial,
         }),
@@ -71,7 +70,6 @@ export function useEquipmentMutations() {
         method: 'PATCH',
         body: JSON.stringify({
           ...(patch.name != null ? { name: patch.name } : {}),
-          ...(patch.category != null ? { category: patch.category } : {}),
           ...(patch.totalQty != null ? { total_qty: patch.totalQty } : {}),
           ...(patch.needsSerial != null ? { needs_serial: patch.needsSerial } : {}),
           ...(patch.isActive != null ? { is_active: patch.isActive } : {}),

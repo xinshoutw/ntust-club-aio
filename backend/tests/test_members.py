@@ -233,7 +233,9 @@ async def test_list_semesters_distinct_desc(client, db):
     club = await setup_club_session(client, db)
     db.add_all(
         [
-            ClubMember(club_id=club.id, name=f"社員{i}", student_id=f"B1110900{i}", kind="社員", semester=s)
+            ClubMember(
+                club_id=club.id, name=f"社員{i}", student_id=f"B1110900{i}", kind="社員", semester=s
+            )
             for i, s in enumerate(["114-1", "114-2", "114-1", "113-2"])
         ]
     )

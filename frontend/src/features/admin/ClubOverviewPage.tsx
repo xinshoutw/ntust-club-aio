@@ -100,6 +100,7 @@ export default function ClubOverviewPage() {
           {tracked.map((t) => (
             <div
               key={t.id}
+              className="click-tint"
               style={rowStyle}
               {...clickableRow(() =>
                 openDetail({
@@ -133,6 +134,7 @@ export default function ClubOverviewPage() {
           {rooms.map((r) => (
             <div
               key={r.id}
+              className="click-tint"
               style={rowStyle}
               {...clickableRow(() =>
                 openDetail({
@@ -156,6 +158,7 @@ export default function ClubOverviewPage() {
           {venues.map((v) => (
             <div
               key={v.id}
+              className="click-tint"
               style={rowStyle}
               {...clickableRow(() =>
                 openDetail({
@@ -179,6 +182,7 @@ export default function ClubOverviewPage() {
           {loans.map((l) => (
             <div
               key={l.id}
+              className="click-tint"
               style={rowStyle}
               {...clickableRow(() =>
                 openDetail({

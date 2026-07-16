@@ -349,6 +349,7 @@ export default function ReviewPage() {
         {queue.map((item) => (
           <div
             key={item.id}
+            className="click-tint"
             role="button"
             tabIndex={0}
             onClick={() => openItem(item)}

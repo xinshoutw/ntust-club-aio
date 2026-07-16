@@ -68,7 +68,7 @@ export default function EvalDocsPage() {
         {scores.map((s) => (
           <div
             key={s.key}
-            className="card"
+            className="card click-tint"
             role="button"
             tabIndex={0}
             onClick={() => go(AD_ROUTES[s.key])}
@@ -110,7 +110,7 @@ export default function EvalDocsPage() {
           return (
             <div
               key={award.key}
-              className="card"
+              className="card click-tint"
               role="button"
               tabIndex={0}
               onClick={() => navigate(`/eval/award/${award.key}`)}

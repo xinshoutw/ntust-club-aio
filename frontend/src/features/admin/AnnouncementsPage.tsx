@@ -95,6 +95,7 @@ export default function AnnouncementsPage() {
         {ANNOUNCEMENTS.map((a) => (
           <div
             key={a.id}
+            className="click-tint"
             role="button"
             tabIndex={0}
             onClick={() => view(a)}

@@ -117,6 +117,14 @@ body {
   outline-offset: 1px;
 }
 
+/* 可點擊卡片/列 hover 一律變色(全站一致);!important 蓋過各列 inline background */
+.click-tint {
+  transition: background-color 0.12s;
+}
+.click-tint:hover {
+  background-color: var(--seal-tint) !important;
+}
+
 /* 已修改未儲存的欄位:橘黃色外框(box-shadow 避免與 AntD 邊框樣式打架) */
 .field-dirty :is(.ant-input-outlined, .ant-input-affix-wrapper-outlined) {
   border-color: #d48806;

@@ -90,7 +90,7 @@ export default function ActivityClosePage() {
           {closable.map((a) => (
             <div
               key={a.id}
-              className="card"
+              className="card click-tint"
               role="button"
               tabIndex={0}
               onClick={() => setParams({ id: a.id }, { replace: true })}

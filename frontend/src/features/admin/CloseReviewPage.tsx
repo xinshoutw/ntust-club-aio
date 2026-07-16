@@ -282,6 +282,7 @@ export default function CloseReviewPage() {
           .map((p) => (
             <div
               key={p.id}
+              className="click-tint"
               role="button"
               tabIndex={0}
               onClick={() => openItem(p)}

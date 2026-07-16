@@ -44,7 +44,7 @@ export default function SignupListPage() {
           return (
             <div
               key={item.id}
-              className="card signup-card"
+              className={clickable ? 'card signup-card click-tint' : 'card signup-card'}
               role="button"
               tabIndex={clickable ? 0 : -1}
               aria-disabled={!clickable}

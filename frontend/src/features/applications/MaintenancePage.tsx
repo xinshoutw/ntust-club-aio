@@ -71,7 +71,7 @@ export default function MaintenancePage() {
               }}
               error={filesError}
               accept={`${IMAGE_ACCEPT},video/*`}
-              hint="拖放或點擊選擇(照片 ≤10MB、短片 ≤200MB)"
+              hint="拖放圖片或影片檔案"
               validate={validateEvidence}
               maxTotalBytes={MAX_VIDEO_BYTES}
               maxCount={5}

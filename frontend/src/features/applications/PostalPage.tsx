@@ -123,7 +123,7 @@ export default function PostalPage() {
               }}
               error={filesError}
               accept={`.pdf,${IMAGE_ACCEPT}`}
-              hint="拖放或點擊選擇(PDF 或影像)"
+              hint="拖放 PDF 或圖片檔案"
               validate={async (f) => ((await isPdfFile(f)) || (await isImageFile(f)) ? null : '不是有效的 PDF 或影像檔')}
               maxTotalBytes={50 * 1024 * 1024}
               maxCount={1}

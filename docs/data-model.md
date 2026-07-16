@@ -408,6 +408,16 @@ approved 且 活動結束日(end_date)+1個月 已過 且未送結案 → 「逾
 - system_settings 新 key:`equipment_workday_buffer`({before,after},預設 2/1)、`fixed_booking_window`
 - violations 逾期判定同時存在 Python(violation_service)與 SQL(make_interval)兩處實作,邊界=期限當天仍可銷案(已以測試釘住);規則變動需同步兩處
 
+### 3.y 第八輪後端同步補記(2026-07-16)
+
+- **announcements**:`attrs text[]`(性質多選)、`club_id FK`(單一社團)、`takeover_until date NULL`(蓋板截止;期限內社團每次登入全版顯示,顯示邏輯在前端)、`notify bool`;`target_value` 已移除(migration 轉換);content 存 markdown 原文
+- **clubs.contact_emails text[]**:聯絡 Email 至多 3 組、第 1 組必填;公告通知寄送對象(Email 全寄+社團自設 Discord webhook 一併推)
+- **signup_items**:`event_at`/`signup_start`(建立預設現在)/`signup_end` 皆 timestamptz;`max_participants NOT NULL CHECK >=1`;`requires_confirmation`(審核制:報名 confirmed=False,管理員確認後才成立;未確認不可登錄簽到);移除 `deadline/event_date/time_text/audience/allow_multiple`;fields JSONB 保序=顯示順序
+- **audit_logs.user_id FK → ON DELETE SET NULL**:刪除帳號稽核保留;有業務 FK 歷史的帳號刪除回 409(導向停權)
+- **system_settings**:`fixed_booking_window={open_from,open_until}`(日期區間,舊 open_months/manual_open 移除;未設定=不開放);`upload_limits={doc,img,zip,video}`;`activity_attachment_total_mb`(預設 50,活動申請附件加總上限);「線上報名時間窗」不再存在(各報名活動自訂起訖)
+- **權限鍵別名**:前端 `areview/asignup` 與後端既有 `aact/areg` 任一即通過(`require_permission(*keys)`);`abooking/aroom/amember` 的管理端 router 尚未實作,屆時統一命名
+- 已知隱患:`signup_items.year` 取 `current_year`(114)與 `eval_window.year`(116)不對齊,幹訓/會議餵 ad7/ad8 前需確認
+
 ## 4. 學年與學期規則(已確認)
 
 - **上學期 = 8–1 月、下學期 = 2–7 月**(原型 `semesterOf` 寫反了,以本規則為準)

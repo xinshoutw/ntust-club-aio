@@ -201,6 +201,18 @@ async def test_session_sliding_renewal(client, db):
     assert any(c.startswith("csrf_token=") and "Max-Age=604800" in c for c in cookies)
 
 
+async def test_validation_error_does_not_echo_input(client, db):
+    """422 detail 不回傳 input/url:巨型或敏感輸入不得在錯誤回應中二次外洩。"""
+    resp = await client.post(
+        "/api/v1/auth/login", json={"username": "x" * 500, "password": 12345}
+    )
+    assert resp.status_code == 422
+    body = resp.text
+    assert "x" * 500 not in body
+    for err in resp.json()["meta"]["detail"]:
+        assert "input" not in err and "url" not in err
+
+
 async def test_expired_session_rejected(client, db):
     await make_user(db, username="club01")
     await login(client, "club01")

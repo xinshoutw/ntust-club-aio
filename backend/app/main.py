@@ -90,9 +90,11 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException) 
 async def validation_exception_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
-    return _envelope(
-        422, "輸入驗證失敗", {"code": "VALIDATION", "detail": jsonable_encoder(exc.errors())}
-    )
+    # 不回傳 input/url:巨型或敏感輸入不得在錯誤回應中二次外洩(defense in depth)
+    detail = [
+        {k: v for k, v in err.items() if k not in {"input", "url"}} for err in exc.errors()
+    ]
+    return _envelope(422, "輸入驗證失敗", {"code": "VALIDATION", "detail": jsonable_encoder(detail)})
 
 
 @app.exception_handler(IntegrityError)

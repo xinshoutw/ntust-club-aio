@@ -4,7 +4,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import AttachmentArea, { type BagFile } from '../../components/ui/AttachmentArea'
 import StatusPill from '../../components/ui/StatusPill'
 import { IMAGE_ACCEPT, isImageFile, isVideoFile } from '../../lib/uploads'
-import type { StatusKey } from '../../lib/status'
+import { MAINTENANCE_RECORDS } from './mock'
 
 // 影片 200MB / 圖片 10MB(architecture.md);魔術位元組驗證,加總上限取單檔最大值
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024
@@ -15,20 +15,6 @@ async function validateEvidence(f: File): Promise<string | null> {
   if (await isVideoFile(f)) return f.size <= MAX_VIDEO_BYTES ? null : '影片超過 200 MB 上限'
   return '不是有效的照片或影片檔'
 }
-
-interface MaintenanceRecord {
-  id: string
-  location: string
-  items: string
-  date: string
-  status: StatusKey
-  handleNote?: string
-}
-
-const RECORDS: MaintenanceRecord[] = [
-  { id: 'MNT-114-0023', location: '社團大樓 3F S304 音樂教室', items: '天花板漏水、燈管不亮', date: '2026/06/16', status: 'in_progress', handleNote: '已報修總務處,預計本週處理' },
-  { id: 'MNT-114-0019', location: '社辦 S312', items: '門鎖損壞', date: '2026/05/02', status: 'done', handleNote: '已更換鎖芯' },
-]
 
 export default function MaintenancePage() {
   const { message } = App.useApp()
@@ -86,7 +72,7 @@ export default function MaintenancePage() {
         <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近報修</div>
         <table className="tb" style={{ minWidth: 620 }}>
           <tbody>
-            {RECORDS.slice(0, 5).map((r) => (
+            {MAINTENANCE_RECORDS.slice(0, 5).map((r) => (
               <tr key={r.id}>
                 <td>
                   <div style={{ fontWeight: 500 }}>{r.location}</div>

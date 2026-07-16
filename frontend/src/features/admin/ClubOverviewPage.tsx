@@ -3,20 +3,89 @@ import { Modal } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import type { StatusKey } from '../../lib/status'
-import { TRACKED } from '../activities/mock'
+import { CLUB_ACTIVITIES, TRACKED, type TrackedApplication } from '../activities/mock'
+import { budgetTotals, type Activity } from '../activities/types'
+import { CERTIFICATE_RECORDS, MAINTENANCE_RECORDS } from '../applications/mock'
 import { EQUIPMENT_LOANS, ROOM_REQUESTS, VENUE_BOOKINGS, roomEntryText } from '../bookings/mock'
 import { CLUB_PROFILE } from '../club-settings/mock'
+import ActivityReviewModal from './ActivityReviewModal'
+import BookingReviewModal, { type BookingReviewItem } from './BookingReviewModal'
 import ClubSelect from './ClubSelect'
 import { CLUBS_MASTER } from './clubsMock'
 import { useAdminClub } from './clubContext'
+import { REVIEW_ITEMS, type ReviewItem } from './reviewMock'
 
 const label: React.CSSProperties = { color: 'var(--steel)' }
 
-// 點擊任一項目開啟的唯讀詳情
+// 線上申請(空間報修/幹部證明)無專屬審核彈窗,以唯讀詳情呈現
 interface Detail {
   title: string
   status: StatusKey
   rows: [string, React.ReactNode][]
+}
+
+// 審核 mock 未涵蓋的活動:以社團端活動資料組出唯讀審核檢視(狀態沿用追蹤列)
+function activityReviewView(a: Activity, status: StatusKey): ReviewItem {
+  return {
+    id: a.id,
+    club: a.club,
+    name: a.name,
+    type: a.type,
+    isLarge: a.isLarge,
+    largeApproved: a.largeApproved,
+    date: a.date,
+    requested: budgetTotals(a.budget).requested,
+    status,
+    detail: {
+      timeRange: a.timeRange ? `${a.date}${a.endDate ? ` – ${a.endDate}` : ''} ${a.timeRange}` : undefined,
+      location: a.location,
+      participantsIn: a.participantsIn,
+      participantsOut: a.participantsOut,
+      submittedAt: a.submittedAt,
+      submittedBy: a.submittedBy,
+      attachments: (a.attachments ?? []).map((f) => f.name),
+      // mock 無核定金額紀錄,核定欄以擬請值示意
+      budget: a.budget.map((b) => ({
+        id: b.id,
+        category: b.category,
+        description: b.description,
+        selfFund: b.selfFund,
+        requested: b.requestedSubsidy,
+        approved: b.approvedSubsidy ?? b.requestedSubsidy,
+      })),
+    },
+  }
+}
+
+function onlineDetail(t: TrackedApplication): Detail {
+  const mnt = MAINTENANCE_RECORDS.find((m) => m.id === t.id)
+  if (mnt) {
+    return {
+      title: t.name,
+      status: mnt.status,
+      rows: [
+        ['類別', '空間報修'],
+        ['地點', mnt.location],
+        ['報修項目', mnt.items],
+        ['申請日', <span className="num" key="d">{mnt.date}</span>],
+        ...(mnt.handleNote ? ([['處理備註', mnt.handleNote]] as [string, React.ReactNode][]) : []),
+      ],
+    }
+  }
+  const cert = CERTIFICATE_RECORDS.find((c) => c.id === t.id)
+  if (cert) {
+    return {
+      title: t.name,
+      status: cert.status,
+      rows: [
+        ['類別', '幹部證明'],
+        ['申請對象', cert.holder],
+        ['學年期', cert.term],
+        ['申請日', <span className="num" key="d">{cert.date}</span>],
+      ],
+    }
+  }
+  return { title: t.name, status: t.status, rows: [['類別', t.category]] }
 }
 
 function clickableRow(onClick: () => void): React.HTMLAttributes<HTMLDivElement> {
@@ -33,17 +102,48 @@ function clickableRow(onClick: () => void): React.HTMLAttributes<HTMLDivElement>
   }
 }
 
-// 行政端社團總覽:比照社團端總覽,唯讀檢視所選社團的申請進度與借用中項目;
-// 所有項目皆可點擊開啟詳情彈窗
+// 行政端社團總覽:比照社團端總覽,檢視所選社團的申請進度與借用中項目;
+// 點擊項目開與各專屬審核介面相同的彈窗(待審核者可直接核准/退回,其餘唯讀)
 export default function ClubOverviewPage() {
   const { club } = useAdminClub()
   const master = CLUBS_MASTER.find((c) => c.name === club)
+  const [review, setReview] = useState<ReviewItem | null>(null)
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const [booking, setBooking] = useState<BookingReviewItem | null>(null)
+  const [bookingOpen, setBookingOpen] = useState(false)
   const [detail, setDetail] = useState<Detail | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
 
+  const openReview = (item: ReviewItem) => {
+    setReview(item)
+    setReviewOpen(true)
+  }
+  const openBooking = (item: BookingReviewItem) => {
+    setBooking(item)
+    setBookingOpen(true)
+  }
   const openDetail = (d: Detail) => {
     setDetail(d)
     setDetailOpen(true)
+  }
+
+  const openTracked = (t: TrackedApplication) => {
+    // 借用類:同 id 對照借用 mock,開借用審核彈窗
+    if (t.category === '借用') {
+      const room = ROOM_REQUESTS.find((r) => r.id === t.id)
+      if (room) return openBooking({ kind: 'room', data: room })
+      const venue = VENUE_BOOKINGS.find((v) => v.id === t.id)
+      if (venue) return openBooking({ kind: 'venue', data: venue })
+      const loan = EQUIPMENT_LOANS.find((l) => l.id === t.id)
+      if (loan) return openBooking({ kind: 'loan', data: loan })
+    }
+    if (t.category === '線上申請') return openDetail(onlineDetail(t))
+    // 活動:以名稱+社團對照審核 mock;未涵蓋者以社團端活動資料組出唯讀檢視
+    const found = REVIEW_ITEMS.find((r) => r.name === t.name && r.club === club)
+    if (found) return openReview(found)
+    const activity = CLUB_ACTIVITIES.find((a) => a.name === t.name && a.club === club)
+    if (activity) return openReview(activityReviewView(activity, t.status))
+    openReview({ id: t.id, club, name: t.name, type: '活動', date: '—', requested: 0, status: t.status })
   }
 
   // mock 僅資工系學會有完整平時資料;其餘社團顯示空狀態
@@ -98,18 +198,7 @@ export default function ClubOverviewPage() {
             </span>
           </div>
           {tracked.map((t) => (
-            <div
-              key={t.id}
-              className="click-tint"
-              style={rowStyle}
-              {...clickableRow(() =>
-                openDetail({
-                  title: t.name,
-                  status: t.status,
-                  rows: [['類別', t.category]],
-                }),
-              )}
-            >
+            <div key={t.id} className="click-tint" style={rowStyle} {...clickableRow(() => openTracked(t))}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14 }}>{t.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--steel)' }}>{t.category}</div>
@@ -136,17 +225,7 @@ export default function ClubOverviewPage() {
               key={r.id}
               className="click-tint"
               style={rowStyle}
-              {...clickableRow(() =>
-                openDetail({
-                  title: r.room,
-                  status: r.status,
-                  rows: [
-                    ['類別', '固定場地借用'],
-                    ['每週時段', r.entries.map(roomEntryText).join('、')],
-                    ['用途', r.note || '—'],
-                  ],
-                }),
-              )}
+              {...clickableRow(() => openBooking({ kind: 'room', data: r }))}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14 }}>{r.room}</div>
@@ -160,17 +239,7 @@ export default function ClubOverviewPage() {
               key={v.id}
               className="click-tint"
               style={rowStyle}
-              {...clickableRow(() =>
-                openDetail({
-                  title: v.venue,
-                  status: v.status,
-                  rows: [
-                    ['類別', '臨時場地借用'],
-                    ['日期時段', <span className="num" key="d">{v.date} 第 {v.periods.join('、')} 節</span>],
-                    ['用途', v.purpose || '—'],
-                  ],
-                }),
-              )}
+              {...clickableRow(() => openBooking({ kind: 'venue', data: v }))}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14 }}>{v.venue}</div>
@@ -184,20 +253,7 @@ export default function ClubOverviewPage() {
               key={l.id}
               className="click-tint"
               style={rowStyle}
-              {...clickableRow(() =>
-                openDetail({
-                  title: `${l.equipment} ×${l.qty}`,
-                  status: l.status,
-                  rows: [
-                    ['類別', '器材借用'],
-                    ['借用區間', <span className="num" key="d">{l.startDate} – {l.endDate}</span>],
-                    ...(l.activity ? ([['關聯活動', l.activity]] as [string, React.ReactNode][]) : []),
-                    ['用途', l.purpose || '—'],
-                    ...(l.borrower ? ([['借用人', l.borrower]] as [string, React.ReactNode][]) : []),
-                    ...(l.returnedBy ? ([['歸還人', l.returnedBy]] as [string, React.ReactNode][]) : []),
-                  ],
-                }),
-              )}
+              {...clickableRow(() => openBooking({ kind: 'loan', data: l }))}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14 }}>{l.equipment} <span className="num">×{l.qty}</span></div>
@@ -214,7 +270,29 @@ export default function ClubOverviewPage() {
         </div>
       </div>
 
-      {/* 項目詳情(唯讀);常駐至關閉動畫結束 */}
+      {/* 活動申請審核彈窗(與申請審核頁同版面);常駐待關閉動畫結束(afterClose)才卸載 */}
+      {review && (
+        <ActivityReviewModal
+          key={review.id}
+          item={review}
+          open={reviewOpen}
+          onClose={() => setReviewOpen(false)}
+          afterClose={() => setReview(null)}
+        />
+      )}
+
+      {/* 借用審核彈窗(與臨時場地器材審核頁同版面):審核中可核准/退回,其餘唯讀 */}
+      {booking && (
+        <BookingReviewModal
+          key={booking.data.id}
+          item={booking}
+          open={bookingOpen}
+          onClose={() => setBookingOpen(false)}
+          afterClose={() => setBooking(null)}
+        />
+      )}
+
+      {/* 線上申請詳情(唯讀);常駐至關閉動畫結束 */}
       <Modal
         open={detailOpen}
         onCancel={() => setDetailOpen(false)}

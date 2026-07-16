@@ -10,13 +10,14 @@ export interface ReviewItem {
   date: string
   requested: number
   status: StatusKey
+  // 行政端社團總覽會以社團端活動 mock 組出唯讀檢視,部分欄位可能缺漏(彈窗以 — 呈現)
   detail?: {
-    timeRange: string
-    location: string
-    participantsIn: number
-    participantsOut: number
-    submittedAt: string
-    submittedBy: string
+    timeRange?: string
+    location?: string
+    participantsIn?: number
+    participantsOut?: number
+    submittedAt?: string
+    submittedBy?: string
     attachments: string[]
     budget: { id: number; category: string; description: string; selfFund: number; requested: number; approved: number }[]
   }

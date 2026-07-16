@@ -4,6 +4,7 @@ import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
 import { kindLabel, type MemberKind } from '../../lib/roles'
 import { MEMBERS } from '../members/mock'
+import { CERTIFICATE_RECORDS } from './mock'
 
 const TERMS = [
   { value: '114', label: '114 學年度' },
@@ -88,12 +89,14 @@ export default function CertificatePage() {
         <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
         <table className="tb" style={{ minWidth: 480 }}>
           <tbody>
-            <tr>
-              <td style={{ fontWeight: 500 }}>顏志明 (會長)</td>
-              <td style={{ color: 'var(--steel)', fontSize: 13 }}>114學年度第2學期</td>
-              <td className="num" style={{ fontSize: 13, width: 110 }}>2026/06/10</td>
-              <td style={{ width: 100 }}><StatusPill status="pending" /></td>
-            </tr>
+            {CERTIFICATE_RECORDS.map((c) => (
+              <tr key={c.id}>
+                <td style={{ fontWeight: 500 }}>{c.holder}</td>
+                <td style={{ color: 'var(--steel)', fontSize: 13 }}>{c.term}</td>
+                <td className="num" style={{ fontSize: 13, width: 110 }}>{c.date}</td>
+                <td style={{ width: 100 }}><StatusPill status={c.status} /></td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>

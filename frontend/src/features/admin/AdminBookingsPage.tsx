@@ -1,154 +1,31 @@
 import { useState } from 'react'
 import dayjs, { type Dayjs } from 'dayjs'
-import { App, Button, DatePicker, Input, Modal, Tooltip } from 'antd'
+import { Button, DatePicker, Tooltip } from 'antd'
 import { LeftOutlined, RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
+import BookingReviewModal, { type BookingReviewItem } from './BookingReviewModal'
 import {
   CELL,
   EQUIPMENT_LOANS,
   PERIODS,
   VENUES,
   VENUE_BOOKINGS,
-  availableInWindow,
   cellInfo,
   type CellState,
-  type EquipmentLoan,
-  type VenueBooking,
 } from '../bookings/mock'
 
-type Pending = { kind: 'venue'; data: VenueBooking } | { kind: 'loan'; data: EquipmentLoan }
-
-const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 const GRID_LEGEND: CellState[] = ['free', 'reviewing', 'temp', 'fixed']
 const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
 
-// 臨時場地/器材借用審核彈窗:核准或退回(退回原因必填)
-function BookingReviewModal({
-  item,
-  open,
-  onClose,
-  afterClose,
-}: {
-  item: Pending
-  open: boolean
-  onClose: () => void
-  afterClose: () => void
-}) {
-  const { message } = App.useApp()
-  const [rejectOpen, setRejectOpen] = useState(false)
-  const [reason, setReason] = useState('')
-  const title = item.kind === 'venue' ? item.data.venue : `${item.data.equipment} ×${item.data.qty}`
-
-  const closeReject = () => {
-    setRejectOpen(false)
-    setReason('')
-  }
-
-  const submitReject = () => {
-    if (!reason.trim()) {
-      message.error('退回原因為必填')
-      return
-    }
-    message.success('已退回借用申請')
-    closeReject()
-    onClose()
-  }
-
-  return (
-    <Modal
-      open={open}
-      onCancel={onClose}
-      afterClose={afterClose}
-      width={520}
-      title={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 26 }}>
-          <span style={{ fontSize: 16, fontWeight: 600 }}>{title}</span>
-          <StatusPill status="pending" />
-        </div>
-      }
-      footer={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <Button danger style={{ height: 38 }} onClick={() => setRejectOpen(true)}>退回</Button>
-          <Button
-            type="primary"
-            style={{ height: 38 }}
-            onClick={() => {
-              message.success('已核准借用申請')
-              onClose()
-            }}
-          >
-            核准
-          </Button>
-        </div>
-      }
-    >
-      <div style={{ display: 'grid', gridTemplateColumns: '88px 1fr', gap: '9px 12px', fontSize: 13, marginTop: 4 }}>
-        <div style={detailLabel}>社團</div><div>{item.data.club}</div>
-        {item.kind === 'venue' ? (
-          <>
-            <div style={detailLabel}>場地</div><div>{item.data.venue}</div>
-            <div style={detailLabel}>日期時段</div>
-            <div className="num">{item.data.date} 第 {item.data.periods.join('、')} 節</div>
-          </>
-        ) : (
-          <>
-            <div style={detailLabel}>器材</div><div>{item.data.equipment} <span className="num">×{item.data.qty}</span></div>
-            <div style={detailLabel}>借用區間</div><div className="num">{item.data.startDate} – {item.data.endDate}</div>
-            {item.data.activity && (
-              <>
-                <div style={detailLabel}>綁定活動</div><div>{item.data.activity}</div>
-              </>
-            )}
-          </>
-        )}
-        <div style={detailLabel}>用途</div><div>{item.data.purpose || '—'}</div>
-      </div>
-
-      {/* 器材可借數檢核:以本單借用區間推導可借數(排除本單自身),不足時提醒 */}
-      {item.kind === 'loan' &&
-        (() => {
-          const free = availableInWindow(item.data.equipment, item.data.startDate, item.data.endDate, item.data.id)
-          if (item.data.qty <= free) return null
-          return (
-            <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--paper)', borderRadius: 6, fontSize: 13, color: '#B03A2E' }}>
-              可借數不足：該區間「{item.data.equipment}」可借 <span className="num">{free}</span>，本單申請{' '}
-              <span className="num">{item.data.qty}</span>；核准前請確認歸還排程
-            </div>
-          )
-        })()}
-
-      <Modal
-        open={rejectOpen}
-        title="退回借用申請"
-        okText="確認退回"
-        destroyOnHidden
-        okButtonProps={{ danger: true }}
-        cancelText="取消"
-        onOk={submitReject}
-        onCancel={closeReject}
-      >
-        <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 8 }}>退回原因(必填,通知社團)</div>
-        <Input.TextArea
-          autoFocus
-          rows={3}
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder="例:所選時段已有其他社團借用"
-        />
-      </Modal>
-    </Modal>
-  )
-}
-
 export default function AdminBookingsPage() {
-  const [selected, setSelected] = useState<Pending | null>(null)
+  const [selected, setSelected] = useState<BookingReviewItem | null>(null)
   const [open, setOpen] = useState(false)
   const [gridDate, setGridDate] = useState<Dayjs>(() => dayjs())
   const pendingVenues = VENUE_BOOKINGS.filter((v) => v.status === 'pending')
   const pendingLoans = EQUIPMENT_LOANS.filter((l) => l.status === 'pending')
 
-  const openReview = (item: Pending) => {
+  const openReview = (item: BookingReviewItem) => {
     setSelected(item)
     setOpen(true)
   }

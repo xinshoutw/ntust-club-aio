@@ -113,6 +113,8 @@ class SettingsUpdateIn(BaseModel):
     close_lock_months: int | None = Field(None, ge=1, le=6)
     upload_limits: UploadLimitsIn | None = None
     activity_attachment_total_mb: int | None = Field(None, ge=1, le=1024)
+    maintenance_total_mb: int | None = Field(None, ge=1, le=1024)
+    close_photo_total_mb: int | None = Field(None, ge=1, le=1024)
     storage_limits: StorageLimitsIn | None = None
     eval_window: EvalWindowIn | None = None
     violation_items: list[str] | None = Field(None, max_length=50)

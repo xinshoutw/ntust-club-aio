@@ -183,7 +183,7 @@ async def availability_grids(
 
     - 只回傳被佔用/審核中的格子;其餘由前端依 venue 開放旗標補 available/closed
     - 固定借用為每週固定時段(weekday 對應);已核准標 fixed/mine,審核中標 pending(2026-07-17 起顯示)
-    - 審核中(含本社)一律標 pending;本社**已核准**才標 mine(2026-07-17 修正:自己審核中不再誤標我的借用)
+    - 審核中(含本社)一律標 pending;本社已核准才標 mine(2026-07-17 修正:自己審核中不再誤標我的借用)
     - 區間一次撈(單一場地 15 天檢視原逐日 15 請求,2026-07-17 改批次)
     """
     grids: dict[date, dict[int, dict[str, dict]]] = {

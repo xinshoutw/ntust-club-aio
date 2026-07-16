@@ -30,7 +30,10 @@ async def test_get_defaults(client, db):
     assert data["equipment_workday_buffer"] == {"before": 2, "after": 1}
     assert data["close_lock_months"] == 1
     assert data["upload_limits"] == {"doc": 50, "img": 10, "zip": 100, "video": 200}
-    assert data["activity_attachment_total_mb"] == 50
+    # 各申請性質的加總上限(2026-07-17 改依性質給總量)
+    assert data["activity_attachment_total_mb"] == 15
+    assert data["maintenance_total_mb"] == 100
+    assert data["close_photo_total_mb"] == 10
     assert data["storage_limits"] == {"capacity_gib": 40, "per_club_gib": 2, "reserve_gib": 10}
     assert data["eval_window"]["year"] == 116
     assert "其他" in data["violation_items"]

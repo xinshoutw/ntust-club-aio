@@ -38,10 +38,13 @@ DEFAULTS: dict[str, Any] = {
     # 教室固定借用開放窗:日期區間(2026-07-16 第八輪,取代開放月份+手動加開);
     # 未設定即不開放,由管理員於系統設定調整
     "fixed_booking_window": {"open_from": None, "open_until": None},
-    # 上傳上限(MB;architecture.md §3.5 預設值,管理員後台可調)
+    # 單檔上限(MB;magic-byte 型別驗證用的上界,architecture.md §3.5;管理員後台可調)
     "upload_limits": {"doc": 50, "img": 10, "zip": 100, "video": 200},
-    # 活動申請附件加總上限(MB;2026-07-16 第八輪)
-    "activity_attachment_total_mb": 50,
+    # 各申請性質的「附件加總上限」(MB;2026-07-17 改依申請性質給總量,取代單看檔案類型):
+    # 活動申請附件 15、空間報修佐證 100(含影片)、活動結案照片 10
+    "activity_attachment_total_mb": 15,
+    "maintenance_total_mb": 100,
+    "close_photo_total_mb": 10,
     # 儲存容量/配額(GiB;2026-07-17 資安審查):capacity=應用程式邏輯可用容量
     # (含 DB 估算大小,與檔案管理頁一致)、per_club=單一社團未歸檔檔案上限、
     # reserve=filesystem 實際保留空間(防 DB/log/temp 佔用)。

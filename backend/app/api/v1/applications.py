@@ -1,12 +1,15 @@
 """社團端:線上申請(幹部證明/郵局帳戶異動/空間報修)+ 違規查詢 + 公告。"""
 
+from pathlib import Path
+
 import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Request, UploadFile
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.api.pagination import Pagination
+from app.core.config import settings
 from app.core.deps import ClubUser, DbDep, client_ip
-from app.core.errors import not_found, validation_error
+from app.core.errors import AppError, not_found, validation_error
 from app.models import (
     Announcement,
     AnnouncementDismissal,
@@ -34,6 +37,7 @@ from app.schemas.applications import (
 from app.schemas.common import ApiResponse
 from app.services import audit, notify, violation_service
 from app.services import files as file_service
+from app.services.settings_service import get_setting
 
 router = APIRouter(prefix="/club", tags=["applications"])
 
@@ -223,15 +227,31 @@ async def upload_evidence(
     row = await db.get(MaintenanceRequest, request_id)
     if row is None or row.club_id != user.club_id:
         raise not_found("找不到報修單")
-    # 每單佐證上限:報修影片最大 200MB,無上限會被灌爆磁碟(2026-07-16 資安審查)
-    existing = await db.scalar(
+    # 鎖報修列:同單並發上傳序列化,加總上限不被雙寫繞過
+    await db.execute(
+        sa.select(MaintenanceRequest.id)
+        .where(MaintenanceRequest.id == row.id)
+        .with_for_update()
+    )
+    existing_count = await db.scalar(
         sa.select(sa.func.count())
         .select_from(File)
         .where(File.subject_type == "maintenance", File.subject_id == row.id)
     )
-    if (existing or 0) >= MAX_EVIDENCE_PER_REQUEST:
+    if (existing_count or 0) >= MAX_EVIDENCE_PER_REQUEST:
         raise validation_error(f"每筆報修至多 {MAX_EVIDENCE_PER_REQUEST} 個佐證檔案")
-    # 佐證接受照片或影片(影片走 200MB 上限)
+
+    # 佐證加總上限(2026-07-17 改依申請性質給總量;預設 100MB 含影片,system_settings 可調)
+    cap_mb = int(await get_setting(db, "maintenance_total_mb"))
+    cap = cap_mb * 1024 * 1024
+    existing_bytes = await file_service.total_uploaded(
+        db, subject_type="maintenance", subject_id=row.id, slot="evidence"
+    )
+    over_cap = AppError(413, "FILE_TOO_LARGE", f"佐證檔加總超過 {cap_mb}MB 上限")
+    if existing_bytes >= cap:
+        raise over_cap
+
+    # 佐證接受照片或影片(單檔仍走各自政策的 magic-byte 與單檔上界)
     ext = (file.filename or "").lower().rsplit(".", 1)
     policy = (
         file_service.VIDEO
@@ -249,6 +269,9 @@ async def upload_evidence(
         subject_id=row.id,
         slot="evidence",
     )
+    if existing_bytes + saved.size > cap:
+        (Path(settings.upload_dir) / saved.path).unlink(missing_ok=True)
+        raise over_cap
     await db.commit()
     return ApiResponse(data=FileOut.model_validate(saved))
 

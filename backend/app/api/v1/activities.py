@@ -269,6 +269,19 @@ async def upload_photo(
     activity = await svc.get_own_activity(db, user, activity_id)
     if activity.status != ActivityStatus.APPROVED:
         raise conflict("僅結案準備中(已核准)的活動可上傳照片")
+    # 鎖活動列:同活動並發上傳序列化,加總上限才不會被雙寫繞過
+    await db.execute(sa.select(Activity.id).where(Activity.id == activity.id).with_for_update())
+
+    # 結案照片加總上限(2026-07-17 改依申請性質給總量;預設 10MB,system_settings 可調)
+    cap_mb = int(await get_setting(db, "close_photo_total_mb"))
+    cap = cap_mb * 1024 * 1024
+    existing = await file_service.total_uploaded(
+        db, subject_type=svc.PHOTO_SUBJECT, subject_id=activity.id, slot=svc.PHOTO_SLOT
+    )
+    over_cap = AppError(413, "FILE_TOO_LARGE", f"照片加總超過 {cap_mb}MB 上限")
+    if existing >= cap:
+        raise over_cap
+
     row = await file_service.save_upload(
         db,
         file,
@@ -281,6 +294,9 @@ async def upload_photo(
         slot=svc.PHOTO_SLOT,
         dedup="slot",  # SHA-256 跨活動拒重複(同 slot=report_photo)
     )
+    if existing + row.size > cap:
+        (Path(settings.upload_dir) / row.path).unlink(missing_ok=True)
+        raise over_cap
     await db.commit()
     return ApiResponse(data=FileOut.model_validate(row))
 
@@ -319,19 +335,11 @@ async def upload_attachment(
         sa.select(Activity.id).where(Activity.id == activity.id).with_for_update()
     )
 
-    # 附件加總上限(2026-07-16 第八輪;預設 50MB,system_settings 可調)
+    # 附件加總上限(2026-07-17 改依申請性質給總量;預設 15MB,system_settings 可調)
     cap_mb = int(await get_setting(db, "activity_attachment_total_mb"))
     cap = cap_mb * 1024 * 1024
-    existing = int(
-        await db.scalar(
-            sa.select(sa.func.coalesce(sa.func.sum(File.size), 0)).where(
-                File.subject_type == svc.PHOTO_SUBJECT,
-                File.subject_id == activity.id,
-                File.slot == svc.ATTACHMENT_SLOT,
-                File.archived_at.is_(None),
-            )
-        )
-        or 0
+    existing = await file_service.total_uploaded(
+        db, subject_type=svc.PHOTO_SUBJECT, subject_id=activity.id, slot=svc.ATTACHMENT_SLOT
     )
     over_cap = AppError(413, "FILE_TOO_LARGE", f"附件加總超過 {cap_mb}MB 上限")
     if existing >= cap:

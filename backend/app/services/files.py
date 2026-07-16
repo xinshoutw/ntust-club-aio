@@ -314,6 +314,23 @@ async def save_upload(
     return row
 
 
+async def total_uploaded(
+    db: AsyncSession, *, subject_type: str, subject_id: int, slot: str
+) -> int:
+    """某單據某 slot 的未歸檔檔案加總大小(bytes);供各申請性質的加總上限檢核。"""
+    return int(
+        await db.scalar(
+            sa.select(sa.func.coalesce(sa.func.sum(File.size), 0)).where(
+                File.subject_type == subject_type,
+                File.subject_id == subject_id,
+                File.slot == slot,
+                File.archived_at.is_(None),
+            )
+        )
+        or 0
+    )
+
+
 def can_access(file: File, user: User) -> bool:
     """權限邊界:admin 全通;staff 僅職務相關;club 只能取自己社團;viewer 取評鑑上傳(需開權)。"""
     match user.role:

@@ -314,12 +314,26 @@ async def list_announcements(
     )
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = (await db.execute(query.offset(page.offset).limit(page.page_size))).all()
+    read_at = club.announcements_read_at
     data = []
     for ann, dismissed in rows:
         out = AnnouncementOut.model_validate(ann)
         out.dismissed = dismissed
+        out.unread = read_at is None or ann.created_at > read_at
         data.append(out)
     return ApiResponse(data=data, meta=page.meta(total or 0))
+
+
+@router.post("/announcements/read")
+async def mark_announcements_read(user: ClubUser, db: DbDep) -> ApiResponse[None]:
+    """公告全部標為已讀(水位線前移):開啟鈴鐺或進入總覽(公告所在頁)時呼叫。
+
+    以 DB 時鐘(now())為準,與 created_at(server_default now())同源,避免 app/DB 時鐘飄移。
+    """
+    club = await db.get(Club, user.club_id)
+    club.announcements_read_at = await db.scalar(sa.select(sa.func.now()))
+    await db.commit()
+    return ApiResponse(data=None)
 
 
 @router.post("/announcements/{announcement_id}/dismiss")

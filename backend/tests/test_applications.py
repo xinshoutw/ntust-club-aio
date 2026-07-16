@@ -240,6 +240,32 @@ async def test_announcement_dismiss(client, db):
     assert resp.status_code == 404
 
 
+async def test_announcement_read_watermark(client, db):
+    """鈴鐺已讀:初始全未讀;標記後已讀;之後的新公告再度未讀。"""
+    club = await setup_session(client, db)
+    admin = await make_user(db, username="admin01", role="admin")
+    db.add(Announcement(title="舊公告", content="x", target_type="all", created_by=admin.id))
+    await db.commit()
+
+    rows = (await client.get("/api/v1/club/announcements")).json()["data"]
+    assert rows[0]["unread"] is True
+
+    resp = await client.post("/api/v1/club/announcements/read", headers=csrf_headers(client))
+    assert resp.status_code == 200
+    rows = (await client.get("/api/v1/club/announcements")).json()["data"]
+    assert rows[0]["unread"] is False
+
+    # 已讀之後的新公告 → 未讀;舊公告維持已讀
+    db.add(
+        Announcement(
+            title="新公告", content="x", target_type="club", club_id=club.id, created_by=admin.id
+        )
+    )
+    await db.commit()
+    rows = (await client.get("/api/v1/club/announcements")).json()["data"]
+    assert {a["title"]: a["unread"] for a in rows} == {"新公告": True, "舊公告": False}
+
+
 async def test_maintenance_evidence_capped(client, db, monkeypatch):
     """每筆報修佐證檔上限:超過即 422(防大檔灌爆磁碟)。"""
     from app.api.v1 import applications as app_mod

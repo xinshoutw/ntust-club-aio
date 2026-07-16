@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import ARRAY
@@ -30,6 +30,9 @@ class Club(Base, TimestampMixin):
     suspended_until: Mapped[date | None] = mapped_column(sa.Date)  # NULL=未停權
     suspend_reason: Mapped[str | None] = mapped_column(sa.Text)
     is_active: Mapped[bool] = mapped_column(default=True)
+    # 公告已讀水位線(鈴鐺紅點):created_at 晚於此者未讀;NULL=全部未讀。
+    # 一社一帳號,故掛在 club;鈴鐺開啟或進入總覽(公告所在頁)時前移
+    announcements_read_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
 
 
 class ClubMember(Base, TimestampMixin):

@@ -182,7 +182,7 @@ async def availability_grids(
     status:pending(審核中)/temp(臨時)/fixed(固定)/mine(自己已核准);club=借用社團名(hover 顯示)。
 
     - 只回傳被佔用/審核中的格子;其餘由前端依 venue 開放旗標補 available/closed
-    - 固定借用為每週固定時段(weekday 對應);只顯示已核准,審核中的固定借用不顯示
+    - 固定借用為每週固定時段(weekday 對應);已核准標 fixed/mine,審核中標 pending(2026-07-17 起顯示)
     - 審核中(含本社)一律標 pending;本社**已核准**才標 mine(2026-07-17 修正:自己審核中不再誤標我的借用)
     - 區間一次撈(單一場地 15 天檢視原逐日 15 請求,2026-07-17 改批次)
     """
@@ -223,14 +223,18 @@ async def availability_grids(
             sa.select(RoomBookingSlot, RoomBookingRequest, Club.name)
             .join(RoomBookingRequest, RoomBookingSlot.request_id == RoomBookingRequest.id)
             .join(Club, RoomBookingRequest.club_id == Club.id)
-            .where(RoomBookingRequest.status == BookingStatus.APPROVED)
+            .where(RoomBookingRequest.status != BookingStatus.REJECTED)
         )
     ).all()
     for day in grids:
         for slot, request, club_name in fixed_rows:
             if slot.weekday != day.isoweekday():
                 continue
-            status = "mine" if request.club_id == own_club_id else "fixed"
+            # 審核中固定借用標 pending;本社已核准 mine、他社已核准 fixed
+            if request.status != BookingStatus.APPROVED:
+                status = "pending"
+            else:
+                status = "mine" if request.club_id == own_club_id else "fixed"
             mark(day, request.venue_id, slot.period, status, club_name)
 
     return grids

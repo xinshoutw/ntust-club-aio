@@ -381,8 +381,8 @@ async def test_availability_grid_statuses(client, db):
     # 本社的臨時申請仍在審核中 → pending(非 mine);格帶社團名供 hover
     assert grid[str(venue.id)]["3"] == {"status": "pending", "club": "熱舞社"}
     assert grid[str(venue.id)]["7"] == {"status": "pending", "club": "吉他社"}
-    # 審核中的固定借用不顯示(2026-07-15:場況圖只顯示已核准的固定借用)
-    assert str(fixed_venue.id) not in grid
+    # 審核中的固定借用也標記(2026-07-17:pending 固定借用顯示為審核中)
+    assert grid[str(fixed_venue.id)]["5"] == {"status": "pending", "club": "吉他社"}
 
     await db.execute(
         sa.update(RoomBookingRequest).where(RoomBookingRequest.id == rid).values(status="approved")

@@ -36,7 +36,7 @@ function money(a: ClubActivity): string {
 function sortValue(a: ClubActivity, key: SortKey): string | number {
   if (key === 'budget') return a.selfFundTotal + a.requestedTotal
   if (key === 'status') return STATUS[a.status].label
-  return a[key]
+  return a[key] ?? '' // 部分填寫草稿可能無日期
 }
 
 // 檔名可點預覽,右側附下載鈕

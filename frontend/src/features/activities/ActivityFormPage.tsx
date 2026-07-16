@@ -187,18 +187,19 @@ function ActivityForm({ editing }: { editing?: ClubActivityDetail }) {
     { self: 0, requested: 0 },
   )
 
-  const buildInput = (v: FormValues): ActivityInput => ({
-    name: v.name.trim(),
-    type: v.type,
+  // 草稿允許部分填寫:未填欄位以 undefined 傳遞(送審路徑經完整驗證,欄位必然齊全)
+  const buildInput = (v: Partial<FormValues>): ActivityInput => ({
+    name: (v.name ?? '').trim(),
+    type: v.type ?? '社課',
     isLarge: v.type === '活動' ? !!v.isLarge : false,
-    date: v.date.format('YYYY/MM/DD'),
-    endDate: v.endDate.format('YYYY/MM/DD'),
-    startTime: v.startTime.format('HH:mm'),
-    endTime: v.endTime.format('HH:mm'),
-    location: v.location.trim(),
+    date: v.date?.format('YYYY/MM/DD'),
+    endDate: v.endDate?.format('YYYY/MM/DD'),
+    startTime: v.startTime?.format('HH:mm'),
+    endTime: v.endTime?.format('HH:mm'),
+    location: (v.location ?? '').trim(),
     content: (v.content ?? '').trim(),
-    participantsIn: v.participantsIn,
-    participantsOut: v.participantsOut,
+    participantsIn: v.participantsIn ?? undefined,
+    participantsOut: v.participantsOut ?? undefined,
     works: works.filter((w) => !isWorkEmpty(w)).map((w) => ({ task: w.task.trim(), owner: w.owner.trim() })),
     budget: filledBudget.map((r) => ({
       category: r.category,
@@ -219,16 +220,46 @@ function ActivityForm({ editing }: { editing?: ClubActivityDetail }) {
   }
 
   const saveDraft = async () => {
-    // 後端 ActivityIn 對草稿同樣要求完整基本資料,先過表單驗證
-    let v: FormValues
-    try {
-      v = await form.validateFields()
-    } catch {
-      message.error('草稿也需填妥基本資料,請先完成必填欄位')
+    // 退回件的「儲存修改」仍須完整(非草稿列的完整性由 DB CHECK 收口);草稿只要有填任何一欄即可
+    let v: Partial<FormValues>
+    if (editing?.status === 'rejected') {
+      try {
+        v = await form.validateFields()
+      } catch {
+        message.error('請先完成必填欄位')
+        return
+      }
+      if (!checkTimes(v as FormValues)) return
+    } else {
+      v = form.getFieldsValue()
+      // 填了的起訖須自洽;其餘留待送出時檢核
+      if (v.date && v.endDate && v.endDate.isBefore(v.date, 'day')) {
+        message.error('結束日期不得早於開始日期')
+        return
+      }
+      if (
+        v.date &&
+        v.endDate &&
+        v.endDate.isSame(v.date, 'day') &&
+        v.startTime &&
+        v.endTime &&
+        !v.endTime.isAfter(v.startTime)
+      ) {
+        message.error('活動結束時間須晚於開始時間')
+        return
+      }
+    }
+    const input = buildInput(v)
+    const hasAny =
+      !!(input.name || input.location || input.content || input.date || input.startTime || input.endTime) ||
+      input.participantsIn != null ||
+      input.participantsOut != null ||
+      input.works.length > 0 ||
+      input.budget.length > 0
+    if (!hasAny) {
+      message.error('請至少填寫一個欄位再暫存')
       return
     }
-    if (!checkTimes(v)) return
-    const input = buildInput(v)
     const doSave = async () => {
       setBusy('draft')
       try {
@@ -331,8 +362,9 @@ function ActivityForm({ editing }: { editing?: ClubActivityDetail }) {
                 type: editing.type,
                 isLarge: editing.isLarge,
                 location: editing.location,
-                date: dayjs(editing.date, 'YYYY/MM/DD'),
-                endDate: dayjs(editing.endDate, 'YYYY/MM/DD'),
+                // 部分填寫的草稿可能缺日期(dayjs(undefined) 會變成今天,必須先判空)
+                date: editing.date ? dayjs(editing.date, 'YYYY/MM/DD') : undefined,
+                endDate: editing.endDate ? dayjs(editing.endDate, 'YYYY/MM/DD') : undefined,
                 startTime: parseTimeRange(editing.timeRange)[0],
                 endTime: parseTimeRange(editing.timeRange)[1],
                 participantsIn: editing.participantsIn,

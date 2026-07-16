@@ -16,8 +16,8 @@ export interface ClubActivity {
   type: ActivityType
   isLarge: boolean
   largeApproved?: boolean // 管理員認可後行政分才享大型 ×3 加權
-  date: string // YYYY/MM/DD(開始日期)
-  endDate: string // YYYY/MM/DD(未跨日 = date)
+  date?: string // YYYY/MM/DD(開始日期);草稿可部分填寫,僅草稿可能缺
+  endDate?: string // YYYY/MM/DD(未跨日 = date)
   timeRange?: string // 'HH:mm–HH:mm'
   location: string
   content: string
@@ -107,8 +107,8 @@ interface ActivityOut {
   type: ActivityType
   is_large: boolean
   is_large_approved: boolean | null
-  date: string
-  end_date: string
+  date: string | null // 僅草稿可能為 null(部分填寫)
+  end_date: string | null
   start_time: string | null
   end_time: string | null
   location: string
@@ -165,8 +165,8 @@ const toActivity = (o: ActivityOut): ClubActivity => ({
   type: o.type,
   isLarge: o.is_large,
   largeApproved: o.is_large_approved ?? undefined,
-  date: slashDate(o.date),
-  endDate: slashDate(o.end_date),
+  date: o.date ? slashDate(o.date) : undefined,
+  endDate: o.end_date ? slashDate(o.end_date) : undefined,
   timeRange: o.start_time && o.end_time ? `${hm(o.start_time)}–${hm(o.end_time)}` : undefined,
   location: o.location,
   content: o.content,
@@ -341,18 +341,19 @@ export interface ActivityBudgetInput {
   requestedSubsidy: number
 }
 
+/** 草稿允許部分填寫:日期/時間/人數可缺(送審時後端檢核必填) */
 export interface ActivityInput {
   name: string
   type: ActivityType
   isLarge: boolean
-  date: string // YYYY/MM/DD
-  endDate: string
-  startTime: string // HH:mm
-  endTime: string
+  date?: string // YYYY/MM/DD
+  endDate?: string
+  startTime?: string // HH:mm
+  endTime?: string
   location: string
   content: string
-  participantsIn: number
-  participantsOut: number
+  participantsIn?: number
+  participantsOut?: number
   works: WorkItem[]
   budget: ActivityBudgetInput[]
 }
@@ -362,14 +363,14 @@ const toActivityBody = (v: ActivityInput): string =>
     name: v.name,
     type: v.type,
     is_large: v.isLarge,
-    date: isoDate(v.date),
-    end_date: isoDate(v.endDate),
-    start_time: v.startTime,
-    end_time: v.endTime,
+    date: v.date ? isoDate(v.date) : null,
+    end_date: v.endDate ? isoDate(v.endDate) : null,
+    start_time: v.startTime ?? null,
+    end_time: v.endTime ?? null,
     location: v.location,
     content: v.content,
-    participants_in: v.participantsIn,
-    participants_out: v.participantsOut,
+    participants_in: v.participantsIn ?? 0,
+    participants_out: v.participantsOut ?? 0,
     staff_text: worksToStaffText(v.works),
     budget_items: v.budget.map((b) => ({
       category: b.category,

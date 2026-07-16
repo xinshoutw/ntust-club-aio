@@ -149,6 +149,54 @@ async def test_notify_resolves_target_recipients(client, db, monkeypatch):
     assert emails == ["a@ntust.edu.tw", "b@ntust.edu.tw"]
 
 
+async def test_takeover_toggle(client, db):
+    """PATCH 蓋板切換:給日期=開啟(期限內登入蓋板)、null=關閉;audit。"""
+    await seed(client, db)
+    resp = await client.post(URL, json=body(), headers=csrf_headers(client))
+    ann_id = resp.json()["data"]["id"]
+    assert resp.json()["data"]["takeover_until"] is None
+
+    # 開啟蓋板
+    resp = await client.patch(
+        f"{URL}/{ann_id}", json={"takeover_until": "2026-08-31"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["takeover_until"] == "2026-08-31"
+    assert await db.scalar(
+        sa.select(Announcement.takeover_until).where(Announcement.id == ann_id)
+    ) is not None
+
+    # null=關閉蓋板
+    resp = await client.patch(
+        f"{URL}/{ann_id}", json={"takeover_until": None}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200
+    assert resp.json()["data"]["takeover_until"] is None
+    assert await db.scalar(
+        sa.select(Announcement.takeover_until).where(Announcement.id == ann_id)
+    ) is None
+
+    audit_count = await db.scalar(
+        sa.select(sa.func.count()).where(AuditLog.action == "announcement_takeover_updated")
+    )
+    assert audit_count == 2
+
+    # 驗證失敗:非日期 → 422;不存在 → 404;無 aannounce → 403
+    resp = await client.patch(
+        f"{URL}/{ann_id}", json={"takeover_until": "not-a-date"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 422
+    resp = await client.patch(
+        f"{URL}/99999", json={"takeover_until": "2026-08-31"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 404
+    await login(client, "other")
+    resp = await client.patch(
+        f"{URL}/{ann_id}", json={"takeover_until": "2026-08-31"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 403
+
+
 def test_announcement_components_shape():
     """Discord Components V2:flags 1<<15、Container(17)內含 Text Display(10)。"""
     payload = notify.announcement_components("標題", "內容 **粗體**", "2026/07/16")

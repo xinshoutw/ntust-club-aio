@@ -55,6 +55,12 @@ class AnnouncementCreateIn(BaseModel):
         return self
 
 
+class TakeoverIn(BaseModel):
+    """蓋板切換:給日期=期限內社團每次登入全版顯示;null=關閉蓋板。"""
+
+    takeover_until: date | None
+
+
 class AdminAnnouncementOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

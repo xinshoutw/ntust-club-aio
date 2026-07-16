@@ -19,7 +19,7 @@ from app.core.errors import not_found, validation_error
 from app.core.semesters import TAIPEI
 from app.models import Announcement, Club
 from app.models.enums import AnnouncementTarget, ClubAttribute
-from app.schemas.announcements import AdminAnnouncementOut, AnnouncementCreateIn
+from app.schemas.announcements import AdminAnnouncementOut, AnnouncementCreateIn, TakeoverIn
 from app.schemas.common import ApiResponse
 from app.services import audit, notify
 
@@ -105,6 +105,31 @@ async def create_announcement(
         background.add_task(
             notify.announcement_broadcast, row.title, row.content, date_str, emails, webhooks
         )
+    return ApiResponse(data=AdminAnnouncementOut.model_validate(row))
+
+
+@router.patch("/{announcement_id}")
+async def update_takeover(
+    announcement_id: int,
+    body: TakeoverIn,
+    user: AnnounceAdmin,
+    db: DbDep,
+    request: Request,
+) -> ApiResponse[AdminAnnouncementOut]:
+    """蓋板切換:給日期=期限內社團每次登入全版顯示;null=關閉蓋板。"""
+    row = await db.get(Announcement, announcement_id)
+    if row is None:
+        raise not_found("找不到公告")
+
+    row.takeover_until = body.takeover_until
+    audit.record(
+        db,
+        action="announcement_takeover_updated",
+        user=user,
+        detail=f"announcement={row.id};takeover_until={body.takeover_until or '(關閉)'}",
+        ip=client_ip(request),
+    )
+    await db.commit()
     return ApiResponse(data=AdminAnnouncementOut.model_validate(row))
 
 

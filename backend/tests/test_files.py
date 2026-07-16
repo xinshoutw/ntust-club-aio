@@ -174,3 +174,57 @@ async def test_archived_file_returns_410(client, db):
     resp = await client.get(f"/api/v1/files/{row.id}")
     assert resp.status_code == 410
     assert resp.json()["meta"]["code"] == "FILE_ARCHIVED"
+
+
+async def test_common_image_formats_accepted(db):
+    """結案照片放寬為所有常見影像格式(2026-07-16 第八輪,魔術位元組驗證)。"""
+    user = await make_user(db, username="club01")
+    samples = {
+        "a.gif": b"GIF89a" + b"\x00" * 32,
+        "b.webp": b"RIFF\x00\x00\x00\x00WEBP" + b"\x00" * 32,
+        "c.bmp": b"BM" + b"\x00" * 32,
+        "d.tiff": b"II*\x00" + b"\x00" * 32,
+        "e.heic": b"\x00\x00\x00\x18ftypheic" + b"\x00" * 32,
+        "f.avif": b"\x00\x00\x00\x18ftypavif" + b"\x00" * 32,
+    }
+    for name, content in samples.items():
+        row = await file_service.save_upload(
+            db,
+            fake_upload(name, content),
+            policy=file_service.IMAGE,
+            module="reports",
+            uploaded_by=user.id,
+        )
+        assert row.mime.startswith("image/"), name
+    await db.commit()
+
+    # mp4 品牌的 ftyp 不得冒充 heic;副檔名與內容不符一律 415
+    with pytest.raises(AppError) as err:
+        await file_service.save_upload(
+            db,
+            fake_upload("fake.heic", b"\x00\x00\x00\x18ftypisom" + b"\x00" * 32),
+            policy=file_service.IMAGE,
+            module="reports",
+            uploaded_by=user.id,
+        )
+    assert err.value.code == "UNSUPPORTED_FILE_TYPE"
+
+
+async def test_upload_limit_reads_settings(db):
+    """上傳上限讀 system_settings upload_limits(管理員後台可調)。"""
+    from app.models import SystemSetting
+
+    user = await make_user(db, username="club01")
+    db.add(SystemSetting(key="upload_limits", value={"img": 1}))  # 圖片上限 1MB
+    await db.commit()
+
+    with pytest.raises(AppError) as err:
+        await file_service.save_upload(
+            db,
+            fake_upload("big.png", PNG_BYTES[:8] + b"\x00" * (1024 * 1024 + 16)),
+            policy=file_service.IMAGE,
+            module="reports",
+            uploaded_by=user.id,
+        )
+    assert err.value.code == "FILE_TOO_LARGE"
+    assert "1MB" in err.value.message

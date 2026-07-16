@@ -1,9 +1,10 @@
 """報名簽到登錄 API(管理端;評鑑僅採計簽到,活動結束後登錄)。"""
 
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 
 import sqlalchemy as sa
 
+from app.core.semesters import TAIPEI
 from app.models import SessionAttendance, Signup, SignupItem, SignupItemSession
 from tests.conftest import csrf_headers, login, make_club, make_user
 
@@ -19,13 +20,14 @@ async def seed(client, db):
     return club, admin
 
 
-async def make_item(db, admin, *, kind="leader_meeting", session_based=True, event_date=None):
+async def make_item(db, admin, *, kind="leader_meeting", session_based=True, event_at=None):
     item = SignupItem(
         year=YEAR,
         name="社團負責人會議" if kind == "leader_meeting" else "幹部訓練",
         kind=kind,
         session_based=session_based,
-        event_date=event_date,
+        event_at=event_at,
+        max_participants=5,
         created_by=admin.id,
     )
     db.add(item)
@@ -122,7 +124,9 @@ async def test_non_session_item_auto_creates_default_session(client, db):
         admin,
         kind="cadre_training",
         session_based=False,
-        event_date=date.today() - timedelta(days=2),
+        event_at=datetime.combine(
+            date.today() - timedelta(days=2), time(9, 0), tzinfo=TAIPEI
+        ),
     )
     db.add(Signup(item_id=item.id, club_id=club.id))
     await db.commit()

@@ -55,6 +55,12 @@ async def _clean(_database):
         await conn.execute(sa.text(f"TRUNCATE {_ALL_TABLES} RESTART IDENTITY CASCADE"))
 
 
+@pytest.fixture(autouse=True)
+def _mute_discord(monkeypatch):
+    """測試不打真實 Discord webhook(.env 現值為測試群組);要測發送的自行 monkeypatch。"""
+    monkeypatch.setattr(settings, "discord_webhook_url", "")
+
+
 @pytest.fixture
 async def db():
     async with async_session_factory() as session:

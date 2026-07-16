@@ -276,3 +276,46 @@ async def test_club_user_cannot_access_admin_endpoints(client, db):
     )
     assert resp.status_code == 403
     assert (await client.get("/api/v1/admin/activities")).status_code == 403
+
+
+async def test_large_approval_admin_override_without_application(client, db):
+    """未申請大型的「活動」可由管理員逕行核定(2026-07-15 第七輪);社課不可。"""
+    await seed(client, db)
+    aid = await submit_activity(client, db, is_large=False)
+
+    await login(client, "advisor")
+    resp = await approve_first_stage(client, aid, is_large_approved=True)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    assert data["is_large"] is True  # 逕行核定
+    assert data["is_large_approved"] is True
+
+    # 類型=社課 不得認定為大型活動
+    cid = await submit_activity(client, db, name="每週社課", type="社課", is_large=False)
+    await login(client, "advisor")
+    resp = await approve_first_stage(client, cid, is_large_approved=True)
+    assert resp.status_code == 422
+
+
+async def test_large_application_denied_by_default(client, db):
+    """有申請大型但管理員未勾認可 → is_large_approved=False(空心+斜線)。"""
+    await seed(client, db)
+    aid = await submit_activity(client, db, is_large=True)
+
+    await login(client, "advisor")
+    resp = await approve_first_stage(client, aid)  # 未帶 is_large_approved
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["is_large"] is True
+    assert data["is_large_approved"] is False
+
+
+async def test_review_permission_key_alias(client, db):
+    """前端權限彈窗鍵 areview 與既有 aact 皆可看審核列表(鍵名尚未統一)。"""
+    await seed(client, db)
+    aid = await submit_activity(client, db)
+    await make_user(db, username="fe_reviewer", role="admin", permissions=["areview"])
+    await login(client, "fe_reviewer")
+    resp = await client.get("/api/v1/admin/activities")
+    assert resp.status_code == 200
+    assert aid in [a["id"] for a in resp.json()["data"]]

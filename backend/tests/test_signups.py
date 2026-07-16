@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import UTC, datetime, timedelta
 
 import sqlalchemy as sa
 
@@ -14,13 +14,14 @@ FIELDS = [
 
 
 async def make_item(db, admin_id: int, **kw) -> SignupItem:
+    now = datetime.now(UTC)
     defaults = dict(
         year=114,
         name="社團負責人研習",
         description="",
         is_open=True,
-        deadline=date.today() + timedelta(days=7),
-        allow_multiple=True,
+        signup_start=now - timedelta(days=1),
+        signup_end=now + timedelta(days=7),
         max_participants=3,
         fields=FIELDS,
         created_by=admin_id,
@@ -140,28 +141,71 @@ async def test_draft_cross_device_and_cleared_on_submit(client, db):
     assert resp.status_code == 409
 
 
-async def test_single_participant_and_deadline(client, db):
+async def test_capacity_and_signup_window(client, db):
     club, admin = await setup(client, db)
-    single = await make_item(
-        db, admin.id, name="單人活動", allow_multiple=False, max_participants=None
-    )
+    single = await make_item(db, admin.id, name="單人活動", max_participants=1)
 
     resp = await client.post(
         f"/api/v1/club/signup-items/{single.id}/signup",
         json={"participants": participants("甲", "乙")},
         headers=csrf_headers(client),
     )
-    assert resp.status_code == 422
+    assert resp.status_code == 422  # 超過名額上限
 
+    now = datetime.now(UTC)
     closed = await make_item(
-        db, admin.id, name="過期活動", deadline=date.today() - timedelta(days=1)
+        db, admin.id, name="已截止活動", signup_end=now - timedelta(hours=1)
     )
     resp = await client.post(
         f"/api/v1/club/signup-items/{closed.id}/signup",
         json={"participants": participants("甲")},
         headers=csrf_headers(client),
     )
-    assert resp.status_code == 409
+    assert resp.status_code == 409  # 已過報名截止
+
+    upcoming = await make_item(
+        db, admin.id, name="未開始活動", signup_start=now + timedelta(days=1)
+    )
+    resp = await client.post(
+        f"/api/v1/club/signup-items/{upcoming.id}/signup",
+        json={"participants": participants("甲")},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 409  # 報名尚未開始
+
+    rows = (await client.get("/api/v1/club/signup-items")).json()["data"]
+    accepting = {r["name"]: r["accepting"] for r in rows}
+    assert accepting["單人活動"] is True
+    assert accepting["已截止活動"] is False
+    assert accepting["未開始活動"] is False
+
+
+async def test_review_based_signup_pending_until_confirmed(client, db):
+    """審核制活動:報名後待確認(pending),confirmed=False。"""
+    club, admin = await setup(client, db)
+    item = await make_item(db, admin.id, name="審核制活動", requires_confirmation=True)
+
+    resp = await client.post(
+        f"/api/v1/club/signup-items/{item.id}/signup",
+        json={"participants": participants("甲")},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201
+
+    detail = (await client.get(f"/api/v1/club/signup-items/{item.id}")).json()["data"]
+    assert detail["my_status"] == "pending"
+    assert detail["my_signup"]["confirmed"] is False
+
+    # 非審核制:送出即成功
+    normal = await make_item(db, admin.id, name="一般活動")
+    await client.post(
+        f"/api/v1/club/signup-items/{normal.id}/signup",
+        json={"participants": participants("乙")},
+        headers=csrf_headers(client),
+    )
+    detail = (await client.get(f"/api/v1/club/signup-items/{normal.id}")).json()["data"]
+    assert detail["my_status"] == "signed"
+    assert detail["my_signup"]["confirmed"] is True
 
 
 async def test_eval_signup_requires_awards(client, db):

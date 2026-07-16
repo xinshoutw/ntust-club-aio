@@ -165,26 +165,31 @@ async def test_announcements_targeting(client, db):
                 title="藝術性公告",
                 content="x",
                 target_type="attr",
-                target_value="藝術性",
+                attrs=["藝術性", "體育性"],  # 性質可多選(2026-07-16 第八輪)
                 created_by=admin.id,
             ),
             Announcement(
                 title="給熱舞社",
                 content="x",
                 target_type="club",
-                target_value=str(club.id),
+                club_id=club.id,
+                takeover_until=date(2026, 12, 31),  # 蓋板公告
                 created_by=admin.id,
             ),
             Announcement(
                 title="給吉他社",
                 content="x",
                 target_type="club",
-                target_value=str(other.id),
+                club_id=other.id,
                 created_by=admin.id,
             ),
         ]
     )
     await db.commit()
 
-    titles = [a["title"] for a in (await client.get("/api/v1/club/announcements")).json()["data"]]
+    rows = (await client.get("/api/v1/club/announcements")).json()["data"]
+    titles = [a["title"] for a in rows]
     assert titles == ["給熱舞社", "藝術性公告", "全體公告"]
+    # 蓋板截止一併給前端(蓋板顯示邏輯在 client)
+    assert rows[0]["takeover_until"] == "2026-12-31"
+    assert rows[2]["takeover_until"] is None

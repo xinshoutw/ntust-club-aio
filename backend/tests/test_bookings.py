@@ -70,10 +70,15 @@ async def make_activity(
 
 
 async def open_fixed_window(db):
-    """固定借用預設僅 6 月/1 月受理;測試以管理員手動加開。"""
+    """固定借用預設不開放;測試以日期區間加開(2026-07-16 第八輪)。"""
+    today = date.today()
     db.add(
         SystemSetting(
-            key="fixed_booking_window", value={"open_months": [6, 1], "manual_open": True}
+            key="fixed_booking_window",
+            value={
+                "open_from": (today - timedelta(days=1)).isoformat(),
+                "open_until": (today + timedelta(days=7)).isoformat(),
+            },
         )
     )
     await db.commit()
@@ -150,7 +155,7 @@ async def test_room_booking_create_and_list(client, db):
 
 
 async def test_room_booking_window_gate(client, db):
-    """僅於開放窗受理(預設 6 月/1 月;7 月未加開 → 拒收)。"""
+    """僅於開放窗受理(預設未設定日期區間 → 不開放)。"""
     await setup_session(client, db)
     venue = await make_venue(db)
     body = {"venue_id": venue.id, "purpose": "社課", "slots": [{"weekday": 1, "period": "1"}]}
@@ -160,11 +165,12 @@ async def test_room_booking_window_gate(client, db):
     assert resp.json()["meta"]["code"] == "WINDOW_CLOSED"
 
     window = (await client.get("/api/v1/club/room-bookings/window")).json()["data"]
-    assert window == {"open": False, "open_months": [6, 1], "manual_open": False}
+    assert window == {"open": False, "open_from": None, "open_until": None}
 
     await open_fixed_window(db)
     window = (await client.get("/api/v1/club/room-bookings/window")).json()["data"]
     assert window["open"] is True
+    assert window["open_from"] is not None
     resp = await client.post("/api/v1/club/room-bookings", json=body, headers=csrf_headers(client))
     assert resp.status_code == 201
 

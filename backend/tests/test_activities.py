@@ -365,3 +365,35 @@ async def test_list_filters_and_sorting(client, db):
 
     resp = await client.get("/api/v1/club/activities/semesters")
     assert resp.json()["data"] == ["114-2", "114-1"]
+
+
+async def test_attachment_total_cap(client, db):
+    """附件加總上限(2026-07-16 第八輪):讀 system_settings,超過回 413。"""
+    from app.models import SystemSetting
+
+    await setup_session(client, db)
+    db.add(SystemSetting(key="activity_attachment_total_mb", value=1))  # 1MB 加總上限
+    await db.commit()
+    activity = await create_activity(client)
+    url = f"/api/v1/club/activities/{activity['id']}/attachments"
+
+    pdf = b"%PDF-1.7 " + b"\x00" * 700_000  # ~0.7MB
+    resp = await client.post(
+        url, files={"file": ("企劃書.pdf", io.BytesIO(pdf), "application/pdf")},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201, resp.text
+
+    # 第二份使加總超過 1MB → 413,且不殘留孤兒檔
+    resp = await client.post(
+        url, files={"file": ("附件2.pdf", io.BytesIO(pdf), "application/pdf")},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 413
+    assert resp.json()["meta"]["code"] == "FILE_TOO_LARGE"
+    assert "加總" in resp.json()["error"]
+
+    detail = (await client.get(f"/api/v1/club/activities/{activity['id']}")).json()["data"]
+    assert len(detail["attachments"]) == 1
+    on_disk = [p for p in settings.upload_dir.rglob("*") if p.is_file()]
+    assert len(on_disk) == 1  # 超限檔案已清掉

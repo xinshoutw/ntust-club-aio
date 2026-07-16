@@ -2,7 +2,8 @@ import { App, Button, Form, Input, Select } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
-import { MEMBERS, type Member } from '../members/mock'
+import { kindLabel, type MemberKind } from '../../lib/roles'
+import { MEMBERS } from '../members/mock'
 
 const TERMS = [
   { value: '114', label: '114 學年度' },
@@ -10,10 +11,8 @@ const TERMS = [
   { value: '114-2', label: '114 學年度第 2 學期' },
 ]
 
-const POSITION_KIND: Record<string, Member['kind']> = {
-  社長或會長: '社長／會長',
-  副社長或副會長: '副社長／副會長',
-}
+// 可申請證明的職位:標準身份值,顯示依社團名稱推導(社長/會長)
+const POSITIONS: MemberKind[] = ['負責人', '副負責人']
 
 export default function CertificatePage() {
   const { user } = useAuth()
@@ -26,7 +25,7 @@ export default function CertificatePage() {
   const matches =
     term && position
       ? MEMBERS.filter(
-          (m) => m.kind === POSITION_KIND[position] && (term === '114' ? m.semester.startsWith('114') : m.semester === term),
+          (m) => m.kind === position && (term === '114' ? m.semester.startsWith('114') : m.semester === term),
         )
       : []
   const uniqueNames = [...new Set(matches.map((m) => m.name))]
@@ -59,7 +58,7 @@ export default function CertificatePage() {
               <Input readOnly style={{ background: 'var(--paper)' }} />
             </Form.Item>
             <Form.Item name="position" label="擔任職位" rules={[{ required: true, message: '請選擇職位' }]} style={{ marginBottom: 0 }}>
-              <Select placeholder="請選擇" options={Object.keys(POSITION_KIND).map((p) => ({ value: p, label: p }))} />
+              <Select placeholder="請選擇" options={POSITIONS.map((p) => ({ value: p, label: kindLabel(p, user?.club) }))} />
             </Form.Item>
             <div>
               <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>姓名</div>
@@ -90,7 +89,7 @@ export default function CertificatePage() {
         <table className="tb" style={{ minWidth: 480 }}>
           <tbody>
             <tr>
-              <td style={{ fontWeight: 500 }}>顏志明 (社長或會長)</td>
+              <td style={{ fontWeight: 500 }}>顏志明 (會長)</td>
               <td style={{ color: 'var(--steel)', fontSize: 13 }}>114學年度第2學期</td>
               <td className="num" style={{ fontSize: 13, width: 110 }}>2026/06/10</td>
               <td style={{ width: 100 }}><StatusPill status="pending" /></td>

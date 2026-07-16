@@ -4,6 +4,7 @@ import { DownloadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { Pager } from '../../components/ui/tableControls'
 import { neutralizeFormula } from '../../lib/csv'
+import { kindLabel } from '../../lib/roles'
 import { CURRENT_SEMESTER, semesterOptions } from '../../lib/semester'
 import { MEMBERS } from '../members/mock'
 import ClubSelect from './ClubSelect'
@@ -29,9 +30,9 @@ export default function AdminMembersPage() {
       message.error(`${club} 沒有成員可匯出`)
       return
     }
-    // 與社團端匯入格式相容(無標題列);職稱補空字串讓各列欄數一致;中和 Excel 公式前綴
+    // 與社團端匯入格式相容(無標題列);身份以顯示詞輸出;職稱補空字串讓各列欄數一致;中和 Excel 公式前綴
     const text = list
-      .map((m) => [m.name, m.studentId, m.kind, m.title ?? ''].map(neutralizeFormula).join(','))
+      .map((m) => [m.name, m.studentId, kindLabel(m.kind, club), m.title ?? ''].map(neutralizeFormula).join(','))
       .join('\n')
     const url = URL.createObjectURL(new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' }))
     const a = document.createElement('a')
@@ -68,7 +69,7 @@ export default function AdminMembersPage() {
             <tr>
               <th>姓名</th>
               <th>學號</th>
-              <th>身分</th>
+              <th>身份</th>
               <th>職稱</th>
               <th>更新時間</th>
             </tr>
@@ -78,7 +79,7 @@ export default function AdminMembersPage() {
               <tr key={m.id}>
                 <td style={{ fontWeight: 500 }}>{m.name}</td>
                 <td className="num" style={{ color: 'var(--steel)' }}>{m.studentId}</td>
-                <td>{m.kind}</td>
+                <td>{kindLabel(m.kind, club)}</td>
                 <td>{m.title ?? '—'}</td>
                 <td className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.updatedAt}</td>
               </tr>

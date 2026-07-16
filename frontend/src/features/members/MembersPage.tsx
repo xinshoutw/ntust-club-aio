@@ -4,14 +4,19 @@ import { DownOutlined, DownloadOutlined, EditOutlined, UploadOutlined } from '@a
 import PageHeader from '../../components/ui/PageHeader'
 import { FilterButton, Pager, SortButton } from '../../components/ui/tableControls'
 import { neutralizeFormula } from '../../lib/csv'
+import { MEMBER_KINDS, kindLabel, parseKind } from '../../lib/roles'
 import { CURRENT_SEMESTER, semesterOptions } from '../../lib/semester'
+import { useAuth } from '../../app/auth'
 import { MEMBERS, type Member } from './mock'
 
-const KINDS: Member['kind'][] = ['社員', '幹部', '副社長／副會長', '社長／會長']
 const PAGE_SIZE = 50
 
 export default function MembersPage() {
   const { message } = App.useApp()
+  const { user } = useAuth()
+  // 身份顯示依社團名稱末字推導(社→社長、會→會長);儲存值一律為標準身份
+  const label = (k: Member['kind']) => kindLabel(k, user?.club)
+  const kindOptions = MEMBER_KINDS.map((k) => ({ value: k, label: kindLabel(k, user?.club) }))
   const [members, setMembers] = useState<Member[]>(MEMBERS)
   const [addOpen, setAddOpen] = useState(false)
   const [csvOpen, setCsvOpen] = useState(false)
@@ -21,7 +26,8 @@ export default function MembersPage() {
   const [semester, setSemester] = useState<string>(CURRENT_SEMESTER)
   const [page, setPage] = useState(1)
   const [sort, setSort] = useState<{ key: 'kind' | 'title'; dir: 1 | -1 } | null>(null)
-  const [kindFilter, setKindFilter] = useState<Member['kind'][]>([])
+  // 篩選值為顯示詞(社長/會長依社團名稱推導)
+  const [kindFilter, setKindFilter] = useState<string[]>([])
   const [editing, setEditing] = useState<{ id: number; field: 'kind' | 'title' } | null>(null)
   const [form] = Form.useForm()
   const kind = Form.useWatch('kind', form)
@@ -49,8 +55,7 @@ export default function MembersPage() {
     let base = nextId()
     rows.forEach((cols, i) => {
       const [name, studentId, k, title] = cols
-      const kind = (k ?? '').replace(/\//g, '／')
-      const memberKind = kind === '' ? '社員' : (KINDS as string[]).includes(kind) ? (kind as Member['kind']) : null
+      const memberKind = (k ?? '').trim() === '' ? '社員' : parseKind(k)
       if (!name || !studentId || !memberKind) {
         skipped.push(i + 1)
         return
@@ -84,9 +89,10 @@ export default function MembersPage() {
       message.error(`${csvSemester} 沒有成員可匯出`)
       return
     }
-    // 維持匯入相容格式(無標題列、不加引號);職稱補空字串讓各列欄數一致;中和 Excel 公式前綴
+    // 維持匯入相容格式(無標題列、不加引號);身份以顯示詞輸出(parseKind 可回讀);
+    // 職稱補空字串讓各列欄數一致;中和 Excel 公式前綴
     const text = rows
-      .map((m) => [m.name, m.studentId, m.kind, m.title ?? ''].map(neutralizeFormula).join(','))
+      .map((m) => [m.name, m.studentId, label(m.kind), m.title ?? ''].map(neutralizeFormula).join(','))
       .join('\n')
     const url = URL.createObjectURL(new Blob(['\uFEFF' + text], { type: 'text/csv;charset=utf-8' }))
     const a = document.createElement('a')
@@ -104,15 +110,16 @@ export default function MembersPage() {
   }
 
   const view = useMemo(() => {
+    // 篩選與排序都以顯示詞為準(與畫面所見一致)
+    const shown = (m: Member, key: 'kind' | 'title') => (key === 'kind' ? label(m.kind) : (m.title ?? ''))
     let list = members.filter((m) => semester === 'all' || m.semester === semester)
-    if (kindFilter.length) list = list.filter((m) => kindFilter.includes(m.kind))
+    if (kindFilter.length) list = list.filter((m) => kindFilter.includes(label(m.kind)))
     if (sort) {
-      list = [...list].sort(
-        (a, b) => sort.dir * String(a[sort.key] ?? '').localeCompare(String(b[sort.key] ?? ''), 'zh-Hant'),
-      )
+      list = [...list].sort((a, b) => sort.dir * shown(a, sort.key).localeCompare(shown(b, sort.key), 'zh-Hant'))
     }
     return list
-  }, [members, semester, kindFilter, sort])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [members, semester, kindFilter, sort, user?.club])
 
   const paged = view.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
   const toggleSort = (key: 'kind' | 'title') =>
@@ -175,10 +182,10 @@ export default function MembersPage() {
                 <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                   <SortButton label="身份" sortKey="kind" sort={sort} onToggle={toggleSort} />
                   <FilterButton
-                    options={KINDS as unknown as string[]}
+                    options={MEMBER_KINDS.map((k) => kindLabel(k, user?.club))}
                     selected={kindFilter}
                     onChange={(next) => {
-                      setKindFilter(next as Member['kind'][])
+                      setKindFilter(next)
                       setPage(1)
                     }}
                     label="篩選身份"
@@ -206,7 +213,7 @@ export default function MembersPage() {
                       defaultOpen
                       value={m.kind}
                       style={{ width: 150 }}
-                      options={KINDS.map((k) => ({ value: k, label: k }))}
+                      options={kindOptions}
                       onChange={(v) => {
                         // 職稱僅幹部有;換成其他身份一律清除,避免殘留舊職稱
                         update(m.id, { kind: v, ...(v === '幹部' ? {} : { title: undefined }) })
@@ -216,7 +223,7 @@ export default function MembersPage() {
                     />
                   ) : (
                     <button type="button" className="link-btn" style={{ padding: 0, color: 'var(--ink)' }} onClick={() => setEditing({ id: m.id, field: 'kind' })}>
-                      {m.kind} <DownOutlined style={{ fontSize: 10, color: 'var(--steel)' }} />
+                      {label(m.kind)} <DownOutlined style={{ fontSize: 10, color: 'var(--steel)' }} />
                     </button>
                   )}
                 </td>
@@ -285,7 +292,7 @@ export default function MembersPage() {
             <Select options={semesterOptions(members.map((m) => m.semester))} />
           </Form.Item>
           <Form.Item name="kind" label="身份" rules={[{ required: true }]}>
-            <Select options={KINDS.map((k) => ({ value: k, label: k }))} />
+            <Select options={kindOptions} />
           </Form.Item>
           {kind === '幹部' && (
             <Form.Item name="title" label="職稱" preserve={false} rules={[{ required: true, message: '請填寫職稱' }]}>

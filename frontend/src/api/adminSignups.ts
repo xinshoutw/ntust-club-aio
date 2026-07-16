@@ -4,7 +4,7 @@
 //   故建立活動時一律把 BASE_FIELDS 前置到自訂欄位前;管理端顯示/匯出時再把它們與自訂欄位分開。
 // - 簽到:PUT /{id}/attendance {club_id, attended, session_id?};非場次制免帶 session_id
 //   (後端自動建立/沿用單一預設場次);場次制(負責人會議)session_id 必填,
-//   但後端目前未提供場次列表/建立 API,前端暫無法取得場次 id(見頁面停用說明)。
+//   場次由 GET/POST/DELETE /{id}/sessions 管理(建立僅場次制可用,非場次制 409)。
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api } from './client'
@@ -114,10 +114,42 @@ const toRegistration = (r: RegistrationOut): Registration => ({
   participants: r.entries.map((e) => e.answers),
 })
 
+// ---- 場次(負責人會議等場次制活動的逐場簽到) ----
+
+export interface SessionAttendance {
+  clubId: number
+  attended: boolean
+}
+
+export interface SignupSession {
+  id: number
+  name: string
+  date: string // YYYY/MM/DD
+  semester: string
+  attendance: SessionAttendance[] // 已登錄過簽到的社團(未登錄者不在列)
+}
+
+interface SessionOut {
+  id: number
+  name: string
+  date: string // ISO date
+  semester: string
+  attendance: { club_id: number; attended: boolean }[]
+}
+
+const toSession = (s: SessionOut): SignupSession => ({
+  id: s.id,
+  name: s.name,
+  date: dayjs(s.date).format('YYYY/MM/DD'),
+  semester: s.semester,
+  attendance: s.attendance.map((a) => ({ clubId: a.club_id, attended: a.attended })),
+})
+
 const keys = {
   all: ['adminSignups'] as const,
   list: ['adminSignups', 'list'] as const,
   registrations: (itemId: number) => ['adminSignups', 'registrations', itemId] as const,
+  sessions: (itemId: number) => ['adminSignups', 'sessions', itemId] as const,
 }
 
 export function useAdminSignupItems() {
@@ -135,6 +167,16 @@ export function useRegistrations(itemId: number | undefined) {
       api<RegistrationOut[]>(`/admin/signup-items/${itemId}/registrations`).then((rows) =>
         rows.map(toRegistration),
       ),
+    enabled: itemId != null,
+  })
+}
+
+/** 場次清單(含各場已登錄的簽到狀態);非場次制項目傳 undefined 即不發查詢 */
+export function useSessions(itemId: number | undefined) {
+  return useQuery({
+    queryKey: keys.sessions(itemId ?? 0),
+    queryFn: () =>
+      api<SessionOut[]>(`/admin/signup-items/${itemId}/sessions`).then((rows) => rows.map(toSession)),
     enabled: itemId != null,
   })
 }
@@ -203,5 +245,23 @@ export function useSignupItemMutations() {
       }),
     onSuccess: invalidate,
   })
-  return { create, confirm, markAttendance }
+  // 場次增刪:出席場次數(registrations.attended_sessions)隨場次/簽到變動,一併失效
+  const invalidateSessions = (itemId: number) => {
+    void qc.invalidateQueries({ queryKey: keys.sessions(itemId) })
+    void qc.invalidateQueries({ queryKey: keys.registrations(itemId) })
+  }
+  const createSession = useMutation({
+    mutationFn: ({ itemId, name, date }: { itemId: number; name: string; date: string /* YYYY/MM/DD */ }) =>
+      api<SessionOut>(`/admin/signup-items/${itemId}/sessions`, {
+        method: 'POST',
+        body: JSON.stringify({ name, date: dayjs(date, 'YYYY/MM/DD').format('YYYY-MM-DD') }),
+      }),
+    onSuccess: (_, { itemId }) => invalidateSessions(itemId),
+  })
+  const deleteSession = useMutation({
+    mutationFn: ({ itemId, sessionId }: { itemId: number; sessionId: number }) =>
+      api<null>(`/admin/signup-items/${itemId}/sessions/${sessionId}`, { method: 'DELETE' }),
+    onSuccess: (_, { itemId }) => invalidateSessions(itemId),
+  })
+  return { create, confirm, markAttendance, createSession, deleteSession }
 }

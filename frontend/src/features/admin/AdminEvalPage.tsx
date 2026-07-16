@@ -271,14 +271,14 @@ export default function AdminEvalPage() {
               </div>
             )}
             <div>
-              <div style={{ fontSize: 13, marginBottom: 6 }}>調整原因(必填)</div>
+              <div style={{ fontSize: 13, marginBottom: 6 }}>調整原因</div>
               <Input.TextArea
                 autoFocus={mode.kind === 'revert'}
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 rows={3}
                 maxLength={500}
-                placeholder="將記錄於稽核軌跡"
+                placeholder="簡述說明"
               />
             </div>
           </div>

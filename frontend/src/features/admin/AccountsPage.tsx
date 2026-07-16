@@ -1,8 +1,16 @@
 import { useState } from 'react'
-import { App, Button, Checkbox, Input, Modal, Tabs } from 'antd'
+import { App, Button, Checkbox, Input, Modal, Spin, Tabs } from 'antd'
 import { confirmDialog } from '../../lib/confirm'
 import PageHeader from '../../components/ui/PageHeader'
 import OneTimePasswordModal from './OneTimePasswordModal'
+import {
+  USERNAME_HINT,
+  USERNAME_RE,
+  useAccountMutations,
+  useAccounts,
+  type Account,
+  type ManagedRole,
+} from '../../api/adminAccounts'
 
 // 頁面權限鍵(與後端 permissions 對齊;super 不受限)
 const PERMISSION_KEYS = [
@@ -19,34 +27,26 @@ const PERMISSION_KEYS = [
   ['afiles', '檔案管理'],
 ] as const
 
-interface Account {
-  name: string
-  account: string
-  active: boolean
-  scope?: string // 管理員:最高權限/一般/受限
-  perms?: string
-  permKeys?: string[] // 管理員:實際頁面權限鍵(權限彈窗預設值)
-  awards?: string // 評審:負責獎項
-  group?: string // 評審:分組
+const PAGE_KEY_SET = new Set<string>(PERMISSION_KEYS.map(([k]) => k))
+
+// 權限彈窗以外的既有鍵(簽核關卡等)僅供顯示;儲存時原樣保留
+const EXTRA_KEY_LABELS: Record<string, string> = {
+  approve_advisor: '輔導老師簽核',
+  approve_chief: '組長簽核',
+  approve_dean: '學務長簽核',
+  aact: '活動管理(舊鍵)',
+  areg: '報名管理(舊鍵)',
 }
 
-const ADMINS: Account[] = [
-  { name: '王組長', account: 'admin_wang', active: true, scope: '最高權限', perms: '全部' },
-  { name: '李承辦', account: 'admin_lee', active: true, scope: '一般', perms: '活動審核、結案審核、活動管理', permKeys: ['areview', 'aclose', 'asignup'] },
-  { name: '陳助理', account: 'admin_chen', active: true, scope: '一般', perms: '借用審核、維修、違規、社團管理', permKeys: ['abooking', 'aroom', 'amaint', 'aviol', 'amember'] },
-  { name: '學務長', account: 'dean', active: true, scope: '受限(僅簽核)', perms: '學務長簽核關', permKeys: [] },
-]
+const permsText = (a: Account): string => {
+  if (a.isSuper) return '全部'
+  const labels = a.permissions.map(
+    (k) => PERMISSION_KEYS.find(([key]) => key === k)?.[1] ?? EXTRA_KEY_LABELS[k] ?? k,
+  )
+  return labels.length ? labels.join('、') : '—'
+}
 
-const STAFF: Account[] = [
-  { name: '李工讀', account: 'staff_lee', active: true },
-  { name: '陳工讀', account: 'staff_chen', active: true },
-]
-
-const VIEWERS: Account[] = [
-  { name: '張老師', account: 'viewer01', active: true, awards: '最佳社團獎、最佳活動獎', group: '第 1 組(資工系學會、電機系學會)' },
-  { name: '李老師', account: 'viewer02', active: true, awards: '最佳財務獎、最佳成果發表獎', group: '第 1 組(資工系學會、電機系學會)' },
-  { name: '陳老師', account: 'viewer03', active: false, awards: '最佳社團負責人獎', group: '第 2 組(學生會)' },
-]
+const TAB_ROLE: Record<string, ManagedRole> = { admins: 'admin', staff: 'staff', viewers: 'viewer' }
 
 function ActiveTag({ active }: { active: boolean }) {
   return (
@@ -72,11 +72,16 @@ function ActiveTag({ active }: { active: boolean }) {
 export default function AccountsPage() {
   const { message, modal } = App.useApp()
   const [tab, setTab] = useState('admins')
-  // 管理員列表為 state:權限彈窗「儲存」須實際落地(重開/列表即時反映)
-  const [admins, setAdmins] = useState<Account[]>(ADMINS)
-  // 一次性密碼彈窗:目標帳號 + 顯示開關(關閉動畫結束後卸載);
-  // 重設流程按「確認重設」才生效(Esc/遮罩=取消不重設)
-  const [pwTarget, setPwTarget] = useState<{ title: string; account?: string; resetName?: string } | null>(null)
+
+  const accountsQuery = useAccounts()
+  const accounts = accountsQuery.data ?? []
+  const admins = accounts.filter((a) => a.role === 'admin')
+  const staff = accounts.filter((a) => a.role === 'staff')
+  const viewers = accounts.filter((a) => a.role === 'viewer')
+  const { create, remove, setActive, resetPassword, setPermissions } = useAccountMutations()
+
+  // 一次性密碼彈窗:密碼由後端於建立/重設當次回傳,關閉後不再顯示
+  const [pwTarget, setPwTarget] = useState<{ title: string; account: string; password: string } | null>(null)
   const [pwOpen, setPwOpen] = useState(false)
   // 權限設定彈窗:草稿受控,按「儲存」才生效;未存關閉須確認
   const [permTarget, setPermTarget] = useState<Account | null>(null)
@@ -89,8 +94,8 @@ export default function AccountsPage() {
 
   const roleLabel = tab === 'admins' ? '管理員' : tab === 'staff' ? '工讀生' : '評審'
 
-  const showPassword = (title: string, account?: string, resetName?: string) => {
-    setPwTarget({ title, account, resetName })
+  const showPassword = (title: string, account: string, password: string) => {
+    setPwTarget({ title, account, password })
     setPwOpen(true)
   }
 
@@ -101,7 +106,12 @@ export default function AccountsPage() {
       okText: '確認刪除',
       okButtonProps: { danger: true },
       cancelText: '取消',
-      onOk: () => message.success(`已刪除 ${a.name}(${a.account})`),
+      onOk: () => {
+        remove.mutate(a.id, {
+          onSuccess: () => message.success(`已刪除 ${a.name}(${a.username})`),
+          onError: (e) => message.error(e.message),
+        })
+      },
     })
 
   const toggleActive = (a: Account) => {
@@ -112,30 +122,72 @@ export default function AccountsPage() {
         okText: '確認',
         okButtonProps: { danger: true },
         cancelText: '取消',
-        onOk: () => message.success(`已停權 ${a.name}`),
+        onOk: () => {
+          setActive.mutate(
+            { id: a.id, active: false },
+            {
+              onSuccess: () => message.success(`已停權 ${a.name}`),
+              onError: (e) => message.error(e.message),
+            },
+          )
+        },
       })
     } else {
-      message.success(`已恢復 ${a.name} 的帳號`)
+      setActive.mutate(
+        { id: a.id, active: true },
+        {
+          onSuccess: () => message.success(`已恢復 ${a.name} 的帳號`),
+          onError: (e) => message.error(e.message),
+        },
+      )
     }
   }
 
+  // 重設密碼:先確認(取消不重設),成功後顯示後端回傳的一次性密碼
+  const askResetPassword = (a: Account) =>
+    confirmDialog(modal, {
+      title: `重設密碼 — ${a.name}`,
+      content: '重設後原密碼立即失效,並須於首次登入時變更密碼',
+      okText: '確認重設',
+      cancelText: '取消',
+      onOk: () => {
+        resetPassword.mutate(a.id, {
+          onSuccess: ({ password }) => showPassword(`已重設密碼 — ${a.name}`, a.username, password),
+          onError: (e) => message.error(e.message),
+        })
+      },
+    })
+
   const createAccount = () => {
-    if (!newName.trim()) {
+    const name = newName.trim()
+    const username = newAccount.trim()
+    if (!name) {
       message.error('請輸入姓名')
       return
     }
-    const account = newAccount.trim() || `${tab === 'admins' ? 'admin' : tab === 'staff' ? 'staff' : 'viewer'}_${newName.trim().toLowerCase()}`
-    setCreateOpen(false)
-    setNewName('')
-    setNewAccount('')
-    // 建立後直接顯示帳號與一次性密碼
-    showPassword(`已建立${roleLabel}帳號 — ${newName.trim()}`, account)
+    if (!USERNAME_RE.test(username)) {
+      message.error(USERNAME_HINT)
+      return
+    }
+    create.mutate(
+      { role: TAB_ROLE[tab], name, username },
+      {
+        onSuccess: ({ account, password }) => {
+          setCreateOpen(false)
+          setNewName('')
+          setNewAccount('')
+          // 建立後直接顯示帳號與一次性密碼
+          showPassword(`已建立${roleLabel}帳號 — ${account.name}`, account.username, password)
+        },
+        onError: (e) => message.error(e.message),
+      },
+    )
   }
 
   const actions = (a: Account, extra?: React.ReactNode) => (
     <td className="r" style={{ whiteSpace: 'nowrap' }}>
       {extra}
-      <button type="button" className="link-btn" onClick={() => showPassword(`重設密碼 — ${a.name}`, a.account, a.name)}>
+      <button type="button" className="link-btn" onClick={() => askResetPassword(a)}>
         重設密碼
       </button>
       <button type="button" className="link-btn" onClick={() => toggleActive(a)}>
@@ -147,6 +199,15 @@ export default function AccountsPage() {
     </td>
   )
 
+  const emptyRow = (colSpan: number) =>
+    !accountsQuery.isPending && (
+      <tr className="no-hover">
+        <td colSpan={colSpan} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
+          尚無{roleLabel}帳號
+        </td>
+      </tr>
+    )
+
   const adminsTable = (
     <table className="tb" style={{ minWidth: 760 }}>
       <thead>
@@ -154,21 +215,21 @@ export default function AccountsPage() {
       </thead>
       <tbody>
         {admins.map((a) => (
-          <tr key={a.account}>
+          <tr key={a.id}>
             <td style={{ fontWeight: 500 }}>{a.name}</td>
-            <td className="num" style={{ color: 'var(--steel)' }}>{a.account}</td>
-            <td>{a.scope}</td>
-            <td style={{ fontSize: 13, color: 'var(--steel)' }}>{a.perms}</td>
+            <td className="num" style={{ color: 'var(--steel)' }}>{a.username}</td>
+            <td>{a.isSuper ? '最高權限' : '一般'}</td>
+            <td style={{ fontSize: 13, color: 'var(--steel)' }}>{permsText(a)}</td>
             <td><ActiveTag active={a.active} /></td>
             {actions(
               a,
-              a.scope !== '最高權限' && (
+              !a.isSuper && (
                 <button
                   type="button"
                   className="link-btn"
                   onClick={() => {
                     setPermTarget(a)
-                    setPermDraft(a.permKeys ?? [])
+                    setPermDraft(a.permissions.filter((k) => PAGE_KEY_SET.has(k)))
                     setPermOpen(true)
                   }}
                 >
@@ -178,6 +239,7 @@ export default function AccountsPage() {
             )}
           </tr>
         ))}
+        {admins.length === 0 && emptyRow(6)}
       </tbody>
     </table>
   )
@@ -188,38 +250,39 @@ export default function AccountsPage() {
         <tr><th>姓名</th><th>帳號</th><th>狀態</th><th className="r">動作</th></tr>
       </thead>
       <tbody>
-        {STAFF.map((a) => (
-          <tr key={a.account}>
+        {staff.map((a) => (
+          <tr key={a.id}>
             <td style={{ fontWeight: 500 }}>{a.name}</td>
-            <td className="num" style={{ color: 'var(--steel)' }}>{a.account}</td>
+            <td className="num" style={{ color: 'var(--steel)' }}>{a.username}</td>
             <td><ActiveTag active={a.active} /></td>
             {actions(a)}
           </tr>
         ))}
+        {staff.length === 0 && emptyRow(4)}
       </tbody>
     </table>
   )
 
+  // 負責獎項/分組資料由「分組與評審指派」功能管理(後端尚未提供),先以 — 佔位
   const viewersTable = (
-    <>
-      <table className="tb" style={{ minWidth: 760 }}>
-        <thead>
-          <tr><th>評審</th><th>帳號</th><th>負責獎項</th><th>分組</th><th>狀態</th><th className="r">動作</th></tr>
-        </thead>
-        <tbody>
-          {VIEWERS.map((a) => (
-            <tr key={a.account}>
-              <td style={{ fontWeight: 500 }}>{a.name}</td>
-              <td className="num" style={{ color: 'var(--steel)' }}>{a.account}</td>
-              <td style={{ fontSize: 13 }}>{a.awards}</td>
-              <td style={{ fontSize: 13, color: 'var(--steel)' }}>{a.group}</td>
-              <td><ActiveTag active={a.active} /></td>
-              {actions(a)}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </>
+    <table className="tb" style={{ minWidth: 760 }}>
+      <thead>
+        <tr><th>評審</th><th>帳號</th><th>負責獎項</th><th>分組</th><th>狀態</th><th className="r">動作</th></tr>
+      </thead>
+      <tbody>
+        {viewers.map((a) => (
+          <tr key={a.id}>
+            <td style={{ fontWeight: 500 }}>{a.name}</td>
+            <td className="num" style={{ color: 'var(--steel)' }}>{a.username}</td>
+            <td style={{ fontSize: 13, color: 'var(--muted)' }}>—</td>
+            <td style={{ fontSize: 13, color: 'var(--muted)' }}>—</td>
+            <td><ActiveTag active={a.active} /></td>
+            {actions(a)}
+          </tr>
+        ))}
+        {viewers.length === 0 && emptyRow(6)}
+      </tbody>
+    </table>
   )
 
   return (
@@ -233,18 +296,20 @@ export default function AccountsPage() {
         }
       />
 
-      <div className="card" style={{ marginTop: 16, overflowX: 'auto', paddingTop: 8 }}>
-        <Tabs
-          activeKey={tab}
-          onChange={setTab}
-          style={{ padding: '0 20px' }}
-          items={[
-            { key: 'admins', label: '管理員', children: adminsTable },
-            { key: 'staff', label: '工讀生', children: staffTable },
-            { key: 'viewers', label: '評審', children: viewersTable },
-          ]}
-        />
-      </div>
+      <Spin spinning={accountsQuery.isPending}>
+        <div className="card" style={{ marginTop: 16, overflowX: 'auto', paddingTop: 8 }}>
+          <Tabs
+            activeKey={tab}
+            onChange={setTab}
+            style={{ padding: '0 20px' }}
+            items={[
+              { key: 'admins', label: '管理員', children: adminsTable },
+              { key: 'staff', label: '工讀生', children: staffTable },
+              { key: 'viewers', label: '評審', children: viewersTable },
+            ]}
+          />
+        </div>
+      </Spin>
 
       {/* 新增帳號:建立後顯示帳號與一次性密碼;destroyOnHidden+取消清空,重開不殘留 */}
       <Modal
@@ -253,6 +318,7 @@ export default function AccountsPage() {
         okText="建立帳號"
         cancelText="取消"
         destroyOnHidden
+        confirmLoading={create.isPending}
         onOk={createAccount}
         onCancel={() => {
           setCreateOpen(false)
@@ -268,15 +334,19 @@ export default function AccountsPage() {
             <Input autoFocus value={newName} onChange={(e) => setNewName(e.target.value)} />
           </div>
           <div>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>帳號</div>
-            <Input className="num" value={newAccount} onChange={(e) => setNewAccount(e.target.value)} />
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
+              <span style={{ color: '#C13B34' }}>*</span> 帳號
+            </div>
+            <Input className="num" value={newAccount} onChange={(e) => setNewAccount(e.target.value)} placeholder={USERNAME_HINT} />
           </div>
         </div>
       </Modal>
 
       {/* 權限設定(一般管理員):變更的項目以橘框標示,按「儲存」才生效 */}
       {(() => {
-        const original = permTarget?.permKeys ?? []
+        const original = permTarget ? permTarget.permissions.filter((k) => PAGE_KEY_SET.has(k)) : []
+        // 頁面清單以外的既有鍵(簽核關卡等)不受此彈窗管理,儲存時原樣保留
+        const extraKeys = permTarget ? permTarget.permissions.filter((k) => !PAGE_KEY_SET.has(k)) : []
         const permDirty =
           permDraft.length !== original.length || permDraft.some((k) => !original.includes(k))
         const closePerm = () => {
@@ -300,18 +370,19 @@ export default function AccountsPage() {
             title={`頁面權限 — ${permTarget?.name ?? ''}`}
             okText="儲存"
             cancelText="取消"
+            confirmLoading={setPermissions.isPending}
             onOk={() => {
-              // 儲存落地:寫回列表(頁面權限欄同步),重開彈窗即顯示新勾選
-              const permsText = permDraft.length
-                ? PERMISSION_KEYS.filter(([k]) => permDraft.includes(k)).map(([, l]) => l).join('、')
-                : '—'
-              setAdmins((list) =>
-                list.map((a) =>
-                  a.account === permTarget?.account ? { ...a, permKeys: [...permDraft], perms: permsText } : a,
-                ),
+              if (!permTarget) return
+              setPermissions.mutate(
+                { id: permTarget.id, permissions: [...extraKeys, ...permDraft] },
+                {
+                  onSuccess: () => {
+                    setPermOpen(false)
+                    message.success(`已更新 ${permTarget.name} 的頁面權限`)
+                  },
+                  onError: (e) => message.error(e.message),
+                },
               )
-              setPermOpen(false)
-              message.success(`已更新 ${permTarget?.name} 的頁面權限`)
             }}
             onCancel={closePerm}
             footer={(node) => (
@@ -356,18 +427,10 @@ export default function AccountsPage() {
 
       {pwTarget && (
         <OneTimePasswordModal
-          key={pwTarget.account ?? pwTarget.title}
+          key={pwTarget.account}
           title={pwTarget.title}
           account={pwTarget.account}
-          okLabel={pwTarget.resetName ? '確認重設' : undefined}
-          onOk={
-            pwTarget.resetName
-              ? () => {
-                  message.success(`已重設 ${pwTarget.resetName} 的密碼`)
-                  setPwOpen(false)
-                }
-              : undefined
-          }
+          password={pwTarget.password}
           open={pwOpen}
           onClose={() => setPwOpen(false)}
           afterClose={() => setPwTarget(null)}

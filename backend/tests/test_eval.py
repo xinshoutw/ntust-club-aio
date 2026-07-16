@@ -280,6 +280,55 @@ async def test_award_upload_progress_and_delete(client, db):
     assert detail["items"][0]["uploads"] == []
 
 
+async def test_eval_upload_dedup_survives_concurrent_sessions(db):
+    """先查後寫在兩個獨立 session 併發時會一起通過;唯一索引必須攔下第二筆。"""
+    from sqlalchemy.exc import IntegrityError
+
+    from app.core.db import async_session_factory
+
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+
+    def file_row(i: int) -> File:
+        return File(
+            club_id=club.id,
+            uploaded_by=user.id,
+            subject_type="eval_upload",
+            subject_id=1,
+            slot="o1",
+            original_name=f"same{i}.png",
+            size=10,
+            mime="image/png",
+            sha256="same-content-hash",
+            path=f"eval/2026/07/x{i}",
+        )
+
+    dup_query = sa.select(File.id).where(
+        File.club_id == club.id,
+        File.slot == "o1",
+        File.sha256 == "same-content-hash",
+        File.archived_at.is_(None),
+    )
+    async with async_session_factory() as s1, async_session_factory() as s2:
+        # 模擬 save_upload 的應用層檢查:兩個 session 都看不到對方未 commit 的列
+        assert await s1.scalar(dup_query) is None
+        assert await s2.scalar(dup_query) is None
+
+        s1.add(file_row(1))
+        await s1.commit()
+
+        s2.add(file_row(2))
+        with pytest.raises(IntegrityError):  # API 層由全域 handler 轉 409
+            await s2.commit()
+
+    # partial index 僅涵蓋 eval_upload:其他模組同 club/slot/sha 不受限
+    async with async_session_factory() as s3:
+        other = file_row(3)
+        other.subject_type = "maintenance"
+        s3.add(other)
+        await s3.commit()
+
+
 async def test_locked_award_files_cannot_be_deleted_via_other_award(client, db):
     club, user, admin = await setup(client, db)
     await _seed_award(db)

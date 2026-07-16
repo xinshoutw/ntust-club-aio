@@ -22,6 +22,16 @@ class File(Base, TimestampMixin):
             unique=True,
             postgresql_where=sa.text("archived_at IS NULL AND slot = 'report_photo'"),
         ),
+        # 評鑑上傳同槽位去重的 DB 層收口:save_upload 的先查後寫在兩個
+        # session 併發時會一起通過,唯一索引攔下第二筆(slot=rubric item_key)
+        sa.Index(
+            "uq_files_club_eval_slot_sha",
+            "club_id",
+            "slot",
+            "sha256",
+            unique=True,
+            postgresql_where=sa.text("archived_at IS NULL AND subject_type = 'eval_upload'"),
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)

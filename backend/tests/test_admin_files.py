@@ -70,9 +70,9 @@ async def test_usage_summary_with_db_text_and_repair_first(client, db):
     # 「文字內容」= 整個 DB 的估算大小(pg_database_size)
     assert data["db_size"] > 0
     assert data["total_size"] == 10800 + data["db_size"]
-    # 容量/剩餘量由後端依 storage_limits 計算(預設 40 GiB),前端不再用常數
-    assert data["capacity"] == 40 * 1024**3
-    assert data["remaining"] == data["capacity"] - data["total_size"]
+    # 容量=實際磁碟總量、剩餘=磁碟可用空間(2026-07-17:改用後端可取得的實際磁碟空間)
+    assert data["capacity"] > data["total_size"]
+    assert 0 < data["remaining"] <= data["capacity"]
 
 
 async def test_usage_order_without_repair_files(client, db):

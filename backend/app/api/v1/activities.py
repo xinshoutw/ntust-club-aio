@@ -58,7 +58,8 @@ _SORTABLE = {
 
 
 async def _validate_categories(db, items) -> None:
-    allowed = set(await get_setting(db, "budget_categories"))
+    # budget_categories 為 [{name, hint}](2026-07-17);校驗僅比對名稱
+    allowed = {c["name"] for c in await get_setting(db, "budget_categories")}
     for item in items:
         if item.category not in allowed:
             raise validation_error(f"經費科目「{item.category}」不在目錄中")

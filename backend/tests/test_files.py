@@ -162,33 +162,15 @@ async def test_club_quota_exceeded_rejected(db):
     assert await db.scalar(sa.select(sa.func.count()).select_from(File)) == 1
 
 
-async def test_global_capacity_exceeded_rejected(db):
-    club = await make_club(db)
-    user = await make_user(db, username="club01", club_id=club.id)
-    db.add(_fake_row(None, user.id, 40 * _GIB))  # 邏輯容量預設 40 GiB,已滿
-    await db.commit()
-
-    with pytest.raises(AppError) as err:
-        await file_service.save_upload(
-            db,
-            fake_upload("p.png", PNG_BYTES),
-            policy=file_service.IMAGE,
-            module="reports",
-            uploaded_by=user.id,
-            club_id=club.id,
-        )
-    assert err.value.code == "INSUFFICIENT_STORAGE"
-    assert "系統" in err.value.message
-
-
-async def test_reserve_free_space_rejected(db, monkeypatch):
+async def test_system_disk_full_rejected(db, monkeypatch):
+    """系統總量改用實際磁碟可用空間:free 小於檔案即拒絕(2026-07-17)。"""
     import collections
 
     user = await make_user(db, username="club01")
     usage = collections.namedtuple("usage", "total used free")
-    # 保留空間預設 10 GiB;剩 5 GiB → 拒絕(mock stdlib 查詢)
+    # 磁碟僅剩 10 bytes → 任何檔案都放不下(mock stdlib 查詢)
     monkeypatch.setattr(
-        file_service.shutil, "disk_usage", lambda p: usage(100 * _GIB, 95 * _GIB, 5 * _GIB)
+        file_service.shutil, "disk_usage", lambda p: usage(100 * _GIB, 100 * _GIB - 10, 10)
     )
     with pytest.raises(AppError) as err:
         await file_service.save_upload(
@@ -199,6 +181,7 @@ async def test_reserve_free_space_rejected(db, monkeypatch):
             uploaded_by=user.id,
         )
     assert err.value.code == "INSUFFICIENT_STORAGE"
+    assert "系統" in err.value.message
 
 
 async def test_archived_files_not_counted_in_quota(db):

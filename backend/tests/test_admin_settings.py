@@ -34,10 +34,14 @@ async def test_get_defaults(client, db):
     assert data["activity_attachment_total_mb"] == 15
     assert data["maintenance_total_mb"] == 100
     assert data["close_photo_total_mb"] == 10
-    assert data["storage_limits"] == {"capacity_gib": 40, "per_club_gib": 2, "reserve_gib": 10}
+    # 系統總量改用實際磁碟空間;設定僅留單一社團配額(移除 capacity/reserve)
+    assert data["storage_limits"] == {"per_club_gib": 2}
     assert data["eval_window"]["year"] == 116
     assert "其他" in data["violation_items"]
-    assert "膳食費" in data["budget_categories"]
+    # 經費科目改為 [{name, hint}]
+    names = [c["name"] for c in data["budget_categories"]]
+    assert "膳食費" in names
+    assert any(c["name"] == "保險費" and c["hint"] for c in data["budget_categories"])
     # 不再提供「線上報名時間窗」鍵(報名窗由各報名活動起訖決定)
     assert "signup_window" not in data and "reg_window" not in data
 
@@ -105,22 +109,16 @@ async def test_put_validations(client, db):
     )
     assert resp.status_code == 422
 
-    # 清成空清單
+    # 清成空清單(每項名稱皆空)
     resp = await client.put(
-        URL, json={"budget_categories": ["  "]}, headers=csrf_headers(client)
+        URL, json={"budget_categories": [{"name": "  ", "hint": ""}]}, headers=csrf_headers(client)
     )
     assert resp.status_code == 422
 
-    # 儲存配額:單一社團配額不得超過總容量;數值須為正
+    # 儲存配額:單一社團配額須為正整數(不再有 capacity/reserve)
     resp = await client.put(
         URL,
-        json={"storage_limits": {"capacity_gib": 10, "per_club_gib": 20, "reserve_gib": 5}},
-        headers=csrf_headers(client),
-    )
-    assert resp.status_code == 422
-    resp = await client.put(
-        URL,
-        json={"storage_limits": {"capacity_gib": 0, "per_club_gib": 1, "reserve_gib": 1}},
+        json={"storage_limits": {"per_club_gib": 0}},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
@@ -130,18 +128,37 @@ async def test_storage_limits_update_and_audit(client, db):
     await seed(client, db)
     resp = await client.put(
         URL,
-        json={"storage_limits": {"capacity_gib": 60, "per_club_gib": 3, "reserve_gib": 12}},
+        json={"storage_limits": {"per_club_gib": 3}},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 200, resp.text
     data = resp.json()["data"]
-    assert data["storage_limits"] == {"capacity_gib": 60, "per_club_gib": 3, "reserve_gib": 12}
+    assert data["storage_limits"] == {"per_club_gib": 3}
 
     stored = await db.get(SystemSetting, "storage_limits")
-    assert stored.value["capacity_gib"] == 60
+    assert stored.value["per_club_gib"] == 3
     audit_row = await db.scalar(sa.select(AuditLog).where(AuditLog.action == "settings_updated"))
     assert audit_row is not None
     assert "storage_limits" in audit_row.detail
+
+
+async def test_budget_categories_with_hints(client, db):
+    """經費科目為 [{name, hint}];依名稱去重保序,寫入後可讀回。"""
+    await seed(client, db)
+    resp = await client.put(
+        URL,
+        json={
+            "budget_categories": [
+                {"name": "膳食費", "hint": "含茶點"},
+                {"name": "膳食費", "hint": "重複名稱去除"},
+                {"name": "交通費", "hint": ""},
+            ]
+        },
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    cats = resp.json()["data"]["budget_categories"]
+    assert cats == [{"name": "膳食費", "hint": "含茶點"}, {"name": "交通費", "hint": ""}]
 
 
 async def test_fixed_window_setting_drives_club_endpoint(client, db):

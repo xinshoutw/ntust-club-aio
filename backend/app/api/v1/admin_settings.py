@@ -36,6 +36,15 @@ MANAGED_KEYS = (
 )
 
 
+def _to_json(value: Any) -> Any:
+    """序列化設定值:物件用其 to_json();list 逐項展開(如 budget_categories 的 {name,hint})。"""
+    if hasattr(value, "to_json"):
+        return value.to_json()
+    if isinstance(value, list):
+        return [_to_json(item) for item in value]
+    return value
+
+
 @router.get("")
 async def get_settings(user: SuperAdmin, db: DbDep) -> ApiResponse[dict[str, Any]]:
     data = {key: await get_setting(db, key) for key in MANAGED_KEYS}
@@ -49,7 +58,7 @@ async def update_settings(
     changed = body.model_dump(exclude_unset=True, exclude_none=True)
     for key in changed:
         value = getattr(body, key)
-        await set_setting(db, key, value.to_json() if hasattr(value, "to_json") else value)
+        await set_setting(db, key, _to_json(value))
     if changed:
         audit.record(
             db,

@@ -8,17 +8,21 @@ from app.models import SystemSetting
 
 # 預設值(DB 無該 key 時採用;行政調整後以 DB 為準)
 DEFAULTS: dict[str, Any] = {
-    # 經費科目九項(2026-07-13 定案;UI 提示文字由前端維護)
+    # 經費科目九項(2026-07-13 定案);2026-07-17 起每項含 hint(選填),
+    # 社團填申請時依所選科目顯示;{name, hint} 由行政後台維護
     "budget_categories": [
-        "指導老師、教練費",
-        "保險費",
-        "交通費",
-        "膳食費",
-        "印刷費",
-        "比賽獎勵品",
-        "雜支",
-        "其他",
-        "活動收入",
+        {"name": "指導老師、教練費", "hint": "請在下方加註講師相關專業工作背景"},
+        {
+            "name": "保險費",
+            "hint": "保額上限為新台幣 100 萬元，申請學校補助要保人為國立臺灣科技大學",
+        },
+        {"name": "交通費", "hint": "若租賃遊覽車請於結案時上傳行照、駕照及租賃契約"},
+        {"name": "膳食費", "hint": ""},
+        {"name": "印刷費", "hint": ""},
+        {"name": "比賽獎勵品", "hint": ""},
+        {"name": "雜支", "hint": "請在下方註明細項內容"},
+        {"name": "其他", "hint": "請在下方註明細項內容"},
+        {"name": "活動收入", "hint": "請在下方註明活動預計收入總金額"},
     ],
     # 違規勸導項目目錄(原型 VIOL_ITEMS;行政可調)
     "violation_items": [
@@ -45,11 +49,9 @@ DEFAULTS: dict[str, Any] = {
     "activity_attachment_total_mb": 15,
     "maintenance_total_mb": 100,
     "close_photo_total_mb": 10,
-    # 儲存容量/配額(GiB;2026-07-17 資安審查):capacity=應用程式邏輯可用容量
-    # (含 DB 估算大小,與檔案管理頁一致)、per_club=單一社團未歸檔檔案上限、
-    # reserve=filesystem 實際保留空間(防 DB/log/temp 佔用)。
-    # 調高 capacity 前必須先擴 GCE Persistent Disk;此為邏輯值,不代表實體磁碟
-    "storage_limits": {"capacity_gib": 40, "per_club_gib": 2, "reserve_gib": 10},
+    # 儲存配額(GiB):系統總量改用後端可取得的實際磁碟空間(不再設邏輯容量與保留空間,
+    # 2026-07-17 需求方:容量不足告警之後人為介入);此處僅保留單一社團未歸檔檔案上限
+    "storage_limits": {"per_club_gib": 2},
     # 評鑑視窗(2026-07-14 拍板:預設 116 年,2026/02/01–2027/01/31)
     # ad7/ad8 以「場次日期落在視窗」採計(2026-07-16 第九輪,無年度對齊問題)
     "eval_window": {"year": 116, "start": "2026-02-01", "end": "2027-01-31"},

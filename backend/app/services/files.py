@@ -197,27 +197,20 @@ async def save_upload(
     sniff, mime = _SIGNATURES[ext]
     max_size = await _policy_max_size(db, policy)
 
-    # 配額檢查(2026-07-17 資安審查):quota 在此共用服務收口,不逐 endpoint 補。
-    # 此處先做「無鎖」預檢與逐塊 best-effort 早退;權威結算在串流完成後
-    # 取 advisory lock 再重算(避免慢速上傳在串流期間霸佔全域鎖)
+    # 配額檢查(2026-07-17 需求方:系統總量改用實際磁碟可用空間,不再設邏輯容量與保留空間;
+    # 容量不足告警之後人為介入)。此處先做「無鎖」預檢;per-club 權威結算在串流完成後取
+    # advisory lock 再重算(避免慢速上傳在串流期間霸佔全域鎖)
     limits = await get_setting(db, "storage_limits")
-    reserve = int(limits["reserve_gib"]) * _GIB
-    logical_remaining = (
-        int(limits["capacity_gib"]) * _GIB - await storage_usage(db) - await database_size(db)
-    )
     club_remaining = None
     if club_id is not None:
         club_remaining = int(limits["per_club_gib"]) * _GIB - await storage_usage(db, club_id)
 
-    upload_root = Path(settings.upload_dir)
-    upload_root.mkdir(parents=True, exist_ok=True)
+    disk_root = upload_root()
     # 預檢:無宣告大小時以政策上限保守估計,不等 .part 寫完才發現超額
     declared = upload.size if upload.size else max_size
     if club_remaining is not None and declared > club_remaining:
         raise _insufficient(_CLUB_FULL)
-    if declared > logical_remaining:
-        raise _insufficient(_SYSTEM_FULL)
-    if shutil.disk_usage(upload_root).free - declared < reserve:
+    if declared > shutil.disk_usage(disk_root).free:
         raise _insufficient(_SYSTEM_FULL)
 
     file_id = uuid.uuid4()
@@ -243,18 +236,15 @@ async def save_upload(
                 # 實際累積大小仍逐塊檢查:宣告 size 是 client 可控值,不可盡信
                 if club_remaining is not None and size > club_remaining:
                     raise _insufficient(_CLUB_FULL)
-                if size > logical_remaining:
-                    raise _insufficient(_SYSTEM_FULL)
-                if shutil.disk_usage(upload_root).free < reserve:
-                    raise _insufficient(_SYSTEM_FULL)
+                # 磁碟寫爆由 OS ENOSPC 於 out.write 拋出,交由外層 except 清 tmp
                 hasher.update(chunk)
                 out.write(chunk)
         if first:  # 空檔案
             raise AppError(415, "UNSUPPORTED_FILE_TYPE", "檔案內容與副檔名不符")
 
-        # 權威配額結算:lock 只覆蓋「重算剩餘量 → flush → 呼叫端 commit」,
+        # per-club 權威配額結算:lock 只覆蓋「重算剩餘量 → flush → 呼叫端 commit」,
         # 不含串流期間(慢速上傳不得霸佔全域鎖);兩個並發上傳在此序列化,
-        # 不得同時看見相同剩餘量
+        # 不得同時看見相同剩餘量。系統總量以實際磁碟空間為準,無邏輯上限需在此重算
         # ponytail: 結算仍是全域一把鎖;單校流量足夠,吞吐不足再改 reservation table
         await db.execute(
             sa.text("SELECT pg_advisory_xact_lock(:key)"), {"key": _STORAGE_LOCK_KEY}
@@ -263,11 +253,6 @@ async def save_upload(
             club_remaining = int(limits["per_club_gib"]) * _GIB - await storage_usage(db, club_id)
             if size > club_remaining:
                 raise _insufficient(_CLUB_FULL)
-        logical_remaining = (
-            int(limits["capacity_gib"]) * _GIB - await storage_usage(db) - await database_size(db)
-        )
-        if size > logical_remaining:
-            raise _insufficient(_SYSTEM_FULL)
 
         sha256 = hasher.hexdigest()
         if dedup is not None:
@@ -312,6 +297,13 @@ async def save_upload(
         dest.unlink(missing_ok=True)
         raise
     return row
+
+
+def upload_root() -> Path:
+    """上傳根目錄(容量統計與配額檢查共用)。"""
+    root = Path(settings.upload_dir)
+    root.mkdir(parents=True, exist_ok=True)
+    return root
 
 
 async def total_uploaded(

@@ -52,25 +52,13 @@ class UploadLimitsIn(BaseModel):
 
 
 class StorageLimitsIn(BaseModel):
-    """儲存容量/配額(GiB)。capacity 為應用程式邏輯容量(含 DB 估算大小);
-    調高前必須先擴 GCE Persistent Disk,面板僅調整邏輯值。"""
+    """儲存配額(GiB):系統總量改用實際磁碟空間,此處僅單一社團未歸檔檔案上限
+    (2026-07-17 需求方:移除邏輯容量與保留空間)。"""
 
-    capacity_gib: int = Field(ge=1, le=4096)
     per_club_gib: int = Field(ge=1, le=1024)
-    reserve_gib: int = Field(ge=1, le=1024)
-
-    @model_validator(mode="after")
-    def _club_within_capacity(self):
-        if self.per_club_gib > self.capacity_gib:
-            raise ValueError("單一社團配額不得超過系統總容量")
-        return self
 
     def to_json(self) -> dict[str, Any]:
-        return {
-            "capacity_gib": self.capacity_gib,
-            "per_club_gib": self.per_club_gib,
-            "reserve_gib": self.reserve_gib,
-        }
+        return {"per_club_gib": self.per_club_gib}
 
 
 class EvalWindowIn(BaseModel):
@@ -105,6 +93,16 @@ def _clean_items(v: list[str], label: str) -> list[str]:
     return cleaned
 
 
+class BudgetCategoryIn(BaseModel):
+    """經費科目:名稱 + 選填提示(社團填申請時依所選科目顯示)。"""
+
+    name: str = Field(min_length=1, max_length=50)
+    hint: str = Field("", max_length=200)
+
+    def to_json(self) -> dict[str, str]:
+        return {"name": self.name.strip(), "hint": self.hint.strip()}
+
+
 class SettingsUpdateIn(BaseModel):
     """PUT /admin/settings:部分更新,只寫有帶的鍵。"""
 
@@ -118,7 +116,7 @@ class SettingsUpdateIn(BaseModel):
     storage_limits: StorageLimitsIn | None = None
     eval_window: EvalWindowIn | None = None
     violation_items: list[str] | None = Field(None, max_length=50)
-    budget_categories: list[str] | None = Field(None, max_length=50)
+    budget_categories: list[BudgetCategoryIn] | None = Field(None, max_length=50)
 
     @field_validator("violation_items")
     @classmethod
@@ -127,5 +125,16 @@ class SettingsUpdateIn(BaseModel):
 
     @field_validator("budget_categories")
     @classmethod
-    def _budget(cls, v: list[str] | None) -> list[str] | None:
-        return None if v is None else _clean_items(v, "經費科目")
+    def _budget(cls, v: list[BudgetCategoryIn] | None) -> list[BudgetCategoryIn] | None:
+        if v is None:
+            return None
+        seen: set[str] = set()
+        out: list[BudgetCategoryIn] = []
+        for c in v:
+            name = c.name.strip()
+            if name and name not in seen:  # 依名稱去重保序
+                seen.add(name)
+                out.append(c)
+        if not out:
+            raise ValueError("經費科目至少需保留一項")
+        return out

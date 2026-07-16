@@ -6,6 +6,7 @@
 - 報修檔案可直接刪除(影片佔用大);其餘模組依歸檔政策由系統管理
 """
 
+import shutil
 import uuid
 from typing import Annotated
 
@@ -20,7 +21,6 @@ from app.schemas.admin import AdminFileOut, FileUsageModuleOut, FileUsageOut
 from app.schemas.common import ApiResponse
 from app.services import audit
 from app.services import files as file_service
-from app.services.settings_service import get_setting
 
 router = APIRouter(prefix="/admin/files", tags=["admin"])
 
@@ -77,9 +77,9 @@ async def usage(user: FilesAdmin, db: DbDep) -> ApiResponse[FileUsageOut]:
 
     db_size = await file_service.database_size(db)
     files_total = sum(s["size"] for s in stats.values())
-    # 容量與剩餘量由後端依 storage_limits 計算;前端不再自帶容量常數
-    limits = await get_setting(db, "storage_limits")
-    capacity = int(limits["capacity_gib"]) * 1024**3
+    # 容量改用後端可取得的實際磁碟空間(2026-07-17 需求方:不再設邏輯容量);
+    # capacity=磁碟總量、remaining=磁碟實際可用空間(已反映 DB/log/其他佔用)
+    disk = shutil.disk_usage(file_service.upload_root())
     return ApiResponse(
         data=FileUsageOut(
             modules=[
@@ -90,8 +90,8 @@ async def usage(user: FilesAdmin, db: DbDep) -> ApiResponse[FileUsageOut]:
             ],
             db_size=db_size,
             total_size=files_total + db_size,
-            capacity=capacity,
-            remaining=max(0, capacity - files_total - db_size),
+            capacity=disk.total,
+            remaining=disk.free,
         )
     )
 

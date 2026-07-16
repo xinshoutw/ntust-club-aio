@@ -68,7 +68,7 @@ async def get_auth(request: Request, response: Response, db: DbDep) -> tuple[Ses
     now = datetime.now(UTC)
     session = await db.get(Session, session_id)
     if session is None or session.expires_at <= now:
-        raise unauthenticated("登入已過期,請重新登入")
+        raise unauthenticated("登入憑證已過期，請重新登入")
 
     user = await db.get(User, session.user_id)
     if user is None or not user.is_active:
@@ -77,7 +77,7 @@ async def get_auth(request: Request, response: Response, db: DbDep) -> tuple[Ses
     if request.method in UNSAFE_METHODS:
         token = request.headers.get(CSRF_HEADER, "")
         if not token or not secrets.compare_digest(token, session.csrf_token):
-            raise forbidden("CSRF 驗證失敗,請重新整理頁面", code="CSRF_FAILED")
+            raise forbidden("CSRF 驗證失敗，請重新整理頁面", code="CSRF_FAILED")
 
     if session.expires_at < now + SESSION_TTL - SESSION_RENEW_INTERVAL:
         session.expires_at = now + SESSION_TTL

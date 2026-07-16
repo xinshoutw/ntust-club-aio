@@ -80,6 +80,18 @@ export default function SignupBuilderPage() {
     }
   }, [dragKey])
 
+  // 鍵盤重排(無障礙):把手為可聚焦按鈕,方向鍵上/下移一格;拖曳仍為指標增強
+  const moveField = (key: number, delta: -1 | 1) =>
+    setFields((fs) => {
+      const from = fs.findIndex((f) => f.key === key)
+      const to = from + delta
+      if (from < 0 || to < 0 || to >= fs.length) return fs
+      const next = [...fs]
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
+      return next
+    })
+
   const update = (key: number, patch: Partial<BuilderField>) =>
     setFields((fs) => fs.map((f) => (f.key === key ? { ...f, ...patch } : f)))
 
@@ -291,14 +303,31 @@ export default function SignupBuilderPage() {
                   style={dragKey === f.key ? { opacity: 0.45, boxShadow: '0 2px 10px rgba(31,36,48,.18)' } : undefined}
                 >
                   <div className="builder-field-main">
-                    <HolderOutlined
-                      style={{ color: 'var(--muted)', cursor: dragKey === f.key ? 'grabbing' : 'grab', touchAction: 'none' }}
-                      aria-label="拖曳排序"
+                    <button
+                      type="button"
+                      aria-label={`調整「${f.label || '未命名欄位'}」順序:方向鍵上下移動,亦可拖曳`}
+                      style={{
+                        border: 'none',
+                        background: 'none',
+                        padding: 2,
+                        display: 'inline-flex',
+                        color: 'var(--steel)',
+                        cursor: dragKey === f.key ? 'grabbing' : 'grab',
+                        touchAction: 'none',
+                      }}
                       onPointerDown={(e) => {
                         e.preventDefault()
                         setDragKey(f.key)
                       }}
-                    />
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                          e.preventDefault()
+                          moveField(f.key, e.key === 'ArrowUp' ? -1 : 1)
+                        }
+                      }}
+                    >
+                      <HolderOutlined />
+                    </button>
                     <Input
                       value={f.label}
                       onChange={(e) => update(f.key, { label: e.target.value })}

@@ -334,7 +334,7 @@ async def test_availability_grid_statuses(client, db):
     await open_fixed_window(db)
     activity = await make_activity(db, club)
 
-    # 自己的臨時申請(pending)→ mine
+    # 自己的臨時申請(pending)→ pending(2026-07-17:自己審核中不再標 mine)
     await client.post(
         "/api/v1/club/venue-bookings",
         json={
@@ -378,8 +378,9 @@ async def test_availability_grid_statuses(client, db):
     grid = (
         await client.get("/api/v1/club/bookings/availability", params={"date": "2026-03-05"})
     ).json()["data"]["grid"]
-    assert grid[str(venue.id)]["3"] == "mine"
-    assert grid[str(venue.id)]["7"] == "pending"
+    # 本社的臨時申請仍在審核中 → pending(非 mine);格帶社團名供 hover
+    assert grid[str(venue.id)]["3"] == {"status": "pending", "club": "熱舞社"}
+    assert grid[str(venue.id)]["7"] == {"status": "pending", "club": "吉他社"}
     # 審核中的固定借用不顯示(2026-07-15:場況圖只顯示已核准的固定借用)
     assert str(fixed_venue.id) not in grid
 
@@ -390,12 +391,12 @@ async def test_availability_grid_statuses(client, db):
     grid = (
         await client.get("/api/v1/club/bookings/availability", params={"date": "2026-03-05"})
     ).json()["data"]["grid"]
-    assert grid[str(fixed_venue.id)]["5"] == "fixed"
+    assert grid[str(fixed_venue.id)]["5"] == {"status": "fixed", "club": "吉他社"}
     # 每週固定:下週同星期也佔用,不同星期不佔用
     grid = (
         await client.get("/api/v1/club/bookings/availability", params={"date": "2026-03-12"})
     ).json()["data"]["grid"]
-    assert grid[str(fixed_venue.id)]["5"] == "fixed"
+    assert grid[str(fixed_venue.id)]["5"]["status"] == "fixed"
     grid = (
         await client.get("/api/v1/club/bookings/availability", params={"date": "2026-03-06"})
     ).json()["data"]["grid"]
@@ -444,11 +445,12 @@ async def test_availability_range(client, db):
     ).json()["data"]["days"]
     by_date = {d["date"]: d["grid"] for d in days}
     assert list(by_date) == [f"2026-03-{i:02d}" for i in range(4, 13)]  # 連續、含頭尾
-    assert by_date["2026-03-05"][str(venue.id)]["3"] == "mine"  # 臨時只佔當日
+    # 臨時只佔當日;本社審核中 → pending(非 mine)
+    assert by_date["2026-03-05"][str(venue.id)]["3"]["status"] == "pending"
     assert str(venue.id) not in by_date["2026-03-06"]
     # 固定每週同星期(3/5、3/12 皆週四);自己社的固定借用顯示 mine;其他日不佔
-    assert by_date["2026-03-05"][str(fixed_venue.id)]["5"] == "mine"
-    assert by_date["2026-03-12"][str(fixed_venue.id)]["5"] == "mine"
+    assert by_date["2026-03-05"][str(fixed_venue.id)]["5"]["status"] == "mine"
+    assert by_date["2026-03-12"][str(fixed_venue.id)]["5"]["status"] == "mine"
     assert str(fixed_venue.id) not in by_date["2026-03-06"]
 
     # 區間驗證:起訖顛倒、超出上限

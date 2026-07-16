@@ -23,6 +23,7 @@ import {
   useAvailabilityDays,
   useVenues,
   venueLabel,
+  type AvailabilityCell,
   type AvailabilityGrid,
   type AvailabilityState,
   type Venue,
@@ -43,14 +44,19 @@ const STATE_OF: Record<AvailabilityState, CellState> = {
   mine: 'mine',
 }
 
-function cellState(venue: Venue, grid: AvailabilityGrid | undefined, period: string): CellState {
-  const s = grid?.[String(venue.id)]?.[period]
-  if (s) return STATE_OF[s]
-  return venue.allowTemp ? 'free' : 'closed'
+function cellOf(
+  venue: Venue,
+  grid: AvailabilityGrid | undefined,
+  period: string,
+): { state: CellState; club?: string } {
+  const c: AvailabilityCell | undefined = grid?.[String(venue.id)]?.[period]
+  if (c) return { state: STATE_OF[c.status], club: c.club }
+  return { state: venue.allowTemp ? 'free' : 'closed' }
 }
 
-// 單一場地格:可借才可點(直接前往臨時場地借用);審核中不可點;不開放不畫方框
-function Cell({ state, label, onBook }: { state: CellState; label: string; onBook: () => void }) {
+// 單一場地格:可借才可點(直接前往臨時場地借用);審核中不可點;不開放不畫方框。
+// 被佔用格 hover 顯示借用社團名(mine 顯示「我的社團」語意由色塊表達,仍附社名)
+function Cell({ state, label, club, onBook }: { state: CellState; label: string; club?: string; onBook: () => void }) {
   const base: React.CSSProperties = { width: '100%', height: 24, borderRadius: 4, background: CELL[state].bg, display: 'block' }
   if (state === 'free') {
     return (
@@ -62,7 +68,9 @@ function Cell({ state, label, onBook }: { state: CellState; label: string; onBoo
       />
     )
   }
-  return <div role="img" aria-label={label} style={base} />
+  const cell = <div role="img" aria-label={club ? `${label}(${club})` : label} style={base} />
+  // 被佔用格(有社團名)才掛 tooltip;不開放格無社名不掛
+  return club ? <Tooltip title={`${club}・${CELL[state].label}`}>{cell}</Tooltip> : cell
 }
 
 function Legend() {
@@ -258,11 +266,11 @@ export default function BookingOverviewPage() {
                         )}
                       </td>
                       {PERIODS.map((p) => {
-                        const state = cellState(v, dayQuery.data, p)
+                        const { state, club } = cellOf(v, dayQuery.data, p)
                         const label = `${v.name} 第${p}節:${CELL[state].label}`
                         return (
                           <td key={p}>
-                            <Cell state={state} label={label} onBook={() => book(v.id, gridDate, p)} />
+                            <Cell state={state} label={label} club={club} onBook={() => book(v.id, gridDate, p)} />
                           </td>
                         )
                       })}
@@ -290,11 +298,11 @@ export default function BookingOverviewPage() {
                           {d.format('MM/DD')}（{WEEKDAY[d.day()]}）
                         </td>
                         {PERIODS.map((p) => {
-                          const state = cellState(venueDef, grid, p)
+                          const { state, club } = cellOf(venueDef, grid, p)
                           const label = `${d.format('MM/DD')} 第${p}節:${CELL[state].label}`
                           return (
                             <td key={p}>
-                              <Cell state={state} label={label} onBook={() => book(venueDef.id, d, p)} />
+                              <Cell state={state} label={label} club={club} onBook={() => book(venueDef.id, d, p)} />
                             </td>
                           )
                         })}

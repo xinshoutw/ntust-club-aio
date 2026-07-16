@@ -95,7 +95,12 @@ const toEquipment = (e: EquipmentOut): EquipmentItem => ({
 
 /** 後端僅回傳被佔用/審核中的格子;其餘由前端依場地開放旗標補 可借/不開放 */
 export type AvailabilityState = 'pending' | 'temp' | 'fixed' | 'mine'
-export type AvailabilityGrid = Record<string, Partial<Record<string, AvailabilityState>>>
+/** 每格帶狀態與借用社團名(hover 顯示) */
+export interface AvailabilityCell {
+  status: AvailabilityState
+  club: string
+}
+export type AvailabilityGrid = Record<string, Partial<Record<string, AvailabilityCell>>>
 
 interface AvailabilityOut {
   date: string

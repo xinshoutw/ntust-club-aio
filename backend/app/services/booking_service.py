@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.semesters import TAIPEI
 from app.models import (
     Activity,
+    Club,
     EquipmentLoan,
     Holiday,
     RoomBookingRequest,
@@ -169,63 +170,68 @@ async def overdue_deadline(db: AsyncSession, end_date: date, return_time: str) -
 
 async def availability_grid(
     db: AsyncSession, day: date, own_club_id: int | None
-) -> dict[int, dict[str, str]]:
+) -> dict[int, dict[str, dict]]:
     """單日場況(區間版的特例);格式見 availability_grids。"""
     return (await availability_grids(db, day, day, own_club_id))[day]
 
 
 async def availability_grids(
     db: AsyncSession, start: date, end: date, own_club_id: int | None
-) -> dict[date, dict[int, dict[str, str]]]:
-    """逐日場況:日 → 場地 × 節次 → 狀態:pending(審核中)/temp(臨時)/fixed(固定)/mine(自己)。
+) -> dict[date, dict[int, dict[str, dict]]]:
+    """逐日場況:日 → 場地 × 節次 → {status, club}。
+    status:pending(審核中)/temp(臨時)/fixed(固定)/mine(自己已核准);club=借用社團名(hover 顯示)。
 
     - 只回傳被佔用/審核中的格子;其餘由前端依 venue 開放旗標補 available/closed
     - 固定借用為每週固定時段(weekday 對應);只顯示已核准,審核中的固定借用不顯示
-    - 審核中僅顯示臨時借用(2026-07-15)
+    - 審核中(含本社)一律標 pending;本社**已核准**才標 mine(2026-07-17 修正:自己審核中不再誤標我的借用)
     - 區間一次撈(單一場地 15 天檢視原逐日 15 請求,2026-07-17 改批次)
     """
-    grids: dict[date, dict[int, dict[str, str]]] = {
+    grids: dict[date, dict[int, dict[str, dict]]] = {
         start + timedelta(days=i): {} for i in range((end - start).days + 1)
     }
 
-    def mark(day: date, venue_id: int, period: str, status: str) -> None:
+    def mark(day: date, venue_id: int, period: str, status: str, club: str) -> None:
         cell = grids[day].setdefault(venue_id, {})
         # mine 優先顯示;已核准蓋過審核中
         rank = {"pending": 0, "temp": 1, "fixed": 1, "mine": 2}
-        if period not in cell or rank[status] > rank[cell[period]]:
-            cell[period] = status
+        current = cell.get(period)
+        if current is None or rank[status] > rank[current["status"]]:
+            cell[period] = {"status": status, "club": club}
 
-    temp_rows = await db.execute(
-        sa.select(VenueBooking).where(
-            VenueBooking.date >= start,
-            VenueBooking.date <= end,
-            VenueBooking.status != BookingStatus.REJECTED,
+    temp_rows = (
+        await db.execute(
+            sa.select(VenueBooking, Club.name)
+            .join(Club, VenueBooking.club_id == Club.id)
+            .where(
+                VenueBooking.date >= start,
+                VenueBooking.date <= end,
+                VenueBooking.status != BookingStatus.REJECTED,
+            )
         )
-    )
-    for booking in temp_rows.scalars():
+    ).all()
+    for booking, club_name in temp_rows:
+        # 本社已核准=mine;其餘已核准=temp;審核中(含本社)=pending
+        if booking.status == BookingStatus.APPROVED:
+            status = "mine" if booking.club_id == own_club_id else "temp"
+        else:
+            status = "pending"
         for period in booking.periods:
-            if booking.club_id == own_club_id:
-                mark(booking.date, booking.venue_id, period, "mine")
-            elif booking.status == BookingStatus.APPROVED:
-                mark(booking.date, booking.venue_id, period, "temp")
-            else:
-                mark(booking.date, booking.venue_id, period, "pending")
+            mark(booking.date, booking.venue_id, period, status, club_name)
 
     fixed_rows = (
         await db.execute(
-            sa.select(RoomBookingSlot, RoomBookingRequest)
+            sa.select(RoomBookingSlot, RoomBookingRequest, Club.name)
             .join(RoomBookingRequest, RoomBookingSlot.request_id == RoomBookingRequest.id)
+            .join(Club, RoomBookingRequest.club_id == Club.id)
             .where(RoomBookingRequest.status == BookingStatus.APPROVED)
         )
     ).all()
     for day in grids:
-        for slot, request in fixed_rows:
+        for slot, request, club_name in fixed_rows:
             if slot.weekday != day.isoweekday():
                 continue
-            if request.club_id == own_club_id:
-                mark(day, request.venue_id, slot.period, "mine")
-            else:
-                mark(day, request.venue_id, slot.period, "fixed")
+            status = "mine" if request.club_id == own_club_id else "fixed"
+            mark(day, request.venue_id, slot.period, status, club_name)
 
     return grids
 

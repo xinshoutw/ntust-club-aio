@@ -8,6 +8,7 @@
 """
 
 import re
+import secrets
 from datetime import timedelta
 
 from argon2 import PasswordHasher
@@ -43,6 +44,38 @@ def verify_password(password_hash: str | None, password: str) -> bool:
 
 def needs_rehash(password_hash: str) -> bool:
     return _hasher.check_needs_rehash(password_hash)
+
+
+# 一次性密碼字元集:排除易混淆字元(0/O、1/l/I);特殊符號挑不需 shift 組合鍵盤差異的
+_PW_UPPER = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+_PW_LOWER = "abcdefghijkmnpqrstuvwxyz"
+_PW_DIGIT = "23456789"
+_PW_SYMBOL = "!@#$%^&*-_+="
+_PW_ALL = _PW_UPPER + _PW_LOWER + _PW_DIGIT + _PW_SYMBOL
+
+ONE_TIME_PASSWORD_LENGTH = 12
+
+
+def generate_password(length: int = ONE_TIME_PASSWORD_LENGTH) -> str:
+    """產生符合密碼政策的一次性密碼(四類字元各至少一個)。"""
+    length = max(length, PASSWORD_MIN_LENGTH)
+    while True:
+        chars = [
+            secrets.choice(_PW_UPPER),
+            secrets.choice(_PW_LOWER),
+            secrets.choice(_PW_DIGIT),
+            secrets.choice(_PW_SYMBOL),
+        ] + [secrets.choice(_PW_ALL) for _ in range(length - 4)]
+        # secrets 洗牌:每個位置與隨機尾段交換(random.shuffle 非密碼學安全)
+        for i in range(len(chars) - 1, 0, -1):
+            j = secrets.randbelow(i + 1)
+            chars[i], chars[j] = chars[j], chars[i]
+        password = "".join(chars)
+        try:
+            validate_password_strength(password)
+        except Exception:  # noqa: BLE001 - 極小機率不合格,重抽
+            continue
+        return password
 
 
 def validate_password_strength(password: str) -> None:

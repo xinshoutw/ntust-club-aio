@@ -81,8 +81,7 @@ export default function LoginPage() {
     >
       <div className="card" style={{ width: 400, maxWidth: '100%', padding: '44px 40px 36px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginBottom: 30, textAlign: 'center' }}>
-          <div style={{ fontWeight: 700, fontSize: 20, letterSpacing: 1 }}>臺科大社團管理系統</div>
-          <div style={{ fontSize: 12, color: 'var(--steel)', letterSpacing: 3 }}>國立臺灣科技大學 學生事務處</div>
+          <div style={{ fontWeight: 700, fontSize: 20, letterSpacing: 1 }}>社團管理系統</div>
         </div>
 
         <form
@@ -97,7 +96,7 @@ export default function LoginPage() {
             <Input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="學號或社團帳號"
+              placeholder="請輸入帳號"
               autoComplete="username"
             />
           </label>

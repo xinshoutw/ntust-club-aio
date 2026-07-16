@@ -1,16 +1,15 @@
 from fastapi import APIRouter, Request, Response
 
-from app.core.config import settings
 from app.core.deps import (
     CSRF_COOKIE,
     SESSION_COOKIE,
     AuthDep,
     DbDep,
     client_ip,
+    set_auth_cookies,
 )
 from app.core.errors import AppError, rate_limited
 from app.core.rate_limit import login_limiter
-from app.core.security import SESSION_TTL
 from app.models import Club, User
 from app.schemas.auth import ChangePasswordRequest, LoginRequest, UserOut
 from app.schemas.common import ApiResponse
@@ -25,32 +24,6 @@ async def _user_out(db: DbDep, user: User) -> UserOut:
         club = await db.get(Club, user.club_id)
         out.club_name = club.name if club else None
     return out
-
-_COOKIE_MAX_AGE = int(SESSION_TTL.total_seconds())
-
-
-def _set_auth_cookies(response: Response, session_id: str, csrf_token: str) -> None:
-    secure = settings.env == "prod"
-    response.set_cookie(
-        SESSION_COOKIE,
-        session_id,
-        max_age=_COOKIE_MAX_AGE,
-        httponly=True,
-        samesite="lax",
-        secure=secure,
-        path="/",
-    )
-    # CSRF cookie 供前端 JS 讀取後以 X-CSRF-Token header 回送(double-submit)
-    response.set_cookie(
-        CSRF_COOKIE,
-        csrf_token,
-        max_age=_COOKIE_MAX_AGE,
-        httponly=False,
-        samesite="lax",
-        secure=secure,
-        path="/",
-    )
-
 
 @router.post("/login")
 async def login(
@@ -70,7 +43,7 @@ async def login(
     except AppError:
         login_limiter.hit(ip or "unknown")  # 只計失敗:校園 NAT 下成功登入不佔額度
         raise
-    _set_auth_cookies(response, str(session.id), session.csrf_token)
+    set_auth_cookies(response, str(session.id), session.csrf_token)
     return ApiResponse(data=await _user_out(db, user))
 
 

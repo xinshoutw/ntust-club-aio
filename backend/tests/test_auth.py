@@ -180,15 +180,25 @@ async def test_session_sliding_renewal(client, db):
     await make_user(db, username="club01")
     await login(client, "club01")
 
+    # 未達續期門檻的請求不重送 cookie(避免每請求 Set-Cookie)
+    resp = await client.get("/api/v1/auth/me")
+    assert "set-cookie" not in resp.headers
+
     # 模擬只剩 1 小時效期
     await db.execute(
         sa.update(Session).values(expires_at=datetime.now(UTC) + timedelta(hours=1))
     )
     await db.commit()
 
-    assert (await client.get("/api/v1/auth/me")).status_code == 200
+    resp = await client.get("/api/v1/auth/me")
+    assert resp.status_code == 200
     remaining = await db.scalar(sa.select(Session.expires_at))
     assert remaining - datetime.now(UTC) > timedelta(days=6)
+
+    # DB 續期須同步重送 session/CSRF cookies,瀏覽器端 Max-Age 才會跟著滑動
+    cookies = resp.headers.get_list("set-cookie")
+    assert any(c.startswith("session_id=") and "Max-Age=604800" in c for c in cookies)
+    assert any(c.startswith("csrf_token=") and "Max-Age=604800" in c for c in cookies)
 
 
 async def test_expired_session_rejected(client, db):

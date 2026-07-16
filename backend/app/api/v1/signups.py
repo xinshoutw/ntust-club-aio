@@ -1,6 +1,8 @@
-"""社團端:線上報名(一社一單、不得更改;草稿寫 DB 跨裝置續填)。"""
+"""社團端:線上報名(一社一單、不得更改;草稿寫 DB 跨裝置續填)。
 
-from datetime import UTC, datetime
+2026-07-16 第八輪:報名窗檢核改 signup_start <= now <= signup_end;
+審核制活動(requires_confirmation)報名後狀態=待確認,管理員確認後才算報名成功。
+"""
 
 import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Request
@@ -8,7 +10,6 @@ from fastapi import APIRouter, BackgroundTasks, Request
 from app.api.pagination import Pagination
 from app.core.deps import ClubUser, DbDep, client_ip
 from app.core.errors import conflict, not_found, validation_error
-from app.core.semesters import TAIPEI
 from app.models import Award, Club, Signup, SignupAward, SignupDraft, SignupEntry, SignupItem
 from app.schemas.common import ApiResponse
 from app.schemas.signups import (
@@ -19,16 +20,9 @@ from app.schemas.signups import (
     SignupSubmitIn,
 )
 from app.services import audit, notify
-from app.services.signup_service import validate_answers
+from app.services import signup_service as svc
 
 router = APIRouter(prefix="/club/signup-items", tags=["signups"])
-
-
-def _deadline_passed(item: SignupItem) -> bool:
-    if item.deadline is None:
-        return False
-    now_tw = datetime.now(UTC).astimezone(TAIPEI).date()
-    return now_tw > item.deadline  # 截止日當天仍可報名
 
 
 async def _get_item(db, item_id: int) -> SignupItem:
@@ -36,6 +30,11 @@ async def _get_item(db, item_id: int) -> SignupItem:
     if item is None:
         raise not_found("找不到報名活動")
     return item
+
+
+def _my_status(item: SignupItem, signup: Signup) -> str:
+    """審核制且未確認=待確認(pending);其餘已報名=signed。"""
+    return "pending" if item.requires_confirmation and not signup.confirmed else "signed"
 
 
 @router.get("")
@@ -46,11 +45,9 @@ async def list_items(
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     items = (await db.scalars(query.offset(page.offset).limit(page.page_size))).all()
 
-    signed = {
-        s
-        for s in await db.scalars(
-            sa.select(Signup.item_id).where(Signup.club_id == user.club_id)
-        )
+    signups = {
+        s.item_id: s
+        for s in await db.scalars(sa.select(Signup).where(Signup.club_id == user.club_id))
     }
     drafts = {
         d
@@ -61,7 +58,12 @@ async def list_items(
     data = []
     for item in items:
         out = SignupItemOut.model_validate(item)
-        out.my_status = "signed" if item.id in signed else "draft" if item.id in drafts else "none"
+        out.accepting = svc.window_open(item)
+        signup = signups.get(item.id)
+        if signup is not None:
+            out.my_status = _my_status(item, signup)
+        elif item.id in drafts:
+            out.my_status = "draft"
         data.append(out)
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
@@ -72,6 +74,7 @@ async def get_item(
 ) -> ApiResponse[SignupItemDetailOut]:
     item = await _get_item(db, item_id)
     out = SignupItemDetailOut.model_validate(item)
+    out.accepting = svc.window_open(item)
 
     signup = await db.scalar(
         sa.select(Signup)
@@ -91,7 +94,7 @@ async def get_item(
             entries=signup.entries,
             awards=awards,
         )
-        out.my_status = "signed"
+        out.my_status = _my_status(item, signup)
         return ApiResponse(data=out)
 
     draft = await db.scalar(
@@ -115,8 +118,8 @@ async def save_draft(
     )
     if existing_signup:
         raise conflict("已完成報名,不可再存草稿")
-    if not item.is_open or _deadline_passed(item):
-        raise conflict("報名已截止")
+    if not svc.window_open(item):
+        raise conflict("不在報名期間內")
 
     draft = await db.scalar(
         sa.select(SignupDraft).where(
@@ -141,8 +144,8 @@ async def submit_signup(
     background: BackgroundTasks,
 ) -> ApiResponse[None]:
     item = await _get_item(db, item_id)
-    if not item.is_open or _deadline_passed(item):
-        raise conflict("報名已截止")
+    if not svc.window_open(item):
+        raise conflict("不在報名期間內")
 
     exists = await db.scalar(
         sa.select(Signup.id).where(Signup.item_id == item.id, Signup.club_id == user.club_id)
@@ -150,13 +153,11 @@ async def submit_signup(
     if exists:
         raise conflict("一經報名不得更改")
 
-    if not item.allow_multiple and len(body.participants) != 1:
-        raise validation_error("此活動僅限一人報名")
-    if item.max_participants and len(body.participants) > item.max_participants:
+    if len(body.participants) > item.max_participants:
         raise validation_error(f"超過人數上限({item.max_participants} 人)")
 
     for index, participant in enumerate(body.participants, start=1):
-        errors = validate_answers(item.fields, participant.answers)
+        errors = svc.validate_answers(item.fields, participant.answers)
         if errors:
             raise validation_error(f"第 {index} 位:{';'.join(errors)}")
 
@@ -175,7 +176,10 @@ async def submit_signup(
     elif item.is_eval:
         raise validation_error("競賽報名須至少勾選一個獎項")
 
-    signup = Signup(item_id=item.id, club_id=user.club_id)
+    # 審核制:報名後待管理員確認;非審核制送出即成功
+    signup = Signup(
+        item_id=item.id, club_id=user.club_id, confirmed=not item.requires_confirmation
+    )
     signup.entries = [SignupEntry(answers=p.answers) for p in body.participants]
     db.add(signup)
     await db.flush()
@@ -194,11 +198,12 @@ async def submit_signup(
     await db.commit()
 
     club = await db.get(Club, user.club_id)
+    pending = "(待確認)" if item.requires_confirmation else ""
     background.add_task(
         notify.club_event,
         "submit",
         "線上報名",
-        f"{club.name}:{item.name}({len(body.participants)} 人)",
+        f"{club.name}:{item.name}({len(body.participants)} 人){pending}",
         club.discord_webhook_url,
     )
     return ApiResponse()

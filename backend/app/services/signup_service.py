@@ -1,13 +1,45 @@
-"""線上報名:管理員自訂表單欄位的驗證。
+"""線上報名:管理員自訂表單欄位的驗證與報名窗推導。
 
 fields 定義(signup_items.fields):
 [{key, label, type(text/textarea/radio/checkbox/select), options[], required}]
-answers 形狀:{field_key: value};checkbox 的 value 為選項陣列。
+陣列順序即顯示順序;answers 形狀:{field_key: value};checkbox 的 value 為選項陣列。
 """
 
+from datetime import UTC, datetime
 from typing import Any
 
+from app.models import SignupItem
+
 _TEXT_MAX = 1000
+
+
+def window_open(item: SignupItem, now: datetime | None = None) -> bool:
+    """報名窗(2026-07-16 第八輪):is_open 且 signup_start <= now <= signup_end。"""
+    now = now or datetime.now(UTC)
+    if not item.is_open:
+        return False
+    if item.signup_start is not None and now < item.signup_start:
+        return False
+    return not (item.signup_end is not None and now > item.signup_end)
+
+
+def normalize_fields(fields: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """補齊/驗證欄位 key:未帶 key 依序補 f1、f2…;key 不得重複。順序保持原樣。"""
+    used = {f["key"] for f in fields if f.get("key")}
+    if len(used) != sum(1 for f in fields if f.get("key")):
+        raise ValueError("欄位 key 重複")
+    result = []
+    serial = 0
+    for field in fields:
+        key = field.get("key")
+        if not key:
+            serial += 1
+            while f"f{serial}" in used:
+                serial += 1
+            key = f"f{serial}"
+            used.add(key)
+        result.append({**field, "key": key})
+    return result
 
 
 def validate_answers(fields: list[dict[str, Any]], answers: dict[str, Any]) -> list[str]:

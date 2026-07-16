@@ -22,7 +22,8 @@ def _tmp_upload_dir(tmp_path, monkeypatch):
 
 
 def fake_upload(name: str, content: bytes) -> UploadFile:
-    return UploadFile(io.BytesIO(content), filename=name)
+    # size=宣告大小(Starlette 於真實請求會計算);配額預檢據此提前拒絕
+    return UploadFile(io.BytesIO(content), filename=name, size=len(content))
 
 
 async def test_save_upload_streams_and_hashes(db):
@@ -119,6 +120,173 @@ async def test_duplicate_photo_rejected_within_club(db):
     row = await upload(club_b.id, "photo1.jpg")
     await db.commit()
     assert row.club_id == club_b.id
+
+
+_GIB = 1024**3
+
+
+def _fake_row(club_id: int | None, uploaded_by: int, size: int, *, archived=False, tag="big"):
+    """只進 DB 的佔用列(不落盤):把用量推到配額邊界用。"""
+    return File(
+        club_id=club_id,
+        uploaded_by=uploaded_by,
+        original_name=f"{tag}.bin",
+        size=size,
+        mime="application/octet-stream",
+        sha256=tag,
+        path=f"reports/2026/07/{tag}",
+        archived_at=datetime.now(UTC) if archived else None,
+    )
+
+
+async def test_club_quota_exceeded_rejected(db):
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    db.add(_fake_row(club.id, user.id, 2 * _GIB - 50))  # 剩 50 bytes
+    await db.commit()
+
+    with pytest.raises(AppError) as err:
+        await file_service.save_upload(
+            db,
+            fake_upload("p.png", PNG_BYTES),
+            policy=file_service.IMAGE,
+            module="reports",
+            uploaded_by=user.id,
+            club_id=club.id,
+        )
+    assert err.value.code == "INSUFFICIENT_STORAGE"
+    assert "社團" in err.value.message
+    await db.rollback()
+    # 拒絕時不留 .part/dest/DB row
+    assert not any(p.is_file() for p in settings.upload_dir.rglob("*"))
+    assert await db.scalar(sa.select(sa.func.count()).select_from(File)) == 1
+
+
+async def test_global_capacity_exceeded_rejected(db):
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    db.add(_fake_row(None, user.id, 40 * _GIB))  # 邏輯容量預設 40 GiB,已滿
+    await db.commit()
+
+    with pytest.raises(AppError) as err:
+        await file_service.save_upload(
+            db,
+            fake_upload("p.png", PNG_BYTES),
+            policy=file_service.IMAGE,
+            module="reports",
+            uploaded_by=user.id,
+            club_id=club.id,
+        )
+    assert err.value.code == "INSUFFICIENT_STORAGE"
+    assert "系統" in err.value.message
+
+
+async def test_reserve_free_space_rejected(db, monkeypatch):
+    import collections
+
+    user = await make_user(db, username="club01")
+    usage = collections.namedtuple("usage", "total used free")
+    # 保留空間預設 10 GiB;剩 5 GiB → 拒絕(mock stdlib 查詢)
+    monkeypatch.setattr(
+        file_service.shutil, "disk_usage", lambda p: usage(100 * _GIB, 95 * _GIB, 5 * _GIB)
+    )
+    with pytest.raises(AppError) as err:
+        await file_service.save_upload(
+            db,
+            fake_upload("p.png", PNG_BYTES),
+            policy=file_service.IMAGE,
+            module="reports",
+            uploaded_by=user.id,
+        )
+    assert err.value.code == "INSUFFICIENT_STORAGE"
+
+
+async def test_archived_files_not_counted_in_quota(db):
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    # 歸檔檔案已離盤:同樣大小若未歸檔會擋,歸檔後不佔配額
+    db.add(_fake_row(club.id, user.id, 2 * _GIB, archived=True))
+    await db.commit()
+
+    row = await file_service.save_upload(
+        db,
+        fake_upload("p.png", PNG_BYTES),
+        policy=file_service.IMAGE,
+        module="reports",
+        uploaded_by=user.id,
+        club_id=club.id,
+    )
+    await db.commit()
+    assert row.size == len(PNG_BYTES)
+
+
+async def test_concurrent_uploads_cannot_pierce_quota(db):
+    """並發上傳不得一起穿透剩餘額度(advisory lock 持有到交易結束)。"""
+    import asyncio
+
+    from app.core.db import async_session_factory
+
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    db.add(_fake_row(club.id, user.id, 2 * _GIB - 60 * 1024))  # 剩 60 KB
+    await db.commit()
+
+    body = PNG_BYTES + b"\x00" * (40 * 1024)  # 各約 40 KB,只容得下一個
+
+    async def upload_one(i: int) -> bool:
+        async with async_session_factory() as s:
+            try:
+                await file_service.save_upload(
+                    s,
+                    fake_upload(f"p{i}.png", body + bytes([i])),
+                    policy=file_service.IMAGE,
+                    module="reports",
+                    uploaded_by=user.id,
+                    club_id=club.id,
+                )
+                await s.commit()
+                return True
+            except AppError as err:
+                assert err.code == "INSUFFICIENT_STORAGE"
+                return False
+
+    results = await asyncio.gather(upload_one(1), upload_one(2))
+    assert sorted(results) == [False, True]
+
+
+async def test_duplicate_flush_conflict_leaves_no_orphan(db):
+    """撞唯一索引(併發去重的 DB 收口)時,已 rename 的實體檔必須一併刪除。"""
+    from sqlalchemy.exc import IntegrityError
+
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    await file_service.save_upload(
+        db,
+        fake_upload("p.jpg", JPG_BYTES),
+        policy=file_service.IMAGE,
+        module="reports",
+        uploaded_by=user.id,
+        club_id=club.id,
+        slot="report_photo",
+    )
+    await db.commit()
+
+    # 略過應用層先查(=另一 session 同時通過檢查的情境),直接撞 DB 唯一索引
+    with pytest.raises(IntegrityError):
+        await file_service.save_upload(
+            db,
+            fake_upload("dup.jpg", JPG_BYTES),
+            policy=file_service.IMAGE,
+            module="reports",
+            uploaded_by=user.id,
+            club_id=club.id,
+            slot="report_photo",
+        )
+    await db.rollback()
+
+    disk_files = [p for p in settings.upload_dir.rglob("*") if p.is_file()]
+    assert len(disk_files) == 1  # 只剩第一個檔;無 .part、無 DB 看不見的孤兒
+    assert await db.scalar(sa.select(sa.func.count()).select_from(File)) == 1
 
 
 async def test_download_scoped_to_own_club(client, db):

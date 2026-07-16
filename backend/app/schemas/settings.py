@@ -51,6 +51,28 @@ class UploadLimitsIn(BaseModel):
         return {"doc": self.doc, "img": self.img, "zip": self.zip, "video": self.video}
 
 
+class StorageLimitsIn(BaseModel):
+    """儲存容量/配額(GiB)。capacity 為應用程式邏輯容量(含 DB 估算大小);
+    調高前必須先擴 GCE Persistent Disk,面板僅調整邏輯值。"""
+
+    capacity_gib: int = Field(ge=1, le=4096)
+    per_club_gib: int = Field(ge=1, le=1024)
+    reserve_gib: int = Field(ge=1, le=1024)
+
+    @model_validator(mode="after")
+    def _club_within_capacity(self):
+        if self.per_club_gib > self.capacity_gib:
+            raise ValueError("單一社團配額不得超過系統總容量")
+        return self
+
+    def to_json(self) -> dict[str, Any]:
+        return {
+            "capacity_gib": self.capacity_gib,
+            "per_club_gib": self.per_club_gib,
+            "reserve_gib": self.reserve_gib,
+        }
+
+
 class EvalWindowIn(BaseModel):
     """評鑑年度與採計區間。"""
 
@@ -91,6 +113,7 @@ class SettingsUpdateIn(BaseModel):
     close_lock_months: int | None = Field(None, ge=1, le=6)
     upload_limits: UploadLimitsIn | None = None
     activity_attachment_total_mb: int | None = Field(None, ge=1, le=1024)
+    storage_limits: StorageLimitsIn | None = None
     eval_window: EvalWindowIn | None = None
     violation_items: list[str] | None = Field(None, max_length=50)
     budget_categories: list[str] | None = Field(None, max_length=50)

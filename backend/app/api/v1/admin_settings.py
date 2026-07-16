@@ -27,6 +27,7 @@ MANAGED_KEYS = (
     "close_lock_months",
     "upload_limits",
     "activity_attachment_total_mb",
+    "storage_limits",
     "eval_window",
     "violation_items",
     "budget_categories",

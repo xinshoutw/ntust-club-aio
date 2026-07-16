@@ -8,6 +8,7 @@
 """
 
 import hashlib
+import shutil
 import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -27,6 +28,32 @@ from app.services.settings_service import get_setting
 
 _CHUNK = 1024 * 1024
 _MB = 1024 * 1024
+_GIB = 1024**3
+
+# 上傳配額檢查的 pg_advisory_xact_lock key(全系統唯一一把;隨呼叫端交易釋放)
+_STORAGE_LOCK_KEY = 0x_C1AB_A10_5EC3
+
+_CLUB_FULL = "社團儲存空間額度不足,請先清理檔案或聯絡學務處"
+_SYSTEM_FULL = "系統儲存空間不足,請聯絡學務處"
+
+
+def _insufficient(message: str) -> AppError:
+    return AppError(507, "INSUFFICIENT_STORAGE", message)
+
+
+async def storage_usage(db: AsyncSession, club_id: int | None = None) -> int:
+    """未歸檔檔案佔用(bytes);club_id=None 為全系統(歸檔檔案已離盤不計)。"""
+    query = sa.select(sa.func.coalesce(sa.func.sum(File.size), 0)).where(
+        File.archived_at.is_(None)
+    )
+    if club_id is not None:
+        query = query.where(File.club_id == club_id)
+    return int(await db.scalar(query))
+
+
+async def database_size(db: AsyncSession) -> int:
+    """「文字內容」= 整個 DB 的估算大小;邏輯容量與檔案管理頁一致地包含它。"""
+    return int(await db.scalar(sa.select(sa.func.pg_database_size(sa.func.current_database()))))
 
 
 def _sniff_jpg(head: bytes) -> bool:
@@ -170,6 +197,30 @@ async def save_upload(
     sniff, mime = _SIGNATURES[ext]
     max_size = await _policy_max_size(db, policy)
 
+    # 配額檢查(2026-07-17 資安審查):advisory lock 持有到呼叫端交易結束,
+    # 兩個並發上傳不得同時看見相同剩餘量;quota 在此共用服務收口,不逐 endpoint 補
+    # ponytail: 全域序列化上傳配額;單校流量足夠,吞吐不足再改 reservation table
+    await db.execute(sa.text("SELECT pg_advisory_xact_lock(:key)"), {"key": _STORAGE_LOCK_KEY})
+    limits = await get_setting(db, "storage_limits")
+    reserve = int(limits["reserve_gib"]) * _GIB
+    logical_remaining = (
+        int(limits["capacity_gib"]) * _GIB - await storage_usage(db) - await database_size(db)
+    )
+    club_remaining = None
+    if club_id is not None:
+        club_remaining = int(limits["per_club_gib"]) * _GIB - await storage_usage(db, club_id)
+
+    upload_root = Path(settings.upload_dir)
+    upload_root.mkdir(parents=True, exist_ok=True)
+    # 預檢:無宣告大小時以政策上限保守估計,不等 .part 寫完才發現超額
+    declared = upload.size if upload.size else max_size
+    if club_remaining is not None and declared > club_remaining:
+        raise _insufficient(_CLUB_FULL)
+    if declared > logical_remaining:
+        raise _insufficient(_SYSTEM_FULL)
+    if shutil.disk_usage(upload_root).free - declared < reserve:
+        raise _insufficient(_SYSTEM_FULL)
+
     file_id = uuid.uuid4()
     now = datetime.now(UTC)
     rel_path = f"{module}/{now:%Y}/{now:%m}/{file_id}"
@@ -190,6 +241,13 @@ async def save_upload(
                 size += len(chunk)
                 if size > max_size:
                     raise AppError(413, "FILE_TOO_LARGE", f"檔案超過 {max_size // _MB}MB 上限")
+                # 實際累積大小仍逐塊檢查:宣告 size 是 client 可控值,不可盡信
+                if club_remaining is not None and size > club_remaining:
+                    raise _insufficient(_CLUB_FULL)
+                if size > logical_remaining:
+                    raise _insufficient(_SYSTEM_FULL)
+                if shutil.disk_usage(upload_root).free < reserve:
+                    raise _insufficient(_SYSTEM_FULL)
                 hasher.update(chunk)
                 out.write(chunk)
         if first:  # 空檔案
@@ -209,26 +267,28 @@ async def save_upload(
                 raise AppError(409, "DUPLICATE_FILE", "相同內容的檔案已上傳過(照片不得重複)")
 
         tmp.rename(dest)
+        row = File(
+            id=file_id,
+            club_id=club_id,
+            uploaded_by=uploaded_by,
+            subject_type=subject_type,
+            subject_id=subject_id,
+            slot=slot,
+            original_name=Path(upload.filename or f"upload{ext}").name,
+            size=size,
+            mime=mime,
+            sha256=sha256,
+            path=rel_path,
+        )
+        db.add(row)
+        # 先 flush:讓後續同交易引用 file_id 的列(如 eval_uploads)有正確的插入順序;
+        # 併發去重撞唯一索引也在此浮現(全域 handler 回 409)
+        await db.flush()
     except BaseException:
         tmp.unlink(missing_ok=True)
+        # flush 失敗時 dest 已 rename:一併刪除,不留 DB 看不見、無法清理的孤兒檔
+        dest.unlink(missing_ok=True)
         raise
-
-    row = File(
-        id=file_id,
-        club_id=club_id,
-        uploaded_by=uploaded_by,
-        subject_type=subject_type,
-        subject_id=subject_id,
-        slot=slot,
-        original_name=Path(upload.filename or f"upload{ext}").name,
-        size=size,
-        mime=mime,
-        sha256=sha256,
-        path=rel_path,
-    )
-    db.add(row)
-    # 先 flush:讓後續同交易引用 file_id 的列(如 eval_uploads)有正確的插入順序
-    await db.flush()
     return row
 
 

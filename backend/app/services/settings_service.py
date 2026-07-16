@@ -42,6 +42,11 @@ DEFAULTS: dict[str, Any] = {
     "upload_limits": {"doc": 50, "img": 10, "zip": 100, "video": 200},
     # 活動申請附件加總上限(MB;2026-07-16 第八輪)
     "activity_attachment_total_mb": 50,
+    # 儲存容量/配額(GiB;2026-07-17 資安審查):capacity=應用程式邏輯可用容量
+    # (含 DB 估算大小,與檔案管理頁一致)、per_club=單一社團未歸檔檔案上限、
+    # reserve=filesystem 實際保留空間(防 DB/log/temp 佔用)。
+    # 調高 capacity 前必須先擴 GCE Persistent Disk;此為邏輯值,不代表實體磁碟
+    "storage_limits": {"capacity_gib": 40, "per_club_gib": 2, "reserve_gib": 10},
     # 評鑑視窗(2026-07-14 拍板:預設 116 年,2026/02/01–2027/01/31)
     # ad7/ad8 以「場次日期落在視窗」採計(2026-07-16 第九輪,無年度對齊問題)
     "eval_window": {"year": 116, "start": "2026-02-01", "end": "2027-01-31"},

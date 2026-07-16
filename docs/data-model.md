@@ -425,6 +425,11 @@ approved 且 活動結束日(end_date)+1個月 已過 且未送結案 → 「逾
 - **管理端 router 補齊**:`/admin/clubs`(主檔/改名/啟停/一次性密碼/成員唯讀,amember)、`/admin/venue-bookings`、`/admin/equipment-loans`(含 status=overdue 推導與可借數檢核,abooking)、`/admin/room-bookings`(aroom)、`/admin/bookings/availability`(全校場況,審核中格帶單號供開彈窗)、逾期提醒與停權(super)、公告蓋板 PATCH、維修狀態單步流轉;abooking/aroom/amember 權限鍵定案
 - **auth**:`UserOut.club_name`(role=club 補上,前端顯示與社/會推導用)
 
+### 3.aa Task #6 審查補記(2026-07-17)
+
+- **system_settings 新 key `storage_limits`**(`{capacity_gib, per_club_gib, reserve_gib}`,預設 40/2/10;僅 super 於系統設定面板可調):上傳配額於共用 `save_upload()` 收口——pg advisory xact lock 序列化配額檢查、宣告大小預檢+逐塊實際大小+filesystem 保留空間 hard stop;歸檔檔案不佔配額。`capacity_gib` 為**邏輯容量**(含 pg_database_size,與檔案管理頁一致),調高前必須先擴 GCE Persistent Disk;`/admin/files/usage` 回傳 capacity/remaining,前端不再自帶容量常數。超額回 507 `INSUFFICIENT_STORAGE`
+- **files 新 partial unique index `uq_files_club_eval_slot_sha`**((club_id, slot, sha256) WHERE active eval_upload):評鑑上傳同槽位去重的 DB 層收口,先查後寫的併發競態由唯一索引攔下(migration `a9c2e51d7f43`)
+
 ## 4. 學年與學期規則(已確認)
 
 - **上學期 = 8–1 月、下學期 = 2–7 月**(原型 `semesterOf` 寫反了,以本規則為準)

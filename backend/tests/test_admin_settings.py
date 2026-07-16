@@ -31,6 +31,7 @@ async def test_get_defaults(client, db):
     assert data["close_lock_months"] == 1
     assert data["upload_limits"] == {"doc": 50, "img": 10, "zip": 100, "video": 200}
     assert data["activity_attachment_total_mb"] == 50
+    assert data["storage_limits"] == {"capacity_gib": 40, "per_club_gib": 2, "reserve_gib": 10}
     assert data["eval_window"]["year"] == 116
     assert "其他" in data["violation_items"]
     assert "膳食費" in data["budget_categories"]
@@ -106,6 +107,38 @@ async def test_put_validations(client, db):
         URL, json={"budget_categories": ["  "]}, headers=csrf_headers(client)
     )
     assert resp.status_code == 422
+
+    # 儲存配額:單一社團配額不得超過總容量;數值須為正
+    resp = await client.put(
+        URL,
+        json={"storage_limits": {"capacity_gib": 10, "per_club_gib": 20, "reserve_gib": 5}},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    resp = await client.put(
+        URL,
+        json={"storage_limits": {"capacity_gib": 0, "per_club_gib": 1, "reserve_gib": 1}},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+
+
+async def test_storage_limits_update_and_audit(client, db):
+    await seed(client, db)
+    resp = await client.put(
+        URL,
+        json={"storage_limits": {"capacity_gib": 60, "per_club_gib": 3, "reserve_gib": 12}},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    assert data["storage_limits"] == {"capacity_gib": 60, "per_club_gib": 3, "reserve_gib": 12}
+
+    stored = await db.get(SystemSetting, "storage_limits")
+    assert stored.value["capacity_gib"] == 60
+    audit_row = await db.scalar(sa.select(AuditLog).where(AuditLog.action == "settings_updated"))
+    assert audit_row is not None
+    assert "storage_limits" in audit_row.detail
 
 
 async def test_fixed_window_setting_drives_club_endpoint(client, db):

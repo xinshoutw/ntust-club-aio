@@ -213,6 +213,7 @@ MAIL_FROM_NAME=noreply
 | 422 | `INVALID_SORT` | 排序欄位不在白名單 |
 | 429 | `RATE_LIMITED` | 超過速率限制 |
 | 500 | `INTERNAL` | 未預期錯誤(訊息固定,不洩漏) |
+| 507 | `INSUFFICIENT_STORAGE` | 儲存配額不足(社團/全系統)或磁碟保留空間不足(2026-07-17) |
 
 **分頁**:`?page=1&page_size=20`(1-based;page_size 上限 100);回應 `meta = { page, page_size, total }`。列表端點一律分頁,不做無界查詢。
 

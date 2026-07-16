@@ -331,6 +331,8 @@ class FileUsageOut(BaseModel):
     modules: list[FileUsageModuleOut]  # 有報修檔案時 repair 排第一,其餘依固定順序
     db_size: int  # 「文字內容」:整個 DB 的估算大小(pg_database_size)
     total_size: int  # 檔案 + DB
+    capacity: int  # 邏輯容量(bytes;storage_limits.capacity_gib,後端計算)
+    remaining: int  # capacity − total_size(不為負)
 
 
 class AdminFileOut(BaseModel):

@@ -192,6 +192,46 @@ async def test_stage_only_account_visibility_is_scoped(client, db):
     assert (await client.get(f"/api/v1/admin/activities/{aid}")).status_code == 200
 
 
+async def test_aclose_only_account_sees_only_close_scope(client, db):
+    """僅持 aclose 的帳號視野限結案範圍(closing/approved/closed),不得讀申請中/已退回。"""
+    await seed(client, db)
+    await make_user(db, username="closer", role="admin", permissions=["aclose"])
+
+    pending = await submit_activity(client, db)
+    rejected = await submit_activity(client, db, name="被退回活動")
+    await login(client, "advisor")
+    resp = await client.post(
+        f"/api/v1/admin/activities/{rejected}/reject",
+        json={"reason": "資料不全"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200
+
+    past = (date.today() - timedelta(days=2)).isoformat()
+    closing = await submit_activity(client, db, name="已送結案活動", date=past)
+    await db.execute(sa.update(Activity).where(Activity.id == closing).values(status="approved"))
+    await db.commit()
+    await login(client, "club01")
+    resp = await client.post(
+        f"/api/v1/club/activities/{closing}/close",
+        json=close_payload(),
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200
+
+    await login(client, "closer")
+    listing = (await client.get("/api/v1/admin/activities")).json()
+    ids = [a["id"] for a in listing["data"]]
+    assert closing in ids
+    assert pending not in ids
+    assert rejected not in ids
+
+    # 已知 ID 直接讀非結案範圍 → 視同不存在(避免越權讀預算、審批與附件)
+    assert (await client.get(f"/api/v1/admin/activities/{pending}")).status_code == 404
+    assert (await client.get(f"/api/v1/admin/activities/{rejected}")).status_code == 404
+    assert (await client.get(f"/api/v1/admin/activities/{closing}")).status_code == 200
+
+
 async def test_admin_list_includes_club_name_and_close_deadline(client, db):
     club = await seed(client, db)
     aid = await submit_activity(client, db)

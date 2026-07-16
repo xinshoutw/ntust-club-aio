@@ -40,8 +40,10 @@ _STAGE_BY_STATUS = {
 }
 
 # aact=既有後端鍵、areview=前端權限彈窗鍵(尚未統一,任一即通過);
-# aclose=結案審核頁:僅持該鍵的帳號也需要讀列表/詳情(動作端點另有各自關卡檢查)
-_REVIEW_PAGE_KEYS = ("aact", "areview", "aclose")
+# aclose=結案審核頁:僅持該鍵的帳號也需要讀列表/詳情(動作端點另有各自關卡檢查),
+# 但視野僅限結案範圍(_visible_statuses),不得看到申請中/已退回等非結案狀態
+_FULL_VIEW_KEYS = ("aact", "areview")
+_REVIEW_PAGE_KEYS = (*_FULL_VIEW_KEYS, "aclose")
 _REVIEW_KEYS = (*_REVIEW_PAGE_KEYS, "approve_advisor", "approve_chief", "approve_dean")
 
 
@@ -68,8 +70,8 @@ def _require_stage_key(user, key: str) -> None:
 
 
 def _visible_statuses(user) -> set[ActivityStatus] | None:
-    """受限關卡帳號只看得到自己關卡相關的狀態;None=不限(super 或持審核頁權限)。"""
-    if user.is_super or any(k in user.permissions for k in _REVIEW_PAGE_KEYS):
+    """受限關卡帳號只看得到自己關卡相關的狀態;None=不限(super 或持活動審核頁權限)。"""
+    if user.is_super or any(k in user.permissions for k in _FULL_VIEW_KEYS):
         return None
     visible: set[ActivityStatus] = set()
     if "approve_advisor" in user.permissions:

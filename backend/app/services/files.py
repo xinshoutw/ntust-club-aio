@@ -197,10 +197,9 @@ async def save_upload(
     sniff, mime = _SIGNATURES[ext]
     max_size = await _policy_max_size(db, policy)
 
-    # 配額檢查(2026-07-17 資安審查):advisory lock 持有到呼叫端交易結束,
-    # 兩個並發上傳不得同時看見相同剩餘量;quota 在此共用服務收口,不逐 endpoint 補
-    # ponytail: 全域序列化上傳配額;單校流量足夠,吞吐不足再改 reservation table
-    await db.execute(sa.text("SELECT pg_advisory_xact_lock(:key)"), {"key": _STORAGE_LOCK_KEY})
+    # 配額檢查(2026-07-17 資安審查):quota 在此共用服務收口,不逐 endpoint 補。
+    # 此處先做「無鎖」預檢與逐塊 best-effort 早退;權威結算在串流完成後
+    # 取 advisory lock 再重算(避免慢速上傳在串流期間霸佔全域鎖)
     limits = await get_setting(db, "storage_limits")
     reserve = int(limits["reserve_gib"]) * _GIB
     logical_remaining = (
@@ -252,6 +251,23 @@ async def save_upload(
                 out.write(chunk)
         if first:  # 空檔案
             raise AppError(415, "UNSUPPORTED_FILE_TYPE", "檔案內容與副檔名不符")
+
+        # 權威配額結算:lock 只覆蓋「重算剩餘量 → flush → 呼叫端 commit」,
+        # 不含串流期間(慢速上傳不得霸佔全域鎖);兩個並發上傳在此序列化,
+        # 不得同時看見相同剩餘量
+        # ponytail: 結算仍是全域一把鎖;單校流量足夠,吞吐不足再改 reservation table
+        await db.execute(
+            sa.text("SELECT pg_advisory_xact_lock(:key)"), {"key": _STORAGE_LOCK_KEY}
+        )
+        if club_id is not None:
+            club_remaining = int(limits["per_club_gib"]) * _GIB - await storage_usage(db, club_id)
+            if size > club_remaining:
+                raise _insufficient(_CLUB_FULL)
+        logical_remaining = (
+            int(limits["capacity_gib"]) * _GIB - await storage_usage(db) - await database_size(db)
+        )
+        if size > logical_remaining:
+            raise _insufficient(_SYSTEM_FULL)
 
         sha256 = hasher.hexdigest()
         if reject_duplicate_in_club_slot:

@@ -11,11 +11,20 @@ from app.core.deps import (
 from app.core.errors import AppError, rate_limited
 from app.core.rate_limit import login_limiter
 from app.core.security import SESSION_TTL
+from app.models import Club, User
 from app.schemas.auth import ChangePasswordRequest, LoginRequest, UserOut
 from app.schemas.common import ApiResponse
 from app.services import auth as auth_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+async def _user_out(db: DbDep, user: User) -> UserOut:
+    out = UserOut.model_validate(user)
+    if user.club_id is not None:
+        club = await db.get(Club, user.club_id)
+        out.club_name = club.name if club else None
+    return out
 
 _COOKIE_MAX_AGE = int(SESSION_TTL.total_seconds())
 
@@ -62,7 +71,7 @@ async def login(
         login_limiter.hit(ip or "unknown")  # 只計失敗:校園 NAT 下成功登入不佔額度
         raise
     _set_auth_cookies(response, str(session.id), session.csrf_token)
-    return ApiResponse(data=UserOut.model_validate(user))
+    return ApiResponse(data=await _user_out(db, user))
 
 
 @router.post("/logout")
@@ -77,10 +86,10 @@ async def logout(
 
 
 @router.get("/me")
-async def me(auth: AuthDep) -> ApiResponse[UserOut]:
+async def me(auth: AuthDep, db: DbDep) -> ApiResponse[UserOut]:
     # 首登未改密也可查自己(前端靠 must_change_password 導向改密頁)
     _, user = auth
-    return ApiResponse(data=UserOut.model_validate(user))
+    return ApiResponse(data=await _user_out(db, user))
 
 
 @router.post("/change-password")

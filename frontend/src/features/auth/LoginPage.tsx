@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Button, Input } from 'antd'
+import { homeOf } from '../../lib/home'
 import { useAuth } from '../../app/auth'
 
 export default function LoginPage() {
@@ -9,14 +10,23 @@ export default function LoginPage() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  const submit = () => {
+  const submit = async () => {
     if (!username.trim() || !password.trim()) {
       setError('請輸入帳號與密碼')
       return
     }
-    const user = login(username.trim())
-    navigate(user.role === 'admin' ? '/admin' : '/', { replace: true })
+    setSubmitting(true)
+    try {
+      const user = await login(username.trim(), password)
+      // 首登(或被重設密碼)強制改密後才能進入面板
+      navigate(user.mustChangePassword ? '/change-password' : homeOf(user.role), { replace: true })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : '登入失敗')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -41,7 +51,7 @@ export default function LoginPage() {
           style={{ display: 'flex', flexDirection: 'column', gap: 16 }}
           onSubmit={(e) => {
             e.preventDefault()
-            submit()
+            void submit()
           }}
         >
           <label>
@@ -63,7 +73,7 @@ export default function LoginPage() {
             />
           </label>
           {error && <div style={{ fontSize: 13, color: '#C13B34' }}>{error}</div>}
-          <Button type="primary" htmlType="submit" style={{ height: 42, marginTop: 4, fontSize: 15 }}>
+          <Button type="primary" htmlType="submit" loading={submitting} style={{ height: 42, marginTop: 4, fontSize: 15 }}>
             登入
           </Button>
         </form>

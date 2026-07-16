@@ -1,66 +1,62 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { TAKEOVER_DISMISSED_KEY } from '../components/layout/TakeoverOverlay'
+import { loginApi, logoutApi, meApi, type Role, type SessionUser } from '../api/auth'
 
-export type Role = 'club' | 'admin'
-
-export interface SessionUser {
-  name: string
-  role: Role
-  club?: string
-}
+export type { Role, SessionUser }
 
 interface AuthContextValue {
   user: SessionUser | null
-  login: (username: string) => SessionUser
-  logout: () => void
+  /** 開機恢復 session 中(避免閃現登入頁) */
+  booting: boolean
+  login: (username: string, password: string) => Promise<SessionUser>
+  logout: () => Promise<void>
+  /** 改密完成等使用者資料變動後,原地更新 context */
+  refresh: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
-const STORAGE_KEY = 'club-aio.session'
-
-function isSessionUser(value: unknown): value is SessionUser {
-  if (typeof value !== 'object' || value === null) return false
-  const v = value as Record<string, unknown>
-  return (
-    typeof v.name === 'string' &&
-    (v.role === 'club' || v.role === 'admin') &&
-    (v.club === undefined || typeof v.club === 'string')
-  )
-}
-
-function readStored(): SessionUser | null {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return null
-    const parsed: unknown = JSON.parse(raw)
-    return isSessionUser(parsed) ? parsed : null
-  } catch {
-    return null
-  }
-}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<SessionUser | null>(readStored)
+  const [user, setUser] = useState<SessionUser | null>(null)
+  const [booting, setBooting] = useState(true)
 
-  // ponytail: 假登入,後端 auth 完成後換成 API + session cookie
-  const login = useCallback((username: string): SessionUser => {
-    const isAdmin = username.toLowerCase().includes('admin')
-    const next: SessionUser = isAdmin
-      ? { name: '王家豪(輔導老師)', role: 'admin' }
-      : { name: '顏志明', role: 'club', club: '資工系學會' }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+  // session 為 httpOnly cookie:重新整理後以 /auth/me 恢復登入狀態
+  useEffect(() => {
+    meApi()
+      .then(setUser)
+      .catch(() => setUser(null))
+      .finally(() => setBooting(false))
+  }, [])
+
+  const login = useCallback(async (username: string, password: string): Promise<SessionUser> => {
+    const next = await loginApi(username, password)
     // 蓋板公告「每次登入」都要重新顯示:清掉上次登入的關閉紀錄
     sessionStorage.removeItem(TAKEOVER_DISMISSED_KEY)
     setUser(next)
     return next
   }, [])
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY)
+  const logout = useCallback(async () => {
+    try {
+      await logoutApi()
+    } catch {
+      // session 已失效也視為登出成功
+    }
     setUser(null)
   }, [])
 
-  const value = useMemo(() => ({ user, login, logout }), [user, login, logout])
+  const refresh = useCallback(async () => {
+    try {
+      setUser(await meApi())
+    } catch {
+      setUser(null)
+    }
+  }, [])
+
+  const value = useMemo(
+    () => ({ user, booting, login, logout, refresh }),
+    [user, booting, login, logout, refresh],
+  )
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

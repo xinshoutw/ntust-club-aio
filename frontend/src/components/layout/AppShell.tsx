@@ -80,8 +80,7 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
       if (key === 'admin-audit') guarded(() => navigate('/admin/audit'))
       if (key === 'logout') {
         guarded(() => {
-          logout()
-          navigate('/login', { replace: true })
+          void logout().then(() => navigate('/login', { replace: true }))
         })
       }
     },

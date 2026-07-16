@@ -22,6 +22,7 @@ class UserOut(BaseModel):
     name: str
     email: str | None
     club_id: int | None
+    club_name: str | None = None  # role=club 時由端點補上(前端顯示與社/會推導用)
     is_super: bool
     permissions: list[str]
     can_view_eval: bool

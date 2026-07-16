@@ -2,8 +2,11 @@ import { Navigate, Route, Routes, useLocation } from 'react-router'
 import type { ReactNode } from 'react'
 import { useAuth, type Role } from './app/auth'
 import { ADMIN_NAV, CLUB_NAV } from './lib/nav'
+import { homeOf } from './lib/home'
 import AppShell from './components/layout/AppShell'
 import LoginPage from './features/auth/LoginPage'
+import ChangePasswordPage from './features/auth/ChangePasswordPage'
+import ComingSoonPage from './features/auth/ComingSoonPage'
 import OverviewPage from './features/overview/OverviewPage'
 import ActivityListPage from './features/activities/ActivityListPage'
 import ActivityFormPage from './features/activities/ActivityFormPage'
@@ -45,12 +48,22 @@ import AdminViolationsPage from './features/admin/AdminViolationsPage'
 import AuditPage from './features/admin/AuditPage'
 
 function RequireRole({ roles, children }: { roles: Role[]; children: ReactNode }) {
-  const { user } = useAuth()
+  const { user, booting } = useAuth()
   const location = useLocation()
+  if (booting) return null // session 恢復中,避免閃現登入頁
   if (!user) return <Navigate to="/login" replace state={{ from: location }} />
+  if (user.mustChangePassword) return <Navigate to="/change-password" replace />
   if (!roles.includes(user.role)) {
-    return <Navigate to={user.role === 'admin' ? '/admin' : '/'} replace />
+    return <Navigate to={homeOf(user.role)} replace />
   }
+  return children
+}
+
+// 首登強制改密頁:需已登入,但不受 mustChangePassword 導轉限制
+function RequireAuth({ children }: { children: ReactNode }) {
+  const { user, booting } = useAuth()
+  if (booting) return null
+  if (!user) return <Navigate to="/login" replace />
   return children
 }
 
@@ -58,6 +71,22 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/change-password"
+        element={
+          <RequireAuth>
+            <ChangePasswordPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/coming-soon"
+        element={
+          <RequireAuth>
+            <ComingSoonPage />
+          </RequireAuth>
+        }
+      />
 
       <Route
         element={

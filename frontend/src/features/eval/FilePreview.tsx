@@ -6,9 +6,19 @@ const fmtSize = (b: number) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` 
 
 function Center({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 220, color: 'var(--steel)', fontSize: 13, textAlign: 'center', padding: 24 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center', justifyContent: 'center', minHeight: 220, color: 'var(--steel)', fontSize: 13, textAlign: 'center', padding: 24 }}>
       {children}
     </div>
+  )
+}
+
+// 無法線上預覽的實體檔(zip、舊版 .doc 等)給下載入口;mock 示意檔(url 空)不顯示
+function DownloadLink({ file }: { file: EvalFile }) {
+  if (!file.url) return null
+  return (
+    <a href={file.url} download={file.name} style={{ fontSize: 13 }}>
+      下載「{file.name}」
+    </a>
   )
 }
 
@@ -47,8 +57,22 @@ function DocView({ file }: { file: EvalFile }) {
     }
   }, [file])
 
-  if (!file.raw) return <Center>示意檔案無實際內容;實際上傳的 .docx 可在此預覽</Center>
-  if (error) return <Center>無法解析此文件(舊版 .doc 僅支援下載):{error}</Center>
+  if (!file.raw) {
+    return (
+      <Center>
+        {file.url ? '此文件無法線上預覽,請下載後檢視' : '示意檔案無實際內容;實際上傳的 .docx 可在此預覽'}
+        <DownloadLink file={file} />
+      </Center>
+    )
+  }
+  if (error) {
+    return (
+      <Center>
+        無法解析此文件(舊版 .doc 僅支援下載):{error}
+        <DownloadLink file={file} />
+      </Center>
+    )
+  }
   if (html == null) return <Center>解析文件中…</Center>
   return (
     <div
@@ -104,7 +128,12 @@ export default function FilePreview({ file, open, onClose, afterClose }: FilePre
           <Center>示意檔案無實際內容;實際上傳的 PDF 可在此預覽</Center>
         ))}
       {file?.type === 'doc' && <DocView file={file} />}
-      {file?.type === 'other' && <Center>此檔案格式不支援預覽(支援圖片、PDF、DOC/DOCX)</Center>}
+      {file?.type === 'other' && (
+        <Center>
+          此檔案格式不支援預覽(支援圖片、PDF、DOC/DOCX)
+          <DownloadLink file={file} />
+        </Center>
+      )}
     </Modal>
   )
 }

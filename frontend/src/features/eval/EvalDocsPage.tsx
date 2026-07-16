@@ -2,10 +2,9 @@ import { useNavigate } from 'react-router'
 import { Tooltip } from 'antd'
 import { RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
-import { useAuth } from '../../app/auth'
-import { applyOverrides, computeAdScores, totalOf, type AdKey, type FinalScore } from './scoring'
-import { AWARDS, EVAL_WINDOW, buildScoringInput, overridesOf, uploadProgress } from './store'
-import { AD_LABELS } from './types'
+import { useEvalOverview } from '../../api/eval'
+import type { AdKey, FinalScore } from './scoring'
+import { AD_LABELS, AWARD_BRIEFS } from './types'
 
 // 各項分數的資料來源頁:點字卡跳轉(如網頁經營 → 管理項目)
 const AD_ROUTES: Record<AdKey, string> = {
@@ -33,14 +32,10 @@ function ScoreValue({ s }: { s: FinalScore }) {
   )
 }
 
-// 資料總覽:行政資料各項分數(唯讀,系統自動計算)+ 五獎項資料入口
+// 資料總覽:行政資料各項分數(唯讀,後端自動計算+管理員調整)+ 五獎項資料入口
 export default function EvalDocsPage() {
-  const { user } = useAuth()
   const navigate = useNavigate()
-
-  const club = user?.club ?? ''
-  const scores = applyOverrides(computeAdScores(buildScoringInput(club)), overridesOf(club))
-  const total = totalOf(scores)
+  const { data, error } = useEvalOverview()
 
   const go = (path: string) => navigate(path)
 
@@ -49,23 +44,31 @@ export default function EvalDocsPage() {
       <PageHeader
         title="資料總覽"
         sub={
-          <>
-            {EVAL_WINDOW.label} · 採計期間 <span className="num">{EVAL_WINDOW.range}</span>
-          </>
+          data && (
+            <>
+              {data.windowLabel} · 採計期間 <span className="num">{data.windowRange}</span>
+            </>
+          )
         }
         extra={
           <div style={{ textAlign: 'right', height: 40, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <div style={{ fontSize: 12, color: 'var(--steel)', lineHeight: 1.1 }}>行政資料總分</div>
             <div style={{ lineHeight: 1.1 }}>
-              <span className="num" style={{ fontSize: 22, fontWeight: 600 }}>{total}</span>
+              <span className="num" style={{ fontSize: 22, fontWeight: 600 }}>{data ? data.total : '—'}</span>
               <span className="num" style={{ fontSize: 13, color: 'var(--steel)' }}> / 100</span>
             </div>
           </div>
         }
       />
 
+      {error && (
+        <div className="card" style={{ marginTop: 20, padding: '24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
+          載入評鑑資料失敗:{error.message}
+        </div>
+      )}
+
       <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12 }}>
-        {scores.map((s) => (
+        {(data?.scores ?? []).map((s) => (
           <div
             key={s.key}
             className="card click-tint"
@@ -105,35 +108,32 @@ export default function EvalDocsPage() {
       {/* 五獎項 */}
       <div style={{ fontSize: 15, fontWeight: 600, margin: '28px 0 4px' }}>競賽獎項資料</div>
       <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
-        {AWARDS.map((award) => {
-          const p = uploadProgress(award)
-          return (
-            <div
-              key={award.key}
-              className="card click-tint"
-              role="button"
-              tabIndex={0}
-              onClick={() => navigate(`/eval/award/${award.key}`)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  navigate(`/eval/award/${award.key}`)
-                }
-              }}
-              style={{ padding: '16px 18px', cursor: 'pointer' }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ fontSize: 15, fontWeight: 600, flex: 1 }}>{award.name}</div>
-                <RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>{award.brief}</div>
-              <div style={{ fontSize: 12, marginTop: 10 }}>
-                已上傳 <span className="num" style={{ fontWeight: 600 }}>{p.done}</span>
-                <span className="num" style={{ color: 'var(--steel)' }}>/{p.total}</span> 項
-              </div>
+        {(data?.awards ?? []).map((award) => (
+          <div
+            key={award.id}
+            className="card click-tint"
+            role="button"
+            tabIndex={0}
+            onClick={() => navigate(`/eval/award/${award.id}`)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                navigate(`/eval/award/${award.id}`)
+              }
+            }}
+            style={{ padding: '16px 18px', cursor: 'pointer' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, flex: 1 }}>{award.name}</div>
+              <RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />
             </div>
-          )
-        })}
+            <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>{AWARD_BRIEFS[award.id] ?? ''}</div>
+            <div style={{ fontSize: 12, marginTop: 10 }}>
+              已上傳 <span className="num" style={{ fontWeight: 600 }}>{award.filled}</span>
+              <span className="num" style={{ color: 'var(--steel)' }}>/{award.total}</span> 項
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )

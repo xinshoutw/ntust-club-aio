@@ -1,46 +1,44 @@
-import { useReducer, useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { App, Button, Upload } from 'antd'
 import { LeftOutlined, UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { useAuth } from '../../app/auth'
 import { fmtMB, isImageFile, sha256 } from '../../lib/uploads'
-import { AWARDS, slotFiles, uploadProgress } from './store'
-import { releaseFile, toEvalFile } from './files'
-import { fileTypeOf, type AwardDef, type AwardKey, type EvalFile } from './types'
+import { useAwardDetail, useEvalUploadMutations, type AwardRubricItem, type AwardUploadFile } from '../../api/eval'
+import { fileTypeOf, AWARD_BRIEFS, type EvalFile } from './types'
 import FilePreview from './FilePreview'
 
-// 圖片一律含 HEIC/HEIF 等特規格式;文件收 PDF/Word
-const ACCEPT = '.pdf,.doc,.docx,image/*,.heic,.heif,.avif'
+// 對齊後端 EVAL_POLICY:pdf/doc/docx/jpg/jpeg/png/zip,單檔 50MB
+const ACCEPT = '.pdf,.doc,.docx,.jpg,.jpeg,.png,.zip'
 const MAX_FILE_BYTES = 50 * 1024 * 1024
 
-// 同一獎項底下所有槽位已上傳檔案的 hash(跨槽位去重)
-const awardHashes = (award: AwardDef): Set<string> => {
-  const set = new Set<string>()
-  for (const slot of award.slots) {
-    for (const f of slotFiles(award.key, slot.key)) if (f.hash) set.add(f.hash)
-  }
-  return set
+function BackLink() {
+  return (
+    <Link to="/eval" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+      <LeftOutlined style={{ fontSize: 12 }} />
+      返回資料總覽
+    </Link>
+  )
 }
 
-// 獎項詳細頁:評分細項 → 上傳槽位(狀態、即時預覽)
+// 獎項詳細頁:評分細項(後端逐年 rubric)→ 上傳槽位(狀態、即時預覽)
 export default function AwardDetailPage() {
   const { award: awardKey } = useParams()
   const { user } = useAuth()
   const { message } = App.useApp()
-  const [, force] = useReducer((x: number) => x + 1, 0)
+  const { data: award, isError } = useAwardDetail(awardKey)
+  const { upload, remove } = useEvalUploadMutations(awardKey ?? '')
+  // 本次 session 上傳檔的 SHA-256(uploadId → hash):同獎項內容去重(沿改版前跨槽位語意);
+  // 後端另有未開放/型別/容量重驗,拒絕時以 message.error 顯示(跨 session 去重目前後端未做)
+  const sessionHashes = useRef(new Map<number, string>())
   const [preview, setPreview] = useState<EvalFile | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
 
-  const award = AWARDS.find((a) => a.key === (awardKey as AwardKey))
-
-  if (!award) {
+  if (isError) {
     return (
       <div>
-        <Link to="/eval" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-          <LeftOutlined style={{ fontSize: 12 }} />
-          返回資料總覽
-        </Link>
+        <BackLink />
         <div className="card" style={{ marginTop: 16, padding: '40px 24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
           找不到此獎項
         </div>
@@ -48,46 +46,88 @@ export default function AwardDetailPage() {
     )
   }
 
-  const progress = uploadProgress(award)
-  const groups = [...new Set(award.slots.map((s) => s.group))]
+  if (!award) {
+    return (
+      <div>
+        <BackLink />
+      </div>
+    )
+  }
 
-  const addFiles = async (slotKey: string, f: File) => {
+  const uploadable = award.items.filter((i) => !i.isAdminItem)
+  const progress = {
+    done: uploadable.filter((i) => i.uploads.length > 0).length,
+    total: uploadable.length,
+  }
+
+  // 依後端排序分組(group_label 相同者相鄰)
+  const groups: { label: string; items: AwardRubricItem[] }[] = []
+  for (const item of award.items) {
+    const last = groups[groups.length - 1]
+    if (last && last.label === item.groupLabel) last.items.push(item)
+    else groups.push({ label: item.groupLabel, items: [item] })
+  }
+
+  const addFile = async (item: AwardRubricItem, f: File) => {
     if (f.size > MAX_FILE_BYTES) {
       message.error(`「${f.name}」超過單檔 50 MB 上限`)
       return
     }
-    // 宣稱是圖片的檔案驗魔術位元組(PDF 的降級檢查在 toEvalFile)
+    // 宣稱是圖片的檔案驗魔術位元組(其餘型別由後端重驗)
     if (fileTypeOf(f.name) === 'image' && !(await isImageFile(f))) {
       message.error(`「${f.name}」不是有效的圖片檔`)
       return
     }
     const hash = await sha256(f)
-    if (awardHashes(award).has(hash)) {
+    if ([...sessionHashes.current.values()].includes(hash)) {
       message.error(`「${f.name}」與已上傳的檔案內容相同,已拒絕重複上傳`)
       return
     }
-    slotFiles(award.key, slotKey).push(await toEvalFile(f, hash))
-    message.success(`已上傳「${f.name}」`)
-    force()
+    upload.mutate(
+      { itemId: item.id, file: f },
+      {
+        onSuccess: (uploaded) => {
+          sessionHashes.current.set(uploaded.uploadId, hash)
+          message.success(`已上傳「${f.name}」`)
+        },
+        onError: (e) => message.error(e.message),
+      },
+    )
   }
 
-  const openPreview = (f: EvalFile) => {
+  const removeFile = (item: AwardRubricItem, f: AwardUploadFile) => {
+    remove.mutate(
+      { itemId: item.id, uploadId: f.uploadId },
+      {
+        onSuccess: () => sessionHashes.current.delete(f.uploadId),
+        onError: (e) => message.error(e.message),
+      },
+    )
+  }
+
+  const openPreview = async (f: EvalFile) => {
+    // docx 預覽需要原始檔內容(mammoth);伺服器檔案先抓回 blob 再開
+    if (f.type === 'doc' && !f.raw) {
+      try {
+        const blob = await (await fetch(f.url, { credentials: 'same-origin' })).blob()
+        f = { ...f, raw: new File([blob], f.name) }
+      } catch {
+        // 抓取失敗:仍開啟預覽視窗,由 DocView 顯示無法預覽說明
+      }
+    }
     setPreview(f)
     setPreviewOpen(true)
   }
 
   return (
     <div>
-      <Link to="/eval" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-        <LeftOutlined style={{ fontSize: 12 }} />
-        返回資料總覽
-      </Link>
+      <BackLink />
       <div style={{ marginTop: 12 }}>
         <PageHeader
           title={award.name}
           sub={
             <>
-              {user?.club} · {award.brief}
+              {user?.club} · {AWARD_BRIEFS[award.id] ?? ''}
             </>
           }
           extra={
@@ -101,77 +141,73 @@ export default function AwardDetailPage() {
         />
       </div>
 
+      {award.items.length === 0 && (
+        <div className="card" style={{ marginTop: 16, padding: '40px 24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
+          {award.year} 年度評分項目尚未建立,請待學務處公告
+        </div>
+      )}
+
       {groups.map((g) => (
-        <div className="card" key={g} style={{ marginTop: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, padding: '14px 20px 6px' }}>{g}</div>
-          {award.slots
-            .filter((s) => s.group === g)
-            .map((slot) => {
-              const files = slotFiles(award.key, slot.key)
-              return (
-                <div key={slot.key} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 20px', borderTop: '1px solid var(--line)', flexWrap: 'wrap' }}>
-                  <div style={{ flex: 1, minWidth: 240 }}>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                      <span style={{ fontSize: 14, fontWeight: 500 }}>{slot.name}</span>
-                      <span className="num" style={{ fontSize: 12, color: 'var(--steel)' }}>{slot.weight}</span>
-                    </div>
-                    <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 3, lineHeight: 1.7 }}>
-                      {slot.hints.join(';')}
-                    </div>
-                    {files.length > 0 && (
-                      <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 6 }}>
-                        已使用 <span className="num">{fmtMB(files.reduce((s, f) => s + f.size, 0))}</span> MB(單檔上限{' '}
-                        <span className="num">50</span> MB)
-                      </div>
-                    )}
-                    {files.length > 0 && (
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-                        {files.map((f) => (
-                          <span key={f.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 4, padding: '2px 6px' }}>
-                            <button type="button" className="link-btn" style={{ padding: 0, fontSize: 12 }} onClick={() => openPreview(f)}>
-                              {f.name}
-                            </button>
-                            <button
-                              type="button"
-                              className="link-btn danger"
-                              aria-label={`移除 ${f.name}`}
-                              style={{ padding: '0 2px', fontSize: 12 }}
-                              onClick={() => {
-                                const list = slotFiles(award.key, slot.key)
-                                list.splice(list.findIndex((x) => x.id === f.id), 1)
-                                releaseFile(f)
-                                force()
-                              }}
-                            >
-                              ×
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  {slot.auto ? (
-                    <span style={{ fontSize: 12, color: 'var(--steel)', border: '1px solid var(--line)', borderRadius: 999, padding: '2px 10px', whiteSpace: 'nowrap' }}>
-                      {slot.auto}
-                    </span>
-                  ) : (
-                    <Upload
-                      accept={ACCEPT}
-                      multiple
-                      showUploadList={false}
-                      beforeUpload={(f) => {
-                        void addFiles(slot.key, f)
-                        return false
-                      }}
-                    >
-                      <Button size="small" style={{ height: 30 }} icon={<UploadOutlined />}>
-                        上傳
-                      </Button>
-                    </Upload>
-                  )}
+        <div className="card" key={g.label || g.items[0].id} style={{ marginTop: 16 }}>
+          {g.label && <div style={{ fontSize: 14, fontWeight: 600, padding: '14px 20px 6px' }}>{g.label}</div>}
+          {g.items.map((item) => (
+            <div key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '12px 20px', borderTop: '1px solid var(--line)', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 240 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                  <span style={{ fontSize: 14, fontWeight: 500 }}>{item.name}</span>
+                  <span className="num" style={{ fontSize: 12, color: 'var(--steel)' }}>配分 {item.maxScore}</span>
                 </div>
-              )
-            })}
+                {item.help && (
+                  <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 3, lineHeight: 1.7 }}>{item.help}</div>
+                )}
+                {item.uploads.length > 0 && (
+                  <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 6 }}>
+                    已使用 <span className="num">{fmtMB(item.uploads.reduce((s, f) => s + f.size, 0))}</span> MB(單檔上限{' '}
+                    <span className="num">50</span> MB)
+                  </div>
+                )}
+                {item.uploads.length > 0 && (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                    {item.uploads.map((f) => (
+                      <span key={f.uploadId} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 4, padding: '2px 6px' }}>
+                        <button type="button" className="link-btn" style={{ padding: 0, fontSize: 12 }} onClick={() => void openPreview(f)}>
+                          {f.name}
+                        </button>
+                        <button
+                          type="button"
+                          className="link-btn danger"
+                          aria-label={`移除 ${f.name}`}
+                          style={{ padding: '0 2px', fontSize: 12 }}
+                          onClick={() => removeFile(item, f)}
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {item.isAdminItem ? (
+                <span style={{ fontSize: 12, color: 'var(--steel)', border: '1px solid var(--line)', borderRadius: 999, padding: '2px 10px', whiteSpace: 'nowrap' }}>
+                  自動採計
+                </span>
+              ) : (
+                <Upload
+                  accept={ACCEPT}
+                  multiple
+                  showUploadList={false}
+                  beforeUpload={(f) => {
+                    void addFile(item, f)
+                    return false
+                  }}
+                >
+                  <Button size="small" style={{ height: 30 }} icon={<UploadOutlined />} loading={upload.isPending}>
+                    上傳
+                  </Button>
+                </Upload>
+              )}
+            </div>
+          ))}
         </div>
       ))}
 

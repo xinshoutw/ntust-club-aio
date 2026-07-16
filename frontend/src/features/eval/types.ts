@@ -22,23 +22,13 @@ export interface ActivityResult {
   feedback: EvalFile | null
 }
 
-// 與 data-model awards.slug 對齊:club/finance/activity/result/leader
-export type AwardKey = 'club' | 'finance' | 'activity' | 'result' | 'leader'
-
-export interface AwardSlot {
-  key: string
-  group: string
-  name: string
-  weight: string
-  hints: string[]
-  auto?: string // 非上傳槽位(自動採計/現場評分)的說明
-}
-
-export interface AwardDef {
-  key: AwardKey
-  name: string
-  brief: string
-  slots: AwardSlot[]
+// 獎項簡述(前端文案;獎項主檔與評分細項在後端,鍵=awards.id slug)
+export const AWARD_BRIEFS: Record<string, string> = {
+  club: '行政資料 40% + 社團營運 60%',
+  finance: '制度、預算、帳目憑證與公開徵信',
+  activity: '單一活動的企劃、執行與結案',
+  result: '成果的影響力、執行與學習成長',
+  leader: '個人獎:自我介紹、社團經歷與事蹟',
 }
 
 export const AD_LABELS: Record<AdKey, { group: string; name: string }> = {

@@ -334,3 +334,37 @@ async def test_review_permission_key_alias(client, db):
     resp = await client.get("/api/v1/admin/activities")
     assert resp.status_code == 200
     assert aid in [a["id"] for a in resp.json()["data"]]
+
+
+async def test_close_approve_persists_submission_confirmations(client, db):
+    """核准時的繳交確認落庫;未確認之項目評鑑以 0 分計(scoring 讀取)。"""
+    await seed(client, db)
+    past = (date.today() - timedelta(days=2)).isoformat()
+    aid = await submit_activity(client, db, date=past)
+    await db.execute(sa.update(Activity).where(Activity.id == aid).values(status="approved"))
+    await db.commit()
+
+    await login(client, "club01")
+    resp = await client.post(
+        f"/api/v1/club/activities/{aid}/close",
+        json=close_payload(),
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200
+
+    await login(client, "advisor")
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/close-approve",
+        json={"photos_confirmed": False, "reflections_confirmed": False},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200
+
+    from app.models import ActivityReport
+
+    report = await db.get(ActivityReport, aid)
+    assert (report.photos_confirmed, report.report_confirmed, report.reflections_confirmed) == (
+        False,
+        True,
+        False,
+    )

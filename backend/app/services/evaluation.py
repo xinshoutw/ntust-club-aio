@@ -109,13 +109,24 @@ async def gather_scoring_input(db: AsyncSession, club_id: int, window: EvalWindo
         )
         reflection_counts = dict(rows.all())
 
+    # 結案審核的繳交確認:未確認之項目以 0 分計(照片確認同時涵蓋影片連結)
+    def _confirmed(aid: int, field: str) -> bool:
+        report = reports.get(aid)
+        return bool(getattr(report, field)) if report is not None else True
+
     results = tuple(
         ActivityResult(
             activity_id=aid,
-            photo_count=photo_counts.get(aid, 0),
-            has_video_link=bool(reports[aid].video_url) if aid in reports else False,
-            has_report=aid in reports,
-            has_feedback=reflection_counts.get(aid, 0) > 0,
+            photo_count=photo_counts.get(aid, 0) if _confirmed(aid, "photos_confirmed") else 0,
+            has_video_link=(
+                bool(reports[aid].video_url)
+                if aid in reports and _confirmed(aid, "photos_confirmed")
+                else False
+            ),
+            has_report=aid in reports and _confirmed(aid, "report_confirmed"),
+            has_feedback=(
+                reflection_counts.get(aid, 0) > 0 and _confirmed(aid, "reflections_confirmed")
+            ),
         )
         for aid in activity_ids
     )

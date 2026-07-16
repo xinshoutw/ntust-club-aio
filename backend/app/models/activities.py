@@ -93,6 +93,11 @@ class ActivityReport(Base, TimestampMixin):
     video_url: Mapped[str | None] = mapped_column(sa.Text)  # 唯一選填;http(s) 驗證
     expense: Mapped[int] = mapped_column()  # 實際支出(核銷依據)
     submitted_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
+    # 結案審核繳交確認(2026-07-16 第九輪):輔導老師核准時逐項確認,
+    # 未確認之項目評鑑以 0 分計(scoring 讀取;照片確認同時涵蓋影片連結)
+    photos_confirmed: Mapped[bool] = mapped_column(default=True, server_default=sa.true())
+    report_confirmed: Mapped[bool] = mapped_column(default=True, server_default=sa.true())
+    reflections_confirmed: Mapped[bool] = mapped_column(default=True, server_default=sa.true())
 
     reflections: Mapped[list[ActivityReflection]] = relationship(
         cascade="all, delete-orphan", order_by="ActivityReflection.id"

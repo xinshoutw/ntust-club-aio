@@ -44,6 +44,14 @@ class RejectIn(BaseModel):
     _strip = field_validator("reason")(_strip_reason)
 
 
+class CloseApproveIn(BaseModel):
+    """結案核准繳交確認:未確認之項目評鑑以 0 分計(照片確認涵蓋影片連結)。"""
+
+    photos_confirmed: bool = True
+    report_confirmed: bool = True
+    reflections_confirmed: bool = True
+
+
 class ScoreOverrideIn(BaseModel):
     key: str
     score: float
@@ -83,6 +91,28 @@ class AttendanceIn(BaseModel):
     club_id: int
     attended: bool
     session_id: int | None = None  # 場次制活動(如負責人會議)必填;非場次制免帶
+
+
+class SessionIn(BaseModel):
+    """場次建立(負責人會議等場次制活動)。"""
+
+    name: str = Field(min_length=1, max_length=100)
+    date: date
+
+
+class SessionAttendanceOut(BaseModel):
+    club_id: int
+    attended: bool
+
+
+class SessionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    date: date
+    semester: str
+    attendance: list[SessionAttendanceOut] = []
 
 
 # ---- 違規勸導管理 ----

@@ -15,7 +15,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from app.api.pagination import Pagination
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, forbidden, not_found, validation_error
-from app.models import Activity, ApprovalRecord, Club
+from app.models import Activity, ActivityReport, ApprovalRecord, Club
 from app.models.enums import (
     ActivityStatus,
     ActivityType,
@@ -24,7 +24,7 @@ from app.models.enums import (
     UserRole,
 )
 from app.schemas.activities import ActivityDetailOut, ActivityOut
-from app.schemas.admin import ApproveActivityIn, RejectIn
+from app.schemas.admin import ApproveActivityIn, CloseApproveIn, RejectIn
 from app.schemas.common import ApiResponse
 from app.services import activity_service as svc
 from app.services import audit, notify
@@ -39,8 +39,9 @@ _STAGE_BY_STATUS = {
     ActivityStatus.PENDING_DEAN: ("approve_dean", "dean"),
 }
 
-# aact=既有後端鍵、areview=前端權限彈窗鍵(尚未統一,任一即通過)
-_REVIEW_PAGE_KEYS = ("aact", "areview")
+# aact=既有後端鍵、areview=前端權限彈窗鍵(尚未統一,任一即通過);
+# aclose=結案審核頁:僅持該鍵的帳號也需要讀列表/詳情(動作端點另有各自關卡檢查)
+_REVIEW_PAGE_KEYS = ("aact", "areview", "aclose")
 _REVIEW_KEYS = (*_REVIEW_PAGE_KEYS, "approve_advisor", "approve_chief", "approve_dean")
 
 
@@ -329,6 +330,7 @@ async def close_approve(
     db: DbDep,
     request: Request,
     background: BackgroundTasks,
+    body: CloseApproveIn | None = None,
 ) -> ApiResponse[None]:
     activity = await _get_activity(db, activity_id, for_update=True)
     if activity.status != ActivityStatus.CLOSING_PENDING_ADVISOR:
@@ -336,6 +338,13 @@ async def close_approve(
     _require_stage_key(user, "approve_advisor")  # 結案:輔導老師單關
 
     activity.status = ActivityStatus.CLOSED
+    # 繳交確認:未確認之項目評鑑以 0 分計(寫入 report,scoring 讀取)
+    if body is not None:
+        report = await db.get(ActivityReport, activity.id)
+        if report is not None:
+            report.photos_confirmed = body.photos_confirmed
+            report.report_confirmed = body.report_confirmed
+            report.reflections_confirmed = body.reflections_confirmed
     _record(db, activity, ApprovalSubject.ACTIVITY_CLOSE, "advisor", ApprovalDecision.APPROVE, user)
     audit.record(
         db,

@@ -14,15 +14,21 @@ from app.models.enums import (
 
 
 class Announcement(Base, TimestampMixin):
+    """公告(2026-07-16 第八輪):content 存 markdown 原文(前端渲染,後端僅存)。"""
+
     __tablename__ = "announcements"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(sa.Text)
-    content: Mapped[str] = mapped_column(sa.Text)
+    content: Mapped[str] = mapped_column(sa.Text)  # markdown 原文
     target_type: Mapped[AnnouncementTarget] = mapped_column(
         db_enum(AnnouncementTarget, "announcement_target"), default=AnnouncementTarget.ALL
     )
-    target_value: Mapped[str | None] = mapped_column(sa.Text)  # 性質名或 club_id
+    attrs: Mapped[list[str] | None] = mapped_column(ARRAY(sa.Text))  # target=attr:性質可多選
+    club_id: Mapped[int | None] = mapped_column(sa.ForeignKey("clubs.id"))  # target=club
+    # 蓋板截止日;NULL=非蓋板。期限內社團每次登入全版顯示(顯示邏輯在前端)
+    takeover_until: Mapped[date | None] = mapped_column(sa.Date)
+    notify: Mapped[bool] = mapped_column(default=False)  # 發布時寄送通知(Email/Discord)
     is_auto: Mapped[bool] = mapped_column(default=False)  # 系統自動通知(如核准訊息)
     created_by: Mapped[int] = mapped_column(sa.ForeignKey("users.id"))
 
@@ -53,7 +59,10 @@ class AuditLog(Base, TimestampMixin):
     __table_args__ = (sa.Index("ix_audit_logs_created_at", "created_at"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int | None] = mapped_column(sa.ForeignKey("users.id"), index=True)
+    # SET NULL:刪除帳號時稽核紀錄保留(2026-07-16 第八輪帳號管理)
+    user_id: Mapped[int | None] = mapped_column(
+        sa.ForeignKey("users.id", ondelete="SET NULL"), index=True
+    )
     role: Mapped[str | None] = mapped_column(sa.Text)
     action: Mapped[str] = mapped_column(sa.Text)
     detail: Mapped[str] = mapped_column(sa.Text, default="")

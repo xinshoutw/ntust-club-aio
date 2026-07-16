@@ -129,6 +129,7 @@ class AnnouncementOut(BaseModel):
 
     id: int
     title: str
-    content: str
+    content: str  # markdown 原文(前端渲染)
     is_auto: bool
+    takeover_until: date | None  # 蓋板截止;前端據此於期限內每次登入顯示蓋板
     created_at: datetime

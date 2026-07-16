@@ -85,11 +85,14 @@ class RoomBookingOut(BaseModel):
 
 
 class FixedWindowOut(BaseModel):
-    """固定借用開放窗狀態(未開放時前端側欄反灰移至「其他」)。"""
+    """固定借用開放窗狀態(未開放時前端側欄反灰移至「其他」)。
+
+    2026-07-16 第八輪:改日期區間(系統設定 RangePicker),取代開放月份+手動加開。
+    """
 
     open: bool
-    open_months: list[int]
-    manual_open: bool
+    open_from: date | None
+    open_until: date | None
 
 
 class VenueBookingIn(BaseModel):

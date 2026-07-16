@@ -6,6 +6,9 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.models.enums import MemberKind
 
 _DISCORD_WEBHOOK_RE = re.compile(r"^https://discord\.com/api/webhooks/\d+/[\w-]+$")
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+MAX_CONTACT_EMAILS = 3
 
 
 class ClubProfileOut(BaseModel):
@@ -16,6 +19,7 @@ class ClubProfileOut(BaseModel):
     attribute: str
     intro: str
     website_url: str | None
+    contact_emails: list[str]
     discord_webhook_url: str | None
     advisor_name: str | None
     advisor_dept: str | None
@@ -28,6 +32,8 @@ class ClubProfileOut(BaseModel):
 class ClubProfileUpdate(BaseModel):
     intro: str | None = Field(None, max_length=2000)
     website_url: str | None = Field(None, max_length=500)
+    # 聯絡 Email:至多 3 組、第 1 組必填(公告通知寄送對象;2026-07-16 第八輪)
+    contact_emails: list[str] | None = Field(None, min_length=1, max_length=MAX_CONTACT_EMAILS)
     discord_webhook_url: str | None = Field(None, max_length=200)
     advisor_name: str | None = Field(None, max_length=50)
     advisor_dept: str | None = Field(None, max_length=50)
@@ -47,6 +53,20 @@ class ClubProfileUpdate(BaseModel):
         if v and not _DISCORD_WEBHOOK_RE.match(v):
             raise ValueError("Discord Webhook URL 格式不正確")
         return v or None
+
+    @field_validator("contact_emails")
+    @classmethod
+    def _valid_emails(cls, v: list[str] | None) -> list[str] | None:
+        if v is None:
+            return None
+        cleaned = [e.strip() for e in v]
+        if not cleaned[0]:
+            raise ValueError("第 1 組聯絡 Email 為必填")
+        cleaned = [e for e in cleaned if e]
+        for addr in cleaned:
+            if len(addr) > 100 or not _EMAIL_RE.match(addr):
+                raise ValueError(f"聯絡 Email 格式不正確:{addr}")
+        return cleaned
 
 
 class MemberOut(BaseModel):

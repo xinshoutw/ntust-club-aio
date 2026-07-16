@@ -10,23 +10,29 @@ from app.models.enums import SignupKind
 
 
 class SignupItem(Base, TimestampMixin):
-    """報名活動項目(管理員建立,自訂表單欄位)。"""
+    """報名活動項目(管理員建立,自訂表單欄位;2026-07-16 第八輪欄位)。"""
 
     __tablename__ = "signup_items"
+    __table_args__ = (
+        # 命名慣例補 ck_signup_items_ 前綴 → ck_signup_items_capacity_min
+        sa.CheckConstraint("max_participants >= 1", name="capacity_min"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     year: Mapped[int] = mapped_column(index=True)  # 民國學年度
     name: Mapped[str] = mapped_column(sa.Text)
-    description: Mapped[str] = mapped_column(sa.Text, default="")
-    is_open: Mapped[bool] = mapped_column(default=True)
-    deadline: Mapped[date | None] = mapped_column(sa.Date)  # 截止日
-    event_date: Mapped[date | None] = mapped_column(sa.Date)
-    time_text: Mapped[str | None] = mapped_column(sa.Text)
+    description: Mapped[str] = mapped_column(sa.Text, default="")  # 活動描述
+    is_open: Mapped[bool] = mapped_column(default=True)  # 管理員可提前關閉
+    event_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))  # 活動時間
     place: Mapped[str | None] = mapped_column(sa.Text)
-    audience: Mapped[str | None] = mapped_column(sa.Text)
-    allow_multiple: Mapped[bool] = mapped_column(default=False)
-    max_participants: Mapped[int | None] = mapped_column()  # 單一社團人數上限
+    # 報名窗:signup_start <= now <= signup_end 才受理(開始建立時預設今天)
+    signup_start: Mapped[datetime] = mapped_column(
+        sa.DateTime(timezone=True), server_default=sa.func.now()
+    )
+    signup_end: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    max_participants: Mapped[int] = mapped_column(default=1)  # 每社名額上限(必填 ≥1)
     # 表單欄位定義:[{key, label, type(text/textarea/radio/checkbox/select), options[], required}]
+    # 陣列順序即顯示順序(拖曳排序後整包送)
     fields: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
     kind: Mapped[SignupKind] = mapped_column(
         db_enum(SignupKind, "signup_kind"), default=SignupKind.NORMAL

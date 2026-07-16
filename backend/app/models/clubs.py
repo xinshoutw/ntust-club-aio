@@ -1,6 +1,7 @@
 from datetime import date
 
 import sqlalchemy as sa
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, db_enum
@@ -15,6 +16,10 @@ class Club(Base, TimestampMixin):
     attribute: Mapped[ClubAttribute] = mapped_column(db_enum(ClubAttribute, "club_attribute"))
     intro: Mapped[str] = mapped_column(sa.Text, default="")
     website_url: Mapped[str | None] = mapped_column(sa.Text)  # 行政分 ad6 依據
+    # 聯絡 Email(管理項目,至多 3 組;公告通知寄送對象,2026-07-16 第八輪)
+    contact_emails: Mapped[list[str]] = mapped_column(
+        ARRAY(sa.Text), default=list, server_default=sa.text("'{}'::text[]")
+    )
     # 社團自設的 Discord webhook(管理項目;該社事件另推一份到這裡)
     discord_webhook_url: Mapped[str | None] = mapped_column(sa.Text)
     # 指導老師(單一,社團自行維護;需多位時再抽表)

@@ -193,3 +193,28 @@ async def test_announcements_targeting(client, db):
     # 蓋板截止一併給前端(蓋板顯示邏輯在 client)
     assert rows[0]["takeover_until"] == "2026-12-31"
     assert rows[2]["takeover_until"] is None
+
+
+async def test_maintenance_evidence_capped(client, db, monkeypatch):
+    """每筆報修佐證檔上限:超過即 422(防大檔灌爆磁碟)。"""
+    from app.api.v1 import applications as app_mod
+
+    await setup_session(client, db)
+    resp = await client.post(
+        "/api/v1/club/maintenance",
+        json={"location": "社辦 B1", "items": "冷氣不冷"},
+        headers=csrf_headers(client),
+    )
+    request_id = resp.json()["data"]["id"]
+
+    monkeypatch.setattr(app_mod, "MAX_EVIDENCE_PER_REQUEST", 1)
+    png = b"\x89PNG\r\n\x1a\n" + b"0" * 64
+    url = f"/api/v1/club/maintenance/{request_id}/evidence"
+    first = await client.post(
+        url, files={"file": ("a.png", png, "image/png")}, headers=csrf_headers(client)
+    )
+    assert first.status_code == 201
+    second = await client.post(
+        url, files={"file": ("b.png", png + b"1", "image/png")}, headers=csrf_headers(client)
+    )
+    assert second.status_code == 422

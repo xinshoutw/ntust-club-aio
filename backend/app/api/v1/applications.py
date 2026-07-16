@@ -10,6 +10,7 @@ from app.models import (
     Announcement,
     Club,
     ClubMember,
+    File,
     MaintenanceRequest,
     OfficerCertificate,
     PostalAccountChange,
@@ -33,6 +34,8 @@ from app.services import audit, notify, violation_service
 from app.services import files as file_service
 
 router = APIRouter(prefix="/club", tags=["applications"])
+
+MAX_EVIDENCE_PER_REQUEST = 5  # 每筆報修佐證檔上限(影片 200MB,防磁碟耗盡)
 
 _POSITION_TITLES: dict[CertPosition, set[str]] = {
     CertPosition.LEADER: {"社長", "會長"},
@@ -154,6 +157,7 @@ async def create_postal(
 async def upload_passbook(
     change_id: int, file: UploadFile, user: ClubUser, db: DbDep
 ) -> ApiResponse[FileOut]:
+    file_service.enforce_upload_rate(user.id)
     row = await db.get(PostalAccountChange, change_id)
     if row is None or row.club_id != user.club_id:
         raise not_found("找不到申請")
@@ -213,9 +217,18 @@ async def create_maintenance(
 async def upload_evidence(
     request_id: int, file: UploadFile, user: ClubUser, db: DbDep
 ) -> ApiResponse[FileOut]:
+    file_service.enforce_upload_rate(user.id)
     row = await db.get(MaintenanceRequest, request_id)
     if row is None or row.club_id != user.club_id:
         raise not_found("找不到報修單")
+    # 每單佐證上限:報修影片最大 200MB,無上限會被灌爆磁碟(2026-07-16 資安審查)
+    existing = await db.scalar(
+        sa.select(sa.func.count())
+        .select_from(File)
+        .where(File.subject_type == "maintenance", File.subject_id == row.id)
+    )
+    if (existing or 0) >= MAX_EVIDENCE_PER_REQUEST:
+        raise validation_error(f"每筆報修至多 {MAX_EVIDENCE_PER_REQUEST} 個佐證檔案")
     # 佐證接受照片或影片(影片走 200MB 上限)
     ext = (file.filename or "").lower().rsplit(".", 1)
     policy = (

@@ -19,7 +19,8 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.errors import AppError, not_found
+from app.core.errors import AppError, not_found, rate_limited
+from app.core.rate_limit import upload_limiter
 from app.models import File, User
 from app.models.enums import UserRole
 from app.services.settings_service import get_setting
@@ -232,10 +233,14 @@ async def save_upload(
 
 
 def can_access(file: File, user: User) -> bool:
-    """權限邊界:admin/staff 全通;club 只能取自己社團;viewer 取評鑑上傳(需開權)。"""
+    """權限邊界:admin 全通;staff 僅職務相關;club 只能取自己社團;viewer 取評鑑上傳(需開權)。"""
     match user.role:
-        case UserRole.ADMIN | UserRole.STAFF:
+        case UserRole.ADMIN:
             return True
+        case UserRole.STAFF:
+            # 最小權限(2026-07-16 資安審查):工讀生職務=報修/違規/器材點交,
+            # 郵局存簿、活動附件、評鑑上傳等敏感檔不開放
+            return file.subject_type in {"maintenance", "violation"}
         case UserRole.CLUB:
             return file.club_id is not None and file.club_id == user.club_id
         case UserRole.VIEWER:
@@ -274,3 +279,9 @@ async def delete_file(db: AsyncSession, file: File) -> Path:
     disk = Path(settings.upload_dir) / file.path
     await db.delete(file)
     return disk
+
+
+def enforce_upload_rate(user_id: int) -> None:
+    """上傳限流(30 次/分/使用者):防重複上傳大檔耗盡磁碟(2026-07-16 資安審查)。"""
+    if not upload_limiter.allow(f"user:{user_id}"):
+        raise rate_limited("上傳過於頻繁,請稍後再試")

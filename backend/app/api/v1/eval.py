@@ -159,6 +159,7 @@ async def award_detail(award_id: str, user: ClubUser, db: DbDep) -> ApiResponse[
 async def upload_eval_file(
     award_id: str, item_id: int, file: UploadFile, user: ClubUser, db: DbDep
 ) -> ApiResponse[EvalFileOut]:
+    file_service.enforce_upload_rate(user.id)
     award = await _award_or_404(db, award_id)
     window = await evaluation.get_eval_window(db)
     if await _upload_locked(db, window.year, award.id):

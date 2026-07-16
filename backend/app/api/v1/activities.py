@@ -242,6 +242,7 @@ async def save_close_draft(
 async def upload_photo(
     activity_id: int, file: UploadFile, user: ClubUser, db: DbDep
 ) -> ApiResponse[FileOut]:
+    file_service.enforce_upload_rate(user.id)
     activity = await svc.get_own_activity(db, user, activity_id)
     if activity.status != ActivityStatus.APPROVED:
         raise conflict("僅結案準備中(已核准)的活動可上傳照片")
@@ -286,6 +287,7 @@ async def delete_photo(
 async def upload_attachment(
     activity_id: int, file: UploadFile, user: ClubUser, db: DbDep
 ) -> ApiResponse[FileOut]:
+    file_service.enforce_upload_rate(user.id)
     activity = await svc.get_own_activity(db, user, activity_id)
     if activity.status not in _EDITABLE:
         raise conflict("僅草稿或退回件可上傳附件")

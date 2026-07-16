@@ -228,3 +228,36 @@ async def test_upload_limit_reads_settings(db):
         )
     assert err.value.code == "FILE_TOO_LARGE"
     assert "1MB" in err.value.message
+
+
+async def test_staff_limited_to_duty_files(client, db):
+    """工讀生僅可取職務相關檔案(報修/違規佐證);郵局存簿等敏感檔視同不存在。"""
+    club = await make_club(db)
+    owner = await make_user(db, username="club01", club_id=club.id)
+    await make_user(db, username="staff01", role="staff")
+
+    passbook = await file_service.save_upload(
+        db,
+        fake_upload("pb.png", PNG_BYTES),
+        policy=file_service.IMAGE,
+        module="postal",
+        uploaded_by=owner.id,
+        club_id=club.id,
+        subject_type="postal_change",
+        slot="passbook",
+    )
+    evidence = await file_service.save_upload(
+        db,
+        fake_upload("ev.png", PNG_BYTES + b"\x00"),
+        policy=file_service.IMAGE,
+        module="maintenance",
+        uploaded_by=owner.id,
+        club_id=club.id,
+        subject_type="maintenance",
+        slot="evidence",
+    )
+    await db.commit()
+
+    await login(client, "staff01")
+    assert (await client.get(f"/api/v1/files/{passbook.id}")).status_code == 404
+    assert (await client.get(f"/api/v1/files/{evidence.id}")).status_code == 200

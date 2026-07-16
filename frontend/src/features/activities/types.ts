@@ -69,28 +69,8 @@ export interface Activity {
   attachments?: EvalFile[] // 申請附件(企劃書、估價單等,可預覽/下載)
 }
 
-// 與後端 system_settings.budget_categories 預設一致(後端逐項驗證科目)
-export const BUDGET_CATEGORIES = [
-  '指導老師、教練費',
-  '保險費',
-  '交通費',
-  '膳食費',
-  '印刷費',
-  '比賽獎勵品',
-  '雜支',
-  '其他',
-  '活動收入',
-]
-
-// 選定科目時顯示於該列下方的提示
-export const BUDGET_HINTS: Record<string, string> = {
-  '指導老師、教練費': '請在下方加註講師相關專業工作背景',
-  保險費: '保額上限為新台幣 100 萬元，申請學校補助要保人為國立臺灣科技大學',
-  交通費: '若租賃遊覽車請於結案時上傳行照、駕照及租賃契約',
-  雜支: '請在下方註明細項內容',
-  其他: '請在下方註明細項內容',
-  活動收入: '請在下方註明活動預計收入總金額',
-}
+// 經費科目與提示已移至後端 system_settings(2026-07-17);由 /club/config 供給,
+// 前端不再維護硬編碼清單(見 api/clubConfig.ts)
 
 export function budgetTotals(items: BudgetItem[]): { self: number; requested: number } {
   return items.reduce(

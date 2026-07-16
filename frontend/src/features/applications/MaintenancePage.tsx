@@ -6,17 +6,20 @@ import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { IMAGE_ACCEPT, isImageFile, isVideoFile } from '../../lib/uploads'
 import { useMaintenanceList, useMaintenanceMutations } from '../../api/applications'
+import { useClubConfig } from '../../api/clubConfig'
 
-// 佐證加總上限 100MB(2026-07-17 改依申請性質給總量;後端 system_settings 為權威值);
-// 單檔仍過型別 magic-byte 與各自單檔上界(影片 200MB / 圖片 10MB,architecture.md)
-const MAX_EVIDENCE_TOTAL_BYTES = 100 * 1024 * 1024
-const MAX_VIDEO_BYTES = 200 * 1024 * 1024
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024
+const MB = 1024 * 1024
 
-async function validateEvidence(f: File): Promise<string | null> {
-  if (await isImageFile(f)) return f.size <= MAX_IMAGE_BYTES ? null : '照片超過 10 MB 上限'
-  if (await isVideoFile(f)) return f.size <= MAX_VIDEO_BYTES ? null : '影片超過 200 MB 上限'
-  return '不是有效的照片或影片檔'
+// 佐證加總上限與單檔型別上界皆由後端組態供給(後端 system_settings 為權威值);
+// 這裡依 config 動態產生單檔 magic-byte + 大小驗證
+function makeValidateEvidence(imgBytes: number, videoBytes: number) {
+  return async (f: File): Promise<string | null> => {
+    if (await isImageFile(f))
+      return f.size <= imgBytes ? null : `照片超過 ${Math.round(imgBytes / MB)} MB 上限`
+    if (await isVideoFile(f))
+      return f.size <= videoBytes ? null : `影片超過 ${Math.round(videoBytes / MB)} MB 上限`
+    return '不是有效的照片或影片檔'
+  }
 }
 
 export default function MaintenancePage() {
@@ -25,6 +28,7 @@ export default function MaintenancePage() {
   const [files, setFiles] = useState<BagFile[]>([])
   const [filesError, setFilesError] = useState(false)
 
+  const config = useClubConfig().data?.uploadLimits
   const listQuery = useMaintenanceList()
   const records = listQuery.data?.records ?? []
   const { submit } = useMaintenanceMutations()
@@ -74,8 +78,8 @@ export default function MaintenancePage() {
               error={filesError}
               accept={`${IMAGE_ACCEPT},video/*`}
               hint="拖放圖片或影片檔案"
-              validate={validateEvidence}
-              maxTotalBytes={MAX_EVIDENCE_TOTAL_BYTES}
+              validate={makeValidateEvidence(config?.imgBytes ?? 10 * MB, config?.videoBytes ?? 200 * MB)}
+              maxTotalBytes={config?.maintenanceBytes ?? 100 * MB}
               maxCount={5}
             />
           </Form.Item>

@@ -19,6 +19,7 @@ import {
   type ClubActivityDetail,
   type CloseSubmitInput,
 } from '../../api/activities'
+import { useClubConfig } from '../../api/clubConfig'
 import type { Reflection } from './types'
 import { TIME_RANGE_SEP, dateRangeText } from './utils'
 import './actform.css'
@@ -38,8 +39,8 @@ interface PhotoBag {
 const isReflectEmpty = (r: ReflectRow) => !r.name.trim() && !r.dept.trim() && !r.text.trim()
 const MIN_REFLECTIONS = 3
 const MIN_PHOTOS = 5
-// 結案照片加總上限 10MB(2026-07-17 改依申請性質給總量;後端 system_settings 為權威值)
-const CLOSE_PHOTO_TOTAL_BYTES = 10 * 1024 * 1024
+// 結案照片加總上限:後端組態供給(system_settings 為權威值);組態未載入前的保底值
+const CLOSE_PHOTO_FALLBACK_BYTES = 10 * 1024 * 1024
 
 const label: React.CSSProperties = { fontSize: 13, fontWeight: 500, marginBottom: 6 }
 const requiredMark = <span style={{ color: '#C13B34' }}> *</span>
@@ -220,6 +221,7 @@ function CloseForm({
 
   // 照片一律「送出結案時」才上傳,不進草稿(2026-07-17 需求方);此前僅暫存於前端。
   // 頁內去重以 SHA-256、加總容量上限皆於選檔時檢核;跨活動重複由後端 sha256 於送出時拒絕
+  const closePhotoBytes = useClubConfig().data?.uploadLimits.closePhotoBytes ?? CLOSE_PHOTO_FALLBACK_BYTES
   const [photos, setPhotos] = useState<PhotoBag[]>([])
   const photoKeyRef = useRef(0)
   const photoQueue = useRef(Promise.resolve())
@@ -240,8 +242,8 @@ function CloseForm({
         }
         const cur = photosRef.current
         const total = cur.reduce((s, p) => s + p.file.size, 0)
-        if (total + f.size > CLOSE_PHOTO_TOTAL_BYTES) {
-          message.error(`照片合計超過 ${Math.round(CLOSE_PHOTO_TOTAL_BYTES / 1024 / 1024)} MB 上限`)
+        if (total + f.size > closePhotoBytes) {
+          message.error(`照片合計超過 ${Math.round(closePhotoBytes / 1024 / 1024)} MB 上限`)
           return
         }
         const hash = await sha256(f)
@@ -706,7 +708,7 @@ function CloseForm({
               </div>
               <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 6 }}>
                 送出結案時才上傳,不隨草稿保存。已選 <span className="num">{fmtMB(photos.reduce((s, p) => s + p.file.size, 0))}</span>/
-                <span className="num">{Math.round(CLOSE_PHOTO_TOTAL_BYTES / 1024 / 1024)}</span> MB
+                <span className="num">{Math.round(closePhotoBytes / 1024 / 1024)}</span> MB
               </div>
             </div>
             <div className="form-grid-2" style={{ marginTop: 12 }}>

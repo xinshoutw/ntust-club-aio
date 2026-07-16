@@ -3,7 +3,9 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.models.enums import MaintenanceStatus, ViolationStatus
+from app.models.enums import BookingStatus, LoanStatus, MaintenanceStatus, ViolationStatus
+from app.schemas.accounts import _USERNAME_RE
+from app.schemas.bookings import RoomSlotOut
 from app.services.scoring import AD_KEYS, AD_MAX
 
 
@@ -126,6 +128,142 @@ class AdminMaintenanceOut(BaseModel):
     status: MaintenanceStatus
     handle_note: str | None
     created_at: datetime
+
+
+# ---- 社團主檔管理(/admin/clubs,權限鍵 amember) ----
+
+
+class AdminClubOut(BaseModel):
+    """列表用:全部社團(<200 筆,不分頁)供 ClubCascader 與管理項目。"""
+
+    id: int
+    name: str
+    attribute: str
+    username: str | None = None  # 社團帳號(一社一帳號;尚未建立時為 None)
+    is_active: bool
+    suspended_until: date | None
+
+
+class AdminClubDetailOut(AdminClubOut):
+    """單一社團:社團自管資料唯讀呈現 + 帳號與停權資訊。
+
+    webhook 僅回是否已設定(布林),不回傳實值。
+    """
+
+    intro: str
+    website_url: str | None
+    contact_emails: list[str]
+    discord_webhook_set: bool
+    advisor_name: str | None
+    advisor_dept: str | None
+    advisor_email: str | None
+    advisor_ext: str | None
+    suspend_reason: str | None
+
+
+class AdminClubUpdate(BaseModel):
+    """行政可改:社團名稱 / 帳號 username / 啟停用(名稱結尾規則於端點驗證)。"""
+
+    name: str | None = Field(None, min_length=1, max_length=100)
+    username: str | None = None
+    is_active: bool | None = None
+
+    @field_validator("name")
+    @classmethod
+    def _strip_name(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        v = v.strip()
+        if not v:
+            raise ValueError("社團名稱不得為空白")
+        return v
+
+    @field_validator("username")
+    @classmethod
+    def _valid_username(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        v = v.strip()
+        if not _USERNAME_RE.match(v):
+            raise ValueError("帳號限 3–50 字的英數字與 . _ -")
+        return v
+
+
+class SuspendIn(BaseModel):
+    """停權管理(僅 super):寫 clubs.suspended_until / suspend_reason。"""
+
+    until: date
+    reason: str = Field(min_length=1, max_length=500)
+
+    _strip = field_validator("reason")(_strip_reason)
+
+
+# ---- 臨時場地與器材借用審核(/admin,權限鍵 abooking) ----
+
+
+class AdminVenueBookingOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    club_id: int
+    club_name: str = ""
+    venue_id: int
+    venue_name: str = ""
+    activity_id: int | None
+    activity_name: str | None = None
+    date: date
+    periods: list[str]
+    purpose: str
+    status: BookingStatus
+    created_at: datetime
+
+
+class AdminEquipmentLoanOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    club_id: int
+    club_name: str = ""
+    equipment_id: int
+    equipment_name: str = ""
+    activity_id: int
+    activity_name: str | None = None
+    qty: int
+    start_date: date
+    end_date: date
+    purpose: str
+    status: LoanStatus
+    created_at: datetime
+    overdue: bool = False  # 推導:結束日之隔天上班日 10:30 未歸還
+    # 審核檢核資訊(僅待審單推導):該區間可借數(排除本單)
+    available_excluding_self: int | None = None
+
+
+# ---- 教室固定借用審核(/admin/room-bookings,權限鍵 aroom) ----
+
+
+class AdminRoomBookingOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    club_id: int
+    club_name: str = ""
+    venue_id: int
+    venue_name: str = ""
+    purpose: str
+    status: BookingStatus
+    created_at: datetime
+    slots: list[RoomSlotOut] = []  # 每週 dow×節次
+
+
+# ---- 維修狀態流轉 ----
+
+
+class MaintenanceStatusIn(BaseModel):
+    """狀態機:待處理 → 處理中 → 已完成(僅允許單步前進)。"""
+
+    status: MaintenanceStatus
+    handle_note: str | None = Field(None, max_length=500)
 
 
 # ---- 稽核軌跡 ----

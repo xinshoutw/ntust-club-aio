@@ -33,6 +33,8 @@ export default function LoginPage() {
     <div
       style={{
         minHeight: '100vh',
+        // 無 reset 預設 content-box,padding 會外加於 100vh 造成整頁垂直捲軸
+        boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',

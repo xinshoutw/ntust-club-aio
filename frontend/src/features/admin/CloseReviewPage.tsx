@@ -14,8 +14,7 @@ import {
 
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 
-// 繳交確認:輔導老師逐項確認;未確認之項目評鑑以 0 分計(原型規則)。
-// 後端 close-approve 尚無 body 可落庫勾選狀態:僅作前端覆核提示(gap,待後端補)
+// 繳交確認:輔導老師逐項確認;未確認之項目評鑑以 0 分計(核准時隨 body 落庫)
 const SUBMISSION_CHECKS = [
   { key: 'photos', label: '活動照片' },
   { key: 'report', label: '成果報告表' },
@@ -55,18 +54,26 @@ function CloseReviewModal({
   }
 
   const submitApprove = () => {
-    closeApprove.mutate(item.activityId, {
-      onSuccess: () => {
-        const missing = SUBMISSION_CHECKS.filter((c) => !checks[c.key]).map((c) => c.label)
-        message.success(
-          missing.length
-            ? `已核准「${item.name}」結案(${missing.join('、')}未繳,該項以 0 分計)`
-            : `已核准「${item.name}」結案`,
-        )
-        onClose()
+    closeApprove.mutate(
+      {
+        id: item.activityId,
+        photosConfirmed: checks.photos,
+        reportConfirmed: checks.report,
+        reflectionsConfirmed: checks.reflections,
       },
-      onError: (e) => message.error(e.message),
-    })
+      {
+        onSuccess: () => {
+          const missing = SUBMISSION_CHECKS.filter((c) => !checks[c.key]).map((c) => c.label)
+          message.success(
+            missing.length
+              ? `已核准「${item.name}」結案(${missing.join('、')}未繳,該項以 0 分計)`
+              : `已核准「${item.name}」結案`,
+          )
+          onClose()
+        },
+        onError: (e) => message.error(e.message),
+      },
+    )
   }
 
   const submitReject = () => {

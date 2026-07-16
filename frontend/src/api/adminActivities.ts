@@ -330,8 +330,26 @@ export function useAdminActivityMutations() {
     onSuccess: invalidate,
   })
   const closeApprove = useMutation({
-    // 後端 close-approve 尚無 body:繳交確認勾選僅前端提示,未落庫(gap,待後端補)
-    mutationFn: (id: number) => api<null>(`/admin/activities/${id}/close-approve`, { method: 'POST' }),
+    // 繳交確認落庫:未確認之項目評鑑以 0 分計(後端 scoring 讀取)
+    mutationFn: ({
+      id,
+      photosConfirmed,
+      reportConfirmed,
+      reflectionsConfirmed,
+    }: {
+      id: number
+      photosConfirmed: boolean
+      reportConfirmed: boolean
+      reflectionsConfirmed: boolean
+    }) =>
+      api<null>(`/admin/activities/${id}/close-approve`, {
+        method: 'POST',
+        body: JSON.stringify({
+          photos_confirmed: photosConfirmed,
+          report_confirmed: reportConfirmed,
+          reflections_confirmed: reflectionsConfirmed,
+        }),
+      }),
     onSuccess: invalidate,
   })
   const closeReject = useMutation({

@@ -1,6 +1,6 @@
 // 空間與器材借用 API 層:snake_case ↔ camelCase 與日期(後端 ISO ↔ 顯示 YYYY/MM/DD)轉換集中在此;
 // 查詢鍵集中管理,mutation 一律 invalidate 整域(送出借用會同時影響場況圖/可借數/我的借用)
-import { keepPreviousData, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs, { type Dayjs } from 'dayjs'
 import { api, apiPaged, apiWithMeta, qs } from './client'
 import type { StatusKey } from '../lib/status'
@@ -263,6 +263,8 @@ const keys = {
   venues: ['bookings', 'venues'] as const,
   equipment: (activityId: number | null) => ['bookings', 'equipment', activityId] as const,
   availability: (iso: string) => ['bookings', 'availability', iso] as const,
+  availabilityRange: (startIso: string, endIso: string) =>
+    ['bookings', 'availability-range', startIso, endIso] as const,
   fixedWindow: ['bookings', 'fixed-window'] as const,
   rooms: (p: PageParams | 'all') => ['bookings', 'room-bookings', p] as const,
   venueBookings: (p: PageParams | 'all') => ['bookings', 'venue-bookings', p] as const,
@@ -308,27 +310,26 @@ export function useAvailability(date: Dayjs) {
   })
 }
 
-/**
- * 多日場況(單一場地 15 天檢視):後端僅提供單日端點,採逐日並行呼叫。
- * 取捨:15 個輕量請求換免後端改動;查詢鍵按日快取,±1 天翻頁可重用 14 天結果。
- */
+/** 多日場況(單一場地 15 天檢視):批次端點一次撈整段區間(2026-07-17,取代逐日 15 請求) */
 export function useAvailabilityDays(dates: Dayjs[]) {
-  return useQueries({
-    queries: dates.map((d) => ({
-      queryKey: keys.availability(toIso(d)),
-      queryFn: () => fetchAvailability(d),
-    })),
-    combine: (results) => ({
-      isPending: results.some((r) => r.isPending),
-      isError: results.some((r) => r.isError),
-      error: results.find((r) => r.isError)?.error,
-      // 只重抓失敗的日期(成功者沿用快取)
-      refetchErrored: () => results.filter((r) => r.isError).forEach((r) => void r.refetch()),
-      byDate: Object.fromEntries(
-        results.map((r, i) => [toIso(dates[i]), r.data]),
-      ) as Record<string, AvailabilityGrid | undefined>,
-    }),
+  const startIso = dates.length ? toIso(dates[0]) : ''
+  const endIso = dates.length ? toIso(dates[dates.length - 1]) : ''
+  const query = useQuery({
+    queryKey: keys.availabilityRange(startIso, endIso),
+    queryFn: () =>
+      api<{ days: { date: string; grid: AvailabilityGrid }[] }>(
+        `/club/bookings/availability-range${qs({ start: startIso, end: endIso })}`,
+      ).then((r) => Object.fromEntries(r.days.map((d) => [d.date, d.grid]))),
+    enabled: dates.length > 0,
+    placeholderData: keepPreviousData,
   })
+  return {
+    isPending: query.isPending,
+    isError: query.isError,
+    error: query.error ?? undefined,
+    refetchErrored: () => void query.refetch(),
+    byDate: (query.data ?? {}) as Record<string, AvailabilityGrid | undefined>,
+  }
 }
 
 /** 固定借用開放窗(系統設定日期區間;side nav 與固定借用頁共用同一查詢) */

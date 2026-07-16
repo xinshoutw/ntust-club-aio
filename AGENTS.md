@@ -191,6 +191,25 @@
 - **三頁重設計**:活動申請審核=「待審佇列(送件早在前)+其他狀態表」+雙欄審核彈窗(左基本資料/右經費核定,章軌移標題列);結案審核=完整結案資料(實支 vs 核定、照片/影片/心得、檢討會議)+**繳交確認勾選(未確認項評鑑以 0 分計)**;報名管理=總表(類型徽章/截止/已報名/每社上限)+單活動管理彈窗(名單/確認報名/簽到登錄/匯出 CSV)
 - 活動申請:附件加總上限 50MB(接後端改讀 system_settings)即時驗證+「已使用 X/50 MB」;結案照片放寬為**所有常見影像格式**(JPEG/PNG/GIF/WebP/BMP/TIFF/HEIC/AVIF 魔術位元組驗證)
 
+## UI/規則調整決議(2026-07-16 第九輪:全面收斂 + 後端落地 + 接線)
+
+- **PageHeader 等高**:標題列固定 `minHeight: 40`(=全域 controlHeight);header 內按鈕不再覆寫 36 高;評鑑分數塊限高 40
+- **分頁全站統一 `Pager`**(tableControls):AntD Pagination `simple` 模式(上一頁/可輸入跳頁的 x / y/下一頁)、置中、**只有一頁也顯示**;禁再用數字頁碼鈕
+- **可點卡片/列 hover 一律變色**:共用 `.click-tint`(!important 蓋 inline background)
+- **排序僅 sort icon 變色**:SortButton/FilterButton(tableControls)為唯一正解,自刻版已收斂
+- **上傳全站統一**:`lib/uploads.ts`(sha256/影像/PDF/影片魔術位元組、IMAGE_ACCEPT 含 HEIC/HEIF/AVIF)+ `components/ui/AttachmentArea`(拖放、SHA-256 內容去重、單檔/加總容量驗證、「已使用 X/Y MB」標示);套用:活動申請附件、報修、郵局、獎項槽位;結案照片沿專屬管線但共用驗證;**所有允許圖片處一律含 HEIC/HEIF**
+- **送出驗證紅框機制**:errors Set + AntD `status="error"` + 區塊紅框 `.area-error`(常駐透明邊框防位移),修改該欄即解除、捲動到第一個錯誤;已套:結案(全欄位)、申請工作分配、固定/臨時借用時段、報修/郵局上傳區、報名活動建立;結案「自籌+擬請皆 0 → 實際支出預填 0」
+- **成員身份標準值**:負責人/副負責人/幹部/社員(`lib/roles.ts`);顯示詞依社團名稱末字推導(kindLabel);**社團名稱強制以「社」或「會」結尾,無例外**(前後端皆驗);「社長/會長」複合形式廢除;CSV 匯出用顯示詞、匯入雙向相容
+- SignupBuilder 資訊調查拖曳改 **pointer 事件自製即時重排**(HTML5 DnD 廢除:drop 才換位、ghost 突兀、不支援觸控)
+- 公告 popup(admin)內建控制項:蓋板 Switch(開啟須選截止日)+ 刪除(confirmDialog);AnnouncementModal 增 `footerExtra`
+- **行政端社團總覽 popup 重用專屬審核彈窗**:DetailModal→`ActivityReviewModal`、BookingReviewModal 抽檔共用;待審項 popup 直接可核准/退回,其餘唯讀;線上申請列有專屬唯讀詳情
+- 行政端管理項目:dirty 橘框 + useUnsavedGuard + 切換社團未存確認;重設密碼=一次性密碼彈窗
+- 系統設定違規項目/經費科目:**AntD 官方可編輯標籤模式**(closable Tag + 虛線「+ 新增」Tag 點開小輸入框),取代自製常駐輸入框
+- 檔案管理:報修檔案專屬區塊(位於大型檔案前,可直接刪除);大型檔案清單排除報修
+- **後端第九輪**:三 migration(signup year 廢除/成員四值身份/semester 快照,皆可逆);admin routers 補齊(clubs/bookings/rooms/overdue/公告蓋板 PATCH/維修狀態);`UserOut.club_name`;成員多值 kind 篩選與 /semesters
+- **DB 指令**:`uv run python scripts/reset_db.py --yes`(清空→head→基礎 seed+superadmin 一次性密碼);`scripts/seed_mock.py --yes`(reset 後灌全模組 mock,帳密印出)
+- **接線慣例**:`src/api/{domain}.ts` 集中 snake↔camel 與日期(ISO↔YYYY/MM/DD)轉換、query keys、mutation onSuccess invalidate;分頁 `apiPaged`+`qs`;**範本=api/members.ts + MembersPage**;auth 走 session cookie(`/auth/me` 開機恢復、首登強制改密頁 `/change-password`、staff/viewer 導 `/coming-soon`)
+
 ## Roadmap(需求方 2026-07-15 宣告)
 
 - 未來還有 **staff panel(工讀生端)** 與 **viewer panel(評審端)** 要實作(頁面清單見上方功能模組)

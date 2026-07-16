@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { App, Button, DatePicker, Input, InputNumber, Select, Spin, TimePicker, Upload } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
@@ -27,10 +27,19 @@ interface ReflectRow extends Reflection {
   key: number
 }
 
+// 送出前暫存於前端的照片(含預覽 URL 與內容雜湊,供去重)
+interface PhotoBag {
+  key: number
+  file: File
+  url: string
+  hash: string
+}
+
 const isReflectEmpty = (r: ReflectRow) => !r.name.trim() && !r.dept.trim() && !r.text.trim()
 const MIN_REFLECTIONS = 3
 const MIN_PHOTOS = 5
-const MAX_PHOTO_BYTES = 10 * 1024 * 1024 // 圖片上限 10MB(architecture.md)
+// 結案照片加總上限 10MB(2026-07-17 改依申請性質給總量;後端 system_settings 為權威值)
+const CLOSE_PHOTO_TOTAL_BYTES = 10 * 1024 * 1024
 
 const label: React.CSSProperties = { fontSize: 13, fontWeight: 500, marginBottom: 6 }
 const requiredMark = <span style={{ color: '#C13B34' }}> *</span>
@@ -209,65 +218,54 @@ function CloseForm({
     return [...saved, ...Array.from({ length: blanks }, () => ({ key: nextKey(), name: '', dept: '', text: '' }))]
   })
 
-  // 照片即時上傳至後端(照片不隨草稿,獨立於結案草稿保存);
-  // 頁內去重以 SHA-256 先擋,跨活動重複由後端以 sha256 拒絕(409)
-  const photos = detail.photos
+  // 照片一律「送出結案時」才上傳,不進草稿(2026-07-17 需求方);此前僅暫存於前端。
+  // 頁內去重以 SHA-256、加總容量上限皆於選檔時檢核;跨活動重複由後端 sha256 於送出時拒絕
+  const [photos, setPhotos] = useState<PhotoBag[]>([])
+  const photoKeyRef = useRef(0)
   const photoQueue = useRef(Promise.resolve())
-  const sessionHashes = useRef(new Set<string>())
-  const hashByFileId = useRef(new Map<string, string>())
-  const [uploading, setUploading] = useState(0)
-  const [removing, setRemoving] = useState<ReadonlySet<string>>(new Set())
+  const photosRef = useRef(photos)
+  photosRef.current = photos
+  const [processing, setProcessing] = useState(0)
+
+  // 卸載時釋放所有預覽 URL(避免記憶體洩漏)
+  useEffect(() => () => photosRef.current.forEach((p) => URL.revokeObjectURL(p.url)), [])
 
   const addPhoto = (f: File) => {
-    setUploading((n) => n + 1)
+    setProcessing((n) => n + 1)
     photoQueue.current = photoQueue.current.then(async () => {
       try {
-        if (f.size > MAX_PHOTO_BYTES) {
-          message.error(`「${f.name}」超過 10MB 上限,請壓縮後再上傳`)
-          return
-        }
         if (!(await isImageFile(f))) {
           message.error(`「${f.name}」不是有效的圖片檔`)
           return
         }
-        const hash = await sha256(f)
-        if (sessionHashes.current.has(hash)) {
-          message.error(`「${f.name}」與已上傳的照片內容相同,已拒絕重複上傳`)
+        const cur = photosRef.current
+        const total = cur.reduce((s, p) => s + p.file.size, 0)
+        if (total + f.size > CLOSE_PHOTO_TOTAL_BYTES) {
+          message.error(`照片合計超過 ${Math.round(CLOSE_PHOTO_TOTAL_BYTES / 1024 / 1024)} MB 上限`)
           return
         }
-        const uploaded = await uploadActivityPhoto(activity.id, f)
-        sessionHashes.current.add(hash)
-        hashByFileId.current.set(uploaded.id, hash)
+        const hash = await sha256(f)
+        if (cur.some((p) => p.hash === hash)) {
+          message.error(`「${f.name}」與已選照片內容相同,已略過`)
+          return
+        }
+        const item: PhotoBag = { key: ++photoKeyRef.current, file: f, url: URL.createObjectURL(f), hash }
+        setPhotos((ps) => [...ps, item])
         clearErr('photos')
-        invalidate()
       } catch (e) {
-        message.error(`「${f.name}」上傳失敗:${errMsg(e)}`)
+        message.error(`「${f.name}」處理失敗:${errMsg(e)}`)
       } finally {
-        setUploading((n) => n - 1)
+        setProcessing((n) => n - 1)
       }
     })
   }
 
-  const removePhoto = async (fileId: string) => {
-    if (removing.has(fileId)) return
-    setRemoving((s) => new Set(s).add(fileId))
-    try {
-      await deleteActivityPhoto(activity.id, fileId)
-      const hash = hashByFileId.current.get(fileId)
-      if (hash) {
-        sessionHashes.current.delete(hash)
-        hashByFileId.current.delete(fileId)
-      }
-      invalidate()
-    } catch (e) {
-      message.error(errMsg(e))
-    } finally {
-      setRemoving((s) => {
-        const n = new Set(s)
-        n.delete(fileId)
-        return n
-      })
-    }
+  const removePhoto = (key: number) => {
+    setPhotos((ps) => {
+      const target = ps.find((p) => p.key === key)
+      if (target) URL.revokeObjectURL(target.url)
+      return ps.filter((p) => p.key !== key)
+    })
   }
 
   // 自動增列:填寫尾列即補一列;blur 離開列時移除空列(保底 3 列)
@@ -322,8 +320,8 @@ function CloseForm({
   }
 
   const submit = async () => {
-    if (uploading > 0) {
-      message.error('照片上傳中,請稍候再送出')
+    if (processing > 0) {
+      message.error('照片處理中,請稍候再送出')
       return
     }
     // 除影片連結外全必填:一次收集所有缺漏欄位,全部標紅框,訊息提示第一項
@@ -394,13 +392,22 @@ function CloseForm({
       reflections: complete.map(({ name, dept, text }) => ({ name: name.trim(), dept: dept.trim(), text: text.trim() })),
     }
     setBusy('submit')
+    // 照片在此(送出時)才上傳,不進草稿;送出失敗時回滾本次已上傳的照片,
+    // 避免留下孤兒檔並阻擋下次(後端跨活動 sha256 去重)重傳
+    const uploaded: string[] = []
     try {
+      for (const p of photos) {
+        const up = await uploadActivityPhoto(activity.id, p.file)
+        uploaded.push(up.id)
+      }
       // 送出 → closing_pending_advisor;成果報告/心得 PDF 由後端依模板於下載時生成
       await submitClose(activity.id, body)
       invalidate()
       message.success('結案已送出,等待審核')
       onDone()
     } catch (e) {
+      await Promise.allSettled(uploaded.map((id) => deleteActivityPhoto(activity.id, id)))
+      invalidate()
       message.error(errMsg(e))
     } finally {
       setBusy(null)
@@ -669,14 +676,14 @@ function CloseForm({
                 style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: 6, margin: -6, border: '1px solid transparent', borderRadius: 6 }}
               >
                 {photos.map((p) => (
-                  <span key={p.id} style={{ position: 'relative', display: 'inline-flex', opacity: removing.has(p.id) ? 0.5 : 1 }}>
-                    <img src={p.url} alt={p.name} title={p.name} style={{ width: 52, height: 40, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--line)' }} />
+                  <span key={p.key} style={{ position: 'relative', display: 'inline-flex' }}>
+                    <img src={p.url} alt={p.file.name} title={p.file.name} style={{ width: 52, height: 40, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--line)' }} />
                     <button
                       type="button"
                       className="link-btn danger"
-                      aria-label={`移除 ${p.name}`}
+                      aria-label={`移除 ${p.file.name}`}
                       style={{ position: 'absolute', top: -6, right: -6, background: '#fff', border: '1px solid var(--line)', borderRadius: '50%', width: 16, height: 16, lineHeight: '12px', padding: 0, fontSize: 11 }}
-                      onClick={() => void removePhoto(p.id)}
+                      onClick={() => removePhoto(p.key)}
                     >
                       ×
                     </button>
@@ -691,15 +698,15 @@ function CloseForm({
                     return false
                   }}
                 >
-                  <Button icon={<UploadOutlined />} loading={uploading > 0}>選擇照片</Button>
+                  <Button icon={<UploadOutlined />} loading={processing > 0}>選擇照片</Button>
                 </Upload>
                 <span className="num" style={{ fontSize: 12, color: photos.length >= MIN_PHOTOS ? '#1F6B45' : 'var(--steel)' }}>
                   {photos.length} 張
                 </span>
               </div>
               <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 6 }}>
-                已使用 <span className="num">{fmtMB(photos.reduce((s, p) => s + p.size, 0))}</span> MB(單檔上限{' '}
-                <span className="num">{Math.round(MAX_PHOTO_BYTES / 1024 / 1024)}</span> MB)
+                送出結案時才上傳,不隨草稿保存。已選 <span className="num">{fmtMB(photos.reduce((s, p) => s + p.file.size, 0))}</span>/
+                <span className="num">{Math.round(CLOSE_PHOTO_TOTAL_BYTES / 1024 / 1024)}</span> MB
               </div>
             </div>
             <div className="form-grid-2" style={{ marginTop: 12 }}>

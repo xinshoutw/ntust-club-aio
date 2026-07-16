@@ -146,10 +146,10 @@ erDiagram
 | suspend_reason | text NULL | |
 | is_active | bool | 退社/未立案=停用 |
 
-> 社長不另設欄位:由 `club_members`(kind=幹部、title=社長/會長)推導,單一真相。逾期次數同理由 `equipment_loans` 推導。**替代:照原型存 leader/overdue 欄**——與名單/借用紀錄雙寫必然漂移,不採。指導老師先做單一(原型如此),若未來要多位再抽 `club_advisors` 表,現在不預建(YAGNI)。
+> 社長不另設欄位:由 `club_members`(kind=負責人)推導,單一真相。逾期次數同理由 `equipment_loans` 推導。**替代:照原型存 leader/overdue 欄**——與名單/借用紀錄雙寫必然漂移,不採。指導老師先做單一(原型如此),若未來要多位再抽 `club_advisors` 表,現在不預建(YAGNI)。
 
-**club_members**(id, club_id FK, name, student_id, kind enum(幹部,社員), title text NULL(幹部必填), created_at, updated_at;UNIQUE(club_id, student_id))
-— 名單更新時間影響行政分 ad5(「名單更新」),`updated_at` 即依據。
+**club_members**(id, club_id FK, name, student_id, kind enum(負責人,副負責人,幹部,社員), title text NULL(僅幹部,必填), semester text(如 114-2), created_at, updated_at;UNIQUE(club_id, student_id, semester))
+— 2026-07-16 第九輪定案:**名單按學期各自一份快照**(同學號可跨學期出現;CSV 匯入指定學期);ad5 依「該學期快照是否存在與人數」採計,不再用 updated_at 推導。**正副負責人為一級身份**,顯示詞依社團名稱末字推導(…社→社長、…會→會長;**社團名稱強制以社或會結尾,無例外**);「社長/會長」複合形式廢除,CSV 匯入接受顯示詞並映射為標準身份。
 
 **venues** — 統一場地主檔(用旗標區分固定/臨時用途;**場地數量與容納人數由管理員後台維護**)
 
@@ -415,8 +415,15 @@ approved 且 活動結束日(end_date)+1個月 已過 且未送結案 → 「逾
 - **signup_items**:`event_at`/`signup_start`(建立預設現在)/`signup_end` 皆 timestamptz;`max_participants NOT NULL CHECK >=1`;`requires_confirmation`(審核制:報名 confirmed=False,管理員確認後才成立;未確認不可登錄簽到);移除 `deadline/event_date/time_text/audience/allow_multiple`;fields JSONB 保序=顯示順序
 - **audit_logs.user_id FK → ON DELETE SET NULL**:刪除帳號稽核保留;有業務 FK 歷史的帳號刪除回 409(導向停權)
 - **system_settings**:`fixed_booking_window={open_from,open_until}`(日期區間,舊 open_months/manual_open 移除;未設定=不開放);`upload_limits={doc,img,zip,video}`;`activity_attachment_total_mb`(預設 50,活動申請附件加總上限);「線上報名時間窗」不再存在(各報名活動自訂起訖)
-- **權限鍵別名**:前端 `areview/asignup` 與後端既有 `aact/areg` 任一即通過(`require_permission(*keys)`);`abooking/aroom/amember` 的管理端 router 尚未實作,屆時統一命名
-- 已知隱患:`signup_items.year` 取 `current_year`(114)與 `eval_window.year`(116)不對齊,幹訓/會議餵 ad7/ad8 前需確認
+- **權限鍵別名**:前端 `areview/asignup` 與後端既有 `aact/areg` 任一即通過(`require_permission(*keys)`)
+
+### 3.z 第九輪補記(2026-07-16)
+
+- **signup_items.year 已移除**:ad7/ad8 以「場次日期落在評鑑視窗」推導採計,年度不儲存,不再有對齊隱患
+- **club_members**:見上方欄位說明(semester 快照、四值身份、社/會結尾規則)
+- **幹部證明**:比對改「學年期(semester)× 身份(負責人/副負責人)」,不再靠職稱字串
+- **管理端 router 補齊**:`/admin/clubs`(主檔/改名/啟停/一次性密碼/成員唯讀,amember)、`/admin/venue-bookings`、`/admin/equipment-loans`(含 status=overdue 推導與可借數檢核,abooking)、`/admin/room-bookings`(aroom)、`/admin/bookings/availability`(全校場況,審核中格帶單號供開彈窗)、逾期提醒與停權(super)、公告蓋板 PATCH、維修狀態單步流轉;abooking/aroom/amember 權限鍵定案
+- **auth**:`UserOut.club_name`(role=club 補上,前端顯示與社/會推導用)
 
 ## 4. 學年與學期規則(已確認)
 

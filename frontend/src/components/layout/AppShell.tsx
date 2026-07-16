@@ -71,8 +71,8 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
       ...(user?.role === 'club' ? [{ key: 'settings', icon: <SettingOutlined />, label: '設定' }] : []),
       ...(user?.role === 'admin' && user.isSuper
         ? [
+            { key: 'admin-audit', icon: <HistoryOutlined />, label: '稽核紀錄' },
             { key: 'admin-settings', icon: <SettingOutlined />, label: '設定' },
-            { key: 'admin-audit', icon: <HistoryOutlined />, label: '稽核軌跡' },
           ]
         : []),
       { key: 'logout', icon: <LogoutOutlined />, label: '登出' },

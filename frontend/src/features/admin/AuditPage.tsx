@@ -52,7 +52,7 @@ export default function AuditPage() {
 
   return (
     <div>
-      <PageHeader title="稽核軌跡" sub="高風險操作紀錄(唯讀)" />
+      <PageHeader title="稽核紀錄" />
 
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>

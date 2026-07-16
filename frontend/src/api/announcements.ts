@@ -1,7 +1,7 @@
 // 公告 API 層:總覽公告卡、蓋板公告(TakeoverOverlay)、通知鈴鐺共用同一查詢
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
-import { apiPaged, qs } from './client'
+import { api, apiPaged, qs } from './client'
 
 /** 與 features/activities/mock 的 Announcement 結構相容(AnnouncementModal 直接沿用) */
 export interface Announcement {
@@ -11,6 +11,7 @@ export interface Announcement {
   date: string
   scope: string
   takeoverUntil?: string
+  dismissed?: boolean // 本社已勾「不再顯示」(蓋板不再出現)
 }
 
 interface AnnouncementOut {
@@ -20,6 +21,7 @@ interface AnnouncementOut {
   is_auto: boolean
   takeover_until: string | null
   created_at: string
+  dismissed: boolean
 }
 
 const toAnnouncement = (a: AnnouncementOut): Announcement => ({
@@ -30,6 +32,7 @@ const toAnnouncement = (a: AnnouncementOut): Announcement => ({
   // 社團端 API 不回發布對象;is_auto=系統自動通知(如核准訊息),其餘為行政公告
   scope: a.is_auto ? '通知' : '公告',
   takeoverUntil: a.takeover_until ? dayjs(a.takeover_until).format('YYYY/MM/DD') : undefined,
+  dismissed: a.dismissed,
 })
 
 // 三處共用近 20 筆:蓋板需涵蓋仍在期限內、但已非最新的公告
@@ -45,5 +48,14 @@ export function useAnnouncements(enabled = true) {
         ({ data, total }) => ({ announcements: data.map(toAnnouncement), total }),
       ),
     enabled,
+  })
+}
+
+/** 蓋板「不再顯示」:跨裝置持久(DB);成功後刷新共用公告查詢 */
+export function useDismissAnnouncement() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => api<null>(`/club/announcements/${id}/dismiss`, { method: 'POST' }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: announcementKeys.list }),
   })
 }

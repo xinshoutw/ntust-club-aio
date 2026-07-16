@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import dayjs from 'dayjs'
-import { CloseOutlined } from '@ant-design/icons'
+import { Modal } from 'antd'
 import Markdown from '../ui/Markdown'
 import { useAnnouncements } from '../../api/announcements'
 
@@ -18,7 +18,9 @@ function readDismissed(): string[] {
   }
 }
 
-// 蓋板公告:期限內社團每次登入後全版顯示;5 秒後右上角出現 X 才能關閉
+// 蓋板公告:期限內社團每次登入後全版顯示;5 秒後右上角出現 X 才能關閉。
+// 以 AntD Modal 承載(焦點移入/trap/背景 inert/關閉後歸還焦點皆由 Modal 處理),
+// 五秒規則以條件 closable 實現;遮罩與 Esc 一律不可關閉
 export default function TakeoverOverlay() {
   const [dismissed, setDismissed] = useState<string[]>(readDismissed)
   const [closable, setClosable] = useState(false)
@@ -37,75 +39,47 @@ export default function TakeoverOverlay() {
   useEffect(() => {
     if (!currentId) return
     setClosable(false)
-    // 蓋板期間鎖住背景捲動
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
     const t = setTimeout(() => setClosable(true), CLOSE_DELAY_MS)
-    return () => {
-      clearTimeout(t)
-      document.body.style.overflow = prevOverflow
-    }
+    return () => clearTimeout(t)
   }, [currentId])
 
-  if (!current) return null
+  // 關閉動畫期間保留最後內容(open+常駐 Modal 慣例)
+  const lastRef = useRef(current)
+  if (current) lastRef.current = current
+  const shown = current ?? lastRef.current
+  if (!shown) return null
 
   const dismiss = () => {
+    if (!current) return
     const next = [...dismissed, current.id]
     setDismissed(next)
     sessionStorage.setItem(TAKEOVER_DISMISSED_KEY, JSON.stringify(next))
   }
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={current.title}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 1300,
-        background: 'rgba(20, 23, 30, 0.62)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 20,
-      }}
+    <Modal
+      open={!!current}
+      onCancel={dismiss}
+      footer={null}
+      closable={closable}
+      mask={{ closable: false }}
+      keyboard={false}
+      width={640}
+      zIndex={1300}
+      styles={{ body: { maxHeight: '70vh', overflowY: 'auto' } }}
+      title={
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', paddingRight: 20 }}>
+          <span style={{ fontSize: 18, fontWeight: 600 }}>{shown.title}</span>
+          <span className="num" style={{ fontSize: 12, color: 'var(--steel)', fontWeight: 400 }}>{shown.date}</span>
+        </div>
+      }
     >
-      <div
-        className="card"
-        style={{ position: 'relative', width: 'min(640px, 100%)', maxHeight: '80vh', overflowY: 'auto', padding: '28px 32px', background: '#fff' }}
-      >
-        {closable && (
-          <button
-            type="button"
-            aria-label="關閉公告"
-            onClick={dismiss}
-            style={{
-              position: 'absolute',
-              top: 14,
-              right: 14,
-              border: 'none',
-              background: 'none',
-              cursor: 'pointer',
-              color: 'var(--steel)',
-              fontSize: 16,
-              padding: 6,
-            }}
-          >
-            <CloseOutlined />
-          </button>
-        )}
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', paddingRight: 30 }}>
-          <span style={{ fontSize: 18, fontWeight: 600 }}>{current.title}</span>
-          <span className="num" style={{ fontSize: 12, color: 'var(--steel)' }}>{current.date}</span>
-        </div>
-        <div style={{ marginTop: 14 }}>
-          <Markdown source={current.content} />
-        </div>
-        <div className="num" style={{ fontSize: 12, color: '#8A5A00', marginTop: 16 }}>
-          公告顯示至 {current.takeoverUntil}
-        </div>
+      <div style={{ marginTop: 6 }}>
+        <Markdown source={shown.content} />
       </div>
-    </div>
+      <div className="num" style={{ fontSize: 12, color: '#8A5A00', marginTop: 16 }}>
+        公告顯示至 {shown.takeoverUntil}
+      </div>
+    </Modal>
   )
 }

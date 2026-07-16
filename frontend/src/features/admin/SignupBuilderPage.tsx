@@ -487,7 +487,7 @@ function PreviewField({ field }: { field: BuilderField }) {
             alignItems: 'center',
             padding: '0 10px',
             fontSize: 12,
-            color: 'var(--muted)',
+            color: 'var(--steel)',
           }}
         >
           請選擇

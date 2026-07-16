@@ -90,7 +90,7 @@ export default function AdminViolationsPage() {
 
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-          <table className="tb dense" style={{ minWidth: 760 }}>
+          <table className="tb dense" aria-label="違規勸導紀錄" style={{ minWidth: 760 }}>
             <thead>
               <tr>
                 <th>社團</th>
@@ -143,7 +143,7 @@ export default function AdminViolationsPage() {
                     {v.status === 'violation_open' &&
                       (v.expired ? (
                         <Tooltip title="已逾 1 個月銷案期限,不再受理銷案">
-                          <span style={{ fontSize: 13, color: 'var(--muted)' }}>已截止</span>
+                          <span style={{ fontSize: 13, color: 'var(--steel)' }}>已截止</span>
                         </Tooltip>
                       ) : (
                         <button type="button" className="link-btn primary" onClick={() => askResolve(v)}>

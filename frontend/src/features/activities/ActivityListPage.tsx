@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { App, Button, Dropdown, Modal, Select, Tooltip } from 'antd'
-import { DownloadOutlined, EllipsisOutlined, FileTextOutlined, FilterOutlined, LinkOutlined, SwapOutlined } from '@ant-design/icons'
+import { DownloadOutlined, EllipsisOutlined, FileTextOutlined, LinkOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
-import { Pager } from '../../components/ui/tableControls'
+import { FilterButton, Pager, SortButton } from '../../components/ui/tableControls'
 import StatusPill from '../../components/ui/StatusPill'
 import LargeBadge from '../../components/ui/LargeBadge'
 import { STATUS } from '../../lib/status'
@@ -337,9 +337,7 @@ export default function ActivityListPage() {
     setSort((s) => (s?.key === key ? (s.dir === 1 ? { key, dir: -1 } : null) : { key, dir: 1 }))
 
   const sortHeader = (label: string, key: SortKey) => (
-    <button type="button" className="link-btn" style={{ padding: 0, fontWeight: 500 }} onClick={() => toggleSort(key)}>
-      {label} <SwapOutlined rotate={90} style={{ fontSize: 11, color: sort?.key === key ? 'var(--seal)' : undefined }} />
-    </button>
+    <SortButton label={label} sortKey={key} sort={sort} onToggle={toggleSort} />
   )
 
   const statusLabels = [...new Set(CLUB_ACTIVITIES.filter((a) => a.status !== 'draft').map((a) => STATUS[a.status].label))]
@@ -415,21 +413,12 @@ export default function ActivityListPage() {
               <th>
                 <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                   {sortHeader('類型', 'type')}
-                  <Dropdown
-                    trigger={['click']}
-                    menu={{
-                      items: ['社課', '活動', '會議'].map((t) => ({ key: t, label: t })),
-                      selectable: true,
-                      multiple: true,
-                      selectedKeys: typeFilter,
-                      onSelect: ({ selectedKeys }) => { setTypeFilter(selectedKeys); setPage(1) },
-                      onDeselect: ({ selectedKeys }) => { setTypeFilter(selectedKeys); setPage(1) },
-                    }}
-                  >
-                    <button type="button" className="link-btn" aria-label="篩選類型" style={{ padding: 0 }}>
-                      <FilterOutlined style={{ fontSize: 11, color: typeFilter.length ? 'var(--seal)' : 'var(--steel)' }} />
-                    </button>
-                  </Dropdown>
+                  <FilterButton
+                    options={['社課', '活動', '會議']}
+                    selected={typeFilter}
+                    onChange={(next) => { setTypeFilter(next); setPage(1) }}
+                    label="篩選類型"
+                  />
                 </span>
               </th>
               <th>{sortHeader('日期', 'date')}</th>
@@ -437,21 +426,12 @@ export default function ActivityListPage() {
               <th>
                 <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                   {sortHeader('狀態', 'status')}
-                  <Dropdown
-                    trigger={['click']}
-                    menu={{
-                      items: statusLabels.map((l) => ({ key: l, label: l })),
-                      selectable: true,
-                      multiple: true,
-                      selectedKeys: statusFilter,
-                      onSelect: ({ selectedKeys }) => { setStatusFilter(selectedKeys); setPage(1) },
-                      onDeselect: ({ selectedKeys }) => { setStatusFilter(selectedKeys); setPage(1) },
-                    }}
-                  >
-                    <button type="button" className="link-btn" aria-label="篩選狀態" style={{ padding: 0 }}>
-                      <FilterOutlined style={{ fontSize: 11, color: statusFilter.length ? 'var(--seal)' : 'var(--steel)' }} />
-                    </button>
-                  </Dropdown>
+                  <FilterButton
+                    options={statusLabels}
+                    selected={statusFilter}
+                    onChange={(next) => { setStatusFilter(next); setPage(1) }}
+                    label="篩選狀態"
+                  />
                 </span>
               </th>
               <th className="r">動作</th>

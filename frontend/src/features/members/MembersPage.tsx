@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
-import { App, Button, Dropdown, Form, Input, Modal, Popconfirm, Select, Upload } from 'antd'
-import { DownOutlined, DownloadOutlined, EditOutlined, FilterOutlined, SwapOutlined, UploadOutlined } from '@ant-design/icons'
+import { App, Button, Form, Input, Modal, Popconfirm, Select, Upload } from 'antd'
+import { DownOutlined, DownloadOutlined, EditOutlined, UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
-import { Pager } from '../../components/ui/tableControls'
+import { FilterButton, Pager, SortButton } from '../../components/ui/tableControls'
 import { neutralizeFormula } from '../../lib/csv'
 import { CURRENT_SEMESTER, semesterOptions } from '../../lib/semester'
 import { MEMBERS, type Member } from './mock'
@@ -173,30 +173,20 @@ export default function MembersPage() {
               <th>學號</th>
               <th>
                 <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                  <button type="button" className="link-btn" style={{ padding: 0, fontWeight: 500, color: sort?.key === 'kind' ? 'var(--seal)' : undefined }} onClick={() => toggleSort('kind')}>
-                    身份 <SwapOutlined rotate={90} style={{ fontSize: 11 }} />
-                  </button>
-                  <Dropdown
-                    trigger={['click']}
-                    menu={{
-                      items: KINDS.map((k) => ({ key: k, label: k })),
-                      selectable: true,
-                      multiple: true,
-                      selectedKeys: kindFilter,
-                      onSelect: ({ selectedKeys }) => { setKindFilter(selectedKeys as Member['kind'][]); setPage(1) },
-                      onDeselect: ({ selectedKeys }) => { setKindFilter(selectedKeys as Member['kind'][]); setPage(1) },
+                  <SortButton label="身份" sortKey="kind" sort={sort} onToggle={toggleSort} />
+                  <FilterButton
+                    options={KINDS as unknown as string[]}
+                    selected={kindFilter}
+                    onChange={(next) => {
+                      setKindFilter(next as Member['kind'][])
+                      setPage(1)
                     }}
-                  >
-                    <button type="button" className="link-btn" aria-label="篩選身份" style={{ padding: 0 }}>
-                      <FilterOutlined style={{ fontSize: 11, color: kindFilter.length ? 'var(--seal)' : 'var(--steel)' }} />
-                    </button>
-                  </Dropdown>
+                    label="篩選身份"
+                  />
                 </span>
               </th>
               <th>
-                <button type="button" className="link-btn" style={{ padding: 0, fontWeight: 500, color: sort?.key === 'title' ? 'var(--seal)' : undefined }} onClick={() => toggleSort('title')}>
-                  職稱 <SwapOutlined rotate={90} style={{ fontSize: 11 }} />
-                </button>
+                <SortButton label="職稱" sortKey="title" sort={sort} onToggle={toggleSort} />
               </th>
               <th>學期</th>
               <th>更新時間</th>

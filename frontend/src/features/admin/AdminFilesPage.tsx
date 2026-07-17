@@ -69,9 +69,11 @@ export default function AdminFilesPage() {
   // 模組順序由 API 決定(有報修檔案時 repair 排第一);報修歸零時整段自比例條與圖例移除
   const modules = (usage?.modules ?? []).filter((m) => m.key !== 'repair' || m.count > 0)
   const usedMb = usage?.totalMb ?? 0
-  // 容量/剩餘量由後端依 storage_limits 計算(管理員於系統設定調整,非前端常數)
-  const capacityMb = usage?.capacityMb ?? 0
-  const remainingMb = usage?.remainingMb ?? 0
+  // 實際磁碟總量/可用空間(2026-07-17 起);磁碟還有 OS 與其他程式的佔用,
+  // 比例條以「其他佔用」段呈現(diskTotal − diskFree − 系統自身)
+  const diskTotalMb = usage?.diskTotalMb ?? 0
+  const diskFreeMb = usage?.diskFreeMb ?? 0
+  const otherUsedMb = Math.max(0, diskTotalMb - diskFreeMb - usedMb)
   const totalCount = (usage?.modules ?? []).reduce((s, m) => s + m.count, 0)
   const repairUsage = usage?.modules.find((m) => m.key === 'repair')
   const otherModules = (usage?.modules ?? []).filter((m) => m.key !== 'repair')
@@ -121,19 +123,20 @@ export default function AdminFilesPage() {
         <div className="card" style={{ marginTop: 20, padding: '20px 24px' }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 24, flexWrap: 'wrap' }}>
             <div>
-              <div style={{ fontSize: 12, color: 'var(--steel)' }}>已用空間</div>
+              <div style={{ fontSize: 12, color: 'var(--steel)' }}>系統佔用</div>
               <div style={{ lineHeight: 1.15, marginTop: 2 }}>
                 <span className="num" style={{ fontSize: 30, fontWeight: 600 }}>{fmtSize(usedMb)}</span>
-                <span className="num" style={{ fontSize: 14, color: 'var(--steel)' }}> / {usage ? fmtSize(capacityMb) : '—'}({pct(usedMb, capacityMb)})</span>
+                <span className="num" style={{ fontSize: 14, color: 'var(--steel)' }}> / 磁碟 {usage ? fmtSize(diskTotalMb) : '—'}({pct(usedMb, diskTotalMb)})</span>
               </div>
             </div>
             <div style={{ flex: 1 }} />
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 12, color: 'var(--steel)' }}>可用空間</div>
-              <div className="num" style={{ fontSize: 18, fontWeight: 600, marginTop: 2 }}>{usage ? fmtSize(remainingMb) : '—'}</div>
+              <div style={{ fontSize: 12, color: 'var(--steel)' }}>磁碟可用空間</div>
+              <div className="num" style={{ fontSize: 18, fontWeight: 600, marginTop: 2 }}>{usage ? fmtSize(diskFreeMb) : '—'}</div>
             </div>
           </div>
 
+          {/* 整條=磁碟總量:系統各模組 + DB + 其他佔用(OS/同機程式)+ 可用,比例才對得上 */}
           <div style={{ display: 'flex', gap: 2, marginTop: 16, height: 20, borderRadius: 4, overflow: 'hidden' }}>
             {modules
               .filter((m) => m.sizeMb > 0)
@@ -142,14 +145,14 @@ export default function AdminFilesPage() {
                   key={m.key}
                   title={
                     <span style={{ fontSize: 13 }}>
-                      {m.label} · {fmtSize(m.sizeMb)}({pct(m.sizeMb, capacityMb)})· {m.count.toLocaleString()} 個檔案
+                      {m.label} · {fmtSize(m.sizeMb)}({pct(m.sizeMb, diskTotalMb)})· {m.count.toLocaleString()} 個檔案
                     </span>
                   }
                 >
                   <div
                     role="img"
                     aria-label={`${m.label} ${fmtSize(m.sizeMb)}`}
-                    style={{ width: `${capacityMb > 0 ? (m.sizeMb / capacityMb) * 100 : 0}%`, background: MODULE_COLORS[m.key], minWidth: 6 }}
+                    style={{ width: `${diskTotalMb > 0 ? (m.sizeMb / diskTotalMb) * 100 : 0}%`, background: MODULE_COLORS[m.key], minWidth: 6 }}
                   />
                 </Tooltip>
               ))}
@@ -157,18 +160,33 @@ export default function AdminFilesPage() {
               <Tooltip
                 title={
                   <span style={{ fontSize: 13 }}>
-                    {DB_TEXT.label}(表單等資料庫內容)· {fmtSize(usage.dbSizeMb)}({pct(usage.dbSizeMb, capacityMb)})
+                    {DB_TEXT.label}(表單等資料庫內容)· {fmtSize(usage.dbSizeMb)}({pct(usage.dbSizeMb, diskTotalMb)})
                   </span>
                 }
               >
                 <div
                   role="img"
                   aria-label={`${DB_TEXT.label} ${fmtSize(usage.dbSizeMb)}`}
-                  style={{ width: `${capacityMb > 0 ? (usage.dbSizeMb / capacityMb) * 100 : 0}%`, background: DB_TEXT.color, minWidth: 6 }}
+                  style={{ width: `${diskTotalMb > 0 ? (usage.dbSizeMb / diskTotalMb) * 100 : 0}%`, background: DB_TEXT.color, minWidth: 6 }}
                 />
               </Tooltip>
             )}
-            <div role="img" aria-label={`可用 ${fmtSize(remainingMb)}`} style={{ flex: 1, background: '#EEF0F3' }} />
+            {usage && otherUsedMb > 0 && (
+              <Tooltip
+                title={
+                  <span style={{ fontSize: 13 }}>
+                    其他佔用(作業系統與同機程式)· {fmtSize(otherUsedMb)}({pct(otherUsedMb, diskTotalMb)})
+                  </span>
+                }
+              >
+                <div
+                  role="img"
+                  aria-label={`其他佔用 ${fmtSize(otherUsedMb)}`}
+                  style={{ width: `${diskTotalMb > 0 ? (otherUsedMb / diskTotalMb) * 100 : 0}%`, background: '#C9CDD6', minWidth: 6 }}
+                />
+              </Tooltip>
+            )}
+            <div role="img" aria-label={`可用 ${fmtSize(diskFreeMb)}`} style={{ flex: 1, background: '#EEF0F3' }} />
           </div>
 
           <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', marginTop: 12 }}>

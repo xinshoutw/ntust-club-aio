@@ -22,17 +22,19 @@ export interface UsageModule {
 export interface FileUsage {
   modules: UsageModule[] // 順序由後端決定(有報修檔案時 repair 第一)
   dbSizeMb: number // 「文字內容」:整個 DB 的估算大小
-  totalMb: number // 檔案 + DB
-  capacityMb: number // 邏輯容量(storage_limits.capacity_gib,後端計算)
-  remainingMb: number // capacity − total(不為負)
+  totalMb: number // 檔案 + DB(系統自身佔用)
+  // 實際磁碟空間(2026-07-17 起,不再有邏輯容量):
+  // diskTotal ≠ total + diskFree,差額是 OS 與同機其他程式的佔用
+  diskTotalMb: number
+  diskFreeMb: number
 }
 
 interface FileUsageOut {
   modules: { key: ModuleKey; label: string; size: number; count: number }[]
   db_size: number
   total_size: number
-  capacity: number
-  remaining: number
+  disk_total: number
+  disk_free: number
 }
 
 export interface StoredFile {
@@ -85,8 +87,8 @@ export function useFileUsage() {
           modules: u.modules.map((m) => ({ key: m.key, label: m.label, sizeMb: toMb(m.size), count: m.count })),
           dbSizeMb: toMb(u.db_size),
           totalMb: toMb(u.total_size),
-          capacityMb: toMb(u.capacity),
-          remainingMb: toMb(u.remaining),
+          diskTotalMb: toMb(u.disk_total),
+          diskFreeMb: toMb(u.disk_free),
         }),
       ),
   })

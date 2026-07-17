@@ -338,9 +338,11 @@ class FileUsageModuleOut(BaseModel):
 class FileUsageOut(BaseModel):
     modules: list[FileUsageModuleOut]  # 有報修檔案時 repair 排第一,其餘依固定順序
     db_size: int  # 「文字內容」:整個 DB 的估算大小(pg_database_size)
-    total_size: int  # 檔案 + DB
-    capacity: int  # 邏輯容量(bytes;storage_limits.capacity_gib,後端計算)
-    remaining: int  # capacity − total_size(不為負)
+    total_size: int  # 檔案 + DB(系統自身佔用,不含 OS/其他程式)
+    # 2026-07-17 改實際磁碟空間(不再有邏輯容量):disk_total ≠ total_size + disk_free,
+    # 差額為 OS 與同機其他程式的佔用
+    disk_total: int  # 磁碟總量(bytes)
+    disk_free: int  # 磁碟可用空間(bytes)
 
 
 class AdminFileOut(BaseModel):

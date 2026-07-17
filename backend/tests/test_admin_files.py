@@ -49,8 +49,17 @@ async def seed(client, db, *, with_repair=True):
     return club, files
 
 
-async def test_usage_summary_with_db_text_and_repair_first(client, db):
+async def test_usage_summary_with_db_text_and_repair_first(client, db, monkeypatch):
     await seed(client, db)
+    # 磁碟空間 mock 給定值:斷言不再依宿主磁碟狀態(CI 磁碟極滿也不脆化)
+    import collections
+
+    from app.services import files as file_service
+
+    usage = collections.namedtuple("usage", "total used free")
+    monkeypatch.setattr(
+        file_service.shutil, "disk_usage", lambda p: usage(100_000, 70_000, 30_000)
+    )
 
     data = (await client.get("/api/v1/admin/files/usage")).json()["data"]
     # 有報修檔案 → repair 排第一,其餘依固定順序
@@ -63,9 +72,9 @@ async def test_usage_summary_with_db_text_and_repair_first(client, db):
     # 「文字內容」= 整個 DB 的估算大小(pg_database_size)
     assert data["db_size"] > 0
     assert data["total_size"] == 10800 + data["db_size"]
-    # 容量=實際磁碟總量、剩餘=磁碟可用空間(2026-07-17:改用後端可取得的實際磁碟空間)
-    assert data["capacity"] > data["total_size"]
-    assert 0 < data["remaining"] <= data["capacity"]
+    # 實際磁碟總量/可用空間(2026-07-17 改磁碟空間;capacity/remaining 已改名)
+    assert data["disk_total"] == 100_000
+    assert data["disk_free"] == 30_000
 
 
 async def test_usage_order_without_repair_files(client, db):

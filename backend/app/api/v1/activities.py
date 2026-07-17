@@ -268,10 +268,11 @@ async def upload_photo(
 ) -> ApiResponse[FileOut]:
     file_service.enforce_upload_rate(user.id)
     activity = await svc.get_own_activity(db, user, activity_id)
+    # 鎖活動列並重讀狀態:與 submit_close/delete_photo 統一鎖序,
+    # 並發上傳的加總上限、送出後上傳/刪除的窄競態都被序列化
+    await db.refresh(activity, attribute_names=["status"], with_for_update=True)
     if activity.status != ActivityStatus.APPROVED:
         raise conflict("僅結案準備中(已核准)的活動可上傳照片")
-    # 鎖活動列:同活動並發上傳序列化,加總上限才不會被雙寫繞過
-    await db.execute(sa.select(Activity.id).where(Activity.id == activity.id).with_for_update())
 
     # 結案照片加總上限(2026-07-17 改依申請性質給總量;預設 10MB,system_settings 可調)
     cap_mb = int(await get_setting(db, "close_photo_total_mb"))
@@ -307,6 +308,9 @@ async def delete_photo(
     activity_id: int, file_id: str, user: ClubUser, db: DbDep
 ) -> ApiResponse[None]:
     activity = await svc.get_own_activity(db, user, activity_id)
+    # 鎖活動列並重讀狀態:submit_close 先 commit 時,這裡看到 closing → 409,
+    # 不會出現「送審已成立、照片卻被(逾時回滾等)後續刪除」的結案
+    await db.refresh(activity, attribute_names=["status"], with_for_update=True)
     if activity.status != ActivityStatus.APPROVED:
         raise conflict("結案已送出,照片不可移除")
     file = await db.get(File, file_id)
@@ -434,6 +438,8 @@ async def submit_close(
 ) -> ApiResponse[ActivityOut]:
     activity = await svc.get_own_activity(db, user, activity_id, with_detail=True)
     lock_months = await get_setting(db, "close_lock_months")
+    # 鎖活動列並重讀狀態:與 upload/delete_photo 統一鎖序,送出與照片增刪序列化
+    await db.refresh(activity, attribute_names=["status"], with_for_update=True)
     if activity.status != ActivityStatus.APPROVED:
         raise conflict("僅已核准的活動可送結案")
     now = datetime.now(UTC)
@@ -441,6 +447,19 @@ async def submit_close(
         raise conflict("活動尚未結束,不可結案")
     if svc.is_close_locked(activity, lock_months, now):
         raise conflict("已逾結案期限並鎖定,請洽學務處解鎖")
+    # 照片檢核收口到後端(先前僅前端擋):取鎖後計數,直呼 API 也擋零照片結案
+    photo_count = await db.scalar(
+        sa.select(sa.func.count())
+        .select_from(File)
+        .where(
+            File.subject_type == svc.PHOTO_SUBJECT,
+            File.subject_id == activity.id,
+            File.slot == svc.PHOTO_SLOT,
+            File.archived_at.is_(None),
+        )
+    )
+    if not photo_count:
+        raise validation_error("送出結案前請先上傳至少一張活動照片")
 
     if activity.report is not None:  # 結案被退回後重送:整份取代
         await db.delete(activity.report)

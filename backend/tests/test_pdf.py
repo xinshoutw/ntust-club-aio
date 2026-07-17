@@ -4,7 +4,7 @@ import sqlalchemy as sa
 
 from app.models import Activity
 from tests.conftest import csrf_headers, login, make_club, make_user
-from tests.test_activities import close_payload, create_activity
+from tests.test_activities import close_payload, create_activity, upload_photo
 
 
 async def _closed_activity(client, db) -> int:
@@ -17,6 +17,7 @@ async def _closed_activity(client, db) -> int:
         sa.update(Activity).where(Activity.id == data["id"]).values(status="approved")
     )
     await db.commit()
+    await upload_photo(client, data["id"])
     resp = await client.post(
         f"/api/v1/club/activities/{data['id']}/close",
         json=close_payload(video_url="https://youtu.be/demo"),
@@ -58,6 +59,7 @@ async def test_pdf_handles_maximum_length_content(client, db):
     )
     await db.commit()
 
+    await upload_photo(client, data["id"])
     long_text = "很" * 2000
     body = close_payload(
         highlights=long_text,

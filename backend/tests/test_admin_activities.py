@@ -4,7 +4,7 @@ import sqlalchemy as sa
 
 from app.models import Activity, ApprovalRecord
 from tests.conftest import csrf_headers, login, make_club, make_user
-from tests.test_activities import close_payload, create_activity, payload
+from tests.test_activities import close_payload, create_activity, payload, upload_photo
 
 
 async def seed(client, db):
@@ -212,6 +212,7 @@ async def test_aclose_only_account_sees_only_close_scope(client, db):
     await db.execute(sa.update(Activity).where(Activity.id == closing).values(status="approved"))
     await db.commit()
     await login(client, "club01")
+    await upload_photo(client, closing)
     resp = await client.post(
         f"/api/v1/club/activities/{closing}/close",
         json=close_payload(),
@@ -267,6 +268,7 @@ async def test_close_review_flow(client, db):
     await db.commit()
 
     await login(client, "club01")
+    await upload_photo(client, aid)
     resp = await client.post(
         f"/api/v1/club/activities/{aid}/close",
         json=close_payload(),
@@ -274,7 +276,7 @@ async def test_close_review_flow(client, db):
     )
     assert resp.status_code == 200
 
-    # 結案退回 → 回到 approved,社團可重送
+    # 結案退回 → 回到 approved,社團可重送(照片仍掛在活動上,重送不需重傳)
     await login(client, "advisor")
     resp = await client.post(
         f"/api/v1/admin/activities/{aid}/close-reject",
@@ -385,6 +387,7 @@ async def test_close_approve_persists_submission_confirmations(client, db):
     await db.commit()
 
     await login(client, "club01")
+    await upload_photo(client, aid)
     resp = await client.post(
         f"/api/v1/club/activities/{aid}/close",
         json=close_payload(),

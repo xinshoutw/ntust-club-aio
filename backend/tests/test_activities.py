@@ -58,6 +58,15 @@ async def approve(db, activity_id: int, **values):
     await db.commit()
 
 
+async def upload_photo(client, aid: int, content: bytes = JPG, name: str = "photo.jpg") -> str:
+    files = {"file": (name, io.BytesIO(content), "image/jpeg")}
+    resp = await client.post(
+        f"/api/v1/club/activities/{aid}/photos", files=files, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 201, resp.text
+    return resp.json()["data"]["id"]
+
+
 def close_payload(**overrides) -> dict:
     base = {
         "member_count": 25,
@@ -201,6 +210,7 @@ async def test_close_eligibility_and_lock_derive_from_end_date(client, db):
     end = (date.today() - timedelta(days=3)).isoformat()
     data = await create_activity(client, name="跨日活動", date=start, end_date=end)
     await approve(db, data["id"])
+    await upload_photo(client, data["id"])
     listing = (await client.get("/api/v1/club/activities")).json()["data"]
     row = next(a for a in listing if a["id"] == data["id"])
     assert row["close_locked"] is False
@@ -261,6 +271,16 @@ async def test_close_submit_and_report(client, db):
         )
         assert resp.status_code == 422, missing
 
+    # 零照片 → 422(照片檢核收口到後端,直呼 API 也擋)
+    resp = await client.post(
+        f"/api/v1/club/activities/{aid}/close",
+        json=close_payload(**review),
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    assert "照片" in resp.json()["error"]
+
+    await upload_photo(client, aid)
     resp = await client.post(
         f"/api/v1/club/activities/{aid}/close",
         json=close_payload(**review),
@@ -284,6 +304,7 @@ async def test_close_locked_after_deadline(client, db):
     data = await create_activity(client, date=stale)
     aid = data["id"]
     await approve(db, aid)
+    await upload_photo(client, aid)
 
     listing = (await client.get("/api/v1/club/activities")).json()["data"]
     assert listing[0]["close_locked"] is True
@@ -340,6 +361,19 @@ async def test_photo_upload_dedupe_and_delete(client, db):
         f"/api/v1/club/activities/{a2['id']}/photos", files=files, headers=csrf_headers(client)
     )
     assert resp.status_code == 201
+    a2_file = resp.json()["data"]["id"]
+
+    # 結案送出後照片不可再刪(送出 vs 刪除以活動列鎖序列化,先送出者勝)
+    resp = await client.post(
+        f"/api/v1/club/activities/{a2['id']}/close",
+        json=close_payload(),
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    resp = await client.delete(
+        f"/api/v1/club/activities/{a2['id']}/photos/{a2_file}", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 409
 
 
 async def test_list_filters_and_sorting(client, db):

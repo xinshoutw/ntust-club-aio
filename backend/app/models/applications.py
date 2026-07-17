@@ -3,7 +3,7 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, db_enum
-from app.models.enums import BookingStatus, CertPosition, MaintenanceStatus
+from app.models.enums import ApplicationStatus, CertPosition, MaintenanceStatus
 
 
 class OfficerCertificate(Base, TimestampMixin):
@@ -16,8 +16,8 @@ class OfficerCertificate(Base, TimestampMixin):
     term: Mapped[str] = mapped_column(sa.Text)  # 如 114-2 或 114(全學年)
     position: Mapped[CertPosition] = mapped_column(db_enum(CertPosition, "cert_position"))
     applicant_name: Mapped[str] = mapped_column(sa.Text)
-    status: Mapped[BookingStatus] = mapped_column(
-        db_enum(BookingStatus, "booking_status"), default=BookingStatus.PENDING
+    status: Mapped[ApplicationStatus] = mapped_column(
+        db_enum(ApplicationStatus, "application_status"), default=ApplicationStatus.PENDING
     )
 
 
@@ -33,8 +33,8 @@ class PostalAccountChange(Base, TimestampMixin):
     account_number: Mapped[str] = mapped_column(sa.Text)  # 列表遮罩:前 3 碼+末 2 碼
     new_agent_name: Mapped[str | None] = mapped_column(sa.Text)
     new_agent_phone: Mapped[str | None] = mapped_column(sa.Text)
-    status: Mapped[BookingStatus] = mapped_column(
-        db_enum(BookingStatus, "booking_status"), default=BookingStatus.PENDING
+    status: Mapped[ApplicationStatus] = mapped_column(
+        db_enum(ApplicationStatus, "application_status"), default=ApplicationStatus.PENDING
     )
 
 

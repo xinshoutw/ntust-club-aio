@@ -74,6 +74,7 @@ from app.models.enums import (
     ActivityType,
     AdjustmentKind,
     AnnouncementTarget,
+    ApplicationStatus,
     ApprovalDecision,
     ApprovalSubject,
     BookingStatus,
@@ -932,7 +933,7 @@ async def _create_applications(
         account_name="國立臺灣科技大學資工系學會",
         account_number="0031234-0567890",
         new_agent_name="林小芳", new_agent_phone="0912345678",
-        status=BookingStatus.PENDING,
+        status=ApplicationStatus.PENDING,
     )
     db.add(postal)
     await db.flush()
@@ -948,7 +949,7 @@ async def _create_applications(
     db.add(
         OfficerCertificate(
             club_id=csie.id, term="114-2", position=CertPosition.LEADER,
-            applicant_name="顏志明", status=BookingStatus.PENDING,
+            applicant_name="顏志明", status=ApplicationStatus.PENDING,
         )
     )
 

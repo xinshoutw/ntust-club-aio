@@ -4,7 +4,7 @@ from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.enums import (
-    BookingStatus,
+    ApplicationStatus,
     CertPosition,
     MaintenanceStatus,
     PostalReason,
@@ -39,7 +39,7 @@ class OfficerCertOut(BaseModel):
     term: str
     position: CertPosition
     applicant_name: str
-    status: BookingStatus
+    status: ApplicationStatus
     created_at: datetime
 
 
@@ -88,7 +88,7 @@ class PostalChangeOut(BaseModel):
     account_number: str  # 2026-07-15 需求方:社團端申請紀錄顯示完整局號帳號(不遮罩)
     new_agent_name: str | None
     new_agent_phone: str | None  # 電話仍依決議 §6-11 遮罩(末 3 碼)
-    status: BookingStatus
+    status: ApplicationStatus
     created_at: datetime
 
 

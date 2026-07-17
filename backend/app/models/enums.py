@@ -110,6 +110,15 @@ class MaintenanceStatus(StrEnum):
     DONE = "done"
 
 
+class ApplicationStatus(StrEnum):
+    """幹部證明/郵局帳戶異動(2026-07-17 需求方拍板):
+    審核中 → 處理中 → 請洽學務處(完成);無退回,學務處線下溝通後直接處理。"""
+
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+
+
 class SignupKind(StrEnum):
     NORMAL = "normal"
     CADRE_TRAINING = "cadre_training"

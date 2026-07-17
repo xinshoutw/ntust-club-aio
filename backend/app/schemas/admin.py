@@ -3,7 +3,15 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.models.enums import BookingStatus, LoanStatus, MaintenanceStatus, ViolationStatus
+from app.models.enums import (
+    ApplicationStatus,
+    BookingStatus,
+    CertPosition,
+    LoanStatus,
+    MaintenanceStatus,
+    PostalReason,
+    ViolationStatus,
+)
 from app.schemas.accounts import _USERNAME_RE
 from app.schemas.bookings import RoomSlotOut
 from app.services.scoring import AD_KEYS, AD_MAX
@@ -158,6 +166,43 @@ class AdminMaintenanceOut(BaseModel):
     status: MaintenanceStatus
     handle_note: str | None
     created_at: datetime
+
+
+# ---- 線上申請管理(/admin/applications,權限鍵 aapply,2026-07-17) ----
+
+
+class AdminOfficerCertOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    club_id: int
+    club_name: str = ""
+    term: str
+    position: CertPosition
+    applicant_name: str
+    status: ApplicationStatus
+    created_at: datetime
+
+
+class AdminPostalChangeOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    club_id: int
+    club_name: str = ""
+    reasons: list[PostalReason]
+    account_name: str
+    account_number: str
+    new_agent_name: str | None
+    new_agent_phone: str | None  # 行政端顯示完整電話(承辦需聯絡代理人)
+    status: ApplicationStatus
+    created_at: datetime
+
+
+class ApplicationStatusIn(BaseModel):
+    """狀態機:審核中 → 處理中 → 請洽學務處(僅允許單步前進,比照維修管理)。"""
+
+    status: ApplicationStatus
 
 
 # ---- 社團主檔管理(/admin/clubs,權限鍵 amember) ----

@@ -57,6 +57,11 @@ export default function PtViolationsPage() {
                 <td><StatusPill status={v.status} /></td>
               </tr>
             ))}
+            {rows.length === 0 && (
+              <tr className="no-hover">
+                <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有違規紀錄</td>
+              </tr>
+            )}
           </tbody>
         </table>
         <Pager page={page} pageSize={PAGE_SIZE} total={rows.length} onChange={setPage} />

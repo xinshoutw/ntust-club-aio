@@ -185,6 +185,9 @@ async def update_activity(
     activity_id: int, body: ActivityIn, user: ClubUser, db: DbDep
 ) -> ApiResponse[ActivityOut]:
     activity = await svc.get_own_activity(db, user, activity_id)
+    # 鎖活動列並重讀狀態(可編輯狀態變更端點統一鎖序):
+    # 與送審並發時後到者看到已轉送審即擋,已送審申請不可再被變造
+    await db.refresh(activity, attribute_names=["status"], with_for_update=True)
     if activity.status not in _EDITABLE:
         raise conflict("僅草稿或退回件可修改")
     await _validate_categories(db, body.budget_items)
@@ -204,6 +207,7 @@ async def update_activity(
 @router.delete("/{activity_id}")
 async def delete_activity(activity_id: int, user: ClubUser, db: DbDep) -> ApiResponse[None]:
     activity = await svc.get_own_activity(db, user, activity_id)
+    await db.refresh(activity, attribute_names=["status"], with_for_update=True)
     if activity.status != ActivityStatus.DRAFT:
         raise conflict("僅草稿可刪除")
     disk_paths = []
@@ -226,6 +230,7 @@ async def submit_activity(
     background: BackgroundTasks,
 ) -> ApiResponse[ActivityOut]:
     activity = await svc.get_own_activity(db, user, activity_id)
+    await db.refresh(activity, attribute_names=["status"], with_for_update=True)
     if activity.status not in _EDITABLE:
         raise conflict("此活動已送審或已核准")
     _require_complete(activity)
@@ -255,6 +260,8 @@ async def save_close_draft(
     activity_id: int, body: CloseDraftIn, user: ClubUser, db: DbDep
 ) -> ApiResponse[None]:
     activity = await svc.get_own_activity(db, user, activity_id)
+    # 與 submit_close 同鎖序:結案送出已清空草稿後,慢到的草稿儲存不可再寫回過期資料
+    await db.refresh(activity, attribute_names=["status"], with_for_update=True)
     if activity.status != ActivityStatus.APPROVED:
         raise conflict("僅已核准的活動可儲存結案草稿")
     activity.close_draft = body.data
@@ -333,12 +340,11 @@ async def upload_attachment(
 ) -> ApiResponse[FileOut]:
     file_service.enforce_upload_rate(user.id)
     activity = await svc.get_own_activity(db, user, activity_id)
+    # 鎖活動列並重讀狀態:並發上傳的加總上限檢核序列化,
+    # 也擋「檢核後才被送審」的狀態競態(不可對已送審申請追加附件)
+    await db.refresh(activity, attribute_names=["status"], with_for_update=True)
     if activity.status not in _EDITABLE:
         raise conflict("僅草稿或退回件可上傳附件")
-    # 鎖活動列:同活動的並發上傳序列化,加總上限檢核才不會被雙寫繞過
-    await db.execute(
-        sa.select(Activity.id).where(Activity.id == activity.id).with_for_update()
-    )
 
     # 附件加總上限(2026-07-17 改依申請性質給總量;預設 15MB,system_settings 可調)
     cap_mb = int(await get_setting(db, "activity_attachment_total_mb"))
@@ -374,6 +380,7 @@ async def delete_attachment(
     activity_id: int, file_id: str, user: ClubUser, db: DbDep
 ) -> ApiResponse[None]:
     activity = await svc.get_own_activity(db, user, activity_id)
+    await db.refresh(activity, attribute_names=["status"], with_for_update=True)
     if activity.status not in _EDITABLE:
         raise conflict("已送審的申請不可移除附件")
     file = await db.get(File, file_id)

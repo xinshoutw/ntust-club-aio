@@ -213,7 +213,7 @@ async def delete_activity(activity_id: int, user: ClubUser, db: DbDep) -> ApiRes
     await db.delete(activity)
     await db.commit()
     for path in disk_paths:  # commit 成功後才動磁碟
-        path.unlink(missing_ok=True)
+        file_service.unlink_quiet(path)
     return ApiResponse()
 
 
@@ -297,7 +297,7 @@ async def upload_photo(
         dedup="slot",  # SHA-256 跨活動拒重複(同 slot=report_photo)
     )
     if existing + row.size > cap:
-        (Path(settings.upload_dir) / row.path).unlink(missing_ok=True)
+        file_service.unlink_quiet(Path(settings.upload_dir) / row.path)
         raise over_cap
     await db.commit()
     return ApiResponse(data=FileOut.model_validate(row))
@@ -323,7 +323,7 @@ async def delete_photo(
         raise not_found("找不到照片")
     disk = await file_service.delete_file(db, file)
     await db.commit()
-    disk.unlink(missing_ok=True)
+    file_service.unlink_quiet(disk)
     return ApiResponse()
 
 
@@ -363,7 +363,7 @@ async def upload_attachment(
     )
     if existing + row.size > cap:
         # 未 commit,DB 列隨交易回滾;磁碟檔需自行清掉
-        (Path(settings.upload_dir) / row.path).unlink(missing_ok=True)
+        file_service.unlink_quiet(Path(settings.upload_dir) / row.path)
         raise over_cap
     await db.commit()
     return ApiResponse(data=FileOut.model_validate(row))
@@ -386,7 +386,7 @@ async def delete_attachment(
         raise not_found("找不到附件")
     disk = await file_service.delete_file(db, file)
     await db.commit()
-    disk.unlink(missing_ok=True)
+    file_service.unlink_quiet(disk)
     return ApiResponse()
 
 

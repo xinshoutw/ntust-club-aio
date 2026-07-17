@@ -270,7 +270,7 @@ async def upload_evidence(
         slot="evidence",
     )
     if existing_bytes + saved.size > cap:
-        (Path(settings.upload_dir) / saved.path).unlink(missing_ok=True)
+        file_service.unlink_quiet(Path(settings.upload_dir) / saved.path)
         raise over_cap
     await db.commit()
     return ApiResponse(data=FileOut.model_validate(saved))

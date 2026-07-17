@@ -154,5 +154,5 @@ async def delete_file(
     )
     disk = await file_service.delete_file(db, file)
     await db.commit()
-    disk.unlink(missing_ok=True)  # commit 成功後才動磁碟
+    file_service.unlink_quiet(disk)  # commit 成功後才動磁碟
     return ApiResponse()

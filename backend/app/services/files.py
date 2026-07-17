@@ -8,6 +8,7 @@
 """
 
 import hashlib
+import logging
 import shutil
 import uuid
 from dataclasses import dataclass
@@ -35,6 +36,20 @@ _STORAGE_LOCK_KEY = 0x_C1AB_A10_5EC3
 
 _CLUB_FULL = "社團儲存空間額度不足,請先清理檔案或聯絡學務處"
 _SYSTEM_FULL = "系統儲存空間不足,請聯絡學務處"
+
+logger = logging.getLogger(__name__)
+
+
+def unlink_quiet(path: Path) -> None:
+    """清理性刪檔:失敗只記 log,不讓清理錯誤蓋掉主要錯誤或已成立的回應。
+
+    上傳超額回滾(413)、去重衝突(409)、commit 後的磁碟清理都走這裡;
+    刪不掉頂多留孤兒檔(可清掃),換成 500 反而誤導呼叫端。
+    """
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        logger.warning("cleanup unlink failed, orphan left on disk: %s", path, exc_info=True)
 
 
 def _insufficient(message: str) -> AppError:
@@ -292,9 +307,9 @@ async def save_upload(
         # 併發去重撞唯一索引也在此浮現(全域 handler 回 409)
         await db.flush()
     except BaseException:
-        tmp.unlink(missing_ok=True)
+        unlink_quiet(tmp)
         # flush 失敗時 dest 已 rename:一併刪除,不留 DB 看不見、無法清理的孤兒檔
-        dest.unlink(missing_ok=True)
+        unlink_quiet(dest)
         raise
     return row
 

@@ -227,5 +227,5 @@ async def delete_eval_file(
     disk = await file_service.delete_file(db, file) if file is not None else None
     await db.commit()
     if disk is not None:  # commit 成功後才動磁碟
-        disk.unlink(missing_ok=True)
+        file_service.unlink_quiet(disk)
     return ApiResponse()

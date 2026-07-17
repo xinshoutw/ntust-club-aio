@@ -101,7 +101,7 @@ export default function BookingOverviewPage() {
   const venues = venuesQuery.data ?? []
   const venueDef = venueView != null ? venues.find((v) => v.id === venueView) : undefined
 
-  // 單日全場地 / 單一場地 15 天(逐日並行查詢,見 api/bookings.useAvailabilityDays)
+  // 單日全場地 / 單一場地 15 天(單一批次區間查詢,見 api/bookings.useAvailabilityDays)
   const dayQuery = useAvailability(gridDate)
   const venueDates = useMemo(
     () => Array.from({ length: VENUE_DAYS }, (_, i) => venueStart.add(i, 'day')),
@@ -137,7 +137,7 @@ export default function BookingOverviewPage() {
 
   const gridPending = venueDef ? rangeQuery.isPending : venuesQuery.isPending || dayQuery.isPending
   // 場況圖來源查詢失敗時整卡顯示錯誤,不畫預設色格
-  // (15 天檢視走逐日並行查詢:任一日失敗即整卡錯誤,重試只補抓失敗的日期)
+  // (15 天檢視為單一批次區間查詢:失敗即整卡錯誤,重試重抓整段區間)
   const gridError = venuesQuery.isError
     ? { error: venuesQuery.error, retry: () => void venuesQuery.refetch() }
     : !venueDef && dayQuery.isError

@@ -170,7 +170,7 @@ async def upload_passbook(
     saved = await file_service.save_upload(
         db,
         file,
-        policy=file_service.IMAGE,
+        policy=file_service.PASSBOOK,
         module="postal",
         uploaded_by=user.id,
         club_id=user.club_id,

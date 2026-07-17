@@ -171,6 +171,9 @@ IMAGE = UploadPolicy(
 DOCUMENT = UploadPolicy(
     "document", frozenset({".pdf", ".doc", ".docx"}), 50 * _MB, settings_key="doc"
 )
+# 郵局存簿/申請書:掃描件常為 PDF,也收影像(2026-07-17 需求方拍板 PDF+Image);
+# 上限對齊前端 PostalPage 的 50MB,固定值(不入 upload_limits)
+PASSBOOK = UploadPolicy("passbook", IMAGE.extensions | frozenset({".pdf"}), 50 * _MB)
 ARCHIVE = UploadPolicy("archive", frozenset({".zip"}), 100 * _MB, settings_key="zip")
 VIDEO = UploadPolicy("video", frozenset({".mp4", ".mov"}), 200 * _MB, settings_key="video")
 

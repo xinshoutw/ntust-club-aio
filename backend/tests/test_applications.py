@@ -303,3 +303,42 @@ async def test_club_config(client, db):
     cats = data["budget_categories"]
     assert {"name", "hint"} <= set(cats[0])
     assert any(c["name"] == "保險費" and c["hint"] for c in cats)
+
+
+async def test_passbook_upload_accepts_pdf_and_image(client, db):
+    """存簿佐證收 PDF+影像(2026-07-17 需求方拍板);其他型別仍 415。"""
+    import io
+
+    await setup_session(client, db)
+    resp = await client.post(
+        "/api/v1/club/postal-changes",
+        json={"reasons": ["印鑑變更"], "account_name": "熱舞社", "account_number": "0001234567890"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201, resp.text
+    change_id = resp.json()["data"]["id"]
+
+    files = {"file": ("存簿.pdf", io.BytesIO(b"%PDF-1.4 minimal"), "application/pdf")}
+    resp = await client.post(
+        f"/api/v1/club/postal-changes/{change_id}/passbook",
+        files=files,
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201, resp.text
+
+    jpg = b"\xff\xd8\xff\xe0" + b"\x00" * 64
+    files = {"file": ("存簿.jpg", io.BytesIO(jpg), "image/jpeg")}
+    resp = await client.post(
+        f"/api/v1/club/postal-changes/{change_id}/passbook",
+        files=files,
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201, resp.text
+
+    files = {"file": ("存簿.zip", io.BytesIO(b"PK\x03\x04zip"), "application/zip")}
+    resp = await client.post(
+        f"/api/v1/club/postal-changes/{change_id}/passbook",
+        files=files,
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 415

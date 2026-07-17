@@ -3,7 +3,7 @@ import { App, Button, Select, Spin } from 'antd'
 import { DownloadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { Pager, SortButton } from '../../components/ui/tableControls'
-import { neutralizeFormula } from '../../lib/csv'
+import { downloadCsv } from '../../lib/csv'
 import { kindLabel } from '../../lib/roles'
 import { CURRENT_SEMESTER, semesterOptions } from '../../lib/semester'
 import { fetchAllAdminMembers, useAdminClubMembers } from '../../api/adminClubs'
@@ -44,16 +44,11 @@ export default function AdminMembersPage() {
         message.error(`${club} 沒有成員可匯出`)
         return
       }
-      // 與社團端匯入格式相容(無標題列);身份以顯示詞輸出;職稱補空字串讓各列欄數一致;中和 Excel 公式前綴
-      const text = rows
-        .map((m) => [m.name, m.studentId, kindLabel(m.kind, club), m.title ?? ''].map(neutralizeFormula).join(','))
-        .join('\n')
-      const url = URL.createObjectURL(new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' }))
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `成員名單_${club}_${semester === 'all' ? '全部學期' : semester}.csv`
-      a.click()
-      URL.revokeObjectURL(url)
+      // 與社團端匯入格式相容(無標題列;後端 csv.reader 支援引號跳脫);身份以顯示詞輸出;職稱補空字串讓各列欄數一致
+      downloadCsv(
+        `成員名單_${club}_${semester === 'all' ? '全部學期' : semester}.csv`,
+        rows.map((m) => [m.name, m.studentId, kindLabel(m.kind, club), m.title ?? '']),
+      )
       message.success(`已匯出 ${rows.length} 名成員`)
     } catch (e) {
       message.error(e instanceof Error ? e.message : '匯出失敗')

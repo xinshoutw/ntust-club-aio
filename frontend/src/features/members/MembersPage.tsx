@@ -4,7 +4,7 @@ import { DownOutlined, DownloadOutlined, EditOutlined, UploadOutlined } from '@a
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { FilterButton, Pager, SortButton } from '../../components/ui/tableControls'
-import { neutralizeFormula } from '../../lib/csv'
+import { downloadCsv } from '../../lib/csv'
 import { MEMBER_KINDS, kindLabel, type MemberKind } from '../../lib/roles'
 import { CURRENT_SEMESTER } from '../../lib/semester'
 import { useAuth } from '../../app/auth'
@@ -106,17 +106,12 @@ export default function MembersPage() {
         message.error(`${csvSemester} 沒有成員可匯出`)
         return
       }
-      // 維持匯入相容格式(無標題列、不加引號);身份以顯示詞輸出(匯入可回讀);
-      // 職稱補空字串讓各列欄數一致;中和 Excel 公式前綴
-      const text = rows
-        .map((m) => [m.name, m.studentId, label(m.kind), m.title ?? ''].map(neutralizeFormula).join(','))
-        .join('\n')
-      const url = URL.createObjectURL(new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' }))
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `成員名單_${csvSemester}.csv`
-      a.click()
-      URL.revokeObjectURL(url)
+      // 匯入相容格式(無標題列;後端 csv.reader 支援引號跳脫);身份以顯示詞輸出(匯入可回讀);
+      // 職稱補空字串讓各列欄數一致
+      downloadCsv(
+        `成員名單_${csvSemester}.csv`,
+        rows.map((m) => [m.name, m.studentId, label(m.kind), m.title ?? '']),
+      )
       setExportOpen(false)
       message.success(`已匯出 ${rows.length} 名成員(${csvSemester})`)
     } catch (e) {

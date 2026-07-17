@@ -225,8 +225,14 @@ function CloseForm({
   const [photos, setPhotos] = useState<PhotoBag[]>([])
   const photoKeyRef = useRef(0)
   const photoQueue = useRef(Promise.resolve())
+  // eager-ref(比照 AttachmentArea):寫入走 commitPhotos 同步 ref,
+  // 佇列任務不受 render 時序影響——連選多張時第二個任務不再讀到過期清單
   const photosRef = useRef(photos)
   photosRef.current = photos
+  const commitPhotos = (next: PhotoBag[]) => {
+    photosRef.current = next
+    setPhotos(next)
+  }
   const [processing, setProcessing] = useState(0)
 
   // 卸載時釋放所有預覽 URL(避免記憶體洩漏)
@@ -247,12 +253,12 @@ function CloseForm({
           return
         }
         const hash = await sha256(f)
-        if (cur.some((p) => p.hash === hash)) {
+        if (photosRef.current.some((p) => p.hash === hash)) {
           message.error(`「${f.name}」與已選照片內容相同,已略過`)
           return
         }
         const item: PhotoBag = { key: ++photoKeyRef.current, file: f, url: URL.createObjectURL(f), hash }
-        setPhotos((ps) => [...ps, item])
+        commitPhotos([...photosRef.current, item])
         clearErr('photos')
       } catch (e) {
         message.error(`「${f.name}」處理失敗:${errMsg(e)}`)
@@ -263,11 +269,9 @@ function CloseForm({
   }
 
   const removePhoto = (key: number) => {
-    setPhotos((ps) => {
-      const target = ps.find((p) => p.key === key)
-      if (target) URL.revokeObjectURL(target.url)
-      return ps.filter((p) => p.key !== key)
-    })
+    const target = photosRef.current.find((p) => p.key === key)
+    if (target) URL.revokeObjectURL(target.url)
+    commitPhotos(photosRef.current.filter((p) => p.key !== key))
   }
 
   // 自動增列:填寫尾列即補一列;blur 離開列時移除空列(保底 3 列)

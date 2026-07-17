@@ -328,12 +328,20 @@ function ActivityForm({
           return
         }
       }
-      await submitActivity(saved.id)
+      try {
+        await submitActivity(saved.id)
+      } catch (e) {
+        invalidate()
+        message.error(`送出申請失敗:${errMsg(e)};申請已存為草稿`)
+        // 新建流程轉入編輯路由:再按送出走更新,不會重複建立草稿
+        if (!editing) navigate(`/activities/${saved.id}/edit`)
+        return
+      }
       invalidate()
       message.success('已送出申請')
       navigate('/activities')
     } catch (e) {
-      invalidate() // 建立/更新可能已成功,讓列表刷新
+      invalidate() // 建立/更新可能已成功(如逾時),讓列表刷新
       message.error(errMsg(e))
     } finally {
       setBusy(null)

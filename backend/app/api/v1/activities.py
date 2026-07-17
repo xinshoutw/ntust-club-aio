@@ -42,7 +42,7 @@ from app.schemas.common import ApiResponse
 from app.services import activity_service as svc
 from app.services import audit, notify, pdf
 from app.services import files as file_service
-from app.services.settings_service import get_setting
+from app.services.settings_service import get_budget_categories, get_setting
 
 router = APIRouter(prefix="/club/activities", tags=["activities"])
 
@@ -59,7 +59,7 @@ _SORTABLE = {
 
 async def _validate_categories(db, items) -> None:
     # budget_categories 為 [{name, hint}](2026-07-17);校驗僅比對名稱
-    allowed = {c["name"] for c in await get_setting(db, "budget_categories")}
+    allowed = {c["name"] for c in await get_budget_categories(db)}
     for item in items:
         if item.category not in allowed:
             raise validation_error(f"經費科目「{item.category}」不在目錄中")

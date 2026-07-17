@@ -14,7 +14,7 @@ from app.core.deps import CurrentUser, DbDep, client_ip, require_super
 from app.schemas.common import ApiResponse
 from app.schemas.settings import SettingsUpdateIn
 from app.services import audit
-from app.services.settings_service import get_setting, set_setting
+from app.services.settings_service import get_budget_categories, get_setting, set_setting
 
 router = APIRouter(prefix="/admin/settings", tags=["admin"])
 
@@ -48,6 +48,8 @@ def _to_json(value: Any) -> Any:
 @router.get("")
 async def get_settings(user: SuperAdmin, db: DbDep) -> ApiResponse[dict[str, Any]]:
     data = {key: await get_setting(db, key) for key in MANAGED_KEYS}
+    # 舊 list[str] 殘留一律正規化為 [{name, hint}],編輯器才不會拿到空列
+    data["budget_categories"] = await get_budget_categories(db)
     return ApiResponse(data=data)
 
 

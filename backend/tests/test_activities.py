@@ -4,7 +4,7 @@ from datetime import date, timedelta
 import sqlalchemy as sa
 
 from app.core.config import settings
-from app.models import Activity
+from app.models import Activity, SystemSetting
 from tests.conftest import csrf_headers, login, make_club, make_user
 
 JPG = b"\xff\xd8\xff\xe0" + b"\x00" * 64
@@ -95,6 +95,20 @@ async def test_create_draft_with_budget_and_derived_totals(client, db):
     assert data["self_fund_total"] == 1000
     assert data["requested_total"] == 2500
     assert data["semester"] == "114-2"
+
+
+async def test_budget_category_check_tolerates_legacy_strings(client, db):
+    """殘留舊 list[str] 經費科目設定時,建立申請與 /club/config 都不得 500。"""
+    await setup_session(client, db)
+    db.add(SystemSetting(key="budget_categories", value=["膳食費", "印刷費"]))
+    await db.commit()
+
+    await create_activity(client)  # payload 科目為 膳食費/印刷費 → 校驗通過
+    cfg = (await client.get("/api/v1/club/config")).json()["data"]
+    assert cfg["budget_categories"] == [
+        {"name": "膳食費", "hint": ""},
+        {"name": "印刷費", "hint": ""},
+    ]
 
 
 async def test_validation_rules(client, db):

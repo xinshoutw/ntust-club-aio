@@ -189,3 +189,15 @@ async def test_fixed_window_setting_drives_club_endpoint(client, db):
     window = (await client.get("/api/v1/club/room-bookings/window")).json()["data"]
     assert window["open"] is True
     assert window["open_from"] == today.isoformat()
+
+async def test_budget_categories_legacy_string_rows_normalized(client, db):
+    """殘留的舊 list[str] 格式(2026-07-17 前)讀取端正規化為 [{name, hint}],不 500。"""
+    await seed(client, db)
+    db.add(SystemSetting(key="budget_categories", value=["膳食費", "交通費"]))
+    await db.commit()
+
+    data = (await client.get(URL)).json()["data"]
+    assert data["budget_categories"] == [
+        {"name": "膳食費", "hint": ""},
+        {"name": "交通費", "hint": ""},
+    ]

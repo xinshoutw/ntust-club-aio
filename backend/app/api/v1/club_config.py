@@ -10,7 +10,7 @@ from fastapi import APIRouter
 
 from app.core.deps import ClubUser, DbDep
 from app.schemas.common import ApiResponse
-from app.services.settings_service import get_setting
+from app.services.settings_service import get_budget_categories, get_setting
 
 router = APIRouter(prefix="/club", tags=["config"])
 
@@ -32,6 +32,6 @@ async def club_config(user: ClubUser, db: DbDep) -> ApiResponse[dict[str, Any]]:
                 "video_mb": int(single["video"]),
             },
             # 經費科目 [{name, hint}]:名稱供下拉、hint 選填顯示於該列
-            "budget_categories": await get_setting(db, "budget_categories"),
+            "budget_categories": await get_budget_categories(db),
         }
     )

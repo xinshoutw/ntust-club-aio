@@ -67,6 +67,19 @@ async def get_setting(db: AsyncSession, key: str) -> Any:
     return DEFAULTS[key]
 
 
+async def get_budget_categories(db: AsyncSession) -> list[dict[str, str]]:
+    """經費科目一律以 [{name, hint}] 形狀回傳。
+
+    2026-07-17 之前存的是 list[str];寫入端(pydantic)與 DEFAULTS 都已是新結構,
+    但殘留舊列或手改 DB 的字串元素在讀取端做形狀防禦,不讓申請/組態端點 500。
+    """
+    raw = await get_setting(db, "budget_categories")
+    return [
+        c if isinstance(c, dict) else {"name": str(c), "hint": ""}
+        for c in raw
+    ]
+
+
 async def set_setting(db: AsyncSession, key: str, value: Any) -> None:
     row = await db.get(SystemSetting, key)
     if row is None:

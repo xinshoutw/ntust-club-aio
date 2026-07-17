@@ -38,3 +38,14 @@ def semester_bounds(label: str) -> tuple[datetime, datetime]:
 def academic_year_of(d: date) -> int:
     """民國學年度(8 月起算)。"""
     return d.year - 1911 if d.month >= 8 else d.year - 1912
+
+
+def next_semester_range(d: date) -> tuple[date, date]:
+    """d 之後最近開始的學期起訖(含頭含尾)。
+
+    固定借用於開放窗(預設 6 月、1 月)受理「下一學期」的申請,
+    申請單以此區間快照為生效範圍(2026-07-17 拍板)。
+    """
+    year_part, sem = semester_of(d).split("-")
+    nxt = f"{year_part}-2" if sem == "1" else f"{int(year_part) + 1}-1"
+    return semester_range(nxt)

@@ -21,6 +21,10 @@ class RoomBookingRequest(Base, TimestampMixin):
     club_id: Mapped[int] = mapped_column(sa.ForeignKey("clubs.id"), index=True)
     venue_id: Mapped[int] = mapped_column(sa.ForeignKey("venues.id"))  # allow_fixed
     purpose: Mapped[str] = mapped_column(sa.Text)  # 用途必填(2026-07-15)
+    # 目標學期起訖快照(2026-07-17 拍板:申請時自動歸屬「下一學期」;
+    # 場況圖僅在此區間顯示,學期結束即不再佔格;比照器材借用的區間快照模式)
+    start_date: Mapped[dt.date] = mapped_column(sa.Date)
+    end_date: Mapped[dt.date] = mapped_column(sa.Date)
     status: Mapped[BookingStatus] = mapped_column(
         db_enum(BookingStatus, "booking_status"), default=BookingStatus.PENDING
     )

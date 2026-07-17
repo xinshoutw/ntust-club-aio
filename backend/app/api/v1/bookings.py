@@ -14,7 +14,7 @@ from fastapi import APIRouter, BackgroundTasks, Query, Request
 from app.api.pagination import Pagination
 from app.core.deps import ClubUser, DbDep, client_ip
 from app.core.errors import conflict, forbidden, validation_error
-from app.core.semesters import TAIPEI
+from app.core.semesters import TAIPEI, next_semester_range
 from app.models import (
     Activity,
     Club,
@@ -137,14 +137,17 @@ MAX_AVAILABILITY_SPAN_DAYS = 31  # 單一場地 15 天檢視用;上限防範圍�
 
 @router.get("/bookings/availability-range")
 async def availability_range(
-    user: ClubUser, db: DbDep, start: date, end: date
+    user: ClubUser, db: DbDep, start: date, end: date, venue: int | None = None
 ) -> ApiResponse[dict]:
-    """區間逐日場況(單一場地多天檢視):取代前端逐日並行請求。"""
+    """區間逐日場況(單一場地多天檢視):取代前端逐日並行請求。
+
+    venue 給定時 SQL 端即縮小到該場地(15 天檢視本就單場地,不必撈全校)。
+    """
     if end < start:
         raise validation_error("結束日期不得早於開始日期")
     if (end - start).days + 1 > MAX_AVAILABILITY_SPAN_DAYS:
         raise validation_error(f"查詢區間最多 {MAX_AVAILABILITY_SPAN_DAYS} 天")
-    grids = await svc.availability_grids(db, start, end, user.club_id)
+    grids = await svc.availability_grids(db, start, end, user.club_id, venue_id=venue)
     return ApiResponse(
         data={"days": [{"date": d.isoformat(), "grid": g} for d, g in grids.items()]}
     )
@@ -214,27 +217,37 @@ async def create_room_booking(
         if error:
             raise validation_error(f"週{'一二三四五六日'[weekday - 1]}:{error}")
 
-    # 每社至多 10 節:本單 + 其他審核中申請合計(核准後的歷史申請屬前學期,不佔額度)
-    pending_count = (
+    # 申請自動歸屬「下一學期」(2026-07-17 拍板),起訖快照存入申請單
+    sem_start, sem_end = next_semester_range(datetime.now(TAIPEI).date())
+
+    # 每社至多 10 節/學期:同目標學期的未退回申請(審核中+已核准)合計
+    used_count = (
         await db.scalar(
             sa.select(sa.func.count())
             .select_from(RoomBookingSlot)
             .join(RoomBookingRequest, RoomBookingSlot.request_id == RoomBookingRequest.id)
             .where(
                 RoomBookingRequest.club_id == user.club_id,
-                RoomBookingRequest.status == BookingStatus.PENDING,
+                RoomBookingRequest.status != BookingStatus.REJECTED,
+                RoomBookingRequest.start_date == sem_start,
             )
         )
         or 0
     )
-    if pending_count + len(body.slots) > svc.MAX_FIXED_SLOTS:
+    if used_count + len(body.slots) > svc.MAX_FIXED_SLOTS:
         raise conflict(
             f"每社團固定借用至多 {svc.MAX_FIXED_SLOTS} 節"
-            f"(審核中已佔 {pending_count} 節)",
+            f"(本學期已佔 {used_count} 節)",
             code="SLOT_LIMIT",
         )
 
-    row = RoomBookingRequest(club_id=user.club_id, venue_id=venue.id, purpose=body.purpose)
+    row = RoomBookingRequest(
+        club_id=user.club_id,
+        venue_id=venue.id,
+        purpose=body.purpose,
+        start_date=sem_start,
+        end_date=sem_end,
+    )
     row.slots = [RoomBookingSlot(weekday=s.weekday, period=s.period) for s in body.slots]
     db.add(row)
     audit.record(db, action="room_booking_submitted", user=user, ip=client_ip(request))

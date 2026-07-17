@@ -176,15 +176,21 @@ async def availability_grid(
 
 
 async def availability_grids(
-    db: AsyncSession, start: date, end: date, own_club_id: int | None
+    db: AsyncSession,
+    start: date,
+    end: date,
+    own_club_id: int | None,
+    venue_id: int | None = None,
 ) -> dict[date, dict[int, dict[str, dict]]]:
     """逐日場況:日 → 場地 × 節次 → {status, club}。
     status:pending(審核中)/temp(臨時)/fixed(固定)/mine(自己已核准);club=借用社團名(hover 顯示)。
 
     - 只回傳被佔用/審核中的格子;其餘由前端依 venue 開放旗標補 available/closed
-    - 固定借用為每週固定時段(weekday 對應);已核准標 fixed/mine,審核中標 pending(2026-07-17 起顯示)
+    - 固定借用僅在其目標學期起訖內顯示(2026-07-17:先前無學期界限,未退回申請永久佔格);
+      已核准標 fixed/mine,審核中標 pending
     - 審核中(含本社)一律標 pending;本社已核准才標 mine(2026-07-17 修正:自己審核中不再誤標我的借用)
-    - 區間一次撈(單一場地 15 天檢視原逐日 15 請求,2026-07-17 改批次)
+    - 區間一次撈(單一場地 15 天檢視原逐日 15 請求,2026-07-17 改批次);
+      venue_id 給定時(單一場地檢視)SQL 端即縮小到該場地
     """
     grids: dict[date, dict[int, dict[str, dict]]] = {
         start + timedelta(days=i): {} for i in range((end - start).days + 1)
@@ -198,18 +204,18 @@ async def availability_grids(
         if current is None or rank[status] > rank[current["status"]]:
             cell[period] = {"status": status, "club": club}
 
-    temp_rows = (
-        await db.execute(
-            sa.select(VenueBooking, Club.name)
-            .join(Club, VenueBooking.club_id == Club.id)
-            .where(
-                VenueBooking.date >= start,
-                VenueBooking.date <= end,
-                VenueBooking.status != BookingStatus.REJECTED,
-            )
+    temp_query = (
+        sa.select(VenueBooking, Club.name)
+        .join(Club, VenueBooking.club_id == Club.id)
+        .where(
+            VenueBooking.date >= start,
+            VenueBooking.date <= end,
+            VenueBooking.status != BookingStatus.REJECTED,
         )
-    ).all()
-    for booking, club_name in temp_rows:
+    )
+    if venue_id is not None:
+        temp_query = temp_query.where(VenueBooking.venue_id == venue_id)
+    for booking, club_name in (await db.execute(temp_query)).all():
         # 本社已核准=mine;其餘已核准=temp;審核中(含本社)=pending
         if booking.status == BookingStatus.APPROVED:
             status = "mine" if booking.club_id == own_club_id else "temp"
@@ -218,18 +224,26 @@ async def availability_grids(
         for period in booking.periods:
             mark(booking.date, booking.venue_id, period, status, club_name)
 
-    fixed_rows = (
-        await db.execute(
-            sa.select(RoomBookingSlot, RoomBookingRequest, Club.name)
-            .join(RoomBookingRequest, RoomBookingSlot.request_id == RoomBookingRequest.id)
-            .join(Club, RoomBookingRequest.club_id == Club.id)
-            .where(RoomBookingRequest.status != BookingStatus.REJECTED)
+    fixed_query = (
+        sa.select(RoomBookingSlot, RoomBookingRequest, Club.name)
+        .join(RoomBookingRequest, RoomBookingSlot.request_id == RoomBookingRequest.id)
+        .join(Club, RoomBookingRequest.club_id == Club.id)
+        .where(
+            RoomBookingRequest.status != BookingStatus.REJECTED,
+            RoomBookingRequest.start_date <= end,
+            RoomBookingRequest.end_date >= start,
+            RoomBookingSlot.weekday.in_({d.isoweekday() for d in grids}),
         )
-    ).all()
+    )
+    if venue_id is not None:
+        fixed_query = fixed_query.where(RoomBookingRequest.venue_id == venue_id)
+    fixed_rows = (await db.execute(fixed_query)).all()
     for day in grids:
         for slot, request, club_name in fixed_rows:
             if slot.weekday != day.isoweekday():
                 continue
+            if not (request.start_date <= day <= request.end_date):
+                continue  # 該日不在申請的目標學期內
             # 審核中固定借用標 pending;本社已核准 mine、他社已核准 fixed
             if request.status != BookingStatus.APPROVED:
                 status = "pending"
@@ -277,6 +291,8 @@ async def admin_availability_grid(db: AsyncSession, day: date) -> dict[int, dict
         .where(
             RoomBookingSlot.weekday == day.isoweekday(),
             RoomBookingRequest.status == BookingStatus.APPROVED,
+            RoomBookingRequest.start_date <= day,
+            RoomBookingRequest.end_date >= day,
         )
     )
     for slot, venue_id in fixed_rows:

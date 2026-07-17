@@ -37,7 +37,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.db import async_session_factory
 from app.core.security import hash_password
-from app.core.semesters import TAIPEI
+from app.core.semesters import TAIPEI, semester_of, semester_range
 from app.models import (
     Activity,
     ActivityBudgetItem,
@@ -823,10 +823,13 @@ async def _create_bookings(
         )
     )
 
-    # 固定借用(整學期每週固定時段;週次 entries)
+    # 固定借用(整學期每週固定時段)。真實申請歸屬「下一學期」;
+    # 展示資料用當前學期起訖,場況圖今天就看得到固定借用格
+    sem_start, sem_end = semester_range(semester_of(date.today()))
     pending_room = RoomBookingRequest(
         club_id=csie.id, venue_id=venue_ids["S304 音樂教室"],
         purpose="每週社課固定教室", status=BookingStatus.PENDING,
+        start_date=sem_start, end_date=sem_end,
     )
     pending_room.slots = [  # 週二 3-4 節
         RoomBookingSlot(weekday=2, period="3"),
@@ -836,6 +839,7 @@ async def _create_bookings(
     approved_room = RoomBookingRequest(
         club_id=clubs["guitar"].id, venue_id=venue_ids["練團室"],
         purpose="樂團團練", status=BookingStatus.APPROVED,
+        start_date=sem_start, end_date=sem_end,
     )
     approved_room.slots = [  # 週四 8-10 節(含第 10 節,滿足連續 3 節規則)
         RoomBookingSlot(weekday=4, period="8"),

@@ -107,7 +107,7 @@ export default function BookingOverviewPage() {
     () => Array.from({ length: VENUE_DAYS }, (_, i) => venueStart.add(i, 'day')),
     [venueStart],
   )
-  const rangeQuery = useAvailabilityDays(venueDef ? venueDates : [])
+  const rangeQuery = useAvailabilityDays(venueDef ? venueDates : [], venueDef?.id)
 
   const roomsQuery = useAllRoomBookings()
   const venueBookingsQuery = useAllVenueBookings()

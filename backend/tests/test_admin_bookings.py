@@ -331,8 +331,10 @@ async def test_admin_availability_grid_with_booking_ids(client, db):
                            date=day, periods=["3"], purpose="彩排")
     approved = VenueBooking(club_id=other_club.id, venue_id=venue.id, activity_id=None,
                             date=day, periods=["7"], purpose="社課", status="approved")
+    # 目標學期起訖涵蓋查詢日,場況才會顯示(2026-07-17:固定借用僅在學期內佔格)
     fixed = RoomBookingRequest(club_id=other_club.id, venue_id=fixed_venue.id,
-                               purpose="社課", status="approved")
+                               purpose="社課", status="approved",
+                               start_date=date(2026, 2, 1), end_date=date(2026, 7, 31))
     fixed.slots = [RoomBookingSlot(weekday=4, period="5")]
     db.add_all([pending, approved, fixed])
     await db.commit()

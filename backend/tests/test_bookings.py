@@ -2,6 +2,7 @@ from datetime import UTC, date, datetime, timedelta
 
 import sqlalchemy as sa
 
+from app.core.semesters import next_semester_range
 from app.models import (
     Activity,
     Equipment,
@@ -14,6 +15,10 @@ from app.models import (
 from app.models.enums import ActivityStatus, VenueCategory
 from app.services.booking_service import next_workday, overdue_deadline
 from tests.conftest import csrf_headers, login, make_club, make_user
+
+
+def first_thursday(start: date) -> date:
+    return start + timedelta(days=(4 - start.isoweekday()) % 7)
 
 
 async def make_venue(db, name="S304 音樂教室", *, allow_fixed=True, allow_temp=False, **kw):
@@ -192,11 +197,12 @@ async def test_room_booking_late_period_rule(client, db):
             headers=csrf_headers(client),
         )
         if resp.status_code == 201:
-            # 成單後即核准,避免審核中額度(每社 10 節)干擾本測試的規則驗證
+            # 成單後即退回:同學期未退回單(審核中+已核准)合計佔每社 10 節額度,
+            # 退回不佔,才不干擾本測試的晚間規則驗證
             await db.execute(
                 sa.update(RoomBookingRequest)
                 .where(RoomBookingRequest.id == resp.json()["data"]["id"])
-                .values(status="approved")
+                .values(status="rejected")
             )
             await db.commit()
         return resp
@@ -333,6 +339,9 @@ async def test_availability_grid_statuses(client, db):
     fixed_venue = await make_venue(db, name="S304")
     await open_fixed_window(db)
     activity = await make_activity(db, club)
+    # 固定借用歸屬「下一學期」:場況斷言取目標學期內的週四(slots weekday=4)
+    sem_start, _ = next_semester_range(date.today())
+    thu = first_thursday(sem_start)
 
     # 自己的臨時申請(pending)→ pending(2026-07-17:自己審核中不再標 mine)
     await client.post(
@@ -340,7 +349,7 @@ async def test_availability_grid_statuses(client, db):
         json={
             "venue_id": venue.id,
             "activity_id": activity.id,
-            "date": "2026-03-05",
+            "date": thu.isoformat(),
             "periods": ["3"],
             "purpose": "擺攤",
         },
@@ -356,7 +365,6 @@ async def test_availability_grid_statuses(client, db):
         json={
             "venue_id": fixed_venue.id,
             "purpose": "社課",
-            # 2026-03-05 是週四(isoweekday=4)
             "slots": [{"weekday": 4, "period": "5"}, {"weekday": 4, "period": "6"}],
         },
         headers=csrf_headers(client),
@@ -367,7 +375,7 @@ async def test_availability_grid_statuses(client, db):
         json={
             "venue_id": venue.id,
             "activity_id": other_activity.id,
-            "date": "2026-03-05",
+            "date": thu.isoformat(),
             "periods": ["7"],
             "purpose": "活動",
         },
@@ -376,7 +384,7 @@ async def test_availability_grid_statuses(client, db):
 
     await login(client, "club01")
     grid = (
-        await client.get("/api/v1/club/bookings/availability", params={"date": "2026-03-05"})
+        await client.get("/api/v1/club/bookings/availability", params={"date": thu.isoformat()})
     ).json()["data"]["grid"]
     # 本社的臨時申請仍在審核中 → pending(非 mine);格帶社團名供 hover
     assert grid[str(venue.id)]["3"] == {"status": "pending", "club": "熱舞社"}
@@ -389,34 +397,43 @@ async def test_availability_grid_statuses(client, db):
     )
     await db.commit()
     grid = (
-        await client.get("/api/v1/club/bookings/availability", params={"date": "2026-03-05"})
+        await client.get("/api/v1/club/bookings/availability", params={"date": thu.isoformat()})
     ).json()["data"]["grid"]
     assert grid[str(fixed_venue.id)]["5"] == {"status": "fixed", "club": "吉他社"}
     # 每週固定:下週同星期也佔用,不同星期不佔用
     grid = (
-        await client.get("/api/v1/club/bookings/availability", params={"date": "2026-03-12"})
+        await client.get(
+            "/api/v1/club/bookings/availability",
+            params={"date": (thu + timedelta(days=7)).isoformat()},
+        )
     ).json()["data"]["grid"]
     assert grid[str(fixed_venue.id)]["5"]["status"] == "fixed"
     grid = (
-        await client.get("/api/v1/club/bookings/availability", params={"date": "2026-03-06"})
+        await client.get(
+            "/api/v1/club/bookings/availability",
+            params={"date": (thu + timedelta(days=1)).isoformat()},
+        )
     ).json()["data"]["grid"]
     assert str(fixed_venue.id) not in grid
 
 
 async def test_availability_range(client, db):
-    """區間逐日場況:臨時只佔當日、固定每週同星期;區間驗證。"""
+    """區間逐日場況:臨時只佔當日、固定每週同星期;venue 篩選;區間驗證。"""
     club = await setup_session(client, db)
     venue = await make_venue(db, name="精誠廣場", allow_fixed=False, allow_temp=True)
     fixed_venue = await make_venue(db, name="S304")
     await open_fixed_window(db)
     activity = await make_activity(db, club)
+    sem_start, _ = next_semester_range(date.today())
+    thu = first_thursday(sem_start)  # 固定借用目標學期內的週四
+    wed, fri, next_thu = thu - timedelta(days=1), thu + timedelta(days=1), thu + timedelta(days=7)
 
     await client.post(
         "/api/v1/club/venue-bookings",
         json={
             "venue_id": venue.id,
             "activity_id": activity.id,
-            "date": "2026-03-05",  # 週四
+            "date": thu.isoformat(),
             "periods": ["3"],
             "purpose": "擺攤",
         },
@@ -440,18 +457,30 @@ async def test_availability_range(client, db):
     days = (
         await client.get(
             "/api/v1/club/bookings/availability-range",
-            params={"start": "2026-03-04", "end": "2026-03-12"},
+            params={"start": wed.isoformat(), "end": next_thu.isoformat()},
         )
     ).json()["data"]["days"]
     by_date = {d["date"]: d["grid"] for d in days}
-    assert list(by_date) == [f"2026-03-{i:02d}" for i in range(4, 13)]  # 連續、含頭尾
+    # 連續、含頭尾
+    assert list(by_date) == [(wed + timedelta(days=i)).isoformat() for i in range(9)]
     # 臨時只佔當日;本社審核中 → pending(非 mine)
-    assert by_date["2026-03-05"][str(venue.id)]["3"]["status"] == "pending"
-    assert str(venue.id) not in by_date["2026-03-06"]
-    # 固定每週同星期(3/5、3/12 皆週四);自己社的固定借用顯示 mine;其他日不佔
-    assert by_date["2026-03-05"][str(fixed_venue.id)]["5"]["status"] == "mine"
-    assert by_date["2026-03-12"][str(fixed_venue.id)]["5"]["status"] == "mine"
-    assert str(fixed_venue.id) not in by_date["2026-03-06"]
+    assert by_date[thu.isoformat()][str(venue.id)]["3"]["status"] == "pending"
+    assert str(venue.id) not in by_date[fri.isoformat()]
+    # 固定每週同星期(兩個週四皆佔);自己社的固定借用顯示 mine;其他日不佔
+    assert by_date[thu.isoformat()][str(fixed_venue.id)]["5"]["status"] == "mine"
+    assert by_date[next_thu.isoformat()][str(fixed_venue.id)]["5"]["status"] == "mine"
+    assert str(fixed_venue.id) not in by_date[fri.isoformat()]
+
+    # venue 篩選(單一場地檢視):只回該場地的格
+    days = (
+        await client.get(
+            "/api/v1/club/bookings/availability-range",
+            params={"start": wed.isoformat(), "end": next_thu.isoformat(), "venue": fixed_venue.id},
+        )
+    ).json()["data"]["days"]
+    by_date = {d["date"]: d["grid"] for d in days}
+    assert str(fixed_venue.id) in by_date[thu.isoformat()]
+    assert str(venue.id) not in by_date[thu.isoformat()]
 
     # 區間驗證:起訖顛倒、超出上限
     resp = await client.get(
@@ -464,6 +493,44 @@ async def test_availability_range(client, db):
         params={"start": "2026-03-01", "end": "2026-04-15"},
     )
     assert resp.status_code == 422
+
+
+async def test_fixed_booking_scoped_to_target_semester(client, db):
+    """固定借用僅在目標學期起訖內佔格(2026-07-17:先前無界限,未退回單永久佔格)。"""
+    await setup_session(client, db)
+    await open_fixed_window(db)
+    venue = await make_venue(db)
+
+    resp = await client.post(
+        "/api/v1/club/room-bookings",
+        json={"venue_id": venue.id, "purpose": "社課", "slots": [{"weekday": 4, "period": "5"}]},
+        headers=csrf_headers(client),
+    )
+    rid = resp.json()["data"]["id"]
+    # 申請自動歸屬「下一學期」起訖快照
+    sem_start, sem_end = next_semester_range(date.today())
+    row = await db.get(RoomBookingRequest, rid)
+    assert (row.start_date, row.end_date) == (sem_start, sem_end)
+
+    await db.execute(
+        sa.update(RoomBookingRequest).where(RoomBookingRequest.id == rid).values(status="approved")
+    )
+    await db.commit()
+
+    thu_in = first_thursday(sem_start)  # 學期內的週四 → 佔格
+    thu_before = thu_in - timedelta(days=7)  # 學期開始前的週四 → 不佔
+    after = sem_end + timedelta(days=1)
+    thu_after = first_thursday(after)  # 學期結束後的週四 → 不佔
+
+    async def grid_of(day: date) -> dict:
+        resp = await client.get(
+            "/api/v1/club/bookings/availability", params={"date": day.isoformat()}
+        )
+        return resp.json()["data"]["grid"]
+
+    assert (await grid_of(thu_in))[str(venue.id)]["5"]["status"] == "mine"  # 本社已核准
+    assert str(venue.id) not in await grid_of(thu_before)
+    assert str(venue.id) not in await grid_of(thu_after)
 
 
 # ---- 器材借用(綁定審核通過活動,區間推導) ----

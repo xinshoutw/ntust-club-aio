@@ -265,8 +265,8 @@ const keys = {
   venues: ['bookings', 'venues'] as const,
   equipment: (activityId: number | null) => ['bookings', 'equipment', activityId] as const,
   availability: (iso: string) => ['bookings', 'availability', iso] as const,
-  availabilityRange: (startIso: string, endIso: string) =>
-    ['bookings', 'availability-range', startIso, endIso] as const,
+  availabilityRange: (startIso: string, endIso: string, venueId?: number) =>
+    ['bookings', 'availability-range', startIso, endIso, venueId ?? null] as const,
   fixedWindow: ['bookings', 'fixed-window'] as const,
   rooms: (p: PageParams | 'all') => ['bookings', 'room-bookings', p] as const,
   venueBookings: (p: PageParams | 'all') => ['bookings', 'venue-bookings', p] as const,
@@ -312,15 +312,16 @@ export function useAvailability(date: Dayjs) {
   })
 }
 
-/** 多日場況(單一場地 15 天檢視):批次端點一次撈整段區間(2026-07-17,取代逐日 15 請求) */
-export function useAvailabilityDays(dates: Dayjs[]) {
+/** 多日場況(單一場地 15 天檢視):批次端點一次撈整段區間(2026-07-17,取代逐日 15 請求);
+ *  venue 給定時後端 SQL 即縮小到該場地 */
+export function useAvailabilityDays(dates: Dayjs[], venueId?: number) {
   const startIso = dates.length ? toIso(dates[0]) : ''
   const endIso = dates.length ? toIso(dates[dates.length - 1]) : ''
   const query = useQuery({
-    queryKey: keys.availabilityRange(startIso, endIso),
+    queryKey: keys.availabilityRange(startIso, endIso, venueId),
     queryFn: () =>
       api<{ days: { date: string; grid: AvailabilityGrid }[] }>(
-        `/club/bookings/availability-range${qs({ start: startIso, end: endIso })}`,
+        `/club/bookings/availability-range${qs({ start: startIso, end: endIso, venue: venueId })}`,
       ).then((r) => Object.fromEntries(r.days.map((d) => [d.date, d.grid]))),
     enabled: dates.length > 0,
     placeholderData: keepPreviousData,

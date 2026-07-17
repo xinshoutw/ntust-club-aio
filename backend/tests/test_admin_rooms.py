@@ -1,7 +1,10 @@
 """教室固定借用審核(/admin/room-bookings,權限鍵 aroom):整單擇一核准/退回。"""
 
+from datetime import date
+
 import sqlalchemy as sa
 
+from app.core.semesters import next_semester_range
 from app.models import (
     ApprovalRecord,
     AuditLog,
@@ -25,14 +28,17 @@ async def seed(client, db):
     db.add(venue)
     await db.commit()
     await db.refresh(venue)
+    sem_start, sem_end = next_semester_range(date.today())  # 目標學期起訖快照
 
     # 兩社衝突申請同一時段(週二 3、4 節)+ 一筆已核准
-    first = RoomBookingRequest(club_id=club.id, venue_id=venue.id, purpose="社課練習")
+    first = RoomBookingRequest(club_id=club.id, venue_id=venue.id, purpose="社課練習",
+                               start_date=sem_start, end_date=sem_end)
     first.slots = [RoomBookingSlot(weekday=2, period="3"), RoomBookingSlot(weekday=2, period="4")]
-    second = RoomBookingRequest(club_id=other_club.id, venue_id=venue.id, purpose="樂團練習")
+    second = RoomBookingRequest(club_id=other_club.id, venue_id=venue.id, purpose="樂團練習",
+                                start_date=sem_start, end_date=sem_end)
     second.slots = [RoomBookingSlot(weekday=2, period="3")]
     done = RoomBookingRequest(club_id=club.id, venue_id=venue.id, purpose="上學期已核准",
-                              status="approved")
+                              status="approved", start_date=sem_start, end_date=sem_end)
     done.slots = [RoomBookingSlot(weekday=5, period="1")]
     db.add_all([first, second, done])
     await db.commit()

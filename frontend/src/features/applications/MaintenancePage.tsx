@@ -28,10 +28,32 @@ export default function MaintenancePage() {
   const [files, setFiles] = useState<BagFile[]>([])
   const [filesError, setFilesError] = useState(false)
 
-  const config = useClubConfig().data?.uploadLimits
+  const configQuery = useClubConfig()
   const listQuery = useMaintenanceList()
   const records = listQuery.data?.records ?? []
   const { submit } = useMaintenanceMutations()
+
+  // 上限以後端組態為權威:載入完成前不開放操作(比照 ActivityFormPage),
+  // 不做前端 fallback 常數,避免組態調整後兩邊說法不一
+  if (configQuery.isPending)
+    return (
+      <div>
+        <PageHeader title="空間報修" />
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
+          <Spin />
+        </div>
+      </div>
+    )
+  if (configQuery.isError)
+    return (
+      <div>
+        <PageHeader title="空間報修" />
+        <div style={{ marginTop: 20 }}>
+          <QueryError title="系統組態載入失敗" error={configQuery.error} onRetry={() => void configQuery.refetch()} />
+        </div>
+      </div>
+    )
+  const config = configQuery.data.uploadLimits
 
   return (
     <div>
@@ -78,8 +100,8 @@ export default function MaintenancePage() {
               error={filesError}
               accept={`${IMAGE_ACCEPT},video/*`}
               hint="拖放圖片或影片檔案"
-              validate={makeValidateEvidence(config?.imgBytes ?? 10 * MB, config?.videoBytes ?? 200 * MB)}
-              maxTotalBytes={config?.maintenanceBytes ?? 100 * MB}
+              validate={makeValidateEvidence(config.imgBytes, config.videoBytes)}
+              maxTotalBytes={config.maintenanceBytes}
               maxCount={5}
             />
           </Form.Item>

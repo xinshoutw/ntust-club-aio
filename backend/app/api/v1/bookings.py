@@ -388,6 +388,8 @@ async def create_equipment_loan(
     holidays = await svc.load_holidays(db)
     start, end = svc.loan_window(activity, buffer, holidays)
 
+    # 以器材為鍵序列化檢核與寫入:兩筆並發申請不會同時以同一份佔用量通過檢核
+    await svc.lock_resource(db, "equipment", equipment.id)
     available = await svc.equipment_available_in_window(
         db, equipment.id, equipment.total_qty, start, end
     )

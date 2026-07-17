@@ -16,11 +16,6 @@ PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
 JPG_BYTES = b"\xff\xd8\xff\xe0" + b"\x00" * 64
 
 
-@pytest.fixture(autouse=True)
-def _tmp_upload_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, "upload_dir", tmp_path)
-
-
 def fake_upload(name: str, content: bytes) -> UploadFile:
     # size=宣告大小(Starlette 於真實請求會計算);配額預檢據此提前拒絕
     return UploadFile(io.BytesIO(content), filename=name, size=len(content))

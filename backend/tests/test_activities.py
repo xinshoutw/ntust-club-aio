@@ -1,7 +1,6 @@
 import io
 from datetime import date, timedelta
 
-import pytest
 import sqlalchemy as sa
 
 from app.core.config import settings
@@ -9,11 +8,6 @@ from app.models import Activity
 from tests.conftest import csrf_headers, login, make_club, make_user
 
 JPG = b"\xff\xd8\xff\xe0" + b"\x00" * 64
-
-
-@pytest.fixture(autouse=True)
-def _tmp_upload_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, "upload_dir", tmp_path)
 
 
 def payload(**overrides) -> dict:

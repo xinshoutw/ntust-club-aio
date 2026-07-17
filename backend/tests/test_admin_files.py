@@ -2,17 +2,10 @@
 
 from datetime import UTC, datetime
 
-import pytest
 import sqlalchemy as sa
 
-from app.core.config import settings
 from app.models import AuditLog, File
 from tests.conftest import csrf_headers, login, make_club, make_user
-
-
-@pytest.fixture(autouse=True)
-def _tmp_upload_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, "upload_dir", tmp_path)
 
 
 def make_file(club_id, user_id, *, module="maintenance", name="clip.mp4", size=1000, **kw):

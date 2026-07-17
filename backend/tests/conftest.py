@@ -80,6 +80,12 @@ def _mute_discord(monkeypatch):
     monkeypatch.setattr(settings, "discord_webhook_url", "")
 
 
+@pytest.fixture(autouse=True)
+def _tmp_upload_dir(tmp_path, monkeypatch):
+    """上傳一律寫 per-test 暫存目錄,絕不碰真實 upload_dir。"""
+    monkeypatch.setattr(settings, "upload_dir", tmp_path)
+
+
 @pytest.fixture
 async def db():
     async with async_session_factory() as session:

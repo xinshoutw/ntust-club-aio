@@ -4,7 +4,6 @@ from datetime import UTC, date, datetime
 import pytest
 import sqlalchemy as sa
 
-from app.core.config import settings
 from app.models import (
     Activity,
     ActivityReflection,
@@ -20,11 +19,6 @@ from app.models.enums import AdjustmentKind, AwardKind
 from tests.conftest import csrf_headers, login, make_club, make_user
 
 EVAL_YEAR = 116  # settings_service DEFAULTS 的評鑑視窗(2026-02-01 ~ 2027-01-31)
-
-
-@pytest.fixture(autouse=True)
-def _tmp_upload_dir(tmp_path, monkeypatch):
-    monkeypatch.setattr(settings, "upload_dir", tmp_path)
 
 
 async def setup(client, db):

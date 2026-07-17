@@ -223,6 +223,38 @@ const toReport = (r: ReportOut): ActivityReport => ({
   submittedAt: slashDate(r.submitted_at),
 })
 
+// close_draft 是 opaque JSON,可能被舊版或直接 API 寫成非預期形狀:
+// 逐欄驗型別、不符即丟棄(hydrate 時走各欄 fallback),避免壞草稿讓結案頁整頁崩潰
+const asStr = (v: unknown): string | undefined => (typeof v === 'string' ? v : undefined)
+const asNum = (v: unknown): number | undefined =>
+  typeof v === 'number' && Number.isFinite(v) ? v : undefined
+const toCloseDraft = (raw: Record<string, unknown> | null): Partial<ActivityReport> | undefined => {
+  if (!raw) return undefined
+  return {
+    memberCount: asNum(raw.memberCount),
+    nonMemberCount: asNum(raw.nonMemberCount),
+    actualStart: asStr(raw.actualStart),
+    actualEnd: asStr(raw.actualEnd),
+    actualLocation: asStr(raw.actualLocation),
+    highlights: asStr(raw.highlights),
+    goals: asStr(raw.goals),
+    others: asStr(raw.others),
+    reviewMeeting: typeof raw.reviewMeeting === 'boolean' ? raw.reviewMeeting : undefined,
+    reviewDate: asStr(raw.reviewDate),
+    reviewAttendees: asNum(raw.reviewAttendees),
+    reviewTopics: asStr(raw.reviewTopics),
+    reviewConclusion: asStr(raw.reviewConclusion),
+    videoLink: asStr(raw.videoLink),
+    expense: asNum(raw.expense),
+    reflections: Array.isArray(raw.reflections)
+      ? raw.reflections.map((x) => {
+          const o = (x ?? {}) as Record<string, unknown>
+          return { name: asStr(o.name) ?? '', dept: asStr(o.dept) ?? '', text: asStr(o.text) ?? '' }
+        })
+      : undefined,
+  }
+}
+
 // 簽核關卡顯示詞(社團端不顯示個人姓名,僅關卡)
 const STAGE_LABEL: Record<string, string> = {
   advisor: '輔導老師',
@@ -242,7 +274,7 @@ const toDetail = (o: ActivityDetailOut): ClubActivityDetail => {
       requestedSubsidy: b.requested_subsidy,
       approvedSubsidy: b.approved_subsidy,
     })),
-    closeDraft: (o.close_draft ?? undefined) as Partial<ActivityReport> | undefined,
+    closeDraft: toCloseDraft(o.close_draft),
     report: o.report ? toReport(o.report) : undefined,
     photos: o.photos.map(toFile),
     attachments: o.attachments.map(toFile),

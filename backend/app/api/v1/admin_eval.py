@@ -147,10 +147,11 @@ async def override_score(
     )
     await db.commit()
     background.add_task(
-        notify.discord,
+        notify.club_event,
         "alert",
         "行政分手動調整",
         f"{club.name}:{body.key} → {body.score}({body.reason})",
+        club.discord_webhook_url,
     )
     scores, total, year = await _club_scores(db, club.id)
     return ApiResponse(data={"total": total, "scores": [s.model_dump() for s in scores]})
@@ -177,7 +178,11 @@ async def revert_score(
     )
     await db.commit()
     background.add_task(
-        notify.discord, "alert", "行政分回到自動計算", f"{club.name}:{body.key}({body.reason})"
+        notify.club_event,
+        "alert",
+        "行政分回到自動計算",
+        f"{club.name}:{body.key}({body.reason})",
+        club.discord_webhook_url,
     )
     scores, total, year = await _club_scores(db, club.id)
     return ApiResponse(data={"total": total, "scores": [s.model_dump() for s in scores]})
@@ -225,10 +230,11 @@ async def set_merit(
     )
     await db.commit()
     background.add_task(
-        notify.discord,
+        notify.club_event,
         "alert",
         "表現優良加分登錄",
         f"{club.name}:+{body.score}({body.reason})",
+        club.discord_webhook_url,
     )
     scores, total, year = await _club_scores(db, club.id)
     return ApiResponse(data={"total": total, "scores": [s.model_dump() for s in scores]})

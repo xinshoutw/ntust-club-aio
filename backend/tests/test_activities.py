@@ -489,3 +489,35 @@ async def test_partial_draft_and_submit_completeness(client, db):
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
+
+
+async def test_close_actual_times_overnight_rules(client, db):
+    """實際時間先後僅單日活動比較;跨日活動的過夜時間(18:10–翌日 10:00)合法(2026-07-17)。"""
+    await setup_session(client, db)
+
+    # 單日活動:實際結束早於開始 → 422
+    past = (date.today() - timedelta(days=3)).isoformat()
+    data = await create_activity(client, date=past)
+    await approve(db, data["id"])
+    await upload_photo(client, data["id"])
+    resp = await client.post(
+        f"/api/v1/club/activities/{data['id']}/close",
+        json=close_payload(actual_start="18:10", actual_end="10:00"),
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    assert "結束時間" in resp.json()["error"]
+
+    # 跨日活動:同一組時間是合法過夜時段 → 200
+    start = (date.today() - timedelta(days=5)).isoformat()
+    end = (date.today() - timedelta(days=4)).isoformat()
+    data = await create_activity(client, name="跨日宿營", date=start, end_date=end)
+    await approve(db, data["id"])
+    # 跨活動 SHA-256 去重:第二個活動的照片須用不同內容
+    await upload_photo(client, data["id"], content=JPG + b"\x01", name="photo2.jpg")
+    resp = await client.post(
+        f"/api/v1/club/activities/{data['id']}/close",
+        json=close_payload(actual_start="18:10", actual_end="10:00"),
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text

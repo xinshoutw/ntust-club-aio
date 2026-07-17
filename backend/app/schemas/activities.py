@@ -129,8 +129,8 @@ class CloseSubmitIn(BaseModel):
 
     @model_validator(mode="after")
     def _check(self):
-        if self.actual_end <= self.actual_start:
-            raise ValueError("實際結束時間必須晚於開始時間")
+        # 實際時間先後不在此比較:跨日活動(如 18:00–翌日 10:00)是合法輸入,
+        # 需要活動起訖日期才能判斷,由 submit_close 端點檢核(與 ActivityIn 同精神)
         if self.review_meeting:
             # 2026-07-15:檢討會議獨立 section,日期/與會人數/討論事項/內容決議皆必填
             if self.review_date is None:

@@ -454,6 +454,9 @@ async def submit_close(
         raise conflict("活動尚未結束,不可結案")
     if svc.is_close_locked(activity, lock_months, now):
         raise conflict("已逾結案期限並鎖定,請洽學務處解鎖")
+    # 實際時間先後僅單日活動可用純時間比較;跨日活動(18:00–翌日 10:00)整段合法
+    if activity.end_date == activity.date and body.actual_end <= body.actual_start:
+        raise validation_error("實際結束時間必須晚於開始時間")
     # 照片檢核收口到後端(先前僅前端擋):取鎖後計數,直呼 API 也擋零照片結案
     photo_count = await db.scalar(
         sa.select(sa.func.count())

@@ -390,7 +390,11 @@ function CloseForm({
     if (existing.length + photos.length === 0) missing.push(['photos', '請上傳「活動照片」'])
     if (expense == null) missing.push(['expense', '請填寫「實際支出」'])
     if (missing.length === 0) {
-      if (!dayjs(actualEnd, 'HH:mm').isAfter(dayjs(actualStart, 'HH:mm'))) {
+      // 時間先後僅單日活動可比較:跨日活動(如 18:00–翌日 10:00)整段合法(後端同規則)
+      if (
+        (!activity.endDate || activity.endDate === activity.date) &&
+        !dayjs(actualEnd, 'HH:mm').isAfter(dayjs(actualStart, 'HH:mm'))
+      ) {
         missing.push(['actualEnd', '實際結束時間須晚於實際開始時間'])
       }
       const video = videoLink.trim()

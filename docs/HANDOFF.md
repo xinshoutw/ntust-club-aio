@@ -2,7 +2,7 @@
 
 > 給下一個 session 的交接快照。永久性專案知識在三層 `AGENTS.md` 與 `docs/architecture.md`、`docs/data-model.md`、`docs/design-guide.md`;本檔只記「現在進行到哪、接下來做什麼」。過期即刪。
 
-## 本輪已完成(13 commit,分支 `dev`,尚未推送)
+## 本輪已完成(17 commit,分支 `dev` 已推)
 
 第十輪交叉審查(`docs/REVIEW_2026-07-17.md`)的 findings **全數處理完畢**,該檔已逐項標注處理結果與 commit hash。摘要:
 
@@ -26,7 +26,6 @@
 
 ## 下一輪待辦 / 待需求方
 
-- **本輪 13 commit 尚未 push**(修復 session 結束時由使用者確認後推)
 - `docs/TASK6_REVIEW_HANDOFF.md` §6 可延後 debt 仍未做(`<Spin>`→Skeleton、`seed_mock --yes` 補 `ENV=dev` guard、inner nginx 信任網段收窄等)
 - EvalResultPage 仍 mock(待需求方規格);staff/viewer panel、首頁導覽頁、Email MJML 模板未動
 - 前端 `bookings/mock.ts` 仍是 admin 借用審核頁的 legacy mock(該頁未接後端)

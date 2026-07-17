@@ -1,66 +1,44 @@
-# Session Handoff(2026-07-17,第十輪:需求方連續回饋落地)
+# Session Handoff(2026-07-17,第十一輪:交叉審查 findings 修復)
 
 > 給下一個 session 的交接快照。永久性專案知識在三層 `AGENTS.md` 與 `docs/architecture.md`、`docs/data-model.md`、`docs/design-guide.md`;本檔只記「現在進行到哪、接下來做什麼」。過期即刪。
 
-## 本輪已完成(40 commit,`61996d4..HEAD`,分支 `dev` 已推)
+## 本輪已完成(13 commit,分支 `dev`,尚未推送)
 
-需求方在同一 session 內連續給了多批回饋,全部前後端落地並補測試。**永久決議已寫入 `AGENTS.md`「UI/規則調整決議(2026-07-17 第十輪)」**,以下只列摘要與驗證狀態。
+第十輪交叉審查(`docs/REVIEW_2026-07-17.md`)的 findings **全數處理完畢**,該檔已逐項標注處理結果與 commit hash。摘要:
 
-### 品牌 / 登入頁
-- NTUST logo(`public/logo.svg`)= favicon + header 最左圖示;`logo.png` 供 Discord webhook 頭貼(`notify._with_identity`)
-- 登入頁移除多餘捲軸(`box-sizing:border-box`);版權宣告自動跨年(`Copyright © 2026[-{今年}]`)+ 維護者資訊 popover(mailto/Discord)
+### 需求方本輪拍板(已寫入實作,語義如下)
+- **固定借用學期歸屬=「自動歸屬下一學期」**:申請時依申請日推導下一學期起訖(6 月開放窗 → 8/1–1/31、1 月 → 2/1–7/31)快照存入 `room_booking_requests.start_date/end_date`(migration `6b5a9c3affd0`,既有列依 created_at 台北時區回填);場況圖僅在區間內標格;每社 10 節額度=同目標學期未退回單合計。**seed_mock 例外**:展示資料用當前學期起訖,今天就看得到格
+- **審查另列的兩項 base 既有 bug 一併修**(活動申請重複草稿、手機登出競態)
 
-### 公告 / 鈴鐺
-- 蓋板「不再顯示」持久化(`announcement_dismissals` 表 + `POST /club/announcements/{id}/dismiss` 冪等)
-- 鈴鐺已讀改水位線(`clubs.announcements_read_at`;`POST /club/announcements/read`);開鈴鐺或進總覽即標已讀
-- 蓋板右上倒數環→X;總覽公告預覽渲染 markdown、鉗兩行、防爆寬
-
-### 活動申請 / 結案
-- 草稿可**部分填寫**(nullable date + status-scoped CHECK;submit/非草稿 update 才檢核完整並列缺漏)
-- 結案照片改「**送出結案時才上傳、不進草稿**」(前端暫存 + SHA-256 去重 + 加總上限;送出失敗回滾已上傳照片)
-- 修「資工系學會-暑期程式馬拉松」結案草稿全白畫面(seed close_draft 誤用 snake_case;已改 camelCase + 前端防護)
-
-### 借用
-- 場況格帶社團名(hover Tooltip);自己審核中→「審核中」(非「我的借用」);**pending 固定借用也顯示**
-- 新增 `GET /club/bookings/availability-range`(批次區間,取代單一場地 15 天檢視的 15 個逐日請求)
-- 最近借用/器材清單改依日期降冪(新在上)
-- 修 `GET /club/members/semesters` 500(`ORDER BY DISTINCT` 非法語法)
-
-### 上傳上限 / 儲存 / 經費科目 / 器材
-- 上傳上限改「**依申請性質給加總上限**」(活動 15 / 報修 100 / 結案照片 10 MB);前端常數移除,改讀 `GET /club/config`
-- 儲存總量改用**實際磁碟可用空間**(移除 capacity/reserve 設定;per-club 保留)
-- 經費科目 `budget_categories` 改 `[{name, hint}]`(hint 移後端;系統設定頁 name+hint 逐列編輯)
-- 器材**移除類別**,點交方式改 `needs_serial`(一般/依序點交);新增 `/admin/equipment` super CRUD;系統設定頁「器材主檔」逐列即時 PATCH;seed 17 項
-- 系統設定頁「儲存」按鈕移回整頁最底(器材主檔卡片改置設定表單前)
+### 主要修復(細節見 REVIEW 檔)
+- 結案:送出/上傳/刪照片統一活動列鎖(refresh with_for_update)、後端擋零照片結案(422);前次送出失敗殘留的孤兒照片顯示為**可移除既有照片**(FileOut 加 sha256 供前端跨集合去重);photosRef eager-ref;照片上限 gate 組態載入
+- 器材主檔:總數欄改 onBlur diff 提交,本地草稿隨 refetch 同步
+- 檔案:`unlink_quiet()` 讓清理性刪檔失敗不再蓋掉 413/409/成功回應;admin_files `capacity/remaining` 改名 `disk_total/disk_free`,前端佔用條加「其他佔用」段(比例對齊真實磁碟)
+- budget_categories 舊 list[str] 殘留讀取端正規化(`get_budget_categories()`)
+- P3-5(migration downgrade CHECK)**實測不成立**:本專案版本的 Alembic 會自動補 CHECK,不修
 
 ## 驗證現況(全綠)
 
-- 後端:`timeout 300 uv run pytest -q` **197 passed**、`ruff check .` 全綠;四個新 migration `alembic up/down/up` 於 dev 庫驗證過(`4290719adc82` / `007931f1afc7` / `ccb5bc27926e` / `33e4dcd04463`)
-- 前端:`pnpm exec tsc -b` 0 錯、`pnpm test` 35 passed、`pnpm lint` 僅 6 個既有 fast-refresh warning
-- dev 庫已 `reset_db + seed_mock`(17 器材、無 115-1 資料、close_draft camelCase)
-
-## 交叉審查(2026-07-17,本輪 changeset)
-
-opus ×3(儲存/上傳、借用/活動/器材、前端)+ codex ×1(gpt-5.6-sol xhigh)已跑完,**無 CRITICAL**。需求方指示**本 session 不修、findings 寫檔、新 session 修復**——完整清單見 **`docs/REVIEW_2026-07-17.md`**。優先待修(P1):
-
-1. 器材主檔「總數」欄每按鍵送 PATCH(應改 onBlur;可能寫中間值)
-2. 結案送出 vs 刪照片跨端點競態 + `/close` 後端未驗證至少一張照片(加列鎖 + 照片數檢核)
-3. 結案送出失敗+重載後孤兒照片無回收路徑(結案表單載入 `detail.photos` 為可移除既有照片)
-4. 固定借用場況「永久佔格」— `RoomBookingRequest` 缺學期界限,pending 納入後放大(需資料模型決策)
-
-P2/P3(次要/polish)與**已接受取捨**(儲存移除 reserve → 共機 DoS 風險,需求方拍板)亦見該檔。新 session 修復時逐項確認後更新該檔。
+- 後端:`timeout 300 uv run pytest -q` **202 passed**、`ruff check .` 全綠;migration `6b5a9c3affd0` up/down/up 驗證過
+- 前端:`pnpm exec tsc -b` 0 錯、`pnpm test` 35 passed、lint 僅既有 fast-refresh warning
+- dev 庫已 `reset_db + seed_mock`
+- 注意:`alembic downgrade base` 在含資料的庫會於第八輪舊 migration(venues category CHECK)失敗,既有限制;新 migration 個別可逆
 
 ## 下一輪待辦 / 待需求方
 
+- **本輪 13 commit 尚未 push**(修復 session 結束時由使用者確認後推)
 - `docs/TASK6_REVIEW_HANDOFF.md` §6 可延後 debt 仍未做(`<Spin>`→Skeleton、`seed_mock --yes` 補 `ENV=dev` guard、inner nginx 信任網段收窄等)
 - EvalResultPage 仍 mock(待需求方規格);staff/viewer panel、首頁導覽頁、Email MJML 模板未動
-- 前端 `bookings/mock.ts` 仍是 admin 借用審核頁的 legacy mock(該頁未接後端);club 端器材已接後端(17 項、無類別)
+- 前端 `bookings/mock.ts` 仍是 admin 借用審核頁的 legacy mock(該頁未接後端)
+- 已接受風險(需求方拍板):磁碟無保留空間 → 共機 DoS,待告警機制
 - 上線切換清單(edge proxy)於 2026-09 執行
 
 ## 環境與慣例提醒
 
 - **多 agent 平行作業絕不可 `git stash`**;跑測試務必包 timeout 且不同時開兩個 pytest
-- 前端 `pnpm exec tsc --noEmit` 是空檢查(solution-style tsconfig),必須 `pnpm exec tsc -b`
+- 前端 `pnpm exec tsc --noEmit` 是空檢查(solution-style tsconfig),必須 `pnpm exec tsc -b`;lint 是 `pnpm run lint`(oxlint)
 - 確認彈窗一律 `lib/confirm.ts`;Modal 一律 open+afterClose 常駐;前端不顯示單號(稽核除外);Commit 英文一行為一 commit、禁元描述;UI 禁 emoji
-- **Python 3.14 lazy annotation**:欄位名若與型別同名(如 `date`)須用別名(`dt.date`),否則 `Mapped[date|None]` 會被靜默解析成 NOT NULL
-- 上傳新端點/新申請性質:加總上限走 `files.total_uploaded()` + 鎖列 + 串流後結算回滾的既有模式(見 activities/applications 上傳端點)
+- **Python 3.14 lazy annotation**:欄位名若與型別同名(如 `date`)須用別名(`dt.date`),否則 `Mapped[date|None]` 會被靜默解析成 NOT NULL(bookings/facilities/activities 均已別名)
+- 上傳新端點/新申請性質:加總上限走 `files.total_uploaded()` + 鎖列 + 串流後結算回滾的既有模式;**清理性 unlink 一律走 `file_service.unlink_quiet()`**
+- 結案照片端點(upload/delete/close)動狀態前先 `db.refresh(activity, attribute_names=["status"], with_for_update=True)` 統一鎖序
+- 測試上傳一律落 per-test 暫存目錄(conftest 全域 autouse `_tmp_upload_dir`),測試檔不必自帶

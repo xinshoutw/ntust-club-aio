@@ -1,4 +1,4 @@
-# Session Handoff(2026-07-17,第十二輪:全庫審計 + 同日修復)
+# Session Handoff(2026-07-17,第十二輪:全庫審計 + 修復 + pt/viewer 原型)
 
 > 給下一個 session 的交接快照。永久性專案知識在三層 `AGENTS.md` 與 `docs/architecture.md`、`docs/data-model.md`、`docs/design-guide.md`;本檔只記「現在進行到哪、接下來做什麼」。過期即刪。
 
@@ -23,15 +23,33 @@
 - 申請狀態機**無退回動作**(需求方只點名兩個新狀態;不合格申請由學務處線下溝通)
 - 器材**核准端**維持「可借數不足仍可核准(管理員裁量)」——審查建議改硬性 409,但既有測試明文此為刻意設計,未動,**待拍板**
 
+## 簽核流程重做(需求方 2026-07-17 拍板,**規格已定、尚未實作**)
+
+角色模型目標:club / **staff=工作人員**(現行 admin 改名;新增頭銜欄位擇一「承辦/組長/學務長」顯示於 header 姓名後方;`superadmin` bool=現行 is_super 語意,帳號面板**不可**授予/移除,由 sh 腳本對 login account promote/revoke)/ **pt=工讀生**(現行 role 代號 staff 改名)/ viewer=評審。頭銜管簽核關卡、permissions 管頁面權限,**並存**。
+
+活動申請簽核(取代現行 advisor/chief/dean 語意,**輔導老師退出流程**):
+- 經費合計 0 → 單關(**承辦**);有經費 → 三關 **承辦→組長→學務長**
+- 每關:核准(**逐項**核定經費,如申請 100/50/40 可核 100/20/0)、退回(必填原因)、調整大型活動 checkbox
+- **退回=退上一級**:學務長退回→學務長不通過+組長強制回審核中(社團不可介入);組長退回→承辦回審核中;**承辦退回才到社團**(可改內容/補件/整個換掉,重新送審=**從頭走**)
+- 刪除:**草稿可刪、退回到社團手上可刪;審核中不可刪**
+- 同頭銜多人平行,一人通過即該關通過;通過/不通過標記下方顯示**處理人姓名**;**社團端也要顯示關卡人員**(推翻先前「不顯示關卡老師」決議,參考 staff 端設計語言)
+- 結案:**承辦單關**;退回可補件重送、不可刪除活動
+
 ## 驗證現況(全綠)
 
 - 後端:`timeout 300 uv run pytest -q` **211 passed**、`ruff check .` 全綠;migration `9d4b7e2c5a18` up/down/up 於 dev 庫驗證過
 - 前端:`pnpm exec tsc -b` 0 錯、`pnpm test` 35 passed、lint 僅既有 fast-refresh warning
 - dev 庫已 `seed_mock --yes` 重灌(含 ApplicationStatus 新值域)
 
+## pt/viewer 基礎原型(2026-07-17 已落地)
+
+- **工讀生端五頁**(`features/pt/`,路由 `/pt/*`,現行 role=staff 登入直入,badge「工讀生」):違規勸導填寫/違規紀錄查詢/器材借出點交(借用人+依序點交序號)/器材歸還點交(歸還人)/逾期追蹤;**評審端三頁**(`features/viewer/`,`/viewer/*`,badge「評審」):我負責的評分/評分依獎項(細項配分彈窗,award 持久於 URL)/已完成評分
+- 皆 mock+toast(比照當年 club/admin 頁流程);viewer 細項配分為示意,接線時以評分標準 PDF/後端為準;`/coming-soon` 已無角色使用(留作 fallback)
+
 ## 下一輪待辦 / 待需求方
 
-- **本輪 16 commit 尚未 push**(使用者確認後推)
+- **簽核流程重做**(上節規格):狀態機/角色代號改名(admin→staff、staff→pt)/頭銜欄位/superadmin sh 腳本/逐項核定經費 UI/社團端關卡人員顯示——**其他待辦的處理方法需求方會再給**,勿自行擴scope
+- **本輪 commit 尚未 push**(使用者確認後推)
 - **待需求方拍板**(見上「待追認」+):`aclose` 是否涵蓋結案核准、場況「已核准蓋過審核中」維持否、器材核准硬性檢核
 - REVIEW_full 的 **P2**:lib 純函式測試補強(permissions/semester/csv/uploads/roles)、`INVALID_SORT` 守門測試、PERIODS/semester/MIN_PHOTOS 單源化、notify helper 與分頁樣板抽取、mock 死碼清除(5 檔零引用+activities/bookings mock 瘦身)
 - REVIEW_full 的 **P3**:AGENTS.md 重組(247→~120 行提案在報告 §8)、data-model §3.aa 儲存節改寫等文件對齊(§9,每筆已標判定方向)、TASK6/REVIEW 歸檔、`.gitignore` 補 `.claude/`

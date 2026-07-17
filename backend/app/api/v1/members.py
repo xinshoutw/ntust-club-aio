@@ -177,7 +177,10 @@ async def import_members(
     }
     seen: set[str] = set()
 
-    for line_no, row in enumerate(csv.reader(io.StringIO(body.csv_text)), start=1):
+    # 剝除 UTF-8 BOM:匯出檔為 Excel 相容而前置 BOM,原樣貼回/上傳匯入時
+    # str.strip() 不會移除 U+FEFF,首列第一欄姓名會被污染成帶 BOM 前綴的值
+    csv_text = body.csv_text.lstrip("﻿")
+    for line_no, row in enumerate(csv.reader(io.StringIO(csv_text)), start=1):
         cells = [c.strip() for c in row]
         if not any(cells):
             continue

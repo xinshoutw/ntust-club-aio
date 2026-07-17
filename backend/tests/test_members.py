@@ -244,3 +244,18 @@ async def test_list_semesters_distinct_desc(client, db):
     resp = await client.get("/api/v1/club/members/semesters")
     assert resp.status_code == 200
     assert resp.json()["data"] == ["114-2", "114-1", "113-2"]
+
+
+async def test_csv_import_strips_bom(client, db):
+    """匯出檔前置 UTF-8 BOM(Excel 相容),原樣匯入時首列姓名不得被 BOM 污染。"""
+    await setup_club_session(client, db)
+    resp = await client.post(
+        "/api/v1/club/members/import",
+        json={"csv_text": "﻿陳大文,B11109001,社員", "semester": "114-2"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["created"] == 1
+
+    listing = (await client.get("/api/v1/club/members", params={"semester": "114-2"})).json()
+    assert listing["data"][0]["name"] == "陳大文"

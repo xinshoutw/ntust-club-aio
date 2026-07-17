@@ -12,11 +12,12 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from app.api.pagination import Pagination, parse_sort
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, not_found
-from app.models import ApprovalRecord, Club, RoomBookingRequest, Venue
+from app.models import ApprovalRecord, Club, RoomBookingRequest, RoomBookingSlot, Venue
 from app.models.enums import ApprovalDecision, ApprovalSubject, BookingStatus
 from app.schemas.admin import AdminRoomBookingOut, RejectIn
 from app.schemas.common import ApiResponse
 from app.services import audit, notify
+from app.services import booking_service as svc
 
 router = APIRouter(prefix="/admin/room-bookings", tags=["admin"])
 
@@ -111,6 +112,24 @@ async def approve_room_booking(
     background: BackgroundTasks,
 ) -> ApiResponse[AdminRoomBookingOut]:
     booking = await _pending_request(db, request_id)
+    # 核准前確認同場地同學期沒有已核准單佔用相同(星期,節次);advisory lock 序列化並發核准
+    # (整單擇一是人工判斷,但「已核准 vs 再核准」的重疊必須由系統擋下)
+    await svc.lock_resource(db, "room", booking.venue_id)
+    pairs = [(s.weekday, s.period) for s in booking.slots]
+    taken = await db.scalar(
+        sa.select(sa.func.count())
+        .select_from(RoomBookingSlot)
+        .join(RoomBookingRequest, RoomBookingRequest.id == RoomBookingSlot.request_id)
+        .where(
+            RoomBookingRequest.venue_id == booking.venue_id,
+            RoomBookingRequest.status == BookingStatus.APPROVED,
+            RoomBookingRequest.start_date <= booking.end_date,
+            RoomBookingRequest.end_date >= booking.start_date,
+            sa.tuple_(RoomBookingSlot.weekday, RoomBookingSlot.period).in_(pairs),
+        )
+    )
+    if taken:
+        raise conflict("該場地已有已核准的固定借用佔用相同時段", code="SLOT_TAKEN")
     booking.status = BookingStatus.APPROVED
     _record_approval(db, booking.id, ApprovalDecision.APPROVE, user)
     audit.record(

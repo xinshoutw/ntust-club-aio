@@ -156,6 +156,19 @@ async def approve_venue_booking(
     background: BackgroundTasks,
 ) -> ApiResponse[AdminVenueBookingOut]:
     booking = await _pending_venue_booking(db, booking_id)
+    # 核准前確認同場地同日時段沒有已核准的借用;advisory lock 序列化並發核准
+    # (兩張互相衝突的待審單各自持有自己的列鎖,擋不住彼此)
+    await svc.lock_resource(db, "venue", booking.venue_id)
+    taken = await db.scalar(
+        sa.select(sa.func.count()).where(
+            VenueBooking.venue_id == booking.venue_id,
+            VenueBooking.date == booking.date,
+            VenueBooking.status == BookingStatus.APPROVED,
+            VenueBooking.periods.op("&&")(booking.periods),
+        )
+    )
+    if taken:
+        raise conflict("該場地時段已有已核准的借用", code="SLOT_TAKEN")
     booking.status = BookingStatus.APPROVED
     _record_approval(
         db, ApprovalSubject.VENUE_BOOKING, booking.id, ApprovalDecision.APPROVE, user
@@ -297,6 +310,8 @@ async def approve_equipment_loan(
     background: BackgroundTasks,
 ) -> ApiResponse[AdminEquipmentLoanOut]:
     loan = await _pending_loan(db, loan_id)
+    equipment = await db.get(Equipment, loan.equipment_id)
+    # 可借數不足仍可核准(管理員裁量,列表紅字警示提示);是否改硬性檢核待需求方拍板
     loan.status = LoanStatus.APPROVED
     _record_approval(db, ApprovalSubject.EQUIPMENT_LOAN, loan.id, ApprovalDecision.APPROVE, user)
     audit.record(
@@ -308,7 +323,6 @@ async def approve_equipment_loan(
     )
     await db.commit()
 
-    equipment = await db.get(Equipment, loan.equipment_id)
     await _notify_club(
         background,
         db,

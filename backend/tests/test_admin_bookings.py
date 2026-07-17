@@ -358,3 +358,38 @@ async def test_admin_availability_grid_with_booking_ids(client, db):
     assert (
         await client.get("/api/v1/admin/bookings/availability", params={"date": "bad"})
     ).status_code == 422
+
+
+# ---- 核准衝突/可借數硬性檢核(2026-07-17 第十二輪) ----
+
+
+async def test_venue_approve_blocks_approved_overlap(client, db):
+    """核准前檢核:同場地同日已有核准單佔用重疊節次 → 409;不重疊照常核准。"""
+    club, other_club = await seed(client, db)
+    venue = await make_venue(db)
+    rows = [
+        VenueBooking(club_id=club.id, venue_id=venue.id, activity_id=None,
+                     date=date(2026, 3, 7), periods=["3", "4"], purpose="擺攤",
+                     status="approved"),
+        VenueBooking(club_id=other_club.id, venue_id=venue.id, activity_id=None,
+                     date=date(2026, 3, 7), periods=["4", "5"], purpose="社課"),
+        VenueBooking(club_id=other_club.id, venue_id=venue.id, activity_id=None,
+                     date=date(2026, 3, 7), periods=["6"], purpose="彩排"),
+    ]
+    db.add_all(rows)
+    await db.commit()
+    for row in rows:
+        await db.refresh(row)
+    _, overlap, free = rows
+
+    resp = await client.post(
+        f"/api/v1/admin/venue-bookings/{overlap.id}/approve", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 409
+    assert resp.json()["meta"]["code"] == "SLOT_TAKEN"
+
+    resp = await client.post(
+        f"/api/v1/admin/venue-bookings/{free.id}/approve", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200
+

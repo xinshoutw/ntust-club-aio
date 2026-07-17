@@ -64,6 +64,19 @@ def fixed_window_open(window: dict, now: datetime | None = None) -> bool:
     return date.fromisoformat(open_from) <= today <= date.fromisoformat(open_until)
 
 
+# 資源層 advisory lock:序列化「可用量/衝突檢核 → 寫入」的關鍵區段(隨交易釋放)。
+# 申請/核准端點的列鎖只鎖單筆申請,擋不住兩筆不同申請並發通過同一份佔用量檢核;
+# 以 (namespace, resource_id) 鎖資源本身,申請端與核准端用同一把鍵
+_LOCK_NS = {"equipment": 411001, "venue": 411002, "room": 411003}
+
+
+async def lock_resource(db: AsyncSession, kind: str, resource_id: int) -> None:
+    await db.execute(
+        sa.text("SELECT pg_advisory_xact_lock(:ns, :id)"),
+        {"ns": _LOCK_NS[kind], "id": resource_id},
+    )
+
+
 async def equipment_available(db: AsyncSession, equipment_id: int, total_qty: int) -> int:
     """目前可借數 = total − 借出中數量(推導不儲存;未指定活動區間時的粗略值)。"""
     out = await db.scalar(

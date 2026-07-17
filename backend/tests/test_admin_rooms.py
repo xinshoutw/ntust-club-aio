@@ -128,3 +128,15 @@ async def test_approve_and_reject_whole_request(client, db):
     }
     actions = set(await db.scalars(sa.select(AuditLog.action)))
     assert {"room_booking_approved", "room_booking_rejected"} <= actions
+
+
+async def test_room_approve_blocks_approved_overlap(client, db):
+    """核准 first 後,slots 重疊且同目標學期的 second 不可再核准(2026-07-17 第十二輪)。"""
+    first, second, _ = await seed(client, db)
+
+    resp = await client.post(f"{URL}/{first.id}/approve", headers=csrf_headers(client))
+    assert resp.status_code == 200
+
+    resp = await client.post(f"{URL}/{second.id}/approve", headers=csrf_headers(client))
+    assert resp.status_code == 409
+    assert resp.json()["meta"]["code"] == "SLOT_TAKEN"

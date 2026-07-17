@@ -180,8 +180,8 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
             style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', font: 'inherit' }}
             onClick={() =>
               guarded(() => {
-                logout()
-                navigate('/login', { replace: true })
+                // 與桌面選單一致:session 銷毀完成才導頁,避免 /login 又被既有 session 彈回
+                void logout().then(() => navigate('/login', { replace: true }))
               })
             }
           >

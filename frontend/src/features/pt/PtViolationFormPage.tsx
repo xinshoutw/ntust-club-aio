@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { App, Button, Checkbox, DatePicker, Form, Input, Select } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import { CLUBS, VIOLATION_ITEMS } from './mock'
@@ -8,7 +7,6 @@ import { CLUBS, VIOLATION_ITEMS } from './mock'
 export default function PtViolationFormPage() {
   const { message } = App.useApp()
   const [form] = Form.useForm()
-  const [submitting, setSubmitting] = useState(false)
 
   return (
     <div>
@@ -20,13 +18,9 @@ export default function PtViolationFormPage() {
           layout="vertical"
           requiredMark
           onFinish={() => {
-            setSubmitting(true)
-            // mock:接後端時改 mutation
-            setTimeout(() => {
-              setSubmitting(false)
-              message.success('違規勸導已送出')
-              form.resetFields()
-            }, 300)
+            // mock:接後端時改 mutation(送出鈕 loading=isPending)
+            message.success('違規勸導已送出')
+            form.resetFields()
           }}
         >
           <Form.Item name="club" label="社團" rules={[{ required: true, message: '請選擇社團' }]}>
@@ -56,7 +50,7 @@ export default function PtViolationFormPage() {
             <Input.TextArea rows={3} maxLength={500} placeholder="選填" />
           </Form.Item>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <Button type="primary" htmlType="submit" loading={submitting}>
+            <Button type="primary" htmlType="submit">
               送出勸導
             </Button>
           </div>

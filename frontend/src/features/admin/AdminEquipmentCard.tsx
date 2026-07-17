@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { App, Button, Input, InputNumber, Select, Spin, Switch } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import QueryError from '../../components/ui/QueryError'
@@ -12,11 +12,16 @@ import {
 const sectionTitle: React.CSSProperties = { fontSize: 15, fontWeight: 600, marginBottom: 14 }
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
-// 每列欄位變更即各自 PATCH(數量/名稱/類別/序號登記/啟用);新增於底部一列
+// 每列以本地草稿編輯,blur 有差異才 PATCH(打字中不送出中間值);
+// 點交方式/啟用為離散控制,變更即 PATCH。新增於底部一列
 function EquipmentRow({ item }: { item: EquipmentItem }) {
   const { message } = App.useApp()
   const { update } = useEquipmentMutations()
   const [name, setName] = useState(item.name)
+  const [qty, setQty] = useState<number | null>(item.totalQty)
+  // refetch 帶回他人的改動時同步本地草稿(避免停在舊值、互蓋)
+  useEffect(() => setName(item.name), [item.name])
+  useEffect(() => setQty(item.totalQty), [item.totalQty])
 
   const patch = (p: Parameters<typeof update.mutate>[0]['patch']) =>
     update.mutate(
@@ -32,7 +37,14 @@ function EquipmentRow({ item }: { item: EquipmentItem }) {
       <Input
         value={name}
         onChange={(e) => setName(e.target.value)}
-        onBlur={() => name.trim() && name !== item.name && patch({ name: name.trim() })}
+        onBlur={() => {
+          const trimmed = name.trim()
+          if (!trimmed) {
+            setName(item.name) // 清空不送出,回權威值
+            return
+          }
+          if (trimmed !== item.name) patch({ name: trimmed })
+        }}
         style={{ flex: 1, minWidth: 120 }}
         aria-label="器材名稱"
       />
@@ -44,10 +56,17 @@ function EquipmentRow({ item }: { item: EquipmentItem }) {
         aria-label="點交方式"
       />
       <InputNumber
-        value={item.totalQty}
+        value={qty}
         min={0}
         precision={0}
-        onChange={(v) => v != null && v !== item.totalQty && patch({ totalQty: v })}
+        onChange={setQty}
+        onBlur={() => {
+          if (qty == null) {
+            setQty(item.totalQty) // 清空不送出,回權威值
+            return
+          }
+          if (qty !== item.totalQty) patch({ totalQty: qty })
+        }}
         style={{ width: 90, flexShrink: 0 }}
         aria-label="總數"
       />

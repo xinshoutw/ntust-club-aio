@@ -1,4 +1,4 @@
-from datetime import date
+import datetime as dt
 from typing import Any
 
 import sqlalchemy as sa
@@ -43,7 +43,7 @@ class Holiday(Base, TimestampMixin):
 
     __tablename__ = "holidays"
 
-    date: Mapped[date] = mapped_column(sa.Date, primary_key=True)
+    date: Mapped[dt.date] = mapped_column(sa.Date, primary_key=True)
     name: Mapped[str] = mapped_column(sa.Text)
 
 

@@ -1,4 +1,4 @@
-from datetime import date, datetime
+import datetime as dt
 
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import ARRAY
@@ -57,7 +57,7 @@ class VenueBooking(Base, TimestampMixin):
     venue_id: Mapped[int] = mapped_column(sa.ForeignKey("venues.id"))  # allow_temp
     # 綁定審核通過活動(2026-07-15 第六輪前端必選;NULL 容舊資料,新申請應用層必填)
     activity_id: Mapped[int | None] = mapped_column(sa.ForeignKey("activities.id"))
-    date: Mapped[date] = mapped_column(sa.Date)
+    date: Mapped[dt.date] = mapped_column(sa.Date)
     periods: Mapped[list[str]] = mapped_column(ARRAY(sa.String(2)))  # 複選節次
     purpose: Mapped[str] = mapped_column(sa.Text)  # 用途必填(2026-07-15)
     status: Mapped[BookingStatus] = mapped_column(
@@ -80,19 +80,19 @@ class EquipmentLoan(Base, TimestampMixin):
     equipment_id: Mapped[int] = mapped_column(sa.ForeignKey("equipment.id"), index=True)
     activity_id: Mapped[int] = mapped_column(sa.ForeignKey("activities.id"), index=True)
     qty: Mapped[int] = mapped_column()
-    start_date: Mapped[date] = mapped_column(sa.Date)  # 推導:活動開始日 −N 個工作天
-    end_date: Mapped[date] = mapped_column(sa.Date)  # 推導:活動結束日 +M 個工作天
+    start_date: Mapped[dt.date] = mapped_column(sa.Date)  # 推導:活動開始日 −N 個工作天
+    end_date: Mapped[dt.date] = mapped_column(sa.Date)  # 推導:活動結束日 +M 個工作天
     purpose: Mapped[str] = mapped_column(sa.Text)
     status: Mapped[LoanStatus] = mapped_column(
         db_enum(LoanStatus, "loan_status"), default=LoanStatus.PENDING
     )
     # 借出點交(工讀生;需序號類登記序號)
     checkout_by: Mapped[int | None] = mapped_column(sa.ForeignKey("users.id"))
-    checkout_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    checkout_at: Mapped[dt.datetime | None] = mapped_column(sa.DateTime(timezone=True))
     serials: Mapped[list[str] | None] = mapped_column(ARRAY(sa.Text))
     borrower_name: Mapped[str | None] = mapped_column(sa.Text)  # 借用人(借出點交時登記)
     # 歸還點交
     checkin_by: Mapped[int | None] = mapped_column(sa.ForeignKey("users.id"))
-    checkin_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    checkin_at: Mapped[dt.datetime | None] = mapped_column(sa.DateTime(timezone=True))
     checkin_note: Mapped[str | None] = mapped_column(sa.Text)
     returner_name: Mapped[str | None] = mapped_column(sa.Text)  # 歸還人(歸還點交時登記)

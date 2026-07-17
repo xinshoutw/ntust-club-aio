@@ -2,7 +2,10 @@ import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { App, Button, InputNumber, Modal, Select } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
+import { Pager } from '../../components/ui/tableControls'
 import { ASSIGNMENTS, type AwardAssignment } from './mock'
+
+const PAGE_SIZE = 20
 
 // 評分(依獎項)(評審端基礎原型):選獎項 → 逐社團開評分彈窗填各細項。
 // mock:分數僅存本地 state;獎項選取持久於 URL(?award=)
@@ -12,17 +15,21 @@ export default function ViewerScorePage() {
   const awardKey = params.get('award') ?? ASSIGNMENTS[0].key
   const award: AwardAssignment = ASSIGNMENTS.find((a) => a.key === awardKey) ?? ASSIGNMENTS[0]
 
-  // scored[club] = 各細項分數(mock 本地暫存)
+  // scored[`${award}:${club}`] = 各細項分數(mock 本地暫存)。
+  // 鍵含獎項:同一社團可能出現在多個獎項分組,單以社團名為鍵會跨獎互相污染
+  // (後端 ReviewScore 唯一鍵亦為 year+award+club+reviewer)
   const [scored, setScored] = useState<Record<string, Record<string, number>>>({})
+  const scoreKey = (club: string) => `${award.key}:${club}`
   const [selectedClub, setSelectedClub] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState<Record<string, number | null>>({})
+  const [page, setPage] = useState(1)
 
   const openClub = (club: string) => {
     setSelectedClub(club)
     setDraft(
       Object.fromEntries(
-        award.items.map((i) => [i.key, scored[club]?.[i.key] ?? null]),
+        award.items.map((i) => [i.key, scored[scoreKey(club)]?.[i.key] ?? null]),
       ),
     )
     setOpen(true)
@@ -41,7 +48,9 @@ export default function ViewerScorePage() {
     }
     setScored((prev) => ({
       ...prev,
-      [selectedClub]: Object.fromEntries(award.items.map((i) => [i.key, draft[i.key] as number])),
+      [scoreKey(selectedClub)]: Object.fromEntries(
+        award.items.map((i) => [i.key, draft[i.key] as number]),
+      ),
     }))
     setOpen(false)
     message.success(`${selectedClub} 評分已儲存(合計 ${total} 分)`)
@@ -56,7 +65,10 @@ export default function ViewerScorePage() {
             size="small"
             value={award.key}
             style={{ width: 200 }}
-            onChange={(v) => setParams({ award: v })}
+            onChange={(v) => {
+              setParams({ award: v })
+              setPage(1)
+            }}
             options={ASSIGNMENTS.map((a) => ({ value: a.key, label: a.label }))}
           />
         }
@@ -72,8 +84,8 @@ export default function ViewerScorePage() {
             </tr>
           </thead>
           <tbody>
-            {award.clubs.map((club) => {
-              const s = scored[club]
+            {award.clubs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((club) => {
+              const s = scored[scoreKey(club)]
               const sum = s ? Object.values(s).reduce((a, b) => a + b, 0) : null
               return (
                 <tr key={club} className="click-tint" style={{ cursor: 'pointer' }} onClick={() => openClub(club)}>
@@ -85,8 +97,14 @@ export default function ViewerScorePage() {
                 </tr>
               )
             })}
+            {award.clubs.length === 0 && (
+              <tr className="no-hover">
+                <td colSpan={3} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>此獎項沒有受評社團</td>
+              </tr>
+            )}
           </tbody>
         </table>
+        <Pager page={page} pageSize={PAGE_SIZE} total={award.clubs.length} onChange={setPage} />
       </div>
 
       <Modal

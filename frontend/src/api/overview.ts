@@ -2,7 +2,7 @@
 // (照原 mock 邏輯:結案期限=活動結束日 +1 個月,推導不儲存)
 import { useQuery } from '@tanstack/react-query'
 import dayjs, { type Dayjs } from 'dayjs'
-import { apiPaged, qs } from './client'
+import { fetchAllPages } from './fetchAll'
 import type { StatusKey } from '../lib/status'
 
 export interface OverviewTodo {
@@ -53,9 +53,7 @@ export function useOverviewActivities() {
   return useQuery({
     queryKey: overviewKeys.activities,
     queryFn: async () => {
-      const { data } = await apiPaged<ActivityOut[]>(
-        `/club/activities${qs({ page: 1, page_size: 100 })}`,
-      )
+      const data = await fetchAllPages<ActivityOut>('/club/activities')
       const today = dayjs().startOf('day')
       const todos: OverviewTodo[] = data
         .filter((a) => a.close_locked || a.can_close)

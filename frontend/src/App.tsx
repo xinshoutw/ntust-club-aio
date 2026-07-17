@@ -45,6 +45,7 @@ import OverduePage from './features/admin/OverduePage'
 import AdminEvalPage from './features/admin/AdminEvalPage'
 import AccountsPage from './features/admin/AccountsPage'
 import AdminFilesPage from './features/admin/AdminFilesPage'
+import AdminApplicationsPage from './features/admin/AdminApplicationsPage'
 import AdminMaintenancePage from './features/admin/AdminMaintenancePage'
 import AdminSettingsPage from './features/admin/AdminSettingsPage'
 import AdminViolationsPage from './features/admin/AdminViolationsPage'
@@ -184,6 +185,7 @@ export default function App() {
           <Route path="overdue" element={<OverduePage />} />
           <Route path="eval" element={<AdminEvalPage />} />
           <Route path="accounts" element={<AccountsPage />} />
+          <Route path="applications" element={<AdminApplicationsPage />} />
           <Route path="maintenance" element={<AdminMaintenancePage />} />
           <Route path="violations" element={<AdminViolationsPage />} />
           <Route path="files" element={<AdminFilesPage />} />

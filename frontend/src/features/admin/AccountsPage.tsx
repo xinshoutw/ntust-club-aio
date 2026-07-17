@@ -24,6 +24,7 @@ const PERMISSION_KEYS = [
   ['amember', '社團管理'],
   ['aeval', '行政分審核'],
   ['amaint', '維修管理'],
+  ['aapply', '線上申請管理'],
   ['aviol', '違規管理'],
   ['afiles', '檔案管理'],
 ] as const

@@ -19,6 +19,7 @@ const ROUTE_KEYS: [string, string[]][] = [
   ['/admin/eval', ['aeval']],
   ['/admin/accounts', []],
   ['/admin/maintenance', ['amaint']],
+  ['/admin/applications', ['aapply']],
   ['/admin/violations', ['aviol']],
   ['/admin/files', ['afiles']],
   ['/admin/settings', []],

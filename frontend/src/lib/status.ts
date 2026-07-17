@@ -19,6 +19,8 @@ export type StatusKey =
   | 'returned'
   | 'overdue'
   | 'done'
+  | 'processing'
+  | 'completed'
   | 'violation_open'
   | 'violation_resolved'
 
@@ -44,6 +46,9 @@ export const STATUS: Record<StatusKey, StatusStyle> = {
   rejected: { label: '已退回', fg: '#B03A2E', bg: '#FBE9E7' },
   locked: { label: '已逾期', fg: '#A3341F', bg: '#F9E4DE', withLock: true },
   in_progress: { label: '處理中', fg: '#1D5A9E', bg: '#E8F0FB' },
+  // 幹部證明/郵局帳戶異動(2026-07-17 需求方拍板):審核中 → 處理中 → 請洽學務處
+  processing: { label: '處理中', fg: '#1D5A9E', bg: '#E8F0FB' },
+  completed: { label: '請洽學務處', fg: '#1F6B45', bg: '#E3F2E9', border: 'rgba(31,107,69,.4)' },
   open: { label: '開放中', fg: '#1F6B45', bg: '#E3F2E9', border: 'rgba(31,107,69,.4)' },
   ended: { label: '已截止', fg: '#3A3F4A', bg: '#E8EAEE' },
   registered: { label: '已報名', fg: '#1D5A9E', bg: '#E8F0FB' },

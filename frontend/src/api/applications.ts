@@ -130,7 +130,7 @@ interface PostalChangeOut {
   account_number: string
   new_agent_name: string | null
   new_agent_phone: string | null
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'processing' | 'completed'
   created_at: string
 }
 
@@ -222,7 +222,7 @@ interface OfficerCertOut {
   term: string
   position: string
   applicant_name: string
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'processing' | 'completed'
   created_at: string
 }
 

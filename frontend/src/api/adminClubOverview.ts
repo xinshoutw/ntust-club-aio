@@ -188,7 +188,7 @@ export function useAdminEquipmentLoanList(p: LoanListParams, canView = true) {
   })
 }
 
-// ---- 線上申請:空間報修(幹部證明尚無 admin 端點,暫不列) ----
+// ---- 線上申請:空間報修(幹部證明/郵局異動由 /admin/applications 管理頁承載,本頁暫不列) ----
 
 export interface AdminMaintenanceRow {
   id: number

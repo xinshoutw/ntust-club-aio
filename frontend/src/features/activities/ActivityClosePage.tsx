@@ -20,6 +20,7 @@ import {
   type CloseSubmitInput,
 } from '../../api/activities'
 import { useClubConfig } from '../../api/clubConfig'
+import type { EvalFile } from '../eval/types'
 import type { Reflection } from './types'
 import { TIME_RANGE_SEP, dateRangeText } from './utils'
 import './actform.css'
@@ -39,8 +40,6 @@ interface PhotoBag {
 const isReflectEmpty = (r: ReflectRow) => !r.name.trim() && !r.dept.trim() && !r.text.trim()
 const MIN_REFLECTIONS = 3
 const MIN_PHOTOS = 5
-// 結案照片加總上限:後端組態供給(system_settings 為權威值);組態未載入前的保底值
-const CLOSE_PHOTO_FALLBACK_BYTES = 10 * 1024 * 1024
 
 const label: React.CSSProperties = { fontSize: 13, fontWeight: 500, marginBottom: 6 }
 const requiredMark = <span style={{ color: '#C13B34' }}> *</span>
@@ -72,6 +71,9 @@ export default function ActivityClosePage() {
   const selectedId = rawId ? Number(rawId) : undefined
   const activity = closable.find((a) => a.id === selectedId)
   const detailQuery = useActivityDetail(activity?.id)
+  // 照片加總上限來自後端組態(system_settings 為權威);表單以組態載入為前置條件,
+  // 不再用前端保底常數(與 ActivityFormPage 的組態 gate 一致)
+  const configQuery = useClubConfig()
 
   return (
     <div>
@@ -144,11 +146,21 @@ export default function ActivityClosePage() {
       )}
 
       {activity &&
-        (detailQuery.data ? (
-          <CloseForm key={activity.id} activity={activity} detail={detailQuery.data} onDone={() => navigate('/activities')} />
+        (detailQuery.data && configQuery.data ? (
+          <CloseForm
+            key={activity.id}
+            activity={activity}
+            detail={detailQuery.data}
+            closePhotoBytes={configQuery.data.uploadLimits.closePhotoBytes}
+            onDone={() => navigate('/activities')}
+          />
         ) : detailQuery.isError ? (
           <div style={{ marginTop: 20 }}>
             <QueryError title="活動資料載入失敗" error={detailQuery.error} onRetry={() => void detailQuery.refetch()} />
+          </div>
+        ) : configQuery.isError ? (
+          <div style={{ marginTop: 20 }}>
+            <QueryError title="系統組態載入失敗" error={configQuery.error} onRetry={() => void configQuery.refetch()} />
           </div>
         ) : (
           <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
@@ -162,10 +174,12 @@ export default function ActivityClosePage() {
 function CloseForm({
   activity,
   detail,
+  closePhotoBytes,
   onDone,
 }: {
   activity: ClubActivity
   detail: ClubActivityDetail
+  closePhotoBytes: number
   onDone: () => void
 }) {
   const { message } = App.useApp()
@@ -220,8 +234,12 @@ function CloseForm({
   })
 
   // 照片一律「送出結案時」才上傳,不進草稿(2026-07-17 需求方);此前僅暫存於前端。
-  // 頁內去重以 SHA-256、加總容量上限皆於選檔時檢核;跨活動重複由後端 sha256 於送出時拒絕
-  const closePhotoBytes = useClubConfig().data?.uploadLimits.closePhotoBytes ?? CLOSE_PHOTO_FALLBACK_BYTES
+  // 頁內去重以 SHA-256、加總容量上限皆於選檔時檢核;跨活動重複由後端 sha256 於送出時拒絕。
+  // APPROVED 狀態下 detail.photos 只會是「前次送出失敗殘留」的孤兒照片:
+  // 顯示為可移除的既有照片(佔加總與張數),使用者才能回收額度、避免重選同張被去重卡死
+  const [existing, setExisting] = useState<EvalFile[]>(() => detail.photos)
+  const existingRef = useRef(existing)
+  existingRef.current = existing
   const [photos, setPhotos] = useState<PhotoBag[]>([])
   const photoKeyRef = useRef(0)
   const photoQueue = useRef(Promise.resolve())
@@ -247,13 +265,18 @@ function CloseForm({
           return
         }
         const cur = photosRef.current
-        const total = cur.reduce((s, p) => s + p.file.size, 0)
+        const total =
+          cur.reduce((s, p) => s + p.file.size, 0) +
+          existingRef.current.reduce((s, p) => s + p.size, 0)
         if (total + f.size > closePhotoBytes) {
           message.error(`照片合計超過 ${Math.round(closePhotoBytes / 1024 / 1024)} MB 上限`)
           return
         }
         const hash = await sha256(f)
-        if (photosRef.current.some((p) => p.hash === hash)) {
+        if (
+          photosRef.current.some((p) => p.hash === hash) ||
+          existingRef.current.some((p) => p.hash === hash)
+        ) {
           message.error(`「${f.name}」與已選照片內容相同,已略過`)
           return
         }
@@ -272,6 +295,18 @@ function CloseForm({
     const target = photosRef.current.find((p) => p.key === key)
     if (target) URL.revokeObjectURL(target.url)
     commitPhotos(photosRef.current.filter((p) => p.key !== key))
+  }
+
+  // 既有照片=前次送出失敗的殘留,移除即後端刪檔(回收加總額度)
+  const removeExisting = async (f: EvalFile) => {
+    try {
+      await deleteActivityPhoto(activity.id, f.id)
+      setExisting((xs) => xs.filter((x) => x.id !== f.id))
+      invalidate()
+      message.success('已移除照片')
+    } catch (e) {
+      message.error(errMsg(e))
+    }
   }
 
   // 自動增列:填寫尾列即補一列;blur 離開列時移除空列(保底 3 列)
@@ -352,7 +387,7 @@ function CloseForm({
     } else if (complete.length < MIN_REFLECTIONS) {
       missing.push(['reflections', `學習心得至少需 ${MIN_REFLECTIONS} 位本校學生`])
     }
-    if (photos.length === 0) missing.push(['photos', '請上傳「活動照片」'])
+    if (existing.length + photos.length === 0) missing.push(['photos', '請上傳「活動照片」'])
     if (expense == null) missing.push(['expense', '請填寫「實際支出」'])
     if (missing.length === 0) {
       if (!dayjs(actualEnd, 'HH:mm').isAfter(dayjs(actualStart, 'HH:mm'))) {
@@ -375,7 +410,7 @@ function CloseForm({
       return
     }
     setErrors(new Set())
-    if (photos.length < MIN_PHOTOS && !videoLink.trim()) {
+    if (existing.length + photos.length < MIN_PHOTOS && !videoLink.trim()) {
       message.warning(`照片未達 ${MIN_PHOTOS} 張且無影片連結，評鑑項目「照片 / 影片」將不計分`)
     }
 
@@ -681,6 +716,20 @@ function CloseForm({
                 className={errors.has('photos') ? 'area-error' : undefined}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: 6, margin: -6, border: '1px solid transparent', borderRadius: 6 }}
               >
+                {existing.map((f) => (
+                  <span key={f.id} style={{ position: 'relative', display: 'inline-flex' }}>
+                    <img src={f.url} alt={f.name} title={`${f.name}(前次送出殘留,已在伺服器)`} style={{ width: 52, height: 40, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--line)' }} />
+                    <button
+                      type="button"
+                      className="link-btn danger"
+                      aria-label={`移除 ${f.name}`}
+                      style={{ position: 'absolute', top: -6, right: -6, background: '#fff', border: '1px solid var(--line)', borderRadius: '50%', width: 16, height: 16, lineHeight: '12px', padding: 0, fontSize: 11 }}
+                      onClick={() => void removeExisting(f)}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
                 {photos.map((p) => (
                   <span key={p.key} style={{ position: 'relative', display: 'inline-flex' }}>
                     <img src={p.url} alt={p.file.name} title={p.file.name} style={{ width: 52, height: 40, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--line)' }} />
@@ -706,13 +755,21 @@ function CloseForm({
                 >
                   <Button icon={<UploadOutlined />} loading={processing > 0}>選擇照片</Button>
                 </Upload>
-                <span className="num" style={{ fontSize: 12, color: photos.length >= MIN_PHOTOS ? '#1F6B45' : 'var(--steel)' }}>
-                  {photos.length} 張
+                <span className="num" style={{ fontSize: 12, color: existing.length + photos.length >= MIN_PHOTOS ? '#1F6B45' : 'var(--steel)' }}>
+                  {existing.length + photos.length} 張
                 </span>
               </div>
               <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 6 }}>
-                送出結案時才上傳,不隨草稿保存。已選 <span className="num">{fmtMB(photos.reduce((s, p) => s + p.file.size, 0))}</span>/
-                <span className="num">{Math.round(closePhotoBytes / 1024 / 1024)}</span> MB
+                送出結案時才上傳,不隨草稿保存。已選{' '}
+                <span className="num">
+                  {fmtMB(existing.reduce((s, f) => s + f.size, 0) + photos.reduce((s, p) => s + p.file.size, 0))}
+                </span>
+                /<span className="num">{Math.round(closePhotoBytes / 1024 / 1024)}</span> MB
+                {existing.length > 0 && (
+                  <>
+                    ；含前次送出未完成殘留的 <span className="num">{existing.length}</span> 張(可移除回收額度)
+                  </>
+                )}
               </div>
             </div>
             <div className="form-grid-2" style={{ marginTop: 12 }}>

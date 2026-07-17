@@ -65,6 +65,7 @@ interface FileOut {
   original_name: string
   size: number
   mime: string
+  sha256: string
 }
 
 interface ReflectionOut {
@@ -198,6 +199,7 @@ const toFile = (f: FileOut): EvalFile => ({
   type: typeFromMime(f.mime, f.original_name),
   size: f.size,
   url: fileUrl(f.id),
+  hash: f.sha256, // 既有照片與新選檔的內容去重
   uploadedAt: '—', // 後端 FileOut 不含時間戳
 })
 

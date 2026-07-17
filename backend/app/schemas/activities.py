@@ -85,6 +85,7 @@ class FileOut(BaseModel):
     original_name: str
     size: int
     mime: str
+    sha256: str  # 前端據此對「既有照片 vs 新選檔」做內容去重
 
 
 class ReflectionIn(BaseModel):

@@ -4,6 +4,7 @@ import { App, Badge, Drawer, Dropdown, Popover } from 'antd'
 import { confirmDialog } from '../../lib/confirm'
 import { BellOutlined, DownOutlined, HistoryOutlined, LogoutOutlined, MenuOutlined, SettingOutlined } from '@ant-design/icons'
 import { useAuth } from '../../app/auth'
+import { homeOf } from '../../lib/home'
 import { useAnnouncements, useMarkAnnouncementsRead } from '../../api/announcements'
 import { UnsavedProvider, useHasUnsaved } from '../../app/unsaved'
 import type { NavGroup } from '../../lib/nav'
@@ -103,7 +104,7 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
         <button
           type="button"
           className="topbar-brand"
-          onClick={() => guarded(() => navigate(user?.role === 'admin' ? '/admin' : '/'))}
+          onClick={() => guarded(() => navigate(homeOf(user?.role)))}
         >
           <img src="/logo.svg" alt="" className="topbar-logo" />
           臺科大社團管理系統

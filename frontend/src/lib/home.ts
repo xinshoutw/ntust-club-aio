@@ -6,7 +6,7 @@ import type { Role } from '../api/auth'
 export function homeOf(role: Role | undefined): string {
   if (role === 'admin') return '/admin'
   if (role === 'club') return '/'
-  if (role === 'staff') return '/pt/violations/new'
+  if (role === 'staff') return '/pt' // index 轉導首項(違規勸導填寫)
   if (role === 'viewer') return '/viewer'
   return '/coming-soon'
 }

@@ -1,7 +1,7 @@
 import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router'
 import { useMemo, type ReactNode } from 'react'
 import { useAuth, type Role } from './app/auth'
-import { buildAdminNav, buildClubNav } from './lib/nav'
+import { buildAdminNav, buildClubNav, buildPtNav, buildViewerNav } from './lib/nav'
 import { canAccessAdminPath } from './lib/permissions'
 import { useFixedWindow } from './api/bookings'
 import { usePendingActivityTotal, usePendingCloseTotal } from './api/adminActivities'
@@ -47,6 +47,14 @@ import AccountsPage from './features/admin/AccountsPage'
 import AdminFilesPage from './features/admin/AdminFilesPage'
 import AdminApplicationsPage from './features/admin/AdminApplicationsPage'
 import AdminMaintenancePage from './features/admin/AdminMaintenancePage'
+import PtViolationFormPage from './features/pt/PtViolationFormPage'
+import PtViolationsPage from './features/pt/PtViolationsPage'
+import PtCheckoutPage from './features/pt/PtCheckoutPage'
+import PtCheckinPage from './features/pt/PtCheckinPage'
+import PtOverduePage from './features/pt/PtOverduePage'
+import MyReviewsPage from './features/viewer/MyReviewsPage'
+import ViewerScorePage from './features/viewer/ViewerScorePage'
+import ViewerDonePage from './features/viewer/ViewerDonePage'
 import AdminSettingsPage from './features/admin/AdminSettingsPage'
 import AdminViolationsPage from './features/admin/AdminViolationsPage'
 import AuditPage from './features/admin/AuditPage'
@@ -82,6 +90,16 @@ function AdminShell() {
     [user, pendingReview.data, pendingClose.data],
   )
   return <AppShell nav={nav} badgeLabel="行政後台" />
+}
+
+function PtShell() {
+  const nav = useMemo(() => buildPtNav(), [])
+  return <AppShell nav={nav} badgeLabel="工讀生" />
+}
+
+function ViewerShell() {
+  const nav = useMemo(() => buildViewerNav(), [])
+  return <AppShell nav={nav} badgeLabel="評審" />
 }
 
 // admin 子路由的權限 gate:無權限時就地說明,不悄悄導走(避免誤會系統壞掉)
@@ -192,6 +210,37 @@ export default function App() {
           <Route path="settings" element={<AdminSettingsPage />} />
           <Route path="audit" element={<AuditPage />} />
         </Route>
+      </Route>
+
+      {/* 工讀生端(基礎原型;現行 role 代號 staff,之後隨後端改 pt) */}
+      <Route
+        path="/pt"
+        element={
+          <RequireRole roles={['staff']}>
+            <PtShell />
+          </RequireRole>
+        }
+      >
+        <Route index element={<Navigate to="/pt/violations/new" replace />} />
+        <Route path="violations/new" element={<PtViolationFormPage />} />
+        <Route path="violations" element={<PtViolationsPage />} />
+        <Route path="checkout" element={<PtCheckoutPage />} />
+        <Route path="checkin" element={<PtCheckinPage />} />
+        <Route path="overdue" element={<PtOverduePage />} />
+      </Route>
+
+      {/* 評審端(基礎原型) */}
+      <Route
+        path="/viewer"
+        element={
+          <RequireRole roles={['viewer']}>
+            <ViewerShell />
+          </RequireRole>
+        }
+      >
+        <Route index element={<MyReviewsPage />} />
+        <Route path="score" element={<ViewerScorePage />} />
+        <Route path="done" element={<ViewerDonePage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

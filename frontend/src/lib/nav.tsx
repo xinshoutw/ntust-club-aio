@@ -203,3 +203,37 @@ export function buildAdminNav(
     .map((g) => ({ ...g, items: g.items.filter((i) => canAccessAdminPath(user, i.path)) }))
     .filter((g) => g.items.length > 0)
 }
+
+// 工讀生端(2026-07-17 基礎原型;role 代號之後隨後端改 pt)
+export function buildPtNav(): NavGroup[] {
+  return [
+    {
+      label: '違規勸導',
+      items: [
+        { key: 'pt-viol-new', label: '違規勸導填寫', path: '/pt/violations/new', icon: <FormOutlined /> },
+        { key: 'pt-viol-list', label: '違規紀錄查詢', path: '/pt/violations', icon: <UnorderedListOutlined /> },
+      ],
+    },
+    {
+      label: '器材點交',
+      items: [
+        { key: 'pt-checkout', label: '器材借出點交', path: '/pt/checkout', icon: <AppstoreOutlined /> },
+        { key: 'pt-checkin', label: '器材歸還點交', path: '/pt/checkin', icon: <FileDoneOutlined /> },
+        { key: 'pt-overdue', label: '逾期追蹤', path: '/pt/overdue', icon: <StopOutlined /> },
+      ],
+    },
+  ]
+}
+
+// 評審端(2026-07-17 基礎原型)
+export function buildViewerNav(): NavGroup[] {
+  return [
+    {
+      items: [
+        { key: 'v-my', label: '我負責的評分', path: '/viewer', icon: <HomeOutlined /> },
+        { key: 'v-score', label: '評分(依獎項)', path: '/viewer/score', icon: <TrophyOutlined /> },
+        { key: 'v-done', label: '已完成評分', path: '/viewer/done', icon: <FileDoneOutlined /> },
+      ],
+    },
+  ]
+}

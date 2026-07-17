@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { App, Button, DatePicker, Form, Input, InputNumber, Select, Spin, Tag } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
@@ -74,6 +74,8 @@ function TagListInput({ value = [], onChange }: { value?: string[]; onChange?: (
 }
 
 // 經費科目編輯:每列名稱 + 提示(選填);末端「新增科目」補一列。受控元件。
+let budgetRowSeq = 0
+
 function BudgetCategoriesInput({
   value = [],
   onChange,
@@ -81,15 +83,24 @@ function BudgetCategoriesInput({
   value?: BudgetCategory[]
   onChange?: (next: BudgetCategory[]) => void
 }) {
+  // 列身分 key 與 value 平行維護:index key 在刪中間列時會讓後列 DOM 被復用、
+  // 焦點與輸入法組字錯位;value 為 Form 注入的資料形狀,不能塞 key 欄位
+  const rowKeys = useRef<number[]>([])
+  while (rowKeys.current.length < value.length) rowKeys.current.push(++budgetRowSeq)
+  if (rowKeys.current.length > value.length) rowKeys.current.length = value.length
+
   const update = (i: number, patch: Partial<BudgetCategory>) =>
     onChange?.(value.map((c, idx) => (idx === i ? { ...c, ...patch } : c)))
-  const remove = (i: number) => onChange?.(value.filter((_, idx) => idx !== i))
+  const remove = (i: number) => {
+    rowKeys.current = rowKeys.current.filter((_: number, idx: number) => idx !== i)
+    onChange?.(value.filter((_, idx) => idx !== i))
+  }
   const add = () => onChange?.([...value, { name: '', hint: '' }])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       {value.map((c, i) => (
-        <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div key={rowKeys.current[i]} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <Input
             value={c.name}
             onChange={(e) => update(i, { name: e.target.value })}

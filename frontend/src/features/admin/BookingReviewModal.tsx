@@ -3,30 +3,20 @@ import { App, Button, Input, Modal } from 'antd'
 import StatusPill from '../../components/ui/StatusPill'
 import {
   DOW_TEXT,
-  ROOM_REQUESTS,
-  availableInWindow,
   type EquipmentLoan,
   type RoomRequest,
   type VenueBooking,
 } from '../bookings/mock'
 
-// data 允許 API 層的擴充欄位(availableExcludingSelf);mock 物件(欄位缺省)同樣相容
+// data 允許 API 層的擴充欄位:loan 的 availableExcludingSelf(後端推導)、
+// room 的 conflictKeys(`${dow}|${period}`;呼叫端以全部審核中申請的現場資料計算,
+// 比照 AdminRoomsPage 同邏輯——衝突=兩社搶同場地同星期同節次)
 export type BookingReviewItem =
   | { kind: 'venue'; data: VenueBooking }
   | { kind: 'loan'; data: EquipmentLoan & { availableExcludingSelf?: number } }
-  | { kind: 'room'; data: RoomRequest }
+  | { kind: 'room'; data: RoomRequest & { conflictKeys?: string[] } }
 
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
-
-// 固定借用衝突=兩社搶同教室同星期同節次(僅比對審核中申請;與教室固定借用審核頁同邏輯)
-const isRoomConflict = (room: RoomRequest, dow: number, period: string): boolean =>
-  ROOM_REQUESTS.some(
-    (o) =>
-      o.id !== room.id &&
-      o.status === 'pending' &&
-      o.room === room.room &&
-      o.entries.some((e) => e.dow === dow && e.periods.includes(period)),
-  )
 
 // 場地/器材借用審核彈窗(臨時場地器材審核頁與行政端社團總覽共用):
 // 審核中顯示核准/退回(退回原因必填),其他狀態唯讀;含器材可借數檢核與固定借用衝突標示
@@ -53,10 +43,7 @@ export default function BookingReviewModal({
   const canReview = item.data.status === 'pending'
   const title =
     item.kind === 'venue' ? item.data.venue : item.kind === 'room' ? item.data.room : `${item.data.equipment} ×${item.data.qty}`
-  const roomConflict =
-    item.kind === 'room' && canReview
-      ? item.data.entries.some((e) => e.periods.some((p) => isRoomConflict(item.data, e.dow, p)))
-      : false
+  const roomConflict = item.kind === 'room' && canReview && (item.data.conflictKeys?.length ?? 0) > 0
 
   const closeReject = () => {
     setRejectOpen(false)
@@ -146,7 +133,7 @@ export default function BookingReviewModal({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {item.data.entries.flatMap((e) =>
                 e.periods.map((p) => {
-                  const conflict = canReview && isRoomConflict(item.data, e.dow, p)
+                  const conflict = canReview && (item.data.conflictKeys?.includes(`${e.dow}|${p}`) ?? false)
                   return (
                     <span key={`${e.dow}-${p}`} className="num" style={{ color: conflict ? '#C13B34' : undefined, fontWeight: conflict ? 500 : undefined }}>
                       週{DOW_TEXT[e.dow]} 第 {p} 節{conflict && '（衝突）'}
@@ -186,15 +173,12 @@ export default function BookingReviewModal({
         )}
       </div>
 
-      {/* 器材可借數檢核:以本單借用區間推導可借數(排除本單自身),不足時提醒;僅審核中需要
-          API 資料帶 availableExcludingSelf(後端推導);mock 資料退回前端推導 */}
+      {/* 器材可借數檢核:後端以本單借用區間推導可借數(排除本單自身),不足時提醒;僅審核中需要 */}
       {item.kind === 'loan' &&
         canReview &&
         (() => {
-          const free =
-            item.data.availableExcludingSelf ??
-            availableInWindow(item.data.equipment, item.data.startDate, item.data.endDate, item.data.id)
-          if (item.data.qty <= free) return null
+          const free = item.data.availableExcludingSelf
+          if (free == null || item.data.qty <= free) return null
           return (
             <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--paper)', borderRadius: 6, fontSize: 13, color: '#B03A2E' }}>
               可借數不足：該區間「{item.data.equipment}」可借 <span className="num">{free}</span>，本單申請{' '}

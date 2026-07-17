@@ -5,7 +5,11 @@ import StatusPill from '../../components/ui/StatusPill'
 import type { StatusKey } from '../../lib/status'
 import { roomEntryText } from '../bookings/mock'
 import { useAdminClubDetail } from '../../api/adminClubs'
-import { useAdminBookingMutations } from '../../api/adminBookings'
+import {
+  useAdminBookingMutations,
+  usePendingRoomBookings,
+  type AdminRoomRequest,
+} from '../../api/adminBookings'
 import { useAdminActivityDetail, useAdminActivityMutations } from '../../api/adminActivities'
 import {
   useAdminClubActivities,
@@ -109,6 +113,27 @@ export default function ClubOverviewPage() {
     setBooking(item)
     setBookingApiId(apiId)
     setBookingOpen(true)
+  }
+
+  // 固定借用衝突以「全部社團的審核中申請」現場資料計算(邏輯同 AdminRoomsPage:
+  // 兩社搶同場地同星期同節次;同樣僅取前 50 筆待審)
+  const pendingRoomsQuery = usePendingRoomBookings({ page: 1, pageSize: 50 }, canRooms && clubId != null)
+  const pendingRooms = pendingRoomsQuery.data?.requests ?? []
+  const roomConflictKeys = (r: AdminRoomRequest): string[] => {
+    if (r.status !== 'pending') return []
+    const keys: string[] = []
+    for (const e of r.entries)
+      for (const p of e.periods)
+        if (
+          pendingRooms.some(
+            (o) =>
+              o.apiId !== r.apiId &&
+              o.venueId === r.venueId &&
+              o.entries.some((oe) => oe.dow === e.dow && oe.periods.includes(p)),
+          )
+        )
+          keys.push(`${e.dow}|${p}`)
+    return keys
   }
 
   const openMaintenance = (m: AdminMaintenanceRow) => {
@@ -243,7 +268,7 @@ export default function ClubOverviewPage() {
               key={`room-${r.id}`}
               className="click-tint"
               style={rowStyle}
-              {...clickableRow(() => openBooking({ kind: 'room', data: r }, r.apiId))}
+              {...clickableRow(() => openBooking({ kind: 'room', data: { ...r, conflictKeys: roomConflictKeys(r) } }, r.apiId))}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14 }}>{r.room}</div>

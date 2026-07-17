@@ -273,9 +273,10 @@ export function usePendingEquipmentLoans(p: PendingListParams) {
   })
 }
 
-export function usePendingRoomBookings(p: PendingListParams) {
+export function usePendingRoomBookings(p: PendingListParams, enabled = true) {
   return useQuery({
     queryKey: keys.roomBookings(p),
+    enabled,
     queryFn: () =>
       apiPaged<AdminRoomBookingOut[]>(
         `/admin/room-bookings${qs({ status: 'pending', page: p.page, page_size: p.pageSize })}`,

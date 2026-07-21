@@ -63,6 +63,20 @@ body {
 .tb .r {
   text-align: right;
 }
+/* 固定欄寬版面(2026-07-21 需求方:欄寬不得隨內容浮動):
+   搭配 <Cols widths={...}/> 指定各欄寬;窄語意欄給 px、文字欄給 % 或 auto 吸收餘裕 */
+.tb.fixed {
+  table-layout: fixed;
+}
+.tb.fixed td {
+  overflow-wrap: break-word;
+}
+/* 單行截斷欄(名稱類):配 title 屬性 hover 看全文 */
+.tb .cell-clip {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* 行政密表 */
 .tb.dense {
   font-size: 13px;

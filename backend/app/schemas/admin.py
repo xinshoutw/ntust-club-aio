@@ -226,6 +226,7 @@ class ClubOptionOut(BaseModel):
 
     id: int
     name: str
+    kind: str  # 社團/學會(負責人顯示詞推導)
     attribute: str | None  # ClubCascader 第一層=性質資料夾;None 歸「未分類」
 
 

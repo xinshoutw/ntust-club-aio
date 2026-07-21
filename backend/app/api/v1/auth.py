@@ -26,6 +26,7 @@ async def _user_out(db: DbDep, user: User) -> UserOut:
     if user.club_id is not None:
         club = await db.get(Club, user.club_id)
         out.club_name = club.name if club else None
+        out.club_kind = club.kind.value if club else None
     return out
 
 @router.post("/login")

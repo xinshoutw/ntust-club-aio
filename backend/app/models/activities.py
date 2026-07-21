@@ -44,8 +44,8 @@ class Activity(Base, TimestampMixin):
     end_date: Mapped[dt.date | None] = mapped_column(sa.Date)  # 活動結束日
     start_time: Mapped[time | None] = mapped_column(sa.Time)  # 開始時間屬 date
     end_time: Mapped[time | None] = mapped_column(sa.Time)  # 結束時間屬 end_date
-    participants_in: Mapped[int] = mapped_column(default=0)  # 校內人數
-    participants_out: Mapped[int] = mapped_column(default=0)  # 校外人數
+    participants_in: Mapped[int] = mapped_column(default=0)  # 社員人數(2026-07-21 語彙統一)
+    participants_out: Mapped[int] = mapped_column(default=0)  # 非社員人數
     staff_text: Mapped[str] = mapped_column(sa.Text, default="")
     fund_source: Mapped[str | None] = mapped_column(sa.Text)  # 輔導老師第一關認定
     school_approved: Mapped[int | None] = mapped_column()  # 學校核定補助(元)

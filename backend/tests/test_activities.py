@@ -143,7 +143,8 @@ async def test_validation_rules(client, db):
 
 async def test_submit_flow_and_edit_guard(client, db):
     await setup_session(client, db)
-    data = await create_activity(client)
+    future = (date.today() + timedelta(days=30)).isoformat()
+    data = await create_activity(client, date=future)
     aid = data["id"]
 
     resp = await client.post(
@@ -154,7 +155,7 @@ async def test_submit_flow_and_edit_guard(client, db):
 
     # 送審後不可修改/刪除/重複送審
     resp = await client.put(
-        f"/api/v1/club/activities/{aid}", json=payload(), headers=csrf_headers(client)
+        f"/api/v1/club/activities/{aid}", json=payload(date=future), headers=csrf_headers(client)
     )
     assert resp.status_code == 409
     resp = await client.delete(f"/api/v1/club/activities/{aid}", headers=csrf_headers(client))
@@ -163,6 +164,50 @@ async def test_submit_flow_and_edit_guard(client, db):
         f"/api/v1/club/activities/{aid}/submit", headers=csrf_headers(client)
     )
     assert resp.status_code == 409
+
+
+async def test_submit_rejects_past_start(client, db):
+    """過去時間全面禁止(2026-07-21):送審/退回重送擋過去開始時刻;草稿不擋。"""
+    await setup_session(client, db)
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+
+    # 過去日期仍可存草稿(結案補登等歷史草稿沿用既有行為)
+    data = await create_activity(client, date=yesterday)
+    aid = data["id"]
+    assert data["status"] == "draft"
+
+    # 送審 → 422
+    resp = await client.post(
+        f"/api/v1/club/activities/{aid}/submit", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 422
+    assert "早於現在" in resp.json()["error"]
+
+    # 改為未來即可送審
+    future = (date.today() + timedelta(days=7)).isoformat()
+    resp = await client.put(
+        f"/api/v1/club/activities/{aid}", json=payload(date=future), headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200
+    resp = await client.post(
+        f"/api/v1/club/activities/{aid}/submit", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200
+
+    # 退回重送(update 非草稿路徑)同樣擋過去時間
+    await db.execute(sa.update(Activity).where(Activity.id == aid).values(status="rejected"))
+    await db.commit()
+    resp = await client.put(
+        f"/api/v1/club/activities/{aid}",
+        json=payload(date=yesterday),
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    assert "早於現在" in resp.json()["error"]
+    resp = await client.put(
+        f"/api/v1/club/activities/{aid}", json=payload(date=future), headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200
 
 
 async def test_club_scoping(client, db):
@@ -471,9 +516,12 @@ async def test_partial_draft_and_submit_completeness(client, db):
     msg = resp.json()["error"]
     assert "開始日期" in msg and "活動地點" in msg and "活動名稱" not in msg
 
-    # 補齊後可送審
+    # 補齊後可送審(送審擋過去時間,補齊時帶未來日期)
+    future = (date.today() + timedelta(days=30)).isoformat()
     resp = await client.put(
-        f"/api/v1/club/activities/{draft['id']}", json=payload(), headers=csrf_headers(client)
+        f"/api/v1/club/activities/{draft['id']}",
+        json=payload(date=future),
+        headers=csrf_headers(client),
     )
     assert resp.status_code == 200, resp.text
     resp = await client.post(

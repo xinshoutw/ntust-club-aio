@@ -1,16 +1,27 @@
-"""2026-07-21 需求方新功能:取消借用、場地不開放規則、單次可借上限、行政手動借用。"""
+"""2026-07-21 需求方新功能:取消借用、場地不開放規則、單次可借上限、行政手動借用、
+過去時間全面禁止(節次時刻表)。"""
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 
 import sqlalchemy as sa
 
+from app.core.semesters import TAIPEI
 from app.models import EquipmentLoan, VenueBooking
 from app.models.enums import BookingStatus, LoanStatus
+from app.services import booking_service
 from tests.conftest import csrf_headers, login, make_club, make_user
 from tests.test_bookings import make_activity, make_equipment, make_venue
 
 TOMORROW = date.today() + timedelta(days=7)
 YESTERDAY = date.today() - timedelta(days=7)
+
+
+def freeze_taipei(monkeypatch, day: date, hhmm: str) -> datetime:
+    """把借用領域時鐘釘在台北時區某日某時刻,節次邊界測試不依賴牆鐘。"""
+    hour, minute = (int(x) for x in hhmm.split(":"))
+    fixed = datetime.combine(day, time(hour, minute), tzinfo=TAIPEI).astimezone(UTC)
+    monkeypatch.setattr(booking_service, "now_utc", lambda: fixed)
+    return fixed
 
 
 async def seed_club(client, db):
@@ -297,6 +308,94 @@ async def test_active_filter_on_club_lists(client, db):
     assert {row["id"] for row in resp.json()["data"]} == {rows["out"]}
     resp = await client.get("/api/v1/club/equipment-loans", params={"status": "returned"})
     assert {row["id"] for row in resp.json()["data"]} == {rows["ret"]}
+
+
+# ---- 過去時間全面禁止(2026-07-21,節次時刻表) ----
+
+
+async def test_venue_booking_rejects_past_date(client, db):
+    club = await seed_club(client, db)
+    venue = await make_venue(db, allow_temp=True)
+    activity = await make_activity(db, club, day=TOMORROW)
+    body = {"venue_id": venue.id, "activity_id": activity.id, "date": str(YESTERDAY),
+            "periods": ["5"], "purpose": "社課", "phone": "0912000111"}
+    resp = await client.post(
+        "/api/v1/club/venue-bookings", json=body, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 422
+    assert "早於今天" in resp.json()["error"]
+
+
+async def test_venue_booking_today_started_period_boundary(client, db, monkeypatch):
+    """今天的申請以節次時刻表把關:最早節次起點 ≤ now 即擋;固定時鐘不依賴牆鐘。"""
+    club = await seed_club(client, db)
+    venue = await make_venue(db, allow_temp=True)
+    activity = await make_activity(db, club, day=TOMORROW)
+    today = date.today()
+    # 釘在今天 12:00(台北):第 3 節(10:20)已開始、第 5 節(12:20)未開始
+    freeze_taipei(monkeypatch, today, "12:00")
+
+    body = {"venue_id": venue.id, "activity_id": activity.id, "date": str(today),
+            "purpose": "社課", "phone": "0912000111"}
+    # 已開始節次(且 periods 無序:最早者為第 3 節)→ 422
+    resp = await client.post(
+        "/api/v1/club/venue-bookings",
+        json={**body, "periods": ["5", "3"]},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    assert "已開始" in resp.json()["error"]
+    # 未開始節次 → 201
+    resp = await client.post(
+        "/api/v1/club/venue-bookings",
+        json={**body, "periods": ["5", "6"]},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201, resp.text
+
+    # 邊界:正好 12:20(第 5 節起點)視為已開始
+    freeze_taipei(monkeypatch, today, "12:20")
+    resp = await client.post(
+        "/api/v1/club/venue-bookings",
+        json={**body, "periods": ["5"]},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+
+    # 午夜後、第 1 節(08:10)前:今天全部節次皆可申請
+    # (換場地:同社同場地同日已有上面的申請,會先撞重複申請檢核)
+    other_venue = await make_venue(db, name="精誠廣場", allow_fixed=False, allow_temp=True)
+    freeze_taipei(monkeypatch, today, "00:30")
+    resp = await client.post(
+        "/api/v1/club/venue-bookings",
+        json={**body, "venue_id": other_venue.id, "periods": ["1"]},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201, resp.text
+
+
+async def test_equipment_loan_rejects_ended_activity(client, db):
+    club = await seed_club(client, db)
+    eq = await make_equipment(db)
+    ended = await make_activity(
+        db, club, day=YESTERDAY - timedelta(days=2), end_day=YESTERDAY
+    )
+    body = {"equipment_id": eq.id, "activity_id": ended.id, "qty": 1,
+            "purpose": "補借", "phone": "0912000111"}
+    resp = await client.post(
+        "/api/v1/club/equipment-loans", json=body, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 422
+    assert "已結束" in resp.json()["error"]
+
+    # 未結束活動照常可借
+    upcoming = await make_activity(db, club, name="未來活動", day=TOMORROW)
+    resp = await client.post(
+        "/api/v1/club/equipment-loans",
+        json={**body, "activity_id": upcoming.id},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201, resp.text
 
 
 async def test_phone_character_whitelist(client, db):

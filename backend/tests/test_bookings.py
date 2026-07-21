@@ -21,6 +21,12 @@ def first_thursday(start: date) -> date:
     return start + timedelta(days=(4 - start.isoweekday()) % 7)
 
 
+def future_tuesday(weeks_ahead: int = 3) -> date:
+    """未來的週二:工作天推導測試的定錨(相對日期,避免固定日期隨時間變成過去)。"""
+    today = date.today()
+    return today + timedelta(days=(1 - today.weekday()) % 7 + 7 * weeks_ahead)
+
+
 async def make_venue(db, name="S304 音樂教室", *, allow_fixed=True, allow_temp=False, **kw):
     venue = Venue(
         name=name,
@@ -284,11 +290,12 @@ async def test_venue_booking_requires_approved_activity(client, db):
     venue = await make_venue(db, name="精誠廣場", allow_fixed=False, allow_temp=True)
     approved = await make_activity(db, club)
     pending = await make_activity(db, club, name="未核准", status=ActivityStatus.PENDING_ADVISOR)
+    day = date.today() + timedelta(days=14)  # 過去日期已全面禁止,一律用未來日期
 
     body = {
         "venue_id": venue.id,
         "activity_id": approved.id,
-        "date": "2026-03-05",
+        "date": day.isoformat(),
         "periods": ["3", "4"],
         "purpose": "擺攤",
         "phone": "0912000111",
@@ -304,7 +311,7 @@ async def test_venue_booking_requires_approved_activity(client, db):
     # 未核准活動 → 422
     resp = await client.post(
         "/api/v1/club/venue-bookings",
-        json={**body, "date": "2026-03-06", "activity_id": pending.id},
+        json={**body, "date": (day + timedelta(days=1)).isoformat(), "activity_id": pending.id},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
@@ -314,7 +321,11 @@ async def test_venue_booking_requires_approved_activity(client, db):
     other_activity = await make_activity(db, other, name="他社活動")
     resp = await client.post(
         "/api/v1/club/venue-bookings",
-        json={**body, "date": "2026-03-07", "activity_id": other_activity.id},
+        json={
+            **body,
+            "date": (day + timedelta(days=2)).isoformat(),
+            "activity_id": other_activity.id,
+        },
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
@@ -322,8 +333,8 @@ async def test_venue_booking_requires_approved_activity(client, db):
     # 缺 activity_id → 422(必填)
     resp = await client.post(
         "/api/v1/club/venue-bookings",
-        json={"venue_id": venue.id, "date": "2026-03-08", "periods": ["3"], "purpose": "x",
-              "phone": "0912000111"},
+        json={"venue_id": venue.id, "date": (day + timedelta(days=3)).isoformat(),
+              "periods": ["3"], "purpose": "x", "phone": "0912000111"},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
@@ -545,8 +556,10 @@ async def test_equipment_loan_window_derived_from_activity(client, db):
     """借用區間=活動開始日 −2 個工作天 ~ 結束日 +1 個工作天(排除週六日與假日)。"""
     club = await setup_session(client, db)
     eq = await make_equipment(db, total_qty=5)
-    # 2026-03-10(二)~ 2026-03-12(四)
-    activity = await make_activity(db, club, day=date(2026, 3, 10), end_day=date(2026, 3, 12))
+    # 未來的週二 ~ 週四(相對日期:過去活動已禁止借用)
+    tue = future_tuesday()
+    thu = tue + timedelta(days=2)
+    activity = await make_activity(db, club, day=tue, end_day=thu)
 
     resp = await client.post(
         "/api/v1/club/equipment-loans",
@@ -556,23 +569,21 @@ async def test_equipment_loan_window_derived_from_activity(client, db):
     )
     assert resp.status_code == 201, resp.text
     data = resp.json()["data"]
-    assert data["start_date"] == "2026-03-06"  # 週二 −2 工作天=上週五
-    assert data["end_date"] == "2026-03-13"  # 週四 +1 工作天=週五
+    assert data["start_date"] == (tue - timedelta(days=4)).isoformat()  # 週二 −2 工作天=上週五
+    assert data["end_date"] == (thu + timedelta(days=1)).isoformat()  # 週四 +1 工作天=週五
     assert data["activity_name"] == "迎新宿營"
 
-    # 假日再往前跳:3/6(五)為假日 → 起日 3/5(四)
-    db.add(Holiday(date=date(2026, 3, 6), name="補假"))
+    # 假日再往前跳:上週五為假日 → 起日再往前一天(週四)
+    db.add(Holiday(date=tue - timedelta(days=4), name="補假"))
     await db.commit()
-    activity2 = await make_activity(
-        db, club, name="第二活動", day=date(2026, 3, 10), end_day=date(2026, 3, 12)
-    )
+    activity2 = await make_activity(db, club, name="第二活動", day=tue, end_day=thu)
     resp = await client.post(
         "/api/v1/club/equipment-loans",
         json={"equipment_id": eq.id, "activity_id": activity2.id, "qty": 1, "purpose": "x",
               "phone": "0912000111"},
         headers=csrf_headers(client),
     )
-    assert resp.json()["data"]["start_date"] == "2026-03-05"
+    assert resp.json()["data"]["start_date"] == (tue - timedelta(days=5)).isoformat()
 
     # 未核准活動不可借
     pending = await make_activity(db, club, name="未核准", status=ActivityStatus.DRAFT)
@@ -589,7 +600,8 @@ async def test_equipment_available_within_window(client, db):
     """可借數依指定活動推導區間動態計算:總數 − 區間重疊之未歸還未退回借用量。"""
     club = await setup_session(client, db)
     eq = await make_equipment(db, total_qty=5)
-    first = await make_activity(db, club, day=date(2026, 3, 10), end_day=date(2026, 3, 12))
+    tue = future_tuesday()  # 未來的週二(相對日期:過去活動已禁止借用)
+    first = await make_activity(db, club, day=tue, end_day=tue + timedelta(days=2))
 
     resp = await client.post(
         "/api/v1/club/equipment-loans",
@@ -597,16 +609,20 @@ async def test_equipment_available_within_window(client, db):
               "phone": "0912000111"},
         headers=csrf_headers(client),
     )
-    assert resp.status_code == 201  # 佔用 2026-03-06 ~ 2026-03-13(pending 亦佔用)
+    assert resp.status_code == 201  # 佔用 週五(−4)~ 週五(+3)(pending 亦佔用)
 
-    # 區間重疊的活動(3/16 起,窗 3/12–3/18)→ 可借 2
+    # 區間重疊的活動(下週一起,窗 週四(+2)– 週三(+8))→ 可借 2
     overlap = await make_activity(
-        db, club, name="重疊活動", day=date(2026, 3, 16), end_day=date(2026, 3, 17)
+        db, club, name="重疊活動",
+        day=tue + timedelta(days=6), end_day=tue + timedelta(days=7),
     )
     listing = await client.get("/api/v1/club/equipment", params={"activity_id": overlap.id})
     body = listing.json()
     assert body["data"][0]["available"] == 2
-    assert body["meta"] == {"loan_start": "2026-03-12", "loan_end": "2026-03-18"}
+    assert body["meta"] == {
+        "loan_start": (tue + timedelta(days=2)).isoformat(),
+        "loan_end": (tue + timedelta(days=8)).isoformat(),
+    }
 
     resp = await client.post(
         "/api/v1/club/equipment-loans",
@@ -616,9 +632,10 @@ async def test_equipment_available_within_window(client, db):
     )
     assert resp.status_code == 409  # 超過區間可借數
 
-    # 不重疊的活動(3/23 起,窗 3/19–3/25)→ 可借 5
+    # 不重疊的活動(再下週一起,窗自 週四(+9) 起)→ 可借 5
     apart = await make_activity(
-        db, club, name="不重疊活動", day=date(2026, 3, 23), end_day=date(2026, 3, 24)
+        db, club, name="不重疊活動",
+        day=tue + timedelta(days=13), end_day=tue + timedelta(days=14),
     )
     listing = (await client.get("/api/v1/club/equipment", params={"activity_id": apart.id})).json()
     assert listing["data"][0]["available"] == 5
@@ -672,7 +689,7 @@ async def test_suspended_club_cannot_book(client, db):
     venue_body = {
         "venue_id": venue.id,
         "activity_id": activity.id,
-        "date": "2026-03-05",
+        "date": (date_cls.today() + timedelta(days=14)).isoformat(),
         "periods": ["3"],
         "purpose": "x",
         "phone": "0912000111",

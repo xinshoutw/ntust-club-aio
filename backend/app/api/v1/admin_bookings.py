@@ -393,6 +393,8 @@ async def availability(user: BookingAdmin, db: DbDep, date: date) -> ApiResponse
 
 
 # ---- 最高權限手動借用(2026-07-21 需求方拍板;club NULL=行政,顯示「學務處」) ----
+# 刻意不擋過去日期(社團端申請已全面禁止):補登歷史資料是本功能的用途之一,
+# 舊系統遷移後的資料補正也靠這裡回填
 
 
 @router.post("/bookings/manual-venue", status_code=201)

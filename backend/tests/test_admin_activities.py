@@ -19,12 +19,27 @@ async def seed(client, db):
 
 
 async def submit_activity(client, db, **overrides) -> int:
+    """送審一筆活動;date 覆寫在送審後直接改 DB。
+
+    送審已全面禁止過去開始時刻(2026-07-21),但結案/鎖定測試需要「已結束」的活動:
+    以未來日期走完真實送審流程,再把日期改回測試指定值。
+    """
     await login(client, "club01")
-    data = await create_activity(client, **overrides)
+    wanted = overrides.pop("date", None)
+    future = (date.today() + timedelta(days=30)).isoformat()
+    data = await create_activity(client, date=future, **overrides)
     resp = await client.post(
         f"/api/v1/club/activities/{data['id']}/submit", headers=csrf_headers(client)
     )
     assert resp.status_code == 200
+    if wanted is not None:
+        wanted_day = date.fromisoformat(wanted)
+        await db.execute(
+            sa.update(Activity)
+            .where(Activity.id == data["id"])
+            .values(date=wanted_day, end_date=wanted_day)
+        )
+        await db.commit()
     return data["id"]
 
 

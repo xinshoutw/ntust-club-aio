@@ -89,6 +89,23 @@ async def test_create_item_validations(client, db):
     )
     assert resp.status_code == 422
 
+    # 過去時間全面禁止(2026-07-21):活動時間/報名截止不得早於現在
+    resp = await client.post(
+        URL,
+        json=body(event_at=(now - timedelta(days=1)).isoformat()),
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    resp = await client.post(
+        URL,
+        json=body(
+            signup_start=(now - timedelta(days=10)).isoformat(),
+            signup_end=(now - timedelta(days=3)).isoformat(),
+        ),
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+
     # 權限:無 areg 的管理員 → 403
     await make_user(db, username="other", role="admin", permissions=["aact"])
     await login(client, "other")

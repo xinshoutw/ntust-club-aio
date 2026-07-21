@@ -1,5 +1,7 @@
 """公告系統(2026-07-16 第八輪):管理端 CRUD、驗證、通知收件解析與模板。"""
 
+from datetime import date, timedelta
+
 import sqlalchemy as sa
 
 from app.models import Announcement, AuditLog, Club
@@ -7,6 +9,10 @@ from app.services import notify
 from tests.conftest import csrf_headers, login, make_club, make_user
 
 URL = "/api/v1/admin/announcements"
+
+# 蓋板截止日不得早於今天(2026-07-21):測試以相對日期避免時效性失敗
+FUTURE = (date.today() + timedelta(days=30)).isoformat()
+PAST = (date.today() - timedelta(days=1)).isoformat()
 
 
 async def seed(client, db):
@@ -57,6 +63,18 @@ async def test_create_validations(client, db):
     resp = await client.post(URL, json=body(takeover=True), headers=csrf_headers(client))
     assert resp.status_code == 422
 
+    # 蓋板截止日不得早於今天(2026-07-21;今天可=期限含當日)
+    resp = await client.post(
+        URL, json=body(takeover=True, takeover_until=PAST), headers=csrf_headers(client)
+    )
+    assert resp.status_code == 422
+    resp = await client.post(
+        URL,
+        json=body(takeover=True, takeover_until=date.today().isoformat()),
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201, resp.text
+
 
 async def test_create_list_delete_with_audit(client, db):
     club = await seed(client, db)
@@ -64,12 +82,12 @@ async def test_create_list_delete_with_audit(client, db):
     resp = await client.post(
         URL,
         json=body(target_type="club", club_id=club.id, takeover=True,
-                  takeover_until="2026-07-31"),
+                  takeover_until=FUTURE),
         headers=csrf_headers(client),
     )
     assert resp.status_code == 201, resp.text
     created = resp.json()["data"]
-    assert created["takeover_until"] == "2026-07-31"
+    assert created["takeover_until"] == FUTURE
     assert created["club_id"] == club.id
 
     rows = (await client.get(URL)).json()["data"]
@@ -78,7 +96,7 @@ async def test_create_list_delete_with_audit(client, db):
 
     # 未勾蓋板時不存截止日
     resp = await client.post(
-        URL, json=body(title="無蓋板", takeover_until="2026-08-31"), headers=csrf_headers(client)
+        URL, json=body(title="無蓋板", takeover_until=FUTURE), headers=csrf_headers(client)
     )
     assert resp.json()["data"]["takeover_until"] is None
 
@@ -158,10 +176,10 @@ async def test_takeover_toggle(client, db):
 
     # 開啟蓋板
     resp = await client.patch(
-        f"{URL}/{ann_id}", json={"takeover_until": "2026-08-31"}, headers=csrf_headers(client)
+        f"{URL}/{ann_id}", json={"takeover_until": FUTURE}, headers=csrf_headers(client)
     )
     assert resp.status_code == 200, resp.text
-    assert resp.json()["data"]["takeover_until"] == "2026-08-31"
+    assert resp.json()["data"]["takeover_until"] == FUTURE
     assert await db.scalar(
         sa.select(Announcement.takeover_until).where(Announcement.id == ann_id)
     ) is not None
@@ -181,18 +199,22 @@ async def test_takeover_toggle(client, db):
     )
     assert audit_count == 2
 
-    # 驗證失敗:非日期 → 422;不存在 → 404;無 aannounce → 403
+    # 驗證失敗:非日期/過去日期 → 422;不存在 → 404;無 aannounce → 403
     resp = await client.patch(
         f"{URL}/{ann_id}", json={"takeover_until": "not-a-date"}, headers=csrf_headers(client)
     )
     assert resp.status_code == 422
     resp = await client.patch(
-        f"{URL}/99999", json={"takeover_until": "2026-08-31"}, headers=csrf_headers(client)
+        f"{URL}/{ann_id}", json={"takeover_until": PAST}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 422
+    resp = await client.patch(
+        f"{URL}/99999", json={"takeover_until": FUTURE}, headers=csrf_headers(client)
     )
     assert resp.status_code == 404
     await login(client, "other")
     resp = await client.patch(
-        f"{URL}/{ann_id}", json={"takeover_until": "2026-08-31"}, headers=csrf_headers(client)
+        f"{URL}/{ann_id}", json={"takeover_until": FUTURE}, headers=csrf_headers(client)
     )
     assert resp.status_code == 403
 

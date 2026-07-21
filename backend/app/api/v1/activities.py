@@ -7,7 +7,7 @@ approved →(活動結束後)close → closing_pending_advisor → closed;退回
 逾期鎖定=推導(活動日+1 個月未送結案),管理員可解鎖(close_unlocked)。
 """
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time
 from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
@@ -20,7 +20,7 @@ from app.api.pagination import Pagination, parse_sort
 from app.core.config import settings
 from app.core.deps import ClubUser, DbDep, client_ip
 from app.core.errors import AppError, conflict, not_found, validation_error
-from app.core.semesters import semester_of, semester_range
+from app.core.semesters import TAIPEI, semester_of, semester_range
 from app.models import (
     Activity,
     ActivityReflection,
@@ -92,6 +92,17 @@ def _require_complete(activity: Activity) -> None:
     ]
     if missing:
         raise validation_error(f"送出前請先完成:{'、'.join(missing)}")
+
+
+def _require_future_start(activity: Activity) -> None:
+    """過去時間全面禁止(2026-07-21):送審/退回重送的開始時刻不得早於現在。
+
+    於 _require_complete 之後呼叫(日期/時間必然齊備);草稿不擋。
+    schema 允許空時間時以當日 00:00 保守處理,不放行部分過去的申請。
+    """
+    start = datetime.combine(activity.date, activity.start_time or time(0, 0), tzinfo=TAIPEI)
+    if start < datetime.now(UTC):
+        raise validation_error("活動開始時間早於現在,請調整活動日期與時間")
 
 
 @router.get("")
@@ -200,6 +211,7 @@ async def update_activity(
     svc.replace_budget_items(activity, body.budget_items)
     if activity.status != ActivityStatus.DRAFT:
         _require_complete(activity)  # 退回件僅能存完整資料(部分填寫只屬草稿)
+        _require_future_start(activity)  # 退回重送不得存過去時間
     await db.commit()
     activity = await svc.get_own_activity(db, user, activity_id)
     lock_months = await get_setting(db, "close_lock_months")
@@ -236,6 +248,7 @@ async def submit_activity(
     if activity.status not in _EDITABLE:
         raise conflict("此活動已送審或已核准")
     _require_complete(activity)
+    _require_future_start(activity)
     activity.status = ActivityStatus.PENDING_ADVISOR
     club = await _club_of(db, user)
     audit.record(

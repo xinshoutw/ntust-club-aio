@@ -21,6 +21,51 @@ from app.models.enums import BookingStatus, LoanStatus
 # 14 節次(原型 PERIODS/BK_SLOTS)
 PERIODS: tuple[str, ...] = ("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "A", "B", "C", "D")
 
+# 節次起訖時刻(退役舊系統 clubclass 的權威對照,2026-07-21 需求方確認;
+# 前端鏡射於 frontend/src/api/bookings.ts 的 PERIOD_TIMES,改動須同步)
+PERIOD_TIMES: dict[str, tuple[time, time]] = {
+    "1": (time(8, 10), time(9, 0)),
+    "2": (time(9, 10), time(10, 0)),
+    "3": (time(10, 20), time(11, 10)),
+    "4": (time(11, 20), time(12, 10)),
+    "5": (time(12, 20), time(13, 10)),
+    "6": (time(13, 20), time(14, 10)),
+    "7": (time(14, 20), time(15, 10)),
+    "8": (time(15, 30), time(16, 20)),
+    "9": (time(16, 30), time(17, 20)),
+    "10": (time(17, 30), time(18, 20)),
+    "A": (time(18, 25), time(19, 15)),
+    "B": (time(19, 20), time(20, 10)),
+    "C": (time(20, 15), time(21, 5)),
+    "D": (time(21, 10), time(22, 0)),
+}
+
+
+def now_utc() -> datetime:
+    """借用領域的單一時鐘來源;「今天已過節次」等牆鐘敏感測試以 monkeypatch 注入。"""
+    return datetime.now(UTC)
+
+
+def today_taipei(now: datetime | None = None) -> date:
+    return (now or now_utc()).astimezone(TAIPEI).date()
+
+
+def booking_start_at(day: date, periods: list[str]) -> datetime:
+    """借用起始時刻=最早節次的起點(台北時區);periods 不保證有序,取全部節次最早者。"""
+    first = min(periods, key=PERIODS.index)
+    return datetime.combine(day, PERIOD_TIMES[first][0], tzinfo=TAIPEI)
+
+
+def booking_started(day: date, periods: list[str], now: datetime | None = None) -> bool:
+    """時間是否已經過申請起始時刻(含相等=已開始)。"""
+    return booking_start_at(day, periods) <= (now or now_utc())
+
+
+def started_periods(now: datetime | None = None) -> list[str]:
+    """今天(台北)已開始的節次(起點 ≤ now);供 SQL 以陣列重疊(&&)判斷已開始。"""
+    local = (now or now_utc()).astimezone(TAIPEI).time()
+    return [p for p in PERIODS if PERIOD_TIMES[p][0] <= local]
+
 # 固定借用規則(2026-07-15 需求方定案)
 MAX_FIXED_SLOTS = 10  # 每社至多 10 節(1 節 = 1 小時)
 LATE_PERIODS = frozenset({"10", "A", "B", "C", "D"})  # 晚間時段:需至少連續 3 節起借

@@ -4,9 +4,17 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.core.semesters import TAIPEI
 from app.models.enums import AnnouncementTarget, ClubAttribute
 
 _VALID_ATTRS = {a.value for a in ClubAttribute}
+
+
+def _takeover_not_past(v: date | None) -> date | None:
+    """過去時間全面禁止(2026-07-21):過去截止日=蓋板永不顯示,不得早於今天(台北)。"""
+    if v is not None and v < datetime.now(TAIPEI).date():
+        raise ValueError("蓋板截止日期不得早於今天")
+    return v
 
 
 class AnnouncementCreateIn(BaseModel):
@@ -18,6 +26,8 @@ class AnnouncementCreateIn(BaseModel):
     takeover: bool = False  # 蓋板(期限內社團每次登入全版顯示)
     takeover_until: date | None = None
     notify: bool = False  # 發布時寄送 Email + Discord 通知
+
+    _takeover_until = field_validator("takeover_until")(_takeover_not_past)
 
     @field_validator("title")
     @classmethod
@@ -59,6 +69,8 @@ class TakeoverIn(BaseModel):
     """蓋板切換:給日期=期限內社團每次登入全版顯示;null=關閉蓋板。"""
 
     takeover_until: date | None
+
+    _takeover_until = field_validator("takeover_until")(_takeover_not_past)
 
 
 class AdminAnnouncementOut(BaseModel):

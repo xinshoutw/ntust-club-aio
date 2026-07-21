@@ -6,7 +6,7 @@
 - 臨時借用/器材借用綁定審核通過活動;器材借用區間由活動起訖 ± 工作天緩衝推導
 """
 
-from datetime import UTC, date, datetime
+from datetime import date, datetime
 
 import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Query, Request
@@ -38,7 +38,7 @@ from app.schemas.bookings import (
     VenueOut,
 )
 from app.schemas.common import ApiResponse
-from app.services import audit, notify
+from app.services import activity_service, audit, notify
 from app.services import booking_service as svc
 from app.services.settings_service import get_setting
 
@@ -53,7 +53,7 @@ async def _notify_submit(background: BackgroundTasks, db, user, title: str, desc
 async def _ensure_not_suspended(db, user) -> None:
     """停權中的社團不得申請借用(器材逾期停權管理的執行點)。"""
     club = await db.get(Club, user.club_id)
-    today_tw = datetime.now(UTC).astimezone(TAIPEI).date()
+    today_tw = svc.today_taipei()
     if club.suspended_until and club.suspended_until >= today_tw:
         raise forbidden(
             f"社團停權中(至 {club.suspended_until}),暫停借用申請", code="CLUB_SUSPENDED"
@@ -184,7 +184,7 @@ async def list_room_bookings(
     if active is not None:
         ongoing = sa.and_(
             RoomBookingRequest.status.in_([BookingStatus.PENDING, BookingStatus.APPROVED]),
-            RoomBookingRequest.end_date >= _today_taipei(),
+            RoomBookingRequest.end_date >= svc.today_taipei(),
         )
         query = query.where(ongoing if active else sa.not_(ongoing))
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
@@ -292,7 +292,7 @@ async def list_venue_bookings(
     if active is not None:
         ongoing = sa.and_(
             VenueBooking.status.in_([BookingStatus.PENDING, BookingStatus.APPROVED]),
-            VenueBooking.date >= _today_taipei(),
+            VenueBooking.date >= svc.today_taipei(),
         )
         query = query.where(ongoing if active else sa.not_(ongoing))
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
@@ -319,6 +319,13 @@ async def create_venue_booking(
     if venue is None or not venue.is_active or not venue.allow_temp:
         raise validation_error("該場地不開放臨時借用")
     activity = await _approved_activity(db, user, body.activity_id)
+
+    # 過去時間全面禁止(2026-07-21):過去日期直接擋;
+    # 今天則以節次時刻表擋「最早節次已開始」的申請
+    if body.date < svc.today_taipei():
+        raise validation_error("借用日期不得早於今天")
+    if svc.booking_started(body.date, body.periods):
+        raise validation_error("所選節次已開始,請選擇尚未開始的時段")
 
     # 同社同場地同日重複申請直接擋(不同社的衝突由審核關把關)
     dup = await db.scalar(
@@ -420,10 +427,16 @@ async def create_equipment_loan(
         raise validation_error(f"{equipment.name} 單次至多借用 {equipment.max_lease_count} 件")
     activity = await _approved_activity(db, user, body.activity_id)
 
+    # 過去時間全面禁止(2026-07-21):已結束的活動不可再借器材
+    if activity_service.end_datetime(activity) < svc.now_utc():
+        raise validation_error("所選活動已結束,無法申請器材借用")
+
     # 借用區間=活動起訖 ± 工作天緩衝(申請當下推導後寫入,設定調整不回溯)
     buffer = await get_setting(db, "equipment_workday_buffer")
     holidays = await svc.load_holidays(db)
     start, end = svc.loan_window(activity, buffer, holidays)
+    if end < svc.today_taipei():
+        raise validation_error("推導的借用區間已過去,無法申請")
 
     # 以器材為鍵序列化檢核與寫入:兩筆並發申請不會同時以同一份佔用量通過檢核
     await svc.lock_resource(db, "equipment", equipment.id)
@@ -462,18 +475,12 @@ async def create_equipment_loan(
 # ---- 取消(2026-07-21 需求方:審核中或已核准未開始者可取消) ----
 
 
-def _today_taipei() -> date:
-    from app.core.semesters import TAIPEI
-
-    return datetime.now(TAIPEI).date()
-
-
 def _ensure_cancellable(status: object, pending: object, approved: object, start: date) -> None:
     """審核中隨時可取消;已核准需尚未開始(開始日在今天之後)。"""
     if status == pending:
         return
     if status == approved:
-        if start > _today_taipei():
+        if start > svc.today_taipei():
             return
         raise conflict("已開始或已結束的借用無法取消")
     raise conflict("此狀態的申請無法取消")

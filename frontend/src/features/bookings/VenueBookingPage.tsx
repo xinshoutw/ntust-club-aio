@@ -55,12 +55,13 @@ export default function VenueBookingPage() {
   // 過去時間全面禁止(2026-07-21):過去日期不可選;選「今天」時已開始節次禁選(後端亦擋)
   const dateValue = Form.useWatch('date', form) as Dayjs | undefined
   const disabledPeriods = dateValue?.isSame(todayStart, 'day') ? startedPeriods() : []
+  const disabledKey = disabledPeriods.join(',')
   useEffect(() => {
-    // 日期切到今天後,先前選到的已開始節次自動剔除
-    if (!disabledPeriods.length) return
-    setPeriods((cur) => cur.filter((p) => !disabledPeriods.includes(p)))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dateValue])
+    // 日期切到今天、或表單開著跨過節次起點時,已選到的已開始節次自動剔除
+    // (disabled 按鈕不可再點,靠這裡收走,避免卡住送不出)
+    if (!disabledKey) return
+    setPeriods((cur) => cur.filter((p) => !disabledKey.split(',').includes(p)))
+  }, [disabledKey])
 
   const cancelRow = (v: { id: number; venueName: string; date: string }) =>
     confirmDialog(modal, {

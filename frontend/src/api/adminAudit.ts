@@ -50,6 +50,8 @@ export const ACTION_LABELS: Record<string, string> = {
   equipment_loan_approved: '核准器材借用',
   equipment_loan_rejected: '退回器材借用',
   equipment_loan_reminded: '器材逾期提醒',
+  equipment_checked_out: '器材借出點交',
+  equipment_checked_in: '器材歸還點交',
   eval_score_overridden: '調整行政分',
   eval_score_reverted: '恢復自動評分',
   eval_merit_set: '登錄表現優良加分',
@@ -63,6 +65,7 @@ export const ACTION_LABELS: Record<string, string> = {
   signup_submitted: '送出線上報名',
   signup_confirmed: '確認報名',
   signup_attendance_marked: '登錄報名簽到',
+  violation_filed: '開立違規勸導',
   violation_resolved: '違規銷案',
 }
 

@@ -233,7 +233,7 @@ export default function App() {
         <Route path="overdue" element={<PtOverduePage />} />
       </Route>
 
-      {/* 評審端(基礎原型) */}
+      {/* 評審端 */}
       <Route
         path="/viewer"
         element={

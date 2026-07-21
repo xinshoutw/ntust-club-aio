@@ -1,59 +1,67 @@
-import { useMemo, useState } from 'react'
+import { useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { App, Button, InputNumber, Modal, Select } from 'antd'
+import { App, Button, Input, InputNumber, Modal, Select, Skeleton, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import { Pager } from '../../components/ui/tableControls'
-import { ASSIGNMENTS, type AwardAssignment } from './mock'
+import FilePreview from '../eval/FilePreview'
+import type { EvalFile } from '../eval/types'
+import {
+  PRESENTATION_MAX,
+  useClubAwardDetail,
+  useSaveScore,
+  useViewerAssignments,
+  type ClubAwardDetail,
+  type ScoreSaveInput,
+  type ViewerAssignment,
+} from '../../api/viewer'
 
 const PAGE_SIZE = 20
 
-// 評分(依獎項)(評審端基礎原型):選獎項 → 逐社團開評分彈窗填各細項。
-// mock:分數僅存本地 state;獎項選取持久於 URL(?award=)
+const fmtSize = (b: number) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`)
+
+/** 分數顯示:去除浮點雜訊(rubric max_score 為 float) */
+const fmtScore = (n: number) => Math.round(n * 100) / 100
+
+// 評分(依獎項):選獎項 → 逐社團開評分彈窗;獎項選取持久於 URL(?award=)
 export default function ViewerScorePage() {
   const { message } = App.useApp()
   const [params, setParams] = useSearchParams()
-  const awardKey = params.get('award') ?? ASSIGNMENTS[0].key
-  const award: AwardAssignment = ASSIGNMENTS.find((a) => a.key === awardKey) ?? ASSIGNMENTS[0]
+  const assignmentsQuery = useViewerAssignments()
+  const assignments = assignmentsQuery.data ?? []
+  const awardParam = params.get('award')
+  const award: ViewerAssignment | null = assignments.find((a) => a.awardId === awardParam) ?? assignments[0] ?? null
 
-  // scored[`${award}:${club}`] = 各細項分數(mock 本地暫存)。
-  // 鍵含獎項:同一社團可能出現在多個獎項分組,單以社團名為鍵會跨獎互相污染
-  // (後端 ReviewScore 唯一鍵亦為 year+award+club+reviewer)
-  const [scored, setScored] = useState<Record<string, Record<string, number>>>({})
-  const scoreKey = (club: string) => `${award.key}:${club}`
-  const [selectedClub, setSelectedClub] = useState<string | null>(null)
-  const [open, setOpen] = useState(false)
-  const [draft, setDraft] = useState<Record<string, number | null>>({})
   const [page, setPage] = useState(1)
+  const [selectedClubId, setSelectedClubId] = useState<number | null>(null)
+  const [open, setOpen] = useState(false)
 
-  const openClub = (club: string) => {
-    setSelectedClub(club)
-    setDraft(
-      Object.fromEntries(
-        award.items.map((i) => [i.key, scored[scoreKey(club)]?.[i.key] ?? null]),
-      ),
-    )
+  const clubs = award?.clubs ?? []
+  const selectedClub = clubs.find((c) => c.clubId === selectedClubId) ?? null
+
+  const openClub = (clubId: number) => {
+    setSelectedClubId(clubId)
     setOpen(true)
   }
 
-  const total = useMemo(
-    () => award.items.reduce((s, i) => s + (draft[i.key] ?? 0), 0),
-    [award.items, draft],
-  )
-
-  const save = () => {
-    if (!selectedClub) return
-    if (award.items.some((i) => draft[i.key] == null)) {
-      message.error('所有評分細項皆須填寫')
+  // 儲存成功:next=false 關閉;next=true 切到同獎項下一個未評社團,無下一個則關閉
+  const handleSaved = (next: boolean, total: number) => {
+    const savedName = selectedClub?.clubName ?? ''
+    if (!next) {
+      message.success(`已儲存「${savedName}」評分(合計 ${fmtScore(total)} 分)`)
+      setOpen(false)
       return
     }
-    setScored((prev) => ({
-      ...prev,
-      [scoreKey(selectedClub)]: Object.fromEntries(
-        award.items.map((i) => [i.key, draft[i.key] as number]),
-      ),
-    }))
-    setOpen(false)
-    message.success(`${selectedClub} 評分已儲存(合計 ${total} 分)`)
+    const idx = clubs.findIndex((c) => c.clubId === selectedClubId)
+    const ordered = [...clubs.slice(idx + 1), ...clubs.slice(0, Math.max(idx, 0))]
+    const nextClub = ordered.find((c) => !c.scored && c.clubId !== selectedClubId)
+    if (nextClub) {
+      message.success(`已儲存「${savedName}」評分,前往「${nextClub.clubName}」`)
+      setSelectedClubId(nextClub.clubId)
+    } else {
+      message.success(`已儲存「${savedName}」評分,此獎項社團皆已完成評分`)
+      setOpen(false)
+    }
   }
 
   return (
@@ -63,87 +71,384 @@ export default function ViewerScorePage() {
         sub={
           <Select
             size="small"
-            value={award.key}
+            loading={assignmentsQuery.isPending}
+            value={award?.awardId}
             style={{ width: 200 }}
             onChange={(v) => {
               setParams({ award: v })
               setPage(1)
             }}
-            options={ASSIGNMENTS.map((a) => ({ value: a.key, label: a.label }))}
+            options={assignments.map((a) => ({ value: a.awardId, label: a.awardName }))}
           />
         }
       />
 
-      <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-        <table className="tb dense" style={{ minWidth: 560 }}>
-          <thead>
-            <tr>
-              <th>社團</th>
-              <th>評分狀態</th>
-              <th>合計</th>
-            </tr>
-          </thead>
-          <tbody>
-            {award.clubs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((club) => {
-              const s = scored[scoreKey(club)]
-              const sum = s ? Object.values(s).reduce((a, b) => a + b, 0) : null
-              return (
-                <tr key={club} className="click-tint" style={{ cursor: 'pointer' }} onClick={() => openClub(club)}>
-                  <td style={{ fontWeight: 500 }}>{club}</td>
-                  <td style={{ fontSize: 13, color: s ? '#1F6B45' : 'var(--steel)' }}>
-                    {s ? '已評分(可修改)' : '未評分'}
-                  </td>
-                  <td className="num">{sum ?? '—'}</td>
+      {assignmentsQuery.isError ? (
+        <div style={{ marginTop: 20 }}>
+          <QueryError title="評分指派載入失敗" error={assignmentsQuery.error} onRetry={() => void assignmentsQuery.refetch()} />
+        </div>
+      ) : !assignmentsQuery.isPending && assignments.length === 0 ? (
+        <div className="card" style={{ marginTop: 20, padding: '40px 24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
+          尚未被指派評分
+        </div>
+      ) : (
+        <Spin spinning={assignmentsQuery.isPending}>
+          <div className="card" style={{ marginTop: 20, overflowX: 'auto', minHeight: assignmentsQuery.isPending ? 120 : undefined }}>
+            <table className="tb dense" style={{ minWidth: 560 }}>
+              <thead>
+                <tr>
+                  <th>社團</th>
+                  <th>評分狀態</th>
+                  <th>合計</th>
                 </tr>
-              )
-            })}
-            {award.clubs.length === 0 && (
-              <tr className="no-hover">
-                <td colSpan={3} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>此獎項沒有受評社團</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-        <Pager page={page} pageSize={PAGE_SIZE} total={award.clubs.length} onChange={setPage} />
-      </div>
+              </thead>
+              <tbody>
+                {clubs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((c) => (
+                  <tr key={c.clubId} className="click-tint" style={{ cursor: 'pointer' }} onClick={() => openClub(c.clubId)}>
+                    <td style={{ fontWeight: 500 }}>
+                      {c.clubName}
+                      {c.attribute && <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: 'var(--steel)' }}>{c.attribute}</span>}
+                    </td>
+                    <td style={{ fontSize: 13, color: c.scored ? '#1F6B45' : 'var(--steel)' }}>
+                      {c.scored ? '已評分(可修改)' : '未評分'}
+                    </td>
+                    <td className="num">{c.total != null ? fmtScore(c.total) : '—'}</td>
+                  </tr>
+                ))}
+                {!assignmentsQuery.isPending && clubs.length === 0 && (
+                  <tr className="no-hover">
+                    <td colSpan={3} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>此獎項沒有受評社團</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            <Pager page={page} pageSize={PAGE_SIZE} total={clubs.length} onChange={setPage} />
+          </div>
+        </Spin>
+      )}
 
+      <ScoreModal
+        award={award}
+        clubId={selectedClubId}
+        clubName={selectedClub?.clubName ?? ''}
+        clubAttribute={selectedClub?.attribute}
+        open={open}
+        onClose={() => setOpen(false)}
+        afterClose={() => setSelectedClubId(null)}
+        onSaved={handleSaved}
+      />
+    </div>
+  )
+}
+
+// ---- 評分彈窗:左=受評資料(逐細項檔案,點擊就地預覽),右=評分面板 ----
+
+function ScoreModal({
+  award,
+  clubId,
+  clubName,
+  clubAttribute,
+  open,
+  onClose,
+  afterClose,
+  onSaved,
+}: {
+  award: ViewerAssignment | null
+  clubId: number | null
+  clubName: string
+  clubAttribute?: string
+  open: boolean
+  onClose: () => void
+  afterClose: () => void
+  onSaved: (next: boolean, total: number) => void
+}) {
+  const detailQuery = useClubAwardDetail(clubId, award?.awardId ?? '')
+  const [preview, setPreview] = useState<EvalFile | null>(null)
+  const [previewOpen, setPreviewOpen] = useState(false)
+
+  const openPreview = async (f: EvalFile) => {
+    // docx 預覽需要原始檔內容(mammoth);伺服器檔案先抓回 blob 再開(比照 AwardDetailPage)
+    if (f.type === 'doc' && !f.raw) {
+      try {
+        const blob = await (await fetch(f.url, { credentials: 'same-origin' })).blob()
+        f = { ...f, raw: new File([blob], f.name) }
+      } catch {
+        // 抓取失敗:仍開啟預覽視窗,由 DocView 顯示無法預覽說明
+      }
+    }
+    setPreview(f)
+    setPreviewOpen(true)
+  }
+
+  return (
+    <>
       <Modal
         open={open}
-        onCancel={() => setOpen(false)}
-        afterClose={() => setSelectedClub(null)}
+        onCancel={onClose}
+        afterClose={afterClose}
         destroyOnHidden
-        title={selectedClub ? `${award.label} — ${selectedClub}` : ''}
-        footer={
-          <Button type="primary" onClick={save}>
-            儲存評分
-          </Button>
+        width={1000}
+        footer={null}
+        title={
+          clubName && (
+            <span style={{ display: 'inline-flex', gap: 10, alignItems: 'baseline' }}>
+              <span>
+                {award?.awardName} — {clubName}
+              </span>
+              {clubAttribute && <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--steel)' }}>{clubAttribute}</span>}
+            </span>
+          )
         }
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {award.items.map((item, idx) => (
-            <div key={item.key} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ flex: 1 }}>
-                {item.label}
-                <span className="num" style={{ marginLeft: 8, fontSize: 12, color: 'var(--steel)' }}>
-                  配分 {item.max}
+        {detailQuery.isError ? (
+          <QueryError compact title="受評資料載入失敗" error={detailQuery.error} onRetry={() => void detailQuery.refetch()} />
+        ) : !detailQuery.data || !award || clubId == null ? (
+          // 彈窗立即開、內容 Skeleton,不等網路才開窗
+          <Skeleton active paragraph={{ rows: 8 }} style={{ marginTop: 8 }} />
+        ) : (
+          <ScorePanel
+            key={clubId}
+            award={award}
+            clubId={clubId}
+            detail={detailQuery.data}
+            onSaved={onSaved}
+            onPreview={(f) => void openPreview(f)}
+          />
+        )}
+      </Modal>
+      <FilePreview file={preview} open={previewOpen} onClose={() => setPreviewOpen(false)} afterClose={() => setPreview(null)} />
+    </>
+  )
+}
+
+// ---- 評分面板(key=club 重掛,狀態隨社團重置)----
+
+function ScorePanel({
+  award,
+  clubId,
+  detail,
+  onSaved,
+  onPreview,
+}: {
+  award: ViewerAssignment
+  clubId: number
+  detail: ClubAwardDetail
+  onSaved: (next: boolean, total: number) => void
+  onPreview: (f: EvalFile) => void
+}) {
+  const { message } = App.useApp()
+  const save = useSaveScore()
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  const [scores, setScores] = useState<Record<number, number | null>>(() => {
+    const init: Record<number, number | null> = {}
+    for (const i of detail.items) init[i.id] = detail.score?.items[i.id]?.score ?? null
+    return init
+  })
+  const [comments, setComments] = useState<Record<number, string>>(() => {
+    const init: Record<number, string> = {}
+    for (const i of detail.items) init[i.id] = detail.score?.items[i.id]?.comment ?? ''
+    return init
+  })
+  const [presentation, setPresentation] = useState<number | null>(detail.score?.presentationScore ?? null)
+  const [errors, setErrors] = useState<ReadonlySet<string>>(new Set())
+  const [pending, setPending] = useState<'save' | 'next' | null>(null)
+
+  const itemsMax = detail.items.reduce((s, i) => s + i.maxScore, 0)
+  const fullMax = itemsMax + (award.hasPresentation ? PRESENTATION_MAX : 0)
+  const total =
+    detail.items.reduce((s, i) => s + (scores[i.id] ?? 0), 0) + (award.hasPresentation ? (presentation ?? 0) : 0)
+
+  const clearError = (key: string) => {
+    if (!errors.has(key)) return
+    setErrors((prev) => {
+      const next = new Set(prev)
+      next.delete(key)
+      return next
+    })
+  }
+
+  const submit = (next: boolean) => {
+    const missing = detail.items.filter((i) => scores[i.id] == null).map((i) => String(i.id))
+    if (award.hasPresentation && presentation == null) missing.push('presentation')
+    if (missing.length) {
+      setErrors(new Set(missing))
+      message.error('所有評分細項皆須填寫')
+      // 捲動到第一個紅框欄位(全站送出驗證慣例)
+      setTimeout(() => {
+        panelRef.current
+          ?.querySelector('.ant-input-number-status-error')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 0)
+      return
+    }
+    setErrors(new Set())
+    setPending(next ? 'next' : 'save')
+    const input: ScoreSaveInput = {
+      items: detail.items.map((i) => ({
+        rubricItemId: i.id,
+        score: scores[i.id] as number,
+        comment: comments[i.id],
+      })),
+      presentationScore: award.hasPresentation ? (presentation as number) : undefined,
+    }
+    save.mutate(
+      { clubId, awardId: award.awardId, input },
+      {
+        // 成功後由父層決定關閉或切下一社團(切換即 key 重掛,pending 隨之重置)
+        onSuccess: () => onSaved(next, total),
+        onError: (e) => {
+          message.error(e.message)
+          setPending(null)
+        },
+      },
+    )
+  }
+
+  return (
+    <div ref={panelRef} style={{ display: 'flex', gap: 20, alignItems: 'stretch' }}>
+      {/* 左欄:受評資料(逐細項檔案) */}
+      <div
+        style={{
+          flex: '1 1 45%',
+          minWidth: 0,
+          maxHeight: '62vh',
+          overflowY: 'auto',
+          paddingRight: 16,
+          borderRight: '1px solid var(--line)',
+        }}
+      >
+        <div style={{ fontSize: 12, color: 'var(--steel)', marginBottom: 10 }}>受評資料</div>
+        {detail.items.map((item, idx) => {
+          const files = detail.uploads[item.id] ?? []
+          const showGroup = !!item.groupLabel && item.groupLabel !== detail.items[idx - 1]?.groupLabel
+          return (
+            <div key={item.id} style={{ paddingTop: idx > 0 ? 12 : 0 }}>
+              {showGroup && (
+                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)', margin: '4px 0 6px' }}>{item.groupLabel}</div>
+              )}
+              <div style={{ fontSize: 13, fontWeight: 500 }}>{item.name}</div>
+              {files.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>此項未繳交資料</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
+                  {files.map((f) => (
+                    <div key={f.id} style={{ display: 'flex', alignItems: 'baseline', gap: 8, minWidth: 0 }}>
+                      <button
+                        type="button"
+                        className="link-btn"
+                        style={{ padding: 0, fontSize: 13, textAlign: 'left', overflowWrap: 'anywhere' }}
+                        onClick={() => onPreview(f)}
+                      >
+                        {f.name}
+                      </button>
+                      <span className="num" style={{ fontSize: 12, color: 'var(--steel)', whiteSpace: 'nowrap' }}>
+                        {fmtSize(f.size)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* 右欄:評分面板 */}
+      <div style={{ flex: '1 1 55%', minWidth: 0, display: 'flex', flexDirection: 'column', maxHeight: '62vh' }}>
+        <div style={{ flex: 1, overflowY: 'auto', paddingRight: 4 }}>
+          <div style={{ fontSize: 12, color: 'var(--steel)', marginBottom: 4 }}>評分</div>
+          {detail.items.map((item, idx) => {
+            const key = String(item.id)
+            const showGroup = !!item.groupLabel && item.groupLabel !== detail.items[idx - 1]?.groupLabel
+            return (
+              <div key={item.id} style={{ padding: '10px 0', borderTop: idx > 0 ? '1px solid var(--line)' : undefined }}>
+                {showGroup && (
+                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--steel)', marginBottom: 6 }}>{item.groupLabel}</div>
+                )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500 }}>{item.name}</div>
+                  <InputNumber<number>
+                    min={0}
+                    max={item.maxScore}
+                    value={scores[item.id]}
+                    status={errors.has(key) ? 'error' : undefined}
+                    onChange={(v) => {
+                      setScores((prev) => ({ ...prev, [item.id]: v }))
+                      clearError(key)
+                    }}
+                    style={{ width: 90 }}
+                  />
+                  <span className="num" style={{ fontSize: 12, color: 'var(--steel)', width: 36 }}>
+                    /{fmtScore(item.maxScore)}
+                  </span>
+                </div>
+                {item.help && (
+                  <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4, lineHeight: 1.7 }}>{item.help}</div>
+                )}
+                <Input.TextArea
+                  autoSize={{ minRows: 1, maxRows: 4 }}
+                  placeholder="評語(選填)"
+                  value={comments[item.id] ?? ''}
+                  onChange={(e) => setComments((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                  style={{ marginTop: 8 }}
+                />
+              </div>
+            )
+          })}
+          {award.hasPresentation && (
+            <div style={{ padding: '10px 0', borderTop: '1px solid var(--line)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500 }}>
+                  現場簡報(<span className="num">{PRESENTATION_MAX}</span>)
+                </div>
+                <InputNumber<number>
+                  min={0}
+                  max={PRESENTATION_MAX}
+                  precision={0}
+                  value={presentation}
+                  status={errors.has('presentation') ? 'error' : undefined}
+                  onChange={(v) => {
+                    setPresentation(v)
+                    clearError('presentation')
+                  }}
+                  style={{ width: 90 }}
+                />
+                <span className="num" style={{ fontSize: 12, color: 'var(--steel)', width: 36 }}>
+                  /{PRESENTATION_MAX}
                 </span>
               </div>
-              <InputNumber
-                autoFocus={idx === 0}
-                min={0}
-                max={item.max}
-                value={draft[item.key]}
-                onChange={(v) => setDraft((prev) => ({ ...prev, [item.key]: v }))}
-                style={{ width: 90 }}
-              />
             </div>
-          ))}
-          <div style={{ borderTop: '1px solid var(--line)', paddingTop: 10, textAlign: 'right' }}>
-            合計 <span className="num" style={{ fontSize: 16, fontWeight: 600 }}>{total}</span> /{' '}
-            <span className="num">{award.items.reduce((s, i) => s + i.max, 0)}</span>
-          </div>
+          )}
         </div>
-      </Modal>
+
+        <div
+          style={{
+            borderTop: '1px solid var(--line)',
+            paddingTop: 12,
+            marginTop: 4,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+          }}
+        >
+          <div style={{ flex: 1, fontSize: 13 }}>
+            合計 <span className="num" style={{ fontSize: 18, fontWeight: 600 }}>{fmtScore(total)}</span>{' '}
+            / <span className="num">{fmtScore(fullMax)}</span>
+            {detail.score && (
+              <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 2 }}>
+                上次儲存 <span className="num">{detail.score.submittedAt}</span>
+              </div>
+            )}
+          </div>
+          <Button onClick={() => submit(false)} loading={pending === 'save'} disabled={pending === 'next'}>
+            儲存
+          </Button>
+          <Button type="primary" onClick={() => submit(true)} loading={pending === 'next'} disabled={pending === 'save'}>
+            儲存並下一社團
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }

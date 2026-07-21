@@ -105,7 +105,9 @@ export default function FilePreview({ file, open, onClose, afterClose }: FilePre
           <span style={{ display: 'inline-flex', gap: 10, alignItems: 'baseline' }}>
             <span style={{ fontSize: 15, fontWeight: 600 }}>{file.name}</span>
             <span className="num" style={{ fontSize: 12, color: 'var(--steel)', fontWeight: 400 }}>
-              {fmtSize(file.size)} · {file.uploadedAt}
+              {/* 上傳時間可能未提供(如評審端受評資料),略過分隔符 */}
+              {fmtSize(file.size)}
+              {file.uploadedAt && ` · ${file.uploadedAt}`}
             </span>
           </span>
         )

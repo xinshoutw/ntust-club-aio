@@ -13,11 +13,16 @@
 3. **CMS 資料遷移完成**(`migration/cms_import.py`,idempotent):dev 庫=159 社(3 偽社團不遷:國際事務處/testclub/學務處就輔組)、users 178(staff 17/17 含侍筱鳳 `800`;`101101101` 黃宥維已升 superadmin)、成員 30,477、活動 14,234、公告 8;一次性密碼 109 筆在 `migration/out/one_time_passwords_2026-07-21.csv`(**交承辦後銷毀**)
 4. **clubclass 遷移完成**(`migration/cc_import.py`,idempotent;來源=拋棄式 MySQL 容器 `cc-legacy`,dump=`legacy/clubclass/cc_2026-07-21.sql`):場地 23(4 停用承接歷史)、器材 25(8 停用)、教室借用 15,634(一舍 B2 拆樓梯+白板)、器材借用 7,173;行政借用 club_id=NULL 顯示「學務處」
 5. **借用五新功能**(migration `b3e7d40a95c1`):取消(cancelled 狀態)、行政手動借用頁、場地不開放規則 Rule Page(venue_block_rules)、器材單次可借上限、**聯絡電話必填**(場地/器材申請;需求方原選填後改必填)
-6. **兩輪 Opus 對抗審查已修**:CMS 輪 7 findings(無 C/H);clubclass 輪 1 HIGH(NULL club 通知 500)+1 MEDIUM(固定借用取消鈕條件)皆修畢
+6. **需求方 7 點 UX/效能調整(同日第三批)已落地**:
+   - 聯絡電話僅允許 `0-9 - ( ) * #`(前後端同規則)
+   - 各借用頁底部列表可直接取消;**「正在借用/正在申請」(全部、不限長度)+「最近」(近 5 筆)雙列表**(借用三頁+總覽+幹部證明/郵局/報修;bookings 走後端 `active=true/false` 過濾)
+   - **申請審核/結案審核改伺服器端分頁**(原整批撈 14k+ 造成卡頓):佇列只抓可簽核狀態;歷史表 20/50 一頁、活動時間新在前;篩選(社團/類型含大型推導/狀態)與排序全下推 SQL(`/admin/activities` 新參數 status/club_id/type 多值、locked、sort);總覽排除 closed、已歸還伺服器分頁
+   - 公告 markdown 連結一律開新分頁(專屬 DOMPurify 實例);Modal 動畫固定目的地(transform-origin center)
+7. **三輪 Opus 對抗審查皆已修**:CMS 輪 7 findings(無 C/H);clubclass 輪 1 HIGH(NULL club 通知 500)+1 MEDIUM;第三輪 1 HIGH(僅 areview 帳號永久 spinner)+2 MEDIUM(手動器材漏電話驗證、DOMPurify 全域 hook 外溢)
 
 ## 驗證現況(全綠)
 
-- 後端 `timeout 300 uv run pytest -q` **218 passed**、`ruff check .` 全綠
+- 後端 `timeout 300 uv run pytest -q` **222 passed**、`ruff check .` 全綠
 - 前端 `pnpm exec tsc -b` 0 錯、`pnpm test` 35 passed、lint 僅既有 fast-refresh warning
 - **注意**:dev 庫=真實遷移資料(非 seed_mock);要回 mock 環境跑 `seed_mock --yes`,要回遷移資料跑 `reset_db --yes` + `uv run python ../migration/cms_import.py`
 

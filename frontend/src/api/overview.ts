@@ -53,7 +53,18 @@ export function useOverviewActivities() {
   return useQuery({
     queryKey: overviewKeys.activities,
     queryFn: async () => {
-      const data = await fetchAllPages<ActivityOut>('/club/activities')
+      // 排除已結案(歷史大宗,總覽的待辦/進行中皆用不到;2026-07-21 SQL 分批要求)
+      const data = await fetchAllPages<ActivityOut>('/club/activities', {
+        status: [
+          'draft',
+          'pending_advisor',
+          'pending_chief',
+          'pending_dean',
+          'approved',
+          'rejected',
+          'closing_pending_advisor',
+        ],
+      })
       const today = dayjs().startOf('day')
       const todos: OverviewTodo[] = data
         .filter((a) => a.close_locked || a.can_close)

@@ -4,6 +4,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import {
+  Cols,
   MultiSortButton,
   sortRows,
   useMultiSort,
@@ -72,7 +73,9 @@ export default function AdminMaintenancePage() {
 
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-          <table className="tb dense" style={{ minWidth: 760 }}>
+          <table className="tb dense fixed" style={{ minWidth: 760 }}>
+            {/* 社團/地點截斷、項目吃剩餘寬且允許換行;申請日/狀態固定 px(狀態含單步推進下拉) */}
+            <Cols widths={['18%', '18%', 'auto', 96, 150]} />
             <thead>
               <tr>
                 <th>社團</th>
@@ -85,11 +88,11 @@ export default function AdminMaintenancePage() {
             <tbody>
               {rows.map((q) => (
                 <tr key={q.id}>
-                  <td>{q.club}</td>
-                  <td style={{ fontWeight: 500 }}>{q.location}</td>
+                  <td className="cell-clip" title={q.club}>{q.club}</td>
+                  <td className="cell-clip" title={q.location} style={{ fontWeight: 500 }}>{q.location}</td>
                   <td style={{ fontSize: 13, color: 'var(--steel)' }}>{q.items}</td>
                   <td className="num" style={{ fontSize: 13 }}>{q.date}</td>
-                  <td style={{ width: 150 }}>
+                  <td>
                     {q.status === 'done' ? (
                       <StatusPill status="done" />
                     ) : (

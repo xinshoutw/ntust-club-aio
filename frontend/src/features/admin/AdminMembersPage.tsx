@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { App, Button, Select, Spin } from 'antd'
 import { DownloadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
-import { MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
+import { Cols, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
 import { downloadCsv } from '../../lib/csv'
 import { kindLabel } from '../../lib/roles'
 import { CURRENT_SEMESTER, semesterOptions } from '../../lib/semester'
@@ -85,7 +85,9 @@ export default function AdminMembersPage() {
 
       <Spin spinning={clubId != null && listQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-          <table className="tb" style={{ minWidth: 680 }}>
+          <table className="tb fixed" style={{ minWidth: 680 }}>
+            {/* 姓名/職稱吃彈性寬並截斷;學號/身份/電話/學期/更新時間固定 px */}
+            <Cols widths={['15%', 100, 92, 'auto', 105, 80, 140]} />
             <thead>
               <tr>
                 <th><MultiSortButton label="姓名" sortKey="name" stack={stack} onToggle={toggleSort} /></th>
@@ -100,10 +102,10 @@ export default function AdminMembersPage() {
             <tbody>
               {members.map((m) => (
                 <tr key={m.id}>
-                  <td style={{ fontWeight: 500 }}>{m.name}</td>
+                  <td className="cell-clip" title={m.name} style={{ fontWeight: 500 }}>{m.name}</td>
                   <td className="num" style={{ color: 'var(--steel)' }}>{m.studentId}</td>
                   <td>{kindLabel(m.kind, clubKind)}</td>
-                  <td>{m.title ?? '—'}</td>
+                  <td className="cell-clip" title={m.title ?? undefined}>{m.title ?? '—'}</td>
                   <td className="num">{m.phone ?? '—'}</td>
                   <td className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.semester}</td>
                   <td className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.updatedAt}</td>

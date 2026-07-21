@@ -4,7 +4,7 @@ import { RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
-import { Pager } from '../../components/ui/tableControls'
+import { Cols, Pager } from '../../components/ui/tableControls'
 import { DOW_TEXT } from '../bookings/mock'
 import {
   useAdminBookingMutations,
@@ -227,7 +227,9 @@ export default function AdminRoomsPage() {
 
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-          <table className="tb dense" aria-label="待審教室固定借用" style={{ minWidth: 760 }}>
+          <table className="tb dense fixed" aria-label="待審教室固定借用" style={{ minWidth: 760 }}>
+            {/* 社團/教室/用途截斷、每週時段吃剩餘寬且允許換行;狀態/開啟固定 px */}
+            <Cols widths={['16%', '15%', 'auto', '18%', 90, 32]} />
             <thead>
               <tr>
                 <th>社團</th>
@@ -235,7 +237,7 @@ export default function AdminRoomsPage() {
                 <th>每週時段</th>
                 <th>用途</th>
                 <th>狀態</th>
-                <th aria-label="開啟" style={{ width: 32 }} />
+                <th aria-label="開啟" />
               </tr>
             </thead>
             <tbody>
@@ -248,8 +250,8 @@ export default function AdminRoomsPage() {
                   }}
                   style={{ cursor: 'pointer' }}
                 >
-                  <td>{r.club}</td>
-                  <td style={{ fontWeight: 500 }}>
+                  <td className="cell-clip" title={r.club}>{r.club}</td>
+                  <td className="cell-clip" title={r.room || '未命名教室'} style={{ fontWeight: 500 }}>
                     <button
                       type="button"
                       className="row-open-btn"
@@ -276,7 +278,7 @@ export default function AdminRoomsPage() {
                       }),
                     )}
                   </td>
-                  <td style={{ fontSize: 13, color: 'var(--steel)' }}>{r.note}</td>
+                  <td className="cell-clip" title={r.note} style={{ fontSize: 13, color: 'var(--steel)' }}>{r.note}</td>
                   <td><StatusPill status={r.status} /></td>
                   <td className="r"><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>
                 </tr>

@@ -6,6 +6,7 @@ import type { Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
+import { Cols } from '../../components/ui/tableControls'
 import { confirmDialog } from '../../lib/confirm'
 import { downloadCsv } from '../../lib/csv'
 import KindBadge from '../signup/KindBadge'
@@ -337,7 +338,9 @@ export default function SignupManagePage() {
 
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-          <table className="tb dense" style={{ minWidth: 720 }} aria-label="報名活動列表">
+          <table className="tb dense fixed" style={{ minWidth: 720 }} aria-label="報名活動列表">
+            {/* 活動名吃剩餘寬且允許換行(含類別徽章);截止/人數/狀態/開啟固定 px */}
+            <Cols widths={['auto', 100, 130, 96, 90, 32]} />
             <thead>
               <tr>
                 <th>活動</th>
@@ -345,7 +348,7 @@ export default function SignupManagePage() {
                 <th className="r">已報名</th>
                 <th className="r">每社上限</th>
                 <th>狀態</th>
-                <th aria-label="開啟" style={{ width: 32 }} />
+                <th aria-label="開啟" />
               </tr>
             </thead>
             <tbody>
@@ -376,7 +379,7 @@ export default function SignupManagePage() {
                     )}
                   </td>
                   <td className="r num">{item.maxParticipants} 人</td>
-                  <td style={{ width: 90 }}><StatusPill status={item.status} /></td>
+                  <td><StatusPill status={item.status} /></td>
                   <td className="r"><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>
                 </tr>
               ))}

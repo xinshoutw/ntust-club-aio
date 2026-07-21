@@ -4,7 +4,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
 import { fmtMoney } from '../activities/types'
-import { Pager } from '../../components/ui/tableControls'
+import { Cols, Pager } from '../../components/ui/tableControls'
 import { useModalAutoFocus } from '../../components/ui/useModalAutoFocus'
 import {
   canActOnClose,
@@ -415,14 +415,16 @@ export default function CloseReviewPage() {
       <Spin spinning={overdueQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>逾期未結案</div>
-          <table className="tb dense" style={{ minWidth: 640 }} aria-label="逾期未結案活動">
+          <table className="tb dense fixed" style={{ minWidth: 640 }} aria-label="逾期未結案活動">
+            {/* 社團/名稱吃剩餘寬並截斷;期限/狀態/動作固定 px */}
+            <Cols widths={['26%', 'auto', 110, 96, 90]} />
             <thead>
               <tr>
                 <th scope="col">社團</th>
                 <th scope="col">活動名稱</th>
                 <th scope="col">結案期限</th>
                 <th scope="col">狀態</th>
-                <th scope="col" aria-label="動作" style={{ width: 90 }} />
+                <th scope="col" aria-label="動作" />
               </tr>
             </thead>
             <tbody>
@@ -435,8 +437,8 @@ export default function CloseReviewPage() {
                     ...(overdueItem?.id === l.id && overdueOpen ? { background: 'var(--seal-tint)' } : {}),
                   }}
                 >
-                  <td>{l.club}</td>
-                  <td style={{ fontWeight: 500 }}>
+                  <td className="cell-clip" title={l.club}>{l.club}</td>
+                  <td className="cell-clip" title={l.name} style={{ fontWeight: 500 }}>
                     <button
                       type="button"
                       className="row-open-btn"
@@ -452,10 +454,10 @@ export default function CloseReviewPage() {
                   <td className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>
                     {l.closeDeadline ?? '—'}
                   </td>
-                  <td style={{ width: 110 }}>
+                  <td>
                     <StatusPill status={l.closeLocked ? 'locked' : 'unlocked'} />
                   </td>
-                  <td className="r" style={{ width: 90 }}>
+                  <td className="r">
                     {l.closeLocked && (
                       <Button
                         size="small"

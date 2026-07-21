@@ -3,6 +3,7 @@ import { App, Select, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
+import { Cols } from '../../components/ui/tableControls'
 import {
   NEXT_STATUS,
   useAdminOfficerCerts,
@@ -80,7 +81,9 @@ export default function AdminApplicationsPage() {
       <Spin spinning={certsQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
           <div style={{ padding: '14px 16px 0', fontSize: 15, fontWeight: 600 }}>幹部證明</div>
-          <table className="tb dense" style={{ minWidth: 720 }}>
+          <table className="tb dense fixed" style={{ minWidth: 720 }}>
+            {/* 社團吃剩餘寬並截斷;學年期/職位/申請人/申請日/狀態固定 px */}
+            <Cols widths={['auto', 90, 110, 100, 96, 150]} />
             <thead>
               <tr>
                 <th>社團</th>
@@ -94,12 +97,12 @@ export default function AdminApplicationsPage() {
             <tbody>
               {certs.map((c) => (
                 <tr key={c.id}>
-                  <td>{c.club}</td>
+                  <td className="cell-clip" title={c.club}>{c.club}</td>
                   <td className="num">{c.term}</td>
                   <td>{c.position}</td>
                   <td style={{ fontWeight: 500 }}>{c.applicant}</td>
                   <td className="num" style={{ fontSize: 13 }}>{c.date}</td>
-                  <td style={{ width: 150 }}>
+                  <td>
                     <StatusCell kind="cert" id={c.id} status={c.status} name={`${c.club} ${c.applicant}`} />
                   </td>
                 </tr>
@@ -124,7 +127,9 @@ export default function AdminApplicationsPage() {
       <Spin spinning={postalQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
           <div style={{ padding: '14px 16px 0', fontSize: 15, fontWeight: 600 }}>郵局帳戶異動</div>
-          <table className="tb dense" style={{ minWidth: 860 }}>
+          <table className="tb dense fixed" style={{ minWidth: 860 }}>
+            {/* 社團截斷、事由吃剩餘寬且允許換行;戶名/帳號/代理人/申請日/狀態固定 px */}
+            <Cols widths={['14%', 'auto', 100, 130, 130, 96, 150]} />
             <thead>
               <tr>
                 <th>社團</th>
@@ -139,7 +144,7 @@ export default function AdminApplicationsPage() {
             <tbody>
               {postals.map((p) => (
                 <tr key={p.id}>
-                  <td>{p.club}</td>
+                  <td className="cell-clip" title={p.club}>{p.club}</td>
                   <td style={{ fontSize: 13 }}>{p.reasons.join('、')}</td>
                   <td>{p.accountName}</td>
                   <td className="num" style={{ fontSize: 13 }}>{p.accountNumber}</td>
@@ -153,7 +158,7 @@ export default function AdminApplicationsPage() {
                     )}
                   </td>
                   <td className="num" style={{ fontSize: 13 }}>{p.date}</td>
-                  <td style={{ width: 150 }}>
+                  <td>
                     <StatusCell kind="postal" id={p.id} status={p.status} name={`${p.club} ${p.accountName}`} />
                   </td>
                 </tr>

@@ -4,7 +4,7 @@ import { App, Button, DatePicker, Spin, Tooltip } from 'antd'
 import { LeftOutlined, RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
-import { Pager } from '../../components/ui/tableControls'
+import { Cols, Pager } from '../../components/ui/tableControls'
 import BookingReviewModal from './BookingReviewModal'
 import { CELL, PERIODS, type CellState } from '../bookings/mock'
 import {
@@ -179,7 +179,9 @@ export default function AdminBookingsPage() {
       <Spin spinning={venueQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>場地</div>
-          <table className="tb dense" aria-label="待審場地借用" style={{ minWidth: 720 }}>
+          <table className="tb dense fixed" aria-label="待審場地借用" style={{ minWidth: 720 }}>
+            {/* 社團/場地截斷、時段與用途吃剩餘寬且允許換行;日期/狀態/開啟固定 px */}
+            <Cols widths={['18%', '18%', 96, 'auto', 90, 32]} />
             <thead>
               <tr>
                 <th>社團</th>
@@ -187,14 +189,14 @@ export default function AdminBookingsPage() {
                 <th>日期</th>
                 <th>時段與用途</th>
                 <th>狀態</th>
-                <th aria-label="開啟" style={{ width: 32 }} />
+                <th aria-label="開啟" />
               </tr>
             </thead>
             <tbody>
               {pendingVenues.map((v) => (
                 <tr key={v.id} onClick={() => openReview({ kind: 'venue', data: v })} style={{ cursor: 'pointer' }}>
-                  <td>{v.club}</td>
-                  <td style={{ fontWeight: 500 }}>
+                  <td className="cell-clip" title={v.club}>{v.club}</td>
+                  <td className="cell-clip" title={v.venue || '未命名場地'} style={{ fontWeight: 500 }}>
                     <button
                       type="button"
                       className="row-open-btn"
@@ -209,8 +211,8 @@ export default function AdminBookingsPage() {
                   </td>
                   <td className="num" style={{ fontSize: 13 }}>{v.date}</td>
                   <td style={{ fontSize: 13, color: 'var(--steel)' }}>第 {v.periods.join('、')} 節 · {v.purpose}</td>
-                  <td style={{ width: 90 }}><StatusPill status={v.status} /></td>
-                  <td className="r" style={{ width: 32 }}><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>
+                  <td><StatusPill status={v.status} /></td>
+                  <td className="r"><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>
                 </tr>
               ))}
               {venueQuery.isError && (
@@ -234,7 +236,9 @@ export default function AdminBookingsPage() {
       <Spin spinning={loanQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>器材</div>
-          <table className="tb dense" aria-label="待審器材借用" style={{ minWidth: 720 }}>
+          <table className="tb dense fixed" aria-label="待審器材借用" style={{ minWidth: 720 }}>
+            {/* 社團截斷、器材與數量允許換行(數量須可見)、活動與用途吃剩餘寬;期間/狀態/開啟固定 px */}
+            <Cols widths={['16%', '20%', 184, 'auto', 90, 32]} />
             <thead>
               <tr>
                 <th>社團</th>
@@ -242,7 +246,7 @@ export default function AdminBookingsPage() {
                 <th>借用期間</th>
                 <th>活動與用途</th>
                 <th>狀態</th>
-                <th aria-label="開啟" style={{ width: 32 }} />
+                <th aria-label="開啟" />
               </tr>
             </thead>
             <tbody>
@@ -251,7 +255,7 @@ export default function AdminBookingsPage() {
                 const short = l.availableExcludingSelf != null && l.qty > l.availableExcludingSelf
                 return (
                   <tr key={l.id} onClick={() => openReview({ kind: 'loan', data: l })} style={{ cursor: 'pointer' }}>
-                    <td>{l.club}</td>
+                    <td className="cell-clip" title={l.club}>{l.club}</td>
                     <td style={{ fontWeight: 500 }}>
                       <button
                         type="button"
@@ -276,8 +280,8 @@ export default function AdminBookingsPage() {
                     <td style={{ fontSize: 13, color: 'var(--steel)' }}>
                       {l.activity ? `${l.activity} · ${l.purpose}` : l.purpose}
                     </td>
-                    <td style={{ width: 90 }}><StatusPill status={l.status} /></td>
-                    <td className="r" style={{ width: 32 }}><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>
+                    <td><StatusPill status={l.status} /></td>
+                    <td className="r"><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>
                   </tr>
                 )
               })}

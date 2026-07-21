@@ -3,6 +3,7 @@ import { App, Button, DatePicker, Form, Input, Modal, Spin } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
+import { Cols } from '../../components/ui/tableControls'
 import { useAdminClubs } from '../../api/adminClubs'
 import { useAdminEquipmentLoanList } from '../../api/adminClubOverview'
 import { useOverdueMutations, useSuspendedClubs } from '../../api/adminOverdue'
@@ -73,7 +74,9 @@ export default function OverduePage() {
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>逾期未還器材</div>
         <Spin spinning={overdueQuery.isPending}>
-          <table className="tb dense" aria-label="逾期未還器材" style={{ minWidth: 720 }}>
+          <table className="tb dense fixed" aria-label="逾期未還器材" style={{ minWidth: 720 }}>
+            {/* 社團截斷、器材允許換行(數量須可見)、借用資訊吃剩餘寬;狀態/動作固定 px */}
+            <Cols widths={['18%', '20%', 'auto', 96, 100]} />
             <thead>
               <tr>
                 <th scope="col">社團</th>
@@ -86,7 +89,7 @@ export default function OverduePage() {
             <tbody>
               {overdue.map((l) => (
                 <tr key={l.apiId}>
-                  <td>{l.club}</td>
+                  <td className="cell-clip" title={l.club}>{l.club}</td>
                   <td style={{ fontWeight: 500 }}>
                     {l.equipment} <span className="num">×{l.qty}</span>
                   </td>
@@ -94,8 +97,8 @@ export default function OverduePage() {
                     借用區間 <span className="num">{l.startDate} – {l.endDate}</span>
                     {l.activity ? ` · ${l.activity}` : ''}
                   </td>
-                  <td style={{ width: 110 }}><StatusPill status="overdue" /></td>
-                  <td className="r" style={{ width: 100 }}>
+                  <td><StatusPill status="overdue" /></td>
+                  <td className="r">
                     <button
                       type="button"
                       className="link-btn"
@@ -127,7 +130,9 @@ export default function OverduePage() {
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
         <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>停權中社團</div>
         <Spin spinning={suspendedQuery.isPending}>
-          <table className="tb" aria-label="停權中社團" style={{ minWidth: 560 }}>
+          <table className="tb fixed" aria-label="停權中社團" style={{ minWidth: 560 }}>
+            {/* 社團截斷、停權資訊吃剩餘寬;狀態/動作固定 px */}
+            <Cols widths={['26%', 100, 'auto', 110]} />
             <thead>
               <tr>
                 <th scope="col">社團</th>
@@ -139,12 +144,12 @@ export default function OverduePage() {
             <tbody>
               {suspensions.map((s) => (
                 <tr key={s.id}>
-                  <td style={{ fontWeight: 500, width: 160 }}>{s.name}</td>
-                  <td style={{ width: 100 }}><StatusPill status="suspended" /></td>
+                  <td className="cell-clip" title={s.name} style={{ fontWeight: 500 }}>{s.name}</td>
+                  <td><StatusPill status="suspended" /></td>
                   <td style={{ fontSize: 13, color: 'var(--steel)' }}>
                     至 <span className="num">{s.until}</span>{s.reason ? ` · ${s.reason}` : ''}
                   </td>
-                  <td className="r" style={{ width: 100 }}>
+                  <td className="r">
                     <button
                       type="button"
                       className="link-btn primary"

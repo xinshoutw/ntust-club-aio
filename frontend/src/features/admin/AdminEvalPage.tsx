@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { App, Button, Input, InputNumber, Modal, Tooltip } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
+import { Cols } from '../../components/ui/tableControls'
 import type { AdKey } from '../eval/scoring'
 import { AD_LABELS } from '../eval/types'
 import {
@@ -116,13 +117,15 @@ export default function AdminEvalPage() {
       ) : (
         <>
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-        <table className="tb" style={{ minWidth: 780 }} aria-label="行政分評分項目">
+        <table className="tb fixed" style={{ minWidth: 780 }} aria-label="行政分評分項目">
+          {/* 評分項目吃剩餘寬(兩行說明允許換行);分數/動作固定 px */}
+          <Cols widths={['auto', 110, 130, 300]} />
           <thead>
             <tr>
               <th>評分項目</th>
               <th className="r">自動計算</th>
               <th className="r">採用分數</th>
-              <th style={{ width: 300 }}>動作</th>
+              <th>動作</th>
             </tr>
           </thead>
           <tbody>
@@ -192,7 +195,9 @@ export default function AdminEvalPage() {
       {/* 各社團行政分總覽:點列切換上方審核對象 */}
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
         <div style={{ fontSize: 14, fontWeight: 600, padding: '14px 20px 6px' }}>各社團行政分</div>
-        <table className="tb" aria-label="各社團行政分">
+        <table className="tb fixed" aria-label="各社團行政分">
+          {/* 社團名吃剩餘寬並截斷;性質/總分固定 px */}
+          <Cols widths={['auto', 120, 120]} />
           <thead>
             <tr>
               <th>社團</th>
@@ -207,7 +212,7 @@ export default function AdminEvalPage() {
                 onClick={() => setClub(c.clubName)}
                 style={{ cursor: 'pointer', fontWeight: c.clubName === club ? 600 : undefined }}
               >
-                <td>
+                <td className="cell-clip" title={c.clubName}>
                   <button
                     type="button"
                     className="row-open-btn"

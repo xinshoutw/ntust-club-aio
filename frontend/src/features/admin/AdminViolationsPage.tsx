@@ -4,6 +4,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import {
+  Cols,
   FilterButton,
   MultiSortButton,
   sortRows,
@@ -100,7 +101,9 @@ export default function AdminViolationsPage() {
 
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-          <table className="tb dense" aria-label="違規勸導紀錄" style={{ minWidth: 760 }}>
+          <table className="tb dense fixed" aria-label="違規勸導紀錄" style={{ minWidth: 760 }}>
+            {/* 社團/地點截斷、項目吃剩餘寬且允許換行;日期/填寫/期限/狀態/動作固定 px */}
+            <Cols widths={['13%', 96, '11%', 'auto', 88, 132, 90, 84]} />
             <thead>
               <tr>
                 <th>社團</th>
@@ -136,15 +139,15 @@ export default function AdminViolationsPage() {
             <tbody>
               {rows.map((v) => (
                 <tr key={v.id}>
-                  <td>{v.club}</td>
+                  <td className="cell-clip" title={v.club}>{v.club}</td>
                   <td className="num" style={{ fontSize: 13 }}>{v.date}</td>
-                  <td>{v.location}</td>
+                  <td className="cell-clip" title={v.location}>{v.location}</td>
                   <td style={{ fontSize: 13 }}>
                     <div>{v.items.join('、')}</div>
                     {v.other && <div style={{ fontSize: 12, color: 'var(--steel)' }}>{v.other}</div>}
                     {v.resolveNote && <div style={{ fontSize: 12, color: 'var(--steel)' }}>銷案:{v.resolveNote}</div>}
                   </td>
-                  <td style={{ fontSize: 13, color: 'var(--steel)' }}>{v.filler}</td>
+                  <td className="cell-clip" title={v.filler} style={{ fontSize: 13, color: 'var(--steel)' }}>{v.filler}</td>
                   <td className="num" style={{ fontSize: 13, color: v.expired ? '#B03A2E' : undefined }}>
                     {v.status === 'violation_resolved' ? '—' : v.expired ? `${v.deadline} 已截止` : v.deadline}
                   </td>

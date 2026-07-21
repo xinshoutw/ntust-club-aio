@@ -3,7 +3,7 @@ import { App, Select, Spin, Tooltip } from 'antd'
 import { DeleteOutlined, DownloadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
-import { MultiSortButton, sortParam, useMultiSort } from '../../components/ui/tableControls'
+import { Cols, MultiSortButton, sortParam, useMultiSort } from '../../components/ui/tableControls'
 import { confirmDialog } from '../../lib/confirm'
 import {
   fileDownloadUrl,
@@ -237,7 +237,9 @@ export default function AdminFilesPage() {
               <span className="num">{fmtSize(repairUsage?.sizeMb ?? repairFiles.reduce((s, f) => s + f.sizeMb, 0))}</span>
             </span>
           </div>
-          <table className="tb" style={{ minWidth: 680 }}>
+          <table className="tb fixed" style={{ minWidth: 680 }}>
+            {/* 檔名吃剩餘寬並截斷;社團截斷;大小/日期/狀態/動作固定 px */}
+            <Cols widths={['auto', '16%', 90, 110, 80, 96]} />
             <thead>
               <tr>
                 <th>檔名</th>
@@ -251,8 +253,8 @@ export default function AdminFilesPage() {
             <tbody>
               {repairFiles.map((f) => (
                 <tr key={f.id}>
-                  <td style={{ fontWeight: 500 }}>{f.name}</td>
-                  <td style={{ fontSize: 13, color: 'var(--steel)' }}>{f.club}</td>
+                  <td className="cell-clip" title={f.name} style={{ fontWeight: 500 }}>{f.name}</td>
+                  <td className="cell-clip" title={f.club} style={{ fontSize: 13, color: 'var(--steel)' }}>{f.club}</td>
                   <td className="r num" style={{ fontSize: 13 }}>{fmtSize(f.sizeMb)}</td>
                   <td className="num" style={{ fontSize: 13 }}>{f.date}</td>
                   <td style={{ fontSize: 13, color: 'var(--steel)' }}>{f.archived ? '已歸檔' : '使用中'}</td>
@@ -291,7 +293,9 @@ export default function AdminFilesPage() {
           />
         </div>
         <Spin spinning={largeQuery.isPending}>
-          <table className="tb" style={{ minWidth: 760 }}>
+          <table className="tb fixed" style={{ minWidth: 760 }}>
+            {/* 檔名吃剩餘寬並截斷;社團截斷;模組/大小/日期/狀態/動作固定 px */}
+            <Cols widths={['auto', 110, '14%', 96, 120, 80, 96]} />
             <thead>
               <tr>
                 <th>檔名</th>
@@ -310,14 +314,14 @@ export default function AdminFilesPage() {
             <tbody>
               {largeList.map((f) => (
                 <tr key={f.id}>
-                  <td style={{ fontWeight: 500 }}>{f.name}</td>
+                  <td className="cell-clip" title={f.name} style={{ fontWeight: 500 }}>{f.name}</td>
                   <td>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
                       <span style={{ width: 9, height: 9, borderRadius: 3, background: MODULE_COLORS[f.module] }} />
                       {usage?.modules.find((m) => m.key === f.module)?.label ?? f.module}
                     </span>
                   </td>
-                  <td style={{ fontSize: 13, color: 'var(--steel)' }}>{f.club}</td>
+                  <td className="cell-clip" title={f.club} style={{ fontSize: 13, color: 'var(--steel)' }}>{f.club}</td>
                   <td className="r num" style={{ fontSize: 13 }}>{fmtSize(f.sizeMb)}</td>
                   <td className="num" style={{ fontSize: 13 }}>{f.date}</td>
                   <td style={{ fontSize: 13, color: 'var(--steel)' }}>{f.archived ? '已歸檔' : '使用中'}</td>

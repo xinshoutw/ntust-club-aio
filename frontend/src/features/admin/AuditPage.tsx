@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
-import { FilterButton, Pager } from '../../components/ui/tableControls'
+import { Cols, FilterButton, Pager } from '../../components/ui/tableControls'
 import { ACTION_OPTIONS, ROLE_OPTIONS, actionKeyOf, roleKeyOf, useAuditLogs } from '../../api/adminAudit'
 
 const PAGE_SIZE = 20
@@ -56,7 +56,9 @@ export default function AuditPage() {
 
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-          <table className="tb dense" style={{ minWidth: 760 }}>
+          <table className="tb dense fixed" style={{ minWidth: 760 }}>
+            {/* 操作者截斷、內容吃剩餘寬且允許換行;時間/角色/動作固定 px */}
+            <Cols widths={[140, '13%', 90, 130, 'auto']} />
             <thead>
               <tr>
                 <th>時間</th>
@@ -100,7 +102,7 @@ export default function AuditPage() {
               {logs.map((l) => (
                 <tr key={l.id}>
                   <td className="num" style={{ fontSize: 13, color: 'var(--steel)', whiteSpace: 'nowrap' }}>{l.time}</td>
-                  <td style={{ fontWeight: 500 }}>{l.who}</td>
+                  <td className="cell-clip" title={l.who} style={{ fontWeight: 500 }}>{l.who}</td>
                   <td style={{ fontSize: 13, color: 'var(--steel)' }}>{l.roleLabel}</td>
                   <td>{l.actionLabel}</td>
                   <td style={{ fontSize: 13, color: 'var(--steel)' }}>{l.detail}</td>

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { App, Button, Checkbox, Input, InputNumber, Modal, Skeleton } from 'antd'
 import StatusPill from '../../components/ui/StatusPill'
 import LargeBadge from '../../components/ui/LargeBadge'
+import { Cols } from '../../components/ui/tableControls'
 import StampTrail, { type StampStage } from '../../components/ui/StampTrail'
 import { useModalAutoFocus } from '../../components/ui/useModalAutoFocus'
 import { fmtMoney } from '../activities/types'
@@ -328,13 +329,15 @@ export default function ActivityReviewModal({
                 <span>{item.fundSource || '—'}</span>
               )}
             </div>
-            <table className="tb dense">
+            <table className="tb dense fixed">
+              {/* 摘要吃剩餘寬(說明允許換行);金額欄固定 px */}
+              <Cols widths={['auto', 90, 90, 96]} />
               <thead>
                 <tr>
                   <th style={{ paddingLeft: 0 }}>摘要</th>
                   <th className="r">自籌</th>
                   <th className="r">擬請</th>
-                  <th className="r" style={{ width: 96, paddingRight: 0 }}>核定</th>
+                  <th className="r" style={{ paddingRight: 0 }}>核定</th>
                 </tr>
               </thead>
               <tbody>

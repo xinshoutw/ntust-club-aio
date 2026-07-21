@@ -3,7 +3,7 @@ import { App, Button, Checkbox, Input, Modal, Spin, Tabs } from 'antd'
 import { confirmDialog } from '../../lib/confirm'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
-import { Pager } from '../../components/ui/tableControls'
+import { Cols, Pager } from '../../components/ui/tableControls'
 import OneTimePasswordModal from './OneTimePasswordModal'
 import {
   USERNAME_HINT,
@@ -320,15 +320,17 @@ export default function AccountsPage() {
     )
 
   const adminsTable = (
-    <table className="tb" style={{ minWidth: 760 }}>
+    <table className="tb fixed" style={{ minWidth: 760 }}>
+      {/* 頁面權限吃剩餘寬且允許換行;姓名/帳號截斷;層級/狀態/動作固定 px */}
+      <Cols widths={['13%', 110, 90, 'auto', 84, 216]} />
       <thead>
         <tr><th>姓名</th><th>帳號</th><th>權限層級</th><th>頁面權限</th><th>狀態</th><th className="r">動作</th></tr>
       </thead>
       <tbody>
         {admins.map((a) => (
           <tr key={a.id}>
-            <td style={{ fontWeight: 500 }}>{a.name}</td>
-            <td className="num" style={{ color: 'var(--steel)' }}>{a.username}</td>
+            <td className="cell-clip" title={a.name} style={{ fontWeight: 500 }}>{a.name}</td>
+            <td className="num cell-clip" title={a.username} style={{ color: 'var(--steel)' }}>{a.username}</td>
             <td>{a.isSuper ? '最高權限' : '一般'}</td>
             <td style={{ fontSize: 13, color: 'var(--steel)' }}>{permsText(a)}</td>
             <td><ActiveTag active={a.active} /></td>
@@ -357,15 +359,16 @@ export default function AccountsPage() {
   )
 
   const staffTable = (
-    <table className="tb" style={{ minWidth: 560 }}>
+    <table className="tb fixed" style={{ minWidth: 560 }}>
+      <Cols widths={['24%', 'auto', 84, 178]} />
       <thead>
         <tr><th>姓名</th><th>帳號</th><th>狀態</th><th className="r">動作</th></tr>
       </thead>
       <tbody>
         {staff.map((a) => (
           <tr key={a.id}>
-            <td style={{ fontWeight: 500 }}>{a.name}</td>
-            <td className="num" style={{ color: 'var(--steel)' }}>{a.username}</td>
+            <td className="cell-clip" title={a.name} style={{ fontWeight: 500 }}>{a.name}</td>
+            <td className="num cell-clip" title={a.username} style={{ color: 'var(--steel)' }}>{a.username}</td>
             <td><ActiveTag active={a.active} /></td>
             {actions(a)}
           </tr>
@@ -378,15 +381,16 @@ export default function AccountsPage() {
 
   // 負責獎項/分組資料由「分組與評審指派」功能管理(後端尚未提供),先以 — 佔位
   const viewersTable = (
-    <table className="tb" style={{ minWidth: 760 }}>
+    <table className="tb fixed" style={{ minWidth: 760 }}>
+      <Cols widths={['14%', '16%', 'auto', 90, 84, 178]} />
       <thead>
         <tr><th>評審</th><th>帳號</th><th>負責獎項</th><th>分組</th><th>狀態</th><th className="r">動作</th></tr>
       </thead>
       <tbody>
         {viewers.map((a) => (
           <tr key={a.id}>
-            <td style={{ fontWeight: 500 }}>{a.name}</td>
-            <td className="num" style={{ color: 'var(--steel)' }}>{a.username}</td>
+            <td className="cell-clip" title={a.name} style={{ fontWeight: 500 }}>{a.name}</td>
+            <td className="num cell-clip" title={a.username} style={{ color: 'var(--steel)' }}>{a.username}</td>
             <td style={{ fontSize: 13, color: 'var(--muted)' }}>—</td>
             <td style={{ fontSize: 13, color: 'var(--muted)' }}>—</td>
             <td><ActiveTag active={a.active} /></td>
@@ -432,16 +436,17 @@ export default function AccountsPage() {
           }}
         />
       </div>
-      <table className="tb" style={{ minWidth: 760 }}>
+      <table className="tb fixed" style={{ minWidth: 760 }}>
+        <Cols widths={['auto', 110, '20%', 84, 160]} />
         <thead>
           <tr><th>社團名稱</th><th>性質</th><th>帳號</th><th>狀態</th><th className="r">動作</th></tr>
         </thead>
         <tbody>
           {pagedClubs.map((c) => (
             <tr key={c.id}>
-              <td style={{ fontWeight: 500 }}>{c.name}</td>
+              <td className="cell-clip" title={c.name} style={{ fontWeight: 500 }}>{c.name}</td>
               <td style={{ fontSize: 13, color: 'var(--steel)' }}>{c.attribute ?? '—'}</td>
-              <td>
+              <td className="cell-clip" title={c.username ?? undefined}>
                 {c.username != null ? (
                   <span className="num" style={{ color: 'var(--steel)' }}>{c.username}</span>
                 ) : (

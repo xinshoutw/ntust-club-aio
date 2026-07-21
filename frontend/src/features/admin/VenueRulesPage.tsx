@@ -3,6 +3,7 @@ import { useState } from 'react'
 import type { Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
+import { Cols } from '../../components/ui/tableControls'
 import { confirmDialog } from '../../lib/confirm'
 import PeriodPicker from '../bookings/PeriodPicker'
 import { useAdminVenues } from '../../api/adminBookings'
@@ -111,7 +112,9 @@ export default function VenueRulesPage() {
 
       <Spin spinning={rulesQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <table className="tb" style={{ minWidth: 720 }}>
+          <table className="tb fixed" style={{ minWidth: 720 }}>
+            {/* 場地/原因截斷;期間固定 px;星期/節次允許換行 */}
+            <Cols widths={['16%', 200, 110, 110, 'auto', 90]} />
             <thead>
               <tr>
                 <th>場地</th>
@@ -125,13 +128,13 @@ export default function VenueRulesPage() {
             <tbody>
               {rules.map((r) => (
                 <tr key={r.id}>
-                  <td style={{ fontWeight: 500 }}>{r.venueName}</td>
+                  <td className="cell-clip" title={r.venueName} style={{ fontWeight: 500 }}>{r.venueName}</td>
                   <td className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>
                     {r.startDate === r.endDate ? r.startDate : `${r.startDate} – ${r.endDate}`}
                   </td>
                   <td style={{ fontSize: 13 }}>{weekdaysText(r)}</td>
                   <td className="num" style={{ fontSize: 13 }}>{r.periods.join('、')}</td>
-                  <td style={{ fontSize: 13 }}>{r.reason}</td>
+                  <td className="cell-clip" title={r.reason} style={{ fontSize: 13 }}>{r.reason}</td>
                   <td className="r">
                     <Button size="small" danger onClick={() => doDelete(r)}>刪除</Button>
                   </td>

@@ -4,7 +4,7 @@ import { RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import LargeBadge from '../../components/ui/LargeBadge'
-import { FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
+import { Cols, FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
 import { STATUS } from '../../lib/status'
 import { useAuth } from '../../app/auth'
 import { fmtMoney } from '../activities/types'
@@ -187,7 +187,9 @@ export default function ReviewPage() {
         {/* 最近審核(他關審核中/已核准/已退回):供查閱與追蹤,預設審核時間新→舊 */}
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近審核</div>
-          <table className="tb dense" style={{ minWidth: 880 }} aria-label="最近審核的活動申請">
+          <table className="tb dense fixed" style={{ minWidth: 880 }} aria-label="最近審核的活動申請">
+            {/* 社團/名稱吃剩餘寬並截斷;類型允許換行(含大型徽章);日期/金額/狀態/審核時間固定 px */}
+            <Cols widths={['18%', 'auto', 130, 104, 90, 100, 140, 32]} />
             <thead>
               <tr>
                 <th>
@@ -236,7 +238,7 @@ export default function ReviewPage() {
                   </span>
                 </th>
                 <th><MultiSortButton label="審核時間" sortKey="reviewed_at" stack={stack} onToggle={toggleSort} /></th>
-                <th aria-label="開啟" style={{ width: 32 }} />
+                <th aria-label="開啟" />
               </tr>
             </thead>
             <tbody>
@@ -246,8 +248,8 @@ export default function ReviewPage() {
                   onClick={() => openItem(item)}
                   style={{ cursor: 'pointer', ...(current?.id === item.id && open ? { background: 'var(--seal-tint)' } : {}) }}
                 >
-                  <td>{item.club}</td>
-                  <td style={{ fontWeight: 500 }}>
+                  <td className="cell-clip" title={item.club}>{item.club}</td>
+                  <td className="cell-clip" title={item.name} style={{ fontWeight: 500 }}>
                     <button
                       type="button"
                       className="row-open-btn"

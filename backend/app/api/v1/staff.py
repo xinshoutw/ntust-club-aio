@@ -241,6 +241,8 @@ async def checkout_equipment_loan(
             raise validation_error(
                 f"依序點交器材需逐件登記序號(共 {loan.qty} 件)", code="SERIALS_REQUIRED"
             )
+        if len(set(serials)) != len(serials):
+            raise validation_error("序號不可重複", code="SERIALS_DUPLICATED")
         loan.serials = serials
     elif body.serials:
         raise validation_error("此器材為一般點交,毋須登記序號", code="SERIALS_NOT_ALLOWED")

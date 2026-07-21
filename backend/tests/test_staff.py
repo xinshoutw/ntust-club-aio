@@ -316,8 +316,8 @@ async def test_checkout_serials_and_state(client, db, monkeypatch):
     loan, _ = await make_loan(db, club.id, eq_name="無線麥克風", needs_serial=True, qty=2)
     url = f"/api/v1/staff/equipment-loans/{loan.id}/checkout"
 
-    # 序號驗證:缺件 / 空白 / 多給 / 少給 → 422
-    for serials in (None, ["A1", "   "], ["A1", "A2", "A3"], ["A1"]):
+    # 序號驗證:缺件 / 空白 / 多給 / 少給 / 重複 → 422
+    for serials in (None, ["A1", "   "], ["A1", "A2", "A3"], ["A1"], ["A1", " A1"]):
         payload = {"borrower_name": "陳借用"}
         if serials is not None:
             payload["serials"] = serials

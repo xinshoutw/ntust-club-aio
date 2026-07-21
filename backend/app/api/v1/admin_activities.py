@@ -179,9 +179,11 @@ async def list_activities(
     club_id: Annotated[list[int] | None, Query()] = None,
     type_: Annotated[list[str] | None, Query(alias="type")] = None,
     locked: bool = Query(False),
+    overdue: bool = Query(False),
     sort: str | None = None,
 ) -> ApiResponse[list[ActivityOut]]:
     # status/club_id/type 可重複帶多值;locked=true 僅回逾期鎖定(已核准+超過結案期限+未解鎖);
+    # overdue=true 回全部逾期未結案(不分是否已解鎖,結案審核頁逾期表);
     # sort 走白名單(預設 id 降冪)——清單一律伺服器端分頁(2026-07-21)
     query = (
         sa.select(Activity, Club.name)
@@ -209,16 +211,18 @@ async def list_activities(
             conds.append(_large_condition())
         query = query.where(sa.or_(*conds))
     lock_months = await get_setting(db, "close_lock_months")
-    if locked:
-        # 與 activity_service.is_close_locked 同規則:PG 月加法與 add_months 同為日夾底
+    if locked or overdue:
+        # 與 activity_service.is_close_locked 同規則:PG 月加法與 add_months 同為日夾底;
+        # locked 僅未解鎖者,overdue 不分鎖定與否(是否鎖定由回應的 close_locked 區分)
         threshold = datetime.now(TAIPEI).date()
         query = query.where(
             Activity.status == ActivityStatus.APPROVED,
-            Activity.close_unlocked.is_(False),
             sa.func.coalesce(Activity.end_date, Activity.date)
             + sa.func.make_interval(0, int(lock_months))
             < threshold,
         )
+        if locked:
+            query = query.where(Activity.close_unlocked.is_(False))
     if sort and sort.removeprefix("-") == "reviewed_at":
         # 最近審核:降冪(新→舊)與升冪皆 NULLS LAST(無審核紀錄者殿後),
         # 固定 id 降冪 tiebreak 使同秒紀錄的分頁穩定

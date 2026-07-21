@@ -451,6 +451,38 @@ async def test_list_filters_locked_and_sort(client, db):
     assert resp.status_code == 422
 
 
+async def test_overdue_filter_includes_unlocked(client, db):
+    """overdue=true 回全部逾期未結案(不分鎖定與否);locked=true 僅未解鎖者。"""
+    club = await seed(client, db)
+    creator = await make_user(db, username="creator5", club_id=club.id)
+    old = date.today() - timedelta(days=200)
+
+    def act(name, *, unlocked=False, day=old):
+        return Activity(
+            club_id=club.id, name=name, location="x", type="社課或會議",
+            date=day, end_date=day, status="approved", created_by=creator.id,
+            close_unlocked=unlocked,
+        )
+
+    db.add_all([
+        act("逾期鎖定"),
+        act("逾期已解鎖", unlocked=True),
+        act("未逾期", day=date.today() + timedelta(days=3)),
+    ])
+    await db.commit()
+
+    await login(client, "advisor")
+    resp = await client.get("/api/v1/admin/activities", params={"overdue": "true"})
+    rows = {r["name"]: r for r in resp.json()["data"]}
+    assert set(rows) == {"逾期鎖定", "逾期已解鎖"}
+    assert rows["逾期鎖定"]["close_locked"] is True  # 前端據此區分已鎖定/已解鎖列
+    assert rows["逾期已解鎖"]["close_locked"] is False
+    assert all(r["close_deadline"] for r in rows.values())
+
+    resp = await client.get("/api/v1/admin/activities", params={"locked": "true"})
+    assert {r["name"] for r in resp.json()["data"]} == {"逾期鎖定"}
+
+
 async def test_reviewed_at_field_and_sorting(client, db):
     """reviewed_at=申請+結案簽核紀錄的 max(created_at);排序兩向 NULLS LAST(無審核紀錄殿後)。"""
     from app.models.enums import ApprovalDecision, ApprovalSubject

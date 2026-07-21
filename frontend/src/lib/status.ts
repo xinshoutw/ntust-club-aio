@@ -8,6 +8,7 @@ export type StatusKey =
   | 'closed'
   | 'rejected'
   | 'locked'
+  | 'unlocked'
   | 'in_progress'
   | 'pending'
   | 'closing_due'
@@ -47,6 +48,8 @@ export const STATUS: Record<StatusKey, StatusStyle> = {
   closed: { label: '已結案', fg: '#FFFFFF', bg: '#2E7D57' },
   rejected: { label: '已退回', fg: '#B03A2E', bg: '#FBE9E7' },
   locked: { label: '已逾期', fg: '#A3341F', bg: '#F9E4DE', withLock: true },
+  // 逾期未結案但管理員已解鎖(結案審核頁逾期表):社團可補送結案,行政待其行動
+  unlocked: { label: '已解鎖', fg: '#1D5A9E', bg: '#E8F0FB' },
   in_progress: { label: '處理中', fg: '#1D5A9E', bg: '#E8F0FB' },
   // 幹部證明/郵局帳戶異動(2026-07-17 需求方拍板):審核中 → 處理中 → 請洽學務處
   processing: { label: '處理中', fg: '#1D5A9E', bg: '#E8F0FB' },

@@ -270,6 +270,8 @@ export interface AdminActivityPageParams {
   types?: string[]
   /** 僅逾期鎖定(已核准+超過結案期限+未解鎖;後端推導) */
   locked?: boolean
+  /** 全部逾期未結案(已核准+超過結案期限,不分鎖定與否;closeLocked 區分兩者) */
+  overdue?: boolean
   /** 排序白名單:club/name/type/date/status/created_at/reviewed_at;前綴 - 為降冪 */
   sort?: string
   page: number
@@ -317,6 +319,7 @@ export function useAdminActivitiesPaged(p: AdminActivityPageParams) {
           club_id: p.clubIds?.map(String),
           type: p.types,
           locked: p.locked ? true : undefined,
+          overdue: p.overdue ? true : undefined,
           sort: p.sort,
           page: p.page,
           page_size: p.pageSize,

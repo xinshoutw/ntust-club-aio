@@ -12,9 +12,10 @@ import {
   useAdminActivityMutations,
   type AdminActivity,
 } from '../../api/adminActivities'
+import ActivityReviewModal from './ActivityReviewModal'
 
-// 一頁最多 50 筆、活動時間新在前(2026-07-21 需求方:整批撈取造成瀏覽器卡頓)
-const PAGE_SIZE = 50
+// 一頁最多 25 筆(2026-07-21 需求方:50 筆太長,減半)、活動時間新在前
+const PAGE_SIZE = 25
 
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 
@@ -289,9 +290,12 @@ export default function CloseReviewPage() {
   const { message } = App.useApp()
   const [selected, setSelected] = useState<AdminActivity | null>(null)
   const [open, setOpen] = useState(false)
+  // 逾期列另開 ActivityReviewModal(唯讀活動詳情),與待審結案的 CloseReviewModal 各自獨立
+  const [overdueItem, setOverdueItem] = useState<AdminActivity | null>(null)
+  const [overdueOpen, setOverdueOpen] = useState(false)
 
   const [pendingPage, setPendingPage] = useState(1)
-  const [lockedPage, setLockedPage] = useState(1)
+  const [overduePage, setOverduePage] = useState(1)
   // 伺服器端分頁+排序:活動時間新在前(2026-07-21)
   const pendingQuery = useAdminActivitiesPaged({
     statuses: ['closing_pending_advisor'],
@@ -299,23 +303,31 @@ export default function CloseReviewPage() {
     page: pendingPage,
     pageSize: PAGE_SIZE,
   })
-  // 逾期鎖定改後端推導過濾(原自 2,800+ 筆已核准整批撈取後前端篩選)
-  const lockedQuery = useAdminActivitiesPaged({
-    locked: true,
+  // 逾期未結案:後端推導過濾,含已鎖定與已解鎖(overdue=true 不分鎖定與否)
+  const overdueQuery = useAdminActivitiesPaged({
+    overdue: true,
     sort: '-date',
-    page: lockedPage,
+    page: overduePage,
     pageSize: PAGE_SIZE,
   })
   const { unlock } = useAdminActivityMutations()
 
   const pending = pendingQuery.data?.rows ?? []
   const pendingTotal = pendingQuery.data?.total ?? 0
-  const locked = lockedQuery.data?.rows ?? []
-  const lockedTotal = lockedQuery.data?.total ?? 0
+  const overdue = overdueQuery.data?.rows ?? []
+  const overdueTotal = overdueQuery.data?.total ?? 0
+
+  // 點列即抓詳情,載入完成後彈窗自動補齊(照 ReviewPage 的立即開窗模式)
+  const overdueDetailQuery = useAdminActivityDetail(overdueItem?.activityId)
 
   const openItem = (p: AdminActivity) => {
     setSelected(p)
     setOpen(true)
+  }
+
+  const openOverdue = (l: AdminActivity) => {
+    setOverdueItem(l)
+    setOverdueOpen(true)
   }
 
   const doUnlock = (l: AdminActivity) => {
@@ -331,7 +343,7 @@ export default function CloseReviewPage() {
         title="結案審核"
         sub={
           <>
-            待審 <span className="num">{pendingTotal}</span> 件 · 逾期鎖定 <span className="num">{lockedTotal}</span> 件
+            待審 <span className="num">{pendingTotal}</span> 件 · 逾期未結案 <span className="num">{overdueTotal}</span> 件
           </>
         }
       />
@@ -396,9 +408,10 @@ export default function CloseReviewPage() {
         </div>
       </Spin>
 
-      <Spin spinning={lockedQuery.isPending}>
+      {/* 逾期未結案:已鎖定與已解鎖皆列出(狀態欄區分),整列可點開活動詳情 */}
+      <Spin spinning={overdueQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>逾期未結案(已鎖定)</div>
+          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>逾期未結案</div>
           <table className="tb dense" style={{ minWidth: 640 }} aria-label="逾期未結案活動">
             <thead>
               <tr>
@@ -410,36 +423,62 @@ export default function CloseReviewPage() {
               </tr>
             </thead>
             <tbody>
-              {locked.map((l) => (
-                <tr key={l.id} className="no-hover">
+              {overdue.map((l) => (
+                <tr
+                  key={l.id}
+                  onClick={() => openOverdue(l)}
+                  style={{
+                    cursor: 'pointer',
+                    ...(overdueItem?.id === l.id && overdueOpen ? { background: 'var(--seal-tint)' } : {}),
+                  }}
+                >
                   <td>{l.club}</td>
-                  <td style={{ fontWeight: 500 }}>{l.name}</td>
+                  <td style={{ fontWeight: 500 }}>
+                    <button
+                      type="button"
+                      className="row-open-btn"
+                      aria-label={`開啟「${l.name || '未命名活動'}」詳情`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openOverdue(l)
+                      }}
+                    >
+                      {l.name}
+                    </button>
+                  </td>
                   <td className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>
                     {l.closeDeadline ?? '—'}
                   </td>
-                  <td style={{ width: 110 }}><StatusPill status="locked" /></td>
+                  <td style={{ width: 110 }}>
+                    <StatusPill status={l.closeLocked ? 'locked' : 'unlocked'} />
+                  </td>
                   <td className="r" style={{ width: 90 }}>
-                    <Button
-                      size="small"
-                      style={{ height: 28 }}
-                      loading={unlock.isPending && unlock.variables === l.activityId}
-                      onClick={() => doUnlock(l)}
-                    >
-                      解鎖
-                    </Button>
+                    {l.closeLocked && (
+                      <Button
+                        size="small"
+                        style={{ height: 28 }}
+                        loading={unlock.isPending && unlock.variables === l.activityId}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          doUnlock(l)
+                        }}
+                      >
+                        解鎖
+                      </Button>
+                    )}
                   </td>
                 </tr>
               ))}
-              {!lockedQuery.isPending && locked.length === 0 && (
+              {!overdueQuery.isPending && overdue.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
-                    {lockedQuery.isError ? `載入失敗:${lockedQuery.error.message}` : '沒有逾期的活動'}
+                    {overdueQuery.isError ? `載入失敗:${overdueQuery.error.message}` : '沒有逾期的活動'}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
-          <Pager page={lockedPage} pageSize={PAGE_SIZE} total={lockedTotal} onChange={setLockedPage} />
+          <Pager page={overduePage} pageSize={PAGE_SIZE} total={overdueTotal} onChange={setOverduePage} />
         </div>
       </Spin>
 
@@ -451,6 +490,17 @@ export default function CloseReviewPage() {
           open={open}
           onClose={() => setOpen(false)}
           afterClose={() => setSelected(null)}
+        />
+      )}
+      {/* 逾期列:重用 ActivityReviewModal 唯讀模式(不帶 onApprove/onReject,僅供查看);
+          詳情載入完成後以完整資料(經費/附件)替換列表列 */}
+      {overdueItem && (
+        <ActivityReviewModal
+          key={overdueItem.id}
+          item={overdueDetailQuery.data ?? overdueItem}
+          open={overdueOpen}
+          onClose={() => setOverdueOpen(false)}
+          afterClose={() => setOverdueItem(null)}
         />
       )}
     </div>

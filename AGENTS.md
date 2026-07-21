@@ -234,7 +234,14 @@
 - **社團英文名 en_name**(管理項目可編輯);**attribute 改 NULL-able**(停社舊社團原性質不可考)
 - **人數語彙統一「社員/非社員」**(原申請表「校內/校外」;與舊系統語意一致)
 - **資料遷移**:`migration/cms_import.py`(idempotent,legacy_id_map;範圍與 TODO 見 `migration/README.md` 與 data-model.md §1.2)。全帳號重發一次性密碼(輸出 `migration/out/*.csv`,不入版控)+首登強制改密
-- 待需求方:評鑑檔案庫/行政歷史文件是否歸檔(TODO,需求方後續給);舊機 media 檔案實體(TODO);clubclass 借用資料另遷(MySQL,VM 偵查中)。帳號 `800` 衝突已解:偽社團「學務處就輔組」不遷
+- 待需求方:評鑑檔案庫/行政歷史文件是否歸檔(TODO,需求方後續給);舊機 media 檔案實體(TODO)。帳號 `800` 衝突已解:偽社團「學務處就輔組」不遷
+- **clubclass 遷移(同日第二批拍板,已落地)**:`migration/cc_import.py` 遷入 教室借用 15,634、器材借用 7,173(對映見 migration/README.md);連動五個新 feature:
+  - **取消借用**:Booking/Loan 新狀態 `cancelled`;社團可取消審核中或已核准未開始的借用(借用總覽動作欄;鎖列後驗狀態)
+  - **手動借用**(`/admin/manual-booking`,僅 super):行政直接借用臨時場地/器材,免審直接核准;club_id NULL、顯示「學務處」
+  - **場地不開放規則 Rule Page**(`/admin/venue-rules`,僅 super):`venue_block_rules`(區間×星期×節次+原因);場況圖「不開放」蓋過一切、社團申請 422、核准 409 SLOT_BLOCKED;行政手動借用不受限
+  - **器材單次可借上限** `equipment.max_lease_count`(NULL=不限;主檔卡可編;申請端檢核)
+  - **借用聯絡電話** phone(臨時場地/器材申請選填;舊資料遷入)
+  - migration `b3e7d40a95c1`(可逆;downgrade 刪行政借用列、cancelled→rejected)
 
 ## Roadmap(需求方 2026-07-15 宣告)
 

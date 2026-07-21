@@ -73,8 +73,15 @@
 **待辦**:(1) 舊機 media 目錄抓回後匯入檔案實體(企劃書/活動照片/附件);
 (2) 評鑑檔案庫 Club_clubfiles(12,752 檔、14 分類,新版無對應功能)是否歸檔待需求方決議;
 (3) 行政歷史文件 clubrecordfromstaff(7 筆)同上;
-(4) clubclass(場地器材借用)另套系統,dump 未含,屆時另遷。
+(4) clubclass 已遷入(2026-07-21 同日,`migration/cc_import.py`):場地/器材主檔對照
+(停用資源建 inactive 列)、教室借用 15,634、器材借用 7,173;一舍 B2 拆 樓梯+白板 兩筆;
+行政借用 club_id=NULL(顯示「學務處」);已核准且區間已過的器材借用標 returned。
 (帳號 `800` 同名衝突已解:偽社團「學務處就輔組」不遷,staff 侍筱鳳已遷入)
+**連動 schema(migration `b3e7d40a95c1`)**:BookingStatus/LoanStatus 加 cancelled;
+venue_bookings/equipment_loans 加 phone、club_id NULL-able(行政手動借用);
+equipment_loans.activity_id NULL-able(舊系統活動已刪);equipment.max_lease_count(單次上限);
+新表 **venue_block_rules**(venue_id, start_date, end_date, weekdays smallint[] NULL=每天,
+periods text[], reason, created_by)=場地不開放規則,場況圖/申請/核准檢核依據。
 
 ## 2. ER 總覽(核心關聯)
 

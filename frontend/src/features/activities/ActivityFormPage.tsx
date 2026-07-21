@@ -205,7 +205,7 @@ function ActivityForm({
   // 草稿允許部分填寫:未填欄位以 undefined 傳遞(送審路徑經完整驗證,欄位必然齊全)
   const buildInput = (v: Partial<FormValues>): ActivityInput => ({
     name: (v.name ?? '').trim(),
-    type: v.type ?? '社課',
+    type: v.type ?? '社課或會議',
     isLarge: v.type === '活動' ? !!v.isLarge : false,
     date: v.date?.format('YYYY/MM/DD'),
     endDate: v.endDate?.format('YYYY/MM/DD'),
@@ -394,7 +394,7 @@ function ActivityForm({
                 participantsOut: editing.participantsOut,
                 content: editing.content || undefined,
               }
-            : { type: '社課' }
+            : { type: '社課或會議' }
         }
       >
         <div className="actform-grid">
@@ -414,7 +414,7 @@ function ActivityForm({
                 <Form.Item label="活動類型" required style={{ marginBottom: 0 }}>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                     <Form.Item name="type" noStyle rules={[{ required: true }]}>
-                      <Select style={{ flex: 1 }} options={['社課', '活動', '會議'].map((v) => ({ value: v, label: v }))} />
+                      <Select style={{ flex: 1 }} options={['社課或會議', '活動'].map((v) => ({ value: v, label: v }))} />
                     </Form.Item>
                     {activityType === '活動' && (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}>
@@ -501,16 +501,16 @@ function ActivityForm({
               <div className="form-grid-2">
                 <Form.Item
                   name="participantsIn"
-                  label="校內參加人數"
-                  rules={[{ required: true, message: '請輸入校內人數' }]}
+                  label="社員參加人數"
+                  rules={[{ required: true, message: '請輸入社員人數' }]}
                   style={{ marginBottom: 0 }}
                 >
                   <InputNumber style={{ width: '100%' }} min={0} precision={0} />
                 </Form.Item>
                 <Form.Item
                   name="participantsOut"
-                  label="校外參加人數"
-                  rules={[{ required: true, message: '請輸入校外人數' }]}
+                  label="非社員參加人數"
+                  rules={[{ required: true, message: '請輸入非社員人數' }]}
                   style={{ marginBottom: 0 }}
                 >
                   <InputNumber style={{ width: '100%' }} min={0} precision={0} />

@@ -12,6 +12,8 @@ interface AdminClubValue {
   club: string
   /** 對應的社團主鍵;主檔載入前或名稱失配時為 null(查詢以 enabled 擋住) */
   clubId: number | null
+  /** 社團/學會(負責人顯示詞推導);載入前為 undefined */
+  clubKind: string | undefined
   setClub: (c: string) => void
 }
 
@@ -34,9 +36,11 @@ export function AdminClubProvider({ children }: { children: ReactNode }) {
     setClubState(c)
     sessionStorage.setItem(STORAGE_KEY, c)
   }
-  const clubId = clubs?.find((c) => c.name === club)?.id ?? null
+  const selected = clubs?.find((c) => c.name === club)
+  const clubId = selected?.id ?? null
+  const clubKind = selected?.kind
   return (
-    <AdminClubContext.Provider value={{ club, clubId, setClub }}>
+    <AdminClubContext.Provider value={{ club, clubId, clubKind, setClub }}>
       {children}
     </AdminClubContext.Provider>
   )

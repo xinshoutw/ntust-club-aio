@@ -1,10 +1,13 @@
-// 成員身份:標準值為 社員/幹部/副負責人/負責人;顯示時依社團名稱末字推導
-// (「…社」→社長/副社長、「…會」→會長/副會長;社團名稱強制以「社」或「會」結尾,無例外)
+// 成員身份:標準值為 社員/幹部/副負責人/負責人;顯示詞依社團的 kind(社團/學會)推導
+// (社團→社長/副社長、學會→會長/副會長;2026-07-21 起 kind 為獨立欄位,
+// 建立/改名時由名稱結尾自動推導、推導不到手動指定,取代原「名稱強制社/會結尾」規則)
 export const MEMBER_KINDS = ['社員', '幹部', '副負責人', '負責人'] as const
 export type MemberKind = (typeof MEMBER_KINDS)[number]
 
-export function kindLabel(kind: MemberKind, club: string | undefined): string {
-  const noun = club?.endsWith('會') ? '會' : '社'
+export type ClubKind = '社團' | '學會'
+
+export function kindLabel(kind: MemberKind, clubKind: ClubKind | string | undefined): string {
+  const noun = clubKind === '學會' ? '會' : '社'
   if (kind === '負責人') return `${noun}長`
   if (kind === '副負責人') return `副${noun}長`
   return kind

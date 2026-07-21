@@ -23,8 +23,8 @@ export interface Reflection {
 
 // 活動成果調查(結案表單;除影片連結外全必填,心得 ≥3 筆)
 export interface ActivityReport {
-  memberCount: number // 實際社員人數(預期值=申請的校內人數)
-  nonMemberCount: number // 實際非社員人數(預期值=申請的校外人數)
+  memberCount: number // 實際社員人數(預期值=申請的社員人數)
+  nonMemberCount: number // 實際非社員人數(預期值=申請的非社員人數)
   actualStart: string // 實際開始時間 HH:mm(預填申請的預估時間)
   actualEnd: string
   actualLocation: string // 實際地點(預填申請地點)
@@ -46,7 +46,7 @@ export interface Activity {
   id: string
   name: string
   club: string
-  type: '社課' | '活動' | '會議'
+  type: '社課或會議' | '活動'
   isLarge?: boolean // 社團申請大型活動
   largeApproved?: boolean // 管理員認可後行政分才享大型 ×3 加權
   date: string // 開始日期

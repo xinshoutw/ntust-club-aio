@@ -77,7 +77,7 @@ export default function CertificatePage() {
               <Input readOnly style={{ background: 'var(--paper)' }} />
             </Form.Item>
             <Form.Item name="position" label="擔任職位" rules={[{ required: true, message: '請選擇職位' }]} style={{ marginBottom: 0 }}>
-              <Select placeholder="請選擇" options={POSITIONS.map((p) => ({ value: p, label: kindLabel(p, user?.club) }))} />
+              <Select placeholder="請選擇" options={POSITIONS.map((p) => ({ value: p, label: kindLabel(p, user?.clubKind) }))} />
             </Form.Item>
             <div>
               <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>姓名</div>
@@ -121,7 +121,7 @@ export default function CertificatePage() {
             <tbody>
               {records.map((c) => (
                 <tr key={c.id}>
-                  <td style={{ fontWeight: 500 }}>{`${c.applicantName} (${kindLabel(c.position, user?.club)})`}</td>
+                  <td style={{ fontWeight: 500 }}>{`${c.applicantName} (${kindLabel(c.position, user?.clubKind)})`}</td>
                   <td style={{ color: 'var(--steel)', fontSize: 13 }}>{termLabel(c.term)}</td>
                   <td className="num" style={{ fontSize: 13, width: 110 }}>{c.date}</td>
                   <td style={{ width: 100 }}><StatusPill status={c.status} /></td>

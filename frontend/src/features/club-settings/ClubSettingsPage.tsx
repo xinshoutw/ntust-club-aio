@@ -14,6 +14,11 @@ interface SettingsValues {
   advisorDept?: string
   advisorEmail?: string
   advisorExt?: string
+  advisorOutName?: string
+  advisorOutDept?: string
+  advisorOutEmail?: string
+  advisorOutPhone?: string
+  enName?: string
   url?: string
   intro?: string
   email1: string
@@ -31,6 +36,11 @@ const PROFILE_KEYS = [
   'advisorDept',
   'advisorEmail',
   'advisorExt',
+  'advisorOutName',
+  'advisorOutDept',
+  'advisorOutEmail',
+  'advisorOutPhone',
+  'enName',
   'url',
   'intro',
   'email1',
@@ -45,6 +55,11 @@ const fromProfile = (p: ClubProfile): SettingsValues => ({
   advisorDept: p.advisorDept,
   advisorEmail: p.advisorEmail,
   advisorExt: p.advisorExt,
+  advisorOutName: p.advisorOutName,
+  advisorOutDept: p.advisorOutDept,
+  advisorOutEmail: p.advisorOutEmail,
+  advisorOutPhone: p.advisorOutPhone,
+  enName: p.enName,
   url: p.url,
   intro: p.intro,
   email1: p.emails[0],
@@ -116,6 +131,11 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
           advisorDept: v.advisorDept ?? '',
           advisorEmail: v.advisorEmail ?? '',
           advisorExt: v.advisorExt ?? '',
+          advisorOutName: v.advisorOutName ?? '',
+          advisorOutDept: v.advisorOutDept ?? '',
+          advisorOutEmail: v.advisorOutEmail ?? '',
+          advisorOutPhone: v.advisorOutPhone ?? '',
+          enName: v.enName ?? '',
         })
         baseline = fromProfile(next)
         setSaved(baseline)
@@ -155,6 +175,8 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
         <div className="form-grid-2" style={{ marginTop: 20, alignItems: 'stretch' }}>
           <div className="card" style={{ padding: 24 }}>
             <div style={sectionTitle}>指導老師</div>
+            {/* 校內/校外各至多一位(2026-07-21) */}
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--steel)', marginBottom: 8 }}>校內</div>
             <div className="form-grid-2">
               <Form.Item
                 name="advisorName"
@@ -181,12 +203,36 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
                 <Input className="num" />
               </Form.Item>
             </div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--steel)', margin: '16px 0 8px' }}>校外(選填)</div>
+            <div className="form-grid-2">
+              <Form.Item name="advisorOutName" label="姓名" className={itemClass('advisorOutName')} style={{ marginBottom: 0 }}>
+                <Input />
+              </Form.Item>
+              <Form.Item name="advisorOutDept" label="單位/職稱" className={itemClass('advisorOutDept')} style={{ marginBottom: 0 }}>
+                <Input />
+              </Form.Item>
+              <Form.Item
+                name="advisorOutEmail"
+                label="Email"
+                className={itemClass('advisorOutEmail')}
+                rules={[{ type: 'email', message: 'Email 格式不正確' }]}
+                style={{ marginBottom: 0 }}
+              >
+                <Input />
+              </Form.Item>
+              <Form.Item name="advisorOutPhone" label="電話" className={itemClass('advisorOutPhone')} style={{ marginBottom: 0 }}>
+                <Input className="num" />
+              </Form.Item>
+            </div>
           </div>
 
           <div className="card" style={{ padding: 24 }}>
             <div style={sectionTitle}>社團簡介</div>
             <Form.Item label="社團名稱">
               <Input readOnly value={profile.name} style={{ background: 'var(--paper)' }} />
+            </Form.Item>
+            <Form.Item name="enName" label="英文名稱" className={itemClass('enName')}>
+              <Input placeholder="English name（選填）" />
             </Form.Item>
             <Form.Item
               name="url"

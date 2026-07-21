@@ -13,13 +13,15 @@ export const slashDate = (iso: string): string => dayjs(iso).format('YYYY/MM/DD'
 export interface AdminClub {
   id: number
   name: string
-  attribute: string
+  kind: string // 社團/學會
+  attribute: string | null // 停社舊社團原性質不可考 → null
   username: string | null // 社團帳號(一社一帳號;尚未建立時為 null)
   isActive: boolean
   suspendedUntil: string | null // YYYY/MM/DD;null=未停權
 }
 
 export interface AdminClubDetail extends AdminClub {
+  enName: string
   intro: string
   websiteUrl: string | null
   contactEmails: string[]
@@ -28,19 +30,25 @@ export interface AdminClubDetail extends AdminClub {
   advisorDept: string | null
   advisorEmail: string | null
   advisorExt: string | null
+  advisorOutName: string | null
+  advisorOutDept: string | null
+  advisorOutEmail: string | null
+  advisorOutPhone: string | null
   suspendReason: string | null
 }
 
 interface AdminClubOut {
   id: number
   name: string
-  attribute: string
+  kind: string
+  attribute: string | null
   username: string | null
   is_active: boolean
   suspended_until: string | null
 }
 
 interface AdminClubDetailOut extends AdminClubOut {
+  en_name: string | null
   intro: string
   website_url: string | null
   contact_emails: string[]
@@ -49,12 +57,17 @@ interface AdminClubDetailOut extends AdminClubOut {
   advisor_dept: string | null
   advisor_email: string | null
   advisor_ext: string | null
+  advisor_out_name: string | null
+  advisor_out_dept: string | null
+  advisor_out_email: string | null
+  advisor_out_phone: string | null
   suspend_reason: string | null
 }
 
 const toClub = (c: AdminClubOut): AdminClub => ({
   id: c.id,
   name: c.name,
+  kind: c.kind,
   attribute: c.attribute,
   username: c.username,
   isActive: c.is_active,
@@ -63,6 +76,7 @@ const toClub = (c: AdminClubOut): AdminClub => ({
 
 const toDetail = (c: AdminClubDetailOut): AdminClubDetail => ({
   ...toClub(c),
+  enName: c.en_name ?? '',
   intro: c.intro,
   websiteUrl: c.website_url,
   contactEmails: c.contact_emails,
@@ -71,6 +85,10 @@ const toDetail = (c: AdminClubDetailOut): AdminClubDetail => ({
   advisorDept: c.advisor_dept,
   advisorEmail: c.advisor_email,
   advisorExt: c.advisor_ext,
+  advisorOutName: c.advisor_out_name,
+  advisorOutDept: c.advisor_out_dept,
+  advisorOutEmail: c.advisor_out_email,
+  advisorOutPhone: c.advisor_out_phone,
   suspendReason: c.suspend_reason,
 })
 
@@ -109,7 +127,8 @@ export function useAdminClubs() {
 export interface ClubOption {
   id: number
   name: string
-  attribute: string
+  kind: string // 社團/學會(負責人顯示詞推導)
+  attribute: string | null // null 歸「未分類」
 }
 
 export function useClubOptions() {
@@ -136,6 +155,7 @@ export interface AdminMember {
   studentId: string
   kind: MemberKind
   title?: string
+  phone?: string
   semester: string
   updatedAt: string
 }
@@ -146,6 +166,7 @@ interface MemberOut {
   student_id: string
   kind: MemberKind
   title: string | null
+  phone: string | null
   semester: string
   updated_at: string
 }
@@ -156,6 +177,7 @@ const toMember = (m: MemberOut): AdminMember => ({
   studentId: m.student_id,
   kind: m.kind,
   title: m.title ?? undefined,
+  phone: m.phone ?? undefined,
   semester: m.semester,
   updatedAt: dayjs(m.updated_at).format('YYYY/MM/DD HH:mm'),
 })
@@ -190,6 +212,8 @@ export async function fetchAllAdminMembers(clubId: number, semester?: string): P
 export interface AdminClubPatch {
   id: number
   name?: string
+  kind?: string // 社團/學會;改名推導不到時手動指定
+  enName?: string
   username?: string
   isActive?: boolean
 }
@@ -198,11 +222,11 @@ export function useAdminClubMutations() {
   const qc = useQueryClient()
   const invalidate = () => void qc.invalidateQueries({ queryKey: adminClubKeys.all })
   const update = useMutation({
-    mutationFn: ({ id, name, username, isActive }: AdminClubPatch) =>
+    mutationFn: ({ id, name, kind, enName, username, isActive }: AdminClubPatch) =>
       api<AdminClubDetailOut>(`/admin/clubs/${id}`, {
         method: 'PATCH',
         // JSON.stringify 會略過 undefined 欄位 → 未變更欄位不送(後端 exclude_unset)
-        body: JSON.stringify({ name, username, is_active: isActive }),
+        body: JSON.stringify({ name, kind, en_name: enName, username, is_active: isActive }),
       }).then(toDetail),
     onSuccess: invalidate,
   })

@@ -240,7 +240,7 @@ export default function ActivityReviewModal({
             <div style={detailLabel}>地點</div><div>{d?.location ?? '—'}</div>
             <div style={detailLabel}>參加人數</div>
             <div>
-              校內 <span className="num">{d?.participantsIn ?? '—'}</span> · 校外{' '}
+              社員 <span className="num">{d?.participantsIn ?? '—'}</span> · 非社員{' '}
               <span className="num">{d?.participantsOut ?? '—'}</span>
             </div>
             <div style={detailLabel}>送件</div>

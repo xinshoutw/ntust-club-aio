@@ -97,7 +97,7 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
   const actualTime = rep ? `${rep.actualStart}–${rep.actualEnd}` : ''
   const timeChanged = !!rep && normTime(actualTime) !== normTime(a.timeRange ?? '')
   const locationChanged = !!rep && rep.actualLocation !== a.location
-  const plannedCountsText = `校內 ${a.participantsIn} · 校外 ${a.participantsOut}`
+  const plannedCountsText = `社員 ${a.participantsIn} · 非社員 ${a.participantsOut}`
   const countChanged = !!rep && (rep.memberCount !== a.participantsIn || rep.nonMemberCount !== a.participantsOut)
 
   const downloadItems = [
@@ -493,7 +493,7 @@ export default function ActivityListPage() {
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     {sortHeader('類型', 'type')}
                     <FilterButton
-                      options={['社課', '活動', '會議']}
+                      options={['社課或會議', '活動']}
                       selected={typeFilter}
                       onChange={(next) => { setTypeFilter(next); setPage(1) }}
                       label="篩選類型"

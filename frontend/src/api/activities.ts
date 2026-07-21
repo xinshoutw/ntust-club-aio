@@ -8,7 +8,7 @@ import type { StatusKey } from '../lib/status'
 import { fileTypeOf, type EvalFile, type EvalFileType } from '../features/eval/types'
 import type { ActivityReport, BudgetItem, Reflection, WorkItem } from '../features/activities/types'
 
-export type ActivityType = '社課' | '活動' | '會議'
+export type ActivityType = '社課或會議' | '活動'
 
 export interface ClubActivity {
   id: number

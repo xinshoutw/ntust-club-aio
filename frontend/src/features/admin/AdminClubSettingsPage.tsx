@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { App, Button, Input, Spin, Switch } from 'antd'
+import { App, Button, Input, Select, Spin, Switch } from 'antd'
 import { confirmDialog } from '../../lib/confirm'
 import PageHeader from '../../components/ui/PageHeader'
 import { useUnsavedGuard } from '../../app/unsaved'
@@ -12,15 +12,25 @@ const label: React.CSSProperties = { color: 'var(--steel)' }
 
 interface FormState {
   name: string
+  kind: string // 社團/學會;名稱結尾可推導時自動同步,推導不到時手動指定
   account: string
   active: boolean
 }
+
+// 名稱結尾推導 社團/學會;推導不到回 null(與後端 derive_kind 同規則)
+const deriveKind = (name: string): string | null =>
+  name.endsWith('社') ? '社團' : name.endsWith('會') ? '學會' : null
 
 const advisorText = (d: AdminClubDetail | undefined): string => {
   if (!d?.advisorName) return '—'
   return [d.advisorName, d.advisorDept, d.advisorExt ? `分機 ${d.advisorExt}` : null]
     .filter(Boolean)
     .join(' · ')
+}
+
+const advisorOutText = (d: AdminClubDetail | undefined): string => {
+  if (!d?.advisorOutName) return '—'
+  return [d.advisorOutName, d.advisorOutDept, d.advisorOutPhone].filter(Boolean).join(' · ')
 }
 
 // 行政端管理項目:社團自行維護的內容唯讀;可改名稱/帳號、重設密碼、啟停用
@@ -35,13 +45,17 @@ export default function AdminClubSettingsPage() {
   // 切換社團當下新社團詳情尚未載入會使派生值變 null、dirty 誤判為 false,繞過切換確認)
   const [saved, setSaved] = useState<FormState | null>(null)
   const [form, setForm] = useState<FormState | null>(null)
-  const [nameError, setNameError] = useState(false)
   // 一次性密碼:API 回傳後才開彈窗;關閉動畫結束即卸載(明碼不留存)
   const [pw, setPw] = useState<{ password: string; account?: string } | null>(null)
   const [pwOpen, setPwOpen] = useState(false)
 
   const dirty =
-    !!form && !!saved && (form.name !== saved.name || form.account !== saved.account || form.active !== saved.active)
+    !!form &&
+    !!saved &&
+    (form.name !== saved.name ||
+      form.kind !== saved.kind ||
+      form.account !== saved.account ||
+      form.active !== saved.active)
   // 未儲存離開警告:側欄/頂欄導航由 shell 攔截,關閉分頁由 beforeunload 攔截
   useUnsavedGuard(dirty)
   const dirtyRef = useRef(dirty)
@@ -54,7 +68,6 @@ export default function AdminClubSettingsPage() {
     const resetTo = () => {
       setSaved(null)
       setForm(null)
-      setNameError(false)
       setLastClub(club)
     }
     if (!dirtyRef.current) {
@@ -75,7 +88,12 @@ export default function AdminClubSettingsPage() {
   // 詳情載入後初始化基準與編輯值;切換社團(兩者歸 null)後以新社團詳情重新初始化
   useEffect(() => {
     if (form === null && detail && club === lastClub) {
-      const base = { name: detail.name, account: detail.username ?? '', active: detail.isActive }
+      const base = {
+        name: detail.name,
+        kind: detail.kind,
+        account: detail.username ?? '',
+        active: detail.isActive,
+      }
       setSaved(base)
       setForm(base)
     }
@@ -85,12 +103,6 @@ export default function AdminClubSettingsPage() {
   const save = () => {
     if (!form || !saved || clubId == null) return
     const name = form.name.trim()
-    // 社團名稱強制以「社」或「會」結尾(社長/會長身份顯示依此推導),無例外;後端亦驗證
-    if (!/[社會]$/.test(name)) {
-      setNameError(true)
-      message.error('社團名稱必須以「社」或「會」結尾')
-      return
-    }
     if (!dirty) {
       message.info('內容未變更')
       return
@@ -101,12 +113,18 @@ export default function AdminClubSettingsPage() {
           id: clubId,
           // 僅送有變更的欄位(undefined 不會進 JSON body)
           name: name !== saved.name ? name : undefined,
+          kind: form.kind !== saved.kind ? form.kind : undefined,
           username: form.account.trim() !== saved.account ? form.account.trim() : undefined,
           isActive: form.active !== saved.active ? form.active : undefined,
         },
         {
           onSuccess: (res) => {
-            const base = { name: res.name, account: res.username ?? '', active: res.isActive }
+            const base = {
+              name: res.name,
+              kind: res.kind,
+              account: res.username ?? '',
+              active: res.isActive,
+            }
             setSaved(base)
             setForm(base)
             message.success(res.isActive ? `已儲存 ${res.name} 帳號設定` : `已停用 ${res.name} 帳號`)
@@ -164,7 +182,9 @@ export default function AdminClubSettingsPage() {
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>社團資料</div>
           <Spin spinning={clubId != null && detailQuery.isPending}>
             <div style={{ display: 'grid', gridTemplateColumns: '104px 1fr', gap: '10px 12px', fontSize: 13 }}>
-              <div style={label}>指導老師</div><div>{advisorText(detail)}</div>
+              <div style={label}>英文名稱</div><div>{detail?.enName || '—'}</div>
+              <div style={label}>校內指導老師</div><div>{advisorText(detail)}</div>
+              <div style={label}>校外指導老師</div><div>{advisorOutText(detail)}</div>
               <div style={label}>網頁連結</div>
               <div>
                 {detail?.websiteUrl ? (
@@ -193,15 +213,28 @@ export default function AdminClubSettingsPage() {
                 <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>社團名稱</div>
                 <Input
                   value={form.name}
-                  status={nameError ? 'error' : undefined}
                   onChange={(e) => {
-                    setNameError(false)
-                    setForm({ ...form, name: e.target.value })
+                    const name = e.target.value
+                    // 結尾社/會自動推導類型;推導不到保留原值由下方手動指定
+                    setForm({ ...form, name, kind: deriveKind(name.trim()) ?? form.kind })
                   }}
                 />
-                {nameError && (
-                  <div style={{ fontSize: 12, color: '#C13B34', marginTop: 4 }}>社團名稱必須以「社」或「會」結尾</div>
-                )}
+              </div>
+              <div className={form.kind !== saved.kind ? 'field-dirty' : undefined}>
+                <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>類型</div>
+                <Select
+                  value={form.kind}
+                  style={{ width: 140 }}
+                  options={[
+                    { value: '社團', label: '社團' },
+                    { value: '學會', label: '學會' },
+                  ]}
+                  disabled={deriveKind(form.name.trim()) != null}
+                  onChange={(v) => setForm({ ...form, kind: v })}
+                />
+                <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>
+                  名稱以「社」/「會」結尾時自動判定;其他結尾請手動指定(影響社長/會長顯示詞)
+                </div>
               </div>
               <div className={form.account !== saved.account ? 'field-dirty' : undefined}>
                 <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>社團帳號</div>

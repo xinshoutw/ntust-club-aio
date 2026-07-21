@@ -25,7 +25,7 @@ const typeKey = (item: AdminActivity): string =>
   item.type === '活動' && (item.largeApproved === true || (item.isLarge && item.largeApproved !== false))
     ? '大型活動'
     : item.type
-const TYPE_OPTIONS = ['社課', '會議', '活動', '大型活動']
+const TYPE_OPTIONS = ['社課或會議', '活動', '大型活動']
 
 type SortKey = 'club' | 'name' | 'type' | 'date' | 'status'
 

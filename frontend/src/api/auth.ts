@@ -7,8 +7,10 @@ export interface SessionUser {
   role: Role
   username: string
   name: string
-  /** 社團名稱(role=club);社/會結尾,身份顯示詞由此推導 */
+  /** 社團名稱(role=club) */
   club?: string
+  /** 社團/學會(role=club);負責人顯示詞(社長/會長)由此推導 */
+  clubKind?: string
   clubId?: number
   isSuper: boolean
   permissions: string[]
@@ -24,6 +26,7 @@ interface UserOut {
   email: string | null
   club_id: number | null
   club_name: string | null
+  club_kind: string | null
   is_super: boolean
   permissions: string[]
   can_view_eval: boolean
@@ -36,6 +39,7 @@ const toUser = (u: UserOut): SessionUser => ({
   username: u.username,
   name: u.name,
   club: u.club_name ?? undefined,
+  clubKind: u.club_kind ?? undefined,
   clubId: u.club_id ?? undefined,
   isSuper: u.is_super,
   permissions: u.permissions,

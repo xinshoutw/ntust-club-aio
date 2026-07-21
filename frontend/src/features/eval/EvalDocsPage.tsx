@@ -4,7 +4,7 @@ import { RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { useEvalOverview } from '../../api/eval'
 import type { AdKey, FinalScore } from './scoring'
-import { AD_LABELS, AWARD_BRIEFS } from './types'
+import { AD_LABELS } from './types'
 
 // 各項分數的資料來源頁:點字卡跳轉(如網頁經營 → 管理項目)
 const AD_ROUTES: Record<AdKey, string> = {
@@ -83,12 +83,6 @@ export default function EvalDocsPage() {
             }}
             style={{ padding: '14px 18px', cursor: 'pointer' }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ fontSize: 11, color: 'var(--steel)', letterSpacing: 1, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {AD_LABELS[s.key].group}
-              </div>
-              <RightOutlined style={{ fontSize: 10, color: 'var(--steel)' }} />
-            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
               <div style={{ fontSize: 14, fontWeight: 600, flex: 1 }}>{AD_LABELS[s.key].name}</div>
               {s.overridden && (
@@ -100,7 +94,6 @@ export default function EvalDocsPage() {
             <div style={{ marginTop: 10 }}>
               <ScoreValue s={s} />
             </div>
-            <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 8, lineHeight: 1.6 }}>{s.note}</div>
           </div>
         ))}
       </div>
@@ -127,7 +120,6 @@ export default function EvalDocsPage() {
               <div style={{ fontSize: 15, fontWeight: 600, flex: 1 }}>{award.name}</div>
               <RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />
             </div>
-            <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>{AWARD_BRIEFS[award.id] ?? ''}</div>
             <div style={{ fontSize: 12, marginTop: 10 }}>
               已上傳 <span className="num" style={{ fontWeight: 600 }}>{award.filled}</span>
               <span className="num" style={{ color: 'var(--steel)' }}>/{award.total}</span> 項

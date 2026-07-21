@@ -21,8 +21,8 @@ const PAGE_SIZE = 50
 export default function MembersPage() {
   const { message } = App.useApp()
   const { user } = useAuth()
-  // 身份顯示依社團名稱末字推導(社→社長、會→會長);儲存值一律為標準身份
-  const label = (k: MemberKind) => kindLabel(k, user?.club)
+  // 身份顯示依社團 kind 推導(社團→社長、學會→會長);儲存值一律為標準身份
+  const label = (k: MemberKind) => kindLabel(k, user?.clubKind)
   const kindOptions = MEMBER_KINDS.map((k) => ({ value: k, label: label(k) }))
 
   const [addOpen, setAddOpen] = useState(false)
@@ -36,7 +36,7 @@ export default function MembersPage() {
   const [sort, setSort] = useState<{ key: 'kind' | 'title'; dir: 1 | -1 } | null>(null)
   // 篩選值為顯示詞(社長/會長依社團名稱推導),查詢時轉回標準身份
   const [kindFilter, setKindFilter] = useState<string[]>([])
-  const [editing, setEditing] = useState<{ id: number; field: 'kind' | 'title' } | null>(null)
+  const [editing, setEditing] = useState<{ id: number; field: 'kind' | 'title' | 'phone' } | null>(null)
   const [form] = Form.useForm()
   const kind = Form.useWatch('kind', form)
 
@@ -63,7 +63,7 @@ export default function MembersPage() {
   // 頁面目前顯示的學期(「全部學期」時退回當前學期),作為各對話框的預設
   const pageSemester = semester === 'all' ? CURRENT_SEMESTER : semester
 
-  const onAdd = (values: { name: string; studentId: string; kind: MemberKind; title?: string; semester: string }) => {
+  const onAdd = (values: { name: string; studentId: string; kind: MemberKind; title?: string; phone?: string; semester: string }) => {
     create.mutate(values, {
       onSuccess: () => {
         setAddOpen(false)
@@ -76,7 +76,7 @@ export default function MembersPage() {
 
   const doImport = () => {
     if (!csvText.trim()) {
-      message.error('請先選擇檔案或貼上內容;格式:姓名,學號,身份[,職稱]')
+      message.error('請先選擇檔案或貼上內容;格式:姓名,學號,身份[,職稱[,電話]]')
       return
     }
     importCsv.mutate(
@@ -110,7 +110,7 @@ export default function MembersPage() {
       // 職稱補空字串讓各列欄數一致
       downloadCsv(
         `成員名單_${csvSemester}.csv`,
-        rows.map((m) => [m.name, m.studentId, label(m.kind), m.title ?? '']),
+        rows.map((m) => [m.name, m.studentId, label(m.kind), m.title ?? '', m.phone ?? '']),
       )
       setExportOpen(false)
       message.success(`已匯出 ${rows.length} 名成員(${csvSemester})`)
@@ -121,7 +121,7 @@ export default function MembersPage() {
     }
   }
 
-  const patchMember = (id: number, patch: { kind?: MemberKind; title?: string | null }) => {
+  const patchMember = (id: number, patch: { kind?: MemberKind; title?: string | null; phone?: string | null }) => {
     update.mutate(
       { id, ...patch },
       {
@@ -205,6 +205,7 @@ export default function MembersPage() {
                 <th>
                   <SortButton label="職稱" sortKey="title" sort={sort} onToggle={toggleSort} />
                 </th>
+                <th>電話</th>
                 <th>學期</th>
                 <th>更新時間</th>
                 <th className="r">動作</th>
@@ -225,8 +226,8 @@ export default function MembersPage() {
                         style={{ width: 150 }}
                         options={kindOptions}
                         onChange={(v) => {
-                          // 職稱僅幹部有;換成其他身份一律清除,避免殘留舊職稱
-                          patchMember(m.id, { kind: v, ...(v === '幹部' ? {} : { title: null }) })
+                          // 職稱各身份皆可保留(2026-07-21 放寬)
+                          patchMember(m.id, { kind: v })
                           setEditing(null)
                         }}
                         onBlur={() => setEditing(null)}
@@ -253,11 +254,32 @@ export default function MembersPage() {
                           setEditing(null)
                         }}
                       />
-                    ) : m.kind !== '幹部' ? (
-                      <span style={{ color: 'var(--muted)' }}>—</span>
                     ) : (
                       <button type="button" className="link-btn" style={{ padding: 0, color: 'var(--ink)' }} onClick={() => setEditing({ id: m.id, field: 'title' })}>
-                        {m.title ?? '(未填)'} <EditOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />
+                        {m.title ?? (m.kind === '幹部' ? '(未填)' : '—')} <EditOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />
+                      </button>
+                    )}
+                  </td>
+                  <td>
+                    {editing?.id === m.id && editing.field === 'phone' ? (
+                      <Input
+                        size="small"
+                        autoFocus
+                        defaultValue={m.phone}
+                        className="num"
+                        style={{ width: 130 }}
+                        onBlur={(e) => {
+                          patchMember(m.id, { phone: e.target.value.trim() || null })
+                          setEditing(null)
+                        }}
+                        onPressEnter={(e) => {
+                          patchMember(m.id, { phone: (e.target as HTMLInputElement).value.trim() || null })
+                          setEditing(null)
+                        }}
+                      />
+                    ) : (
+                      <button type="button" className="link-btn num" style={{ padding: 0, color: 'var(--ink)' }} onClick={() => setEditing({ id: m.id, field: 'phone' })}>
+                        {m.phone ?? '—'} <EditOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />
                       </button>
                     )}
                   </td>
@@ -283,14 +305,14 @@ export default function MembersPage() {
               ))}
               {listQuery.isError && (
                 <tr className="no-hover">
-                  <td colSpan={7}>
+                  <td colSpan={8}>
                     <QueryError compact title="成員名單載入失敗" error={listQuery.error} onRetry={() => listQuery.refetch()} />
                   </td>
                 </tr>
               )}
               {!listQuery.isError && !listQuery.isPending && members.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
+                  <td colSpan={8} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
                     尚未建立成員名單
                   </td>
                 </tr>
@@ -325,11 +347,16 @@ export default function MembersPage() {
           <Form.Item name="kind" label="身份" rules={[{ required: true }]}>
             <Select options={kindOptions} />
           </Form.Item>
-          {kind === '幹部' && (
-            <Form.Item name="title" label="職稱" preserve={false} rules={[{ required: true, message: '請填寫職稱' }]}>
-              <Input placeholder="例:總務、活動" />
-            </Form.Item>
-          )}
+          <Form.Item
+            name="title"
+            label="職稱"
+            rules={kind === '幹部' ? [{ required: true, message: '請填寫職稱' }] : []}
+          >
+            <Input placeholder={kind === '幹部' ? '例:總務、活動' : '選填'} />
+          </Form.Item>
+          <Form.Item name="phone" label="電話">
+            <Input className="num" placeholder="選填" />
+          </Form.Item>
         </Form>
       </Modal>
 
@@ -360,7 +387,7 @@ export default function MembersPage() {
           rows={6}
           value={csvText}
           onChange={(e) => setCsvText(e.target.value)}
-          placeholder={'王小明,B11100001,幹部,活動\n林大同,B11100002,社員'}
+          placeholder={'王小明,B11100001,幹部,活動,0912345678\n林大同,B11100002,社員'}
         />
       </Modal>
 

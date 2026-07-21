@@ -1,8 +1,10 @@
 # ruff: noqa: E402
 import os
 
-# 必須在 import app 之前設定:測試一律打獨立資料庫(絕不碰開發庫)
-os.environ["POSTGRES_DB"] = "club_aio_test"
+# 必須在 import app 之前設定:測試一律打獨立資料庫(絕不碰開發庫)。
+# CLUB_AIO_TEST_DB 允許平行 worktree 各用一個測試庫,互不搶鎖
+TEST_DB = os.environ.get("CLUB_AIO_TEST_DB", "club_aio_test")
+os.environ["POSTGRES_DB"] = TEST_DB
 
 import httpx
 import pytest
@@ -17,7 +19,6 @@ from app.main import app
 from app.models import Base, Club, User
 from app.models.enums import ClubAttribute, ClubKind, UserRole
 
-TEST_DB = "club_aio_test"
 # 測試通用密碼(符合密碼政策)
 PASSWORD = "Secret!2345"
 _PASSWORD_HASH = hash_password(PASSWORD)  # argon2 只算一次,加速建帳號

@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { App, Button, Input, InputNumber, Modal, Select, Skeleton, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
-import { Pager } from '../../components/ui/tableControls'
+import { Cols, Pager, sortRows, type SortEntry } from '../../components/ui/tableControls'
 import FilePreview from '../eval/FilePreview'
 import type { EvalFile } from '../eval/types'
 import {
@@ -11,12 +11,24 @@ import {
   useClubAwardDetail,
   useSaveScore,
   useViewerAssignments,
+  type AssignmentClub,
   type ClubAwardDetail,
   type ScoreSaveInput,
   type ViewerAssignment,
 } from '../../api/viewer'
 
 const PAGE_SIZE = 20
+
+// 預設排序:未評分在前(待辦優先),組內社團名升冪;無排序 UI,固定鏈(client-side)
+type ClubSortKey = 'scored' | 'club'
+const CLUB_SORT: readonly SortEntry<ClubSortKey>[] = [
+  { key: 'scored', dir: 1 },
+  { key: 'club', dir: 1 },
+]
+const CLUB_CMPS: Record<ClubSortKey, (a: AssignmentClub, b: AssignmentClub) => number> = {
+  scored: (a, b) => Number(a.scored) - Number(b.scored),
+  club: (a, b) => a.clubName.localeCompare(b.clubName, 'zh-Hant'),
+}
 
 const fmtSize = (b: number) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`)
 
@@ -36,7 +48,8 @@ export default function ViewerScorePage() {
   const [selectedClubId, setSelectedClubId] = useState<number | null>(null)
   const [open, setOpen] = useState(false)
 
-  const clubs = award?.clubs ?? []
+  // 顯示序=排序後(「儲存並下一社團」的巡覽順序跟著顯示序走)
+  const clubs = useMemo(() => sortRows(award?.clubs ?? [], CLUB_SORT, CLUB_CMPS), [award])
   const selectedClub = clubs.find((c) => c.clubId === selectedClubId) ?? null
 
   const openClub = (clubId: number) => {
@@ -94,7 +107,8 @@ export default function ViewerScorePage() {
       ) : (
         <Spin spinning={assignmentsQuery.isPending}>
           <div className="card" style={{ marginTop: 20, overflowX: 'auto', minHeight: assignmentsQuery.isPending ? 120 : undefined }}>
-            <table className="tb dense" style={{ minWidth: 560 }}>
+            <table className="tb dense fixed" style={{ minWidth: 560 }}>
+              <Cols widths={['auto', 130, 90]} />
               <thead>
                 <tr>
                   <th>社團</th>
@@ -105,7 +119,11 @@ export default function ViewerScorePage() {
               <tbody>
                 {clubs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((c) => (
                   <tr key={c.clubId} className="click-tint" style={{ cursor: 'pointer' }} onClick={() => openClub(c.clubId)}>
-                    <td style={{ fontWeight: 500 }}>
+                    <td
+                      className="cell-clip"
+                      title={c.attribute ? `${c.clubName}(${c.attribute})` : c.clubName}
+                      style={{ fontWeight: 500 }}
+                    >
                       {c.clubName}
                       {c.attribute && <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: 'var(--steel)' }}>{c.attribute}</span>}
                     </td>

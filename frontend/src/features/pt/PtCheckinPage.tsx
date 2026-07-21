@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { App, Button, Input, Modal, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
-import { Pager } from '../../components/ui/tableControls'
+import { Cols, Pager } from '../../components/ui/tableControls'
 import { STAFF_PAGE_SIZE, useStaffLoans, useStaffMutations, type StaffLoan } from '../../api/staff'
 
 // 器材歸還點交:借出中逐單點收,登記歸還人(備註選填,如損壞情形)
@@ -50,7 +50,8 @@ export default function PtCheckinPage() {
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         <Spin spinning={listQuery.isPending}>
-          <table className="tb dense" style={{ minWidth: 720 }}>
+          <table className="tb dense fixed" style={{ minWidth: 720 }}>
+            <Cols widths={['30%', 'auto', 190, 110]} />
             <thead>
               <tr>
                 <th>社團</th>
@@ -72,12 +73,12 @@ export default function PtCheckinPage() {
                     setOpen(true)
                   }}
                 >
-                  <td>{l.club}</td>
-                  <td style={{ fontWeight: 500 }}>
+                  <td className="cell-clip" title={l.club}>{l.club}</td>
+                  <td className="cell-clip" title={`${l.equipment} ×${l.qty}`} style={{ fontWeight: 500 }}>
                     {l.equipment} <span className="num">×{l.qty}</span>
                   </td>
                   <td className="num" style={{ fontSize: 13 }}>{l.start} – {l.end}</td>
-                  <td style={{ fontSize: 13 }}>{l.borrower}</td>
+                  <td className="cell-clip" title={l.borrower} style={{ fontSize: 13 }}>{l.borrower}</td>
                 </tr>
               ))}
               {listQuery.isError && (

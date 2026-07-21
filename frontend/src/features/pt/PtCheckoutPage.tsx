@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { App, Button, Input, Modal, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
-import { Pager } from '../../components/ui/tableControls'
+import { Cols, Pager } from '../../components/ui/tableControls'
 import { STAFF_PAGE_SIZE, useStaffLoans, useStaffMutations, type StaffLoan } from '../../api/staff'
 
 // 器材借出點交:已核准借用逐單點交,登記借用人;
@@ -63,7 +63,8 @@ export default function PtCheckoutPage() {
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         <Spin spinning={listQuery.isPending}>
-          <table className="tb dense" style={{ minWidth: 720 }}>
+          <table className="tb dense fixed" style={{ minWidth: 720 }}>
+            <Cols widths={['30%', 'auto', 190, 90]} />
             <thead>
               <tr>
                 <th>社團</th>
@@ -75,8 +76,8 @@ export default function PtCheckoutPage() {
             <tbody>
               {rows.map((l) => (
                 <tr key={l.id} className="click-tint" style={{ cursor: 'pointer' }} onClick={() => openModal(l)}>
-                  <td>{l.club}</td>
-                  <td style={{ fontWeight: 500 }}>
+                  <td className="cell-clip" title={l.club}>{l.club}</td>
+                  <td className="cell-clip" title={`${l.equipment} ×${l.qty}`} style={{ fontWeight: 500 }}>
                     {l.equipment} <span className="num">×{l.qty}</span>
                   </td>
                   <td className="num" style={{ fontSize: 13 }}>{l.start} – {l.end}</td>

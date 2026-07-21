@@ -3,7 +3,7 @@ import { App, Button, Spin, Tooltip } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
-import { Pager } from '../../components/ui/tableControls'
+import { Cols, Pager } from '../../components/ui/tableControls'
 import { confirmDialog } from '../../lib/confirm'
 import { STAFF_PAGE_SIZE, useStaffLoans, useStaffMutations, type StaffLoan } from '../../api/staff'
 
@@ -45,7 +45,8 @@ export default function PtOverduePage() {
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         <Spin spinning={listQuery.isPending}>
-          <table className="tb dense" style={{ minWidth: 760 }}>
+          <table className="tb dense fixed" style={{ minWidth: 760 }}>
+            <Cols widths={['20%', 'auto', 144, 72, 90, 90, 100]} />
             <thead>
               <tr>
                 <th>社團</th>
@@ -60,13 +61,13 @@ export default function PtOverduePage() {
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>
-                  <td>{r.club}</td>
-                  <td style={{ fontWeight: 500 }}>
+                  <td className="cell-clip" title={r.club}>{r.club}</td>
+                  <td className="cell-clip" title={`${r.equipment} ×${r.qty}`} style={{ fontWeight: 500 }}>
                     {r.equipment} <span className="num">×{r.qty}</span>
                   </td>
                   <td className="num" style={{ fontSize: 13 }}>{r.due}</td>
                   <td className="num" style={{ fontSize: 13, color: '#A3341F' }}>{r.daysLate} 天</td>
-                  <td style={{ fontSize: 13 }}>{r.borrower}</td>
+                  <td className="cell-clip" title={r.borrower} style={{ fontSize: 13 }}>{r.borrower}</td>
                   <td><StatusPill status="overdue" /></td>
                   <td>
                     {r.manual ? (

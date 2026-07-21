@@ -128,7 +128,7 @@ const keys = {
   all: ['staff'] as const,
   clubs: ['staff', 'clubs'] as const,
   violationItems: ['staff', 'violationItems'] as const,
-  violations: (page: number) => ['staff', 'violations', page] as const,
+  violations: (page: number, sort: string | undefined) => ['staff', 'violations', page, sort] as const,
   loans: (status: StaffLoanStatus, page: number) => ['staff', 'loans', status, page] as const,
 }
 
@@ -149,12 +149,13 @@ export function useViolationItems() {
   })
 }
 
-export function useStaffViolations(page: number) {
+/** sort:逗號多鍵(白名單 date/location/items/filler/deadline/status);未帶=後端預設 未銷案在前+發生日升冪 */
+export function useStaffViolations(page: number, sort?: string) {
   return useQuery({
-    queryKey: keys.violations(page),
+    queryKey: keys.violations(page, sort),
     queryFn: () =>
       apiPaged<StaffViolationOut[]>(
-        `/staff/violations${qs({ page, page_size: STAFF_PAGE_SIZE })}`,
+        `/staff/violations${qs({ sort, page, page_size: STAFF_PAGE_SIZE })}`,
       ).then(({ data, total }) => ({ violations: data.map(toViolation), total })),
     placeholderData: keepPreviousData,
   })

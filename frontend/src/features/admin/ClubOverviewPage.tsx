@@ -90,8 +90,9 @@ export default function ClubOverviewPage() {
   const actMutations = useAdminActivityMutations()
   const bookingMutations = useAdminBookingMutations()
 
-  // 點活動列 → 取完整詳情(經費/附件)→ 詳情到位即開審核彈窗
+  // 點活動列 → 彈窗立即開啟(Skeleton),詳情(經費/附件)到位後補齊
   const [reviewId, setReviewId] = useState<number | null>(null)
+  const [reviewName, setReviewName] = useState('')
   const [reviewOpen, setReviewOpen] = useState(false)
   const reviewQuery = useAdminActivityDetail(reviewId ?? undefined)
   const reviewItem = reviewQuery.data
@@ -104,8 +105,9 @@ export default function ClubOverviewPage() {
 
   const info = detailQuery.data
 
-  const openActivity = (id: number) => {
+  const openActivity = (id: number, name: string) => {
     setReviewId(id)
+    setReviewName(name)
     setReviewOpen(true)
   }
 
@@ -228,12 +230,11 @@ export default function ClubOverviewPage() {
           </div>
           {!canActivities && !canMaint && <NoPermission />}
           {activities.map((a) => (
-            <div key={`act-${a.id}`} className="click-tint" style={rowStyle} {...clickableRow(() => openActivity(a.id))}>
+            <div key={`act-${a.id}`} className="click-tint" style={rowStyle} {...clickableRow(() => openActivity(a.id, a.name))}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14 }}>{a.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--steel)' }}>活動申請</div>
               </div>
-              {reviewId === a.id && reviewQuery.isPending && <Spin size="small" />}
               <StatusPill status={a.status} />
             </div>
           ))}
@@ -314,23 +315,25 @@ export default function ClubOverviewPage() {
         </div>
       </div>
 
-      {/* 活動申請審核彈窗(與申請審核頁同版面);常駐待關閉動畫結束(afterClose)才卸載 */}
-      {reviewId != null && reviewItem && (
+      {/* 活動申請審核彈窗(與申請審核頁同版面);點列立即開啟、詳情補齊;
+          常駐待關閉動畫結束(afterClose)才卸載 */}
+      {reviewId != null && (
         <ActivityReviewModal
-          key={reviewItem.id}
-          item={reviewItem}
+          key={reviewId}
+          item={reviewItem ?? null}
+          pendingName={reviewName}
           open={reviewOpen}
           onClose={() => setReviewOpen(false)}
           afterClose={() => setReviewId(null)}
           onApprove={(p) =>
             actMutations.approve.mutateAsync({
-              id: reviewItem.activityId,
+              id: reviewId,
               fundSource: p.fundSource || undefined,
               budget: p.budget,
-              isLargeApproved: reviewItem.type === '活動' ? p.largeApproved : undefined,
+              isLargeApproved: reviewItem?.type === '活動' ? p.largeApproved : undefined,
             })
           }
-          onReject={(reason) => actMutations.reject.mutateAsync({ id: reviewItem.activityId, reason })}
+          onReject={(reason) => actMutations.reject.mutateAsync({ id: reviewId, reason })}
         />
       )}
 

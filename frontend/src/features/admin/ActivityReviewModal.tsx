@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
-import { App, Button, Checkbox, Input, InputNumber, Modal } from 'antd'
+import { App, Button, Checkbox, Input, InputNumber, Modal, Skeleton } from 'antd'
 import StatusPill from '../../components/ui/StatusPill'
 import LargeBadge from '../../components/ui/LargeBadge'
 import StampTrail, { type StampStage } from '../../components/ui/StampTrail'
+import { useModalAutoFocus } from '../../components/ui/useModalAutoFocus'
 import { fmtMoney } from '../activities/types'
 import { useAuth } from '../../app/auth'
 import { canActOn, stageOfStatus } from '../../api/adminActivities'
@@ -60,17 +61,21 @@ export interface ActivityApprovePayload {
 }
 
 // 活動申請審核彈窗(申請審核頁與行政端社團總覽共用):
-// 章軌、基本資料、經費來源與逐項核定、大型活動認可;待本關者可核准/退回,其餘唯讀
+// 章軌、基本資料、經費來源與逐項核定、大型活動認可;待本關者可簽核/退回,其餘唯讀
 // onApprove/onReject:接 API 的頁面傳入 mutateAsync 回呼(成功 message+關彈窗、失敗 message.error)
+// item 可為 null:點擊即開彈窗、詳情到位前顯示 Skeleton(不等網路才開窗,2026-07-21 需求方)
 export default function ActivityReviewModal({
   item,
+  pendingName,
   open,
   onClose,
   afterClose,
   onApprove,
   onReject,
 }: {
-  item: ReviewItem
+  item: ReviewItem | null
+  /** item 尚未載入時標題列顯示的名稱(通常=列表列的活動名) */
+  pendingName?: string
   open: boolean
   onClose: () => void
   afterClose: () => void
@@ -82,35 +87,44 @@ export default function ActivityReviewModal({
   const [rejectOpen, setRejectOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const approveRef = useModalAutoFocus(open)
   // 大型活動:社團申請或管理員逕行核定;認可後行政分才享 ×3 加權。
   // 未處理的申請預設不勾(空心=待處理),認可須管理員明確勾選,避免順手核准即誤放 ×3
-  const [largeApproved, setLargeApproved] = useState(item.largeApproved ?? false)
+  const [largeApproved, setLargeApproved] = useState(item?.largeApproved ?? false)
   // 經費來源:有申請補助的案件由第一關認定(後端必填)
-  const [fundSource, setFundSource] = useState(item.fundSource ?? '')
-  const d = item.detail
+  const [fundSource, setFundSource] = useState(item?.fundSource ?? '')
+  const d = item?.detail
   // 核定金額:controlled,依預算列 id 管理
   const [approvals, setApprovals] = useState<Record<number, number>>(() =>
     Object.fromEntries((d?.budget ?? []).map((b) => [b.id, b.approved])),
   )
   // 接線頁面開彈窗時詳情可能尚未載入:budget 到位後一次性回填核定金額。
-  // 只補 approvals——fundSource/largeApproved 列表列已帶,且可能已被使用者編輯,不得覆寫
-  const seeded = useRef(!!item.detail)
+  // 只補 approvals——fundSource/largeApproved 列表列已帶,且可能已被使用者編輯,不得覆寫。
+  // 以 null 開窗(社團總覽)則首筆資料到位時連 largeApproved/fundSource 一併補種
+  const startedNull = useRef(item == null)
+  const seeded = useRef(!!item?.detail)
   useEffect(() => {
+    if (!item) return
+    if (startedNull.current) {
+      startedNull.current = false
+      setLargeApproved(item.largeApproved ?? false)
+      setFundSource(item.fundSource ?? '')
+    }
     if (seeded.current || !item.detail) return
     seeded.current = true
     setApprovals(Object.fromEntries(item.detail.budget.map((b) => [b.id, b.approved])))
   }, [item])
 
   // 「本關」:接 API 的頁面(有 onApprove)依登入者簽核鍵推導;mock 展示維持第一關可簽
-  const canReview = onApprove ? canActOn(user, item.status) : item.status === 'pending_advisor'
+  const canReview = item ? (onApprove ? canActOn(user, item.status) : item.status === 'pending_advisor') : false
   // 經費來源/逐項核定/大型認可僅第一關(承辦人)可編輯;組長/學務長關唯讀核准
-  const isFirstStage = item.status === 'pending_advisor'
+  const isFirstStage = item?.status === 'pending_advisor'
   const canEdit = canReview && isFirstStage
-  const requestedTotal = d?.budget.reduce((s, b) => s + b.requested, 0) ?? item.requested
+  const requestedTotal = d?.budget.reduce((s, b) => s + b.requested, 0) ?? item?.requested ?? 0
   const approvedTotal = d?.budget.reduce((s, b) => s + (approvals[b.id] ?? 0), 0) ?? 0
   const singleStage = requestedTotal === 0 // 無補助 → 承辦人單關即核准
   const nextStageNote =
-    isFirstStage && !singleStage ? ',送組長關' : item.status === 'pending_chief' ? ',送學務長關' : ''
+    isFirstStage && !singleStage ? ',送組長關' : item?.status === 'pending_chief' ? ',送學務長關' : ''
 
   const closeReject = () => {
     setRejectOpen(false)
@@ -118,6 +132,7 @@ export default function ActivityReviewModal({
   }
 
   const submitApprove = async () => {
+    if (!item) return
     const largeNote = isFirstStage && item.type === '活動' ? `(大型活動${largeApproved ? '已認可' : '未認可'})` : ''
     if (onApprove) {
       if (isFirstStage && requestedTotal > 0 && !fundSource.trim()) {
@@ -143,6 +158,7 @@ export default function ActivityReviewModal({
   }
 
   const submitReject = async () => {
+    if (!item) return
     if (!reason.trim()) {
       message.error('退回原因為必填')
       return
@@ -175,13 +191,17 @@ export default function ActivityReviewModal({
       width={hasBudget ? 880 : 620}
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 26 }}>
-          <span style={{ fontSize: 16, fontWeight: 600 }}>{item.name}</span>
-          {/* 本關可簽核時,徽章即時反映下方「認可為大型活動」勾選 */}
-          <LargeBadge applied={item.isLarge} approved={canEdit ? largeApproved : item.largeApproved} />
-          <StatusPill status={item.status} />
+          <span style={{ fontSize: 16, fontWeight: 600 }}>{item?.name ?? pendingName ?? ''}</span>
+          {item && (
+            <>
+              {/* 本關可簽核時,徽章即時反映下方「認可為大型活動」勾選 */}
+              <LargeBadge applied={item.isLarge} approved={canEdit ? largeApproved : item.largeApproved} />
+              <StatusPill status={item.status} />
+            </>
+          )}
           <span style={{ flex: 1 }} />
           {/* 單關(無補助)不畫章軌:只有一顆章沒有資訊量,徒佔標題列空間 */}
-          {!singleStage && <StampTrail stages={stagesOf(item.status)} />}
+          {item && !singleStage && <StampTrail stages={stagesOf(item.status)} />}
         </div>
       }
       footer={
@@ -192,10 +212,10 @@ export default function ActivityReviewModal({
             </Button>
             <Button
               type="primary"
-              autoFocus
+              ref={approveRef}
               style={{ height: 38 }}
               // 接線頁面詳情未載入前不可核准(經費逐項核定要靠 detail 的 budget)
-              disabled={!!onApprove && !item.detail}
+              disabled={!!onApprove && !item?.detail}
               loading={submitting && !rejectOpen}
               onClick={() => void submitApprove()}
             >
@@ -204,16 +224,21 @@ export default function ActivityReviewModal({
           </div>
         ) : (
           <div style={{ fontSize: 12, color: 'var(--steel)' }}>
-            {item.status === 'rejected'
-              ? '此申請已退回社團修正'
-              : stageOfStatus(item.status)
-                ? '非本關卡待審單據，僅供查看'
-                : '僅供查看'}
+            {!item
+              ? '載入中…'
+              : item.status === 'rejected'
+                ? '此申請已退回社團修正'
+                : stageOfStatus(item.status)
+                  ? '非本關卡待審單據，僅供查看'
+                  : '僅供查看'}
           </div>
         )
       }
     >
+      {/* 詳情未到位先鋪 Skeleton(彈窗立即開啟,內容漸進補齊) */}
+      {!item && <Skeleton active paragraph={{ rows: 6 }} style={{ marginTop: 8 }} />}
       {/* 有經費才走雙欄:左=基本資料,右=經費逐項核定 */}
+      {item && (
       <div
         style={{
           display: 'grid',
@@ -352,6 +377,7 @@ export default function ActivityReviewModal({
           </div>
         )}
       </div>
+      )}
 
       <Modal
         open={rejectOpen}

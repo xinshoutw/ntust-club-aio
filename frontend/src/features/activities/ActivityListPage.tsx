@@ -117,7 +117,7 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
       open={open}
       onCancel={onClose}
       afterClose={afterClose}
-      width={rep ? 1080 : 640}
+      width={rep ? 1080 : 840}
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 26 }}>
           {a.name} <StatusPill status={a.status} />

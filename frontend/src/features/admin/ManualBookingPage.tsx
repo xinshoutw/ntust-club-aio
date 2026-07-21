@@ -93,7 +93,7 @@ export default function ManualBookingPage() {
               <Form.Item name="purpose" label="用途" rules={[{ required: true, message: '請輸入用途' }]}>
                 <Input placeholder="例:行政人員活動" />
               </Form.Item>
-              <Form.Item name="phone" label="聯絡電話">
+              <Form.Item name="phone" label="聯絡電話" rules={[{ pattern: /^[0-9\-()*#]+$/, message: '僅能輸入數字與 - ( ) * #' }]}>
                 <Input className="num" placeholder="選填" maxLength={30} />
               </Form.Item>
               <div style={{ textAlign: 'right' }}>
@@ -123,7 +123,7 @@ export default function ManualBookingPage() {
               <Form.Item name="purpose" label="用途" rules={[{ required: true, message: '請輸入用途' }]}>
                 <Input placeholder="例:校慶佈置" />
               </Form.Item>
-              <Form.Item name="phone" label="聯絡電話">
+              <Form.Item name="phone" label="聯絡電話" rules={[{ pattern: /^[0-9\-()*#]+$/, message: '僅能輸入數字與 - ( ) * #' }]}>
                 <Input className="num" placeholder="選填" maxLength={30} />
               </Form.Item>
               <div style={{ textAlign: 'right' }}>

@@ -1,17 +1,20 @@
 import { useEffect } from 'react'
+import dayjs from 'dayjs'
 import { App, Button, Form, Input, InputNumber, Select, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
+import { confirmDialog } from '../../lib/confirm'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import {
   useBookingMutations,
   useEquipmentList,
-  useEquipmentLoans,
+  useActiveEquipmentLoans,
+  useRecentEquipmentLoans,
 } from '../../api/bookings'
 import { useActivityList } from '../../api/activities'
 
 export default function EquipmentPage() {
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const [form] = Form.useForm()
 
   // 器材借用綁定審核通過之活動,不再自選日期區間;
@@ -24,9 +27,27 @@ export default function EquipmentPage() {
   // 換活動時沿用舊列表避免表格閃空,但可借數在新活動資料就緒前一律視為未知(顯示 —)
   const loanWindow = activityId != null && !equipmentQuery.isPlaceholderData ? equipmentQuery.data?.window ?? null : null
 
-  const recentQuery = useEquipmentLoans({ page: 1, pageSize: 5 })
-  const recent = recentQuery.data?.rows ?? []
-  const { createEquipmentLoan } = useBookingMutations()
+  // 正在借用=進行中全部(不限長度、可取消);最近借用=歸還/退回/取消 近 5 筆(2026-07-21)
+  const activeQuery = useActiveEquipmentLoans()
+  const activeRows = activeQuery.data ?? []
+  const recentQuery = useRecentEquipmentLoans()
+  const recent = recentQuery.data ?? []
+  const { createEquipmentLoan, cancelEquipmentLoan } = useBookingMutations()
+  const todayStart = dayjs().startOf('day')
+
+  const cancelRow = (l: { id: number; equipmentName: string; qty: number }) =>
+    confirmDialog(modal, {
+      title: `取消器材借用 ${l.equipmentName} ×${l.qty}`,
+      content: '取消後不可復原;已核准的借用取消後數量將釋出',
+      okText: '取消借用',
+      okButtonProps: { danger: true },
+      cancelText: '返回',
+      onOk: () =>
+        cancelEquipmentLoan.mutate(l.id, {
+          onSuccess: () => message.success('已取消'),
+          onError: (e) => message.error(e.message),
+        }),
+    })
 
   const selectedId = Form.useWatch('equipment', form) as number | undefined
   const selectedAvail = loanWindow != null && selectedId != null ? items.find((e) => e.id === selectedId)?.available ?? null : null
@@ -223,7 +244,7 @@ export default function EquipmentPage() {
             >
               <Input placeholder="簡述說明" />
             </Form.Item>
-            <Form.Item name="phone" label="聯絡電話" rules={[{ required: true, message: '請輸入聯絡電話' }]}>
+            <Form.Item name="phone" label="聯絡電話" rules={[{ required: true, message: '請輸入聯絡電話' }, { pattern: /^[0-9\-()*#]+$/, message: '僅能輸入數字與 - ( ) * #' }]}>
               <Input className="num" placeholder="申請聯絡人電話" maxLength={30} />
             </Form.Item>
 
@@ -233,6 +254,60 @@ export default function EquipmentPage() {
           </Form>
         </div>
       </div>
+
+      <Spin spinning={activeQuery.isPending}>
+        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在借用</div>
+          <table className="tb" aria-label="正在借用" style={{ minWidth: 760 }}>
+            <thead>
+              <tr>
+                <th scope="col">品項</th>
+                <th scope="col">借用期間</th>
+                <th scope="col">活動/用途</th>
+                <th scope="col">借用人</th>
+                <th scope="col">狀態</th>
+                <th scope="col" className="r">動作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activeRows.map((l) => (
+                <tr key={l.id}>
+                  <td style={{ fontWeight: 500 }}>
+                    {l.equipmentName} <span className="num">×{l.qty}</span>
+                    {l.serials?.length ? (
+                      <span className="num" style={{ color: 'var(--steel)', fontSize: 12 }}> ({l.serials.join('、')})</span>
+                    ) : null}
+                  </td>
+                  <td className="num" style={{ fontSize: 13 }}>{l.startDate} – {l.endDate}</td>
+                  <td style={{ color: 'var(--steel)', fontSize: 13 }}>{l.activityName ?? l.purpose}</td>
+                  <td style={{ color: 'var(--steel)', fontSize: 13 }}>{l.borrower ?? '—'}</td>
+                  <td style={{ width: 110 }}><StatusPill status={l.status} /></td>
+                  <td className="r" style={{ width: 80 }}>
+                    {l.status === 'pending' ||
+                    (l.status === 'approved' && dayjs(l.startDate, 'YYYY/MM/DD').isAfter(todayStart, 'day')) ? (
+                      <Button size="small" danger onClick={() => cancelRow(l)}>取消</Button>
+                    ) : (
+                      <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {activeQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={6}>
+                    <QueryError compact title="借用紀錄載入失敗" error={activeQuery.error} onRetry={() => activeQuery.refetch()} />
+                  </td>
+                </tr>
+              )}
+              {!activeQuery.isError && !activeQuery.isPending && activeRows.length === 0 && (
+                <tr className="no-hover">
+                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>目前沒有進行中的借用</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Spin>
 
       <Spin spinning={recentQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>

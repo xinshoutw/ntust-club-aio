@@ -3,12 +3,14 @@ import { useSearchParams } from 'react-router'
 import dayjs, { type Dayjs } from 'dayjs'
 import { App, Button, DatePicker, Form, Input, Select, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
+import { confirmDialog } from '../../lib/confirm'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import {
   PERIODS,
   useBookingMutations,
-  useVenueBookings,
+  useActiveVenueBookings,
+  useRecentVenueBookings,
   useVenues,
   venueLabel,
 } from '../../api/bookings'
@@ -16,7 +18,7 @@ import { useActivityList } from '../../api/activities'
 import PeriodPicker from './PeriodPicker'
 
 export default function VenueBookingPage() {
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const [form] = Form.useForm()
   // 借用總覽格子點入時自動帶入場地、日期、時段
   const [params] = useSearchParams()
@@ -34,9 +36,27 @@ export default function VenueBookingPage() {
   // 借用需綁定審核通過之活動(與器材借用一致;共用活動域查詢)
   const activitiesQuery = useActivityList({ status: 'approved' })
   const approved = activitiesQuery.data ?? []
-  const recentQuery = useVenueBookings({ page: 1, pageSize: 5 })
-  const recent = recentQuery.data?.rows ?? []
-  const { createVenueBooking } = useBookingMutations()
+  // 正在申請=進行中全部(不限長度、可取消);最近申請=已結束/退回/取消 近 5 筆(2026-07-21)
+  const activeQuery = useActiveVenueBookings()
+  const activeRows = activeQuery.data ?? []
+  const recentQuery = useRecentVenueBookings()
+  const recent = recentQuery.data ?? []
+  const { createVenueBooking, cancelVenueBooking } = useBookingMutations()
+  const todayStart = dayjs().startOf('day')
+
+  const cancelRow = (v: { id: number; venueName: string; date: string }) =>
+    confirmDialog(modal, {
+      title: `取消臨時借用 ${v.venueName}(${v.date})`,
+      content: '取消後不可復原;已核准的借用取消後時段將釋出',
+      okText: '取消借用',
+      okButtonProps: { danger: true },
+      cancelText: '返回',
+      onOk: () =>
+        cancelVenueBooking.mutate(v.id, {
+          onSuccess: () => message.success('已取消'),
+          onError: (e) => message.error(e.message),
+        }),
+    })
 
   // 場地主檔為非同步載入,query 帶入的場地待資料就緒後再驗證回填
   useEffect(() => {
@@ -119,7 +139,7 @@ export default function VenueBookingPage() {
             <Form.Item
               name="phone"
               label="聯絡電話"
-              rules={[{ required: true, message: '請輸入聯絡電話' }]}
+              rules={[{ required: true, message: '請輸入聯絡電話' }, { pattern: /^[0-9\-()*#]+$/, message: '僅能輸入數字與 - ( ) * #' }]}
               style={{ marginBottom: 0 }}
             >
               <Input className="num" placeholder="申請聯絡人電話" maxLength={30} />
@@ -152,6 +172,52 @@ export default function VenueBookingPage() {
           </div>
         </Form>
       </div>
+
+      <Spin spinning={activeQuery.isPending}>
+        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在申請</div>
+          <table className="tb" aria-label="正在申請" style={{ minWidth: 560 }}>
+            <thead>
+              <tr>
+                <th scope="col">場地</th>
+                <th scope="col">日期</th>
+                <th scope="col">時段</th>
+                <th scope="col">狀態</th>
+                <th scope="col" className="r">動作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activeRows.map((v) => (
+                <tr key={v.id}>
+                  <td style={{ fontWeight: 500 }}>{v.venueName}</td>
+                  <td className="num" style={{ fontSize: 13 }}>{v.date}</td>
+                  <td style={{ color: 'var(--steel)', fontSize: 13 }}>第 {v.periods.join('、')} 節</td>
+                  <td style={{ width: 110 }}><StatusPill status={v.status} /></td>
+                  <td className="r" style={{ width: 80 }}>
+                    {v.status === 'pending' || dayjs(v.date, 'YYYY/MM/DD').isAfter(todayStart, 'day') ? (
+                      <Button size="small" danger onClick={() => cancelRow(v)}>取消</Button>
+                    ) : (
+                      <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {activeQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={5}>
+                    <QueryError compact title="申請紀錄載入失敗" error={activeQuery.error} onRetry={() => activeQuery.refetch()} />
+                  </td>
+                </tr>
+              )}
+              {!activeQuery.isError && !activeQuery.isPending && activeRows.length === 0 && (
+                <tr className="no-hover">
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>目前沒有進行中的申請</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Spin>
 
       <Spin spinning={recentQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>

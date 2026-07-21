@@ -234,7 +234,7 @@
 - **社團英文名 en_name**(管理項目可編輯);**attribute 改 NULL-able**(停社舊社團原性質不可考)
 - **人數語彙統一「社員/非社員」**(原申請表「校內/校外」;與舊系統語意一致)
 - **資料遷移**:`migration/cms_import.py`(idempotent,legacy_id_map;範圍與 TODO 見 `migration/README.md` 與 data-model.md §1.2)。全帳號重發一次性密碼(輸出 `migration/out/*.csv`,不入版控)+首登強制改密
-- 待需求方:評鑑檔案庫/行政歷史文件是否歸檔;舊 staff 帳號 `800` 同名衝突;舊機 media 檔案實體;clubclass 借用資料另遷
+- 待需求方:評鑑檔案庫/行政歷史文件是否歸檔(TODO,需求方後續給);舊機 media 檔案實體(TODO);clubclass 借用資料另遷(MySQL,VM 偵查中)。帳號 `800` 衝突已解:偽社團「學務處就輔組」不遷
 
 ## Roadmap(需求方 2026-07-15 宣告)
 

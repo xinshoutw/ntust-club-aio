@@ -31,7 +31,7 @@ LEGACY_DB=legacy_clubs uv run python ../migration/cms_import.py  # 指定舊庫�
 
 | 舊 | 新 | 說明 |
 |---|---|---|
-| Club_club + clubcontent + clubproperty | clubs + users(club) | 性質=停社 → is_active=false、attribute=NULL;kind 依名稱結尾推導,特例見 `KIND_OVERRIDES`;「國際事務處」「testclub」不遷 |
+| Club_club + clubcontent + clubproperty | clubs + users(club) | 性質=停社 → is_active=false、attribute=NULL;kind 依名稱結尾推導,特例見 `KIND_OVERRIDES`;「國際事務處」「testclub」「學務處就輔組」不遷 |
 | Club_student | club_members | Semester「104 1」→「104-1」;社長/會長→負責人、副社長/副會長→副負責人;Phone/Date→phone/updated_at;同學期同學號取 id 最大者 |
 | Club_teacher | clubs.advisor_* / advisor_out_* | 校內/校外各取最新一位 |
 | Club_activity(+fund/staff/meta) | activities(+budget_items/reports) | type:course/conference→社課或會議、extra→活動;status 對映見 `STATUS_MAP`;結案資料寬鬆匯入(缺欄留空) |

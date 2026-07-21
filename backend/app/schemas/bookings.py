@@ -215,6 +215,8 @@ class ManualEquipmentLoanIn(BaseModel):
     purpose: str = Field(min_length=1, max_length=200)
     phone: str | None = Field(None, max_length=30)
 
+    _phone = field_validator("phone")(_validate_phone)
+
     @model_validator(mode="after")
     def _range(self) -> ManualEquipmentLoanIn:
         if self.end_date < self.start_date:

@@ -76,9 +76,11 @@ export default function ReviewPage() {
   const clubOptions = (clubsQuery.data ?? []).map((c) => c.name)
   const statusOptions = [...new Set(othersStatuses.map((st) => STATUS[st].label))]
 
-  const clubIds = clubFilter.length
+  const clubIdMatches = clubFilter.length
     ? (clubsQuery.data ?? []).filter((c) => clubFilter.includes(c.name)).map((c) => c.id)
     : undefined
+  // 有選社團但主檔未載入/名稱失效 → 強制空集,不可 fail-open 回全部
+  const clubIds = clubIdMatches && clubIdMatches.length === 0 ? [-1] : clubIdMatches
   const statuses = statusFilter.length
     ? othersStatuses.filter((st) => statusFilter.includes(STATUS[st].label))
     : othersStatuses
@@ -115,7 +117,7 @@ export default function ReviewPage() {
         }
       />
 
-      <Spin spinning={queueQuery.isPending || listQuery.isPending}>
+      <Spin spinning={queueQuery.isLoading || listQuery.isPending}>
         {/* 待審佇列:本關可簽核的單據,送件早的在前 */}
         <div className="card" style={{ marginTop: 20 }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 6px' }}>待審佇列</div>

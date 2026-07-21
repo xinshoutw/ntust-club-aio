@@ -161,7 +161,7 @@ async def list_activities(
     page: Pagination,
     status: Annotated[list[ActivityStatus] | None, Query()] = None,
     club_id: Annotated[list[int] | None, Query()] = None,
-    type: Annotated[list[str] | None, Query()] = None,
+    type_: Annotated[list[str] | None, Query(alias="type")] = None,
     locked: bool = Query(False),
     sort: str | None = None,
 ) -> ApiResponse[list[ActivityOut]]:
@@ -180,16 +180,16 @@ async def list_activities(
         query = query.where(Activity.status.in_(status))
     if club_id:
         query = query.where(Activity.club_id.in_(club_id))
-    if type:
-        unknown = [t for t in type if t not in _TYPE_LABELS]
+    if type_:
+        unknown = [t for t in type_ if t not in _TYPE_LABELS]
         if unknown:
             raise validation_error(f"未知的類型:{','.join(unknown)}")
         conds = []
-        if "社課或會議" in type:
+        if "社課或會議" in type_:
             conds.append(Activity.type == ActivityType.COURSE_MEETING)
-        if "活動" in type:
+        if "活動" in type_:
             conds.append(sa.and_(Activity.type == ActivityType.EVENT, sa.not_(_large_condition())))
-        if "大型活動" in type:
+        if "大型活動" in type_:
             conds.append(_large_condition())
         query = query.where(sa.or_(*conds))
     lock_months = await get_setting(db, "close_lock_months")

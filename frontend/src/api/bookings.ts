@@ -279,9 +279,9 @@ const keys = {
   availabilityRange: (startIso: string, endIso: string, venueId?: number) =>
     ['bookings', 'availability-range', startIso, endIso, venueId ?? null] as const,
   fixedWindow: ['bookings', 'fixed-window'] as const,
-  rooms: (p: PageParams | 'all') => ['bookings', 'room-bookings', p] as const,
-  venueBookings: (p: PageParams | 'all') => ['bookings', 'venue-bookings', p] as const,
-  loans: (p: PageParams | 'all') => ['bookings', 'equipment-loans', p] as const,
+  rooms: (p: PageParams) => ['bookings', 'room-bookings', p] as const,
+  venueBookings: (p: PageParams) => ['bookings', 'venue-bookings', p] as const,
+  loans: (p: PageParams) => ['bookings', 'equipment-loans', p] as const,
 }
 
 // ---- 查詢 hooks ----
@@ -361,38 +361,8 @@ export function useFixedWindow() {
   })
 }
 
-export function useRoomBookings(p: PageParams) {
-  return useQuery({
-    queryKey: keys.rooms(p),
-    queryFn: () =>
-      apiPaged<RoomBookingOut[]>(`/club/room-bookings${qs({ page: p.page, page_size: p.pageSize })}`).then(
-        ({ data, total }) => ({ rows: data.map(toRoomBooking), total }),
-      ),
-    placeholderData: keepPreviousData,
-  })
-}
 
-export function useVenueBookings(p: PageParams) {
-  return useQuery({
-    queryKey: keys.venueBookings(p),
-    queryFn: () =>
-      apiPaged<VenueBookingOut[]>(`/club/venue-bookings${qs({ page: p.page, page_size: p.pageSize })}`).then(
-        ({ data, total }) => ({ rows: data.map(toVenueBooking), total }),
-      ),
-    placeholderData: keepPreviousData,
-  })
-}
 
-export function useEquipmentLoans(p: PageParams) {
-  return useQuery({
-    queryKey: keys.loans(p),
-    queryFn: () =>
-      apiPaged<EquipmentLoanOut[]>(`/club/equipment-loans${qs({ page: p.page, page_size: p.pageSize })}`).then(
-        ({ data, total }) => ({ rows: data.map(toEquipmentLoan), total }),
-      ),
-    placeholderData: keepPreviousData,
-  })
-}
 
 /** 逐頁抓齊(僅限 active=true 的小結果集;歷史清單一律走伺服器分頁) */
 async function fetchAllPages<T>(

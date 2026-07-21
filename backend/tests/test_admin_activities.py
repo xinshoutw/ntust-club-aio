@@ -449,3 +449,68 @@ async def test_list_filters_locked_and_sort(client, db):
     assert all(a["type"] == "社課或會議" for a in resp.json()["data"])
     resp = await client.get("/api/v1/admin/activities", params=[("type", "怪型")])
     assert resp.status_code == 422
+
+
+async def test_large_type_filter_and_locked_boundary(client, db):
+    """「大型活動」推導過濾(三值 is_large_approved)與逾期鎖定的日界。"""
+    from datetime import date, timedelta
+
+    from app.models import Activity
+    from app.services.activity_service import add_months
+    from app.services.settings_service import get_setting
+
+    club = await seed(client, db)
+    creator = await make_user(db, username="creator3", club_id=club.id)
+    day = date.today() + timedelta(days=30)
+
+    def act(name, *, type_="活動", is_large=False, approved=None):
+        return Activity(
+            club_id=club.id, name=name, location="x", type=type_,
+            date=day, end_date=day, status="approved", created_by=creator.id,
+            is_large=is_large, is_large_approved=approved,
+        )
+
+    db.add_all([
+        act("認可大型", is_large=True, approved=True),
+        act("申請中大型", is_large=True, approved=None),
+        act("被否准", is_large=True, approved=False),
+        act("一般活動"),
+        act("純社課", type_="社課或會議"),
+    ])
+    await db.commit()
+    await login(client, "advisor")
+
+    resp = await client.get("/api/v1/admin/activities", params=[("type", "大型活動")])
+    names = {a["name"] for a in resp.json()["data"]}
+    assert names == {"認可大型", "申請中大型"}
+    resp = await client.get("/api/v1/admin/activities", params=[("type", "活動")])
+    names = {a["name"] for a in resp.json()["data"]}
+    assert names == {"被否准", "一般活動"}
+
+    # 鎖定日界:期限日當天不鎖、隔天鎖(與 is_close_locked 同界)
+    lock_months = int(await get_setting(db, "close_lock_months"))
+    # 找 base 使 add_months(base, N) == today(當天不鎖)與 == 昨天(鎖)
+    base_today = None
+    base_locked = None
+    probe = date.today() - timedelta(days=25)
+    for delta in range(70):
+        candidate = probe - timedelta(days=delta)
+        if add_months(candidate, lock_months) == date.today():
+            base_today = candidate
+        if add_months(candidate, lock_months) == date.today() - timedelta(days=1):
+            base_locked = candidate
+    assert base_today and base_locked
+    a_edge = Activity(
+        club_id=club.id, name="期限日當天", location="x", type="社課或會議",
+        date=base_today, end_date=base_today, status="approved", created_by=creator.id,
+    )
+    a_lock = Activity(
+        club_id=club.id, name="期限已過一天", location="x", type="社課或會議",
+        date=base_locked, end_date=base_locked, status="approved", created_by=creator.id,
+    )
+    db.add_all([a_edge, a_lock])
+    await db.commit()
+    resp = await client.get("/api/v1/admin/activities", params={"locked": "true"})
+    names = {a["name"] for a in resp.json()["data"]}
+    assert "期限已過一天" in names
+    assert "期限日當天" not in names

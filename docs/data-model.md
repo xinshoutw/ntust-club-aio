@@ -67,6 +67,15 @@
 
 兩套舊系統的每個實體都有落點;原型新增的功能(評鑑評分、線上報名、幹部證明、郵局異動、維修、停權)也全數入模。
 
+**CMS 資料遷移現況(2026-07-21,scripts=`migration/cms_import.py`,idempotent)**:
+社團/帳號/指導老師/成員/活動(含經費、結案)/公告已遷入 dev 庫(160 社、30,478 成員、14,236 活動)。
+密碼不可攜(舊制 sha256(密碼+帳號))→ 全帳號重發一次性密碼+首登強制改密。
+**待辦**:(1) 舊機 media 目錄抓回後匯入檔案實體(企劃書/活動照片/附件);
+(2) 評鑑檔案庫 Club_clubfiles(12,752 檔、14 分類,新版無對應功能)是否歸檔待需求方決議;
+(3) 行政歷史文件 clubrecordfromstaff(7 筆)同上;
+(4) 舊 staff「侍筱鳳」帳號 `800` 與偽社團「學務處就輔組」帳號同名,staff 端未遷入待處理;
+(5) clubclass(場地器材借用)另套系統,dump 未含,屆時另遷。
+
 ## 2. ER 總覽(核心關聯)
 
 ```mermaid
@@ -137,19 +146,22 @@ erDiagram
 |---|---|---|
 | id | serial PK | |
 | name | text UNIQUE | |
-| attribute | enum(自治性,學藝性,服務性,聯誼性,藝術性,體育性) | 公告分眾、統計用 |
+| kind | enum(社團,學會) | 2026-07-21:負責人顯示詞(社長/會長)推導依據;建立/改名時名稱結尾社/會自動推導、推導不到手動指定,**取代原「名稱強制社/會結尾」規則** |
+| en_name | text NULL | 英文名(舊系統 EN_Name 遷入,2026-07-21) |
+| attribute | enum(自治性,學藝性,服務性,聯誼性,藝術性,體育性) NULL | 公告分眾、統計用;**停社舊社團原性質不可考 → NULL**(2026-07-21) |
 | intro | text | 社團簡介 |
 | website_url | text NULL | 影響行政分「網頁經營」(ad6) |
 | discord_webhook_url | text NULL | 社團自設 webhook(管理項目,2026-07-13 前端定案);該社事件另推一份 |
-| advisor_name / advisor_dept / advisor_email / advisor_ext | text NULL | 指導老師(社團自行維護) |
+| advisor_name / advisor_dept / advisor_email / advisor_ext | text NULL | 校內指導老師(社團自行維護) |
+| advisor_out_name / advisor_out_dept / advisor_out_email / advisor_out_phone | text NULL | 校外指導老師(2026-07-21:校內/校外各至多一位) |
 | suspended_until | date NULL | 停權至;NULL=未停權 |
 | suspend_reason | text NULL | |
 | is_active | bool | 退社/未立案=停用 |
 
-> 社長不另設欄位:由 `club_members`(kind=負責人)推導,單一真相。逾期次數同理由 `equipment_loans` 推導。**替代:照原型存 leader/overdue 欄**——與名單/借用紀錄雙寫必然漂移,不採。指導老師先做單一(原型如此),若未來要多位再抽 `club_advisors` 表,現在不預建(YAGNI)。
+> 社長不另設欄位:由 `club_members`(kind=負責人)推導,單一真相。逾期次數同理由 `equipment_loans` 推導。**替代:照原型存 leader/overdue 欄**——與名單/借用紀錄雙寫必然漂移,不採。指導老師=校內/校外各一組欄位(2026-07-21 需求方拍板,取代原單一組;固定兩槽故不抽表)。
 
-**club_members**(id, club_id FK, name, student_id, kind enum(負責人,副負責人,幹部,社員), title text NULL(僅幹部,必填), semester text(如 114-2), created_at, updated_at;UNIQUE(club_id, student_id, semester))
-— 2026-07-16 第九輪定案:**名單按學期各自一份快照**(同學號可跨學期出現;CSV 匯入指定學期);ad5 依「該學期快照是否存在與人數」採計,不再用 updated_at 推導。**正副負責人為一級身份**,顯示詞依社團名稱末字推導(…社→社長、…會→會長;**社團名稱強制以社或會結尾,無例外**);「社長/會長」複合形式廢除,CSV 匯入接受顯示詞並映射為標準身份。
+**club_members**(id, club_id FK, name, student_id, kind enum(負責人,副負責人,幹部,社員), title text NULL(幹部必填,其他身份選填;2026-07-21 放寬), phone text NULL(2026-07-21 新增,舊系統遷入), semester text(如 114-2), created_at, updated_at;UNIQUE(club_id, student_id, semester))
+— 2026-07-16 第九輪定案:**名單按學期各自一份快照**(同學號可跨學期出現;CSV 匯入指定學期,格式 姓名,學號,身份[,職稱[,電話]]);ad5 依「該學期快照是否存在與人數」採計,不再用 updated_at 推導。**正副負責人為一級身份**,顯示詞依 `clubs.kind` 推導(社團→社長、學會→會長;2026-07-21 起不再依名稱末字);「社長/會長」複合形式廢除,CSV 匯入接受顯示詞並映射為標準身份。舊系統入社日期遷入 updated_at。
 
 **venues** — 統一場地主檔(用旗標區分固定/臨時用途;**場地數量與容納人數由管理員後台維護**)
 
@@ -179,7 +191,7 @@ erDiagram
 | id | serial PK | |
 | club_id | FK | |
 | name / content / location | text | |
-| type | enum(社課,活動,會議) | 2026-07-13 需求調整(原:一般活動/社課/大型活動) |
+| type | enum(社課或會議,活動) | 2026-07-21 二分制(原三分 社課/活動/會議 → 社課與會議合併);僅「活動」可勾大型 |
 | is_large | bool default false | 社團申請大型活動(僅 type=活動 可勾);定義:工作人員或服務對象 50 人以上/連辦 2-3 天或逾 20 小時/經費 10 萬以上/籌備 3 個月以上且 5 次以上籌備會議 |
 | is_large_approved | bool NULL | 審核時管理員認可;**認可後評鑑行政分才享大型 ×3 加權**(2026-07-14 定案,取代原「類型=大型活動」) |
 | date / end_date | date | 活動起訖日期(2026-07-15 需求方:單日改為時間區間;未跨日 end_date=date;學期歸屬與 ad1「一天一件」皆以開始日推導)(2026-07-16 已同步) |

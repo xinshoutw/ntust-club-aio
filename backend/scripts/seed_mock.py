@@ -9,6 +9,7 @@
 
 涵蓋:14 社團(各一帳號)、資工系學會為資料最豐富的示範社(成員兩學期名單、
 全狀態活動、借用、線上申請、違規、報名、評鑑調整)、管理端各權限帳號、
+評審分組指派(財務獎/活動獎兩組;viewer01 兩組含已送出評分、viewer02 一組)、
 公告四型、器材主檔、實體檔案(合法 PNG 照片/佐證與單頁 PDF 企劃書,
 GET /files/{id} 可直接取用)。
 
@@ -45,16 +46,22 @@ from app.models import (
     ActivityReport,
     Announcement,
     ApprovalRecord,
+    AwardRubricItem,
     Base,
     Club,
     ClubMember,
     Equipment,
     EquipmentLoan,
     EvalAdjustment,
+    EvalGroup,
+    EvalGroupClub,
+    EvalGroupReviewer,
     File,
     MaintenanceRequest,
     OfficerCertificate,
     PostalAccountChange,
+    ReviewScore,
+    ReviewScoreItem,
     RoomBookingRequest,
     RoomBookingSlot,
     SessionAttendance,
@@ -347,11 +354,20 @@ async def _create_clubs_and_users(db: AsyncSession) -> tuple[dict[str, Club], di
         name="李工讀",
         must_change_password=False,
     )
+    viewer_hash = hash_password(VIEWER_PASSWORD)
     users["viewer01"] = User(
         role=UserRole.VIEWER,
         username="viewer01",
-        password_hash=hash_password(VIEWER_PASSWORD),
+        password_hash=viewer_hash,
         name="評審 01",
+        can_view_eval=True,
+        must_change_password=False,
+    )
+    users["viewer02"] = User(
+        role=UserRole.VIEWER,
+        username="viewer02",
+        password_hash=viewer_hash,
+        name="評審 02",
         can_view_eval=True,
         must_change_password=False,
     )
@@ -1150,9 +1166,14 @@ async def _create_signups(
         )
 
 
-def _create_eval(db: AsyncSession, clubs: dict[str, Club], super_user: User) -> None:
-    """評鑑:AwardRubricItem 逐年由行政建立(基礎 seed 未建),故略過 rubric/上傳;
-    僅登錄一筆表現優良加分(行政分屬最佳社團獎;評鑑視窗預設 116 年)。"""
+async def _create_eval(
+    db: AsyncSession, clubs: dict[str, Club], users: dict[str, User], super_user: User
+) -> None:
+    """評鑑:表現優良加分 + 評審分組指派 + viewer01 已送出的評分示例。
+
+    rubric 已由基礎 seed 建立(五獎 PDF 細項,年=116);此處建兩個分組
+    (財務獎、活動獎各一),viewer01 指派兩組、viewer02 指派活動獎組。
+    """
     db.add(
         EvalAdjustment(
             year=116, award_id="club", club_id=clubs["csie_club"].id,
@@ -1161,6 +1182,54 @@ def _create_eval(db: AsyncSession, clubs: dict[str, Club], super_user: User) -> 
             actor_id=super_user.id,
         )
     )
+
+    finance_group = EvalGroup(year=116, award_id="finance", name="最佳財務獎 A 組", sort=1)
+    activity_group = EvalGroup(year=116, award_id="activity", name="最佳活動獎 A 組", sort=2)
+    db.add_all([finance_group, activity_group])
+    await db.flush()  # 取得 group id
+
+    for key in ("csie_club", "guitar", "photo_club"):
+        db.add(EvalGroupClub(group_id=finance_group.id, club_id=clubs[key].id))
+    for key in ("hiking", "dance_club", "rockband"):
+        db.add(EvalGroupClub(group_id=activity_group.id, club_id=clubs[key].id))
+    # sort 決定「評審A/評審B」匿名代號
+    db.add_all([
+        EvalGroupReviewer(group_id=finance_group.id, user_id=users["viewer01"].id, sort=1),
+        EvalGroupReviewer(group_id=activity_group.id, user_id=users["viewer01"].id, sort=1),
+        EvalGroupReviewer(group_id=activity_group.id, user_id=users["viewer02"].id, sort=2),
+    ])
+
+    # viewer01 已送出的財務獎評分示例(細項配分順序 f1..f6=20/15/15/10/15/25,簡報 20)
+    finance_items = (
+        await db.scalars(
+            sa.select(AwardRubricItem)
+            .where(
+                AwardRubricItem.award_id == "finance",
+                AwardRubricItem.year == 116,
+                AwardRubricItem.is_admin_item.is_(False),
+            )
+            .order_by(AwardRubricItem.sort)
+        )
+    ).all()
+    demo_scores = [
+        ("csie_club", [18, 13, 12, 9, 14, 21], 17, _dt(2026, 7, 10, 14, 20),
+         "帳冊編碼完整,公開徵信定期公告。"),
+        ("guitar", [15, 11, 10, 8, 12, 18], 14, _dt(2026, 7, 11, 9, 45), ""),
+    ]
+    for club_key, item_scores, presentation, submitted_at, first_comment in demo_scores:
+        score = ReviewScore(
+            year=116, award_id="finance", club_id=clubs[club_key].id,
+            reviewer_id=users["viewer01"].id,
+            presentation_score=presentation, submitted_at=submitted_at,
+        )
+        score.items = [
+            ReviewScoreItem(
+                rubric_item_id=item.id, score=value,
+                comment=first_comment if i == 0 else "",
+            )
+            for i, (item, value) in enumerate(zip(finance_items, item_scores, strict=True))
+        ]
+        db.add(score)
 
 
 def _create_settings(db: AsyncSession) -> None:
@@ -1200,7 +1269,7 @@ async def seed_mock(super_username: str) -> None:
         _create_violations(db, clubs, users)
         _create_announcements(db, clubs, super_user)
         await _create_signups(db, clubs, users)
-        _create_eval(db, clubs, super_user)
+        await _create_eval(db, clubs, users, super_user)
         _create_settings(db)
         await db.commit()
 
@@ -1224,7 +1293,8 @@ def _print_accounts(super_username: str, super_password: str) -> None:
         ("admin", "admin_chen", ADMIN_PASSWORD, "權限:abooking/aroom/amaint/aviol/amember"),
         ("admin", "dean", ADMIN_PASSWORD, "學務長(僅 approve_dean 簽核)"),
         ("staff", "staff_lee", STAFF_PASSWORD, "工讀生"),
-        ("viewer", "viewer01", VIEWER_PASSWORD, "評審"),
+        ("viewer", "viewer01", VIEWER_PASSWORD, "評審(財務獎+活動獎兩組,含已送出示例)"),
+        ("viewer", "viewer02", VIEWER_PASSWORD, "評審(活動獎一組)"),
     ]
     rows += [
         ("club", account, CLUB_PASSWORD, name + ("(停用)" if not active else ""))

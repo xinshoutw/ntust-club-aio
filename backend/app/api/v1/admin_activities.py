@@ -134,16 +134,21 @@ def _record(
 # 類型篩選標籤(前端 FilterButton;「大型活動」=類型活動且已認可或申請中未被否准)
 _TYPE_LABELS = ("社課或會議", "活動", "大型活動")
 
-# 最近審核時間:該活動申請/結案簽核紀錄的 max(created_at)
-# (相關子查詢,走 ix_approval_records_subject 索引)
-_REVIEWED_AT = (
-    sa.select(sa.func.max(ApprovalRecord.created_at))
-    .where(
-        ApprovalRecord.subject_type.in_([ApprovalSubject.ACTIVITY, ApprovalSubject.ACTIVITY_CLOSE]),
-        ApprovalRecord.subject_id == Activity.id,
+# 最近審核時間:該活動申請/結案簽核紀錄的 max(created_at)。
+# 彙總子查詢一次算完再 outerjoin(相關子查詢當 ORDER BY 會對過濾集逐列執行,
+# 「最近審核」預設排序整個歷史集都吃,抵銷伺服器分頁的效益)
+_REVIEWED_SUBQ = (
+    sa.select(
+        ApprovalRecord.subject_id.label("subject_id"),
+        sa.func.max(ApprovalRecord.created_at).label("reviewed_at"),
     )
-    .scalar_subquery()
+    .where(
+        ApprovalRecord.subject_type.in_([ApprovalSubject.ACTIVITY, ApprovalSubject.ACTIVITY_CLOSE])
+    )
+    .group_by(ApprovalRecord.subject_id)
+    .subquery("last_review")
 )
+_REVIEWED_AT = _REVIEWED_SUBQ.c.reviewed_at
 
 # 排序白名單(2026-07-21:清單改伺服器端分頁,14k+ 筆不再整批撈取);
 # reviewed_at 包 NullsLast:不論鍵位/升降冪皆 NULLS LAST(無審核紀錄者殿後),
@@ -229,8 +234,12 @@ async def list_activities(
         # 最近審核出現在任一鍵位:固定 id 降冪 tiebreak 使同秒紀錄的分頁穩定
         order = [*order, Activity.id.desc()]
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
-    # reviewed_at 子查詢於計數後才加進 select,避免 count 也逐列跑相關子查詢
-    query = query.add_columns(_REVIEWED_AT.label("reviewed_at")).order_by(*order)
+    # 彙總 join 於計數後才加進查詢(count 不需要 reviewed_at)
+    query = (
+        query.outerjoin(_REVIEWED_SUBQ, _REVIEWED_SUBQ.c.subject_id == Activity.id)
+        .add_columns(_REVIEWED_AT.label("reviewed_at"))
+        .order_by(*order)
+    )
     rows = (await db.execute(query.offset(page.offset).limit(page.page_size))).all()
     data = []
     for activity, club_name, reviewed_at in rows:

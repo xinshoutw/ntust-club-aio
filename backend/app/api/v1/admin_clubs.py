@@ -12,6 +12,7 @@ from typing import Annotated
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy.exc import IntegrityError
 
 from app.api.pagination import Pagination, parse_sort
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission, require_role
@@ -227,7 +228,10 @@ async def create_club_account(
 
     帳號啟停與社團主檔同步:停用中社團補建的帳號同樣是停用狀態。
     """
-    club = await _club_or_404(db, club_id)
+    # 鎖社團列再驗「尚無帳號」:並發重複建立會在此序列化,後到者見到新帳號 → 409
+    club = await db.scalar(sa.select(Club).where(Club.id == club_id).with_for_update())
+    if club is None:
+        raise not_found("找不到社團")
     if await _club_account(db, club_id) is not None:
         raise conflict("該社團已建立帳號")
     exists = await db.scalar(sa.select(User.id).where(User.username == body.username))
@@ -245,7 +249,12 @@ async def create_club_account(
         is_active=club.is_active,  # 跟隨社團啟停狀態
     )
     db.add(account)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        # username 唯一檢查與 INSERT 之間的並發窗口:撞 uq_users_username → 409
+        await db.rollback()
+        raise conflict("此帳號已存在") from None
     audit.record(
         db,
         action="club_account_created",

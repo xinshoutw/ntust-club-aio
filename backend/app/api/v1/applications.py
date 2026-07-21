@@ -309,7 +309,8 @@ def _announcement_visible(club: Club) -> sa.ColumnElement[bool]:
         Announcement.target_type == AnnouncementTarget.ALL,
         sa.and_(
             Announcement.target_type == AnnouncementTarget.ATTR,
-            Announcement.attrs.any(club.attribute.value),
+            # 停社社團 attribute 為 None:不命中任何性質分眾
+            Announcement.attrs.any(club.attribute.value) if club.attribute else sa.false(),
         ),
         sa.and_(
             Announcement.target_type == AnnouncementTarget.CLUB,

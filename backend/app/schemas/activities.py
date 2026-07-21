@@ -26,7 +26,7 @@ class ActivityIn(BaseModel):
     """申請表單。草稿允許部分填寫(至少一欄有內容);必填完整性由 submit 端點檢核。"""
 
     name: str = Field("", max_length=100)
-    type: ActivityType = ActivityType.COURSE  # 前端預設社課
+    type: ActivityType = ActivityType.COURSE_MEETING  # 前端預設社課或會議
     is_large: bool = False
     # dt.date:欄位名 date 帶預設值後成為 class attribute,會遮蔽 datetime.date(lazy annotation)
     date: dt.date | None = None  # 開始日期

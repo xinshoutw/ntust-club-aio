@@ -88,12 +88,22 @@ async def test_list_and_detail(client, db):
 async def test_patch_name_username_active(client, db):
     club, account, no_account = await seed(client, db)
 
-    # 名稱必須以「社」或「會」結尾(全站強制規定)
+    # 名稱不再強制社/會結尾(2026-07-21):推導不到 kind 時沿用原值
     resp = await client.patch(
         f"{URL}/{club.id}", json={"name": "熱舞team"}, headers=csrf_headers(client)
     )
-    assert resp.status_code == 422
-    assert resp.json()["meta"]["code"] == "CLUB_NAME_SUFFIX"
+    assert resp.status_code == 200
+    assert resp.json()["data"]["kind"] == "社團"
+
+    # 改名結尾「會」→ kind 自動推導為學會;改回「社」→ 社團
+    resp = await client.patch(
+        f"{URL}/{club.id}", json={"name": "熱舞研究會"}, headers=csrf_headers(client)
+    )
+    assert resp.json()["data"]["kind"] == "學會"
+    resp = await client.patch(
+        f"{URL}/{club.id}", json={"name": "熱舞社"}, headers=csrf_headers(client)
+    )
+    assert resp.json()["data"]["kind"] == "社團"
 
     # 名稱重複 → 409
     resp = await client.patch(

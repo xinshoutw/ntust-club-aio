@@ -7,6 +7,7 @@ from app.models.enums import (
     ApplicationStatus,
     BookingStatus,
     CertPosition,
+    ClubKind,
     LoanStatus,
     MaintenanceStatus,
     PostalReason,
@@ -213,7 +214,8 @@ class AdminClubOut(BaseModel):
 
     id: int
     name: str
-    attribute: str
+    kind: str  # 社團/學會
+    attribute: str | None  # 停社舊社團原性質不可考 → None
     username: str | None = None  # 社團帳號(一社一帳號;尚未建立時為 None)
     is_active: bool
     suspended_until: date | None
@@ -224,7 +226,7 @@ class ClubOptionOut(BaseModel):
 
     id: int
     name: str
-    attribute: str  # ClubCascader 第一層=性質資料夾
+    attribute: str | None  # ClubCascader 第一層=性質資料夾;None 歸「未分類」
 
 
 class AdminClubDetailOut(AdminClubOut):
@@ -233,6 +235,7 @@ class AdminClubDetailOut(AdminClubOut):
     webhook 僅回是否已設定(布林),不回傳實值。
     """
 
+    en_name: str | None
     intro: str
     website_url: str | None
     contact_emails: list[str]
@@ -241,13 +244,23 @@ class AdminClubDetailOut(AdminClubOut):
     advisor_dept: str | None
     advisor_email: str | None
     advisor_ext: str | None
+    advisor_out_name: str | None
+    advisor_out_dept: str | None
+    advisor_out_email: str | None
+    advisor_out_phone: str | None
     suspend_reason: str | None
 
 
 class AdminClubUpdate(BaseModel):
-    """行政可改:社團名稱 / 帳號 username / 啟停用(名稱結尾規則於端點驗證)。"""
+    """行政可改:社團名稱 / 社團或學會 / 英文名 / 帳號 username / 啟停用。
+
+    改名時結尾「社」→社團、「會」→學會自動推導 kind;推導不到時沿用原值,
+    可另帶 kind 手動指定(2026-07-21,取代原「名稱強制社/會結尾」規則)。
+    """
 
     name: str | None = Field(None, min_length=1, max_length=100)
+    kind: ClubKind | None = None
+    en_name: str | None = Field(None, max_length=200)
     username: str | None = None
     is_active: bool | None = None
 

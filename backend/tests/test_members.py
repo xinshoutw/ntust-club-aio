@@ -82,14 +82,14 @@ async def test_member_crud_and_scoping(client, db):
     )
     assert resp.status_code == 201
 
-    # 行內編輯:改身份為社員 → 職稱自動清空
+    # 行內編輯:改身份為社員 → 職稱保留(2026-07-21 放寬:非幹部亦可有職稱)
     resp = await client.patch(
         f"/api/v1/club/members/{member_id}",
         json={"kind": "社員"},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 200
-    assert resp.json()["data"]["title"] is None
+    assert resp.json()["data"]["title"] == "總務"
 
     # 他社帳號看不到、也改不到
     other = await make_club(db, name="吉他社")

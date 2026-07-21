@@ -2,7 +2,7 @@
 
 - 列表不分頁(全校社團 <200 筆,供 ClubCascader/管理項目)
 - 詳情=社團自管資料唯讀呈現;webhook 只回是否已設定,不回實值
-- 行政可改:社團名稱(必須以「社」或「會」結尾)/帳號 username/啟停用
+- 行政可改:社團名稱/社團或學會(kind)/英文名/帳號 username/啟停用
 - 重設密碼:一次性密碼(比照 /admin/accounts:明碼僅該次回傳、argon2、首登強制改密)
 - 成員名單唯讀,參數比照社團端 /club/members
 """
@@ -14,10 +14,10 @@ from fastapi import APIRouter, Depends, Query, Request
 
 from app.api.pagination import Pagination, parse_sort
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission, require_role
-from app.core.errors import conflict, not_found, validation_error
+from app.core.errors import conflict, not_found
 from app.core.security import generate_password, hash_password
 from app.models import Club, ClubMember, PasswordHistory, Session, User
-from app.models.enums import MemberKind, UserRole
+from app.models.enums import ClubKind, MemberKind, UserRole
 from app.schemas.accounts import PasswordResetOut
 from app.schemas.admin import AdminClubDetailOut, AdminClubOut, AdminClubUpdate, ClubOptionOut
 from app.schemas.clubs import MemberOut
@@ -30,8 +30,17 @@ ClubAdmin = Annotated[CurrentUser, Depends(require_permission("amember"))]
 # 最小社團選項對「任何管理員」開放(公告/行政分審核等獨立權限頁也要選社團)
 AnyAdmin = Annotated[CurrentUser, Depends(require_role(UserRole.ADMIN))]
 
-# 全站強制規定(2026-07-16):社團名稱必須以「社」或「會」結尾
-_NAME_SUFFIXES = ("社", "會")
+
+def derive_kind(name: str) -> ClubKind | None:
+    """名稱結尾推導 社團/學會;推導不到回 None(由呼叫端手動指定或沿用)。
+
+    2026-07-21 需求方拍板:取代原「社團名稱必須以社/會結尾」強制規則。
+    """
+    if name.endswith("社"):
+        return ClubKind.CLUB
+    if name.endswith("會"):
+        return ClubKind.ASSOCIATION
+    return None
 
 # 成員名單排序白名單(比照社團端 members.py)
 _MEMBER_SORTABLE = {
@@ -65,10 +74,12 @@ def _detail_out(club: Club, account: User | None) -> AdminClubDetailOut:
     return AdminClubDetailOut(
         id=club.id,
         name=club.name,
-        attribute=club.attribute.value,
+        kind=club.kind.value,
+        attribute=club.attribute.value if club.attribute else None,
         username=account.username if account else None,
         is_active=club.is_active,
         suspended_until=club.suspended_until,
+        en_name=club.en_name,
         intro=club.intro,
         website_url=club.website_url,
         contact_emails=club.contact_emails or [],
@@ -77,6 +88,10 @@ def _detail_out(club: Club, account: User | None) -> AdminClubDetailOut:
         advisor_dept=club.advisor_dept,
         advisor_email=club.advisor_email,
         advisor_ext=club.advisor_ext,
+        advisor_out_name=club.advisor_out_name,
+        advisor_out_dept=club.advisor_out_dept,
+        advisor_out_email=club.advisor_out_email,
+        advisor_out_phone=club.advisor_out_phone,
         suspend_reason=club.suspend_reason,
     )
 
@@ -94,7 +109,8 @@ async def list_clubs(user: ClubAdmin, db: DbDep) -> ApiResponse[list[AdminClubOu
         AdminClubOut(
             id=club.id,
             name=club.name,
-            attribute=club.attribute.value,
+            kind=club.kind.value,
+            attribute=club.attribute.value if club.attribute else None,
             username=username,
             is_active=club.is_active,
             suspended_until=club.suspended_until,
@@ -112,7 +128,12 @@ async def club_options(user: AnyAdmin, db: DbDep) -> ApiResponse[list[ClubOption
     """
     rows = await db.scalars(sa.select(Club).order_by(Club.attribute, Club.name, Club.id))
     return ApiResponse(
-        data=[ClubOptionOut(id=c.id, name=c.name, attribute=c.attribute.value) for c in rows]
+        data=[
+            ClubOptionOut(
+                id=c.id, name=c.name, attribute=c.attribute.value if c.attribute else None
+            )
+            for c in rows
+        ]
     )
 
 
@@ -134,15 +155,23 @@ async def update_club(
 
     if "name" in fields and fields["name"] != club.name:
         name = fields["name"]
-        if not name.endswith(_NAME_SUFFIXES):
-            raise validation_error(
-                "社團名稱必須以「社」或「會」結尾", code="CLUB_NAME_SUFFIX"
-            )
         dup = await db.scalar(sa.select(Club.id).where(Club.name == name, Club.id != club.id))
         if dup:
             raise conflict("此社團名稱已存在")
         changes.append(f"name:{club.name}→{name}")
         club.name = name
+        # 改名自動推導 社團/學會;推導不到沿用原值(可用 kind 欄手動指定)
+        derived = derive_kind(name)
+        if derived is not None and "kind" not in fields:
+            fields["kind"] = derived
+
+    if "kind" in fields and fields["kind"] != club.kind:
+        changes.append(f"kind:{club.kind.value}→{fields['kind'].value}")
+        club.kind = fields["kind"]
+
+    if "en_name" in fields and fields["en_name"] != club.en_name:
+        changes.append("en_name")
+        club.en_name = fields["en_name"]
 
     if "username" in fields:
         username = fields["username"]

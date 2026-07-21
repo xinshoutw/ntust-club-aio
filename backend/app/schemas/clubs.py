@@ -16,21 +16,28 @@ class ClubProfileOut(BaseModel):
 
     id: int
     name: str
-    attribute: str
+    kind: str  # 社團/學會(負責人顯示詞推導依據)
+    en_name: str | None
+    attribute: str | None  # 停社舊社團原性質不可考 → None
     intro: str
     website_url: str | None
     contact_emails: list[str]
     discord_webhook_url: str | None
-    advisor_name: str | None
+    advisor_name: str | None  # 校內指導老師
     advisor_dept: str | None
     advisor_email: str | None
     advisor_ext: str | None
+    advisor_out_name: str | None  # 校外指導老師
+    advisor_out_dept: str | None
+    advisor_out_email: str | None
+    advisor_out_phone: str | None
     suspended_until: date | None
     suspend_reason: str | None
 
 
 class ClubProfileUpdate(BaseModel):
     intro: str | None = Field(None, max_length=2000)
+    en_name: str | None = Field(None, max_length=200)
     website_url: str | None = Field(None, max_length=500)
     # 聯絡 Email:至多 3 組、第 1 組必填(公告通知寄送對象;2026-07-16 第八輪)
     contact_emails: list[str] | None = Field(None, min_length=1, max_length=MAX_CONTACT_EMAILS)
@@ -39,6 +46,10 @@ class ClubProfileUpdate(BaseModel):
     advisor_dept: str | None = Field(None, max_length=50)
     advisor_email: str | None = Field(None, max_length=100)
     advisor_ext: str | None = Field(None, max_length=20)
+    advisor_out_name: str | None = Field(None, max_length=50)
+    advisor_out_dept: str | None = Field(None, max_length=50)
+    advisor_out_email: str | None = Field(None, max_length=100)
+    advisor_out_phone: str | None = Field(None, max_length=30)
 
     @field_validator("website_url")
     @classmethod
@@ -76,7 +87,8 @@ class MemberOut(BaseModel):
     name: str
     student_id: str
     kind: MemberKind
-    title: str | None
+    title: str | None  # 幹部必填;其他身份選填(2026-07-21 放寬)
+    phone: str | None
     semester: str
     updated_at: datetime
 
@@ -86,6 +98,7 @@ class MemberIn(BaseModel):
     student_id: str = Field(min_length=1, max_length=20)
     kind: MemberKind
     title: str | None = Field(None, max_length=30)
+    phone: str | None = Field(None, max_length=30)
     semester: str = Field(pattern=r"^\d{3}-[12]$")
 
 
@@ -94,12 +107,13 @@ class MemberUpdate(BaseModel):
     student_id: str | None = Field(None, min_length=1, max_length=20)
     kind: MemberKind | None = None
     title: str | None = Field(None, max_length=30)
+    phone: str | None = Field(None, max_length=30)
 
 
 class MemberImportRequest(BaseModel):
     """CSV 匯入(貼上文字;檔案上傳由前端讀成文字後同端點),整批寫入指定學期。
 
-    格式:姓名,學號,身份[,職稱];身份=社員/幹部/負責人/副負責人
+    格式:姓名,學號,身份[,職稱[,電話]];身份=社員/幹部/負責人/副負責人
     (也接受顯示詞 社長/會長/副社長/副會長)
     """
 

@@ -1,8 +1,9 @@
 """社團端:成員列表(CRUD + CSV 匯入)。
 
 - 名單按學期各自一份快照(club_members.semester);同學號可跨學期出現
-- CSV 格式:姓名,學號,身份[,職稱];身份=社員/幹部/負責人/副負責人
+- CSV 格式:姓名,學號,身份[,職稱[,電話]];身份=社員/幹部/負責人/副負責人
   (也接受顯示詞 社長/會長/副社長/副會長,映射為標準身份)
+- 職稱:幹部必填,其他身份選填(2026-07-21 放寬)
 """
 
 import csv
@@ -53,7 +54,7 @@ _KIND_ALIASES = {
 def _validate_member(kind: MemberKind, title: str | None) -> str | None:
     if kind == MemberKind.OFFICER and not title:
         raise validation_error("幹部必須填寫職稱")
-    return title if kind == MemberKind.OFFICER else None  # 僅幹部有職稱
+    return title or None  # 幹部必填;其他身份選填(2026-07-21 放寬)
 
 
 @router.get("")
@@ -108,6 +109,7 @@ async def create_member(body: MemberIn, user: ClubUser, db: DbDep) -> ApiRespons
         student_id=body.student_id,
         kind=body.kind,
         title=title,
+        phone=body.phone or None,
         semester=body.semester,
     )
     db.add(member)
@@ -189,10 +191,16 @@ async def import_members(
             continue
         name, student_id, identity = cells[0], cells[1], cells[2]
         title = cells[3].strip() if len(cells) > 3 and cells[3].strip() else None
+        phone = cells[4].strip() if len(cells) > 4 and cells[4].strip() else None
         if not name or not student_id:
             errors.append(f"第 {line_no} 列:姓名與學號必填")
             continue
-        if len(name) > 50 or len(student_id) > 20 or (title and len(title) > 30):
+        if (
+            len(name) > 50
+            or len(student_id) > 20
+            or (title and len(title) > 30)
+            or (phone and len(phone) > 30)
+        ):
             errors.append(f"第 {line_no} 列:欄位長度超過上限")
             continue
         if student_id in seen:
@@ -203,12 +211,9 @@ async def import_members(
         if kind is None:
             errors.append(f"第 {line_no} 列:身份「{identity}」無法辨識")
             continue
-        if kind == MemberKind.OFFICER:
-            if not title:
-                errors.append(f"第 {line_no} 列:幹部需填職稱")
-                continue
-        else:
-            title = None  # 僅幹部有職稱
+        if kind == MemberKind.OFFICER and not title:
+            errors.append(f"第 {line_no} 列:幹部需填職稱")
+            continue
 
         seen.add(student_id)
         member = existing.get(student_id)
@@ -220,13 +225,14 @@ async def import_members(
                     student_id=student_id,
                     kind=kind,
                     title=title,
+                    phone=phone,
                     semester=body.semester,
                 )
             )
             created += 1
-        elif (member.name, member.kind, member.title) != (name, kind, title):
+        elif (member.name, member.kind, member.title, member.phone) != (name, kind, title, phone):
             # 值沒變就不觸碰:no-op 重匯不得改動 updated_at(ad5 名單更新依據)
-            member.name, member.kind, member.title = name, kind, title
+            member.name, member.kind, member.title, member.phone = name, kind, title, phone
             updated += 1
 
     await db.commit()

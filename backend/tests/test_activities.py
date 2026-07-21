@@ -126,7 +126,7 @@ async def test_validation_rules(client, db):
     )
     assert resp.status_code == 422
 
-    large_course = payload(type="社課", is_large=True)
+    large_course = payload(type="社課或會議", is_large=True)
     resp = await client.post(
         "/api/v1/club/activities", json=large_course, headers=csrf_headers(client)
     )
@@ -392,15 +392,15 @@ async def test_photo_upload_dedupe_and_delete(client, db):
 
 async def test_list_filters_and_sorting(client, db):
     await setup_session(client, db)
-    await create_activity(client, name="甲", date="2026-03-01", type="社課")
+    await create_activity(client, name="甲", date="2026-03-01", type="社課或會議")
     await create_activity(client, name="乙", date="2026-04-01", type="活動")
-    await create_activity(client, name="丙", date="2025-10-10", type="會議")
+    await create_activity(client, name="丙", date="2025-10-10", type="社課或會議")
 
     resp = await client.get("/api/v1/club/activities", params={"semester": "114-2"})
     assert resp.json()["meta"]["total"] == 2
 
-    resp = await client.get("/api/v1/club/activities", params={"type": "會議"})
-    assert [a["name"] for a in resp.json()["data"]] == ["丙"]
+    resp = await client.get("/api/v1/club/activities", params={"type": "社課或會議"})
+    assert [a["name"] for a in resp.json()["data"]] == ["甲", "丙"]  # 預設 date desc
 
     resp = await client.get("/api/v1/club/activities", params={"sort": "date"})
     assert [a["name"] for a in resp.json()["data"]] == ["丙", "甲", "乙"]

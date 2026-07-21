@@ -13,6 +13,16 @@ class AuthProvider(StrEnum):
     SSO = "sso"
 
 
+class ClubKind(StrEnum):
+    """社團/學會(2026-07-21 需求方拍板):負責人顯示詞由此推導(社團→社長、學會→會長)。
+
+    建立/改名時名稱結尾「社」→社團、「會」→學會自動推導;推導不到時必須手動指定。
+    """
+
+    CLUB = "社團"
+    ASSOCIATION = "學會"
+
+
 class ClubAttribute(StrEnum):
     AUTONOMOUS = "自治性"
     ACADEMIC = "學藝性"
@@ -39,9 +49,11 @@ class VenueCategory(StrEnum):
 
 
 class ActivityType(StrEnum):
-    COURSE = "社課"
+    """二分制(2026-07-21 需求方拍板,原 社課/活動/會議 三分):
+    「社課或會議」與「活動」;僅「活動」可勾大型活動。"""
+
+    COURSE_MEETING = "社課或會議"
     EVENT = "活動"
-    MEETING = "會議"
 
 
 class ActivityStatus(StrEnum):

@@ -53,7 +53,7 @@ async def list_clubs(user: EvalAdmin, db: DbDep) -> ApiResponse[list[dict]]:
             {
                 "club_id": club.id,
                 "club_name": club.name,
-                "attribute": club.attribute.value,
+                "attribute": club.attribute.value if club.attribute else None,
                 "year": year,
                 "total": total,
                 "scores": [s.model_dump() for s in scores],

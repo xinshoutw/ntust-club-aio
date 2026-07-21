@@ -30,7 +30,8 @@ def _club_out(club: Club) -> AdminClubOut:
     return AdminClubOut(
         id=club.id,
         name=club.name,
-        attribute=club.attribute.value,
+        kind=club.kind.value,
+        attribute=club.attribute.value if club.attribute else None,
         is_active=club.is_active,
         suspended_until=club.suspended_until,
     )

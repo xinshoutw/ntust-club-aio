@@ -348,7 +348,7 @@ async def test_large_approval_admin_override_without_application(client, db):
     assert data["is_large_approved"] is True
 
     # 類型=社課 不得認定為大型活動
-    cid = await submit_activity(client, db, name="每週社課", type="社課", is_large=False)
+    cid = await submit_activity(client, db, name="每週社課", type="社課或會議", is_large=False)
     await login(client, "advisor")
     resp = await approve_first_stage(client, cid, is_large_approved=True)
     assert resp.status_code == 422

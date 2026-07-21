@@ -34,7 +34,7 @@ async def seed_closed_activity(db, club, user, *, day, large=False, photos=0, vi
         club_id=club.id,
         name="活動",
         location="活動中心",
-        type="活動" if large else "社課",
+        type="活動" if large else "社課或會議",
         is_large=large,
         is_large_approved=large,
         date=day,

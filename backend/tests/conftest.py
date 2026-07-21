@@ -15,7 +15,7 @@ from app.core.rate_limit import login_limiter, upload_limiter
 from app.core.security import hash_password
 from app.main import app
 from app.models import Base, Club, User
-from app.models.enums import ClubAttribute, UserRole
+from app.models.enums import ClubAttribute, ClubKind, UserRole
 
 TEST_DB = "club_aio_test"
 # 測試通用密碼(符合密碼政策)
@@ -103,6 +103,7 @@ async def client():
 
 
 async def make_club(db, name: str = "熱舞社", **kw) -> Club:
+    kw.setdefault("kind", ClubKind.ASSOCIATION if name.endswith("會") else ClubKind.CLUB)
     club = Club(name=name, attribute=ClubAttribute.ART, **kw)
     db.add(club)
     await db.commit()

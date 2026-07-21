@@ -80,6 +80,7 @@ from app.models.enums import (
     BookingStatus,
     CertPosition,
     ClubAttribute,
+    ClubKind,
     LoanStatus,
     MaintenanceStatus,
     MemberKind,
@@ -277,7 +278,13 @@ class MockFiles:
 async def _create_clubs_and_users(db: AsyncSession) -> tuple[dict[str, Club], dict[str, User]]:
     clubs: dict[str, Club] = {}
     for name, attribute, account, active in CLUBS:
-        club = Club(name=name, attribute=attribute, intro=f"{name}(示範資料)", is_active=active)
+        club = Club(
+            name=name,
+            kind=ClubKind.ASSOCIATION if name.endswith("會") else ClubKind.CLUB,
+            attribute=attribute,
+            intro=f"{name}(示範資料)",
+            is_active=active,
+        )
         clubs[account] = club
         db.add(club)
 
@@ -512,7 +519,7 @@ async def _create_activities(
     # 1. 草稿
     acts["draft"] = _add_activity(
         db, csie, csie_user,
-        name="AI 程式設計社課", type_=ActivityType.COURSE,
+        name="AI 程式設計社課", type_=ActivityType.COURSE_MEETING,
         status=ActivityStatus.DRAFT,
         date_=date(2026, 7, 22), start_time=time(19, 0), end_time=time(21, 0),
         location="S207", content="Python 與生成式 AI 入門,含實作練習。",
@@ -522,7 +529,7 @@ async def _create_activities(
     # 2. 待輔導老師審(無補助)
     acts["pending_advisor"] = _add_activity(
         db, csie, csie_user,
-        name="Python 入門社課", type_=ActivityType.COURSE,
+        name="Python 入門社課", type_=ActivityType.COURSE_MEETING,
         status=ActivityStatus.PENDING_ADVISOR,
         date_=date(2026, 7, 23), start_time=time(19, 0), end_time=time(21, 0),
         location="S207", content="基礎語法與資料處理,適合零基礎社員。",
@@ -575,7 +582,7 @@ async def _create_activities(
     # 6. 已核准・已結束(無補助單關;可進結案流程)
     acts["approved_ended"] = _add_activity(
         db, csie, csie_user,
-        name="期末社員大會", type_=ActivityType.MEETING,
+        name="期末社員大會", type_=ActivityType.COURSE_MEETING,
         status=ActivityStatus.APPROVED,
         date_=date(2026, 6, 24), start_time=time(18, 30), end_time=time(20, 30),
         location="S302/S303", content="本學期成果回顧與下學期幹部交接說明。",
@@ -678,7 +685,7 @@ async def _create_activities(
     # 13. 其他社團:電機系學會已核准社課(多社資料示意)
     acts["ee_approved"] = _add_activity(
         db, clubs["ee_club"], users["ee_club"],
-        name="電路實作工作坊", type_=ActivityType.COURSE,
+        name="電路實作工作坊", type_=ActivityType.COURSE_MEETING,
         status=ActivityStatus.APPROVED,
         date_=date(2026, 7, 8), start_time=time(14, 0), end_time=time(17, 0),
         location="S209", content="麵包板電路與焊接基礎。",

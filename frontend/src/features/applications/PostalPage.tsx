@@ -32,6 +32,9 @@ export default function PostalPage() {
 
   const listQuery = usePostalList()
   const records = listQuery.data?.records ?? []
+  // 正在申請=未完成全部(不限長度);最近申請=已完成 近 5 筆(2026-07-21)
+  const activeRows = records.filter((r) => r.status !== 'completed')
+  const recentRows = records.filter((r) => r.status === 'completed').slice(0, 5)
   const { submit } = usePostalMutations()
 
   const disabled = (r: string) =>
@@ -137,7 +140,7 @@ export default function PostalPage() {
 
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
+          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在申請</div>
           <table className="tb" aria-label="郵局帳戶異動申請紀錄" style={{ minWidth: 520 }}>
             <thead>
               <tr>
@@ -148,7 +151,7 @@ export default function PostalPage() {
               </tr>
             </thead>
             <tbody>
-              {records.map((r) => (
+              {activeRows.map((r) => (
                 <tr key={r.id}>
                   <td style={{ fontWeight: 500 }}>{r.reasons.join('、')}</td>
                   <td style={{ color: 'var(--steel)', fontSize: 13 }}>
@@ -165,7 +168,47 @@ export default function PostalPage() {
                   </td>
                 </tr>
               )}
-              {!listQuery.isPending && !listQuery.isError && records.length === 0 && (
+              {!listQuery.isPending && !listQuery.isError && activeRows.length === 0 && (
+                <tr className="no-hover">
+                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有進行中的申請</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Spin>
+
+      <Spin spinning={listQuery.isPending}>
+        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
+          <table className="tb" aria-label="郵局帳戶異動申請紀錄" style={{ minWidth: 520 }}>
+            <thead>
+              <tr>
+                <th scope="col">事由</th>
+                <th scope="col">帳戶資訊</th>
+                <th scope="col">申請日期</th>
+                <th scope="col">狀態</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentRows.map((r) => (
+                <tr key={r.id}>
+                  <td style={{ fontWeight: 500 }}>{r.reasons.join('、')}</td>
+                  <td style={{ color: 'var(--steel)', fontSize: 13 }}>
+                    戶名:{r.accountName} · 帳號:<span className="num">{r.accountNumber}</span>
+                  </td>
+                  <td className="num" style={{ fontSize: 13, width: 110 }}>{r.date}</td>
+                  <td style={{ width: 100 }}><StatusPill status={r.status} /></td>
+                </tr>
+              ))}
+              {listQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={4}>
+                    <QueryError compact title="申請紀錄載入失敗" error={listQuery.error} onRetry={() => listQuery.refetch()} />
+                  </td>
+                </tr>
+              )}
+              {!listQuery.isPending && !listQuery.isError && recentRows.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>尚無申請紀錄</td>
                 </tr>

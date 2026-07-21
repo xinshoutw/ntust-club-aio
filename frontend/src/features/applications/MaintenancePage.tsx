@@ -31,6 +31,9 @@ export default function MaintenancePage() {
   const configQuery = useClubConfig()
   const listQuery = useMaintenanceList()
   const records = listQuery.data?.records ?? []
+  // 正在申請=未完成全部(不限長度);最近申請=已完成 近 5 筆(2026-07-21)
+  const activeRows = records.filter((r) => r.status !== 'done')
+  const recentRows = records.filter((r) => r.status === 'done').slice(0, 5)
   const { submit } = useMaintenanceMutations()
 
   // 上限以後端組態為權威:載入完成前不開放操作(比照 ActivityFormPage),
@@ -113,7 +116,7 @@ export default function MaintenancePage() {
 
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近報修</div>
+          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在報修</div>
           <table className="tb" aria-label="空間報修紀錄" style={{ minWidth: 620 }}>
             <thead>
               <tr>
@@ -123,7 +126,7 @@ export default function MaintenancePage() {
               </tr>
             </thead>
             <tbody>
-              {records.map((r) => (
+              {activeRows.map((r) => (
                 <tr key={r.id}>
                   <td>
                     <div style={{ fontWeight: 500 }}>{r.location}</div>
@@ -143,7 +146,49 @@ export default function MaintenancePage() {
                   </td>
                 </tr>
               )}
-              {!listQuery.isPending && !listQuery.isError && records.length === 0 && (
+              {!listQuery.isPending && !listQuery.isError && activeRows.length === 0 && (
+                <tr className="no-hover">
+                  <td colSpan={3} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有進行中的申請</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Spin>
+
+      <Spin spinning={listQuery.isPending}>
+        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近報修</div>
+          <table className="tb" aria-label="空間報修紀錄" style={{ minWidth: 620 }}>
+            <thead>
+              <tr>
+                <th scope="col">報修內容</th>
+                <th scope="col">申請日期</th>
+                <th scope="col">狀態</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentRows.map((r) => (
+                <tr key={r.id}>
+                  <td>
+                    <div style={{ fontWeight: 500 }}>{r.location}</div>
+                    <div style={{ fontSize: 13, color: 'var(--steel)' }}>{r.items}</div>
+                    {r.handleNote && (
+                      <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>處理備註:{r.handleNote}</div>
+                    )}
+                  </td>
+                  <td className="num" style={{ fontSize: 13, width: 110 }}>{r.date}</td>
+                  <td style={{ width: 100 }}><StatusPill status={r.status} /></td>
+                </tr>
+              ))}
+              {listQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={3}>
+                    <QueryError compact title="報修紀錄載入失敗" error={listQuery.error} onRetry={() => listQuery.refetch()} />
+                  </td>
+                </tr>
+              )}
+              {!listQuery.isPending && !listQuery.isError && recentRows.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={3} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>尚無報修紀錄</td>
                 </tr>

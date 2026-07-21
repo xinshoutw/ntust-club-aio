@@ -3,11 +3,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api, apiPaged, qs } from './client'
+import { fetchAllPages } from './fetchAll'
 import type { MemberKind } from '../lib/roles'
 import type { StatusKey } from '../lib/status'
 
 // 各申請頁「最近申請」固定近 5 筆
-const RECENT_PAGE_SIZE = 5
 
 interface FileOut {
   id: string
@@ -60,11 +60,13 @@ const toMaintenance = (m: MaintenanceOut): MaintenanceRecord => ({
 
 export function useMaintenanceList() {
   return useQuery({
-    queryKey: [...keys.maintenance, 'recent'],
+    queryKey: [...keys.maintenance, 'list'],
+    // 全量(申請量小):頁面自行切分 正在申請(全部)/最近申請(近 5 筆)(2026-07-21)
     queryFn: () =>
-      apiPaged<MaintenanceOut[]>(`/club/maintenance${qs({ page: 1, page_size: RECENT_PAGE_SIZE })}`).then(
-        ({ data, total }) => ({ records: data.map(toMaintenance), total }),
-      ),
+      fetchAllPages<MaintenanceOut>('/club/maintenance').then((rows) => ({
+        records: rows.map(toMaintenance),
+        total: rows.length,
+      })),
   })
 }
 
@@ -145,11 +147,12 @@ const toPostal = (p: PostalChangeOut): PostalRecord => ({
 
 export function usePostalList() {
   return useQuery({
-    queryKey: [...keys.postal, 'recent'],
+    queryKey: [...keys.postal, 'list'],
     queryFn: () =>
-      apiPaged<PostalChangeOut[]>(`/club/postal-changes${qs({ page: 1, page_size: RECENT_PAGE_SIZE })}`).then(
-        ({ data, total }) => ({ records: data.map(toPostal), total }),
-      ),
+      fetchAllPages<PostalChangeOut>('/club/postal-changes').then((rows) => ({
+        records: rows.map(toPostal),
+        total: rows.length,
+      })),
   })
 }
 
@@ -237,11 +240,12 @@ const toCertificate = (c: OfficerCertOut): CertificateRecord => ({
 
 export function useCertificates() {
   return useQuery({
-    queryKey: [...keys.certificates, 'recent'],
+    queryKey: [...keys.certificates, 'list'],
     queryFn: () =>
-      apiPaged<OfficerCertOut[]>(
-        `/club/officer-certificates${qs({ page: 1, page_size: RECENT_PAGE_SIZE })}`,
-      ).then(({ data, total }) => ({ records: data.map(toCertificate), total })),
+      fetchAllPages<OfficerCertOut>('/club/officer-certificates').then((rows) => ({
+        records: rows.map(toCertificate),
+        total: rows.length,
+      })),
   })
 }
 

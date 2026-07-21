@@ -1,9 +1,10 @@
 """公告系統(2026-07-16 第八輪):管理端 CRUD、驗證、通知收件解析與模板。"""
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 import sqlalchemy as sa
 
+from app.core.semesters import TAIPEI
 from app.models import Announcement, AuditLog, Club
 from app.services import notify
 from tests.conftest import csrf_headers, login, make_club, make_user
@@ -68,9 +69,11 @@ async def test_create_validations(client, db):
         URL, json=body(takeover=True, takeover_until=PAST), headers=csrf_headers(client)
     )
     assert resp.status_code == 422
+    # 「今天」以台北日曆日錨定(驗證器同基準),機器時區不同也不 flake
+    taipei_today = datetime.now(TAIPEI).date().isoformat()
     resp = await client.post(
         URL,
-        json=body(takeover=True, takeover_until=date.today().isoformat()),
+        json=body(takeover=True, takeover_until=taipei_today),
         headers=csrf_headers(client),
     )
     assert resp.status_code == 201, resp.text

@@ -149,6 +149,16 @@ async def require_staff(user: CurrentUser) -> User:
     return user
 
 
+async def require_viewer(user: CurrentUser) -> User:
+    """評審帳號(競賽評分);can_view_eval 由帳號管理建立時給定,停用即全面擋下。"""
+    if user.role != UserRole.VIEWER or not user.can_view_eval:
+        raise forbidden()
+    return user
+
+
+ViewerUser = Annotated[User, Depends(require_viewer)]
+
+
 def client_ip(request: Request) -> str | None:
     """真實 IP:uvicorn --proxy-headers 已依信任鏈改寫 request.client。"""
     return request.client.host if request.client else None

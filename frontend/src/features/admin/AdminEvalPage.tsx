@@ -220,7 +220,7 @@ export default function AdminEvalPage() {
                     {c.clubName}
                   </button>
                 </td>
-                <td>{c.attribute}</td>
+                <td>{c.attribute ?? '—'}</td>
                 <td className="r num">{c.total}</td>
               </tr>
             ))}

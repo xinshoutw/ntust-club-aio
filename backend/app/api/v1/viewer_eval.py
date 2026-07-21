@@ -146,6 +146,9 @@ async def my_assignments(user: ViewerUser, db: DbDep) -> ApiResponse[list[Viewer
                     scored=submitted,
                     total=_score_total(score) if submitted else None,
                     submitted_at=score.submitted_at if score is not None else None,
+                    presentation_pending=(
+                        submitted and award.has_presentation and score.presentation_score is None
+                    ),
                 )
             )
         data.append(

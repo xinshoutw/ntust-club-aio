@@ -41,10 +41,10 @@ export default function MyReviewsPage() {
                 const max = itemsMax(a) + (a.hasPresentation ? PRESENTATION_MAX : 0)
                 return (
                   <div
-                    key={a.awardId}
+                    key={a.groupId}
                     className="card click-tint"
                     style={{ padding: 20, cursor: 'pointer' }}
-                    onClick={() => navigate(`/viewer/score?award=${a.awardId}`)}
+                    onClick={() => navigate(`/viewer/score?group=${a.groupId}`)}
                   >
                     <div style={{ fontSize: 16, fontWeight: 600 }}>{a.awardName}</div>
                     <div style={{ marginTop: 4, fontSize: 12, color: 'var(--steel)' }}>{a.groupName}</div>

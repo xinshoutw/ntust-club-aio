@@ -35,14 +35,16 @@ const fmtSize = (b: number) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` 
 /** 分數顯示:去除浮點雜訊(rubric max_score 為 float) */
 const fmtScore = (n: number) => Math.round(n * 100) / 100
 
-// 評分(依獎項):選獎項 → 逐社團開評分彈窗;獎項選取持久於 URL(?award=)
+// 評分(依獎項):選獎項分組 → 逐社團開評分彈窗;選取持久於 URL(?group=)。
+// 以 group 為鍵而非 award:同一評審可能在同獎項被指派多個分組(A/B 組),award 當鍵會塌陷
 export default function ViewerScorePage() {
   const { message } = App.useApp()
   const [params, setParams] = useSearchParams()
   const assignmentsQuery = useViewerAssignments()
   const assignments = assignmentsQuery.data ?? []
-  const awardParam = params.get('award')
-  const award: ViewerAssignment | null = assignments.find((a) => a.awardId === awardParam) ?? assignments[0] ?? null
+  const groupParam = Number(params.get('group'))
+  const award: ViewerAssignment | null =
+    assignments.find((a) => a.groupId === groupParam) ?? assignments[0] ?? null
 
   const [page, setPage] = useState(1)
   const [selectedClubId, setSelectedClubId] = useState<number | null>(null)
@@ -85,13 +87,20 @@ export default function ViewerScorePage() {
           <Select
             size="small"
             loading={assignmentsQuery.isPending}
-            value={award?.awardId}
-            style={{ width: 200 }}
+            value={award?.groupId}
+            style={{ width: 220 }}
             onChange={(v) => {
-              setParams({ award: v })
+              setParams({ group: String(v) })
               setPage(1)
             }}
-            options={assignments.map((a) => ({ value: a.awardId, label: a.awardName }))}
+            // 同獎項多分組時附分組名區辨,單一分組維持乾淨的獎項名
+            options={assignments.map((a) => ({
+              value: a.groupId,
+              label:
+                assignments.filter((x) => x.awardId === a.awardId).length > 1
+                  ? `${a.awardName} · ${a.groupName}`
+                  : a.awardName,
+            }))}
           />
         }
       />
@@ -129,6 +138,9 @@ export default function ViewerScorePage() {
                     </td>
                     <td style={{ fontSize: 13, color: c.scored ? '#1F6B45' : 'var(--steel)' }}>
                       {c.scored ? '已評分(可修改)' : '未評分'}
+                      {c.presentationPending && (
+                        <span style={{ marginLeft: 6, fontSize: 12, color: '#8A5A00' }}>簡報未評</span>
+                      )}
                     </td>
                     <td className="num">{c.total != null ? fmtScore(c.total) : '—'}</td>
                   </tr>
@@ -287,8 +299,8 @@ function ScorePanel({
   }
 
   const submit = (next: boolean) => {
+    // 現場簡報選填:簡報晚於線上審查,允許先送細項分數、簡報後再補登
     const missing = detail.items.filter((i) => scores[i.id] == null).map((i) => String(i.id))
-    if (award.hasPresentation && presentation == null) missing.push('presentation')
     if (missing.length) {
       setErrors(new Set(missing))
       message.error('所有評分細項皆須填寫')
@@ -308,7 +320,7 @@ function ScorePanel({
         score: scores[i.id] as number,
         comment: comments[i.id],
       })),
-      presentationScore: award.hasPresentation ? (presentation as number) : undefined,
+      presentationScore: award.hasPresentation && presentation != null ? presentation : undefined,
     }
     save.mutate(
       { clubId, awardId: award.awardId, input },
@@ -419,6 +431,9 @@ function ScorePanel({
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500 }}>
                   現場簡報(<span className="num">{PRESENTATION_MAX}</span>)
+                  <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: 'var(--steel)' }}>
+                    選填,可於簡報後補登
+                  </span>
                 </div>
                 <InputNumber<number>
                   min={0}

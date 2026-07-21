@@ -93,6 +93,8 @@ class ViewerClubStateOut(BaseModel):
     scored: bool  # 已送出(ReviewScore.submitted_at 非 NULL)
     total: float | None  # 細項分數合計 + presentation_score;未送出為 None
     submitted_at: datetime | None
+    # 已送出但現場簡報分尚未補登(簡報選填,晚於線上審查;僅 has_presentation 獎)
+    presentation_pending: bool = False
 
 
 class ViewerAssignmentOut(BaseModel):

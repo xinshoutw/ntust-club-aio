@@ -29,6 +29,7 @@ interface AssignmentClubOut {
   scored: boolean
   total: number | null
   submitted_at: string | null
+  presentation_pending: boolean
 }
 
 interface AssignmentOut {
@@ -56,7 +57,7 @@ interface ScoreItemOut {
 interface ScoreOut {
   items: Record<string, ScoreItemOut> // key = rubric_item_id
   presentation_score: number | null
-  submitted_at: string
+  submitted_at: string | null
 }
 
 interface ClubAwardDetailOut {
@@ -94,6 +95,8 @@ export interface AssignmentClub {
   scored: boolean
   total?: number
   submittedAt?: string // YYYY/MM/DD HH:mm
+  /** 已送出但現場簡報分尚未補登(簡報選填、可後補) */
+  presentationPending: boolean
 }
 
 export interface ViewerAssignment {
@@ -115,7 +118,7 @@ export interface ViewerScoreItem {
 export interface ViewerScore {
   items: Record<number, ViewerScoreItem>
   presentationScore?: number
-  submittedAt: string // YYYY/MM/DD HH:mm
+  submittedAt?: string // YYYY/MM/DD HH:mm
 }
 
 export interface ClubAwardDetail {
@@ -161,6 +164,7 @@ const toAssignmentClub = (c: AssignmentClubOut): AssignmentClub => ({
   scored: c.scored,
   total: c.total ?? undefined,
   submittedAt: c.submitted_at ? dateTime(c.submitted_at) : undefined,
+  presentationPending: c.presentation_pending,
 })
 
 const toAssignment = (a: AssignmentOut): ViewerAssignment => ({
@@ -190,7 +194,7 @@ const toScore = (s: ScoreOut): ViewerScore => {
   return {
     items,
     presentationScore: s.presentation_score ?? undefined,
-    submittedAt: dateTime(s.submitted_at),
+    submittedAt: s.submitted_at ? dateTime(s.submitted_at) : undefined,
   }
 }
 

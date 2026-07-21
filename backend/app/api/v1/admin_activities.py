@@ -230,8 +230,9 @@ async def list_activities(
         if locked:
             query = query.where(Activity.close_unlocked.is_(False))
     order = parse_sort(sort, _SORTABLE, Activity.id.desc())
-    if sort and "reviewed_at" in (k.strip().removeprefix("-") for k in sort.split(",")):
-        # 最近審核出現在任一鍵位:固定 id 降冪 tiebreak 使同秒紀錄的分頁穩定
+    if sort:
+        # 固定 id 降冪 tiebreak:任何使用者排序鍵(狀態/類型/日期…)都可能大量同值,
+        # 無穩定全序時獨立 OFFSET 分頁會在換頁間重複/漏列
         order = [*order, Activity.id.desc()]
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     # 彙總 join 於計數後才加進查詢(count 不需要 reviewed_at)

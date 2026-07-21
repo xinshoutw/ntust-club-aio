@@ -306,7 +306,10 @@ async def list_club_members(
         query = query.where(ClubMember.semester == semester)
     if kind:
         query = query.where(ClubMember.kind.in_(kind))
-    query = query.order_by(*parse_sort(sort, _MEMBER_SORTABLE, _MEMBER_DEFAULT_ORDER))
+    # 固定 id tiebreak(同社團端成員列表:非唯一排序鍵下分頁才穩定)
+    query = query.order_by(
+        *parse_sort(sort, _MEMBER_SORTABLE, _MEMBER_DEFAULT_ORDER), ClubMember.id.asc()
+    )
 
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = await db.scalars(query.offset(page.offset).limit(page.page_size))

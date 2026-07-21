@@ -83,7 +83,9 @@ async def list_members(
         query = query.where(ClubMember.semester == semester)
     if kind:
         query = query.where(ClubMember.kind.in_(kind))
-    query = query.order_by(*parse_sort(sort, _SORTABLE, _DEFAULT_ORDER))
+    # 固定 id tiebreak:kind/student_id 皆非唯一(同學號可跨學期),無穩定全序時
+    # 分頁與 CSV 匯出的逐頁抓取會在頁界重複/漏列
+    query = query.order_by(*parse_sort(sort, _SORTABLE, _DEFAULT_ORDER), ClubMember.id.asc())
 
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = await db.scalars(query.offset(page.offset).limit(page.page_size))

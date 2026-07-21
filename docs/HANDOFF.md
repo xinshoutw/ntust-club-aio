@@ -1,4 +1,4 @@
-# Session Handoff(2026-07-21,第十三輪:舊系統資料遷移 + 遷移前置規則調整)
+# Session Handoff(2026-07-21,第十三輪:CMS+clubclass 雙遷移 + 借用五功能)
 
 > 給下一個 session 的交接快照。永久性專案知識在三層 `AGENTS.md` 與 `docs/architecture.md`、`docs/data-model.md`、`docs/design-guide.md`;本檔只記「現在進行到哪、接下來做什麼」。過期即刪。
 
@@ -10,19 +10,21 @@
    - club_members.phone、職稱放寬各身份皆可(幹部仍必填)
    - **活動類型二分**:「社課或會議」/「活動」;人數語彙統一「社員/非社員」
    - 前端全同步(kindLabel 改吃 clubKind、行政端類型下拉、成員電話行內編輯、管理項目雙指導老師+英文名)
-3. **資料遷移完成**(`migration/cms_import.py`,idempotent、重跑驗證 0 新增):dev 庫現況=160 社(2 偽社團不遷)、users 177、成員 30,478、活動 14,236(結案報告 10,913)、經費 15,030、公告 8;一次性密碼 108 筆在 `migration/out/one_time_passwords_2026-07-21.csv`(**交承辦後銷毀**)
+3. **CMS 資料遷移完成**(`migration/cms_import.py`,idempotent):dev 庫=159 社(3 偽社團不遷:國際事務處/testclub/學務處就輔組)、users 178(staff 17/17 含侍筱鳳 `800`;`101101101` 黃宥維已升 superadmin)、成員 30,477、活動 14,234、公告 8;一次性密碼 109 筆在 `migration/out/one_time_passwords_2026-07-21.csv`(**交承辦後銷毀**)
+4. **clubclass 遷移完成**(`migration/cc_import.py`,idempotent;來源=拋棄式 MySQL 容器 `cc-legacy`,dump=`legacy/clubclass/cc_2026-07-21.sql`):場地 23(4 停用承接歷史)、器材 25(8 停用)、教室借用 15,634(一舍 B2 拆樓梯+白板)、器材借用 7,173;行政借用 club_id=NULL 顯示「學務處」
+5. **借用五新功能**(migration `b3e7d40a95c1`):取消(cancelled 狀態)、行政手動借用頁、場地不開放規則 Rule Page(venue_block_rules)、器材單次可借上限、**聯絡電話必填**(場地/器材申請;需求方原選填後改必填)
+6. **兩輪 Opus 對抗審查已修**:CMS 輪 7 findings(無 C/H);clubclass 輪 1 HIGH(NULL club 通知 500)+1 MEDIUM(固定借用取消鈕條件)皆修畢
 
 ## 驗證現況(全綠)
 
-- 後端 `timeout 300 uv run pytest -q` **211 passed**、`ruff check .` 全綠
+- 後端 `timeout 300 uv run pytest -q` **218 passed**、`ruff check .` 全綠
 - 前端 `pnpm exec tsc -b` 0 錯、`pnpm test` 35 passed、lint 僅既有 fast-refresh warning
 - **注意**:dev 庫=真實遷移資料(非 seed_mock);要回 mock 環境跑 `seed_mock --yes`,要回遷移資料跑 `reset_db --yes` + `uv run python ../migration/cms_import.py`
 
 ## 下一輪待辦 / 待需求方
 
 - **舊機 media 目錄**(documents/、images/,~8.7 萬檔):使用者抓回後寫檔案匯入(PlanFile→活動附件、activityimages→結案照片、activityfiles);`migration/README.md` TODO 節
-- **待需求方拍板**:評鑑檔案庫 Club_clubfiles(12,752 檔)歸檔與否;行政歷史文件(7 筆);舊 staff「侍筱鳳」帳號 `800` 與偽社團「學務處就輔組」同名衝突(staff 端未遷)
-- **clubclass(PHP 場地器材借用)**另套 DB,借用歷史要遷需另 dump
+- **待需求方拍板**:評鑑檔案庫 Club_clubfiles(12,752 檔)歸檔與否;行政歷史文件(7 筆)——皆 TODO,需求方後續給
 - **簽核流程重做**(2026-07-17 拍板規格,見上輪 HANDOFF/AGENTS):狀態機/角色改名/頭銜/superadmin sh 腳本/逐項核定 UI——尚未實作
 - 前輪 REVIEW_full 的 P2/P3 待辦仍在(lib 測試補強、文件對齊、AGENTS 重組提案)
 - 成員名單截至 106-2、活動至 2026-10:屬舊系統真實狀態,前端預設學期(114-2)下成員頁會是空的,屬預期

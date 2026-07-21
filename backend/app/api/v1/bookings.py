@@ -171,8 +171,9 @@ async def fixed_window(user: ClubUser, db: DbDep) -> ApiResponse[FixedWindowOut]
 
 @router.get("/room-bookings")
 async def list_room_bookings(
-    user: ClubUser, db: DbDep, page: Pagination
+    user: ClubUser, db: DbDep, page: Pagination, active: bool | None = None
 ) -> ApiResponse[list[RoomBookingOut]]:
+    # active=true 僅回「正在借用」(審核中或學期未結束的已核准);false 僅回其餘(2026-07-21)
     query = (
         sa.select(RoomBookingRequest, Venue.name)
         .join(Venue, RoomBookingRequest.venue_id == Venue.id)
@@ -180,6 +181,12 @@ async def list_room_bookings(
         .options(sa.orm.selectinload(RoomBookingRequest.slots))
         .order_by(RoomBookingRequest.id.desc())
     )
+    if active is not None:
+        ongoing = sa.and_(
+            RoomBookingRequest.status.in_([BookingStatus.PENDING, BookingStatus.APPROVED]),
+            RoomBookingRequest.end_date >= _today_taipei(),
+        )
+        query = query.where(ongoing if active else sa.not_(ongoing))
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = await db.execute(query.offset(page.offset).limit(page.page_size))
     data = []
@@ -271,8 +278,9 @@ async def create_room_booking(
 
 @router.get("/venue-bookings")
 async def list_venue_bookings(
-    user: ClubUser, db: DbDep, page: Pagination
+    user: ClubUser, db: DbDep, page: Pagination, active: bool | None = None
 ) -> ApiResponse[list[VenueBookingOut]]:
+    # active=true 僅回「正在借用」(審核中或未過期的已核准);false 僅回其餘(2026-07-21)
     query = (
         sa.select(VenueBooking, Venue.name, Activity.name)
         .join(Venue, VenueBooking.venue_id == Venue.id)
@@ -281,6 +289,12 @@ async def list_venue_bookings(
         # 借用日新到舊(同日再依建立序);log 型清單「新的在上」以借用日為準
         .order_by(VenueBooking.date.desc(), VenueBooking.id.desc())
     )
+    if active is not None:
+        ongoing = sa.and_(
+            VenueBooking.status.in_([BookingStatus.PENDING, BookingStatus.APPROVED]),
+            VenueBooking.date >= _today_taipei(),
+        )
+        query = query.where(ongoing if active else sa.not_(ongoing))
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = await db.execute(query.offset(page.offset).limit(page.page_size))
     data = []
@@ -353,8 +367,13 @@ async def create_venue_booking(
 
 @router.get("/equipment-loans")
 async def list_equipment_loans(
-    user: ClubUser, db: DbDep, page: Pagination
+    user: ClubUser,
+    db: DbDep,
+    page: Pagination,
+    active: bool | None = None,
+    status: LoanStatus | None = None,
 ) -> ApiResponse[list[EquipmentLoanOut]]:
+    # active=true=審核中/已核准/借出中;false=其餘;status=精確過濾(已歸還分頁用)(2026-07-21)
     query = (
         sa.select(EquipmentLoan, Equipment.name, Activity.name)
         .join(Equipment, EquipmentLoan.equipment_id == Equipment.id)
@@ -363,6 +382,13 @@ async def list_equipment_loans(
         # 借用起始日新到舊(同日再依建立序)
         .order_by(EquipmentLoan.start_date.desc(), EquipmentLoan.id.desc())
     )
+    if active is not None:
+        ongoing = EquipmentLoan.status.in_(
+            [LoanStatus.PENDING, LoanStatus.APPROVED, LoanStatus.CHECKED_OUT]
+        )
+        query = query.where(ongoing if active else sa.not_(ongoing))
+    if status is not None:
+        query = query.where(EquipmentLoan.status == status)
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = await db.execute(query.offset(page.offset).limit(page.page_size))
     return_time = await get_setting(db, "equipment_return_time")

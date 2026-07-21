@@ -262,3 +262,56 @@ async def test_manual_bookings_super_only(client, db):
 
     loans = await db.scalars(sa.select(EquipmentLoan))
     assert all(loan.club_id is None for loan in loans)
+
+
+async def test_active_filter_on_club_lists(client, db):
+    """2026-07-21:active=true 僅回正在借用;false 僅回其餘(伺服器端過濾,不整批撈)。"""
+    club = await seed_club(client, db)
+    venue = await make_venue(db, allow_temp=True)
+    future = await make_booking(db, club, venue, status=BookingStatus.APPROVED)
+    past = await make_booking(db, club, venue, day=YESTERDAY, status=BookingStatus.APPROVED)
+    cancelled = await make_booking(db, club, venue, status=BookingStatus.CANCELLED)
+
+    resp = await client.get("/api/v1/club/venue-bookings", params={"active": "true"})
+    ids = {v["id"] for v in resp.json()["data"]}
+    assert ids == {future.id}
+    resp = await client.get("/api/v1/club/venue-bookings", params={"active": "false"})
+    ids = {v["id"] for v in resp.json()["data"]}
+    assert ids == {past.id, cancelled.id}
+
+    eq = await make_equipment(db)
+    rows = {}
+    for key, status in {
+        "out": LoanStatus.CHECKED_OUT,
+        "ret": LoanStatus.RETURNED,
+        "can": LoanStatus.CANCELLED,
+    }.items():
+        loan = EquipmentLoan(
+            club_id=club.id, equipment_id=eq.id, activity_id=None, qty=1,
+            start_date=YESTERDAY, end_date=YESTERDAY, purpose="x", status=status,
+        )
+        db.add(loan)
+        await db.commit()
+        rows[key] = loan.id
+    resp = await client.get("/api/v1/club/equipment-loans", params={"active": "true"})
+    assert {row["id"] for row in resp.json()["data"]} == {rows["out"]}
+    resp = await client.get("/api/v1/club/equipment-loans", params={"status": "returned"})
+    assert {row["id"] for row in resp.json()["data"]} == {rows["ret"]}
+
+
+async def test_phone_character_whitelist(client, db):
+    club = await seed_club(client, db)
+    venue = await make_venue(db, allow_temp=True)
+    activity = await make_activity(db, club, day=TOMORROW)
+    body = {"venue_id": venue.id, "activity_id": activity.id, "date": str(TOMORROW),
+            "periods": ["5"], "purpose": "x", "phone": "0912-345 678"}  # 空白不合法
+    resp = await client.post(
+        "/api/v1/club/venue-bookings", json=body, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 422
+    resp = await client.post(
+        "/api/v1/club/venue-bookings",
+        json={**body, "phone": "(02)2737#123*"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201, resp.text

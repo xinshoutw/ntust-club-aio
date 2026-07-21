@@ -7,14 +7,16 @@
 - 退回必填原因;結案為輔導老師單關
 """
 
+from datetime import datetime
 from typing import Annotated
 
 import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 
-from app.api.pagination import Pagination
+from app.api.pagination import Pagination, parse_sort
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, forbidden, not_found, validation_error
+from app.core.semesters import TAIPEI
 from app.models import Activity, ActivityReport, ApprovalRecord, Club
 from app.models.enums import (
     ActivityStatus,
@@ -126,31 +128,84 @@ def _record(
     )
 
 
+# 類型篩選標籤(前端 FilterButton;「大型活動」=類型活動且已認可或申請中未被否准)
+_TYPE_LABELS = ("社課或會議", "活動", "大型活動")
+
+# 排序白名單(2026-07-21:清單改伺服器端分頁,14k+ 筆不再整批撈取)
+_SORTABLE = {
+    "club": Club.name,
+    "name": Activity.name,
+    "type": Activity.type,
+    "date": Activity.date,
+    "status": Activity.status,
+    "created_at": Activity.created_at,
+}
+
+
+def _large_condition():
+    """「大型活動」的伺服器端定義(與前端 typeKey 同規則):
+    類型=活動 且(已認可 或 申請中未被否准)。"""
+    return sa.and_(
+        Activity.type == ActivityType.EVENT,
+        sa.or_(
+            Activity.is_large_approved.is_(True),
+            sa.and_(Activity.is_large.is_(True), Activity.is_large_approved.isnot(False)),
+        ),
+    )
+
+
 @router.get("")
 async def list_activities(
     user: Reviewer,
     db: DbDep,
     page: Pagination,
-    status: ActivityStatus | None = None,
-    club_id: int | None = Query(None),
+    status: Annotated[list[ActivityStatus] | None, Query()] = None,
+    club_id: Annotated[list[int] | None, Query()] = None,
+    type: Annotated[list[str] | None, Query()] = None,
+    locked: bool = Query(False),
+    sort: str | None = None,
 ) -> ApiResponse[list[ActivityOut]]:
+    # status/club_id/type 可重複帶多值;locked=true 僅回逾期鎖定(已核准+超過結案期限+未解鎖);
+    # sort 走白名單(預設 id 降冪)——清單一律伺服器端分頁(2026-07-21)
     query = (
         sa.select(Activity, Club.name)
         .join(Club, Activity.club_id == Club.id)
         .where(Activity.status != ActivityStatus.DRAFT)  # 草稿不進審核視野
         .options(sa.orm.selectinload(Activity.budget_items))
-        .order_by(Activity.id.desc())
     )
     visible = _visible_statuses(user)
     if visible is not None:
         query = query.where(Activity.status.in_(visible))
     if status:
-        query = query.where(Activity.status == status)
+        query = query.where(Activity.status.in_(status))
     if club_id:
-        query = query.where(Activity.club_id == club_id)
+        query = query.where(Activity.club_id.in_(club_id))
+    if type:
+        unknown = [t for t in type if t not in _TYPE_LABELS]
+        if unknown:
+            raise validation_error(f"未知的類型:{','.join(unknown)}")
+        conds = []
+        if "社課或會議" in type:
+            conds.append(Activity.type == ActivityType.COURSE_MEETING)
+        if "活動" in type:
+            conds.append(sa.and_(Activity.type == ActivityType.EVENT, sa.not_(_large_condition())))
+        if "大型活動" in type:
+            conds.append(_large_condition())
+        query = query.where(sa.or_(*conds))
+    lock_months = await get_setting(db, "close_lock_months")
+    if locked:
+        # 與 activity_service.is_close_locked 同規則:PG 月加法與 add_months 同為日夾底
+        threshold = datetime.now(TAIPEI).date()
+        query = query.where(
+            Activity.status == ActivityStatus.APPROVED,
+            Activity.close_unlocked.is_(False),
+            sa.func.coalesce(Activity.end_date, Activity.date)
+            + sa.func.make_interval(0, int(lock_months))
+            < threshold,
+        )
+    query = query.order_by(*parse_sort(sort, _SORTABLE, Activity.id.desc()))
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = (await db.execute(query.offset(page.offset).limit(page.page_size))).all()
-    lock_months = await get_setting(db, "close_lock_months")
     data = []
     for activity, club_name in rows:
         out = ActivityOut.model_validate(activity)

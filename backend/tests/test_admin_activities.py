@@ -411,3 +411,41 @@ async def test_close_approve_persists_submission_confirmations(client, db):
         True,
         False,
     )
+
+
+async def test_list_filters_locked_and_sort(client, db):
+    """2026-07-21:清單伺服器端分頁——multi status、locked 推導過濾、sort 白名單。"""
+    from datetime import date, timedelta
+
+    from app.models import Activity
+
+    club = await seed(client, db)
+    creator = await make_user(db, username="creator2", club_id=club.id)
+    await login(client, "advisor")
+    old = Activity(
+        club_id=club.id, name="逾期活動", location="x", type="活動",
+        date=date.today() - timedelta(days=200), end_date=date.today() - timedelta(days=200),
+        status="approved", created_by=creator.id,
+    )
+    fresh = Activity(
+        club_id=club.id, name="近期活動", location="x", type="社課或會議",
+        date=date.today() + timedelta(days=3), end_date=date.today() + timedelta(days=3),
+        status="approved", created_by=creator.id,
+    )
+    db.add_all([old, fresh])
+    await db.commit()
+
+    resp = await client.get("/api/v1/admin/activities", params={"locked": "true"})
+    names = [a["name"] for a in resp.json()["data"]]
+    assert "逾期活動" in names and "近期活動" not in names
+
+    resp = await client.get(
+        "/api/v1/admin/activities", params=[("status", "approved"), ("sort", "-date")]
+    )
+    dates = [a["date"] for a in resp.json()["data"]]
+    assert dates == sorted(dates, reverse=True)
+
+    resp = await client.get("/api/v1/admin/activities", params=[("type", "社課或會議")])
+    assert all(a["type"] == "社課或會議" for a in resp.json()["data"])
+    resp = await client.get("/api/v1/admin/activities", params=[("type", "怪型")])
+    assert resp.status_code == 422

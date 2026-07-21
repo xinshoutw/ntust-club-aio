@@ -1,3 +1,4 @@
+import re
 from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -97,6 +98,26 @@ class FixedWindowOut(BaseModel):
     open_until: date | None
 
 
+# 聯絡電話僅允許 數字與 - ( ) * #(2026-07-21 需求方)
+_PHONE_RE = re.compile(r"^[0-9\-()*#]+$")
+
+
+def _validate_phone(v: str | None) -> str | None:
+    if v is None:
+        return None
+    v = v.strip()
+    if v and not _PHONE_RE.match(v):
+        raise ValueError("聯絡電話僅能輸入數字與 - ( ) * #")
+    return v or None
+
+
+def _validate_phone_required(v: str) -> str:
+    out = _validate_phone(v)
+    if not out:
+        raise ValueError("請輸入聯絡電話")
+    return out
+
+
 class VenueBookingIn(BaseModel):
     venue_id: int
     activity_id: int  # 借用活動(限審核通過;2026-07-15 第六輪必選)
@@ -104,6 +125,8 @@ class VenueBookingIn(BaseModel):
     periods: list[str] = Field(min_length=1, max_length=14)
     purpose: str = Field(min_length=1, max_length=200)  # 用途必填(2026-07-15)
     phone: str = Field(min_length=1, max_length=30)  # 聯絡電話必填(2026-07-21 需求方)
+
+    _phone = field_validator("phone")(_validate_phone_required)
 
     @field_validator("periods")
     @classmethod
@@ -135,6 +158,8 @@ class EquipmentLoanIn(BaseModel):
     qty: int = Field(ge=1, le=1000)
     purpose: str = Field(min_length=1, max_length=200)
     phone: str = Field(min_length=1, max_length=30)  # 聯絡電話必填(2026-07-21 需求方)
+
+    _phone = field_validator("phone")(_validate_phone_required)
 
 
 class EquipmentLoanOut(BaseModel):
@@ -171,6 +196,8 @@ class ManualVenueBookingIn(BaseModel):
     periods: list[str] = Field(min_length=1, max_length=14)
     purpose: str = Field(min_length=1, max_length=200)
     phone: str | None = Field(None, max_length=30)
+
+    _phone = field_validator("phone")(_validate_phone)
 
     @field_validator("periods")
     @classmethod

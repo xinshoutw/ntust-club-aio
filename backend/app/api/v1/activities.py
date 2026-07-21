@@ -9,6 +9,7 @@ approved →(活動結束後)close → closing_pending_advisor → closed;退回
 
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Annotated
 from urllib.parse import quote
 
 import sqlalchemy as sa
@@ -99,7 +100,8 @@ async def list_activities(
     db: DbDep,
     page: Pagination,
     semester: str | None = Query(None, pattern=r"^\d{3}-[12]$"),
-    status: ActivityStatus | None = None,
+    # 可重複帶多值(總覽頁一次查非 closed 各狀態,避免整表撈取;2026-07-21)
+    status: Annotated[list[ActivityStatus] | None, Query()] = None,
     type: ActivityType | None = None,
     sort: str | None = None,
 ) -> ApiResponse[list[ActivityOut]]:
@@ -112,7 +114,7 @@ async def list_activities(
         start, end = semester_range(semester)
         query = query.where(Activity.date >= start, Activity.date <= end)
     if status:
-        query = query.where(Activity.status == status)
+        query = query.where(Activity.status.in_(status))
     if type:
         query = query.where(Activity.type == type)
     query = query.order_by(*parse_sort(sort, _SORTABLE, Activity.date.desc()))

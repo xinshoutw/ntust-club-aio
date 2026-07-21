@@ -271,6 +271,8 @@ export const toEquipmentLoan = (l: EquipmentLoanOut): EquipmentLoanRecord => ({
 
 const keys = {
   all: ['bookings'] as const,
+  active: (kind: string) => ['bookings', 'active', kind] as const,
+  returned: (page: number) => ['bookings', 'returned', page] as const,
   venues: ['bookings', 'venues'] as const,
   equipment: (activityId: number | null) => ['bookings', 'equipment', activityId] as const,
   availability: (iso: string) => ['bookings', 'availability', iso] as const,
@@ -392,12 +394,15 @@ export function useEquipmentLoans(p: PageParams) {
   })
 }
 
-/** 逐頁抓齊(借用總覽的進行中/已歸還需以狀態切分,後端列表無狀態篩選) */
-async function fetchAllPages<T>(path: string): Promise<T[]> {
+/** 逐頁抓齊(僅限 active=true 的小結果集;歷史清單一律走伺服器分頁) */
+async function fetchAllPages<T>(
+  path: string,
+  params: Record<string, string | number | boolean | undefined> = {},
+): Promise<T[]> {
   const PAGE_SIZE = 100 // 後端 page_size 上限
   const out: T[] = []
   for (let page = 1; ; page++) {
-    const { data, total } = await apiPaged<T[]>(`${path}${qs({ page, page_size: PAGE_SIZE })}`)
+    const { data, total } = await apiPaged<T[]>(`${path}${qs({ ...params, page, page_size: PAGE_SIZE })}`)
     out.push(...data)
     // 不足一頁即為最後一頁;total 僅作輔助上限(防 meta 異常時提早/無限迴圈)
     if (data.length < PAGE_SIZE || out.length >= total) break
@@ -405,24 +410,78 @@ async function fetchAllPages<T>(path: string): Promise<T[]> {
   return out
 }
 
-export function useAllRoomBookings() {
+// 正在借用(2026-07-21):伺服器端 active=true——審核中/未過期已核准(器材含借出中);
+// 不含大量歷史紀錄,逐頁抓齊完整呈現、不限長度
+export function useActiveRoomBookings() {
   return useQuery({
-    queryKey: keys.rooms('all'),
-    queryFn: () => fetchAllPages<RoomBookingOut>('/club/room-bookings').then((rows) => rows.map(toRoomBooking)),
+    queryKey: keys.active('rooms'),
+    queryFn: () =>
+      fetchAllPages<RoomBookingOut>('/club/room-bookings', { active: true }).then((rows) =>
+        rows.map(toRoomBooking),
+      ),
   })
 }
 
-export function useAllVenueBookings() {
+export function useActiveVenueBookings() {
   return useQuery({
-    queryKey: keys.venueBookings('all'),
-    queryFn: () => fetchAllPages<VenueBookingOut>('/club/venue-bookings').then((rows) => rows.map(toVenueBooking)),
+    queryKey: keys.active('venues'),
+    queryFn: () =>
+      fetchAllPages<VenueBookingOut>('/club/venue-bookings', { active: true }).then((rows) =>
+        rows.map(toVenueBooking),
+      ),
   })
 }
 
-export function useAllEquipmentLoans() {
+export function useActiveEquipmentLoans() {
   return useQuery({
-    queryKey: keys.loans('all'),
-    queryFn: () => fetchAllPages<EquipmentLoanOut>('/club/equipment-loans').then((rows) => rows.map(toEquipmentLoan)),
+    queryKey: keys.active('loans'),
+    queryFn: () =>
+      fetchAllPages<EquipmentLoanOut>('/club/equipment-loans', { active: true }).then((rows) =>
+        rows.map(toEquipmentLoan),
+      ),
+  })
+}
+
+/** 已歸還(伺服器端分頁;原整批撈取後前端切頁) */
+export function useReturnedEquipmentLoans(p: PageParams) {
+  return useQuery({
+    queryKey: keys.returned(p.page),
+    queryFn: () =>
+      apiPaged<EquipmentLoanOut[]>(
+        `/club/equipment-loans${qs({ status: 'returned', page: p.page, page_size: p.pageSize })}`,
+      ).then(({ data, total }) => ({ rows: data.map(toEquipmentLoan), total })),
+    placeholderData: keepPreviousData,
+  })
+}
+
+// 最近借用(近 5 筆,僅已結束/退回/取消/歸還;active=false)
+export function useRecentRoomBookings() {
+  return useQuery({
+    queryKey: keys.rooms({ page: 1, pageSize: 5 }),
+    queryFn: () =>
+      apiPaged<RoomBookingOut[]>(
+        `/club/room-bookings${qs({ active: false, page: 1, page_size: 5 })}`,
+      ).then(({ data }) => data.map(toRoomBooking)),
+  })
+}
+
+export function useRecentVenueBookings() {
+  return useQuery({
+    queryKey: keys.venueBookings({ page: 1, pageSize: 5 }),
+    queryFn: () =>
+      apiPaged<VenueBookingOut[]>(
+        `/club/venue-bookings${qs({ active: false, page: 1, page_size: 5 })}`,
+      ).then(({ data }) => data.map(toVenueBooking)),
+  })
+}
+
+export function useRecentEquipmentLoans() {
+  return useQuery({
+    queryKey: keys.loans({ page: 1, pageSize: 5 }),
+    queryFn: () =>
+      apiPaged<EquipmentLoanOut[]>(
+        `/club/equipment-loans${qs({ active: false, page: 1, page_size: 5 })}`,
+      ).then(({ data }) => data.map(toEquipmentLoan)),
   })
 }
 

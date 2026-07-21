@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import dayjs from 'dayjs'
 import { App, Button, Form, Input, Select, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
+import { confirmDialog } from '../../lib/confirm'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import {
@@ -9,7 +11,8 @@ import {
   roomEntryText,
   useBookingMutations,
   useFixedWindow,
-  useRoomBookings,
+  useActiveRoomBookings,
+  useRecentRoomBookings,
   useVenues,
   venueLabel,
 } from '../../api/bookings'
@@ -45,7 +48,7 @@ function lateRuleError(dow: number, periods: string[]): string | null {
 }
 
 export default function FixedRoomPage() {
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const [form] = Form.useForm()
   // 已選時段:'dow|period'(dow 1=週一 … 7=週日)
   const [slots, setSlots] = useState<ReadonlySet<string>>(new Set())
@@ -58,9 +61,27 @@ export default function FixedRoomPage() {
   // 開放窗由後端提供(與側欄共用同一查詢);未開放時直接輸入網址也只顯示說明
   const windowQuery = useFixedWindow()
   const venuesQuery = useVenues()
-  const recentQuery = useRoomBookings({ page: 1, pageSize: 5 })
-  const { createRoomBooking } = useBookingMutations()
-  const recent = recentQuery.data?.rows ?? []
+  // 正在申請=進行中全部(不限長度、可取消);最近申請=已結束/退回/取消 近 5 筆(2026-07-21)
+  const activeQuery = useActiveRoomBookings()
+  const activeRows = activeQuery.data ?? []
+  const recentQuery = useRecentRoomBookings()
+  const recent = recentQuery.data ?? []
+  const { createRoomBooking, cancelRoomBooking } = useBookingMutations()
+  const todayStart = dayjs().startOf('day')
+
+  const cancelRow = (r: { id: number; venueName: string }) =>
+    confirmDialog(modal, {
+      title: `取消固定借用 ${r.venueName}`,
+      content: '取消後不可復原;已核准的借用取消後時段將釋出',
+      okText: '取消借用',
+      okButtonProps: { danger: true },
+      cancelText: '返回',
+      onOk: () =>
+        cancelRoomBooking.mutate(r.id, {
+          onSuccess: () => message.success('已取消'),
+          onError: (e) => message.error(e.message),
+        }),
+    })
 
   useEffect(() => {
     const up = () => setDragTo(null)
@@ -261,6 +282,54 @@ export default function FixedRoomPage() {
           </div>
         </Form>
       </div>
+
+      <Spin spinning={activeQuery.isPending}>
+        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在申請</div>
+          <table className="tb" aria-label="正在申請" style={{ minWidth: 620 }}>
+            <thead>
+              <tr>
+                <th scope="col">場地</th>
+                <th scope="col">學期起日</th>
+                <th scope="col">時段</th>
+                <th scope="col">狀態</th>
+                <th scope="col" className="r">動作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activeRows.map((r) => (
+                <tr key={r.id}>
+                  <td style={{ fontWeight: 500 }}>{r.venueName}</td>
+                  <td className="num" style={{ fontSize: 13 }}>{r.startDate}</td>
+                  <td style={{ color: 'var(--steel)', fontSize: 13 }}>
+                    {r.entries.map(roomEntryText).join('、')}
+                  </td>
+                  <td style={{ width: 110 }}><StatusPill status={r.status} /></td>
+                  <td className="r" style={{ width: 80 }}>
+                    {r.status === 'pending' || dayjs(r.startDate, 'YYYY/MM/DD').isAfter(todayStart, 'day') ? (
+                      <Button size="small" danger onClick={() => cancelRow(r)}>取消</Button>
+                    ) : (
+                      <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {activeQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={5}>
+                    <QueryError compact title="申請紀錄載入失敗" error={activeQuery.error} onRetry={() => activeQuery.refetch()} />
+                  </td>
+                </tr>
+              )}
+              {!activeQuery.isError && !activeQuery.isPending && activeRows.length === 0 && (
+                <tr className="no-hover">
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>目前沒有進行中的申請</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Spin>
 
       <Spin spinning={recentQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>

@@ -17,9 +17,10 @@ import { confirmDialog } from '../../lib/confirm'
 import {
   PERIODS,
   roomEntryText,
-  useAllEquipmentLoans,
-  useAllRoomBookings,
-  useAllVenueBookings,
+  useActiveEquipmentLoans,
+  useActiveRoomBookings,
+  useActiveVenueBookings,
+  useReturnedEquipmentLoans,
   useAvailability,
   useAvailabilityDays,
   useBookingMutations,
@@ -114,18 +115,16 @@ export default function BookingOverviewPage() {
   )
   const rangeQuery = useAvailabilityDays(venueDef ? venueDates : [], venueDef?.id)
 
-  const roomsQuery = useAllRoomBookings()
-  const venueBookingsQuery = useAllVenueBookings()
-  const loansQuery = useAllEquipmentLoans()
-  // 「我的借用」只列進行中:退回/歸還/過期(場地日期已過)的紀錄由各借用頁近 5 筆呈現
-  const rooms = (roomsQuery.data ?? []).filter((r) => r.status === 'pending' || r.status === 'approved')
-  const venueBookings = (venueBookingsQuery.data ?? []).filter(
-    (v) => v.status === 'pending' || (v.status === 'approved' && !dayjs(v.date, 'YYYY/MM/DD').isBefore(todayStart, 'day')),
-  )
-  const loans = loansQuery.data ?? []
-  const active = loans.filter((l) => !['returned', 'rejected', 'cancelled'].includes(l.status))
-  const returned = loans.filter((l) => l.status === 'returned')
-  const returnedPaged = returned.slice((returnedPage - 1) * RETURNED_PAGE, returnedPage * RETURNED_PAGE)
+  // 正在借用:伺服器端 active=true 過濾(2026-07-21,原整批撈取後前端篩選)
+  const roomsQuery = useActiveRoomBookings()
+  const venueBookingsQuery = useActiveVenueBookings()
+  const loansQuery = useActiveEquipmentLoans()
+  const returnedQuery = useReturnedEquipmentLoans({ page: returnedPage, pageSize: RETURNED_PAGE })
+  const rooms = roomsQuery.data ?? []
+  const venueBookings = venueBookingsQuery.data ?? []
+  const active = loansQuery.data ?? []
+  const returnedPaged = returnedQuery.data?.rows ?? []
+  const returnedTotal = returnedQuery.data?.total ?? 0
   const listsPending = roomsQuery.isPending || venueBookingsQuery.isPending || loansQuery.isPending
   const listsErrored = [roomsQuery, venueBookingsQuery, loansQuery].filter((q) => q.isError)
   const retryLists = () => {
@@ -333,11 +332,11 @@ export default function BookingOverviewPage() {
         </Spin>
       </div>
 
-      {/* 我的借用:單卡整併(固定/臨時/器材),後端僅回傳本社資料 */}
+      {/* 正在借用:單卡整併(固定/臨時/器材)、完整呈現不限長度(2026-07-21) */}
       <Spin spinning={listsPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近借用</div>
-          <table className="tb" aria-label="最近借用" style={{ minWidth: 680 }}>
+          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在借用</div>
+          <table className="tb" aria-label="正在借用" style={{ minWidth: 680 }}>
             <thead>
               <tr>
                 <th style={{ width: 90 }}>類別</th>
@@ -454,7 +453,7 @@ export default function BookingOverviewPage() {
           </table>
         </div>
 
-        {/* 已歸還:獨立分頁區(後端列表無狀態篩選,自全量資料切分後前端分頁) */}
+        {/* 已歸還:伺服器端分頁(status=returned) */}
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近歸還</div>
           <table className="tb" aria-label="最近歸還" style={{ minWidth: 560 }}>
@@ -477,21 +476,21 @@ export default function BookingOverviewPage() {
                   <td style={{ width: 100 }}><StatusPill status="returned" /></td>
                 </tr>
               ))}
-              {loansQuery.isError && (
+              {returnedQuery.isError && (
                 <tr className="no-hover">
-                  <td colSpan={5}>
-                    <QueryError compact title="歸還紀錄載入失敗" error={loansQuery.error} onRetry={() => loansQuery.refetch()} />
+                  <td colSpan={4}>
+                    <QueryError compact title="歸還紀錄載入失敗" error={returnedQuery.error} onRetry={() => returnedQuery.refetch()} />
                   </td>
                 </tr>
               )}
-              {!loansQuery.isError && returned.length === 0 && (
+              {!returnedQuery.isError && returnedTotal === 0 && (
                 <tr className="no-hover">
                   <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無歸還紀錄</td>
                 </tr>
               )}
             </tbody>
           </table>
-          <Pager page={returnedPage} pageSize={RETURNED_PAGE} total={returned.length} onChange={setReturnedPage} style={{ padding: '10px 0 14px' }} />
+          <Pager page={returnedPage} pageSize={RETURNED_PAGE} total={returnedTotal} onChange={setReturnedPage} style={{ padding: '10px 0 14px' }} />
         </div>
       </Spin>
     </div>

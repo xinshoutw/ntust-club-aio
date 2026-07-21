@@ -173,7 +173,7 @@ async def ensure_masters(
         if row is None:
             row = Equipment(
                 name=name,
-                total_qty=d["total_count"],
+                total_qty=d["total_count"] or 0,
                 max_lease_count=d["max_lease_count"] or None,
                 needs_serial=False,  # 依序點交項目由行政後台再標(舊系統無此概念)
                 sort=d["sort"] or 0,
@@ -204,8 +204,9 @@ async def import_applies(
         targets = venue_ids.get(r["classroom_id"])
         ok, club_id = resolve_club(club_lookup, r["club_id"])
         day = valid_date(r["date"])
-        if status is None or targets is None or day is None or not ok:
-            skipped += 1  # 壞日期/未知狀態/未知場地/無法識別的申請單位
+        periods = periods_of(r)
+        if status is None or targets is None or day is None or not ok or not periods:
+            skipped += 1  # 壞日期/未知狀態/未知場地/無法識別的申請單位/無節次
             continue
         activity_id = act_lookup.get(r["activity_id"])
         purpose = (r["purpose"] or "").strip() or (r["activity"] or "").strip() or "(未填)"
@@ -219,7 +220,7 @@ async def import_applies(
                 venue_id=venue_id,
                 activity_id=activity_id,
                 date=day,
-                periods=periods_of(r),
+                periods=periods,
                 purpose=purpose,
                 phone=(r["phone"] or "").strip() or None,
                 status=status,

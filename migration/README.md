@@ -42,6 +42,20 @@ LEGACY_DB=legacy_clubs uv run python ../migration/cms_import.py  # 指定舊庫�
 稽核 staffactivitylog、審核歷程 auditactivityrecord、行事曆、歷年評鑑期間、
 社團評鑑檔案庫 clubfiles(TODO:待決議)、行政歷史文件 clubrecordfromstaff(TODO)。
 
+## clubclass(cc_import.py,2026-07-21)
+
+前置:cms_import 已跑完(club=CMS Username、activity 走 legacy_id_map 對照)。
+來源=本機拋棄式 MySQL(起法見 cc_import.py docstring)。
+
+| 舊 | 新 | 說明 |
+|---|---|---|
+| Classroom(22) | venues 對照表 `VENUE_MAP` | 一舍 B2 一律拆 樓梯+白板 兩筆;新版已無的 4 處建 inactive 承接 |
+| Device(25) | equipment(含 max_lease_count) | 名稱正規化 `DEVICE_RENAME`;停用 8 項建 inactive |
+| Apply(15,021) | venue_bookings | status 0/1/4/2→pending/approved/rejected/cancelled;phone 保留、其餘申請人明細丟棄 |
+| DeviceApply+DeviceLog | equipment_loans(一品項一筆) | 已核准且區間已過→returned;活動已刪→activity_id NULL |
+| club_id=admin/8開頭未知帳號 | club_id NULL(行政借用,顯示「學務處」) | |
+| ClassroomRule(2,848)、Admin、Notice | 不遷 | 場地封鎖=新 Rule Page 功能;未過期封鎖上線時人工重建 |
+
 ## 注意
 
 - `import_teachers` 非 id-map 型:每次重跑**覆寫** clubs 的指導老師欄位。

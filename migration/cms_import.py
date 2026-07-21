@@ -128,14 +128,15 @@ def local_time(dt: datetime | None) -> time | None:
 class IdMap:
     """舊表+舊id → 新id;啟動時整批載入,寫入時同步記錄(隨同交易 commit)。"""
 
-    def __init__(self) -> None:
+    def __init__(self, system: LegacySystem = LegacySystem.CMS) -> None:
+        self.system = system
         self._map: dict[tuple[str, str], str] = {}
 
     async def load(self, db: AsyncSession) -> None:
         rows = await db.execute(
             sa.select(
                 LegacyIdMap.legacy_table, LegacyIdMap.legacy_id, LegacyIdMap.new_id
-            ).where(LegacyIdMap.legacy_system == LegacySystem.CMS)
+            ).where(LegacyIdMap.legacy_system == self.system)
         )
         for table, legacy_id, new_id in rows:
             self._map[(table, legacy_id)] = new_id
@@ -149,7 +150,7 @@ class IdMap:
         self._map[(table, str(legacy_id))] = str(new_id)
         db.add(
             LegacyIdMap(
-                legacy_system=LegacySystem.CMS,
+                legacy_system=self.system,
                 legacy_table=table,
                 legacy_id=str(legacy_id),
                 new_table=new_table,

@@ -276,6 +276,9 @@ async def list_equipment_loans(
 
     if sort:
         query = query.order_by(*parse_sort(sort, _LOAN_SORTABLE, None), EquipmentLoan.id)
+    elif status == "overdue":
+        # 逾期追蹤:逾越最久(結束日最早)在前
+        query = query.order_by(EquipmentLoan.end_date.asc(), EquipmentLoan.id)
     else:
         # 預設:待審佇列在前,組內借用起日升冪
         pending_first = sa.case((EquipmentLoan.status == LoanStatus.PENDING, 0), else_=1)

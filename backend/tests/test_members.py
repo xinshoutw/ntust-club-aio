@@ -1,6 +1,7 @@
 import sqlalchemy as sa
 
 from app.models import ClubMember
+from app.models.enums import MemberKind
 from tests.conftest import csrf_headers, login, make_club, make_user
 
 
@@ -139,6 +140,42 @@ async def test_member_list_pagination_filter_sort(client, db):
 
     resp = await client.get("/api/v1/club/members", params={"sort": "nope"})
     assert resp.status_code == 422
+
+
+async def test_member_default_order_by_role_weight(client, db):
+    """預設排序=身份權重(負責人→副負責人→幹部→社員)、同權重依學號;kind 排序鍵用權重。"""
+    club = await setup_club_session(client, db)
+    db.add_all(  # 刻意打亂插入序與學號序,驗證非 id 插入序
+        [
+            ClubMember(club_id=club.id, name="乙社員", student_id="B11109003",
+                       kind=MemberKind.MEMBER, semester="114-2"),
+            ClubMember(club_id=club.id, name="總務", student_id="B11109002",
+                       kind=MemberKind.OFFICER, title="總務", semester="114-2"),
+            ClubMember(club_id=club.id, name="副手", student_id="B11109004",
+                       kind=MemberKind.VICE_PRESIDENT, semester="114-2"),
+            ClubMember(club_id=club.id, name="頭頭", student_id="B11109005",
+                       kind=MemberKind.PRESIDENT, semester="114-2"),
+            ClubMember(club_id=club.id, name="甲社員", student_id="B11109001",
+                       kind=MemberKind.MEMBER, semester="114-2"),
+        ]
+    )
+    await db.commit()
+
+    default = (await client.get("/api/v1/club/members")).json()["data"]
+    assert [m["student_id"] for m in default] == [
+        "B11109005", "B11109004", "B11109002", "B11109001", "B11109003",
+    ]
+
+    # kind 排序=身份權重(非「副負責人/幹部/社員/負責人」字面序):-kind → 社員在前
+    resp = await client.get("/api/v1/club/members", params={"sort": "-kind"})
+    kinds = [m["kind"] for m in resp.json()["data"]]
+    assert kinds == ["社員", "社員", "幹部", "副負責人", "負責人"]
+
+    # 多鍵 kind,student_id 等同預設鏈
+    resp = await client.get("/api/v1/club/members", params={"sort": "kind,student_id"})
+    assert [m["student_id"] for m in resp.json()["data"]] == [
+        m["student_id"] for m in default
+    ]
 
 
 async def test_noop_reimport_keeps_updated_at(client, db):

@@ -179,7 +179,6 @@ async def list_room_bookings(
         .join(Venue, RoomBookingRequest.venue_id == Venue.id)
         .where(RoomBookingRequest.club_id == user.club_id)
         .options(sa.orm.selectinload(RoomBookingRequest.slots))
-        .order_by(RoomBookingRequest.id.desc())
     )
     if active is not None:
         ongoing = sa.and_(
@@ -187,6 +186,11 @@ async def list_room_bookings(
             RoomBookingRequest.end_date >= svc.today_taipei(),
         )
         query = query.where(ongoing if active else sa.not_(ongoing))
+    if active:
+        # 正在借用:開始日早的在前(即將到來優先;同日依建立序穩定分頁)
+        query = query.order_by(RoomBookingRequest.start_date.asc(), RoomBookingRequest.id.asc())
+    else:
+        query = query.order_by(RoomBookingRequest.id.desc())
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = await db.execute(query.offset(page.offset).limit(page.page_size))
     data = []
@@ -287,8 +291,6 @@ async def list_venue_bookings(
         .join(Venue, VenueBooking.venue_id == Venue.id)
         .outerjoin(Activity, VenueBooking.activity_id == Activity.id)
         .where(VenueBooking.club_id == user.club_id)
-        # 借用日新到舊(同日再依建立序);log 型清單「新的在上」以借用日為準
-        .order_by(VenueBooking.date.desc(), VenueBooking.id.desc())
     )
     if active is not None:
         ongoing = sa.and_(
@@ -296,6 +298,12 @@ async def list_venue_bookings(
             sa.not_(svc.venue_booking_started_expr()),
         )
         query = query.where(ongoing if active else sa.not_(ongoing))
+    if active:
+        # 正在申請:借用日早的在前(即將到來優先)
+        query = query.order_by(VenueBooking.date.asc(), VenueBooking.id.asc())
+    else:
+        # 借用日新到舊(同日再依建立序);log 型清單「新的在上」以借用日為準
+        query = query.order_by(VenueBooking.date.desc(), VenueBooking.id.desc())
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = await db.execute(query.offset(page.offset).limit(page.page_size))
     data = []
@@ -387,8 +395,6 @@ async def list_equipment_loans(
         .join(Equipment, EquipmentLoan.equipment_id == Equipment.id)
         .outerjoin(Activity, EquipmentLoan.activity_id == Activity.id)
         .where(EquipmentLoan.club_id == user.club_id)
-        # 借用起始日新到舊(同日再依建立序)
-        .order_by(EquipmentLoan.start_date.desc(), EquipmentLoan.id.desc())
     )
     if active is not None:
         ongoing = EquipmentLoan.status.in_(
@@ -397,6 +403,12 @@ async def list_equipment_loans(
         query = query.where(ongoing if active else sa.not_(ongoing))
     if status is not None:
         query = query.where(EquipmentLoan.status == status)
+    if active and status is None:
+        # 正在借用:起始日早的在前(即將到來優先)
+        query = query.order_by(EquipmentLoan.start_date.asc(), EquipmentLoan.id.asc())
+    else:
+        # 借用起始日新到舊(同日再依建立序)
+        query = query.order_by(EquipmentLoan.start_date.desc(), EquipmentLoan.id.desc())
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = await db.execute(query.offset(page.offset).limit(page.page_size))
     return_time = await get_setting(db, "equipment_return_time")

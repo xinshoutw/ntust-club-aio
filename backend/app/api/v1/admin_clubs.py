@@ -15,6 +15,8 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.exc import IntegrityError
 
 from app.api.pagination import Pagination, parse_sort
+from app.api.v1.members import _DEFAULT_ORDER as _MEMBER_DEFAULT_ORDER
+from app.api.v1.members import _SORTABLE as _MEMBER_SORTABLE
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission, require_role
 from app.core.errors import conflict, not_found
 from app.core.security import generate_password, hash_password
@@ -50,16 +52,6 @@ def derive_kind(name: str) -> ClubKind | None:
     if name.endswith("會"):
         return ClubKind.ASSOCIATION
     return None
-
-# 成員名單排序白名單(比照社團端 members.py)
-_MEMBER_SORTABLE = {
-    "name": ClubMember.name,
-    "student_id": ClubMember.student_id,
-    "kind": ClubMember.kind,
-    "title": ClubMember.title,
-    "semester": ClubMember.semester,
-    "updated_at": ClubMember.updated_at,
-}
 
 
 async def _club_or_404(db, club_id: int) -> Club:
@@ -314,7 +306,7 @@ async def list_club_members(
         query = query.where(ClubMember.semester == semester)
     if kind:
         query = query.where(ClubMember.kind.in_(kind))
-    query = query.order_by(*parse_sort(sort, _MEMBER_SORTABLE, ClubMember.id.asc()))
+    query = query.order_by(*parse_sort(sort, _MEMBER_SORTABLE, _MEMBER_DEFAULT_ORDER))
 
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = await db.scalars(query.offset(page.offset).limit(page.page_size))

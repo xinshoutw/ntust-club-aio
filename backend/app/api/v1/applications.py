@@ -21,7 +21,7 @@ from app.models import (
     PostalAccountChange,
     Violation,
 )
-from app.models.enums import AnnouncementTarget, CertPosition, MemberKind
+from app.models.enums import AnnouncementTarget, CertPosition, MemberKind, ViolationStatus
 from app.schemas.activities import FileOut
 from app.schemas.applications import (
     AnnouncementOut,
@@ -283,10 +283,12 @@ async def upload_evidence(
 async def list_violations(
     user: ClubUser, db: DbDep, page: Pagination
 ) -> ApiResponse[list[ViolationOut]]:
+    # 預設排序:未銷案在前,各組內時間升冪(與行政端 /admin/violations 一致)
+    open_first = sa.case((Violation.status == ViolationStatus.OPEN, 0), else_=1)
     query = (
         sa.select(Violation)
         .where(Violation.club_id == user.club_id)
-        .order_by(Violation.id.desc())
+        .order_by(open_first, Violation.occurred_on.asc(), Violation.id)
     )
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = await db.scalars(query.offset(page.offset).limit(page.page_size))

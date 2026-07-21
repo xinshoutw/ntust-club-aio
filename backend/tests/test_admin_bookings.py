@@ -297,6 +297,10 @@ async def test_equipment_overdue_filter(client, db):
         EquipmentLoan(club_id=club.id, equipment_id=eq.id, activity_id=activity.id, qty=1,
                       start_date=today - timedelta(days=12), end_date=today - timedelta(days=10),
                       purpose="已歸還", status="returned"),
+        # 同起日但結束日更早 → 逾越更久,逾期追蹤排最前(end_date 升冪,非起日/插入序)
+        EquipmentLoan(club_id=club.id, equipment_id=eq.id, activity_id=activity.id, qty=1,
+                      start_date=today - timedelta(days=12), end_date=today - timedelta(days=11),
+                      purpose="更逾期", status="checked_out"),
     ]
     db.add_all(rows)
     await db.commit()
@@ -304,14 +308,14 @@ async def test_equipment_overdue_filter(client, db):
     data = (
         await client.get("/api/v1/admin/equipment-loans", params={"status": "overdue"})
     ).json()["data"]
-    assert [d["purpose"] for d in data] == ["逾期單"]
+    assert [d["purpose"] for d in data] == ["更逾期", "逾期單"]
     assert data[0]["overdue"] is True
 
     # 一般狀態篩選照舊;未知狀態 → 422
     data = (
         await client.get("/api/v1/admin/equipment-loans", params={"status": "checked_out"})
     ).json()["data"]
-    assert {d["purpose"] for d in data} == {"逾期單", "借出中"}
+    assert {d["purpose"] for d in data} == {"逾期單", "借出中", "更逾期"}
     assert (
         await client.get("/api/v1/admin/equipment-loans", params={"status": "hack"})
     ).status_code == 422

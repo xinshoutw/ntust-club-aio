@@ -295,8 +295,12 @@ async def test_members_readonly_list(client, db):
 
     body = (await client.get(f"{URL}/{club.id}/members")).json()
     assert body["meta"]["total"] == 2  # 只含該社
-    names = {m["name"] for m in body["data"]}
-    assert names == {"陳予恩", "林小明"}
+    # 預設排序=身份權重(幹部在社員前;與社團端同一實作)
+    assert [m["name"] for m in body["data"]] == ["陳予恩", "林小明"]
+    rows = (
+        await client.get(f"{URL}/{club.id}/members", params={"sort": "-kind"})
+    ).json()["data"]
+    assert [m["name"] for m in rows] == ["林小明", "陳予恩"]  # kind 排序鍵=身份權重
 
     # 學期/身份篩選比照社團端
     rows = (

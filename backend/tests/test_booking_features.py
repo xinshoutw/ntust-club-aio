@@ -6,7 +6,7 @@ from datetime import UTC, date, datetime, time, timedelta
 import sqlalchemy as sa
 
 from app.core.semesters import TAIPEI
-from app.models import EquipmentLoan, VenueBooking
+from app.models import EquipmentLoan, RoomBookingRequest, VenueBooking
 from app.models.enums import BookingStatus, LoanStatus
 from app.services import booking_service
 from tests.conftest import csrf_headers, login, make_club, make_user
@@ -308,6 +308,62 @@ async def test_active_filter_on_club_lists(client, db):
     assert {row["id"] for row in resp.json()["data"]} == {rows["out"]}
     resp = await client.get("/api/v1/club/equipment-loans", params={"status": "returned"})
     assert {row["id"] for row in resp.json()["data"]} == {rows["ret"]}
+
+
+async def test_active_lists_upcoming_first(client, db):
+    """active=true 預設排序=開始日升冪(即將到來在前);false/status= 維持現行降冪(2026-07-21)。"""
+    club = await seed_club(client, db)
+    venue = await make_venue(db, allow_temp=True)
+
+    # 臨時場地:晚的先建立,驗證非建立序;同日依 id 升冪
+    far = await make_booking(db, club, venue, day=TOMORROW + timedelta(days=7),
+                             status=BookingStatus.APPROVED)
+    near = await make_booking(db, club, venue, day=TOMORROW)
+    same_day = await make_booking(db, club, venue, day=TOMORROW + timedelta(days=7))
+    resp = await client.get("/api/v1/club/venue-bookings", params={"active": "true"})
+    assert [v["id"] for v in resp.json()["data"]] == [near.id, far.id, same_day.id]
+    # active=false 維持借用日新到舊
+    past_new = await make_booking(db, club, venue, day=YESTERDAY, status=BookingStatus.APPROVED)
+    past_old = await make_booking(db, club, venue, day=YESTERDAY - timedelta(days=7),
+                                  status=BookingStatus.APPROVED)
+    resp = await client.get("/api/v1/club/venue-bookings", params={"active": "false"})
+    assert [v["id"] for v in resp.json()["data"]] == [past_new.id, past_old.id]
+
+    # 器材:active=true 起始日升冪;status= 精確過濾維持起始日降冪
+    eq = await make_equipment(db)
+
+    def loan(start, end, status=LoanStatus.APPROVED):
+        row = EquipmentLoan(club_id=club.id, equipment_id=eq.id, activity_id=None, qty=1,
+                            start_date=start, end_date=end, purpose="x", status=status)
+        db.add(row)
+        return row
+
+    late = loan(TOMORROW + timedelta(days=7), TOMORROW + timedelta(days=8))
+    soon = loan(TOMORROW, TOMORROW + timedelta(days=1))
+    out = loan(YESTERDAY, YESTERDAY, status=LoanStatus.CHECKED_OUT)
+    done_new = loan(TOMORROW, TOMORROW, status=LoanStatus.RETURNED)
+    done_old = loan(YESTERDAY, YESTERDAY, status=LoanStatus.RETURNED)
+    await db.commit()
+    resp = await client.get("/api/v1/club/equipment-loans", params={"active": "true"})
+    assert [r["id"] for r in resp.json()["data"]] == [out.id, soon.id, late.id]
+    resp = await client.get("/api/v1/club/equipment-loans", params={"status": "returned"})
+    assert [r["id"] for r in resp.json()["data"]] == [done_new.id, done_old.id]
+
+    # 固定教室:active=true 開始日升冪(非插入序);已結束者歸 active=false
+    sem_b = RoomBookingRequest(club_id=club.id, venue_id=venue.id, purpose="下下學期",
+                               start_date=TOMORROW + timedelta(days=60),
+                               end_date=TOMORROW + timedelta(days=90))
+    sem_a = RoomBookingRequest(club_id=club.id, venue_id=venue.id, purpose="下學期",
+                               start_date=TOMORROW, end_date=TOMORROW + timedelta(days=30))
+    ended = RoomBookingRequest(club_id=club.id, venue_id=venue.id, purpose="已結束",
+                               start_date=YESTERDAY - timedelta(days=30), end_date=YESTERDAY,
+                               status=BookingStatus.APPROVED)
+    db.add_all([sem_b, sem_a, ended])
+    await db.commit()
+    resp = await client.get("/api/v1/club/room-bookings", params={"active": "true"})
+    assert [r["id"] for r in resp.json()["data"]] == [sem_a.id, sem_b.id]
+    resp = await client.get("/api/v1/club/room-bookings", params={"active": "false"})
+    assert [r["id"] for r in resp.json()["data"]] == [ended.id]
 
 
 async def test_venue_active_boundary_and_cancel_at_start_time(client, db, monkeypatch):

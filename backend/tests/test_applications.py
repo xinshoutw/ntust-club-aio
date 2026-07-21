@@ -162,6 +162,27 @@ async def test_violations_scoped_to_club(client, db):
     assert listing["data"][0]["resolve_expired"] is True
 
 
+async def test_violations_default_order_open_first_chronological(client, db):
+    """預設排序:未銷案在前、組內發生日升冪(與行政端一致;原為 id 降冪)。"""
+    club = await setup_session(client, db)
+    staff = await make_user(db, username="staff02", role="staff")
+    db.add_all(
+        [
+            Violation(club_id=club.id, occurred_on=date(2026, 3, 1), location="已銷案",
+                      items=["噪音影響他人"], filler_id=staff.id,
+                      status="resolved", resolve_note="已改善"),
+            Violation(club_id=club.id, occurred_on=date(2026, 3, 10), location="晚發生",
+                      items=["噪音影響他人"], filler_id=staff.id),
+            Violation(club_id=club.id, occurred_on=date(2026, 3, 5), location="早發生",
+                      items=["噪音影響他人"], filler_id=staff.id),
+        ]
+    )
+    await db.commit()
+
+    data = (await client.get("/api/v1/club/violations")).json()["data"]
+    assert [d["location"] for d in data] == ["早發生", "晚發生", "已銷案"]
+
+
 async def test_announcements_targeting(client, db):
     club = await setup_session(client, db)  # 熱舞社,attribute=藝術性
     admin = await make_user(db, username="admin01", role="admin")

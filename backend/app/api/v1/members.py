@@ -29,14 +29,26 @@ from app.schemas.common import ApiResponse
 
 router = APIRouter(prefix="/club/members", tags=["club"])
 
+# 身份權重:負責人 → 副負責人 → 幹部 → 社員(kind 排序鍵與預設排序共用;
+# admin_clubs 的 /admin/clubs/{id}/members 亦引用,兩端點同一實作)
+_KIND_WEIGHT = sa.case(
+    (ClubMember.kind == MemberKind.PRESIDENT, 0),
+    (ClubMember.kind == MemberKind.VICE_PRESIDENT, 1),
+    (ClubMember.kind == MemberKind.OFFICER, 2),
+    else_=3,
+)
+
 _SORTABLE = {
     "name": ClubMember.name,
     "student_id": ClubMember.student_id,
-    "kind": ClubMember.kind,
+    "kind": _KIND_WEIGHT,
     "title": ClubMember.title,
     "semester": ClubMember.semester,
     "updated_at": ClubMember.updated_at,
 }
+
+# 預設排序:身份權重升冪(負責人在前),同權重依學號
+_DEFAULT_ORDER = (_KIND_WEIGHT.asc(), ClubMember.student_id.asc())
 
 # 匯入「身份」欄:顯示詞映射為標準身份(社長/會長→負責人;副社長/副會長→副負責人)
 _KIND_ALIASES = {
@@ -71,7 +83,7 @@ async def list_members(
         query = query.where(ClubMember.semester == semester)
     if kind:
         query = query.where(ClubMember.kind.in_(kind))
-    query = query.order_by(*parse_sort(sort, _SORTABLE, ClubMember.id.asc()))
+    query = query.order_by(*parse_sort(sort, _SORTABLE, _DEFAULT_ORDER))
 
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = await db.scalars(query.offset(page.offset).limit(page.page_size))

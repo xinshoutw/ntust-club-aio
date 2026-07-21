@@ -57,12 +57,16 @@ class EvalUpload(Base, TimestampMixin):
 
 
 class EvalGroup(Base, TimestampMixin):
-    """評鑑分組;reviewer sort 決定「評審A/評審B」匿名代號。"""
+    """評鑑分組;reviewer sort 決定「評審A/評審B」匿名代號。
+
+    一個分組屬於一個獎項(award_id,2026-07-21 補):指派=獎項 × 社團 × 評審。
+    """
 
     __tablename__ = "eval_groups"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     year: Mapped[int] = mapped_column(index=True)
+    award_id: Mapped[str] = mapped_column(sa.ForeignKey("awards.id"), index=True)
     name: Mapped[str] = mapped_column(sa.Text)
     sort: Mapped[int] = mapped_column(default=0)
 

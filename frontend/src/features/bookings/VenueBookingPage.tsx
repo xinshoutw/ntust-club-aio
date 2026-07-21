@@ -8,6 +8,7 @@ import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import {
   PERIODS,
+  bookingStarted,
   startedPeriods,
   useBookingMutations,
   useActiveVenueBookings,
@@ -217,7 +218,8 @@ export default function VenueBookingPage() {
                   <td style={{ color: 'var(--steel)', fontSize: 13 }}>第 {v.periods.join('、')} 節</td>
                   <td style={{ width: 110 }}><StatusPill status={v.status} /></td>
                   <td className="r" style={{ width: 80 }}>
-                    {v.status === 'pending' || dayjs(v.date, 'YYYY/MM/DD').isAfter(todayStart, 'day') ? (
+                    {/* 申請起始時刻(最早節次起點)前皆可取消,pending 與 approved 一致(與後端同界) */}
+                    {(v.status === 'pending' || v.status === 'approved') && !bookingStarted(v.date, v.periods) ? (
                       <Button size="small" danger onClick={() => cancelRow(v)}>取消</Button>
                     ) : (
                       <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>

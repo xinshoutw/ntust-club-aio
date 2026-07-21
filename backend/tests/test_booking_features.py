@@ -310,6 +310,66 @@ async def test_active_filter_on_club_lists(client, db):
     assert {row["id"] for row in resp.json()["data"]} == {rows["ret"]}
 
 
+async def test_venue_active_boundary_and_cancel_at_start_time(client, db, monkeypatch):
+    """臨時場地的「正在申請/最近申請」與可否取消都以申請起始時刻分界(2026-07-21)。
+
+    起始時刻=最早節次起點;pending 與 approved 一致——起始時刻一過即移到「最近」且不可取消。
+    """
+    club = await seed_club(client, db)
+    venue = await make_venue(db, allow_temp=True)
+    today = date.today()
+
+    started = await make_booking(db, club, venue, day=today, status=BookingStatus.APPROVED)
+    # periods 刻意無序:遷移舊資料未排序,「已開始」判斷須全元素比對(最早=第 8 節)
+    upcoming = VenueBooking(
+        club_id=club.id, venue_id=venue.id, date=today, periods=["9", "8"],
+        purpose="夜間排練", status=BookingStatus.PENDING,
+    )
+    db.add(upcoming)
+    await db.commit()
+    await db.refresh(upcoming)
+    past_pending = await make_booking(db, club, venue, day=YESTERDAY)  # 過去的 pending
+
+    # 釘在今天 12:00(台北):第 3 節(10:20)已開始、第 8 節(15:30)未開始
+    freeze_taipei(monkeypatch, today, "12:00")
+    resp = await client.get("/api/v1/club/venue-bookings", params={"active": "true"})
+    assert {v["id"] for v in resp.json()["data"]} == {upcoming.id}
+    resp = await client.get("/api/v1/club/venue-bookings", params={"active": "false"})
+    assert {v["id"] for v in resp.json()["data"]} == {started.id, past_pending.id}
+
+    # 已開始(approved)與過去(pending)皆不可取消;未開始(pending)可取消
+    for bid in (started.id, past_pending.id):
+        resp = await client.post(
+            f"/api/v1/club/venue-bookings/{bid}/cancel", headers=csrf_headers(client)
+        )
+        assert resp.status_code == 409
+    resp = await client.post(
+        f"/api/v1/club/venue-bookings/{upcoming.id}/cancel", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200
+
+    # 邊界:正好 15:30(第 8 節起點)=已開始 → 落到「最近」且不可取消
+    late = VenueBooking(
+        club_id=club.id, venue_id=venue.id, date=today, periods=["8"],
+        purpose="邊界", status=BookingStatus.APPROVED,
+    )
+    db.add(late)
+    await db.commit()
+    await db.refresh(late)
+    freeze_taipei(monkeypatch, today, "15:30")
+    resp = await client.get("/api/v1/club/venue-bookings", params={"active": "true"})
+    assert late.id not in {v["id"] for v in resp.json()["data"]}
+    resp = await client.post(
+        f"/api/v1/club/venue-bookings/{late.id}/cancel", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 409
+
+    # 午夜剛過(00:10):今天所有節次都未開始 → 全部仍在「正在申請」
+    freeze_taipei(monkeypatch, today, "00:10")
+    resp = await client.get("/api/v1/club/venue-bookings", params={"active": "true"})
+    assert {started.id, late.id} <= {v["id"] for v in resp.json()["data"]}
+
+
 # ---- 過去時間全面禁止(2026-07-21,節次時刻表) ----
 
 

@@ -280,7 +280,8 @@ async def create_room_booking(
 async def list_venue_bookings(
     user: ClubUser, db: DbDep, page: Pagination, active: bool | None = None
 ) -> ApiResponse[list[VenueBookingOut]]:
-    # active=true 僅回「正在借用」(審核中或未過期的已核准);false 僅回其餘(2026-07-21)
+    # active=true=「正在申請」:審核中或已核准,且申請起始時刻(最早節次起點)未到;
+    # 起始時刻一過即移到「最近申請」(active=false 為其補集;2026-07-21 需求方)
     query = (
         sa.select(VenueBooking, Venue.name, Activity.name)
         .join(Venue, VenueBooking.venue_id == Venue.id)
@@ -292,7 +293,7 @@ async def list_venue_bookings(
     if active is not None:
         ongoing = sa.and_(
             VenueBooking.status.in_([BookingStatus.PENDING, BookingStatus.APPROVED]),
-            VenueBooking.date >= svc.today_taipei(),
+            sa.not_(svc.venue_booking_started_expr()),
         )
         query = query.where(ongoing if active else sa.not_(ongoing))
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
@@ -476,7 +477,7 @@ async def create_equipment_loan(
 
 
 def _ensure_cancellable(status: object, pending: object, approved: object, start: date) -> None:
-    """審核中隨時可取消;已核准需尚未開始(開始日在今天之後)。"""
+    """固定/器材(日粒度):審核中隨時可取消;已核准需尚未開始(開始日在今天之後)。"""
     if status == pending:
         return
     if status == approved:
@@ -484,6 +485,17 @@ def _ensure_cancellable(status: object, pending: object, approved: object, start
             return
         raise conflict("已開始或已結束的借用無法取消")
     raise conflict("此狀態的申請無法取消")
+
+
+def _ensure_venue_cancellable(row: VenueBooking) -> None:
+    """臨時場地(節次粒度):審核中與已核准一致,申請起始時刻(最早節次起點)前可取消。
+
+    起始時刻一過即不可取消——與 active 過濾同一條分界,「正在申請」表內必有取消入口。
+    """
+    if row.status not in (BookingStatus.PENDING, BookingStatus.APPROVED):
+        raise conflict("此狀態的申請無法取消")
+    if svc.booking_started(row.date, row.periods):
+        raise conflict("已開始或已結束的借用無法取消")
 
 
 @router.post("/venue-bookings/{booking_id}/cancel")
@@ -497,7 +509,7 @@ async def cancel_venue_booking(
     )
     if row is None:
         raise not_found("找不到借用申請")
-    _ensure_cancellable(row.status, BookingStatus.PENDING, BookingStatus.APPROVED, row.date)
+    _ensure_venue_cancellable(row)
     row.status = BookingStatus.CANCELLED
     audit.record(
         db,

@@ -16,6 +16,7 @@ import StatusPill from '../../components/ui/StatusPill'
 import { confirmDialog } from '../../lib/confirm'
 import {
   PERIODS,
+  bookingStarted,
   roomEntryText,
   useActiveEquipmentLoans,
   useActiveRoomBookings,
@@ -385,7 +386,8 @@ export default function BookingOverviewPage() {
                   <td className="num" style={{ color: 'var(--steel)', fontSize: 13 }}>{v.date} 第 {v.periods.join('、')} 節</td>
                   <td><StatusPill status={v.status} /></td>
                   <td className="r">
-                    {v.status === 'pending' || dayjs(v.date, 'YYYY/MM/DD').isAfter(todayStart, 'day') ? (
+                    {/* 臨時場地:申請起始時刻(最早節次起點)前皆可取消,pending 與 approved 一致(與後端同界) */}
+                    {(v.status === 'pending' || v.status === 'approved') && !bookingStarted(v.date, v.periods) ? (
                       <Button
                         size="small"
                         danger

@@ -66,6 +66,25 @@ def started_periods(now: datetime | None = None) -> list[str]:
     local = (now or now_utc()).astimezone(TAIPEI).time()
     return [p for p in PERIODS if PERIOD_TIMES[p][0] <= local]
 
+
+def venue_booking_started_expr(now: datetime | None = None) -> sa.ColumnElement[bool]:
+    """SQL 條件:臨時借用已開始(申請起始時刻=最早節次起點 ≤ now)。
+
+    正在申請/最近申請的分界(2026-07-21 需求方):時間經過申請起始時刻即移到「最近」。
+    遷移自舊系統的資料 periods 未必有序,不能只看陣列第一個元素;
+    以「與今天已開始節次集合重疊(&&)」逐元素比對,結果與元素順序無關
+    (新資料由 VenueBookingIn 依節次順序排序後存入,兩種資料皆正確)。
+    """
+    today = today_taipei(now)
+    expr: sa.ColumnElement[bool] = VenueBooking.date < today
+    started = started_periods(now)
+    if started:
+        expr = sa.or_(
+            expr,
+            sa.and_(VenueBooking.date == today, VenueBooking.periods.op("&&")(started)),
+        )
+    return expr
+
 # 固定借用規則(2026-07-15 需求方定案)
 MAX_FIXED_SLOTS = 10  # 每社至多 10 節(1 節 = 1 小時)
 LATE_PERIODS = frozenset({"10", "A", "B", "C", "D"})  # 晚間時段:需至少連續 3 節起借

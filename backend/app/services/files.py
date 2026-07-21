@@ -23,7 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.errors import AppError, not_found, rate_limited
 from app.core.rate_limit import upload_limiter
-from app.models import File, User
+from app.models import EvalGroup, EvalGroupClub, EvalGroupReviewer, EvalUpload, File, User
 from app.models.enums import UserRole
 from app.services.settings_service import get_setting
 
@@ -341,8 +341,9 @@ async def total_uploaded(
     )
 
 
-def can_access(file: File, user: User) -> bool:
-    """權限邊界:admin 全通;staff 僅職務相關;club 只能取自己社團;viewer 取評鑑上傳(需開權)。"""
+async def can_access(db: AsyncSession, file: File, user: User) -> bool:
+    """權限邊界:admin 全通;staff 僅職務相關;club 只能取自己社團;
+    viewer 僅「被指派分組內社團」的評鑑上傳檔(2026-07-21 收緊)。"""
     match user.role:
         case UserRole.ADMIN:
             return True
@@ -353,7 +354,30 @@ def can_access(file: File, user: User) -> bool:
         case UserRole.CLUB:
             return file.club_id is not None and file.club_id == user.club_id
         case UserRole.VIEWER:
-            return user.can_view_eval and file.subject_type == "eval_upload"
+            if not user.can_view_eval or file.subject_type != "eval_upload":
+                return False
+            # 該檔對應的 eval_upload 社團須位於「我被指派」的同年度分組內
+            assigned = await db.scalar(
+                sa.select(EvalGroup.id)
+                .join(EvalGroupClub, EvalGroupClub.group_id == EvalGroup.id)
+                .join(
+                    EvalGroupReviewer,
+                    sa.and_(
+                        EvalGroupReviewer.group_id == EvalGroup.id,
+                        EvalGroupReviewer.user_id == user.id,
+                    ),
+                )
+                .join(
+                    EvalUpload,
+                    sa.and_(
+                        EvalUpload.club_id == EvalGroupClub.club_id,
+                        EvalUpload.year == EvalGroup.year,
+                    ),
+                )
+                .where(EvalUpload.file_id == file.id)
+                .limit(1)
+            )
+            return assigned is not None
     return False
 
 
@@ -363,7 +387,7 @@ _INLINE_MIMES = {"image/jpeg", "image/png", "image/gif", "image/webp", "applicat
 
 async def file_response(db: AsyncSession, file_id: uuid.UUID, user: User) -> FileResponse:
     file = await db.get(File, file_id)
-    if file is None or not can_access(file, user):
+    if file is None or not await can_access(db, file, user):
         raise not_found("找不到檔案")  # 無權限與不存在同訊息,避免探測
     if file.archived_at is not None:
         raise AppError(410, "FILE_ARCHIVED", "檔案已由行政歸檔,請洽學務處")

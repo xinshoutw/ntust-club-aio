@@ -23,7 +23,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.errors import AppError, not_found, rate_limited
 from app.core.rate_limit import upload_limiter
-from app.models import EvalGroup, EvalGroupClub, EvalGroupReviewer, EvalUpload, File, User
+from app.models import (
+    AwardRubricItem,
+    EvalGroup,
+    EvalGroupClub,
+    EvalGroupReviewer,
+    EvalUpload,
+    File,
+    User,
+)
 from app.models.enums import UserRole
 from app.services.settings_service import get_setting
 
@@ -356,7 +364,9 @@ async def can_access(db: AsyncSession, file: File, user: User) -> bool:
         case UserRole.VIEWER:
             if not user.can_view_eval or file.subject_type != "eval_upload":
                 return False
-            # 該檔對應的 eval_upload 社團須位於「我被指派」的同年度分組內
+            # 該檔對應的 eval_upload 須位於「我被指派」的同年度分組內,
+            # 且上傳所屬細項的獎項=該分組的獎項(與 viewer API 的指派檢查同維度:
+            # 分組×獎項×年度;只評財務獎的委員不得下載同社其他獎項的佐證檔)
             assigned = await db.scalar(
                 sa.select(EvalGroup.id)
                 .join(EvalGroupClub, EvalGroupClub.group_id == EvalGroup.id)
@@ -372,6 +382,13 @@ async def can_access(db: AsyncSession, file: File, user: User) -> bool:
                     sa.and_(
                         EvalUpload.club_id == EvalGroupClub.club_id,
                         EvalUpload.year == EvalGroup.year,
+                    ),
+                )
+                .join(
+                    AwardRubricItem,
+                    sa.and_(
+                        AwardRubricItem.id == EvalUpload.rubric_item_id,
+                        AwardRubricItem.award_id == EvalGroup.award_id,
                     ),
                 )
                 .where(EvalUpload.file_id == file.id)

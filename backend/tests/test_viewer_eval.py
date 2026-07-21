@@ -398,10 +398,39 @@ async def test_viewer_file_access_scoped_to_assignment(client, db):
     assert (await client.get(f"/api/v1/files/{file_a.id}")).status_code == 200
     assert (await client.get(f"/api/v1/files/{file_b.id}")).status_code == 404
 
+    # 獎項維度:同社團、但屬「我未被指派的獎項」細項的上傳,不可讀
+    # (club_a 同時在他人負責的 result 獎分組,該獎佐證檔對本評審仍 404)
+    await make_award(db, "result", "最佳成果發表獎", has_presentation=False)
+    other_items = await make_rubric(db, "result", [("r1", 50)])
+    other_reviewer = await make_user(db, username="viewer_r", role="viewer")
+    await make_group(db, "result", [club_a], [other_reviewer], name="成果 A 組")
+    saved_other = await file_service.save_upload(
+        db,
+        UploadFile(io.BytesIO(b"\x89PNG\r\n\x1a\n" + b"\x02" * 64), filename="r.png", size=72),
+        policy=file_service.IMAGE,
+        module="eval",
+        uploaded_by=uploader.id,
+        club_id=club_a.id,
+        subject_type="eval_upload",
+        subject_id=other_items[0].id,
+        slot=other_items[0].item_key,
+    )
+    db.add(
+        EvalUpload(
+            year=EVAL_YEAR,
+            club_id=club_a.id,
+            rubric_item_id=other_items[0].id,
+            file_id=saved_other.id,
+        )
+    )
+    await db.commit()
+    assert (await client.get(f"/api/v1/files/{saved_other.id}")).status_code == 404
+
     # 管理員不受影響(迴歸)
     await make_user(db, username="admin01", role="admin", is_super=True)
     await login(client, "admin01")
     assert (await client.get(f"/api/v1/files/{file_b.id}")).status_code == 200
+    assert (await client.get(f"/api/v1/files/{saved_other.id}")).status_code == 200
 
 
 # ---- rubric seed 對帳 ----

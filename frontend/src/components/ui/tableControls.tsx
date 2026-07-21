@@ -11,33 +11,6 @@ export interface SortState<K extends string> {
   dir: 1 | -1
 }
 
-/** @deprecated 全站改用 useMultiSort(單欄是它的退化情形);待所有頁面遷移後移除 */
-export function useSort<K extends string>(initial: SortState<K> | null = null) {
-  const [sort, setSort] = useState<SortState<K> | null>(initial)
-  const toggle = (key: K) =>
-    setSort((s) => (s?.key === key ? (s.dir === 1 ? { key, dir: -1 } : null) : { key, dir: 1 }))
-  return { sort, toggle }
-}
-
-/** @deprecated 全站改用 MultiSortButton;待所有頁面遷移後移除 */
-export function SortButton<K extends string>({
-  label,
-  sortKey,
-  sort,
-  onToggle,
-}: {
-  label: string
-  sortKey: K
-  sort: SortState<K> | null
-  onToggle: (key: K) => void
-}) {
-  return (
-    <button type="button" className="link-btn" style={{ padding: 0, fontWeight: 500 }} onClick={() => onToggle(sortKey)}>
-      {label} <SwapOutlined rotate={90} style={{ fontSize: 11, color: sort?.key === sortKey ? 'var(--seal)' : undefined }} />
-    </button>
-  )
-}
-
 // ---- 多欄排序(2026-07-21 需求方:點擊的「順序」直接影響最終排序結果)----
 // 規則:最後點擊的欄=最高優先,先前啟用的欄自動降為次要鍵;
 // 同欄再點:升冪→降冪→移除(移除後回落到次鍵,全空則回頁面預設鏈);至多 3 鍵。

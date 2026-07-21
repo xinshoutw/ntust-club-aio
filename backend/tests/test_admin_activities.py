@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import sqlalchemy as sa
 
@@ -449,6 +449,56 @@ async def test_list_filters_locked_and_sort(client, db):
     assert all(a["type"] == "社課或會議" for a in resp.json()["data"])
     resp = await client.get("/api/v1/admin/activities", params=[("type", "怪型")])
     assert resp.status_code == 422
+
+
+async def test_reviewed_at_field_and_sorting(client, db):
+    """reviewed_at=申請+結案簽核紀錄的 max(created_at);排序兩向 NULLS LAST(無審核紀錄殿後)。"""
+    from app.models.enums import ApprovalDecision, ApprovalSubject
+
+    club = await seed(client, db)
+    creator = await make_user(db, username="creator4", club_id=club.id)
+    day = date.today() + timedelta(days=10)
+
+    def act(name, status="approved"):
+        return Activity(
+            club_id=club.id, name=name, location="x", type="社課或會議",
+            date=day, end_date=day, status=status, created_by=creator.id,
+        )
+
+    early, late, never = act("早審"), act("晚審"), act("未審", "pending_advisor")
+    db.add_all([early, late, never])
+    await db.flush()
+
+    t0 = datetime.now(UTC) - timedelta(days=3)
+
+    def rec(activity_id, subject, at):
+        return ApprovalRecord(
+            subject_type=subject, subject_id=activity_id, stage="advisor",
+            decision=ApprovalDecision.APPROVE, actor_id=creator.id, created_at=at,
+        )
+
+    db.add_all([
+        rec(early.id, ApprovalSubject.ACTIVITY, t0 + timedelta(hours=1)),
+        # 晚審:申請關較早、結案審核最晚 → reviewed_at 取兩種 subject 的 max
+        rec(late.id, ApprovalSubject.ACTIVITY, t0),
+        rec(late.id, ApprovalSubject.ACTIVITY_CLOSE, t0 + timedelta(days=1)),
+    ])
+    await db.commit()
+
+    await login(client, "advisor")
+    resp = await client.get("/api/v1/admin/activities", params={"sort": "-reviewed_at"})
+    rows = resp.json()["data"]
+    assert [r["name"] for r in rows] == ["晚審", "早審", "未審"]  # 無審核紀錄者殿後
+    by_name = {r["name"]: r for r in rows}
+    assert by_name["未審"]["reviewed_at"] is None
+    assert by_name["早審"]["reviewed_at"] < by_name["晚審"]["reviewed_at"]  # 同時區 ISO 可比
+
+    resp = await client.get("/api/v1/admin/activities", params={"sort": "reviewed_at"})
+    assert [r["name"] for r in resp.json()["data"]] == ["早審", "晚審", "未審"]
+
+    # 詳情同樣回 reviewed_at(自 approvals 推導)
+    detail = (await client.get(f"/api/v1/admin/activities/{late.id}")).json()["data"]
+    assert detail["reviewed_at"] == by_name["晚審"]["reviewed_at"]
 
 
 async def test_large_type_filter_and_locked_boundary(client, db):

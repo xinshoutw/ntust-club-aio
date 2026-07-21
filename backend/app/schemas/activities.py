@@ -214,6 +214,9 @@ class ActivityOut(BaseModel):
     can_close: bool = False
     has_close_draft: bool = False
     club_name: str = ""  # 行政端填(社團端看自己,免帶)
+    # 最近審核時間=該活動申請/結案簽核紀錄(approval_records)的 max(created_at);
+    # 行政端列表/詳情填,無任何審核紀錄=None
+    reviewed_at: datetime | None = None
 
 
 class ActivityDetailOut(ActivityOut):

@@ -32,6 +32,8 @@ export interface AdminActivity extends ReviewItem {
   closeLocked: boolean
   closeDeadline?: string // 結案期限=活動結束日+鎖定月數(推導)
   semester: string
+  /** 最近審核時間=申請/結案簽核紀錄的 max(created_at)YYYY/MM/DD HH:mm;無審核紀錄=undefined */
+  reviewedAt?: string
 }
 
 export interface AdminFileRef {
@@ -131,6 +133,7 @@ interface AdminActivityOut {
   close_locked: boolean
   close_deadline: string | null
   can_close: boolean
+  reviewed_at: string | null
 }
 
 interface AdminActivityDetailOut extends AdminActivityOut {
@@ -170,6 +173,7 @@ const toAdminActivity = (o: AdminActivityOut): AdminActivity => ({
   closeLocked: o.close_locked,
   closeDeadline: o.close_deadline ? slashDate(o.close_deadline) : undefined,
   semester: o.semester,
+  reviewedAt: o.reviewed_at ? slashDateTime(o.reviewed_at) : undefined,
 })
 
 const toFileRef = (f: FileOut): AdminFileRef => ({ id: f.id, name: f.original_name, url: fileUrl(f.id) })
@@ -266,7 +270,7 @@ export interface AdminActivityPageParams {
   types?: string[]
   /** 僅逾期鎖定(已核准+超過結案期限+未解鎖;後端推導) */
   locked?: boolean
-  /** 排序白名單:club/name/type/date/status/created_at;前綴 - 為降冪 */
+  /** 排序白名單:club/name/type/date/status/created_at/reviewed_at;前綴 - 為降冪 */
   sort?: string
   page: number
   pageSize: number

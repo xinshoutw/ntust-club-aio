@@ -35,7 +35,7 @@ const ALL_STATUSES: AdminActivityStatus[] = [
 // 排序亦為伺服器端白名單(type 排序以原始類型為準,大型不獨立成一級)
 const TYPE_OPTIONS = ['社課或會議', '活動', '大型活動']
 
-type SortKey = 'club' | 'name' | 'type' | 'date' | 'status'
+type SortKey = 'club' | 'name' | 'type' | 'date' | 'status' | 'reviewed_at'
 
 export default function ReviewPage() {
   const { user } = useAuth()
@@ -51,7 +51,7 @@ export default function ReviewPage() {
   const [statusFilter, setStatusFilter] = useState<string[]>([])
   const [page, setPage] = useState(1)
 
-  // 待審佇列:僅撈登入者可簽核的狀態(小結果集);其他狀態表改伺服器端分頁,
+  // 待審佇列:僅撈登入者可簽核的狀態(小結果集);最近審核表改伺服器端分頁,
   // 不再整批撈取 14k+ 筆(2026-07-21 需求方:SQL 存取必須分批)
   const queueStatuses = useMemo(
     () => ALL_STATUSES.filter((st) => canActOn(user, st)),
@@ -88,7 +88,8 @@ export default function ReviewPage() {
     statuses,
     clubIds,
     types: typeFilter.length ? typeFilter : undefined,
-    sort: sort ? `${sort.dir === -1 ? '-' : ''}${sort.key}` : undefined,
+    // 預設審核時間新→舊(明確帶 sort;無審核紀錄者殿後);點欄位排序即覆蓋,清除排序回到預設
+    sort: sort ? `${sort.dir === -1 ? '-' : ''}${sort.key}` : '-reviewed_at',
     page,
     pageSize: PAGE_SIZE,
   })
@@ -182,10 +183,10 @@ export default function ReviewPage() {
           )}
         </div>
 
-        {/* 其他狀態(他關審核中/已核准/已退回):供查閱與追蹤 */}
+        {/* 最近審核(他關審核中/已核准/已退回):供查閱與追蹤,預設審核時間新→舊 */}
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>其他狀態</div>
-          <table className="tb dense" style={{ minWidth: 800 }} aria-label="其他狀態的活動申請">
+          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近審核</div>
+          <table className="tb dense" style={{ minWidth: 880 }} aria-label="最近審核的活動申請">
             <thead>
               <tr>
                 <th>
@@ -233,6 +234,7 @@ export default function ReviewPage() {
                     />
                   </span>
                 </th>
+                <th><SortButton label="審核時間" sortKey="reviewed_at" sort={sort} onToggle={toggleSort} /></th>
                 <th aria-label="開啟" style={{ width: 32 }} />
               </tr>
             </thead>
@@ -264,12 +266,13 @@ export default function ReviewPage() {
                   <td className="num">{item.date}</td>
                   <td className="r num">{fmtMoney(item.requested)}</td>
                   <td><StatusPill status={item.status} /></td>
+                  <td className="num">{item.reviewedAt ?? '—'}</td>
                   <td className="r"><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>
                 </tr>
               ))}
               {!listQuery.isPending && pagedRows.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>無符合篩選條件的申請</td>
+                  <td colSpan={8} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>無符合篩選條件的申請</td>
                 </tr>
               )}
             </tbody>

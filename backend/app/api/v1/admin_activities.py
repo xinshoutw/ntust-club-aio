@@ -131,7 +131,19 @@ def _record(
 # 類型篩選標籤(前端 FilterButton;「大型活動」=類型活動且已認可或申請中未被否准)
 _TYPE_LABELS = ("社課或會議", "活動", "大型活動")
 
-# 排序白名單(2026-07-21:清單改伺服器端分頁,14k+ 筆不再整批撈取)
+# 最近審核時間:該活動申請/結案簽核紀錄的 max(created_at)
+# (相關子查詢,走 ix_approval_records_subject 索引)
+_REVIEWED_AT = (
+    sa.select(sa.func.max(ApprovalRecord.created_at))
+    .where(
+        ApprovalRecord.subject_type.in_([ApprovalSubject.ACTIVITY, ApprovalSubject.ACTIVITY_CLOSE]),
+        ApprovalRecord.subject_id == Activity.id,
+    )
+    .scalar_subquery()
+)
+
+# 排序白名單(2026-07-21:清單改伺服器端分頁,14k+ 筆不再整批撈取);
+# reviewed_at 於 list_activities 特例處理(NULLS LAST + id tiebreak)
 _SORTABLE = {
     "club": Club.name,
     "name": Activity.name,
@@ -139,6 +151,7 @@ _SORTABLE = {
     "date": Activity.date,
     "status": Activity.status,
     "created_at": Activity.created_at,
+    "reviewed_at": _REVIEWED_AT,
 }
 
 
@@ -203,14 +216,27 @@ async def list_activities(
             + sa.func.make_interval(0, int(lock_months))
             < threshold,
         )
-    query = query.order_by(*parse_sort(sort, _SORTABLE, Activity.id.desc()))
+    if sort and sort.removeprefix("-") == "reviewed_at":
+        # 最近審核:降冪(新→舊)與升冪皆 NULLS LAST(無審核紀錄者殿後),
+        # 固定 id 降冪 tiebreak 使同秒紀錄的分頁穩定
+        primary = (
+            _REVIEWED_AT.desc().nulls_last()
+            if sort.startswith("-")
+            else _REVIEWED_AT.asc().nulls_last()
+        )
+        order = [primary, Activity.id.desc()]
+    else:
+        order = parse_sort(sort, _SORTABLE, Activity.id.desc())
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
+    # reviewed_at 子查詢於計數後才加進 select,避免 count 也逐列跑相關子查詢
+    query = query.add_columns(_REVIEWED_AT.label("reviewed_at")).order_by(*order)
     rows = (await db.execute(query.offset(page.offset).limit(page.page_size))).all()
     data = []
-    for activity, club_name in rows:
+    for activity, club_name, reviewed_at in rows:
         out = ActivityOut.model_validate(activity)
         svc.decorate(out, activity, lock_months)
         out.club_name = club_name
+        out.reviewed_at = reviewed_at
         data.append(out)
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
@@ -247,17 +273,20 @@ async def get_activity(
         FileOut.model_validate(f)
         for f in await svc.activity_files(db, activity, svc.ATTACHMENT_SLOT)
     ]
-    approvals = await db.scalars(
-        sa.select(ApprovalRecord)
-        .where(
-            ApprovalRecord.subject_type.in_(
-                [ApprovalSubject.ACTIVITY, ApprovalSubject.ACTIVITY_CLOSE]
-            ),
-            ApprovalRecord.subject_id == activity.id,
+    approvals = (
+        await db.scalars(
+            sa.select(ApprovalRecord)
+            .where(
+                ApprovalRecord.subject_type.in_(
+                    [ApprovalSubject.ACTIVITY, ApprovalSubject.ACTIVITY_CLOSE]
+                ),
+                ApprovalRecord.subject_id == activity.id,
+            )
+            .order_by(ApprovalRecord.id)
         )
-        .order_by(ApprovalRecord.id)
-    )
+    ).all()
     out.approvals = [ApprovalOut.model_validate(r) for r in approvals]
+    out.reviewed_at = max((r.created_at for r in approvals), default=None)
     return ApiResponse(data=out)
 
 

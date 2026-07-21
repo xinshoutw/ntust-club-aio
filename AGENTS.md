@@ -243,6 +243,18 @@
   - **借用聯絡電話** phone(臨時場地/器材申請選填;舊資料遷入)
   - migration `b3e7d40a95c1`(可逆;downgrade 刪行政借用列、cancelled→rejected)
 
+## 第十四輪決議(2026-07-21,需求方 15 項,前後端已落地)
+
+- **第一關全面改稱「承辦人」**(顯示層;程式鍵 `advisor/approve_advisor/pending_advisor` 不動,待簽核重做輪整併);**單關(無補助)不畫章軌**;章字 承/組/長
+- **工讀生端(pt)與評審端(viewer)實裝**(role 代號仍為 staff/viewer):`/staff/*`、`/viewer/*` API 全套;五獎 rubric 依評分標準 PDF seed(年度化,`award_rubric_items`);`eval_groups.award_id` 為分組所屬獎項;**現場簡報 20 分為選填、可於簡報後補登**(表格標「簡報未評」;待需求方追認);評審對受評社團不匿名(匿名方向=評審代號對社團)
+- **申請時間禁過去**(前後端):節次時刻表 `PERIOD_TIMES`(權威=舊 clubclass);臨時場地「正在申請/可取消」邊界=**申請起始時刻**(最早節次起點);手動借用不擋(補登用)
+- **行政端固定借用窗外反灰置底**(比照社團端;窗外殘留 pending 需先調系統設定;待追認)
+- **申請審核「最近審核」**:預設依最後簽核時間新到舊(`reviewed_at`);結案審核逾期區含已解鎖、全列可點,兩區 25/頁
+- **帳號管理含社團 tab**(與「管理項目」雙入口;建立社團帳號=`POST /admin/clubs/{id}/account`)
+- **表格全站慣例**:資料表一律 `tb fixed`+`<Cols>` 固定欄寬;排序 `useMultiSort`(點擊序=優先序;同欄再點=升降互換、無移除態,指示器=實際生效鏈;≤3 鍵)+`MultiSortButton`;伺服器分頁一律補 id tiebreak;後端 `sort` 逗號多鍵;預設排序五準則=佇列公平(送件早在前)/急迫優先(期限近、逾越久在前)/時間就近(新在前)/名冊慣例(身份權重、主檔手動序)/需求方拍板不動
+- **高彈窗一律 `useModalAutoFocus`**(preventScroll,標題保持可見;禁原生 autoFocus);彈窗「點擊即開、內容 Skeleton 補齊」為標準模式;全域 motionUnit 0.06
+- webhook 訊息清冊=`docs/discord-webhook-messages.md`(需求方設計風格後回頭套 notify.py)
+
 ## Roadmap(需求方 2026-07-15 宣告)
 
 - 未來還有 **staff panel(工讀生端)** 與 **viewer panel(評審端)** 要實作(頁面清單見上方功能模組)

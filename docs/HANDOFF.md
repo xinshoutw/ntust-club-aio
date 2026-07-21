@@ -1,43 +1,50 @@
-# Session Handoff(2026-07-21,第十三輪:CMS+clubclass 雙遷移 + 借用五功能)
+# Session Handoff(2026-07-21,第十四輪:pt/viewer 雙面板實裝 + 需求方 15 項 + 全站表格排序/欄寬)
 
 > 給下一個 session 的交接快照。永久性專案知識在三層 `AGENTS.md` 與 `docs/architecture.md`、`docs/data-model.md`、`docs/design-guide.md`;本檔只記「現在進行到哪、接下來做什麼」。過期即刪。
 
-## 本輪已完成(分支 `dev`,已推 origin/dev)
+## 本輪已完成(分支 `dev`,需求方 15 項全數落地;**尚未 push,待使用者確認**)
 
-1. **舊系統(CMS)DB dump 分析與 gap 盤點**:dump=`legacy/ClubManagementSystem/ntust_clubs_2026-07-21.dump`,已還原到 club-aio pg 容器的 `legacy_clubs` 庫;12 項「舊有新無」需求方全數拍板(細節見 AGENTS.md 第十三輪節)
-2. **遷移前置 schema/功能**(migration `8f2c6a91d3e5`,up/down/up 驗證過):
-   - clubs.kind(社團/學會,廢除社名強制社/會結尾)、en_name、attribute NULL-able、advisor_out_*(校內/校外指導老師各一)
-   - club_members.phone、職稱放寬各身份皆可(幹部仍必填)
-   - **活動類型二分**:「社課或會議」/「活動」;人數語彙統一「社員/非社員」
-   - 前端全同步(kindLabel 改吃 clubKind、行政端類型下拉、成員電話行內編輯、管理項目雙指導老師+英文名)
-3. **CMS 資料遷移完成**(`migration/cms_import.py`,idempotent):dev 庫=159 社(3 偽社團不遷:國際事務處/testclub/學務處就輔組)、users 178(staff 17/17 含侍筱鳳 `800`;`101101101` 黃宥維已升 superadmin)、成員 30,477、活動 14,234、公告 8;一次性密碼 109 筆在 `migration/out/one_time_passwords_2026-07-21.csv`(**交承辦後銷毀**)
-4. **clubclass 遷移完成**(`migration/cc_import.py`,idempotent;來源=拋棄式 MySQL 容器 `cc-legacy`,dump=`legacy/clubclass/cc_2026-07-21.sql`):場地 23(4 停用承接歷史)、器材 25(8 停用)、教室借用 15,634(一舍 B2 拆樓梯+白板)、器材借用 7,173;行政借用 club_id=NULL 顯示「學務處」
-5. **借用五新功能**(migration `b3e7d40a95c1`):取消(cancelled 狀態)、行政手動借用頁、場地不開放規則 Rule Page(venue_block_rules)、器材單次可借上限、**聯絡電話必填**(場地/器材申請;需求方原選填後改必填)
-6. **需求方 7 點 UX/效能調整(同日第三批)已落地**:
-   - 聯絡電話僅允許 `0-9 - ( ) * #`(前後端同規則)
-   - 各借用頁底部列表可直接取消;**「正在借用/正在申請」(全部、不限長度)+「最近」(近 5 筆)雙列表**(借用三頁+總覽+幹部證明/郵局/報修;bookings 走後端 `active=true/false` 過濾)
-   - **申請審核/結案審核改伺服器端分頁**(原整批撈 14k+ 造成卡頓):佇列只抓可簽核狀態;歷史表 20/50 一頁、活動時間新在前;篩選(社團/類型含大型推導/狀態)與排序全下推 SQL(`/admin/activities` 新參數 status/club_id/type 多值、locked、sort);總覽排除 closed、已歸還伺服器分頁
-   - 公告 markdown 連結一律開新分頁(專屬 DOMPurify 實例);Modal 動畫固定目的地(transform-origin center)
-7. **三輪 Opus 對抗審查皆已修**:CMS 輪 7 findings(無 C/H);clubclass 輪 1 HIGH(NULL club 通知 500)+1 MEDIUM;第三輪 1 HIGH(僅 areview 帳號永久 spinner)+2 MEDIUM(手動器材漏電話驗證、DOMPurify 全域 hook 外溢)
+1. **工讀生端(pt)實裝**:後端新 `/staff/*` router(社團/違規目錄/違規開立/違規查詢/器材借出與歸還點交(依序點交序號、去重)/逾期清單/發送提醒——提醒與 admin 共用 `services/loan_remind.py`);前端五頁全接線、mock 移除;行政借用(club NULL)顯示「學務處」且提醒鈕停用
+2. **評審端(viewer)實裝**:migration `f6d2b81c47a9`(eval_groups.award_id);**五獎 rubric 依評分標準 PDF seed(年 116,48 細項,seed 對帳 assert)**——社團端 AwardDetailPage 上傳槽位隨之可用;`/viewer/*` API(assignments/detail/score upsert/done,指派=分組×獎項×年度,檔案下載同維度收斂);前端三頁接線,評分彈窗=雙欄(左受評檔案 FilePreview、右逐項評分+評語+簡報),「儲存並下一社團」流水線;**現場簡報分選填可後補**(表格顯示「簡報未評」,待需求方追認);seed_mock 建兩分組+viewer01/02
+3. **禁過去申請時間(前後端)**:`PERIOD_TIMES` 節次時刻表落地(權威=舊 clubclass,14 節);臨時場地(含今天已開始節次)/器材(區間已過、活動已結束)/活動 submit 與重送/報名建立/公告蓋板全擋;**手動借用刻意不擋**(補登歷史);草稿不擋
+4. **臨時場地「正在申請/取消」邊界改申請起始時刻**:active=未開始(SQL 以 periods 陣列重疊比對,與序無關);pending/approved 未開始皆可取消,起始時刻一過移「最近申請」不可取消;器材/固定維持日粒度
+5. **行政端固定借用窗外反灰置底**(比照社團端;`GET /admin/room-bookings/window`)——**行為反轉待需求方追認**:窗外整頁鎖住,殘留 pending 需先到系統設定延長區間才能審
+6. **審核頁四項**:「其他狀態」→「最近審核」,`reviewed_at`(approval_records max,彙總 join)入列表+排序白名單,預設 -reviewed_at;**輔導老師全面改稱承辦人**(顯示層;程式鍵 advisor/pending_advisor 不動),單關不畫章軌;結案審核兩區 50→25/頁,逾期區改 `overdue=true`(含已解鎖)全列可點開唯讀詳情
+7. **帳號管理加「社團」tab**(搜尋+分頁 20;建立帳號=新 `POST /admin/clubs/{id}/account`、重設密碼、啟停(社團+帳號連動,文案明示);一社一帳號以鎖列+IntegrityError 守並發)
+8. **彈窗/動畫**:全域 motionUnit 0.06(Fast/Mid/Slow=0.06/0.12/0.18s);活動詳情 popup 640→840;高彈窗改 `useModalAutoFocus`(focus preventScroll,標題保持可見;**禁再用原生 autoFocus 於高彈窗**);社團總覽點列即開審核彈窗(ActivityReviewModal 支援 item=null+Skeleton,largeApproved/fundSource 補種)
+9. **全站表格改造(需求方 1、11 項)**:後端 `sort` 逗號多鍵(≤3,白名單 422);前端 `useMultiSort`(**最後點擊=最高優先**,同欄升→降→移除)+`MultiSortButton`(方向 caret+優先序小字)+`sortRows`+`Cols`;**全部資料表 `tb fixed`+colgroup 固定欄寬**(行內編輯不再變形);預設排序依五準則逐表定案(佇列公平/急迫優先/時間就近/名冊慣例/需求方拍板),成員預設=身份權重→學號、違規=未銷案+期限近、active 借用=開始日近、逾期=逾越最久在前
+10. **Discord webhook 訊息清冊**:`docs/discord-webhook-messages.md`(32 事件/36 文案變體,含可用資料欄位)——**待需求方據此設計風格後回頭改 notify.py**
+11. **資料遷移重演練於本機完成**(159 社/30,477 成員/14,234 活動/15,634+7,173 借用);dev 庫已升 `f6d2b81c47a9` 並 seed rubric
+12. **交叉審查**:Opus×7(viewer 全套、pt+審核+彈窗、各分支自審)+codex×1(表格 sweep);findings 全修(檔案下載獎項維度、簡報必填改策略、group 鍵、reviewed_at 彙總 join、序號去重、骨架聚焦)
 
 ## 驗證現況(全綠)
 
-- 後端 `timeout 300 uv run pytest -q` **222 passed**、`ruff check .` 全綠
+- 後端 `timeout 300 uv run pytest -q` **262 passed**、`ruff check .` 全綠
 - 前端 `pnpm exec tsc -b` 0 錯、`pnpm test` 35 passed、lint 僅既有 fast-refresh warning
-- **注意**:dev 庫=真實遷移資料(非 seed_mock);要回 mock 環境跑 `seed_mock --yes`,要回遷移資料跑 `reset_db --yes` + `uv run python ../migration/cms_import.py`
+- viewer/staff 端對端煙霧測試過(scratch 庫 club_aio_smoke + uvicorn 8001:登入→指派→評分→done、開違規、點交、逾期、跨角色 403)
+- **測試庫可平行**:`CLUB_AIO_TEST_DB=<name>` 覆寫(多 worktree 各用一庫)
 
-## 下一輪待辦 / 待需求方
+## 本機環境(此台 Mac,2026-07-21 起用)
 
-- **舊機 media 目錄**(documents/、images/,~8.7 萬檔):使用者抓回後寫檔案匯入(PlanFile→活動附件、activityimages→結案照片、activityfiles);`migration/README.md` TODO 節
-- **待需求方拍板**:評鑑檔案庫 Club_clubfiles(12,752 檔)歸檔與否;行政歷史文件(7 筆)——皆 TODO,需求方後續給
-- **簽核流程重做**(2026-07-17 拍板規格,見上輪 HANDOFF/AGENTS):狀態機/角色改名/頭銜/superadmin sh 腳本/逐項核定 UI——尚未實作
-- 前輪 REVIEW_full 的 P2/P3 待辦仍在(lib 測試補強、文件對齊、AGENTS 重組提案)
-- 成員名單截至 106-2、活動至 2026-10:屬舊系統真實狀態,前端預設學期(114-2)下成員頁會是空的,屬預期
+- host 5432 被 OrbStack VM 佔用:db 走 **55432**(`compose.override.yml` 不入版控 + `.env` `POSTGRES_PORT=55432`);pnpm 走 corepack shim
+
+## 待需求方拍板/追認
+
+- 簡報分數選填可後補(§2);行政端固定借用窗外整頁鎖(§5);手動借用可回填過去(§3);webhook 風格模板(§10);評鑑檔案庫/行政歷史文件歸檔;`aclose` 範圍、器材核准硬性檢核(前輪遺留)
+
+## 下一輪待辦
+
+- **舊機 media 目錄**(~8.7 萬檔)抓回後寫檔案匯入(migration/README.md TODO)
+- **簽核流程重做餘項**(2026-07-17 拍板):角色代號改名(admin→staff、staff→pt)、頭銜欄位、superadmin sh 腳本、**退回=退上一級狀態機**、社團端關卡人員顯示(逐項核定 UI 已有)
+- **行政端「分組與評審指派」頁**:viewer 面板已實裝但生產環境無法指派(現只有 seed);需 eval_groups CRUD+指派 UI(表與 API 模型已就緒)
+- REVIEW_full P2/P3(lib 測試補強、mock 死碼清除含 bookings/mock 瘦身、AGENTS 重組、文件對齊)
+- 競賽成績總表(super)、報名競賽斷鏈、統計頁、Email 模板、首頁導覽
 
 ## 環境與慣例提醒
 
-- **多 agent 平行作業絕不可 `git stash`**;跑測試務必包 timeout 且不同時開兩個 pytest
-- 前端 `pnpm exec tsc --noEmit` 是空檢查,必須 `pnpm exec tsc -b`;lint 是 `pnpm run lint`(oxlint)
-- 確認彈窗一律 `lib/confirm.ts`;Modal 一律 open+afterClose 常駐;前端不顯示單號(稽核除外);Commit 英文一行為一 commit、禁元描述;UI 禁 emoji
-- **Python 3.14 lazy annotation**:欄位名若與型別同名(如 `date`)須用別名(`dt.date`)
-- 狀態變更端點鎖序/上傳加總上限/`file_service.unlink_quiet()` 等慣例見上輪 HANDOFF(仍有效)與 AGENTS.md
+- 多 agent 平行絕不可 `git stash`;pytest 必包 timeout;平行 worktree 各設 `CLUB_AIO_TEST_DB`
+- 前端 `pnpm exec tsc -b`(--noEmit 是空檢查);lint=`pnpm run lint`
+- 確認彈窗一律 `lib/confirm.ts`;Modal open+afterClose 常駐;**高彈窗聚焦一律 `useModalAutoFocus`**;不顯示單號;UI 禁 emoji;Commit 英文一行為一 commit、禁元描述
+- **表格慣例**:資料表一律 `tb fixed`+`<Cols>`;排序一律 `useMultiSort`+`MultiSortButton`(伺服器端 `sortParam`);新表照五準則給預設排序
+- Python 3.14 lazy annotation:欄位名與型別同名須別名(dt.date)
+- `PERIOD_TIMES` 前後端各一份(booking_service.py / api/bookings.ts),改動須同步

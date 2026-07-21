@@ -64,9 +64,14 @@ LoanStatusFilter = Literal["pending", "approved", "rejected", "checked_out", "re
 
 
 async def _notify_club(
-    background: BackgroundTasks, db, club_id: int, kind: str, title: str, desc: str
+    background: BackgroundTasks, db, club_id: int | None, kind: str, title: str, desc: str
 ) -> None:
+    # NULL club=行政手動借用(遷移的歷史行政借用可為 pending):無社團可通知
+    if club_id is None:
+        return
     club = await db.get(Club, club_id)
+    if club is None:
+        return
     background.add_task(notify.club_event, kind, title, desc, club.discord_webhook_url)
 
 
@@ -397,7 +402,8 @@ async def manual_venue_booking(
     venue = await db.get(Venue, body.venue_id)
     if venue is None or not venue.is_active:
         raise not_found("找不到場地")
-    # 與核准端同鎖同檢核;行政借用不受不開放規則限制(封鎖常配合行政徵用)
+    # 與核准端同鎖同檢核;行政借用不受不開放規則限制(封鎖常配合行政徵用)、
+    # 器材端亦不受單次可借上限限制(super override)
     await svc.lock_resource(db, "venue", venue.id)
     taken = await db.scalar(
         sa.select(sa.func.count()).where(

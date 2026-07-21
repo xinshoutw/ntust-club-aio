@@ -55,6 +55,8 @@ async def remind_equipment_loan(
     return_time = await get_setting(db, "equipment_return_time")
     deadline = await svc.overdue_deadline(db, loan.end_date, return_time)
     equipment = await db.get(Equipment, loan.equipment_id)
+    if loan.club_id is None:
+        raise conflict("行政手動借用無提醒對象")
     club = await db.get(Club, loan.club_id)
 
     audit.record(

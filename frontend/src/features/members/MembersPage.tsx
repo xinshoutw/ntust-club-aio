@@ -3,7 +3,7 @@ import { App, Button, Form, Input, Modal, Popconfirm, Select, Spin, Upload } fro
 import { DownOutlined, DownloadOutlined, EditOutlined, UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
-import { FilterButton, Pager, SortButton } from '../../components/ui/tableControls'
+import { FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
 import { downloadCsv } from '../../lib/csv'
 import { MEMBER_KINDS, kindLabel, type MemberKind } from '../../lib/roles'
 import { CURRENT_SEMESTER } from '../../lib/semester'
@@ -17,6 +17,8 @@ import {
 } from '../../api/members'
 
 const PAGE_SIZE = 50
+// 伺服器端排序白名單(後端 /club/members _SORTABLE);kind 排序鍵=身份權重
+type MemberSortKey = 'name' | 'student_id' | 'kind' | 'title' | 'semester' | 'updated_at'
 
 export default function MembersPage() {
   const { message } = App.useApp()
@@ -33,7 +35,8 @@ export default function MembersPage() {
   const [csvSemester, setCsvSemester] = useState<string>(CURRENT_SEMESTER)
   const [semester, setSemester] = useState<string>(CURRENT_SEMESTER)
   const [page, setPage] = useState(1)
-  const [sort, setSort] = useState<{ key: 'kind' | 'title'; dir: 1 | -1 } | null>(null)
+  // 預設排序=後端預設(身份權重→學號,準則 4 名冊慣例):stack 空時不送 sort 參數
+  const { stack, toggle } = useMultiSort<MemberSortKey>()
   // 篩選值為顯示詞(社長/會長依社團名稱推導),查詢時轉回標準身份
   const [kindFilter, setKindFilter] = useState<string[]>([])
   const [editing, setEditing] = useState<{ id: number; field: 'kind' | 'title' | 'phone' } | null>(null)
@@ -51,7 +54,7 @@ export default function MembersPage() {
   const listQuery = useMembers({
     semester: semester === 'all' ? undefined : semester,
     kinds,
-    sort: sort ? `${sort.dir === -1 ? '-' : ''}${sort.key}` : undefined,
+    sort: sortParam(stack),
     page,
     pageSize: PAGE_SIZE,
   })
@@ -131,8 +134,13 @@ export default function MembersPage() {
     )
   }
 
-  const toggleSort = (key: 'kind' | 'title') =>
-    setSort((s) => (s?.key === key ? (s.dir === 1 ? { key, dir: -1 } : null) : { key, dir: 1 }))
+  const toggleSort = (key: MemberSortKey) => {
+    toggle(key)
+    setPage(1)
+  }
+  const sortHeader = (label: string, key: MemberSortKey) => (
+    <MultiSortButton label={label} sortKey={key} stack={stack} onToggle={toggleSort} />
+  )
 
   return (
     <div>
@@ -186,11 +194,11 @@ export default function MembersPage() {
           <table className="tb" style={{ minWidth: 680 }}>
             <thead>
               <tr>
-                <th>姓名</th>
-                <th>學號</th>
+                <th>{sortHeader('姓名', 'name')}</th>
+                <th>{sortHeader('學號', 'student_id')}</th>
                 <th>
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <SortButton label="身份" sortKey="kind" sort={sort} onToggle={toggleSort} />
+                    {sortHeader('身份', 'kind')}
                     <FilterButton
                       options={MEMBER_KINDS.map((k) => label(k))}
                       selected={kindFilter}
@@ -202,12 +210,10 @@ export default function MembersPage() {
                     />
                   </span>
                 </th>
-                <th>
-                  <SortButton label="職稱" sortKey="title" sort={sort} onToggle={toggleSort} />
-                </th>
+                <th>{sortHeader('職稱', 'title')}</th>
                 <th>電話</th>
-                <th>學期</th>
-                <th>更新時間</th>
+                <th>{sortHeader('學期', 'semester')}</th>
+                <th>{sortHeader('更新時間', 'updated_at')}</th>
                 <th className="r">動作</th>
               </tr>
             </thead>

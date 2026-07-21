@@ -60,6 +60,42 @@ async def test_permission_gate(client, db):
     assert resp.status_code == 403
 
 
+async def test_admin_fixed_window(client, db):
+    """開放窗查詢(側欄反灰用):一般 admin 即可讀(不綁 aroom);社團帳號不可用。"""
+    await seed(client, db)
+
+    # 無 aroom 的管理員也讀得到(側欄要用)
+    await login(client, "other")
+    window = (await client.get(f"{URL}/window")).json()["data"]
+    assert window == {"open": False, "open_from": None, "open_until": None}
+
+    # 設定開放區間後反映開放狀態
+    from datetime import timedelta
+
+    from app.models import SystemSetting
+
+    today = date.today()
+    db.add(
+        SystemSetting(
+            key="fixed_booking_window",
+            value={
+                "open_from": (today - timedelta(days=1)).isoformat(),
+                "open_until": (today + timedelta(days=7)).isoformat(),
+            },
+        )
+    )
+    await db.commit()
+    window = (await client.get(f"{URL}/window")).json()["data"]
+    assert window["open"] is True
+    assert window["open_from"] == (today - timedelta(days=1)).isoformat()
+
+    # 社團帳號 → 403
+    club = await make_club(db, name="第三社")
+    await make_user(db, username="club01", club_id=club.id)
+    await login(client, "club01")
+    assert (await client.get(f"{URL}/window")).status_code == 403
+
+
 async def test_list_with_weekly_slots(client, db):
     first, second, done = await seed(client, db)
 

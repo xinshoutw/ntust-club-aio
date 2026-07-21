@@ -4,6 +4,7 @@ import { useAuth, type Role } from './app/auth'
 import { buildAdminNav, buildClubNav, buildPtNav, buildViewerNav } from './lib/nav'
 import { canAccessAdminPath } from './lib/permissions'
 import { useFixedWindow } from './api/bookings'
+import { useAdminFixedWindow } from './api/adminBookings'
 import { usePendingActivityTotal, usePendingCloseTotal } from './api/adminActivities'
 import { homeOf } from './lib/home'
 import AppShell from './components/layout/AppShell'
@@ -82,14 +83,16 @@ function ClubShell() {
 }
 
 // 行政端側欄徽章=申請/結案待審數(共用審核頁查詢);
-// 側欄項目與徽章查詢皆依 permissions 過濾,受限管理員不再看到整排 403 頁
+// 側欄項目與徽章查詢皆依 permissions 過濾,受限管理員不再看到整排 403 頁。
+// 固定借用開放窗外「教室固定借用」反灰移至最末組(2026-07-21 比照社團端)
 function AdminShell() {
   const { user } = useAuth()
   const pendingReview = usePendingActivityTotal(canAccessAdminPath(user, '/admin/review'))
   const pendingClose = usePendingCloseTotal(canAccessAdminPath(user, '/admin/close-review'))
+  const fixedWindow = useAdminFixedWindow(canAccessAdminPath(user, '/admin/rooms'))
   const nav = useMemo(
-    () => buildAdminNav(user, pendingReview.data, pendingClose.data),
-    [user, pendingReview.data, pendingClose.data],
+    () => buildAdminNav(user, pendingReview.data, pendingClose.data, fixedWindow.data),
+    [user, pendingReview.data, pendingClose.data, fixedWindow.data],
   )
   return <AppShell nav={nav} badgeLabel="行政後台" />
 }

@@ -10,18 +10,35 @@ import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 
 from app.api.pagination import Pagination, parse_sort
-from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
+from app.core.deps import CurrentUser, DbDep, client_ip, require_permission, require_role
 from app.core.errors import conflict, not_found
 from app.models import ApprovalRecord, Club, RoomBookingRequest, RoomBookingSlot, Venue
-from app.models.enums import ApprovalDecision, ApprovalSubject, BookingStatus
+from app.models.enums import ApprovalDecision, ApprovalSubject, BookingStatus, UserRole
 from app.schemas.admin import AdminRoomBookingOut, RejectIn
+from app.schemas.bookings import FixedWindowOut
 from app.schemas.common import ApiResponse
 from app.services import audit, notify
 from app.services import booking_service as svc
+from app.services.settings_service import get_setting
 
 router = APIRouter(prefix="/admin/room-bookings", tags=["admin"])
 
 RoomAdmin = Annotated[CurrentUser, Depends(require_permission("aroom"))]
+# 開放窗查詢供側欄反灰用:一般 admin 即可讀,不綁 aroom(與社團端 /club/room-bookings/window 同形)
+AnyAdmin = Annotated[CurrentUser, Depends(require_role(UserRole.ADMIN))]
+
+
+@router.get("/window")
+async def fixed_window(user: AnyAdmin, db: DbDep) -> ApiResponse[FixedWindowOut]:
+    """固定借用開放窗狀態:未開放時行政端側欄項目反灰置底、頁面顯示未開放(2026-07-21)。"""
+    window = await get_setting(db, "fixed_booking_window")
+    return ApiResponse(
+        data=FixedWindowOut(
+            open=svc.fixed_window_open(window),
+            open_from=window.get("open_from"),
+            open_until=window.get("open_until"),
+        )
+    )
 
 _SORTABLE = {
     "club": Club.name,

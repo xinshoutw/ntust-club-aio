@@ -2,11 +2,13 @@ import { useState } from 'react'
 import { App, Button, Input, Modal, Spin } from 'antd'
 import { RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Pager } from '../../components/ui/tableControls'
 import { DOW_TEXT } from '../bookings/mock'
 import {
   useAdminBookingMutations,
+  useAdminFixedWindow,
   usePendingRoomBookings,
   type AdminRoomRequest,
 } from '../../api/adminBookings'
@@ -144,7 +146,10 @@ export default function AdminRoomsPage() {
   const [open, setOpen] = useState(false)
   const [page, setPage] = useState(1)
 
-  const listQuery = usePendingRoomBookings({ page, pageSize: PAGE_SIZE })
+  // 開放窗外不提供審核面板(2026-07-21 比照社團端);與側欄反灰共用同一查詢
+  const windowQuery = useAdminFixedWindow()
+  const windowOpen = windowQuery.data?.open === true
+  const listQuery = usePendingRoomBookings({ page, pageSize: PAGE_SIZE }, windowOpen)
   const pending = listQuery.data?.requests ?? []
   const total = listQuery.data?.total ?? 0
 
@@ -165,6 +170,49 @@ export default function AdminRoomsPage() {
   }
   const isConflict = (venueId: number) => (dow: number, period: string) =>
     conflictKeys.has(`${venueId}|${dow}|${period}`)
+
+  if (windowQuery.isPending) {
+    return (
+      <div>
+        <PageHeader title="教室固定借用" />
+        <div className="card" style={{ marginTop: 20, padding: '48px 24px', textAlign: 'center' }}>
+          <Spin />
+        </div>
+      </div>
+    )
+  }
+
+  // 開放窗查詢失敗不可誤判為「未開放申請」,顯示錯誤與重試
+  if (windowQuery.isError) {
+    return (
+      <div>
+        <PageHeader title="教室固定借用" />
+        <div style={{ marginTop: 20 }}>
+          <QueryError title="受理期間載入失敗" error={windowQuery.error} onRetry={() => windowQuery.refetch()} />
+        </div>
+      </div>
+    )
+  }
+
+  if (!windowOpen) {
+    const w = windowQuery.data
+    return (
+      <div>
+        <PageHeader title="教室固定借用" />
+        <div className="card" style={{ marginTop: 20, padding: '48px 24px', textAlign: 'center' }}>
+          <div style={{ fontSize: 15, fontWeight: 600 }}>目前未開放申請</div>
+          {w?.openFrom && w.openUntil && (
+            <div className="num" style={{ fontSize: 13, color: 'var(--steel)', marginTop: 8 }}>
+              受理期間 {w.openFrom} – {w.openUntil}
+            </div>
+          )}
+          <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 8 }}>
+            可於系統設定調整開放區間
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div>

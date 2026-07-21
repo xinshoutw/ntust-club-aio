@@ -5,6 +5,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs, { type Dayjs } from 'dayjs'
 import { api, apiPaged, qs } from './client'
+import type { FixedWindow } from './bookings'
 import type { StatusKey } from '../lib/status'
 
 const toDisplayDate = (iso: string): string => dayjs(iso).format('YYYY/MM/DD')
@@ -227,6 +228,30 @@ const keys = {
   venueBookings: (p: PendingListParams) => ['adminBookings', 'venueBookings', p] as const,
   equipmentLoans: (p: PendingListParams) => ['adminBookings', 'equipmentLoans', p] as const,
   roomBookings: (p: PendingListParams) => ['adminBookings', 'roomBookings', p] as const,
+  fixedWindow: ['adminBookings', 'fixedWindow'] as const,
+}
+
+interface FixedWindowOut {
+  open: boolean
+  open_from: string | null
+  open_until: string | null
+}
+
+/** 固定借用開放窗(行政端):未開放時側欄「教室固定借用」反灰置底(2026-07-21 比照社團端);
+ *  AdminShell 與 AdminRoomsPage 共用同一查詢;一般 admin 即可讀,不綁 aroom */
+export function useAdminFixedWindow(enabled = true) {
+  return useQuery({
+    queryKey: keys.fixedWindow,
+    enabled,
+    queryFn: () =>
+      api<FixedWindowOut>('/admin/room-bookings/window').then(
+        (w): FixedWindow => ({
+          open: w.open,
+          openFrom: w.open_from ? toDisplayDate(w.open_from) : undefined,
+          openUntil: w.open_until ? toDisplayDate(w.open_until) : undefined,
+        }),
+      ),
+  })
 }
 
 export interface PendingListParams {

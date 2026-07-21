@@ -116,13 +116,27 @@ export function buildClubNav(window?: FixedWindow): NavGroup[] {
   ]
 }
 
+const ADMIN_ROOM_ITEM: NavItem = {
+  key: 'a-room',
+  label: '教室固定借用',
+  path: '/admin/rooms',
+  icon: <ScheduleOutlined />,
+}
+
 // 側欄徽章=待審數(shell 以共用 query 提供;查詢中/失敗不顯示)。
-// 依 permissions 過濾:受限管理員只看得到自己可用的項目(路由另有 gate)
+// 依 permissions 過濾:受限管理員只看得到自己可用的項目(路由另有 gate)。
+// 固定借用開放窗外「教室固定借用」反灰移至最末組(2026-07-21 比照社團端)。
 export function buildAdminNav(
   user: SessionUser | null,
   pendingReview?: number,
   pendingClose?: number,
+  fixedWindow?: FixedWindow,
 ): NavGroup[] {
+  const fixedBookingOpen = fixedWindow?.open ?? false
+  const closedHint =
+    fixedWindow?.openFrom && fixedWindow.openUntil
+      ? `未開放申請;受理期間 ${fixedWindow.openFrom} – ${fixedWindow.openUntil}`
+      : '目前未開放申請'
   const groups: NavGroup[] = [
   {
     items: [{ key: 'a-home', label: '總覽', path: '/admin', icon: <DashboardOutlined /> }],
@@ -163,7 +177,7 @@ export function buildAdminNav(
     label: '借用審核',
     items: [
       { key: 'a-booking', label: '臨時場地器材借用', path: '/admin/bookings', icon: <EnvironmentOutlined /> },
-      { key: 'a-room', label: '教室固定借用', path: '/admin/rooms', icon: <ScheduleOutlined /> },
+      ...(fixedBookingOpen ? [ADMIN_ROOM_ITEM] : []),
       // 最高權限專屬(canAccessAdminPath 過濾:僅 super 可見)
       { key: 'a-manual', label: '手動借用', path: '/admin/manual-booking', icon: <PlusSquareOutlined /> },
       { key: 'a-venue-rules', label: '場地不開放規則', path: '/admin/venue-rules', icon: <StopOutlined /> },
@@ -199,6 +213,9 @@ export function buildAdminNav(
       { key: 'a-violations', label: '違規管理', path: '/admin/violations', icon: <WarningOutlined /> },
       // 稽核軌跡自側欄移除(2026-07-15 需求方),入口只留 Header 帳號選單
       { key: 'a-files', label: '檔案管理', path: '/admin/files', icon: <FolderOpenOutlined /> },
+      ...(fixedBookingOpen
+        ? []
+        : [{ ...ADMIN_ROOM_ITEM, disabled: true, disabledHint: closedHint }]),
     ],
   },
   ]

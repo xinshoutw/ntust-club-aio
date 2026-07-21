@@ -251,3 +251,10 @@ body {
     transition: none !important;
   }
 }
+
+/* 彈窗進場固定在目的地淡入/縮放,取消自點擊位置飛入的 transform-origin
+   (2026-07-21 需求方:過場位移動畫造成不適;AntD 以 inline style 設 origin,需 !important 蓋過) */
+.ant-modal,
+.ant-image-preview-wrap .ant-image-preview-img {
+  transform-origin: center center !important;
+}

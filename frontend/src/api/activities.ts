@@ -255,9 +255,10 @@ const toCloseDraft = (raw: Record<string, unknown> | null): Partial<ActivityRepo
   }
 }
 
-// 簽核關卡顯示詞(社團端不顯示個人姓名,僅關卡)
+// 簽核關卡顯示詞(社團端不顯示個人姓名,僅關卡;
+// 2026-07-21 需求方拍板:第一關顯示「承辦人」,程式鍵 advisor 不變)
 const STAGE_LABEL: Record<string, string> = {
-  advisor: '輔導老師',
+  advisor: '承辦人',
   chief: '課外組組長',
   dean: '學務長',
 }

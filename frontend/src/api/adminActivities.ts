@@ -250,7 +250,7 @@ export function canActOn(user: SessionUser | null, status: StatusKey): boolean {
   return user.isSuper || user.permissions.includes(`approve_${stage}`)
 }
 
-/** 結案審核(輔導老師單關)可否簽核 */
+/** 結案審核(承辦人單關)可否簽核 */
 export const canActOnClose = (user: SessionUser | null): boolean =>
   !!user && user.role === 'admin' && (user.isSuper || user.permissions.includes('approve_advisor'))
 

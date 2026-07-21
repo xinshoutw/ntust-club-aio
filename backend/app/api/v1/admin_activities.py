@@ -1,10 +1,10 @@
 """行政端:活動申請三關/單關簽核、結案單關審核、逾期鎖定解鎖。
 
-簽核規則(data-model.md §3.3):
-- 有申請補助(擬請補助 >0):輔導老師 → 組長 → 學務長
-- 無申請補助:輔導老師單關即核准
+簽核規則(data-model.md §3.3;2026-07-21 需求方拍板第一關顯示詞改「承辦人」,程式鍵 advisor 不變):
+- 有申請補助(擬請補助 >0):承辦人 → 組長 → 學務長
+- 無申請補助:承辦人單關即核准
 - 第一關認定經費來源與逐項核定金額;大型活動認可(is_large_approved)亦在此關
-- 退回必填原因;結案為輔導老師單關
+- 退回必填原因;結案為承辦人單關
 """
 
 from datetime import datetime
@@ -40,6 +40,9 @@ _STAGE_BY_STATUS = {
     ActivityStatus.PENDING_CHIEF: ("approve_chief", "chief"),
     ActivityStatus.PENDING_DEAN: ("approve_dean", "dean"),
 }
+
+# 通知文案的關卡顯示詞(Discord 對外顯示,不得漏出英文鍵)
+_STAGE_LABEL = {"advisor": "承辦人", "chief": "組長", "dean": "學務長"}
 
 # aact=既有後端鍵、areview=前端權限彈窗鍵(尚未統一,任一即通過);
 # aclose=結案審核頁:僅持該鍵的帳號也需要讀列表/詳情(動作端點另有各自關卡檢查),
@@ -362,7 +365,7 @@ async def approve(
         activity.club_id,
         "approve" if final else "submit",
         "活動申請已核准" if final else "活動申請通過關卡",
-        f"{activity.name}(關卡:{stage})",
+        f"{activity.name}(關卡:{_STAGE_LABEL.get(stage, stage)})",
     )
     lock_months = await get_setting(db, "close_lock_months")
     out = ActivityOut.model_validate(activity)
@@ -421,7 +424,7 @@ async def close_approve(
     activity = await _get_activity(db, activity_id, for_update=True)
     if activity.status != ActivityStatus.CLOSING_PENDING_ADVISOR:
         raise conflict("此活動不在結案待審狀態")
-    _require_stage_key(user, "approve_advisor")  # 結案:輔導老師單關
+    _require_stage_key(user, "approve_advisor")  # 結案:承辦人單關
 
     activity.status = ActivityStatus.CLOSED
     # 繳交確認:未確認之項目評鑑以 0 分計(寫入 report,scoring 讀取)

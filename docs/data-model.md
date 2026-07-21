@@ -205,7 +205,7 @@ erDiagram
 | start_time / end_time | time | 開始時間屬 date、結束時間屬 end_date(2026-07-15;原單日 timeRange)(2026-07-16 已同步) |
 | participants_in / participants_out | int | 校內/校外人數 |
 | staff_text | text | 工作人員(「總務>陳大文;美宣>…」,自由格式) |
-| fund_source | text NULL | 經費來源(輔導老師第一關認定:學務處經費/校務基金/高教深耕…) |
+| fund_source | text NULL | 經費來源(承辦人第一關認定:學務處經費/校務基金/高教深耕…) |
 | school_approved | int NULL | 學校核定補助金額 |
 | status | enum,見下 | |
 | close_unlocked | bool default false | 逾期鎖定的管理員解鎖旗標 |
@@ -216,17 +216,17 @@ erDiagram
 
 ```
 draft(暫存)
-  → pending_advisor(待輔導老師審核)
+  → pending_advisor(待承辦人審核;顯示詞 2026-07-21 由「輔導老師」改「承辦人」,狀態鍵不變)
       ├─ 無申請補助(擬請補助=0):核准 → approved
       └─ 有申請補助:→ pending_chief(待組長) → pending_dean(待學務長) → approved(已核准)
   任一關退回 → rejected(已退回,原因必填,寫入 approval_records;可修改後重送)
-approved → [社團送結案] → closing_pending_advisor(結案待輔導老師審核,單關)
+approved → [社團送結案] → closing_pending_advisor(結案待承辦人審核,單關)
   → closed(已結案)   或退回 → approved(帶退回原因)
 approved 且 活動結束日(end_date)+1個月 已過 且未送結案 → 「逾期鎖定」(推導狀態,非欄位;close_unlocked=true 可解鎖)
 ```
 
 **activity_budget_items**(id, activity_id FK, category text(經費科目九項:指導老師教練費/保險費/交通費/膳食費/印刷費/比賽獎勵品/雜支/其他/活動收入,2026-07-13 定案,含 UI 提示文字), description, self_fund int, requested_subsidy int, approved_subsidy int NULL)
-— 逐項編列;`approved_subsidy` 由輔導老師關卡逐項核定。科目先用 text + 前端下拉(科目表進 settings),不開表(YAGNI,科目穩定後再說)。
+— 逐項編列;`approved_subsidy` 由承辦人關卡逐項核定。科目先用 text + 前端下拉(科目表進 settings),不開表(YAGNI,科目穩定後再說)。
 
 **activity_reports** — 結案成果調查(2026-07-14 需求方改版,取代原型的報名/應到/實到五欄)
 

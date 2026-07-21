@@ -33,7 +33,7 @@ const PAGE_KEY_SET = new Set<string>(PERMISSION_KEYS.map(([k]) => k))
 
 // 權限彈窗以外的既有鍵(簽核關卡等)僅供顯示;儲存時原樣保留
 const EXTRA_KEY_LABELS: Record<string, string> = {
-  approve_advisor: '輔導老師簽核',
+  approve_advisor: '承辦人簽核',
   approve_chief: '組長簽核',
   approve_dean: '學務長簽核',
   aact: '活動管理(舊鍵)',

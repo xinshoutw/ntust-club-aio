@@ -39,7 +39,7 @@ async def test_three_stage_flow_with_subsidy(client, db):
     )
     assert resp.status_code == 403
 
-    # 第一關:輔導老師,核定經費與大型認可
+    # 第一關:承辦人,核定經費與大型認可
     await login(client, "advisor")
     detail = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]
     items = detail["budget_items"]

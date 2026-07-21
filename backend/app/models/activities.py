@@ -47,7 +47,7 @@ class Activity(Base, TimestampMixin):
     participants_in: Mapped[int] = mapped_column(default=0)  # 社員人數(2026-07-21 語彙統一)
     participants_out: Mapped[int] = mapped_column(default=0)  # 非社員人數
     staff_text: Mapped[str] = mapped_column(sa.Text, default="")
-    fund_source: Mapped[str | None] = mapped_column(sa.Text)  # 輔導老師第一關認定
+    fund_source: Mapped[str | None] = mapped_column(sa.Text)  # 承辦人第一關認定
     school_approved: Mapped[int | None] = mapped_column()  # 學校核定補助(元)
     status: Mapped[ActivityStatus] = mapped_column(
         db_enum(ActivityStatus, "activity_status"), default=ActivityStatus.DRAFT
@@ -63,7 +63,7 @@ class Activity(Base, TimestampMixin):
 
 
 class ActivityBudgetItem(Base, TimestampMixin):
-    """經費逐項編列;approved_subsidy 由輔導老師關卡逐項核定。"""
+    """經費逐項編列;approved_subsidy 由承辦人關卡逐項核定。"""
 
     __tablename__ = "activity_budget_items"
 
@@ -103,7 +103,7 @@ class ActivityReport(Base, TimestampMixin):
     video_url: Mapped[str | None] = mapped_column(sa.Text)  # 唯一選填;http(s) 驗證
     expense: Mapped[int] = mapped_column()  # 實際支出(核銷依據)
     submitted_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
-    # 結案審核繳交確認(2026-07-16 第九輪):輔導老師核准時逐項確認,
+    # 結案審核繳交確認(2026-07-16 第九輪):承辦人核准時逐項確認,
     # 未確認之項目評鑑以 0 分計(scoring 讀取;照片確認同時涵蓋影片連結)
     photos_confirmed: Mapped[bool] = mapped_column(default=True, server_default=sa.true())
     report_confirmed: Mapped[bool] = mapped_column(default=True, server_default=sa.true())

@@ -526,7 +526,7 @@ async def _create_activities(
         staff_text="講師:張明哲 教授", participants=(30, 0),
         budget=(("印刷費", "講義印製", 500, 0, None),),
     )
-    # 2. 待輔導老師審(無補助)
+    # 2. 待承辦人審(無補助)
     acts["pending_advisor"] = _add_activity(
         db, csie, csie_user,
         name="Python 入門社課", type_=ActivityType.COURSE_MEETING,
@@ -628,7 +628,7 @@ async def _create_activities(
             ("膳食費", "五餐伙食", 8000, 0, 0),
         ),
     )
-    # 10. 結案待審(report 已送出,輔導老師未簽)
+    # 10. 結案待審(report 已送出,承辦人未簽)
     acts["closing"] = _add_activity(
         db, csie, csie_user,
         name="社員迎新茶會", type_=ActivityType.EVENT,

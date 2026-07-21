@@ -10,21 +10,11 @@ import type { ReviewItem } from './reviewMock'
 
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 
-// 章軌由單據狀態推導;無申請補助=輔導老師單關即核准(後端規則),只畫一顆章
-function stagesOf(status: ReviewItem['status'], singleStage: boolean): StampStage[] {
-  if (singleStage) {
-    const state: StampStage['state'] =
-      status === 'pending_advisor'
-        ? 'current'
-        : status === 'rejected'
-          ? 'rejected'
-          : status === 'draft'
-            ? 'todo'
-            : 'done'
-    return [{ char: '輔', label: '輔導老師', state, note: noteOf(state) }]
-  }
+// 章軌由單據狀態推導;僅三關(有申請補助)畫章軌——
+// 無補助=承辦人單關即核准(後端規則),單關不畫章軌(2026-07-21 需求方拍板)
+function stagesOf(status: ReviewItem['status']): StampStage[] {
   const mk = (advisor: StampStage['state'], chief: StampStage['state'], dean: StampStage['state']): StampStage[] => [
-    { char: '輔', label: '輔導老師', state: advisor, note: noteOf(advisor) },
+    { char: '承', label: '承辦人', state: advisor, note: noteOf(advisor) },
     { char: '組', label: '組長', state: chief, note: noteOf(chief) },
     { char: '長', label: '學務長', state: dean, note: noteOf(dean) },
   ]
@@ -113,12 +103,12 @@ export default function ActivityReviewModal({
 
   // 「本關」:接 API 的頁面(有 onApprove)依登入者簽核鍵推導;mock 展示維持第一關可簽
   const canReview = onApprove ? canActOn(user, item.status) : item.status === 'pending_advisor'
-  // 經費來源/逐項核定/大型認可僅第一關(輔導老師)可編輯;組長/學務長關唯讀核准
+  // 經費來源/逐項核定/大型認可僅第一關(承辦人)可編輯;組長/學務長關唯讀核准
   const isFirstStage = item.status === 'pending_advisor'
   const canEdit = canReview && isFirstStage
   const requestedTotal = d?.budget.reduce((s, b) => s + b.requested, 0) ?? item.requested
   const approvedTotal = d?.budget.reduce((s, b) => s + (approvals[b.id] ?? 0), 0) ?? 0
-  const singleStage = requestedTotal === 0 // 無補助 → 輔導老師單關即核准
+  const singleStage = requestedTotal === 0 // 無補助 → 承辦人單關即核准
   const nextStageNote =
     isFirstStage && !singleStage ? ',送組長關' : item.status === 'pending_chief' ? ',送學務長關' : ''
 
@@ -190,7 +180,8 @@ export default function ActivityReviewModal({
           <LargeBadge applied={item.isLarge} approved={canEdit ? largeApproved : item.largeApproved} />
           <StatusPill status={item.status} />
           <span style={{ flex: 1 }} />
-          <StampTrail stages={stagesOf(item.status, singleStage)} />
+          {/* 單關(無補助)不畫章軌:只有一顆章沒有資訊量,徒佔標題列空間 */}
+          {!singleStage && <StampTrail stages={stagesOf(item.status)} />}
         </div>
       }
       footer={

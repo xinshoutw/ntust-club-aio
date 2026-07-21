@@ -18,7 +18,7 @@ const PAGE_SIZE = 50
 
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 
-// 繳交確認:輔導老師逐項確認;未確認之項目評鑑以 0 分計(核准時隨 body 落庫)
+// 繳交確認:承辦人逐項確認;未確認之項目評鑑以 0 分計(核准時隨 body 落庫)
 const SUBMISSION_CHECKS = [
   { key: 'photos', label: '活動照片' },
   { key: 'report', label: '成果報告表' },
@@ -26,7 +26,7 @@ const SUBMISSION_CHECKS = [
 ] as const
 type CheckKey = (typeof SUBMISSION_CHECKS)[number]['key']
 
-// 結案審核彈窗:輔導老師單關;完整結案資料(GET /admin/activities/{id})+繳交確認,
+// 結案審核彈窗:承辦人單關;完整結案資料(GET /admin/activities/{id})+繳交確認,
 // 核准或退回(退回原因必填)
 function CloseReviewModal({
   item,

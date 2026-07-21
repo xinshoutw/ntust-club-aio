@@ -21,7 +21,7 @@ describe('canActOn(申請審核「本關」推導)', () => {
     expect(canActOn(admin({ permissions: ['approve_chief'] }), 'pending_chief')).toBe(true)
   })
 
-  it('super 可簽輔導老師/組長關;學務長關須本人持 approve_dean(不得代簽)', () => {
+  it('super 可簽承辦人/組長關;學務長關須本人持 approve_dean(不得代簽)', () => {
     const root = admin({ isSuper: true })
     expect(canActOn(root, 'pending_advisor')).toBe(true)
     expect(canActOn(root, 'pending_chief')).toBe(true)
@@ -37,7 +37,7 @@ describe('canActOn(申請審核「本關」推導)', () => {
   })
 })
 
-describe('canActOnClose(結案輔導老師單關)', () => {
+describe('canActOnClose(結案承辦人單關)', () => {
   it('approve_advisor 或 super 可簽;僅持 aclose(頁面權限)不可', () => {
     expect(canActOnClose(admin({ permissions: ['approve_advisor'] }))).toBe(true)
     expect(canActOnClose(admin({ isSuper: true }))).toBe(true)

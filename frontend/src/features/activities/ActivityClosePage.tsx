@@ -59,7 +59,7 @@ const plannedTimes = (tr?: string): [string, string] => {
 }
 
 // 活動結案(側欄頁):選擇可結案(已核准且已結束)之活動 → 成果調查(預填申請值)+ 心得 ≥3 + 照片/影片/支出
-// 除影片連結外全必填;送出後由輔導老師審核,結案通過始計入評鑑行政分
+// 除影片連結外全必填;送出後由承辦人審核,結案通過始計入評鑑行政分
 export default function ActivityClosePage() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()

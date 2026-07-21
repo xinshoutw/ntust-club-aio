@@ -37,7 +37,7 @@ class BudgetApprovalIn(BaseModel):
 
 
 class ApproveActivityIn(BaseModel):
-    """第一關(輔導老師)認定經費來源與逐項核定;其後關卡空 body 即可。
+    """第一關(承辦人)認定經費來源與逐項核定;其後關卡空 body 即可。
 
     school_approved 由後端依逐項核定加總,不接受外部值。
     """

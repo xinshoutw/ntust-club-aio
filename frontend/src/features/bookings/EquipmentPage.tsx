@@ -46,7 +46,7 @@ export default function EquipmentPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [equipmentQuery.data])
 
-  const submit = (values: { activity: number; equipment: number; qty: number; purpose: string; phone?: string }) => {
+  const submit = (values: { activity: number; equipment: number; qty: number; purpose: string; phone: string }) => {
     const equipmentName = items.find((e) => e.id === values.equipment)?.name ?? ''
     const activityName = approved.find((a) => a.id === values.activity)?.name ?? ''
     createEquipmentLoan.mutate(
@@ -223,8 +223,8 @@ export default function EquipmentPage() {
             >
               <Input placeholder="簡述說明" />
             </Form.Item>
-            <Form.Item name="phone" label="聯絡電話">
-              <Input className="num" placeholder="選填" maxLength={30} />
+            <Form.Item name="phone" label="聯絡電話" rules={[{ required: true, message: '請輸入聯絡電話' }]}>
+              <Input className="num" placeholder="申請聯絡人電話" maxLength={30} />
             </Form.Item>
 
             <Button type="primary" htmlType="submit" block loading={createEquipmentLoan.isPending}>

@@ -141,8 +141,8 @@ async def test_venue_block_rules(client, db):
 
     # 社團申請命中封鎖節次 → 422;避開則可
     await login(client, "club01")
-    body = {"venue_id": venue.id, "activity_id": activity.id,
-            "date": str(TOMORROW), "periods": ["4", "5"], "purpose": "社課"}
+    body = {"venue_id": venue.id, "activity_id": activity.id, "date": str(TOMORROW),
+            "periods": ["4", "5"], "purpose": "社課", "phone": "0912000111"}
     resp = await client.post(
         "/api/v1/club/venue-bookings", json=body, headers=csrf_headers(client)
     )
@@ -190,7 +190,8 @@ async def test_max_lease_count(client, db):
     club = await seed_club(client, db)
     eq = await make_equipment(db, total_qty=10, max_lease_count=2)
     activity = await make_activity(db, club, day=TOMORROW)
-    body = {"equipment_id": eq.id, "activity_id": activity.id, "qty": 3, "purpose": "活動"}
+    body = {"equipment_id": eq.id, "activity_id": activity.id, "qty": 3,
+            "purpose": "活動", "phone": "0912000111"}
     resp = await client.post(
         "/api/v1/club/equipment-loans", json=body, headers=csrf_headers(client)
     )
@@ -244,7 +245,7 @@ async def test_manual_bookings_super_only(client, db):
     resp = await client.post(
         "/api/v1/admin/bookings/manual-equipment",
         json={"equipment_id": eq.id, "qty": 2, "start_date": str(TOMORROW),
-              "end_date": str(TOMORROW), "purpose": "行政活動器材"},
+              "end_date": str(TOMORROW), "purpose": "行政活動器材", "phone": "0912000111"},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 201, resp.text
@@ -254,7 +255,7 @@ async def test_manual_bookings_super_only(client, db):
     resp = await client.post(
         "/api/v1/admin/bookings/manual-equipment",
         json={"equipment_id": eq.id, "qty": 2, "start_date": str(TOMORROW),
-              "end_date": str(TOMORROW), "purpose": "超量"},
+              "end_date": str(TOMORROW), "purpose": "超量", "phone": "0912000111"},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 409

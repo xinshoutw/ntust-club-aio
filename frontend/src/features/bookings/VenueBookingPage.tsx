@@ -46,7 +46,7 @@ export default function VenueBookingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [venuesQuery.data])
 
-  const submit = (values: { venue: number; activity: number; purpose: string; phone?: string; date: Dayjs }) => {
+  const submit = (values: { venue: number; activity: number; purpose: string; phone: string; date: Dayjs }) => {
     if (!periods.length) {
       setPeriodsError(true)
       message.error('請選擇至少一個時段')
@@ -116,8 +116,13 @@ export default function VenueBookingPage() {
             >
               <Input placeholder="簡述說明" />
             </Form.Item>
-            <Form.Item name="phone" label="聯絡電話" style={{ marginBottom: 0 }}>
-              <Input className="num" placeholder="選填" maxLength={30} />
+            <Form.Item
+              name="phone"
+              label="聯絡電話"
+              rules={[{ required: true, message: '請輸入聯絡電話' }]}
+              style={{ marginBottom: 0 }}
+            >
+              <Input className="num" placeholder="申請聯絡人電話" maxLength={30} />
             </Form.Item>
           </div>
           <div style={{ fontSize: 13, fontWeight: 500, margin: '18px 0 8px' }}>

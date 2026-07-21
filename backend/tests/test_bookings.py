@@ -291,6 +291,7 @@ async def test_venue_booking_requires_approved_activity(client, db):
         "date": "2026-03-05",
         "periods": ["3", "4"],
         "purpose": "擺攤",
+        "phone": "0912000111",
     }
     resp = await client.post("/api/v1/club/venue-bookings", json=body, headers=csrf_headers(client))
     assert resp.status_code == 201, resp.text
@@ -321,7 +322,8 @@ async def test_venue_booking_requires_approved_activity(client, db):
     # 缺 activity_id → 422(必填)
     resp = await client.post(
         "/api/v1/club/venue-bookings",
-        json={"venue_id": venue.id, "date": "2026-03-08", "periods": ["3"], "purpose": "x"},
+        json={"venue_id": venue.id, "date": "2026-03-08", "periods": ["3"], "purpose": "x",
+              "phone": "0912000111"},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
@@ -352,6 +354,7 @@ async def test_availability_grid_statuses(client, db):
             "date": thu.isoformat(),
             "periods": ["3"],
             "purpose": "擺攤",
+            "phone": "0912000111",
         },
         headers=csrf_headers(client),
     )
@@ -378,6 +381,7 @@ async def test_availability_grid_statuses(client, db):
             "date": thu.isoformat(),
             "periods": ["7"],
             "purpose": "活動",
+            "phone": "0912000111",
         },
         headers=csrf_headers(client),
     )
@@ -436,6 +440,7 @@ async def test_availability_range(client, db):
             "date": thu.isoformat(),
             "periods": ["3"],
             "purpose": "擺攤",
+            "phone": "0912000111",
         },
         headers=csrf_headers(client),
     )
@@ -545,7 +550,8 @@ async def test_equipment_loan_window_derived_from_activity(client, db):
 
     resp = await client.post(
         "/api/v1/club/equipment-loans",
-        json={"equipment_id": eq.id, "activity_id": activity.id, "qty": 2, "purpose": "營隊"},
+        json={"equipment_id": eq.id, "activity_id": activity.id, "qty": 2, "purpose": "營隊",
+              "phone": "0912000111"},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 201, resp.text
@@ -562,7 +568,8 @@ async def test_equipment_loan_window_derived_from_activity(client, db):
     )
     resp = await client.post(
         "/api/v1/club/equipment-loans",
-        json={"equipment_id": eq.id, "activity_id": activity2.id, "qty": 1, "purpose": "x"},
+        json={"equipment_id": eq.id, "activity_id": activity2.id, "qty": 1, "purpose": "x",
+              "phone": "0912000111"},
         headers=csrf_headers(client),
     )
     assert resp.json()["data"]["start_date"] == "2026-03-05"
@@ -571,7 +578,8 @@ async def test_equipment_loan_window_derived_from_activity(client, db):
     pending = await make_activity(db, club, name="未核准", status=ActivityStatus.DRAFT)
     resp = await client.post(
         "/api/v1/club/equipment-loans",
-        json={"equipment_id": eq.id, "activity_id": pending.id, "qty": 1, "purpose": "x"},
+        json={"equipment_id": eq.id, "activity_id": pending.id, "qty": 1, "purpose": "x",
+              "phone": "0912000111"},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
@@ -585,7 +593,8 @@ async def test_equipment_available_within_window(client, db):
 
     resp = await client.post(
         "/api/v1/club/equipment-loans",
-        json={"equipment_id": eq.id, "activity_id": first.id, "qty": 3, "purpose": "營隊"},
+        json={"equipment_id": eq.id, "activity_id": first.id, "qty": 3, "purpose": "營隊",
+              "phone": "0912000111"},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 201  # 佔用 2026-03-06 ~ 2026-03-13(pending 亦佔用)
@@ -601,7 +610,8 @@ async def test_equipment_available_within_window(client, db):
 
     resp = await client.post(
         "/api/v1/club/equipment-loans",
-        json={"equipment_id": eq.id, "activity_id": overlap.id, "qty": 3, "purpose": "x"},
+        json={"equipment_id": eq.id, "activity_id": overlap.id, "qty": 3, "purpose": "x",
+              "phone": "0912000111"},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 409  # 超過區間可借數
@@ -614,7 +624,8 @@ async def test_equipment_available_within_window(client, db):
     assert listing["data"][0]["available"] == 5
     resp = await client.post(
         "/api/v1/club/equipment-loans",
-        json={"equipment_id": eq.id, "activity_id": apart.id, "qty": 5, "purpose": "x"},
+        json={"equipment_id": eq.id, "activity_id": apart.id, "qty": 5, "purpose": "x",
+              "phone": "0912000111"},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 201
@@ -651,7 +662,8 @@ async def test_suspended_club_cannot_book(client, db):
 
     resp = await client.post(
         "/api/v1/club/equipment-loans",
-        json={"equipment_id": eq.id, "activity_id": activity.id, "qty": 1, "purpose": "x"},
+        json={"equipment_id": eq.id, "activity_id": activity.id, "qty": 1, "purpose": "x",
+              "phone": "0912000111"},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 403
@@ -663,6 +675,7 @@ async def test_suspended_club_cannot_book(client, db):
         "date": "2026-03-05",
         "periods": ["3"],
         "purpose": "x",
+        "phone": "0912000111",
     }
     resp = await client.post(
         "/api/v1/club/venue-bookings", json=venue_body, headers=csrf_headers(client)

@@ -56,6 +56,8 @@ import MyReviewsPage from './features/viewer/MyReviewsPage'
 import ViewerScorePage from './features/viewer/ViewerScorePage'
 import ViewerDonePage from './features/viewer/ViewerDonePage'
 import AdminSettingsPage from './features/admin/AdminSettingsPage'
+import ManualBookingPage from './features/admin/ManualBookingPage'
+import VenueRulesPage from './features/admin/VenueRulesPage'
 import AdminViolationsPage from './features/admin/AdminViolationsPage'
 import AuditPage from './features/admin/AuditPage'
 
@@ -197,6 +199,8 @@ export default function App() {
           <Route path="announcements" element={<AnnouncementsPage />} />
           <Route path="bookings" element={<AdminBookingsPage />} />
           <Route path="rooms" element={<AdminRoomsPage />} />
+          <Route path="manual-booking" element={<ManualBookingPage />} />
+          <Route path="venue-rules" element={<VenueRulesPage />} />
           <Route path="club-overview" element={<ClubOverviewPage />} />
           <Route path="members" element={<AdminMembersPage />} />
           <Route path="club-settings" element={<AdminClubSettingsPage />} />

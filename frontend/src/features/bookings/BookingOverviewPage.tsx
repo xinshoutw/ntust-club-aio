@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import dayjs, { type Dayjs } from 'dayjs'
-import { Button, DatePicker, Select, Spin, Tooltip } from 'antd'
+import { App, Button, DatePicker, Select, Spin, Tooltip } from 'antd'
 import {
   ArrowLeftOutlined,
   DoubleLeftOutlined,
@@ -13,6 +13,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { Pager } from '../../components/ui/tableControls'
 import StatusPill from '../../components/ui/StatusPill'
+import { confirmDialog } from '../../lib/confirm'
 import {
   PERIODS,
   roomEntryText,
@@ -21,6 +22,7 @@ import {
   useAllVenueBookings,
   useAvailability,
   useAvailabilityDays,
+  useBookingMutations,
   useVenues,
   venueLabel,
   type AvailabilityCell,
@@ -42,6 +44,7 @@ const STATE_OF: Record<AvailabilityState, CellState> = {
   temp: 'temp',
   fixed: 'fixed',
   mine: 'mine',
+  blocked: 'closed', // 不開放規則(Rule Page):不畫方框,hover 顯示原因
 }
 
 function cellOf(
@@ -88,6 +91,8 @@ function Legend() {
 
 export default function BookingOverviewPage() {
   const navigate = useNavigate()
+  const { message, modal } = App.useApp()
+  const { cancelRoomBooking, cancelVenueBooking, cancelEquipmentLoan } = useBookingMutations()
   const [returnedPage, setReturnedPage] = useState(1)
   const [gridDate, setGridDate] = useState<Dayjs>(() => dayjs())
   // 場地檢視:點場地名稱進入,以當時檢視日為中心 −7~+7 共 15 天;後端不提供過去場況,
@@ -118,7 +123,7 @@ export default function BookingOverviewPage() {
     (v) => v.status === 'pending' || (v.status === 'approved' && !dayjs(v.date, 'YYYY/MM/DD').isBefore(todayStart, 'day')),
   )
   const loans = loansQuery.data ?? []
-  const active = loans.filter((l) => l.status !== 'returned' && l.status !== 'rejected')
+  const active = loans.filter((l) => !['returned', 'rejected', 'cancelled'].includes(l.status))
   const returned = loans.filter((l) => l.status === 'returned')
   const returnedPaged = returned.slice((returnedPage - 1) * RETURNED_PAGE, returnedPage * RETURNED_PAGE)
   const listsPending = roomsQuery.isPending || venueBookingsQuery.isPending || loansQuery.isPending
@@ -126,6 +131,18 @@ export default function BookingOverviewPage() {
   const retryLists = () => {
     for (const q of listsErrored) void q.refetch()
   }
+
+  // 取消(2026-07-21):審核中隨時可取消;已核准僅開始日前可取消(後端亦驗)
+  const confirmCancel = (title: string, run: () => void) =>
+    confirmDialog(modal, {
+      title,
+      content: '取消後不可復原;已核准的借用取消後時段將釋出',
+      okText: '取消借用',
+      okButtonProps: { danger: true },
+      cancelText: '返回',
+      onOk: run,
+    })
+  const cancelError = (e: unknown) => message.error(e instanceof Error ? e.message : '取消失敗')
 
   const book = (venueId: number, date: Dayjs, period: string) =>
     navigate(`/bookings/venue?venue=${venueId}&date=${date.format('YYYY/MM/DD')}&period=${period}`)
@@ -327,6 +344,7 @@ export default function BookingOverviewPage() {
                 <th>內容</th>
                 <th>時間</th>
                 <th style={{ width: 110 }}>狀態</th>
+                <th className="r" style={{ width: 80 }}>動作</th>
               </tr>
             </thead>
             <tbody>
@@ -338,6 +356,23 @@ export default function BookingOverviewPage() {
                     每週 {r.entries.map(roomEntryText).join('、')}
                   </td>
                   <td><StatusPill status={r.status} /></td>
+                  <td className="r">
+                    <Button
+                      size="small"
+                      danger
+                      loading={cancelRoomBooking.isPending}
+                      onClick={() =>
+                        confirmCancel(`取消固定借用 ${r.venueName}`, () =>
+                          cancelRoomBooking.mutate(r.id, {
+                            onSuccess: () => message.success('已取消'),
+                            onError: cancelError,
+                          }),
+                        )
+                      }
+                    >
+                      取消
+                    </Button>
+                  </td>
                 </tr>
               ))}
               {venueBookings.map((v) => (
@@ -346,6 +381,27 @@ export default function BookingOverviewPage() {
                   <td style={{ fontWeight: 500 }}>{v.venueName}<span style={{ color: 'var(--steel)', fontWeight: 400, fontSize: 13 }}> · {v.purpose}</span></td>
                   <td className="num" style={{ color: 'var(--steel)', fontSize: 13 }}>{v.date} 第 {v.periods.join('、')} 節</td>
                   <td><StatusPill status={v.status} /></td>
+                  <td className="r">
+                    {v.status === 'pending' || dayjs(v.date, 'YYYY/MM/DD').isAfter(todayStart, 'day') ? (
+                      <Button
+                        size="small"
+                        danger
+                        loading={cancelVenueBooking.isPending}
+                        onClick={() =>
+                          confirmCancel(`取消臨時借用 ${v.venueName}(${v.date})`, () =>
+                            cancelVenueBooking.mutate(v.id, {
+                              onSuccess: () => message.success('已取消'),
+                              onError: cancelError,
+                            }),
+                          )
+                        }
+                      >
+                        取消
+                      </Button>
+                    ) : (
+                      <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>
+                    )}
+                  </td>
                 </tr>
               ))}
               {active.map((l) => (
@@ -354,18 +410,40 @@ export default function BookingOverviewPage() {
                   <td style={{ fontWeight: 500 }}>{l.equipmentName} <span className="num">×{l.qty}</span></td>
                   <td className="num" style={{ color: 'var(--steel)', fontSize: 13 }}>{l.startDate} – {l.endDate}</td>
                   <td><StatusPill status={l.status} /></td>
+                  <td className="r">
+                    {l.status === 'pending' ||
+                    (l.status === 'approved' && dayjs(l.startDate, 'YYYY/MM/DD').isAfter(todayStart, 'day')) ? (
+                      <Button
+                        size="small"
+                        danger
+                        loading={cancelEquipmentLoan.isPending}
+                        onClick={() =>
+                          confirmCancel(`取消器材借用 ${l.equipmentName} ×${l.qty}`, () =>
+                            cancelEquipmentLoan.mutate(l.id, {
+                              onSuccess: () => message.success('已取消'),
+                              onError: cancelError,
+                            }),
+                          )
+                        }
+                      >
+                        取消
+                      </Button>
+                    ) : (
+                      <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>
+                    )}
+                  </td>
                 </tr>
               ))}
               {listsErrored.length > 0 && (
                 <tr className="no-hover">
-                  <td colSpan={4}>
+                  <td colSpan={5}>
                     <QueryError compact title="借用紀錄載入失敗" error={listsErrored[0]?.error} onRetry={retryLists} />
                   </td>
                 </tr>
               )}
               {listsErrored.length === 0 && !listsPending && rooms.length === 0 && venueBookings.length === 0 && active.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無借用紀錄</td>
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無借用紀錄</td>
                 </tr>
               )}
             </tbody>
@@ -397,7 +475,7 @@ export default function BookingOverviewPage() {
               ))}
               {loansQuery.isError && (
                 <tr className="no-hover">
-                  <td colSpan={4}>
+                  <td colSpan={5}>
                     <QueryError compact title="歸還紀錄載入失敗" error={loansQuery.error} onRetry={() => loansQuery.refetch()} />
                   </td>
                 </tr>

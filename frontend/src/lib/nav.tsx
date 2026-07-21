@@ -164,6 +164,9 @@ export function buildAdminNav(
     items: [
       { key: 'a-booking', label: '臨時場地器材借用', path: '/admin/bookings', icon: <EnvironmentOutlined /> },
       { key: 'a-room', label: '教室固定借用', path: '/admin/rooms', icon: <ScheduleOutlined /> },
+      // 最高權限專屬(canAccessAdminPath 過濾:僅 super 可見)
+      { key: 'a-manual', label: '手動借用', path: '/admin/manual-booking', icon: <PlusSquareOutlined /> },
+      { key: 'a-venue-rules', label: '場地不開放規則', path: '/admin/venue-rules', icon: <StopOutlined /> },
     ],
   },
   {

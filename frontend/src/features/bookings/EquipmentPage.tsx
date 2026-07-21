@@ -30,6 +30,11 @@ export default function EquipmentPage() {
 
   const selectedId = Form.useWatch('equipment', form) as number | undefined
   const selectedAvail = loanWindow != null && selectedId != null ? items.find((e) => e.id === selectedId)?.available ?? null : null
+  // 單次可借上限(2026-07-21;undefined=不限):與可借數取小作為數量上限
+  const selectedCap = selectedId != null ? items.find((e) => e.id === selectedId)?.maxLeaseCount ?? null : null
+  const qtyMax = selectedAvail != null && selectedCap != null
+    ? Math.min(selectedAvail, selectedCap)
+    : selectedAvail ?? selectedCap
 
   // 換活動=換借用區間,可借數重新推導:原選品項在新區間不可借就清掉(資料就緒後檢查)
   useEffect(() => {
@@ -41,7 +46,7 @@ export default function EquipmentPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [equipmentQuery.data])
 
-  const submit = (values: { activity: number; equipment: number; qty: number; purpose: string }) => {
+  const submit = (values: { activity: number; equipment: number; qty: number; purpose: string; phone?: string }) => {
     const equipmentName = items.find((e) => e.id === values.equipment)?.name ?? ''
     const activityName = approved.find((a) => a.id === values.activity)?.name ?? ''
     createEquipmentLoan.mutate(
@@ -50,6 +55,7 @@ export default function EquipmentPage() {
         activityId: values.activity,
         qty: values.qty,
         purpose: values.purpose,
+        phone: values.phone,
       },
       {
         onSuccess: () => {
@@ -194,15 +200,20 @@ export default function EquipmentPage() {
               rules={[
                 { required: true, message: '請輸入數量' },
                 {
-                  // max 只擋鍵入,不會回夾既有值:送出前再驗一次不可超過可借數
-                  validator: (_, v: number | null) =>
-                    v != null && selectedAvail != null && v > selectedAvail
-                      ? Promise.reject(new Error(`該區間可借 ${selectedAvail} 件`))
-                      : Promise.resolve(),
+                  // max 只擋鍵入,不會回夾既有值:送出前再驗一次(可借數與單次上限)
+                  validator: (_, v: number | null) => {
+                    if (v == null) return Promise.resolve()
+                    if (selectedAvail != null && v > selectedAvail)
+                      return Promise.reject(new Error(`該區間可借 ${selectedAvail} 件`))
+                    if (selectedCap != null && v > selectedCap)
+                      return Promise.reject(new Error(`單次至多借用 ${selectedCap} 件`))
+                    return Promise.resolve()
+                  },
                 },
               ]}
+              extra={selectedCap != null ? `單次至多 ${selectedCap} 件` : undefined}
             >
-              <InputNumber style={{ width: '100%' }} min={1} max={selectedAvail ?? 99} precision={0} disabled={!loanWindow} />
+              <InputNumber style={{ width: '100%' }} min={1} max={qtyMax ?? 99} precision={0} disabled={!loanWindow} />
             </Form.Item>
 
             <Form.Item
@@ -211,6 +222,9 @@ export default function EquipmentPage() {
                 rules={[{ required: true, message: '請輸入用途' }]}
             >
               <Input placeholder="簡述說明" />
+            </Form.Item>
+            <Form.Item name="phone" label="聯絡電話">
+              <Input className="num" placeholder="選填" maxLength={30} />
             </Form.Item>
 
             <Button type="primary" htmlType="submit" block loading={createEquipmentLoan.isPending}>

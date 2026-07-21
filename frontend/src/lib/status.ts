@@ -15,6 +15,7 @@ export type StatusKey =
   | 'ended'
   | 'registered'
   | 'suspended'
+  | 'cancelled'
   | 'checked_out'
   | 'returned'
   | 'overdue'
@@ -34,6 +35,7 @@ export interface StatusStyle {
 
 export const STATUS: Record<StatusKey, StatusStyle> = {
   draft: { label: '草稿', fg: '#5B6472', bg: '#EEF0F3' },
+  cancelled: { label: '已取消', fg: '#5B6472', bg: '#EEF0F3' },
   pending: { label: '待審核', fg: '#8A5A00', bg: '#FFF3D6' },
   closing_due: { label: '待結案', fg: '#8A5A00', bg: '#FFF3D6' },
   // 需求方 2026-07-14:社團端不顯示審核關卡,三關統一「申請待審核」

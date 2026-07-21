@@ -3,7 +3,7 @@
 // 轉出的資料形狀與 features/bookings/mock 的介面結構相容(BookingReviewModal 共用),
 // 另帶 apiId(數字主鍵)供 approve/reject 呼叫,頁面不顯示單號
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import dayjs from 'dayjs'
+import dayjs, { type Dayjs } from 'dayjs'
 import { api, apiPaged, qs } from './client'
 import type { StatusKey } from '../lib/status'
 
@@ -40,7 +40,7 @@ const toVenue = (v: VenueOut): AdminVenue => ({
 
 // ---- 全校單日場況 ----
 
-export type GridStatus = 'pending' | 'temp' | 'fixed'
+export type GridStatus = 'pending' | 'temp' | 'fixed' | 'blocked'
 
 export interface GridCell {
   status: GridStatus
@@ -326,4 +326,61 @@ export function useAdminBookingMutations() {
     onSuccess: invalidate,
   })
   return { approveVenue, rejectVenue, approveLoan, rejectLoan, approveRoom, rejectRoom }
+}
+
+
+// ---- 最高權限手動借用(2026-07-21;club NULL=行政,顯示「學務處」,直接核准) ----
+
+export interface ManualVenueInput {
+  venueId: number
+  date: Dayjs
+  periods: string[]
+  purpose: string
+  phone?: string
+}
+
+export interface ManualEquipmentInput {
+  equipmentId: number
+  qty: number
+  range: [Dayjs, Dayjs]
+  purpose: string
+  phone?: string
+}
+
+export function useManualBookingMutations() {
+  const qc = useQueryClient()
+  const invalidate = () => {
+    void qc.invalidateQueries({ queryKey: keys.all })
+    void qc.invalidateQueries({ queryKey: ['bookings'] })
+  }
+  const createVenue = useMutation({
+    mutationFn: (b: ManualVenueInput) =>
+      api<unknown>('/admin/bookings/manual-venue', {
+        method: 'POST',
+        body: JSON.stringify({
+          venue_id: b.venueId,
+          date: b.date.format('YYYY-MM-DD'),
+          periods: b.periods,
+          purpose: b.purpose,
+          phone: b.phone?.trim() || null,
+        }),
+      }),
+    onSuccess: invalidate,
+  })
+  const createEquipment = useMutation({
+    mutationFn: (b: ManualEquipmentInput) =>
+      api<unknown>('/admin/bookings/manual-equipment', {
+        method: 'POST',
+        body: JSON.stringify({
+          equipment_id: b.equipmentId,
+          qty: b.qty,
+          start_date: b.range[0].format('YYYY-MM-DD'),
+          end_date: b.range[1].format('YYYY-MM-DD'),
+          purpose: b.purpose,
+          phone: b.phone?.trim() || null,
+        }),
+      }),
+    onSuccess: invalidate,
+  })
+  return { createVenue, createEquipment }
 }

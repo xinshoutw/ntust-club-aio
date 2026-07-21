@@ -22,7 +22,12 @@ const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
 const PAGE_SIZE = 50
 
 // API 場況格狀態 → 色格狀態(未列出的格=可借)
-const CELL_STATE = { pending: 'reviewing', temp: 'temp', fixed: 'fixed' } as const
+const CELL_STATE = {
+  pending: 'reviewing',
+  temp: 'temp',
+  fixed: 'fixed',
+  blocked: 'closed', // 不開放規則(Rule Page):不畫方框
+} as const
 
 type ReviewItem =
   | { kind: 'venue'; data: AdminVenueBooking }

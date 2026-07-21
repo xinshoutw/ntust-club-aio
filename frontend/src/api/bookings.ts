@@ -58,6 +58,8 @@ export interface EquipmentItem {
   totalQty: number
   needsSerial: boolean // False=一般、True=依序點交(2026-07-17 移除類別)
   available: number
+  /** 單次可借上限(undefined=不限;2026-07-21) */
+  maxLeaseCount?: number
 }
 
 /** 依關聯活動推導的借用區間(顯示格式) */
@@ -76,6 +78,7 @@ interface EquipmentOut {
   id: number
   name: string
   total_qty: number
+  max_lease_count: number | null
   needs_serial: boolean
   available: number
 }
@@ -84,6 +87,7 @@ const toEquipment = (e: EquipmentOut): EquipmentItem => ({
   id: e.id,
   name: e.name,
   totalQty: e.total_qty,
+  maxLeaseCount: e.max_lease_count ?? undefined,
   needsSerial: e.needs_serial,
   available: e.available,
 })
@@ -91,7 +95,7 @@ const toEquipment = (e: EquipmentOut): EquipmentItem => ({
 // ---- 借用總覽色格(單日場況) ----
 
 /** 後端僅回傳被佔用/審核中的格子;其餘由前端依場地開放旗標補 可借/不開放 */
-export type AvailabilityState = 'pending' | 'temp' | 'fixed' | 'mine'
+export type AvailabilityState = 'pending' | 'temp' | 'fixed' | 'mine' | 'blocked'
 /** 每格帶狀態與借用社團名(hover 顯示) */
 export interface AvailabilityCell {
   status: AvailabilityState
@@ -134,7 +138,7 @@ export interface RoomBooking {
   entries: RoomEntry[]
 }
 
-type BookingStatusOut = 'pending' | 'approved' | 'rejected'
+type BookingStatusOut = 'pending' | 'approved' | 'rejected' | 'cancelled'
 
 interface RoomBookingOut {
   id: number
@@ -229,7 +233,7 @@ interface EquipmentLoanOut {
   id: number
   equipment_id: number
   equipment_name: string
-  activity_id: number
+  activity_id: number | null
   activity_name: string | null
   qty: number
   start_date: string
@@ -432,6 +436,7 @@ export interface VenueBookingInput {
   date: Dayjs
   periods: string[]
   purpose: string
+  phone?: string
 }
 
 export interface EquipmentLoanInput {
@@ -439,6 +444,7 @@ export interface EquipmentLoanInput {
   activityId: number
   qty: number
   purpose: string
+  phone?: string
 }
 
 export function useBookingMutations() {
@@ -462,6 +468,7 @@ export function useBookingMutations() {
           date: toIso(b.date),
           periods: b.periods,
           purpose: b.purpose,
+          phone: b.phone?.trim() || null,
         }),
       }),
     onSuccess: invalidate,
@@ -475,9 +482,33 @@ export function useBookingMutations() {
           activity_id: b.activityId,
           qty: b.qty,
           purpose: b.purpose,
+          phone: b.phone?.trim() || null,
         }),
       }),
     onSuccess: invalidate,
   })
-  return { createRoomBooking, createVenueBooking, createEquipmentLoan }
+  // 取消(2026-07-21):審核中隨時可取消;已核准僅開始日前可取消
+  const cancelRoomBooking = useMutation({
+    mutationFn: (id: number) =>
+      api<null>(`/club/room-bookings/${id}/cancel`, { method: 'POST' }),
+    onSuccess: invalidate,
+  })
+  const cancelVenueBooking = useMutation({
+    mutationFn: (id: number) =>
+      api<null>(`/club/venue-bookings/${id}/cancel`, { method: 'POST' }),
+    onSuccess: invalidate,
+  })
+  const cancelEquipmentLoan = useMutation({
+    mutationFn: (id: number) =>
+      api<null>(`/club/equipment-loans/${id}/cancel`, { method: 'POST' }),
+    onSuccess: invalidate,
+  })
+  return {
+    createRoomBooking,
+    createVenueBooking,
+    createEquipmentLoan,
+    cancelRoomBooking,
+    cancelVenueBooking,
+    cancelEquipmentLoan,
+  }
 }

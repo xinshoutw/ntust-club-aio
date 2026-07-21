@@ -19,9 +19,11 @@ function EquipmentRow({ item }: { item: EquipmentItem }) {
   const { update } = useEquipmentMutations()
   const [name, setName] = useState(item.name)
   const [qty, setQty] = useState<number | null>(item.totalQty)
+  const [cap, setCap] = useState<number | null>(item.maxLeaseCount ?? null)
   // refetch 帶回他人的改動時同步本地草稿(避免停在舊值、互蓋)
   useEffect(() => setName(item.name), [item.name])
   useEffect(() => setQty(item.totalQty), [item.totalQty])
+  useEffect(() => setCap(item.maxLeaseCount ?? null), [item.maxLeaseCount])
 
   const patch = (p: Parameters<typeof update.mutate>[0]['patch']) =>
     update.mutate(
@@ -70,6 +72,19 @@ function EquipmentRow({ item }: { item: EquipmentItem }) {
         style={{ width: 90, flexShrink: 0 }}
         aria-label="總數"
       />
+      <InputNumber
+        value={cap}
+        min={1}
+        precision={0}
+        placeholder="不限"
+        onChange={setCap}
+        onBlur={() => {
+          // 單次可借上限(2026-07-21):清空=不限(送 null 清除)
+          if (cap !== (item.maxLeaseCount ?? null)) patch({ maxLeaseCount: cap })
+        }}
+        style={{ width: 90, flexShrink: 0 }}
+        aria-label="單次上限"
+      />
       <Switch
         checked={item.isActive}
         onChange={(v) => patch({ isActive: v })}
@@ -86,6 +101,7 @@ function AddEquipment() {
   const [name, setName] = useState('')
   const [needsSerial, setNeedsSerial] = useState(false)
   const [qty, setQty] = useState<number | null>(null)
+  const [cap, setCap] = useState<number | null>(null)
 
   const add = () => {
     if (!name.trim()) {
@@ -93,13 +109,14 @@ function AddEquipment() {
       return
     }
     create.mutate(
-      { name: name.trim(), totalQty: qty ?? 0, needsSerial },
+      { name: name.trim(), totalQty: qty ?? 0, maxLeaseCount: cap, needsSerial },
       {
         onSuccess: () => {
           message.success('已新增器材')
           setName('')
           setNeedsSerial(false)
           setQty(null)
+          setCap(null)
         },
         onError: (e) => message.error(errMsg(e)),
       },
@@ -116,6 +133,7 @@ function AddEquipment() {
       />
       <Select value={needsSerial} onChange={setNeedsSerial} options={HANDOVER_OPTIONS} style={{ width: 110, flexShrink: 0 }} />
       <InputNumber value={qty} min={0} precision={0} placeholder="總數" style={{ width: 90, flexShrink: 0 }} onChange={setQty} />
+      <InputNumber value={cap} min={1} precision={0} placeholder="單次上限" style={{ width: 90, flexShrink: 0 }} onChange={setCap} />
       <Button icon={<PlusOutlined />} loading={create.isPending} onClick={add} style={{ flexShrink: 0 }}>
         新增
       </Button>
@@ -130,6 +148,9 @@ export default function AdminEquipmentCard() {
   return (
     <div className="card" style={{ marginTop: 16, padding: 24 }}>
       <div style={sectionTitle}>器材主檔</div>
+      <div style={{ fontSize: 12, color: 'var(--steel)', marginBottom: 10 }}>
+        欄位依序:名稱/點交方式/總數/單次可借上限(空=不限)/啟用
+      </div>
       {query.isError ? (
         <QueryError title="器材主檔載入失敗" error={query.error} onRetry={() => void query.refetch()} />
       ) : (

@@ -12,6 +12,8 @@ const ROUTE_KEYS: [string, string[]][] = [
   ['/admin/announcements', ['aannounce']],
   ['/admin/bookings', ['abooking']],
   ['/admin/rooms', ['aroom']],
+  ['/admin/manual-booking', []],
+  ['/admin/venue-rules', []],
   ['/admin/club-overview', ['amember']],
   ['/admin/members', ['amember']],
   ['/admin/club-settings', ['amember']],

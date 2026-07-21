@@ -27,6 +27,7 @@ from app.api.v1 import (
     files,
     members,
     signups,
+    staff,
 )
 from app.api.v1 import (
     eval as eval_api,
@@ -44,6 +45,7 @@ router.include_router(bookings.router)
 router.include_router(applications.router)
 router.include_router(signups.router)
 router.include_router(eval_api.router)
+router.include_router(staff.router)
 router.include_router(admin_activities.router)
 router.include_router(admin_announcements.router)
 router.include_router(admin_bookings.router)

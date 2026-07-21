@@ -13,7 +13,7 @@ from fastapi import APIRouter, BackgroundTasks, Query, Request
 
 from app.api.pagination import Pagination
 from app.core.deps import ClubUser, DbDep, client_ip
-from app.core.errors import conflict, forbidden, validation_error
+from app.core.errors import conflict, forbidden, not_found, validation_error
 from app.core.semesters import TAIPEI, next_semester_range
 from app.models import (
     Activity,
@@ -25,7 +25,7 @@ from app.models import (
     Venue,
     VenueBooking,
 )
-from app.models.enums import ActivityStatus, BookingStatus
+from app.models.enums import ActivityStatus, BookingStatus, LoanStatus
 from app.schemas.bookings import (
     EquipmentLoanIn,
     EquipmentLoanOut,
@@ -318,6 +318,11 @@ async def create_venue_booking(
     if dup:
         raise conflict("同一場地同一天已有申請")
 
+    # 不開放規則(2026-07-21 Rule Page):申請時即擋,核准端亦驗
+    hit = await svc.blocked_periods(db, venue.id, body.date, body.periods)
+    if hit:
+        raise validation_error(f"所選時段不開放借用(節次 {','.join(hit)})")
+
     row = VenueBooking(
         club_id=user.club_id,
         venue_id=venue.id,
@@ -325,6 +330,7 @@ async def create_venue_booking(
         date=body.date,
         periods=body.periods,
         purpose=body.purpose,
+        phone=body.phone,
     )
     db.add(row)
     audit.record(db, action="venue_booking_submitted", user=user, ip=client_ip(request))
@@ -383,6 +389,9 @@ async def create_equipment_loan(
     equipment = await db.get(Equipment, body.equipment_id)
     if equipment is None or not equipment.is_active:
         raise validation_error("找不到該器材")
+    # 單次可借上限(2026-07-21;NULL=不限)
+    if equipment.max_lease_count is not None and body.qty > equipment.max_lease_count:
+        raise validation_error(f"{equipment.name} 單次至多借用 {equipment.max_lease_count} 件")
     activity = await _approved_activity(db, user, body.activity_id)
 
     # 借用區間=活動起訖 ± 工作天緩衝(申請當下推導後寫入,設定調整不回溯)
@@ -406,6 +415,7 @@ async def create_equipment_loan(
         start_date=start,
         end_date=end,
         purpose=body.purpose,
+        phone=body.phone,
     )
     db.add(loan)
     audit.record(db, action="equipment_loan_submitted", user=user, ip=client_ip(request))
@@ -421,3 +431,97 @@ async def create_equipment_loan(
     out.equipment_name = equipment.name
     out.activity_name = activity.name
     return ApiResponse(data=out)
+
+
+# ---- 取消(2026-07-21 需求方:審核中或已核准未開始者可取消) ----
+
+
+def _today_taipei() -> date:
+    from app.core.semesters import TAIPEI
+
+    return datetime.now(TAIPEI).date()
+
+
+def _ensure_cancellable(status: object, pending: object, approved: object, start: date) -> None:
+    """審核中隨時可取消;已核准需尚未開始(開始日在今天之後)。"""
+    if status == pending:
+        return
+    if status == approved:
+        if start > _today_taipei():
+            return
+        raise conflict("已開始或已結束的借用無法取消")
+    raise conflict("此狀態的申請無法取消")
+
+
+@router.post("/venue-bookings/{booking_id}/cancel")
+async def cancel_venue_booking(
+    booking_id: int, user: ClubUser, db: DbDep, request: Request
+) -> ApiResponse[None]:
+    row = await db.scalar(
+        sa.select(VenueBooking)
+        .where(VenueBooking.id == booking_id, VenueBooking.club_id == user.club_id)
+        .with_for_update()
+    )
+    if row is None:
+        raise not_found("找不到借用申請")
+    _ensure_cancellable(row.status, BookingStatus.PENDING, BookingStatus.APPROVED, row.date)
+    row.status = BookingStatus.CANCELLED
+    audit.record(
+        db,
+        action="venue_booking_cancelled",
+        user=user,
+        detail=f"venue_booking={row.id}",
+        ip=client_ip(request),
+    )
+    await db.commit()
+    return ApiResponse()
+
+
+@router.post("/room-bookings/{booking_id}/cancel")
+async def cancel_room_booking(
+    booking_id: int, user: ClubUser, db: DbDep, request: Request
+) -> ApiResponse[None]:
+    row = await db.scalar(
+        sa.select(RoomBookingRequest)
+        .where(RoomBookingRequest.id == booking_id, RoomBookingRequest.club_id == user.club_id)
+        .with_for_update()
+    )
+    if row is None:
+        raise not_found("找不到借用申請")
+    _ensure_cancellable(
+        row.status, BookingStatus.PENDING, BookingStatus.APPROVED, row.start_date
+    )
+    row.status = BookingStatus.CANCELLED
+    audit.record(
+        db,
+        action="room_booking_cancelled",
+        user=user,
+        detail=f"room_booking={row.id}",
+        ip=client_ip(request),
+    )
+    await db.commit()
+    return ApiResponse()
+
+
+@router.post("/equipment-loans/{loan_id}/cancel")
+async def cancel_equipment_loan(
+    loan_id: int, user: ClubUser, db: DbDep, request: Request
+) -> ApiResponse[None]:
+    row = await db.scalar(
+        sa.select(EquipmentLoan)
+        .where(EquipmentLoan.id == loan_id, EquipmentLoan.club_id == user.club_id)
+        .with_for_update()
+    )
+    if row is None:
+        raise not_found("找不到借用申請")
+    _ensure_cancellable(row.status, LoanStatus.PENDING, LoanStatus.APPROVED, row.start_date)
+    row.status = LoanStatus.CANCELLED
+    audit.record(
+        db,
+        action="equipment_loan_cancelled",
+        user=user,
+        detail=f"equipment_loan={row.id}",
+        ip=client_ip(request),
+    )
+    await db.commit()
+    return ApiResponse()

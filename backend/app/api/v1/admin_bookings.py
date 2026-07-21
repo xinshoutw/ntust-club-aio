@@ -14,7 +14,7 @@ import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 
 from app.api.pagination import Pagination, parse_sort
-from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
+from app.core.deps import CurrentUser, DbDep, client_ip, require_permission, require_super
 from app.core.errors import conflict, not_found
 from app.models import (
     Activity,
@@ -32,7 +32,7 @@ from app.models.enums import (
     LoanStatus,
 )
 from app.schemas.admin import AdminEquipmentLoanOut, AdminVenueBookingOut, RejectIn
-from app.schemas.bookings import VenueOut
+from app.schemas.bookings import ManualEquipmentLoanIn, ManualVenueBookingIn, VenueOut
 from app.schemas.common import ApiResponse
 from app.services import audit, notify
 from app.services import booking_service as svc
@@ -41,6 +41,7 @@ from app.services.settings_service import get_setting
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 BookingAdmin = Annotated[CurrentUser, Depends(require_permission("abooking"))]
+SuperAdmin = Annotated[CurrentUser, Depends(require_super)]
 
 _VENUE_SORTABLE = {
     "date": VenueBooking.date,
@@ -170,6 +171,9 @@ async def approve_venue_booking(
     )
     if taken:
         raise conflict("該場地時段已有已核准的借用", code="SLOT_TAKEN")
+    hit = await svc.blocked_periods(db, booking.venue_id, booking.date, booking.periods)
+    if hit:
+        raise conflict(f"該時段不開放借用(節次 {','.join(hit)})", code="SLOT_BLOCKED")
     booking.status = BookingStatus.APPROVED
     _record_approval(
         db, ApprovalSubject.VENUE_BOOKING, booking.id, ApprovalDecision.APPROVE, user
@@ -381,3 +385,89 @@ async def availability(user: BookingAdmin, db: DbDep, date: date) -> ApiResponse
     """全校單日場況格;審核中格帶臨時借用申請 id,供點格開審核彈窗。"""
     grid = await svc.admin_availability_grid(db, date)
     return ApiResponse(data={"date": date.isoformat(), "grid": grid})
+
+
+# ---- 最高權限手動借用(2026-07-21 需求方拍板;club NULL=行政,顯示「學務處」) ----
+
+
+@router.post("/bookings/manual-venue", status_code=201)
+async def manual_venue_booking(
+    body: ManualVenueBookingIn, user: SuperAdmin, db: DbDep, request: Request
+) -> ApiResponse[AdminVenueBookingOut]:
+    venue = await db.get(Venue, body.venue_id)
+    if venue is None or not venue.is_active:
+        raise not_found("找不到場地")
+    # 與核准端同鎖同檢核;行政借用不受不開放規則限制(封鎖常配合行政徵用)
+    await svc.lock_resource(db, "venue", venue.id)
+    taken = await db.scalar(
+        sa.select(sa.func.count()).where(
+            VenueBooking.venue_id == venue.id,
+            VenueBooking.date == body.date,
+            VenueBooking.status == BookingStatus.APPROVED,
+            VenueBooking.periods.op("&&")(body.periods),
+        )
+    )
+    if taken:
+        raise conflict("該場地時段已有已核准的借用", code="SLOT_TAKEN")
+    row = VenueBooking(
+        club_id=None,
+        venue_id=venue.id,
+        activity_id=None,
+        date=body.date,
+        periods=body.periods,
+        purpose=body.purpose,
+        phone=body.phone,
+        status=BookingStatus.APPROVED,
+    )
+    db.add(row)
+    audit.record(
+        db,
+        action="manual_venue_booking_created",
+        user=user,
+        detail=f"{venue.name} {body.date} 節次 {','.join(body.periods)}",
+        ip=client_ip(request),
+    )
+    await db.commit()
+    out = AdminVenueBookingOut.model_validate(row)
+    out.club_name = "學務處"
+    out.venue_name = venue.name
+    return ApiResponse(data=out)
+
+
+@router.post("/bookings/manual-equipment", status_code=201)
+async def manual_equipment_loan(
+    body: ManualEquipmentLoanIn, user: SuperAdmin, db: DbDep, request: Request
+) -> ApiResponse[AdminEquipmentLoanOut]:
+    equipment = await db.get(Equipment, body.equipment_id)
+    if equipment is None or not equipment.is_active:
+        raise not_found("找不到器材")
+    await svc.lock_resource(db, "equipment", equipment.id)
+    available = await svc.equipment_available_in_window(
+        db, equipment.id, equipment.total_qty, body.start_date, body.end_date
+    )
+    if body.qty > available:
+        raise conflict(f"借用區間內可借數量不足(目前可借 {available})")
+    loan = EquipmentLoan(
+        club_id=None,
+        equipment_id=equipment.id,
+        activity_id=None,
+        qty=body.qty,
+        start_date=body.start_date,
+        end_date=body.end_date,
+        purpose=body.purpose,
+        phone=body.phone,
+        status=LoanStatus.APPROVED,
+    )
+    db.add(loan)
+    audit.record(
+        db,
+        action="manual_equipment_loan_created",
+        user=user,
+        detail=f"{equipment.name} ×{body.qty}({body.start_date}~{body.end_date})",
+        ip=client_ip(request),
+    )
+    await db.commit()
+    out = AdminEquipmentLoanOut.model_validate(loan)
+    out.club_name = "學務處"
+    out.equipment_name = equipment.name
+    return ApiResponse(data=out)

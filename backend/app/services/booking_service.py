@@ -13,6 +13,7 @@ from app.models import (
     Holiday,
     RoomBookingRequest,
     RoomBookingSlot,
+    VenueBlockRule,
     VenueBooking,
 )
 from app.models.enums import BookingStatus, LoanStatus
@@ -183,6 +184,40 @@ async def overdue_deadline(db: AsyncSession, end_date: date, return_time: str) -
     return overdue_deadline_in(end_date, return_time, await load_holidays(db))
 
 
+async def blocked_map(
+    db: AsyncSession, start: date, end: date, venue_id: int | None = None
+) -> dict[tuple[date, int], dict[str, str]]:
+    """區間內各(日,場地)的不開放節次 → {節次: 原因}(venue_block_rules 展開)。
+
+    weekdays NULL=區間內每天;有值=僅列出的 ISO 星期(1=一…7=日)。
+    """
+    query = sa.select(VenueBlockRule).where(
+        VenueBlockRule.start_date <= end, VenueBlockRule.end_date >= start
+    )
+    if venue_id is not None:
+        query = query.where(VenueBlockRule.venue_id == venue_id)
+    out: dict[tuple[date, int], dict[str, str]] = {}
+    for rule in (await db.scalars(query)).all():
+        day = max(rule.start_date, start)
+        stop = min(rule.end_date, end)
+        while day <= stop:
+            if not rule.weekdays or day.isoweekday() in rule.weekdays:
+                cell = out.setdefault((day, rule.venue_id), {})
+                for period in rule.periods:
+                    cell[period] = rule.reason
+            day += timedelta(days=1)
+    return out
+
+
+async def blocked_periods(
+    db: AsyncSession, venue_id: int, day: date, periods: list[str]
+) -> list[str]:
+    """申請/核准檢核:回傳與不開放規則重疊的節次(空=無衝突)。"""
+    blocked = await blocked_map(db, day, day, venue_id)
+    hit = blocked.get((day, venue_id), {})
+    return [p for p in periods if p in hit]
+
+
 async def availability_grid(
     db: AsyncSession, day: date, own_club_id: int | None
 ) -> dict[int, dict[str, dict]]:
@@ -213,8 +248,8 @@ async def availability_grids(
 
     def mark(day: date, venue_id: int, period: str, status: str, club: str) -> None:
         cell = grids[day].setdefault(venue_id, {})
-        # mine 優先顯示;已核准蓋過審核中
-        rank = {"pending": 0, "temp": 1, "fixed": 1, "mine": 2}
+        # mine 優先顯示;已核准蓋過審核中;不開放(blocked)蓋過一切
+        rank = {"pending": 0, "temp": 1, "fixed": 1, "mine": 2, "blocked": 3}
         current = cell.get(period)
         if current is None or rank[status] > rank[current["status"]]:
             cell[period] = {"status": status, "club": club}
@@ -268,6 +303,11 @@ async def availability_grids(
                 status = "mine" if request.club_id == own_club_id else "fixed"
             mark(day, request.venue_id, slot.period, status, club_name)
 
+    # 不開放規則:蓋過一切;hover 顯示原因
+    for (day, vid), cells in (await blocked_map(db, start, end, venue_id)).items():
+        for period, reason in cells.items():
+            mark(day, vid, period, "blocked", reason)
+
     return grids
 
 
@@ -279,7 +319,7 @@ async def admin_availability_grid(db: AsyncSession, day: date) -> dict[int, dict
     - 無「自己借用」概念;已核准蓋過審核中(與 club 端同權重規則)
     """
     grid: dict[int, dict[str, dict]] = {}
-    rank = {"pending": 0, "temp": 1, "fixed": 1}
+    rank = {"pending": 0, "temp": 1, "fixed": 1, "blocked": 2}
 
     def mark(venue_id: int, period: str, status: str, booking_id: int | None = None) -> None:
         cell = grid.setdefault(venue_id, {})
@@ -315,5 +355,9 @@ async def admin_availability_grid(db: AsyncSession, day: date) -> dict[int, dict
     )
     for slot, venue_id in fixed_rows:
         mark(venue_id, slot.period, "fixed")
+
+    for (_, vid), cells in (await blocked_map(db, day, day)).items():
+        for period in cells:
+            mark(vid, period, "blocked")
 
     return grid

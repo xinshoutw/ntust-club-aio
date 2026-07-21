@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.enums import BookingStatus, LoanStatus
 from app.services.booking_service import MAX_FIXED_SLOTS, PERIODS
@@ -100,6 +100,7 @@ class VenueBookingIn(BaseModel):
     date: date
     periods: list[str] = Field(min_length=1, max_length=14)
     purpose: str = Field(min_length=1, max_length=200)  # 用途必填(2026-07-15)
+    phone: str | None = Field(None, max_length=30)  # 聯絡電話(選填;2026-07-21)
 
     @field_validator("periods")
     @classmethod
@@ -118,6 +119,7 @@ class VenueBookingOut(BaseModel):
     date: date
     periods: list[str]
     purpose: str
+    phone: str | None = None
     status: BookingStatus
     created_at: datetime
 
@@ -129,6 +131,7 @@ class EquipmentLoanIn(BaseModel):
     activity_id: int
     qty: int = Field(ge=1, le=1000)
     purpose: str = Field(min_length=1, max_length=200)
+    phone: str | None = Field(None, max_length=30)  # 聯絡電話(選填;2026-07-21)
 
 
 class EquipmentLoanOut(BaseModel):
@@ -137,7 +140,7 @@ class EquipmentLoanOut(BaseModel):
     id: int
     equipment_id: int
     equipment_name: str = ""
-    activity_id: int
+    activity_id: int | None  # NULL=舊系統斷鏈或行政手動借用
     activity_name: str | None = None
     qty: int
     start_date: date
@@ -152,3 +155,84 @@ class EquipmentLoanOut(BaseModel):
     checkin_note: str | None
     created_at: datetime
     overdue: bool = False  # 推導
+
+
+# ---- 行政手動借用 / 場地不開放規則(2026-07-21 需求方拍板) ----
+
+
+class ManualVenueBookingIn(BaseModel):
+    """最高權限直接借用臨時場地(club NULL=行政,直接核准)。"""
+
+    venue_id: int
+    date: date
+    periods: list[str] = Field(min_length=1, max_length=14)
+    purpose: str = Field(min_length=1, max_length=200)
+    phone: str | None = Field(None, max_length=30)
+
+    @field_validator("periods")
+    @classmethod
+    def _periods(cls, v: list[str]) -> list[str]:
+        return _validate_periods(v)
+
+
+class ManualEquipmentLoanIn(BaseModel):
+    """最高權限直接借用器材(club NULL=行政,直接核准;區間自填)。"""
+
+    equipment_id: int
+    qty: int = Field(ge=1, le=1000)
+    start_date: date
+    end_date: date
+    purpose: str = Field(min_length=1, max_length=200)
+    phone: str | None = Field(None, max_length=30)
+
+    @model_validator(mode="after")
+    def _range(self) -> ManualEquipmentLoanIn:
+        if self.end_date < self.start_date:
+            raise ValueError("結束日不得早於開始日")
+        return self
+
+
+class VenueBlockRuleIn(BaseModel):
+    """場地不開放規則:區間(單日=同日)+ 星期限定(NULL=每天)+ 節次子集。"""
+
+    venue_id: int
+    start_date: date
+    end_date: date
+    weekdays: list[int] | None = Field(None, min_length=1, max_length=7)
+    periods: list[str] = Field(min_length=1, max_length=14)
+    reason: str = Field(min_length=1, max_length=200)
+
+    @field_validator("periods")
+    @classmethod
+    def _periods(cls, v: list[str]) -> list[str]:
+        return _validate_periods(v)
+
+    @field_validator("weekdays")
+    @classmethod
+    def _weekdays(cls, v: list[int] | None) -> list[int] | None:
+        if v is None:
+            return None
+        cleaned = sorted(set(v))
+        if any(d < 1 or d > 7 for d in cleaned):
+            raise ValueError("星期須為 1(一)–7(日)")
+        return cleaned
+
+    @model_validator(mode="after")
+    def _range(self) -> VenueBlockRuleIn:
+        if self.end_date < self.start_date:
+            raise ValueError("結束日不得早於開始日")
+        return self
+
+
+class VenueBlockRuleOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    venue_id: int
+    venue_name: str = ""
+    start_date: date
+    end_date: date
+    weekdays: list[int] | None
+    periods: list[str]
+    reason: str
+    created_at: datetime

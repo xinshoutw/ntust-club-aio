@@ -302,7 +302,7 @@ class AdminVenueBookingOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    club_id: int
+    club_id: int | None  # NULL=行政手動借用(顯示「學務處」)
     club_name: str = ""
     venue_id: int
     venue_name: str = ""
@@ -319,11 +319,11 @@ class AdminEquipmentLoanOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    club_id: int
+    club_id: int | None  # NULL=行政手動借用(顯示「學務處」)
     club_name: str = ""
     equipment_id: int
     equipment_name: str = ""
-    activity_id: int
+    activity_id: int | None  # NULL=行政手動借用或舊系統斷鏈
     activity_name: str | None = None
     qty: int
     start_date: date

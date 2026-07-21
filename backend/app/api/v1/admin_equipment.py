@@ -37,6 +37,7 @@ async def create_equipment(
     row = Equipment(
         name=body.name,
         total_qty=body.total_qty,
+        max_lease_count=body.max_lease_count,
         needs_serial=body.needs_serial,
         sort=(max_sort or 0) + 1,
     )

@@ -12,6 +12,7 @@ class EquipmentMasterOut(BaseModel):
     id: int
     name: str
     total_qty: int
+    max_lease_count: int | None  # 單次可借上限;NULL=不限(2026-07-21)
     needs_serial: bool
     is_active: bool
 
@@ -19,6 +20,7 @@ class EquipmentMasterOut(BaseModel):
 class EquipmentIn(BaseModel):
     name: str = Field(min_length=1, max_length=50)
     total_qty: int = Field(ge=0, le=100_000)
+    max_lease_count: int | None = Field(None, ge=1, le=100_000)
     needs_serial: bool = False
 
     @field_validator("name")
@@ -35,6 +37,7 @@ class EquipmentUpdateIn(BaseModel):
 
     name: str | None = Field(None, min_length=1, max_length=50)
     total_qty: int | None = Field(None, ge=0, le=100_000)
+    max_lease_count: int | None = Field(None, ge=1, le=100_000)
     needs_serial: bool | None = None
     is_active: bool | None = None
 

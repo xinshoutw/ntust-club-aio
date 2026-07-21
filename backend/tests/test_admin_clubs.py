@@ -233,3 +233,21 @@ async def test_members_readonly_list(client, db):
         await client.get(f"{URL}/{club.id}/members", params={"semester": "bad"})
     ).status_code == 422
     assert (await client.get(f"{URL}/99999/members")).status_code == 404
+
+
+async def test_defunct_club_null_attribute(client, db):
+    """停社社團 attribute=NULL(2026-07-21):列表/選項/詳情不得 500,回 null。"""
+    await seed(client, db)
+    await make_club(db, name="如來實證", attribute=None, is_active=False)
+
+    rows = (await client.get(URL)).json()["data"]
+    defunct = next(r for r in rows if r["name"] == "如來實證")
+    assert defunct["attribute"] is None
+    assert defunct["is_active"] is False
+    assert defunct["kind"] == "社團"  # 結尾非社/會 → 預設社團
+
+    options = (await client.get(f"{URL}/options")).json()["data"]
+    assert any(c["name"] == "如來實證" and c["attribute"] is None for c in options)
+
+    detail = (await client.get(f"{URL}/{defunct['id']}")).json()["data"]
+    assert detail["attribute"] is None

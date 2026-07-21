@@ -104,7 +104,8 @@ async def client():
 
 async def make_club(db, name: str = "熱舞社", **kw) -> Club:
     kw.setdefault("kind", ClubKind.ASSOCIATION if name.endswith("會") else ClubKind.CLUB)
-    club = Club(name=name, attribute=ClubAttribute.ART, **kw)
+    kw.setdefault("attribute", ClubAttribute.ART)  # 可傳 None 模擬停社(原性質不可考)
+    club = Club(name=name, **kw)
     db.add(club)
     await db.commit()
     await db.refresh(club)

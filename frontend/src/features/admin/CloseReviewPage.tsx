@@ -5,6 +5,7 @@ import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
 import { fmtMoney } from '../activities/types'
 import { Pager } from '../../components/ui/tableControls'
+import { useModalAutoFocus } from '../../components/ui/useModalAutoFocus'
 import {
   canActOnClose,
   useAdminActivitiesPaged,
@@ -46,6 +47,7 @@ function CloseReviewModal({
   const { closeApprove, closeReject } = useAdminActivityMutations()
   const [rejectOpen, setRejectOpen] = useState(false)
   const [reason, setReason] = useState('')
+  const approveRef = useModalAutoFocus(open)
   const [checks, setChecks] = useState<Record<CheckKey, boolean>>({ photos: true, report: true, reflections: true })
 
   const detail = detailQuery.data
@@ -126,7 +128,7 @@ function CloseReviewModal({
             </Button>
             <Button
               type="primary"
-              autoFocus
+              ref={approveRef}
               style={{ height: 38 }}
               disabled={!report}
               loading={closeApprove.isPending}

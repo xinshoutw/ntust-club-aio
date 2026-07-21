@@ -3,7 +3,8 @@
 - 列表不分頁(全校社團 <200 筆,供 ClubCascader/管理項目)
 - 詳情=社團自管資料唯讀呈現;webhook 只回是否已設定,不回實值
 - 行政可改:社團名稱/社團或學會(kind)/英文名/帳號 username/啟停用
-- 重設密碼:一次性密碼(比照 /admin/accounts:明碼僅該次回傳、argon2、首登強制改密)
+- 建立社團帳號(一社一帳號)與重設密碼:一次性密碼(比照 /admin/accounts:
+  明碼僅該次回傳、argon2、首登強制改密);入口=帳號管理「社團」分頁與管理項目
 - 成員名單唯讀,參數比照社團端 /club/members
 """
 
@@ -19,7 +20,14 @@ from app.core.security import generate_password, hash_password
 from app.models import Club, ClubMember, PasswordHistory, Session, User
 from app.models.enums import ClubKind, MemberKind, UserRole
 from app.schemas.accounts import PasswordResetOut
-from app.schemas.admin import AdminClubDetailOut, AdminClubOut, AdminClubUpdate, ClubOptionOut
+from app.schemas.admin import (
+    AdminClubDetailOut,
+    AdminClubOut,
+    AdminClubUpdate,
+    ClubAccountCreatedOut,
+    ClubAccountCreateIn,
+    ClubOptionOut,
+)
 from app.schemas.clubs import MemberOut
 from app.schemas.common import ApiResponse
 from app.services import audit
@@ -209,6 +217,45 @@ async def update_club(
         )
     await db.commit()
     return ApiResponse(data=_detail_out(club, account))
+
+
+@router.post("/{club_id}/account", status_code=201)
+async def create_club_account(
+    club_id: int, body: ClubAccountCreateIn, user: ClubAdmin, db: DbDep, request: Request
+) -> ApiResponse[ClubAccountCreatedOut]:
+    """建立社團帳號(一社一帳號):產生一次性密碼,首登強制改密。
+
+    帳號啟停與社團主檔同步:停用中社團補建的帳號同樣是停用狀態。
+    """
+    club = await _club_or_404(db, club_id)
+    if await _club_account(db, club_id) is not None:
+        raise conflict("該社團已建立帳號")
+    exists = await db.scalar(sa.select(User.id).where(User.username == body.username))
+    if exists:
+        raise conflict("此帳號已存在")
+
+    password = generate_password()
+    account = User(
+        role=UserRole.CLUB,
+        username=body.username,
+        password_hash=hash_password(password),
+        name=club.name,
+        club_id=club.id,
+        must_change_password=True,  # 首登強制改密
+        is_active=club.is_active,  # 跟隨社團啟停狀態
+    )
+    db.add(account)
+    await db.flush()
+    audit.record(
+        db,
+        action="club_account_created",
+        user=user,
+        detail=f"club={club.id};account={account.id};username={account.username}",
+        ip=client_ip(request),
+    )
+    await db.commit()
+    # 明文密碼僅此回應;之後只能重設
+    return ApiResponse(data=ClubAccountCreatedOut(username=account.username, password=password))
 
 
 @router.post("/{club_id}/reset-password")

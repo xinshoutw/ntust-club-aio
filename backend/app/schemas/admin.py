@@ -286,6 +286,27 @@ class AdminClubUpdate(BaseModel):
         return v
 
 
+class ClubAccountCreateIn(BaseModel):
+    """建立社團帳號(一社一帳號;帳號名由行政指定,格式比照 /admin/accounts)。"""
+
+    username: str
+
+    @field_validator("username")
+    @classmethod
+    def _valid_username(cls, v: str) -> str:
+        v = v.strip()
+        if not _USERNAME_RE.match(v):
+            raise ValueError("帳號限 3–50 字的英數字與 . _ -")
+        return v
+
+
+class ClubAccountCreatedOut(BaseModel):
+    """僅建立當次回傳明文一次性密碼(比照 /admin/accounts)。"""
+
+    username: str
+    password: str
+
+
 class SuspendIn(BaseModel):
     """停權管理(僅 super):寫 clubs.suspended_until / suspend_reason。"""
 

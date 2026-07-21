@@ -1,10 +1,10 @@
-"""社團主檔管理(/admin/clubs,權限鍵 amember):列表/詳情/修改/重設密碼/成員名單。"""
+"""社團主檔管理(/admin/clubs,權限鍵 amember):列表/詳情/修改/建帳號/重設密碼/成員名單。"""
 
 import sqlalchemy as sa
 
 from app.core.security import validate_password_strength
-from app.models import AuditLog, Club, ClubMember, Session
-from app.models.enums import MemberKind
+from app.models import AuditLog, Club, ClubMember, Session, User
+from app.models.enums import MemberKind, UserRole
 from tests.conftest import csrf_headers, login, make_club, make_user
 
 URL = "/api/v1/admin/clubs"
@@ -31,6 +31,10 @@ async def test_permission_gate(client, db):
     )
     assert resp.status_code == 403
     resp = await client.post(f"{URL}/{club.id}/reset-password", headers=csrf_headers(client))
+    assert resp.status_code == 403
+    resp = await client.post(
+        f"{URL}/{club.id}/account", json={"username": "newclub"}, headers=csrf_headers(client)
+    )
     assert resp.status_code == 403
 
 
@@ -192,6 +196,87 @@ async def test_reset_password(client, db):
     )
     assert audit_row is not None
     assert password not in audit_row.detail  # 明碼絕不落稽核
+
+
+async def test_create_club_account(client, db):
+    club, _, no_account = await seed(client, db)
+
+    resp = await client.post(
+        f"{URL}/{no_account.id}/account", json={"username": "guitar"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 201, resp.text
+    data = resp.json()["data"]
+    assert data["username"] == "guitar"
+    validate_password_strength(data["password"])  # 一次性密碼須符合密碼政策
+
+    account = await db.scalar(sa.select(User).where(User.username == "guitar"))
+    assert account.role == UserRole.CLUB
+    assert account.club_id == no_account.id
+    assert account.name == "吉他社"  # 顯示名=社團名
+    assert account.is_active is True
+    assert account.must_change_password is True
+    rows = (await client.get(URL)).json()["data"]
+    assert next(r for r in rows if r["name"] == "吉他社")["username"] == "guitar"
+
+    # 新帳號可登入且首登強制改密
+    resp = await login(client, "guitar", data["password"])
+    assert resp.status_code == 200
+    assert resp.json()["data"]["must_change_password"] is True
+
+    await login(client, "clubadmin")
+    audit_row = await db.scalar(
+        sa.select(AuditLog).where(AuditLog.action == "club_account_created")
+    )
+    assert audit_row is not None
+    assert data["password"] not in audit_row.detail  # 明碼絕不落稽核
+
+    # 已有帳號的社團(含剛建立者)再建 → 409
+    resp = await client.post(
+        f"{URL}/{no_account.id}/account", json={"username": "guitar2"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 409
+    resp = await client.post(
+        f"{URL}/{club.id}/account", json={"username": "dance"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 409
+
+
+async def test_create_club_account_username_rules(client, db):
+    _, _, no_account = await seed(client, db)
+
+    # username 與既有任何帳號(不限角色)衝突 → 409
+    resp = await client.post(
+        f"{URL}/{no_account.id}/account",
+        json={"username": "clubadmin"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 409
+    # 格式不符(比照 /admin/accounts)→ 422
+    resp = await client.post(
+        f"{URL}/{no_account.id}/account", json={"username": "x"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 422
+    # 社團不存在 → 404
+    resp = await client.post(
+        f"{URL}/99999/account", json={"username": "ghost"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 404
+
+
+async def test_create_club_account_inactive_club(client, db):
+    """停用中社團補建帳號:is_active 跟隨社團=停用,無法登入。"""
+    await seed(client, db)
+    inactive = await make_club(db, name="桌遊社", is_active=False)
+
+    resp = await client.post(
+        f"{URL}/{inactive.id}/account", json={"username": "boardgame"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 201, resp.text
+    password = resp.json()["data"]["password"]
+
+    account = await db.scalar(sa.select(User).where(User.username == "boardgame"))
+    assert account.is_active is False
+    assert (await login(client, "boardgame", password)).status_code == 401
 
 
 async def test_members_readonly_list(client, db):

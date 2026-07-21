@@ -1,6 +1,6 @@
 """行政端:帳號管理(/admin/accounts,僅 super;2026-07-16 第八輪)。
 
-- 三類角色:管理員/工讀生/評審(社團帳號在「社團管理 > 管理項目」)
+- 三類角色:管理員/工讀生/評審(社團帳號走 /admin/clubs:帳號管理「社團」分頁與管理項目皆可維護)
 - 建立與重設密碼:後端以密碼政策產生器產一次性密碼,僅該次 response 回傳明文,
   存 argon2id,must_change_password=true 首登強制改密
 - 刪除帳號:稽核紀錄保留(audit_logs.user_id FK ON DELETE SET NULL);

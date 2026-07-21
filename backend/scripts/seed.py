@@ -19,19 +19,16 @@ from app.core.security import hash_password, validate_password_strength
 from app.models import Award, User, Venue
 from app.models.enums import AwardKind, UserRole, VenueCategory
 
-# 五獎項(原型 AWARDS;rubric 逐年由行政建立/複製)
-AWARDS = [
-    Award(id="club", name="最佳社團獎", kind=AwardKind.GROUP, is_weighted=True, sort=1),
-    Award(id="finance", name="最佳財務獎", kind=AwardKind.GROUP, has_presentation=True, sort=2),
-    Award(id="activity", name="最佳活動獎", kind=AwardKind.GROUP, has_presentation=True, sort=3),
-    Award(id="result", name="最佳成果發表獎", kind=AwardKind.GROUP, sort=4),
-    Award(
-        id="leader",
-        name="最佳社團負責人獎",
-        kind=AwardKind.INDIVIDUAL,
-        has_presentation=True,
-        sort=5,
-    ),
+# 五獎項(原型 AWARDS;rubric 逐年由行政建立/複製)。
+# 存純資料、Award 列於 seed() 內建構:模組層 ORM 實例會在第一次 seed 後轉 persistent,
+# 之後(如測試重跑)再 add 會被當成既有列而靜默跳過 INSERT
+# (id, name, kind, has_presentation, is_weighted, sort)
+AWARDS: list[tuple[str, str, AwardKind, bool, bool, int]] = [
+    ("club", "最佳社團獎", AwardKind.GROUP, False, True, 1),
+    ("finance", "最佳財務獎", AwardKind.GROUP, True, False, 2),
+    ("activity", "最佳活動獎", AwardKind.GROUP, True, False, 3),
+    ("result", "最佳成果發表獎", AwardKind.GROUP, False, False, 4),
+    ("leader", "最佳社團負責人獎", AwardKind.INDIVIDUAL, True, False, 5),
 ]
 
 # 場地主檔(2026-07-15 需求方定案 19 處,與 frontend/src/features/bookings/mock.ts VENUES 對齊;
@@ -62,10 +59,19 @@ VENUES: list[tuple[str, VenueCategory, int, bool, bool]] = [
 
 async def seed(admin_username: str | None, admin_password: str | None) -> None:
     async with async_session_factory() as db:
-        for award in AWARDS:
-            if await db.get(Award, award.id) is None:
-                db.add(award)
-                print(f"award created: {award.id}")
+        for award_id, name, kind, has_presentation, is_weighted, sort in AWARDS:
+            if await db.get(Award, award_id) is None:
+                db.add(
+                    Award(
+                        id=award_id,
+                        name=name,
+                        kind=kind,
+                        has_presentation=has_presentation,
+                        is_weighted=is_weighted,
+                        sort=sort,
+                    )
+                )
+                print(f"award created: {award_id}")
 
         for sort, (name, category, capacity, allow_fixed, allow_temp) in enumerate(VENUES, 1):
             exists = await db.scalar(sa.select(Venue.id).where(Venue.name == name))

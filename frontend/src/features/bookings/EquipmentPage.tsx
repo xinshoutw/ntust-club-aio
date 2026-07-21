@@ -5,6 +5,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import { confirmDialog } from '../../lib/confirm'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
+import { Cols } from '../../components/ui/tableControls'
 import {
   useBookingMutations,
   useEquipmentList,
@@ -98,7 +99,8 @@ export default function EquipmentPage() {
         <div className="card" style={{ overflowX: 'auto' }}>
           <Spin spinning={equipmentQuery.isPending}>
             <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>器材一覽</div>
-            <table className="tb" aria-label="器材一覽" style={{ minWidth: 480 }}>
+            <table className="tb fixed" aria-label="器材一覽" style={{ minWidth: 480 }}>
+              <Cols widths={['auto', 100, 120]} />
               <thead>
                 <tr>
                   <th>品項</th>
@@ -260,7 +262,8 @@ export default function EquipmentPage() {
       <Spin spinning={activeQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在借用</div>
-          <table className="tb" aria-label="正在借用" style={{ minWidth: 760 }}>
+          <table className="tb fixed" aria-label="正在借用" style={{ minWidth: 760 }}>
+            <Cols widths={['auto', 190, 'auto', 100, 110, 80]} />
             <thead>
               <tr>
                 <th scope="col">品項</th>
@@ -283,8 +286,8 @@ export default function EquipmentPage() {
                   <td className="num" style={{ fontSize: 13 }}>{l.startDate} – {l.endDate}</td>
                   <td style={{ color: 'var(--steel)', fontSize: 13 }}>{l.activityName ?? l.purpose}</td>
                   <td style={{ color: 'var(--steel)', fontSize: 13 }}>{l.borrower ?? '—'}</td>
-                  <td style={{ width: 110 }}><StatusPill status={l.status} /></td>
-                  <td className="r" style={{ width: 80 }}>
+                  <td><StatusPill status={l.status} /></td>
+                  <td className="r">
                     {l.status === 'pending' ||
                     (l.status === 'approved' && dayjs(l.startDate, 'YYYY/MM/DD').isAfter(todayStart, 'day')) ? (
                       <Button size="small" danger onClick={() => cancelRow(l)}>取消</Button>
@@ -314,7 +317,8 @@ export default function EquipmentPage() {
       <Spin spinning={recentQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近借用</div>
-          <table className="tb" aria-label="最近借用" style={{ minWidth: 760 }}>
+          <table className="tb fixed" aria-label="最近借用" style={{ minWidth: 760 }}>
+            <Cols widths={['auto', 190, 'auto', 150, 110]} />
             <thead>
               <tr>
                 <th scope="col">品項</th>
@@ -335,13 +339,13 @@ export default function EquipmentPage() {
                   </td>
                   <td className="num" style={{ fontSize: 13 }}>{l.startDate} – {l.endDate}</td>
                   <td style={{ color: 'var(--steel)', fontSize: 13 }}>{l.activityName ?? l.purpose}</td>
-                  <td style={{ color: 'var(--steel)', fontSize: 13, whiteSpace: 'nowrap' }}>
+                  <td style={{ color: 'var(--steel)', fontSize: 13 }}>
                     {l.borrower && <>借用 {l.borrower}</>}
                     {l.borrower && l.returnedBy && ' · '}
                     {l.returnedBy && <>歸還 {l.returnedBy}</>}
                     {!l.borrower && !l.returnedBy && '—'}
                   </td>
-                  <td style={{ width: 110 }}><StatusPill status={l.status} /></td>
+                  <td><StatusPill status={l.status} /></td>
                 </tr>
               ))}
               {recentQuery.isError && (

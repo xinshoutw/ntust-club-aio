@@ -4,6 +4,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import AttachmentArea, { type BagFile } from '../../components/ui/AttachmentArea'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
+import { Cols } from '../../components/ui/tableControls'
 import { IMAGE_ACCEPT, isImageFile, isPdfFile } from '../../lib/uploads'
 import { usePostalList, usePostalMutations } from '../../api/applications'
 
@@ -141,7 +142,8 @@ export default function PostalPage() {
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在申請</div>
-          <table className="tb" aria-label="郵局帳戶異動申請紀錄" style={{ minWidth: 520 }}>
+          <table className="tb fixed" aria-label="郵局帳戶異動申請紀錄" style={{ minWidth: 520 }}>
+            <Cols widths={['30%', 'auto', 110, 100]} />
             <thead>
               <tr>
                 <th scope="col">事由</th>
@@ -157,8 +159,8 @@ export default function PostalPage() {
                   <td style={{ color: 'var(--steel)', fontSize: 13 }}>
                     戶名:{r.accountName} · 帳號:<span className="num">{r.accountNumber}</span>
                   </td>
-                  <td className="num" style={{ fontSize: 13, width: 110 }}>{r.date}</td>
-                  <td style={{ width: 100 }}><StatusPill status={r.status} /></td>
+                  <td className="num" style={{ fontSize: 13 }}>{r.date}</td>
+                  <td><StatusPill status={r.status} /></td>
                 </tr>
               ))}
               {listQuery.isError && (
@@ -181,7 +183,8 @@ export default function PostalPage() {
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
-          <table className="tb" aria-label="郵局帳戶異動申請紀錄" style={{ minWidth: 520 }}>
+          <table className="tb fixed" aria-label="郵局帳戶異動申請紀錄" style={{ minWidth: 520 }}>
+            <Cols widths={['30%', 'auto', 110, 100]} />
             <thead>
               <tr>
                 <th scope="col">事由</th>
@@ -197,8 +200,8 @@ export default function PostalPage() {
                   <td style={{ color: 'var(--steel)', fontSize: 13 }}>
                     戶名:{r.accountName} · 帳號:<span className="num">{r.accountNumber}</span>
                   </td>
-                  <td className="num" style={{ fontSize: 13, width: 110 }}>{r.date}</td>
-                  <td style={{ width: 100 }}><StatusPill status={r.status} /></td>
+                  <td className="num" style={{ fontSize: 13 }}>{r.date}</td>
+                  <td><StatusPill status={r.status} /></td>
                 </tr>
               ))}
               {listQuery.isError && (

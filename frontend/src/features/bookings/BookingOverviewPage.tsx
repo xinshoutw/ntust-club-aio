@@ -11,7 +11,7 @@ import {
 } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
-import { Pager } from '../../components/ui/tableControls'
+import { Cols, Pager } from '../../components/ui/tableControls'
 import StatusPill from '../../components/ui/StatusPill'
 import { confirmDialog } from '../../lib/confirm'
 import {
@@ -337,14 +337,15 @@ export default function BookingOverviewPage() {
       <Spin spinning={listsPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在借用</div>
-          <table className="tb" aria-label="正在借用" style={{ minWidth: 680 }}>
+          <table className="tb fixed" aria-label="正在借用" style={{ minWidth: 680 }}>
+            <Cols widths={[90, 'auto', 240, 110, 80]} />
             <thead>
               <tr>
-                <th style={{ width: 90 }}>類別</th>
+                <th>類別</th>
                 <th>內容</th>
                 <th>時間</th>
-                <th style={{ width: 110 }}>狀態</th>
-                <th className="r" style={{ width: 80 }}>動作</th>
+                <th>狀態</th>
+                <th className="r">動作</th>
               </tr>
             </thead>
             <tbody>
@@ -458,7 +459,8 @@ export default function BookingOverviewPage() {
         {/* 已歸還:伺服器端分頁(status=returned) */}
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近歸還</div>
-          <table className="tb" aria-label="最近歸還" style={{ minWidth: 560 }}>
+          <table className="tb fixed" aria-label="最近歸還" style={{ minWidth: 560 }}>
+            <Cols widths={['auto', 190, 'auto', 100]} />
             <thead>
               <tr>
                 <th scope="col">品項</th>
@@ -475,7 +477,7 @@ export default function BookingOverviewPage() {
                   </td>
                   <td className="num" style={{ fontSize: 13 }}>{l.startDate} – {l.endDate}</td>
                   <td style={{ color: 'var(--steel)', fontSize: 13 }}>{l.purpose}</td>
-                  <td style={{ width: 100 }}><StatusPill status="returned" /></td>
+                  <td><StatusPill status="returned" /></td>
                 </tr>
               ))}
               {returnedQuery.isError && (

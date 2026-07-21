@@ -4,7 +4,7 @@ import { App, Button, Dropdown, Modal, Popconfirm, Select, Spin, Tooltip } from 
 import { DownloadOutlined, EllipsisOutlined, FileTextOutlined, LinkOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
-import { FilterButton, MultiSortButton, Pager, sortRows, useMultiSort } from '../../components/ui/tableControls'
+import { Cols, FilterButton, MultiSortButton, Pager, sortRows, useMultiSort } from '../../components/ui/tableControls'
 import StatusPill from '../../components/ui/StatusPill'
 import LargeBadge from '../../components/ui/LargeBadge'
 import { STATUS } from '../../lib/status'
@@ -388,7 +388,7 @@ export default function ActivityListPage() {
 
   const row = (a: ClubActivity, actions: React.ReactNode) => (
     <tr key={a.id} onClick={() => onRowClick(a)} style={{ cursor: 'pointer' }}>
-      <td style={{ fontWeight: 500 }}>
+      <td className="cell-clip" style={{ fontWeight: 500 }} title={a.name || undefined}>
         {/* 鍵盤入口:與整列 onClick 同動作;stopPropagation 避免雙觸發 */}
         <button
           type="button"
@@ -446,7 +446,8 @@ export default function ActivityListPage() {
             <div style={{ fontSize: 15, fontWeight: 600, padding: '14px 20px 6px' }}>
               草稿 <span className="num" style={{ fontSize: 12, background: '#EEF0F3', color: 'var(--steel)', borderRadius: 999, padding: '1px 8px' }}>{drafts.length}</span>
             </div>
-            <table className="tb" style={{ minWidth: 760 }} aria-label="草稿活動">
+            <table className="tb fixed" style={{ minWidth: 820 }} aria-label="草稿活動">
+              <Cols widths={['auto', 120, 180, 160, 110, 140]} />
               <thead>
                 <tr>
                   <th scope="col">名稱</th>
@@ -498,7 +499,8 @@ export default function ActivityListPage() {
         )}
 
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <table className="tb" style={{ minWidth: 760 }} aria-label="活動列表">
+          <table className="tb fixed" style={{ minWidth: 820 }} aria-label="活動列表">
+            <Cols widths={['auto', 120, 180, 160, 110, 120]} />
             <thead>
               <tr>
                 <th>{sortHeader('名稱', 'name')}</th>

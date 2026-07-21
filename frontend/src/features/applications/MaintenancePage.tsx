@@ -4,6 +4,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import AttachmentArea, { type BagFile } from '../../components/ui/AttachmentArea'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
+import { Cols } from '../../components/ui/tableControls'
 import { IMAGE_ACCEPT, isImageFile, isVideoFile } from '../../lib/uploads'
 import { useMaintenanceList, useMaintenanceMutations } from '../../api/applications'
 import { useClubConfig } from '../../api/clubConfig'
@@ -117,7 +118,8 @@ export default function MaintenancePage() {
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在報修</div>
-          <table className="tb" aria-label="空間報修紀錄" style={{ minWidth: 620 }}>
+          <table className="tb fixed" aria-label="空間報修紀錄" style={{ minWidth: 620 }}>
+            <Cols widths={['auto', 110, 100]} />
             <thead>
               <tr>
                 <th scope="col">報修內容</th>
@@ -135,8 +137,8 @@ export default function MaintenancePage() {
                       <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>處理備註:{r.handleNote}</div>
                     )}
                   </td>
-                  <td className="num" style={{ fontSize: 13, width: 110 }}>{r.date}</td>
-                  <td style={{ width: 100 }}><StatusPill status={r.status} /></td>
+                  <td className="num" style={{ fontSize: 13 }}>{r.date}</td>
+                  <td><StatusPill status={r.status} /></td>
                 </tr>
               ))}
               {listQuery.isError && (
@@ -159,7 +161,8 @@ export default function MaintenancePage() {
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近報修</div>
-          <table className="tb" aria-label="空間報修紀錄" style={{ minWidth: 620 }}>
+          <table className="tb fixed" aria-label="空間報修紀錄" style={{ minWidth: 620 }}>
+            <Cols widths={['auto', 110, 100]} />
             <thead>
               <tr>
                 <th scope="col">報修內容</th>
@@ -177,8 +180,8 @@ export default function MaintenancePage() {
                       <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>處理備註:{r.handleNote}</div>
                     )}
                   </td>
-                  <td className="num" style={{ fontSize: 13, width: 110 }}>{r.date}</td>
-                  <td style={{ width: 100 }}><StatusPill status={r.status} /></td>
+                  <td className="num" style={{ fontSize: 13 }}>{r.date}</td>
+                  <td><StatusPill status={r.status} /></td>
                 </tr>
               ))}
               {listQuery.isError && (

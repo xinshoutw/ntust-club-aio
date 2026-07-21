@@ -5,6 +5,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import { confirmDialog } from '../../lib/confirm'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
+import { Cols } from '../../components/ui/tableControls'
 import {
   DOW_TEXT,
   PERIODS,
@@ -286,7 +287,8 @@ export default function FixedRoomPage() {
       <Spin spinning={activeQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在申請</div>
-          <table className="tb" aria-label="正在申請" style={{ minWidth: 620 }}>
+          <table className="tb fixed" aria-label="正在申請" style={{ minWidth: 620 }}>
+            <Cols widths={['auto', 110, 'auto', 110, 80]} />
             <thead>
               <tr>
                 <th scope="col">場地</th>
@@ -304,8 +306,8 @@ export default function FixedRoomPage() {
                   <td style={{ color: 'var(--steel)', fontSize: 13 }}>
                     {r.entries.map(roomEntryText).join('、')}
                   </td>
-                  <td style={{ width: 110 }}><StatusPill status={r.status} /></td>
-                  <td className="r" style={{ width: 80 }}>
+                  <td><StatusPill status={r.status} /></td>
+                  <td className="r">
                     {r.status === 'pending' || dayjs(r.startDate, 'YYYY/MM/DD').isAfter(todayStart, 'day') ? (
                       <Button size="small" danger onClick={() => cancelRow(r)}>取消</Button>
                     ) : (
@@ -334,7 +336,8 @@ export default function FixedRoomPage() {
       <Spin spinning={recentQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
-          <table className="tb" aria-label="最近申請" style={{ minWidth: 560 }}>
+          <table className="tb fixed" aria-label="最近申請" style={{ minWidth: 560 }}>
+            <Cols widths={['30%', 'auto', 110]} />
             <thead>
               <tr>
                 <th scope="col">場地</th>
@@ -349,7 +352,7 @@ export default function FixedRoomPage() {
                   <td style={{ color: 'var(--steel)', fontSize: 13 }}>
                     {r.entries.map(roomEntryText).join('、')}
                   </td>
-                  <td style={{ width: 110 }}><StatusPill status={r.status} /></td>
+                  <td><StatusPill status={r.status} /></td>
                 </tr>
               ))}
               {recentQuery.isError && (

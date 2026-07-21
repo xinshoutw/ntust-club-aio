@@ -4,7 +4,7 @@ import { Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
-import { Pager } from '../../components/ui/tableControls'
+import { Cols, Pager } from '../../components/ui/tableControls'
 import { useViolations } from '../../api/violations'
 
 const PAGE_SIZE = 20
@@ -31,7 +31,8 @@ export default function ViolationsPage() {
 
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-          <table className="tb" style={{ minWidth: 720 }}>
+          <table className="tb fixed" style={{ minWidth: 720 }}>
+            <Cols widths={[110, '22%', 'auto', 180, 100]} />
             <thead>
               <tr>
                 <th>日期</th>

@@ -2,6 +2,7 @@ import { App, Button, Form, Input, Select, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
+import { Cols } from '../../components/ui/tableControls'
 import { useAuth } from '../../app/auth'
 import { kindLabel, type MemberKind } from '../../lib/roles'
 import {
@@ -112,7 +113,8 @@ export default function CertificatePage() {
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在申請</div>
-          <table className="tb" aria-label="幹部證明申請紀錄" style={{ minWidth: 480 }}>
+          <table className="tb fixed" aria-label="幹部證明申請紀錄" style={{ minWidth: 480 }}>
+            <Cols widths={['auto', 130, 110, 100]} />
             <thead>
               <tr>
                 <th scope="col">申請人</th>
@@ -126,8 +128,8 @@ export default function CertificatePage() {
                 <tr key={c.id}>
                   <td style={{ fontWeight: 500 }}>{`${c.applicantName} (${kindLabel(c.position, user?.clubKind)})`}</td>
                   <td style={{ color: 'var(--steel)', fontSize: 13 }}>{termLabel(c.term)}</td>
-                  <td className="num" style={{ fontSize: 13, width: 110 }}>{c.date}</td>
-                  <td style={{ width: 100 }}><StatusPill status={c.status} /></td>
+                  <td className="num" style={{ fontSize: 13 }}>{c.date}</td>
+                  <td><StatusPill status={c.status} /></td>
                 </tr>
               ))}
               {listQuery.isError && (
@@ -150,7 +152,8 @@ export default function CertificatePage() {
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
-          <table className="tb" aria-label="幹部證明申請紀錄" style={{ minWidth: 480 }}>
+          <table className="tb fixed" aria-label="幹部證明申請紀錄" style={{ minWidth: 480 }}>
+            <Cols widths={['auto', 130, 110, 100]} />
             <thead>
               <tr>
                 <th scope="col">申請人</th>
@@ -164,8 +167,8 @@ export default function CertificatePage() {
                 <tr key={c.id}>
                   <td style={{ fontWeight: 500 }}>{`${c.applicantName} (${kindLabel(c.position, user?.clubKind)})`}</td>
                   <td style={{ color: 'var(--steel)', fontSize: 13 }}>{termLabel(c.term)}</td>
-                  <td className="num" style={{ fontSize: 13, width: 110 }}>{c.date}</td>
-                  <td style={{ width: 100 }}><StatusPill status={c.status} /></td>
+                  <td className="num" style={{ fontSize: 13 }}>{c.date}</td>
+                  <td><StatusPill status={c.status} /></td>
                 </tr>
               ))}
               {listQuery.isError && (

@@ -3,7 +3,7 @@ import { App, Button, Form, Input, Modal, Popconfirm, Select, Spin, Upload } fro
 import { DownOutlined, DownloadOutlined, EditOutlined, UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
-import { FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
+import { Cols, FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
 import { downloadCsv } from '../../lib/csv'
 import { MEMBER_KINDS, kindLabel, type MemberKind } from '../../lib/roles'
 import { CURRENT_SEMESTER } from '../../lib/semester'
@@ -191,7 +191,8 @@ export default function MembersPage() {
 
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-          <table className="tb" style={{ minWidth: 680 }}>
+          <table className="tb fixed" style={{ minWidth: 800 }}>
+            <Cols widths={['auto', 100, 120, 'auto', 120, 80, 134, 90]} />
             <thead>
               <tr>
                 <th>{sortHeader('姓名', 'name')}</th>
@@ -220,7 +221,7 @@ export default function MembersPage() {
             <tbody>
               {members.map((m: Member) => (
                 <tr key={m.id}>
-                  <td style={{ fontWeight: 500 }}>{m.name}</td>
+                  <td className="cell-clip" style={{ fontWeight: 500 }} title={m.name}>{m.name}</td>
                   <td className="num" style={{ color: 'var(--steel)' }}>{m.studentId}</td>
                   <td>
                     {editing?.id === m.id && editing.field === 'kind' ? (
@@ -229,7 +230,7 @@ export default function MembersPage() {
                         autoFocus
                         defaultOpen
                         value={m.kind}
-                        style={{ width: 150 }}
+                        style={{ width: '100%' }}
                         options={kindOptions}
                         onChange={(v) => {
                           // 職稱各身份皆可保留(2026-07-21 放寬)
@@ -250,7 +251,7 @@ export default function MembersPage() {
                         size="small"
                         autoFocus
                         defaultValue={m.title}
-                        style={{ width: 120 }}
+                        style={{ width: '100%' }}
                         onBlur={(e) => {
                           patchMember(m.id, { title: e.target.value.trim() || null })
                           setEditing(null)
@@ -273,7 +274,7 @@ export default function MembersPage() {
                         autoFocus
                         defaultValue={m.phone}
                         className="num"
-                        style={{ width: 130 }}
+                        style={{ width: '100%' }}
                         onBlur={(e) => {
                           patchMember(m.id, { phone: e.target.value.trim() || null })
                           setEditing(null)

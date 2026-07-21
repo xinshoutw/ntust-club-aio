@@ -6,6 +6,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import { confirmDialog } from '../../lib/confirm'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
+import { Cols } from '../../components/ui/tableControls'
 import {
   PERIODS,
   bookingStarted,
@@ -201,7 +202,8 @@ export default function VenueBookingPage() {
       <Spin spinning={activeQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在申請</div>
-          <table className="tb" aria-label="正在申請" style={{ minWidth: 560 }}>
+          <table className="tb fixed" aria-label="正在申請" style={{ minWidth: 560 }}>
+            <Cols widths={['auto', 110, 'auto', 110, 80]} />
             <thead>
               <tr>
                 <th scope="col">場地</th>
@@ -217,8 +219,8 @@ export default function VenueBookingPage() {
                   <td style={{ fontWeight: 500 }}>{v.venueName}</td>
                   <td className="num" style={{ fontSize: 13 }}>{v.date}</td>
                   <td style={{ color: 'var(--steel)', fontSize: 13 }}>第 {v.periods.join('、')} 節</td>
-                  <td style={{ width: 110 }}><StatusPill status={v.status} /></td>
-                  <td className="r" style={{ width: 80 }}>
+                  <td><StatusPill status={v.status} /></td>
+                  <td className="r">
                     {/* 申請起始時刻(最早節次起點)前皆可取消,pending 與 approved 一致(與後端同界) */}
                     {(v.status === 'pending' || v.status === 'approved') && !bookingStarted(v.date, v.periods) ? (
                       <Button size="small" danger onClick={() => cancelRow(v)}>取消</Button>
@@ -248,7 +250,8 @@ export default function VenueBookingPage() {
       <Spin spinning={recentQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
-          <table className="tb" aria-label="最近申請" style={{ minWidth: 560 }}>
+          <table className="tb fixed" aria-label="最近申請" style={{ minWidth: 560 }}>
+            <Cols widths={['auto', 110, 'auto', 110]} />
             <thead>
               <tr>
                 <th scope="col">場地</th>
@@ -263,7 +266,7 @@ export default function VenueBookingPage() {
                   <td style={{ fontWeight: 500 }}>{v.venueName}</td>
                   <td className="num" style={{ fontSize: 13 }}>{v.date}</td>
                   <td style={{ color: 'var(--steel)', fontSize: 13 }}>第 {v.periods.join('、')} 節</td>
-                  <td style={{ width: 110 }}><StatusPill status={v.status} /></td>
+                  <td><StatusPill status={v.status} /></td>
                 </tr>
               ))}
               {recentQuery.isError && (

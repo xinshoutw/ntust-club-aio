@@ -16,6 +16,10 @@ dist/
 # local data
 data/
 
+# 舊系統遷移:DB dump 與一次性密碼輸出(個資/明碼,絕不入版控)
+*.dump
+migration/out/
+
 # macOS
 .DS_Store
 

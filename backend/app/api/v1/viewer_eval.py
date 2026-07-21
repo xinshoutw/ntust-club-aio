@@ -100,7 +100,12 @@ async def my_assignments(user: ViewerUser, db: DbDep) -> ApiResponse[list[Viewer
             sa.select(EvalGroup, Award)
             .join(EvalGroupReviewer, EvalGroupReviewer.group_id == EvalGroup.id)
             .join(Award, Award.id == EvalGroup.award_id)
-            .where(EvalGroupReviewer.user_id == user.id, EvalGroup.year == window.year)
+            # 停用獎項不列入指派(detail/save 對停用獎項回 404,列表須一致)
+            .where(
+                EvalGroupReviewer.user_id == user.id,
+                EvalGroup.year == window.year,
+                Award.is_active,
+            )
             .order_by(EvalGroup.sort, EvalGroup.id)
         )
     ).all()

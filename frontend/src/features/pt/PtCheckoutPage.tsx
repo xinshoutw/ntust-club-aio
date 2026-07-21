@@ -1,23 +1,25 @@
 import { useState } from 'react'
-import { App, Button, Input, Modal } from 'antd'
+import { App, Button, Input, Modal, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import { Pager } from '../../components/ui/tableControls'
-import { APPROVED_LOANS, type PtLoan } from './mock'
+import { STAFF_PAGE_SIZE, useStaffLoans, useStaffMutations, type StaffLoan } from '../../api/staff'
 
-const PAGE_SIZE = 20
-
-// 器材借出點交(工讀生端基礎原型):已核准借用逐單點交,登記借用人;
-// 「依序點交」器材逐件登記序號。目前 mock:確認後僅本地移除 + toast
+// 器材借出點交:已核准借用逐單點交,登記借用人;
+// 「依序點交」器材逐件登記序號(任一空白擋下,與後端檢核一致)
 export default function PtCheckoutPage() {
   const { message } = App.useApp()
-  const [rows, setRows] = useState<PtLoan[]>(APPROVED_LOANS)
   const [page, setPage] = useState(1)
-  const [selected, setSelected] = useState<PtLoan | null>(null)
+  const [selected, setSelected] = useState<StaffLoan | null>(null)
   const [open, setOpen] = useState(false)
   const [borrower, setBorrower] = useState('')
   const [serials, setSerials] = useState<string[]>([])
+  const listQuery = useStaffLoans('approved', page)
+  const { checkout } = useStaffMutations()
+  const rows = listQuery.data?.loans ?? []
+  const total = listQuery.data?.total ?? 0
 
-  const openModal = (loan: PtLoan) => {
+  const openModal = (loan: StaffLoan) => {
     setSelected(loan)
     setBorrower('')
     setSerials(Array.from({ length: loan.needsSerial ? loan.qty : 0 }, () => ''))
@@ -26,20 +28,27 @@ export default function PtCheckoutPage() {
 
   const confirm = () => {
     if (!selected) return
-    if (!borrower.trim()) {
+    const name = borrower.trim()
+    if (!name) {
       message.error('請填寫借用人姓名')
       return
     }
-    if (selected.needsSerial && serials.some((s) => !s.trim())) {
+    const cleaned = serials.map((s) => s.trim())
+    if (selected.needsSerial && cleaned.some((s) => !s)) {
       message.error('依序點交器材需逐件登記序號')
       return
     }
-    setRows((prev) => prev.filter((r) => r.id !== selected.id))
-    setOpen(false)
-    message.success(`${selected.club} ${selected.equipment} ×${selected.qty} 已完成借出點交`)
+    checkout.mutate(
+      { id: selected.id, borrower: name, serials: selected.needsSerial ? cleaned : undefined },
+      {
+        onSuccess: () => {
+          setOpen(false)
+          message.success(`${selected.club} ${selected.equipment} ×${selected.qty} 已完成借出點交`)
+        },
+        onError: (e) => message.error(e.message),
+      },
+    )
   }
-
-  const paged = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   return (
     <div>
@@ -47,40 +56,54 @@ export default function PtCheckoutPage() {
         title="器材借出點交"
         sub={
           <>
-            待點交 <span className="num">{rows.length}</span> 件
+            待點交 <span className="num">{total}</span> 件
           </>
         }
       />
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-        <table className="tb dense" style={{ minWidth: 720 }}>
-          <thead>
-            <tr>
-              <th>社團</th>
-              <th>器材</th>
-              <th>借用區間</th>
-              <th>點交方式</th>
-            </tr>
-          </thead>
-          <tbody>
-            {paged.map((l) => (
-              <tr key={l.id} className="click-tint" style={{ cursor: 'pointer' }} onClick={() => openModal(l)}>
-                <td>{l.club}</td>
-                <td style={{ fontWeight: 500 }}>
-                  {l.equipment} <span className="num">×{l.qty}</span>
-                </td>
-                <td className="num" style={{ fontSize: 13 }}>{l.start} – {l.end}</td>
-                <td style={{ fontSize: 13, color: 'var(--steel)' }}>{l.needsSerial ? '依序點交' : '一般'}</td>
+        <Spin spinning={listQuery.isPending}>
+          <table className="tb dense" style={{ minWidth: 720 }}>
+            <thead>
+              <tr>
+                <th>社團</th>
+                <th>器材</th>
+                <th>借用區間</th>
+                <th>點交方式</th>
               </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr className="no-hover">
-                <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有待借出的核准單</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-        <Pager page={page} pageSize={PAGE_SIZE} total={rows.length} onChange={setPage} />
+            </thead>
+            <tbody>
+              {rows.map((l) => (
+                <tr key={l.id} className="click-tint" style={{ cursor: 'pointer' }} onClick={() => openModal(l)}>
+                  <td>{l.club}</td>
+                  <td style={{ fontWeight: 500 }}>
+                    {l.equipment} <span className="num">×{l.qty}</span>
+                  </td>
+                  <td className="num" style={{ fontSize: 13 }}>{l.start} – {l.end}</td>
+                  <td style={{ fontSize: 13, color: 'var(--steel)' }}>{l.needsSerial ? '依序點交' : '一般'}</td>
+                </tr>
+              ))}
+              {listQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={4}>
+                    <QueryError
+                      compact
+                      title="待點交清單載入失敗"
+                      error={listQuery.error}
+                      onRetry={() => void listQuery.refetch()}
+                    />
+                  </td>
+                </tr>
+              )}
+              {!listQuery.isPending && !listQuery.isError && rows.length === 0 && (
+                <tr className="no-hover">
+                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有待借出的核准單</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          <Pager page={page} pageSize={STAFF_PAGE_SIZE} total={total} onChange={setPage} />
+        </Spin>
       </div>
 
       <Modal
@@ -90,7 +113,7 @@ export default function PtCheckoutPage() {
         destroyOnHidden
         title={selected ? `借出點交 — ${selected.club}` : ''}
         footer={
-          <Button type="primary" onClick={confirm}>
+          <Button type="primary" loading={checkout.isPending} onClick={confirm}>
             確認借出
           </Button>
         }

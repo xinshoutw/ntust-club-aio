@@ -87,7 +87,9 @@ export default function ActivityReviewModal({
   const [rejectOpen, setRejectOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const approveRef = useModalAutoFocus(open)
+  // item 到位才聚焦:骨架模式(item=null)開窗時核准鈕尚未 render,
+  // 待詳情補齊、footer 換上按鈕後再聚焦,Enter 送出才有效
+  const approveRef = useModalAutoFocus(open && !!item)
   // 大型活動:社團申請或管理員逕行核定;認可後行政分才享 ×3 加權。
   // 未處理的申請預設不勾(空心=待處理),認可須管理員明確勾選,避免順手核准即誤放 ×3
   const [largeApproved, setLargeApproved] = useState(item?.largeApproved ?? false)

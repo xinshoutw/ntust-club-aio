@@ -253,25 +253,40 @@ export const canActOnClose = (user: SessionUser | null): boolean =>
 // ---- 查詢 ----
 
 export interface AdminActivityListParams {
-  status?: AdminActivityStatus
+  /** 可帶多值(後端 status 多選;2026-07-21) */
+  statuses?: AdminActivityStatus[]
   clubId?: number
+}
+
+/** 伺服器端分頁查詢(2026-07-21:14k+ 筆禁止整批撈取) */
+export interface AdminActivityPageParams {
+  statuses?: AdminActivityStatus[]
+  clubIds?: number[]
+  /** 類型標籤(社課或會議/活動/大型活動;大型為後端推導型別) */
+  types?: string[]
+  /** 僅逾期鎖定(已核准+超過結案期限+未解鎖;後端推導) */
+  locked?: boolean
+  /** 排序白名單:club/name/type/date/status/created_at;前綴 - 為降冪 */
+  sort?: string
+  page: number
+  pageSize: number
 }
 
 const keys = {
   all: ['adminActivities'] as const,
   list: (p: AdminActivityListParams) => ['adminActivities', 'list', p] as const,
+  paged: (p: AdminActivityPageParams) => ['adminActivities', 'paged', p] as const,
   detail: (id: number) => ['adminActivities', 'detail', id] as const,
 }
 
 export const adminActivityKeys = keys
 
-// 後端無排序參數(id 降冪);逐頁抓齊後由前端排序/篩選/分頁,
-// 保留現有 UX(佇列送件早在前、多選標籤篩選皆非後端可表達)
+// 僅限小結果集(待審佇列等);大清單一律走 useAdminActivitiesPaged
 async function fetchAllAdminActivities(p: AdminActivityListParams): Promise<AdminActivity[]> {
   const out: AdminActivity[] = []
   for (let page = 1; ; page++) {
     const { data, total } = await apiPaged<AdminActivityOut[]>(
-      `/admin/activities${qs({ status: p.status, club_id: p.clubId, page, page_size: 100 })}`,
+      `/admin/activities${qs({ status: p.statuses, club_id: p.clubId, page, page_size: 100 })}`,
     )
     out.push(...data.map(toAdminActivity))
     if (data.length === 0 || out.length >= total) break
@@ -279,10 +294,30 @@ async function fetchAllAdminActivities(p: AdminActivityListParams): Promise<Admi
   return out
 }
 
-export function useAdminActivities(p: AdminActivityListParams = {}) {
+export function useAdminActivities(p: AdminActivityListParams = {}, opts: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: keys.list(p),
     queryFn: () => fetchAllAdminActivities(p),
+    placeholderData: keepPreviousData,
+    enabled: opts.enabled ?? true,
+  })
+}
+
+export function useAdminActivitiesPaged(p: AdminActivityPageParams) {
+  return useQuery({
+    queryKey: keys.paged(p),
+    queryFn: () =>
+      apiPaged<AdminActivityOut[]>(
+        `/admin/activities${qs({
+          status: p.statuses,
+          club_id: p.clubIds?.map(String),
+          type: p.types,
+          locked: p.locked ? true : undefined,
+          sort: p.sort,
+          page: p.page,
+          page_size: p.pageSize,
+        })}`,
+      ).then(({ data, total }) => ({ rows: data.map(toAdminActivity), total })),
     placeholderData: keepPreviousData,
   })
 }

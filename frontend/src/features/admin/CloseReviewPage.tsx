@@ -1,16 +1,20 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { App, Button, Checkbox, Input, Modal, Skeleton, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
 import { fmtMoney } from '../activities/types'
+import { Pager } from '../../components/ui/tableControls'
 import {
   canActOnClose,
-  useAdminActivities,
+  useAdminActivitiesPaged,
   useAdminActivityDetail,
   useAdminActivityMutations,
   type AdminActivity,
 } from '../../api/adminActivities'
+
+// 一頁最多 50 筆、活動時間新在前(2026-07-21 需求方:整批撈取造成瀏覽器卡頓)
+const PAGE_SIZE = 50
 
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 
@@ -286,17 +290,28 @@ export default function CloseReviewPage() {
   const [selected, setSelected] = useState<AdminActivity | null>(null)
   const [open, setOpen] = useState(false)
 
-  const pendingQuery = useAdminActivities({ status: 'closing_pending_advisor' })
-  const approvedQuery = useAdminActivities({ status: 'approved' })
+  const [pendingPage, setPendingPage] = useState(1)
+  const [lockedPage, setLockedPage] = useState(1)
+  // 伺服器端分頁+排序:活動時間新在前(2026-07-21)
+  const pendingQuery = useAdminActivitiesPaged({
+    statuses: ['closing_pending_advisor'],
+    sort: '-date',
+    page: pendingPage,
+    pageSize: PAGE_SIZE,
+  })
+  // 逾期鎖定改後端推導過濾(原自 2,800+ 筆已核准整批撈取後前端篩選)
+  const lockedQuery = useAdminActivitiesPaged({
+    locked: true,
+    sort: '-date',
+    page: lockedPage,
+    pageSize: PAGE_SIZE,
+  })
   const { unlock } = useAdminActivityMutations()
 
-  // 送件早的在前(以活動建立時間近似;結案送件時間僅詳情提供)
-  const pending = useMemo(
-    () => [...(pendingQuery.data ?? [])].sort((a, b) => a.submittedAt.localeCompare(b.submittedAt)),
-    [pendingQuery.data],
-  )
-  // 逾期鎖定為推導狀態:後端無 locked 查詢參數,自已核准中篩 close_locked
-  const locked = useMemo(() => (approvedQuery.data ?? []).filter((i) => i.closeLocked), [approvedQuery.data])
+  const pending = pendingQuery.data?.rows ?? []
+  const pendingTotal = pendingQuery.data?.total ?? 0
+  const locked = lockedQuery.data?.rows ?? []
+  const lockedTotal = lockedQuery.data?.total ?? 0
 
   const openItem = (p: AdminActivity) => {
     setSelected(p)
@@ -316,7 +331,7 @@ export default function CloseReviewPage() {
         title="結案審核"
         sub={
           <>
-            待審 <span className="num">{pending.length}</span> 件 · 逾期鎖定 <span className="num">{locked.length}</span> 件
+            待審 <span className="num">{pendingTotal}</span> 件 · 逾期鎖定 <span className="num">{lockedTotal}</span> 件
           </>
         }
       />
@@ -377,10 +392,11 @@ export default function CloseReviewPage() {
               {pendingQuery.isError ? `載入失敗:${pendingQuery.error.message}` : '目前沒有待審結案'}
             </div>
           )}
+          <Pager page={pendingPage} pageSize={PAGE_SIZE} total={pendingTotal} onChange={setPendingPage} />
         </div>
       </Spin>
 
-      <Spin spinning={approvedQuery.isPending}>
+      <Spin spinning={lockedQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>逾期未結案(已鎖定)</div>
           <table className="tb dense" style={{ minWidth: 640 }} aria-label="逾期未結案活動">
@@ -414,15 +430,16 @@ export default function CloseReviewPage() {
                   </td>
                 </tr>
               ))}
-              {!approvedQuery.isPending && locked.length === 0 && (
+              {!lockedQuery.isPending && locked.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
-                    {approvedQuery.isError ? `載入失敗:${approvedQuery.error.message}` : '沒有逾期的活動'}
+                    {lockedQuery.isError ? `載入失敗:${lockedQuery.error.message}` : '沒有逾期的活動'}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+          <Pager page={lockedPage} pageSize={PAGE_SIZE} total={lockedTotal} onChange={setLockedPage} />
         </div>
       </Spin>
 

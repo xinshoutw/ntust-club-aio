@@ -11,42 +11,88 @@ import { fmtMoney } from '../activities/types'
 import {
   canActOn,
   useAdminActivities,
+  useAdminActivitiesPaged,
   useAdminActivityDetail,
   useAdminActivityMutations,
   type AdminActivity,
+  type AdminActivityStatus,
 } from '../../api/adminActivities'
+import { useClubOptions } from '../../api/adminClubs'
 import ActivityReviewModal from './ActivityReviewModal'
 
 const PAGE_SIZE = 20
+const ALL_STATUSES: AdminActivityStatus[] = [
+  'pending_advisor',
+  'pending_chief',
+  'pending_dean',
+  'approved',
+  'rejected',
+  'closing_pending_advisor',
+  'closed',
+]
 
-// 類型的篩選/排序值:有「大」標記者(申請中或已認可)視為大型活動;
-// 申請被否准(largeApproved===false)以一般活動計 — 解讀待需求方確認
-const typeKey = (item: AdminActivity): string =>
-  item.type === '活動' && (item.largeApproved === true || (item.isLarge && item.largeApproved !== false))
-    ? '大型活動'
-    : item.type
+// 類型篩選由後端推導(「大型活動」=類型活動且已認可或申請中未被否准);
+// 排序亦為伺服器端白名單(type 排序以原始類型為準,大型不獨立成一級)
 const TYPE_OPTIONS = ['社課或會議', '活動', '大型活動']
 
 type SortKey = 'club' | 'name' | 'type' | 'date' | 'status'
-
-function sortValue(item: AdminActivity, key: SortKey): string {
-  if (key === 'type') return typeKey(item)
-  if (key === 'status') return STATUS[item.status].label
-  return item[key]
-}
 
 export default function ReviewPage() {
   const { user } = useAuth()
   const [current, setCurrent] = useState<AdminActivity | null>(null)
   const [open, setOpen] = useState(false)
   const { sort, toggle } = useSort<SortKey>()
+  const toggleSort = (k: SortKey) => {
+    toggle(k)
+    setPage(1) // 伺服器端分頁:換排序回到第 1 頁
+  }
   const [clubFilter, setClubFilter] = useState<string[]>([])
   const [typeFilter, setTypeFilter] = useState<string[]>([])
   const [statusFilter, setStatusFilter] = useState<string[]>([])
   const [page, setPage] = useState(1)
 
-  const listQuery = useAdminActivities()
-  const items = useMemo(() => listQuery.data ?? [], [listQuery.data])
+  // 待審佇列:僅撈登入者可簽核的狀態(小結果集);其他狀態表改伺服器端分頁,
+  // 不再整批撈取 14k+ 筆(2026-07-21 需求方:SQL 存取必須分批)
+  const queueStatuses = useMemo(
+    () => ALL_STATUSES.filter((st) => canActOn(user, st)),
+    [user],
+  )
+  const queueQuery = useAdminActivities(
+    { statuses: queueStatuses },
+    { enabled: queueStatuses.length > 0 },
+  )
+  const queue = useMemo(
+    () =>
+      [...(queueQuery.data ?? [])].sort((a, b) => a.submittedAt.localeCompare(b.submittedAt)),
+    [queueQuery.data],
+  )
+
+  // 篩選:社團名 → id(選項自最小社團主檔);狀態標籤 → 狀態值(待審三關同標籤合併)
+  const othersStatuses = useMemo(
+    () => ALL_STATUSES.filter((st) => !canActOn(user, st)),
+    [user],
+  )
+  const clubsQuery = useClubOptions()
+  const clubOptions = (clubsQuery.data ?? []).map((c) => c.name)
+  const statusOptions = [...new Set(othersStatuses.map((st) => STATUS[st].label))]
+
+  const clubIds = clubFilter.length
+    ? (clubsQuery.data ?? []).filter((c) => clubFilter.includes(c.name)).map((c) => c.id)
+    : undefined
+  const statuses = statusFilter.length
+    ? othersStatuses.filter((st) => statusFilter.includes(STATUS[st].label))
+    : othersStatuses
+  const listQuery = useAdminActivitiesPaged({
+    statuses,
+    clubIds,
+    types: typeFilter.length ? typeFilter : undefined,
+    sort: sort ? `${sort.dir === -1 ? '-' : ''}${sort.key}` : undefined,
+    page,
+    pageSize: PAGE_SIZE,
+  })
+  const pagedRows = listQuery.data?.rows ?? []
+  const total = listQuery.data?.total ?? 0
+
   // 點列即抓詳情(經費/附件),載入完成後彈窗自動補齊
   const detailQuery = useAdminActivityDetail(current?.activityId)
   const { approve, reject } = useAdminActivityMutations()
@@ -55,33 +101,6 @@ export default function ReviewPage() {
     setCurrent(item)
     setOpen(true)
   }
-
-  // 待本關簽核的佇列:依登入者簽核鍵(approve_advisor/chief/dean)推導,送件早的在前
-  const queue = useMemo(
-    () =>
-      items
-        .filter((i) => canActOn(user, i.status))
-        .sort((a, b) => a.submittedAt.localeCompare(b.submittedAt)),
-    [items, user],
-  )
-  const others = useMemo(() => items.filter((i) => !canActOn(user, i.status)), [items, user])
-
-  const clubOptions = [...new Set(others.map((i) => i.club))]
-  const statusOptions = [...new Set(others.map((i) => STATUS[i.status].label))]
-
-  const rows = useMemo(() => {
-    let list = others
-    if (clubFilter.length) list = list.filter((i) => clubFilter.includes(i.club))
-    if (typeFilter.length) list = list.filter((i) => typeFilter.includes(typeKey(i)))
-    if (statusFilter.length) list = list.filter((i) => statusFilter.includes(STATUS[i.status].label))
-    if (sort) {
-      list = [...list].sort(
-        (a, b) => sort.dir * String(sortValue(a, sort.key)).localeCompare(String(sortValue(b, sort.key)), 'zh-Hant'),
-      )
-    }
-    return list
-  }, [others, clubFilter, typeFilter, statusFilter, sort])
-  const pagedRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const resetPage = () => setPage(1)
 
@@ -96,7 +115,7 @@ export default function ReviewPage() {
         }
       />
 
-      <Spin spinning={listQuery.isPending}>
+      <Spin spinning={queueQuery.isPending || listQuery.isPending}>
         {/* 待審佇列:本關可簽核的單據,送件早的在前 */}
         <div className="card" style={{ marginTop: 20 }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 6px' }}>待審佇列</div>
@@ -156,7 +175,7 @@ export default function ReviewPage() {
           ))}
           {queue.length === 0 && (
             <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
-              {listQuery.isError ? `載入失敗:${listQuery.error.message}` : '沒有待本關簽核的申請'}
+              {queueQuery.isError ? `載入失敗:${queueQuery.error.message}` : '沒有待本關簽核的申請'}
             </div>
           )}
         </div>
@@ -169,7 +188,7 @@ export default function ReviewPage() {
               <tr>
                 <th>
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <SortButton label="社團" sortKey="club" sort={sort} onToggle={toggle} />
+                    <SortButton label="社團" sortKey="club" sort={sort} onToggle={toggleSort} />
                     <FilterButton
                       options={clubOptions}
                       selected={clubFilter}
@@ -181,10 +200,10 @@ export default function ReviewPage() {
                     />
                   </span>
                 </th>
-                <th><SortButton label="活動名稱" sortKey="name" sort={sort} onToggle={toggle} /></th>
+                <th><SortButton label="活動名稱" sortKey="name" sort={sort} onToggle={toggleSort} /></th>
                 <th>
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <SortButton label="類型" sortKey="type" sort={sort} onToggle={toggle} />
+                    <SortButton label="類型" sortKey="type" sort={sort} onToggle={toggleSort} />
                     <FilterButton
                       options={TYPE_OPTIONS}
                       selected={typeFilter}
@@ -196,11 +215,11 @@ export default function ReviewPage() {
                     />
                   </span>
                 </th>
-                <th><SortButton label="活動日期" sortKey="date" sort={sort} onToggle={toggle} /></th>
+                <th><SortButton label="活動日期" sortKey="date" sort={sort} onToggle={toggleSort} /></th>
                 <th className="r">擬請補助</th>
                 <th>
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <SortButton label="狀態" sortKey="status" sort={sort} onToggle={toggle} />
+                    <SortButton label="狀態" sortKey="status" sort={sort} onToggle={toggleSort} />
                     <FilterButton
                       options={statusOptions}
                       selected={statusFilter}
@@ -253,7 +272,7 @@ export default function ReviewPage() {
               )}
             </tbody>
           </table>
-          <Pager page={page} pageSize={PAGE_SIZE} total={rows.length} onChange={setPage} />
+          <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} />
         </div>
       </Spin>
 

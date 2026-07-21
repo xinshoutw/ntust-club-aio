@@ -4,7 +4,7 @@ import { RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import LargeBadge from '../../components/ui/LargeBadge'
-import { FilterButton, Pager, SortButton, useSort } from '../../components/ui/tableControls'
+import { FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
 import { STATUS } from '../../lib/status'
 import { useAuth } from '../../app/auth'
 import { fmtMoney } from '../activities/types'
@@ -41,7 +41,8 @@ export default function ReviewPage() {
   const { user } = useAuth()
   const [current, setCurrent] = useState<AdminActivity | null>(null)
   const [open, setOpen] = useState(false)
-  const { sort, toggle } = useSort<SortKey>()
+  // 預設審核時間新→舊(無審核紀錄者殿後);點欄位依點擊序疊加多鍵,全清除後回到預設
+  const { entries, stack, toggle } = useMultiSort<SortKey>([{ key: 'reviewed_at', dir: -1 }])
   const toggleSort = (k: SortKey) => {
     toggle(k)
     setPage(1) // 伺服器端分頁:換排序回到第 1 頁
@@ -88,8 +89,8 @@ export default function ReviewPage() {
     statuses,
     clubIds,
     types: typeFilter.length ? typeFilter : undefined,
-    // 預設審核時間新→舊(明確帶 sort;無審核紀錄者殿後);點欄位排序即覆蓋,清除排序回到預設
-    sort: sort ? `${sort.dir === -1 ? '-' : ''}${sort.key}` : '-reviewed_at',
+    // 顯式預設(-reviewed_at)寫在 useMultiSort defaults:entries 一律非空,固定帶 sort
+    sort: sortParam(entries),
     page,
     pageSize: PAGE_SIZE,
   })
@@ -191,7 +192,7 @@ export default function ReviewPage() {
               <tr>
                 <th>
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <SortButton label="社團" sortKey="club" sort={sort} onToggle={toggleSort} />
+                    <MultiSortButton label="社團" sortKey="club" stack={stack} onToggle={toggleSort} />
                     <FilterButton
                       options={clubOptions}
                       selected={clubFilter}
@@ -203,10 +204,10 @@ export default function ReviewPage() {
                     />
                   </span>
                 </th>
-                <th><SortButton label="活動名稱" sortKey="name" sort={sort} onToggle={toggleSort} /></th>
+                <th><MultiSortButton label="活動名稱" sortKey="name" stack={stack} onToggle={toggleSort} /></th>
                 <th>
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <SortButton label="類型" sortKey="type" sort={sort} onToggle={toggleSort} />
+                    <MultiSortButton label="類型" sortKey="type" stack={stack} onToggle={toggleSort} />
                     <FilterButton
                       options={TYPE_OPTIONS}
                       selected={typeFilter}
@@ -218,11 +219,11 @@ export default function ReviewPage() {
                     />
                   </span>
                 </th>
-                <th><SortButton label="活動日期" sortKey="date" sort={sort} onToggle={toggleSort} /></th>
+                <th><MultiSortButton label="活動日期" sortKey="date" stack={stack} onToggle={toggleSort} /></th>
                 <th className="r">擬請補助</th>
                 <th>
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <SortButton label="狀態" sortKey="status" sort={sort} onToggle={toggleSort} />
+                    <MultiSortButton label="狀態" sortKey="status" stack={stack} onToggle={toggleSort} />
                     <FilterButton
                       options={statusOptions}
                       selected={statusFilter}
@@ -234,7 +235,7 @@ export default function ReviewPage() {
                     />
                   </span>
                 </th>
-                <th><SortButton label="審核時間" sortKey="reviewed_at" sort={sort} onToggle={toggleSort} /></th>
+                <th><MultiSortButton label="審核時間" sortKey="reviewed_at" stack={stack} onToggle={toggleSort} /></th>
                 <th aria-label="開啟" style={{ width: 32 }} />
               </tr>
             </thead>

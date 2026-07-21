@@ -305,10 +305,11 @@ export default function CloseReviewPage() {
     page: pendingPage,
     pageSize: PAGE_SIZE,
   })
-  // 逾期未結案:後端推導過濾,含已鎖定與已解鎖(overdue=true 不分鎖定與否)
+  // 逾期未結案:後端推導過濾,含已鎖定與已解鎖(overdue=true 不分鎖定與否);
+  // 活動日舊在前=逾期最久的先處理(期限=活動日+鎖定月數,單調)
   const overdueQuery = useAdminActivitiesPaged({
     overdue: true,
-    sort: '-date',
+    sort: 'date',
     page: overduePage,
     pageSize: PAGE_SIZE,
   })

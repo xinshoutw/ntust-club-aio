@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { App, Button, Select, Spin } from 'antd'
 import { DownloadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
-import { Pager, SortButton } from '../../components/ui/tableControls'
+import { MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
 import { downloadCsv } from '../../lib/csv'
 import { kindLabel } from '../../lib/roles'
 import { CURRENT_SEMESTER, semesterOptions } from '../../lib/semester'
@@ -12,6 +12,9 @@ import { useAdminClub } from './clubContext'
 
 const PAGE_SIZE = 50
 
+// 伺服器端排序白名單(members 端點;kind=身份權重,負責人→副負責人→幹部→社員)
+type SortKey = 'name' | 'student_id' | 'kind' | 'title' | 'semester' | 'updated_at'
+
 // 唯讀:名單由社團自行維護,行政僅查閱;可選學期、排序、匯出 CSV(比照社團端成員列表)
 // 學期下拉:admin 端無 semesters 子端點,先以「當前學期+全部學期」簡化
 export default function AdminMembersPage() {
@@ -19,21 +22,24 @@ export default function AdminMembersPage() {
   const { message } = App.useApp()
   const [page, setPage] = useState(1)
   const [semester, setSemester] = useState<string>(CURRENT_SEMESTER)
-  const [sort, setSort] = useState<{ key: 'kind' | 'title'; dir: 1 | -1 } | null>(null)
+  // 名冊慣例的預設序(身份權重→學號)=後端預設:不點排序時不帶 sort
+  const { stack, toggle } = useMultiSort<SortKey>()
   const [exporting, setExporting] = useState(false)
   useEffect(() => setPage(1), [clubId, semester])
 
   const listQuery = useAdminClubMembers(clubId, {
     semester: semester === 'all' ? undefined : semester,
-    sort: sort ? `${sort.dir === -1 ? '-' : ''}${sort.key}` : undefined,
+    sort: sortParam(stack),
     page,
     pageSize: PAGE_SIZE,
   })
   const members = listQuery.data?.members ?? []
   const total = listQuery.data?.total ?? 0
 
-  const toggleSort = (key: 'kind' | 'title') =>
-    setSort((s) => (s?.key === key ? (s.dir === 1 ? { key, dir: -1 } : null) : { key, dir: 1 }))
+  const toggleSort = (key: SortKey) => {
+    toggle(key)
+    setPage(1) // 伺服器端分頁:換排序回到第 1 頁
+  }
 
   const exportCsv = async () => {
     if (clubId == null) return
@@ -82,17 +88,13 @@ export default function AdminMembersPage() {
           <table className="tb" style={{ minWidth: 680 }}>
             <thead>
               <tr>
-                <th>姓名</th>
-                <th>學號</th>
-                <th>
-                  <SortButton label="身份" sortKey="kind" sort={sort} onToggle={toggleSort} />
-                </th>
-                <th>
-                  <SortButton label="職稱" sortKey="title" sort={sort} onToggle={toggleSort} />
-                </th>
+                <th><MultiSortButton label="姓名" sortKey="name" stack={stack} onToggle={toggleSort} /></th>
+                <th><MultiSortButton label="學號" sortKey="student_id" stack={stack} onToggle={toggleSort} /></th>
+                <th><MultiSortButton label="身份" sortKey="kind" stack={stack} onToggle={toggleSort} /></th>
+                <th><MultiSortButton label="職稱" sortKey="title" stack={stack} onToggle={toggleSort} /></th>
                 <th>電話</th>
-                <th>學期</th>
-                <th>更新時間</th>
+                <th><MultiSortButton label="學期" sortKey="semester" stack={stack} onToggle={toggleSort} /></th>
+                <th><MultiSortButton label="更新時間" sortKey="updated_at" stack={stack} onToggle={toggleSort} /></th>
               </tr>
             </thead>
             <tbody>

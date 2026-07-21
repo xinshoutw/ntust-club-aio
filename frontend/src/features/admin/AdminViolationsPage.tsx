@@ -1,10 +1,15 @@
 import { useMemo, useState } from 'react'
 import { App, Form, Input, Modal, Spin, Tooltip } from 'antd'
-import dayjs from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
-import { FilterButton, SortButton, useSort } from '../../components/ui/tableControls'
+import {
+  FilterButton,
+  MultiSortButton,
+  sortRows,
+  useMultiSort,
+  type SortEntry,
+} from '../../components/ui/tableControls'
 import { useAdminViolations, useResolveViolation, type AdminViolation } from '../../api/adminViolations'
 
 type SortKey = 'date' | 'location' | 'items' | 'filler' | 'deadline' | 'status'
@@ -13,19 +18,33 @@ const statusLabel = (v: AdminViolation): string => (v.status === 'violation_open
 const deadlineLabel = (v: AdminViolation): string =>
   v.status === 'violation_resolved' ? '—' : v.expired ? '已截止' : '未逾期'
 
-function sortValue(v: AdminViolation, key: SortKey): string {
-  if (key === 'items') return v.items.join('、')
-  if (key === 'deadline') return v.status === 'violation_resolved' ? '' : v.deadline
-  if (key === 'status') return statusLabel(v)
-  return v[key]
+// 各鍵一律寫升冪比較器,方向由 sortRows 依排序鏈翻轉;
+// status 升冪=未銷案在前(業務語意,非標籤字典序);deadline 已銷案(無期限)視為最小值
+const CMPS: Record<SortKey, (a: AdminViolation, b: AdminViolation) => number> = {
+  date: (a, b) => a.date.localeCompare(b.date),
+  location: (a, b) => a.location.localeCompare(b.location, 'zh-Hant'),
+  items: (a, b) => a.items.join('、').localeCompare(b.items.join('、'), 'zh-Hant'),
+  filler: (a, b) => a.filler.localeCompare(b.filler, 'zh-Hant'),
+  deadline: (a, b) =>
+    (a.status === 'violation_resolved' ? '' : a.deadline).localeCompare(
+      b.status === 'violation_resolved' ? '' : b.deadline,
+    ),
+  status: (a, b) =>
+    (a.status === 'violation_open' ? 0 : 1) - (b.status === 'violation_open' ? 0 : 1),
 }
+
+// 預設排序:未銷案在最上,各組內照發生日順序(銷案期限最近的先;與後端預設一致)
+const DEFAULT_SORT: SortEntry<SortKey>[] = [
+  { key: 'status', dir: 1 },
+  { key: 'date', dir: 1 },
+]
 
 export default function AdminViolationsPage() {
   const { message } = App.useApp()
   const [resolving, setResolving] = useState<AdminViolation | null>(null)
   const [resolveOpen, setResolveOpen] = useState(false)
   const [form] = Form.useForm()
-  const { sort, toggle } = useSort<SortKey>()
+  const { entries, stack, toggle } = useMultiSort<SortKey>(DEFAULT_SORT)
   const [itemFilter, setItemFilter] = useState<string[]>([])
   const [fillerFilter, setFillerFilter] = useState<string[]>([])
   const [deadlineFilter, setDeadlineFilter] = useState<string[]>([])
@@ -45,17 +64,8 @@ export default function AdminViolationsPage() {
     if (fillerFilter.length) list = list.filter((v) => fillerFilter.includes(v.filler))
     if (deadlineFilter.length) list = list.filter((v) => deadlineFilter.includes(deadlineLabel(v)))
     if (statusFilter.length) list = list.filter((v) => statusFilter.includes(statusLabel(v)))
-    if (sort) {
-      return [...list].sort(
-        (a, b) => sort.dir * String(sortValue(a, sort.key)).localeCompare(String(sortValue(b, sort.key)), 'zh-Hant'),
-      )
-    }
-    // 預設排序:未銷案在最上,各組內照時間順序(與後端預設一致)
-    return [...list].sort((a, b) => {
-      if (a.status !== b.status) return a.status === 'violation_open' ? -1 : 1
-      return dayjs(a.date, 'YYYY/MM/DD').valueOf() - dayjs(b.date, 'YYYY/MM/DD').valueOf()
-    })
-  }, [violations, sort, itemFilter, fillerFilter, deadlineFilter, statusFilter])
+    return sortRows(list, entries, CMPS)
+  }, [violations, entries, itemFilter, fillerFilter, deadlineFilter, statusFilter])
 
   const askResolve = (v: AdminViolation) => {
     setResolving(v)
@@ -94,29 +104,29 @@ export default function AdminViolationsPage() {
             <thead>
               <tr>
                 <th>社團</th>
-                <th><SortButton label="日期" sortKey="date" sort={sort} onToggle={toggle} /></th>
-                <th><SortButton label="地點" sortKey="location" sort={sort} onToggle={toggle} /></th>
+                <th><MultiSortButton label="日期" sortKey="date" stack={stack} onToggle={toggle} /></th>
+                <th><MultiSortButton label="地點" sortKey="location" stack={stack} onToggle={toggle} /></th>
                 <th>
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <SortButton label="項目" sortKey="items" sort={sort} onToggle={toggle} />
+                    <MultiSortButton label="項目" sortKey="items" stack={stack} onToggle={toggle} />
                     <FilterButton options={itemOptions} selected={itemFilter} onChange={setItemFilter} label="篩選項目" />
                   </span>
                 </th>
                 <th>
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <SortButton label="填寫" sortKey="filler" sort={sort} onToggle={toggle} />
+                    <MultiSortButton label="填寫" sortKey="filler" stack={stack} onToggle={toggle} />
                     <FilterButton options={fillerOptions} selected={fillerFilter} onChange={setFillerFilter} label="篩選填寫人" />
                   </span>
                 </th>
                 <th>
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <SortButton label="銷案期限" sortKey="deadline" sort={sort} onToggle={toggle} />
+                    <MultiSortButton label="銷案期限" sortKey="deadline" stack={stack} onToggle={toggle} />
                     <FilterButton options={['未逾期', '已截止']} selected={deadlineFilter} onChange={setDeadlineFilter} label="篩選期限" />
                   </span>
                 </th>
                 <th>
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <SortButton label="狀態" sortKey="status" sort={sort} onToggle={toggle} />
+                    <MultiSortButton label="狀態" sortKey="status" stack={stack} onToggle={toggle} />
                     <FilterButton options={['未銷案', '已銷案']} selected={statusFilter} onChange={setStatusFilter} label="篩選狀態" />
                   </span>
                 </th>

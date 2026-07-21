@@ -83,9 +83,11 @@ export default function AccountsPage() {
 
   const accountsQuery = useAccounts()
   const accounts = accountsQuery.data ?? []
-  const admins = accounts.filter((a) => a.role === 'admin')
-  const staff = accounts.filter((a) => a.role === 'staff')
-  const viewers = accounts.filter((a) => a.role === 'viewer')
+  // 名冊慣例:三類帳號皆姓名升冪(後端 id 序無語意;端點小量全抓,前端排即可)
+  const byName = (a: Account, b: Account) => a.name.localeCompare(b.name, 'zh-Hant')
+  const admins = accounts.filter((a) => a.role === 'admin').sort(byName)
+  const staff = accounts.filter((a) => a.role === 'staff').sort(byName)
+  const viewers = accounts.filter((a) => a.role === 'viewer').sort(byName)
   const { create, remove, setActive, resetPassword, setPermissions } = useAccountMutations()
 
   // 社團 tab:資料與動作走 /admin/clubs(啟停=社團與帳號一併連動,語意與上三類的純帳號停權不同)

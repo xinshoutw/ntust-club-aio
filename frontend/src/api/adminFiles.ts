@@ -75,7 +75,7 @@ const keys = {
   all: ['adminFiles'] as const,
   usage: ['adminFiles', 'usage'] as const,
   repair: ['adminFiles', 'repair'] as const,
-  large: (module: string) => ['adminFiles', 'large', module] as const,
+  large: (module: string, sort?: string) => ['adminFiles', 'large', module, sort ?? ''] as const,
 }
 
 export function useFileUsage() {
@@ -105,13 +105,14 @@ export function useRepairFiles() {
 
 const LARGE_PAGE_SIZE = 50
 
-/** 大型檔案:單頁 50 筆(後端預設依大小降冪);'all' 前端排除報修(報修有專屬區) */
-export function useLargeFiles(module: Exclude<ModuleKey, 'repair'> | 'all') {
+/** 大型檔案:單頁 50 筆(sort 走後端白名單 size/created_at,未帶=後端預設依大小降冪);
+ * 'all' 前端排除報修(報修有專屬區) */
+export function useLargeFiles(module: Exclude<ModuleKey, 'repair'> | 'all', sort?: string) {
   return useQuery({
-    queryKey: keys.large(module),
+    queryKey: keys.large(module, sort),
     queryFn: () =>
       apiPaged<AdminFileOut[]>(
-        `/admin/files${qs({ module: module === 'all' ? undefined : module, page: 1, page_size: LARGE_PAGE_SIZE })}`,
+        `/admin/files${qs({ module: module === 'all' ? undefined : module, sort, page: 1, page_size: LARGE_PAGE_SIZE })}`,
       ).then(({ data }) => data.map(toFile).filter((f) => f.module !== 'repair')),
   })
 }

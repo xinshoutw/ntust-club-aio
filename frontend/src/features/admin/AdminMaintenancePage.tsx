@@ -1,10 +1,14 @@
 import { useMemo } from 'react'
 import { App, Select, Spin } from 'antd'
-import dayjs from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
-import { SortButton, useSort } from '../../components/ui/tableControls'
+import {
+  MultiSortButton,
+  sortRows,
+  useMultiSort,
+  type SortEntry,
+} from '../../components/ui/tableControls'
 import {
   NEXT_STATUS,
   useAdminMaintenance,
@@ -20,25 +24,29 @@ const STATUS_LABELS: Record<MaintenanceStatus, string> = {
   done: '已完成',
 }
 
-type SortKey = 'location' | 'date'
+// status 僅作預設鏈用(狀態欄無排序鈕);比較器一律升冪,方向由 sortRows 翻轉
+type SortKey = 'location' | 'date' | 'status'
+
+const CMPS: Record<SortKey, (a: MaintenanceItem, b: MaintenanceItem) => number> = {
+  location: (a, b) => a.location.localeCompare(b.location, 'zh-Hant'),
+  date: (a, b) => a.date.localeCompare(b.date),
+  status: (a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status],
+}
+
+// 預設排序:待處理 → 處理中 → 已完成,各組內照申請日順序(與後端預設一致)
+const DEFAULT_SORT: SortEntry<SortKey>[] = [
+  { key: 'status', dir: 1 },
+  { key: 'date', dir: 1 },
+]
 
 export default function AdminMaintenancePage() {
   const { message } = App.useApp()
-  const { sort, toggle } = useSort<SortKey>()
+  const { entries, stack, toggle } = useMultiSort<SortKey>(DEFAULT_SORT)
   const listQuery = useAdminMaintenance()
   const queue = useMemo(() => listQuery.data ?? [], [listQuery.data])
   const updateStatus = useMaintenanceStatusMutation()
 
-  const rows = useMemo(() => {
-    if (sort) {
-      return [...queue].sort((a, b) => sort.dir * a[sort.key].localeCompare(b[sort.key], 'zh-Hant'))
-    }
-    // 預設排序:待處理 → 處理中 → 已完成,各組內照申請日順序(與後端預設一致)
-    return [...queue].sort((a, b) => {
-      if (a.status !== b.status) return STATUS_ORDER[a.status] - STATUS_ORDER[b.status]
-      return dayjs(a.date, 'YYYY/MM/DD').valueOf() - dayjs(b.date, 'YYYY/MM/DD').valueOf()
-    })
-  }, [queue, sort])
+  const rows = useMemo(() => sortRows(queue, entries, CMPS), [queue, entries])
 
   // 狀態機僅允許單步前進(待處理→處理中→已完成):下拉只開放下一步選項
   const onChangeStatus = (q: MaintenanceItem, status: MaintenanceStatus) => {
@@ -68,9 +76,9 @@ export default function AdminMaintenancePage() {
             <thead>
               <tr>
                 <th>社團</th>
-                <th><SortButton label="地點" sortKey="location" sort={sort} onToggle={toggle} /></th>
+                <th><MultiSortButton label="地點" sortKey="location" stack={stack} onToggle={toggle} /></th>
                 <th>項目</th>
-                <th><SortButton label="申請日" sortKey="date" sort={sort} onToggle={toggle} /></th>
+                <th><MultiSortButton label="申請日" sortKey="date" stack={stack} onToggle={toggle} /></th>
                 <th>狀態</th>
               </tr>
             </thead>

@@ -136,6 +136,13 @@ export default function SignupBuilderPage() {
     if (missing.length === 0 && signupStart && signupEnd && !signupEnd.isAfter(signupStart)) {
       missing.push(['signupEnd', '報名截止須晚於報名開始'])
     }
+    // 過去時間全面禁止(2026-07-21):活動時間/報名截止不得早於現在(後端亦擋)
+    if (missing.length === 0 && eventTime?.isBefore(dayjs())) {
+      missing.push(['eventTime', '活動時間不得早於現在'])
+    }
+    if (missing.length === 0 && signupEnd?.isBefore(dayjs())) {
+      missing.push(['signupEnd', '報名截止不得早於現在'])
+    }
     if (missing.length || !eventTime || !signupStart || !signupEnd || cap == null) {
       setErrs(new Set(missing.map(([k]) => k)))
       if (missing.length) message.error(missing[0][1])
@@ -221,6 +228,7 @@ export default function SignupBuilderPage() {
                   showTime={{ format: 'HH:mm' }}
                   style={{ width: '100%' }}
                   format="YYYY/MM/DD HH:mm"
+                  disabledDate={(d) => d.isBefore(dayjs().startOf('day'))}
                   status={errOf('eventTime')}
                   value={eventTime}
                   onChange={(v) => {
@@ -248,6 +256,7 @@ export default function SignupBuilderPage() {
                   showTime={{ format: 'HH:mm' }}
                   style={{ width: '100%' }}
                   format="YYYY/MM/DD HH:mm"
+                  disabledDate={(d) => d.isBefore(dayjs().startOf('day'))}
                   status={errOf('signupStart')}
                   value={signupStart}
                   onChange={(v) => {
@@ -262,6 +271,7 @@ export default function SignupBuilderPage() {
                   showTime={{ format: 'HH:mm' }}
                   style={{ width: '100%' }}
                   format="YYYY/MM/DD HH:mm"
+                  disabledDate={(d) => d.isBefore(dayjs().startOf('day'))}
                   status={errOf('signupEnd')}
                   value={signupEnd}
                   onChange={(v) => {

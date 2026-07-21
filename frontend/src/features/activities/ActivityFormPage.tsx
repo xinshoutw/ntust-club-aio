@@ -231,6 +231,11 @@ function ActivityForm({
       message.error('活動結束時間須晚於開始時間')
       return false
     }
+    // 過去時間全面禁止(2026-07-21):送出/重送擋過去開始時刻(草稿不走此檢核;後端亦擋)
+    if (start.isBefore(dayjs())) {
+      message.error('活動開始時間早於現在，請調整活動日期與時間')
+      return false
+    }
     return true
   }
 
@@ -454,7 +459,11 @@ function ActivityForm({
                   rules={[{ required: true, message: '請選擇開始日期' }]}
                   style={{ marginBottom: 0 }}
                 >
-                  <DatePicker style={{ width: '100%' }} format="YYYY/MM/DD" />
+                  <DatePicker
+                    style={{ width: '100%' }}
+                    format="YYYY/MM/DD"
+                    disabledDate={(d) => d.isBefore(dayjs().startOf('day'))}
+                  />
                 </Form.Item>
                 <Form.Item
                   name="startTime"
@@ -480,6 +489,7 @@ function ActivityForm({
                     style={{ width: '100%' }}
                     format="YYYY/MM/DD"
                     disabledDate={(d) => {
+                      if (d.isBefore(dayjs().startOf('day'))) return true // 過去日期不可選
                       const start = form.getFieldValue('date') as dayjs.Dayjs | undefined
                       return !!start && d.isBefore(start, 'day')
                     }}

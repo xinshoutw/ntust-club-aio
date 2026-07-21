@@ -8,6 +8,7 @@ import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import {
   PERIODS,
+  startedPeriods,
   useBookingMutations,
   useActiveVenueBookings,
   useRecentVenueBookings,
@@ -15,6 +16,7 @@ import {
   venueLabel,
 } from '../../api/bookings'
 import { useActivityList } from '../../api/activities'
+import { activityEnded } from '../activities/utils'
 import PeriodPicker from './PeriodPicker'
 
 export default function VenueBookingPage() {
@@ -24,8 +26,13 @@ export default function VenueBookingPage() {
   const [params] = useSearchParams()
   const qVenueId = Number(params.get('venue'))
   const rawDate = params.get('date')
-  // 嚴格驗證 query 日期(非嚴格 parse 會把 2026/99/99 正規化成別的日期)
-  const qDate = rawDate && dayjs(rawDate, 'YYYY/MM/DD', true).isValid() ? rawDate : undefined
+  // 嚴格驗證 query 日期(非嚴格 parse 會把 2026/99/99 正規化成別的日期);過去日期不帶入
+  const qDate =
+    rawDate &&
+    dayjs(rawDate, 'YYYY/MM/DD', true).isValid() &&
+    !dayjs(rawDate, 'YYYY/MM/DD', true).isBefore(dayjs().startOf('day'))
+      ? rawDate
+      : undefined
   const qPeriod = params.get('period')
   const [periods, setPeriods] = useState<string[]>(() => (qPeriod && PERIODS.includes(qPeriod) ? [qPeriod] : []))
   const [periodsError, setPeriodsError] = useState(false)
@@ -33,9 +40,9 @@ export default function VenueBookingPage() {
   const venuesQuery = useVenues()
   const venues = venuesQuery.data ?? []
   const tempVenues = venues.filter((v) => v.allowTemp)
-  // 借用需綁定審核通過之活動(與器材借用一致;共用活動域查詢)
+  // 借用需綁定審核通過之活動(與器材借用一致;共用活動域查詢);排除已結束活動(2026-07-21)
   const activitiesQuery = useActivityList({ status: 'approved' })
-  const approved = activitiesQuery.data ?? []
+  const approved = (activitiesQuery.data ?? []).filter((a) => !activityEnded(a))
   // 正在申請=進行中全部(不限長度、可取消);最近申請=已結束/退回/取消 近 5 筆(2026-07-21)
   const activeQuery = useActiveVenueBookings()
   const activeRows = activeQuery.data ?? []
@@ -43,6 +50,16 @@ export default function VenueBookingPage() {
   const recent = recentQuery.data ?? []
   const { createVenueBooking, cancelVenueBooking } = useBookingMutations()
   const todayStart = dayjs().startOf('day')
+
+  // 過去時間全面禁止(2026-07-21):過去日期不可選;選「今天」時已開始節次禁選(後端亦擋)
+  const dateValue = Form.useWatch('date', form) as Dayjs | undefined
+  const disabledPeriods = dateValue?.isSame(todayStart, 'day') ? startedPeriods() : []
+  useEffect(() => {
+    // 日期切到今天後,先前選到的已開始節次自動剔除
+    if (!disabledPeriods.length) return
+    setPeriods((cur) => cur.filter((p) => !disabledPeriods.includes(p)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateValue])
 
   const cancelRow = (v: { id: number; venueName: string; date: string }) =>
     confirmDialog(modal, {
@@ -153,13 +170,19 @@ export default function VenueBookingPage() {
             style={{ background: 'var(--paper)', borderRadius: 8, padding: '10px 12px', border: '1px solid transparent', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}
           >
             <Form.Item name="date" rules={[{ required: true, message: '請選擇日期' }]} style={{ marginBottom: 0, flexShrink: 0 }}>
-              <DatePicker format="YYYY/MM/DD" placeholder="日期" style={{ width: 140 }} />
+              <DatePicker
+                format="YYYY/MM/DD"
+                placeholder="日期"
+                style={{ width: 140 }}
+                disabledDate={(d) => d.isBefore(dayjs().startOf('day'))}
+              />
             </Form.Item>
             <div style={{ flex: 1, minWidth: 280 }}>
               <PeriodPicker
                 size="small"
                 nowrap
                 value={periods}
+                disabledPeriods={disabledPeriods}
                 onChange={(next) => {
                   setPeriodsError(false)
                   setPeriods(next)

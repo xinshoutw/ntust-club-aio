@@ -154,7 +154,11 @@ export default function AnnouncementsPage() {
                 rules={[{ required: true, message: '請選擇蓋板截止日期' }]}
                 style={{ marginBottom: 0 }}
               >
-                <DatePicker placeholder="蓋板截止日期" format="YYYY/MM/DD" />
+                <DatePicker
+                  placeholder="蓋板截止日期"
+                  format="YYYY/MM/DD"
+                  disabledDate={(d) => d.isBefore(dayjs().startOf('day'))}
+                />
               </Form.Item>
             )}
           </div>
@@ -264,6 +268,7 @@ export default function AnnouncementsPage() {
                   value={shown.takeoverUntil ? dayjs(shown.takeoverUntil, 'YYYY/MM/DD') : null}
                   format="YYYY/MM/DD"
                   placeholder="蓋板截止日期"
+                  disabledDate={(d) => d.isBefore(dayjs().startOf('day'))}
                   onChange={(d) => {
                     if (d) {
                       setTakeoverUntil(shown.id, d.format('YYYY/MM/DD'))

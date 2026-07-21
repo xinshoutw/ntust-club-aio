@@ -107,12 +107,18 @@ def to_semester(raw: str | None) -> str | None:
     return None
 
 
+def _aware(dt: datetime) -> datetime:
+    # 防護:naive 值(timestamp without time zone 的 dump)一律視為台北時間,
+    # 避免 astimezone 靜默用主機時區解讀造成日期位移
+    return dt.replace(tzinfo=TAIPEI) if dt.tzinfo is None else dt
+
+
 def local_date(dt: datetime | None) -> date | None:
-    return dt.astimezone(TAIPEI).date() if dt else None
+    return _aware(dt).astimezone(TAIPEI).date() if dt else None
 
 
 def local_time(dt: datetime | None) -> time | None:
-    return dt.astimezone(TAIPEI).time().replace(second=0, microsecond=0) if dt else None
+    return _aware(dt).astimezone(TAIPEI).time().replace(second=0, microsecond=0) if dt else None
 
 
 # ---------------------------------------------------------------------------
@@ -182,14 +188,20 @@ async def import_clubs(
         )
     ).all()
 
+    valid_attrs = {a.value for a in ClubAttribute}
     result: dict[int, tuple[int, int]] = {}
     skipped = 0
+    unmapped_attr: list[str] = []
     for row in rows:
         if row.Name in SKIP_CLUBS:
             skipped += 1
             continue
         prop = props.get(row.FK_ClubProperty_id)
         defunct = prop == "停社"
+        # 停社(原性質不可考)與未映射性質皆為 NULL;後者記數回報而非中止
+        if not defunct and prop not in valid_attrs:
+            unmapped_attr.append(f"{row.Name}({prop})")
+        attribute = ClubAttribute(prop) if not defunct and prop in valid_attrs else None
         mapped_club = ids.get("Club_club", row.id)
         if mapped_club is None:
             content = contents.get(row.id)
@@ -197,8 +209,7 @@ async def import_clubs(
                 name=row.Name,
                 kind=derive_club_kind(row.Name),
                 en_name=(row.EN_Name or None),
-                # 停社:原性質不可考 → NULL(需求方 2026-07-21)
-                attribute=None if defunct else ClubAttribute(prop),
+                attribute=attribute,
                 intro=(content.Introduction or "") if content else "",
                 website_url=(content.Url or None) if content else None,
                 is_active=not defunct,
@@ -233,6 +244,8 @@ async def import_clubs(
         result[row.id] = (club_id, user_id)
 
     print(f"clubs: {len(result)} 社(含既有)、跳過 {skipped}(行政單位/測試)")
+    if unmapped_attr:
+        print(f"  性質未映射 → NULL:{unmapped_attr}")
     return result
 
 
@@ -340,9 +353,10 @@ async def import_members(legacy, db: AsyncSession, ids: IdMap, clubs) -> None:
     ).all()
     # 同(社團,學期,學號)取 id 最大者(最新);UNIQUE(club_id, student_id, semester)
     dedup: dict[tuple[int, str, str], object] = {}
-    bad_semester = 0
+    bad_semester = foreign = 0
     for row in rows:
         if row.FK_Club_id not in clubs:
+            foreign += 1  # 不遷移社團的成員
             continue
         semester = to_semester(row.Semester)
         if semester is None or not row.StudentID:
@@ -383,8 +397,11 @@ async def import_members(legacy, db: AsyncSession, ids: IdMap, clubs) -> None:
                 new_id = by_key.get((clubs[legacy_club_id][0], semester, student_id))
                 if new_id is not None:
                     ids.record(db, "Club_student", row.id, "club_members", new_id)
-    dropped = len(rows) - len(dedup) - bad_semester
-    print(f"members: 新增 {created}(重複學期學號覆蓋 {dropped}、學期不合格式 {bad_semester})")
+    dropped = len(rows) - len(dedup) - bad_semester - foreign
+    print(
+        f"members: 新增 {created}(重複學期學號覆蓋 {dropped}、"
+        f"學期不合格式 {bad_semester}、不遷社團 {foreign})"
+    )
 
 
 async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None:

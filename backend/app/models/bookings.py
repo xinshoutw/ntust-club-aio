@@ -57,13 +57,15 @@ class VenueBooking(Base, TimestampMixin):
     __table_args__ = (sa.Index("ix_venue_bookings_venue_date", "venue_id", "date"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    club_id: Mapped[int] = mapped_column(sa.ForeignKey("clubs.id"), index=True)
+    # NULL=最高權限手動借用(行政;2026-07-21)
+    club_id: Mapped[int | None] = mapped_column(sa.ForeignKey("clubs.id"), index=True)
     venue_id: Mapped[int] = mapped_column(sa.ForeignKey("venues.id"))  # allow_temp
     # 綁定審核通過活動(2026-07-15 第六輪前端必選;NULL 容舊資料,新申請應用層必填)
     activity_id: Mapped[int | None] = mapped_column(sa.ForeignKey("activities.id"))
     date: Mapped[dt.date] = mapped_column(sa.Date)
     periods: Mapped[list[str]] = mapped_column(ARRAY(sa.String(2)))  # 複選節次
     purpose: Mapped[str] = mapped_column(sa.Text)  # 用途必填(2026-07-15)
+    phone: Mapped[str | None] = mapped_column(sa.Text)  # 聯絡電話(2026-07-21)
     status: Mapped[BookingStatus] = mapped_column(
         db_enum(BookingStatus, "booking_status"), default=BookingStatus.PENDING
     )
@@ -80,10 +82,13 @@ class EquipmentLoan(Base, TimestampMixin):
     __table_args__ = (sa.Index("ix_equipment_loans_club_status", "club_id", "status"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    club_id: Mapped[int] = mapped_column(sa.ForeignKey("clubs.id"))
+    # NULL=最高權限手動借用(行政;2026-07-21)
+    club_id: Mapped[int | None] = mapped_column(sa.ForeignKey("clubs.id"))
     equipment_id: Mapped[int] = mapped_column(sa.ForeignKey("equipment.id"), index=True)
-    activity_id: Mapped[int] = mapped_column(sa.ForeignKey("activities.id"), index=True)
+    # NULL 容舊系統活動已刪之歷史借用與行政手動借用;新申請應用層必填
+    activity_id: Mapped[int | None] = mapped_column(sa.ForeignKey("activities.id"), index=True)
     qty: Mapped[int] = mapped_column()
+    phone: Mapped[str | None] = mapped_column(sa.Text)  # 聯絡電話(2026-07-21)
     start_date: Mapped[dt.date] = mapped_column(sa.Date)  # 推導:活動開始日 −N 個工作天
     end_date: Mapped[dt.date] = mapped_column(sa.Date)  # 推導:活動結束日 +M 個工作天
     purpose: Mapped[str] = mapped_column(sa.Text)

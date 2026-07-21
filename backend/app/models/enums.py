@@ -90,12 +90,14 @@ class BookingStatus(StrEnum):
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
+    CANCELLED = "cancelled"  # 社團自行取消(審核中或已核准未開始;2026-07-21)
 
 
 class LoanStatus(StrEnum):
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
+    CANCELLED = "cancelled"  # 社團自行取消(審核中或已核准未開始;2026-07-21)
     CHECKED_OUT = "checked_out"
     RETURNED = "returned"
 

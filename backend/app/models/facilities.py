@@ -2,7 +2,7 @@ import datetime as dt
 from typing import Any
 
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, db_enum
@@ -32,10 +32,31 @@ class Equipment(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(sa.Text, unique=True)
     total_qty: Mapped[int] = mapped_column(default=0)
+    # 單次可借上限(NULL=不限;2026-07-21 自舊系統引入)
+    max_lease_count: Mapped[int | None] = mapped_column()
     # 點交方式:False=一般、True=依序點交(需登記序號);2026-07-17 移除類別後為唯一分類欄
     needs_serial: Mapped[bool] = mapped_column(default=False)
     sort: Mapped[int] = mapped_column(default=0)
     is_active: Mapped[bool] = mapped_column(default=True)
+
+
+class VenueBlockRule(Base, TimestampMixin):
+    """場地不開放規則(2026-07-21 Rule Page):場況圖標示不開放、申請與核准時檢核。
+
+    區間 start_date~end_date;weekdays(ISO 1–7)限定星期、NULL=每天;
+    periods=不開放節次子集。刪除=硬刪(異動走 audit_logs)。
+    """
+
+    __tablename__ = "venue_block_rules"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    venue_id: Mapped[int] = mapped_column(sa.ForeignKey("venues.id"), index=True)
+    start_date: Mapped[dt.date] = mapped_column(sa.Date)
+    end_date: Mapped[dt.date] = mapped_column(sa.Date)
+    weekdays: Mapped[list[int] | None] = mapped_column(ARRAY(sa.SmallInteger()))
+    periods: Mapped[list[str]] = mapped_column(ARRAY(sa.String(2)))
+    reason: Mapped[str] = mapped_column(sa.Text)
+    created_by: Mapped[int] = mapped_column(sa.ForeignKey("users.id"))
 
 
 class Holiday(Base, TimestampMixin):

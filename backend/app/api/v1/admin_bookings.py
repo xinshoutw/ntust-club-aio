@@ -108,7 +108,7 @@ async def list_venue_bookings(
 ) -> ApiResponse[list[AdminVenueBookingOut]]:
     query = (
         sa.select(VenueBooking, Club.name, Venue.name, Activity.name)
-        .join(Club, VenueBooking.club_id == Club.id)
+        .outerjoin(Club, VenueBooking.club_id == Club.id)  # NULL club=行政手動借用
         .join(Venue, VenueBooking.venue_id == Venue.id)
         .outerjoin(Activity, VenueBooking.activity_id == Activity.id)
     )
@@ -128,6 +128,7 @@ async def list_venue_bookings(
     rows = await db.execute(query.offset(page.offset).limit(page.page_size))
     data = []
     for booking, club_name, venue_name, activity_name in rows:
+        club_name = club_name or "學務處"  # NULL club=行政手動借用
         out = AdminVenueBookingOut.model_validate(booking)
         out.club_name = club_name
         out.venue_name = venue_name
@@ -249,9 +250,9 @@ async def list_equipment_loans(
 
     query = (
         sa.select(EquipmentLoan, Club.name, Equipment.name, Equipment.total_qty, Activity.name)
-        .join(Club, EquipmentLoan.club_id == Club.id)
+        .outerjoin(Club, EquipmentLoan.club_id == Club.id)  # NULL club=行政手動借用
         .join(Equipment, EquipmentLoan.equipment_id == Equipment.id)
-        .join(Activity, EquipmentLoan.activity_id == Activity.id)
+        .outerjoin(Activity, EquipmentLoan.activity_id == Activity.id)
     )
     if status == "overdue":
         threshold = svc.overdue_threshold_in(datetime.now(UTC), return_time, holidays)
@@ -275,6 +276,7 @@ async def list_equipment_loans(
     rows = await db.execute(query.offset(page.offset).limit(page.page_size))
     data = []
     for loan, club_name, equipment_name, total_qty, activity_name in rows:
+        club_name = club_name or "學務處"  # NULL club=行政手動借用
         out = AdminEquipmentLoanOut.model_validate(loan)
         out.club_name = club_name
         out.equipment_name = equipment_name

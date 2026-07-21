@@ -103,7 +103,9 @@ async def equipment_available_in_window(
     """
     query = sa.select(sa.func.coalesce(sa.func.sum(EquipmentLoan.qty), 0)).where(
         EquipmentLoan.equipment_id == equipment_id,
-        EquipmentLoan.status.notin_([LoanStatus.REJECTED, LoanStatus.RETURNED]),
+        EquipmentLoan.status.notin_(
+            [LoanStatus.REJECTED, LoanStatus.RETURNED, LoanStatus.CANCELLED]
+        ),
         EquipmentLoan.start_date <= end,
         EquipmentLoan.end_date >= start,
     )
@@ -219,11 +221,11 @@ async def availability_grids(
 
     temp_query = (
         sa.select(VenueBooking, Club.name)
-        .join(Club, VenueBooking.club_id == Club.id)
+        .outerjoin(Club, VenueBooking.club_id == Club.id)  # NULL club=行政手動借用
         .where(
             VenueBooking.date >= start,
             VenueBooking.date <= end,
-            VenueBooking.status != BookingStatus.REJECTED,
+            VenueBooking.status.notin_([BookingStatus.REJECTED, BookingStatus.CANCELLED]),
         )
     )
     if venue_id is not None:
@@ -235,14 +237,16 @@ async def availability_grids(
         else:
             status = "pending"
         for period in booking.periods:
-            mark(booking.date, booking.venue_id, period, status, club_name)
+            mark(booking.date, booking.venue_id, period, status, club_name or "學務處")
 
     fixed_query = (
         sa.select(RoomBookingSlot, RoomBookingRequest, Club.name)
         .join(RoomBookingRequest, RoomBookingSlot.request_id == RoomBookingRequest.id)
         .join(Club, RoomBookingRequest.club_id == Club.id)
         .where(
-            RoomBookingRequest.status != BookingStatus.REJECTED,
+            RoomBookingRequest.status.notin_(
+                [BookingStatus.REJECTED, BookingStatus.CANCELLED]
+            ),
             RoomBookingRequest.start_date <= end,
             RoomBookingRequest.end_date >= start,
             RoomBookingSlot.weekday.in_({d.isoweekday() for d in grids}),
@@ -285,7 +289,8 @@ async def admin_availability_grid(db: AsyncSession, day: date) -> dict[int, dict
 
     temp_rows = await db.execute(
         sa.select(VenueBooking).where(
-            VenueBooking.date == day, VenueBooking.status != BookingStatus.REJECTED
+            VenueBooking.date == day,
+            VenueBooking.status.notin_([BookingStatus.REJECTED, BookingStatus.CANCELLED]),
         )
     )
     for booking in temp_rows.scalars():

@@ -228,7 +228,9 @@ async def create_room_booking(
             .join(RoomBookingRequest, RoomBookingSlot.request_id == RoomBookingRequest.id)
             .where(
                 RoomBookingRequest.club_id == user.club_id,
-                RoomBookingRequest.status != BookingStatus.REJECTED,
+                RoomBookingRequest.status.notin_(
+                    [BookingStatus.REJECTED, BookingStatus.CANCELLED]
+                ),
                 RoomBookingRequest.start_date == sem_start,
             )
         )
@@ -310,7 +312,7 @@ async def create_venue_booking(
             VenueBooking.club_id == user.club_id,
             VenueBooking.venue_id == venue.id,
             VenueBooking.date == body.date,
-            VenueBooking.status != BookingStatus.REJECTED,
+            VenueBooking.status.notin_([BookingStatus.REJECTED, BookingStatus.CANCELLED]),
         )
     )
     if dup:

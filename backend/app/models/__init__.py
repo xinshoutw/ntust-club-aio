@@ -23,7 +23,7 @@ from app.models.evaluation import (
     ReviewScore,
     ReviewScoreItem,
 )
-from app.models.facilities import Equipment, Holiday, SystemSetting, Venue
+from app.models.facilities import Equipment, Holiday, SystemSetting, Venue, VenueBlockRule
 from app.models.files import File
 from app.models.misc import (
     Announcement,
@@ -89,6 +89,7 @@ __all__ = [
     "SystemSetting",
     "User",
     "Venue",
+    "VenueBlockRule",
     "VenueBooking",
     "Violation",
 ]

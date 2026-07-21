@@ -42,6 +42,11 @@ LEGACY_DB=legacy_clubs uv run python ../migration/cms_import.py  # 指定舊庫�
 稽核 staffactivitylog、審核歷程 auditactivityrecord、行事曆、歷年評鑑期間、
 社團評鑑檔案庫 clubfiles(TODO:待決議)、行政歷史文件 clubrecordfromstaff(TODO)。
 
+## 注意
+
+- `import_teachers` 非 id-map 型:每次重跑**覆寫** clubs 的指導老師欄位。
+  正式切換後若社團已在新系統改過指導老師,勿再重跑遷移。
+
 ## TODO
 
 - [ ] 舊機 media 目錄抓回後匯入檔案實體(PlanFile/activityfiles/activityimages),

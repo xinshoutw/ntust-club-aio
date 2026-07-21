@@ -357,21 +357,25 @@ export default function BookingOverviewPage() {
                   </td>
                   <td><StatusPill status={r.status} /></td>
                   <td className="r">
-                    <Button
-                      size="small"
-                      danger
-                      loading={cancelRoomBooking.isPending}
-                      onClick={() =>
-                        confirmCancel(`取消固定借用 ${r.venueName}`, () =>
-                          cancelRoomBooking.mutate(r.id, {
-                            onSuccess: () => message.success('已取消'),
-                            onError: cancelError,
-                          }),
-                        )
-                      }
-                    >
-                      取消
-                    </Button>
+                    {r.status === 'pending' || dayjs(r.startDate, 'YYYY/MM/DD').isAfter(todayStart, 'day') ? (
+                      <Button
+                        size="small"
+                        danger
+                        loading={cancelRoomBooking.isPending}
+                        onClick={() =>
+                          confirmCancel(`取消固定借用 ${r.venueName}`, () =>
+                            cancelRoomBooking.mutate(r.id, {
+                              onSuccess: () => message.success('已取消'),
+                              onError: cancelError,
+                            }),
+                          )
+                        }
+                      >
+                        取消
+                      </Button>
+                    ) : (
+                      <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>
+                    )}
                   </td>
                 </tr>
               ))}

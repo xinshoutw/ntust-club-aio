@@ -134,6 +134,8 @@ export interface RoomBooking {
   venueId: number
   venueName: string
   purpose: string
+  /** 目標學期起日(YYYY/MM/DD;取消鈕依此判斷是否已開始) */
+  startDate: string
   status: StatusKey
   entries: RoomEntry[]
 }
@@ -145,6 +147,8 @@ interface RoomBookingOut {
   venue_id: number
   venue_name: string
   purpose: string
+  start_date: string
+  end_date: string
   status: BookingStatusOut
   created_at: string
   slots: { weekday: number; period: string }[]
@@ -168,6 +172,7 @@ export const toRoomBooking = (r: RoomBookingOut): RoomBooking => {
     venueId: r.venue_id,
     venueName: r.venue_name,
     purpose: r.purpose,
+    startDate: fromIso(r.start_date),
     status: r.status,
     entries,
   }
@@ -436,7 +441,7 @@ export interface VenueBookingInput {
   date: Dayjs
   periods: string[]
   purpose: string
-  phone?: string
+  phone: string
 }
 
 export interface EquipmentLoanInput {
@@ -444,7 +449,7 @@ export interface EquipmentLoanInput {
   activityId: number
   qty: number
   purpose: string
-  phone?: string
+  phone: string
 }
 
 export function useBookingMutations() {
@@ -468,7 +473,7 @@ export function useBookingMutations() {
           date: toIso(b.date),
           periods: b.periods,
           purpose: b.purpose,
-          phone: b.phone?.trim() || null,
+          phone: b.phone.trim(),
         }),
       }),
     onSuccess: invalidate,
@@ -482,7 +487,7 @@ export function useBookingMutations() {
           activity_id: b.activityId,
           qty: b.qty,
           purpose: b.purpose,
-          phone: b.phone?.trim() || null,
+          phone: b.phone.trim(),
         }),
       }),
     onSuccess: invalidate,

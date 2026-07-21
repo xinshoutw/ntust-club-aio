@@ -8,6 +8,8 @@ describe('toRoomBooking', () => {
       venue_id: 3,
       venue_name: 'S304 音樂教室',
       purpose: '社課',
+      start_date: '2026-08-01',
+      end_date: '2027-01-31',
       status: 'pending',
       created_at: '2026-07-01T12:00:00',
       slots: [

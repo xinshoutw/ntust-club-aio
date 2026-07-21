@@ -79,6 +79,8 @@ class RoomBookingOut(BaseModel):
     venue_id: int
     venue_name: str = ""
     purpose: str
+    start_date: date  # 目標學期起訖(前端取消鈕依此判斷是否已開始)
+    end_date: date
     status: BookingStatus
     created_at: datetime
     slots: list[RoomSlotOut] = []
@@ -101,7 +103,7 @@ class VenueBookingIn(BaseModel):
     date: date
     periods: list[str] = Field(min_length=1, max_length=14)
     purpose: str = Field(min_length=1, max_length=200)  # 用途必填(2026-07-15)
-    phone: str | None = Field(None, max_length=30)  # 聯絡電話(選填;2026-07-21)
+    phone: str = Field(min_length=1, max_length=30)  # 聯絡電話必填(2026-07-21 需求方)
 
     @field_validator("periods")
     @classmethod
@@ -132,7 +134,7 @@ class EquipmentLoanIn(BaseModel):
     activity_id: int
     qty: int = Field(ge=1, le=1000)
     purpose: str = Field(min_length=1, max_length=200)
-    phone: str | None = Field(None, max_length=30)  # 聯絡電話(選填;2026-07-21)
+    phone: str = Field(min_length=1, max_length=30)  # 聯絡電話必填(2026-07-21 需求方)
 
 
 class EquipmentLoanOut(BaseModel):

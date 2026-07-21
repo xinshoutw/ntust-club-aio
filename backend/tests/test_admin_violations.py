@@ -91,6 +91,34 @@ async def test_list_default_order_sort_and_filters(client, db):
     assert resp.json()["data"][0]["resolve_expired"] is False
 
 
+async def test_multi_key_sort(client, db):
+    """?sort=a,-b 多鍵排序:依鍵序生效、重複鍵去重保留首見、至多 3 鍵。"""
+    await seed(client, db)
+
+    # status 升冪 + 組內 date 降冪
+    resp = await client.get("/api/v1/admin/violations", params={"sort": "status,-date"})
+    data = resp.json()["data"]
+    assert [d["status"] for d in data] == ["open", "open", "resolved"]
+    assert data[0]["occurred_on"] > data[1]["occurred_on"]
+
+    # 重複鍵(含一升一降)保留首見:-date,date 等同 -date
+    base = (await client.get("/api/v1/admin/violations", params={"sort": "-date"})).json()["data"]
+    dup = (
+        await client.get("/api/v1/admin/violations", params={"sort": "-date,date"})
+    ).json()["data"]
+    assert [d["id"] for d in dup] == [d["id"] for d in base]
+
+    # 超過 3 鍵/白名單外鍵 → 422 INVALID_SORT
+    resp = await client.get(
+        "/api/v1/admin/violations", params={"sort": "date,location,status,created_at"}
+    )
+    assert resp.status_code == 422
+    assert resp.json()["meta"]["code"] == "INVALID_SORT"
+    resp = await client.get("/api/v1/admin/violations", params={"sort": "date,hack"})
+    assert resp.status_code == 422
+    assert resp.json()["meta"]["code"] == "INVALID_SORT"
+
+
 async def test_resolve_within_deadline_and_reject_expired(client, db):
     club, other, staff, rows = await seed(client, db)
     expired_row, active_row, resolved_row = rows

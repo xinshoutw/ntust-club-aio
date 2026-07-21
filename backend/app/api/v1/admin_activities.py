@@ -13,7 +13,7 @@ from typing import Annotated
 import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 
-from app.api.pagination import Pagination, parse_sort
+from app.api.pagination import NullsLast, Pagination, parse_sort
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, forbidden, not_found, validation_error
 from app.core.semesters import TAIPEI
@@ -146,7 +146,8 @@ _REVIEWED_AT = (
 )
 
 # 排序白名單(2026-07-21:清單改伺服器端分頁,14k+ 筆不再整批撈取);
-# reviewed_at 於 list_activities 特例處理(NULLS LAST + id tiebreak)
+# reviewed_at 包 NullsLast:不論鍵位/升降冪皆 NULLS LAST(無審核紀錄者殿後),
+# 出現於任一鍵位時 list_activities 另補 id 降冪 tiebreak
 _SORTABLE = {
     "club": Club.name,
     "name": Activity.name,
@@ -154,7 +155,7 @@ _SORTABLE = {
     "date": Activity.date,
     "status": Activity.status,
     "created_at": Activity.created_at,
-    "reviewed_at": _REVIEWED_AT,
+    "reviewed_at": NullsLast(_REVIEWED_AT),
 }
 
 
@@ -223,17 +224,10 @@ async def list_activities(
         )
         if locked:
             query = query.where(Activity.close_unlocked.is_(False))
-    if sort and sort.removeprefix("-") == "reviewed_at":
-        # 最近審核:降冪(新→舊)與升冪皆 NULLS LAST(無審核紀錄者殿後),
-        # 固定 id 降冪 tiebreak 使同秒紀錄的分頁穩定
-        primary = (
-            _REVIEWED_AT.desc().nulls_last()
-            if sort.startswith("-")
-            else _REVIEWED_AT.asc().nulls_last()
-        )
-        order = [primary, Activity.id.desc()]
-    else:
-        order = parse_sort(sort, _SORTABLE, Activity.id.desc())
+    order = parse_sort(sort, _SORTABLE, Activity.id.desc())
+    if sort and "reviewed_at" in (k.strip().removeprefix("-") for k in sort.split(",")):
+        # 最近審核出現在任一鍵位:固定 id 降冪 tiebreak 使同秒紀錄的分頁穩定
+        order = [*order, Activity.id.desc()]
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     # reviewed_at 子查詢於計數後才加進 select,避免 count 也逐列跑相關子查詢
     query = query.add_columns(_REVIEWED_AT.label("reviewed_at")).order_by(*order)

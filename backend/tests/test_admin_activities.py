@@ -543,6 +543,10 @@ async def test_reviewed_at_field_and_sorting(client, db):
     resp = await client.get("/api/v1/admin/activities", params={"sort": "reviewed_at"})
     assert [r["name"] for r in resp.json()["data"]] == ["早審", "晚審", "未審"]
 
+    # 多鍵:reviewed_at 在第二鍵位仍 NULLS LAST(三筆同日期,次鍵決定順序)
+    resp = await client.get("/api/v1/admin/activities", params={"sort": "date,-reviewed_at"})
+    assert [r["name"] for r in resp.json()["data"]] == ["晚審", "早審", "未審"]
+
     # 詳情同樣回 reviewed_at(自 approvals 推導)
     detail = (await client.get(f"/api/v1/admin/activities/{late.id}")).json()["data"]
     assert detail["reviewed_at"] == by_name["晚審"]["reviewed_at"]

@@ -2,7 +2,7 @@
 
 > 給下一個 session 的交接快照。永久性專案知識在三層 `AGENTS.md` 與 `docs/architecture.md`、`docs/data-model.md`、`docs/design-guide.md`;本檔只記「現在進行到哪、接下來做什麼」。過期即刪。
 
-## 本輪已完成(分支 `dev`,前一輪 16 commit + 本輪 commits 皆未推)
+## 本輪已完成(分支 `dev`,已推 origin/dev)
 
 1. **舊系統(CMS)DB dump 分析與 gap 盤點**:dump=`legacy/ClubManagementSystem/ntust_clubs_2026-07-21.dump`,已還原到 club-aio pg 容器的 `legacy_clubs` 庫;12 項「舊有新無」需求方全數拍板(細節見 AGENTS.md 第十三輪節)
 2. **遷移前置 schema/功能**(migration `8f2c6a91d3e5`,up/down/up 驗證過):

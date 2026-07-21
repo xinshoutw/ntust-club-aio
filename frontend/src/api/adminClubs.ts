@@ -207,7 +207,7 @@ export async function fetchAllAdminMembers(clubId: number, semester?: string): P
   return out
 }
 
-// ---- mutations(行政可改:名稱/帳號/啟停用;重設密碼) ----
+// ---- mutations(行政可改:名稱/帳號/啟停用;建立帳號/重設密碼) ----
 
 export interface AdminClubPatch {
   id: number
@@ -238,5 +238,14 @@ export function useAdminClubMutations() {
       ),
     onSuccess: invalidate, // 重設會撤銷 session,狀態欄位不變;保守整域刷新
   })
-  return { update, resetPassword }
+  // 建立社團帳號(一社一帳號;已有帳號後端回 409):一次性明碼同上
+  const createAccount = useMutation({
+    mutationFn: ({ id, username }: { id: number; username: string }) =>
+      api<{ username: string; password: string }>(`/admin/clubs/${id}/account`, {
+        method: 'POST',
+        body: JSON.stringify({ username }),
+      }),
+    onSuccess: invalidate,
+  })
+  return { update, resetPassword, createAccount }
 }

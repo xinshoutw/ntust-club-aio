@@ -3,6 +3,7 @@ import { App, Button, Checkbox, Input, Modal, Spin, Tabs } from 'antd'
 import { confirmDialog } from '../../lib/confirm'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
+import { Pager } from '../../components/ui/tableControls'
 import OneTimePasswordModal from './OneTimePasswordModal'
 import {
   USERNAME_HINT,
@@ -12,6 +13,7 @@ import {
   type Account,
   type ManagedRole,
 } from '../../api/adminAccounts'
+import { useAdminClubMutations, useAdminClubs, type AdminClub } from '../../api/adminClubs'
 
 // 頁面權限鍵(與後端 permissions 對齊;super 不受限)
 const PERMISSION_KEYS = [
@@ -50,6 +52,9 @@ const permsText = (a: Account): string => {
 
 const TAB_ROLE: Record<string, ManagedRole> = { admins: 'admin', staff: 'staff', viewers: 'viewer' }
 
+// 社團 tab:159 社不分頁端點,前端過濾+分頁
+const CLUB_PAGE_SIZE = 20
+
 function ActiveTag({ active }: { active: boolean }) {
   return (
     <span
@@ -70,7 +75,8 @@ function ActiveTag({ active }: { active: boolean }) {
   )
 }
 
-// 帳號管理合一頁:新增/刪除/停權/重設密碼/權限設定集中於此(社團帳號在「社團管理 > 管理項目」)
+// 帳號管理合一頁:新增/刪除/停權/重設密碼/權限設定集中於此。
+// 社團帳號(建立/重設密碼/啟停用)在「社團」分頁,「社團管理 > 管理項目」亦可維護(/admin/clubs)
 export default function AccountsPage() {
   const { message, modal } = App.useApp()
   const [tab, setTab] = useState('admins')
@@ -81,6 +87,17 @@ export default function AccountsPage() {
   const staff = accounts.filter((a) => a.role === 'staff')
   const viewers = accounts.filter((a) => a.role === 'viewer')
   const { create, remove, setActive, resetPassword, setPermissions } = useAccountMutations()
+
+  // 社團 tab:資料與動作走 /admin/clubs(啟停=社團與帳號一併連動,語意與上三類的純帳號停權不同)
+  const clubsQuery = useAdminClubs()
+  const clubs = clubsQuery.data ?? []
+  const clubMutations = useAdminClubMutations()
+  const [clubSearch, setClubSearch] = useState('')
+  const [clubPage, setClubPage] = useState(1)
+  // 建立社團帳號彈窗(open+afterClose 常駐)
+  const [clubAccountTarget, setClubAccountTarget] = useState<AdminClub | null>(null)
+  const [clubAccountOpen, setClubAccountOpen] = useState(false)
+  const [clubUsername, setClubUsername] = useState('')
 
   // 一次性密碼彈窗:密碼由後端於建立/重設當次回傳,關閉後不再顯示
   const [pwTarget, setPwTarget] = useState<{ title: string; account: string; password: string } | null>(null)
@@ -180,6 +197,77 @@ export default function AccountsPage() {
           setNewAccount('')
           // 建立後直接顯示帳號與一次性密碼
           showPassword(`已建立${roleLabel}帳號 — ${account.name}`, account.username, password)
+        },
+        onError: (e) => message.error(e.message),
+      },
+    )
+  }
+
+  // ---- 社團 tab 動作(走 /admin/clubs;語意=社團與其帳號連動) ----
+
+  const askResetClubPassword = (c: AdminClub) =>
+    confirmDialog(modal, {
+      title: `重設 ${c.name} 的密碼`,
+      content: '將產生一次性密碼並登出該帳號所有裝置;社團下次登入須立即更改密碼',
+      okText: '確認重設',
+      cancelText: '取消',
+      onOk: () => {
+        clubMutations.resetPassword.mutate(c.id, {
+          onSuccess: (password) =>
+            showPassword(`已重設密碼 — ${c.name}`, c.username ?? '', password),
+          onError: (e) => message.error(e.message),
+        })
+      },
+    })
+
+  const toggleClubActive = (c: AdminClub) => {
+    if (c.isActive) {
+      confirmDialog(modal, {
+        title: `停用 ${c.name}`,
+        content: '社團與其帳號將一併停用，停用後無法登入；可隨時重新啟用',
+        okText: '確認停用',
+        okButtonProps: { danger: true },
+        cancelText: '取消',
+        onOk: () => {
+          clubMutations.update.mutate(
+            { id: c.id, isActive: false },
+            {
+              onSuccess: () => message.success(`已停用 ${c.name}，社團與其帳號已一併停用`),
+              onError: (e) => message.error(e.message),
+            },
+          )
+        },
+      })
+    } else {
+      clubMutations.update.mutate(
+        { id: c.id, isActive: true },
+        {
+          onSuccess: () => message.success(`已啟用 ${c.name}，社團與其帳號已一併啟用`),
+          onError: (e) => message.error(e.message),
+        },
+      )
+    }
+  }
+
+  const openClubAccountModal = (c: AdminClub) => {
+    setClubAccountTarget(c)
+    setClubUsername('')
+    setClubAccountOpen(true)
+  }
+
+  const submitClubAccount = () => {
+    if (!clubAccountTarget) return
+    const username = clubUsername.trim()
+    if (!USERNAME_RE.test(username)) {
+      message.error(USERNAME_HINT)
+      return
+    }
+    clubMutations.createAccount.mutate(
+      { id: clubAccountTarget.id, username },
+      {
+        onSuccess: ({ username: account, password }) => {
+          setClubAccountOpen(false)
+          showPassword(`已建立社團帳號 — ${clubAccountTarget.name}`, account, password)
         },
         onError: (e) => message.error(e.message),
       },
@@ -305,18 +393,117 @@ export default function AccountsPage() {
     </table>
   )
 
+  // ---- 社團 tab:前端過濾(社團名/帳號)+ client 分頁 ----
+  const clubKeyword = clubSearch.trim().toLowerCase()
+  const filteredClubs = clubKeyword
+    ? clubs.filter(
+        (c) =>
+          c.name.toLowerCase().includes(clubKeyword) ||
+          (c.username ?? '').toLowerCase().includes(clubKeyword),
+      )
+    : clubs
+  // 過濾造成頁數縮減時鉗回最末頁,避免停在空白頁
+  const clubPageSafe = Math.min(
+    clubPage,
+    Math.max(1, Math.ceil(filteredClubs.length / CLUB_PAGE_SIZE)),
+  )
+  const pagedClubs = filteredClubs.slice(
+    (clubPageSafe - 1) * CLUB_PAGE_SIZE,
+    clubPageSafe * CLUB_PAGE_SIZE,
+  )
+
+  const clubsTable = (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+        <Input.Search
+          allowClear
+          placeholder="搜尋社團名稱或帳號"
+          style={{ width: 260 }}
+          value={clubSearch}
+          onChange={(e) => {
+            setClubSearch(e.target.value)
+            setClubPage(1)
+          }}
+        />
+      </div>
+      <table className="tb" style={{ minWidth: 760 }}>
+        <thead>
+          <tr><th>社團名稱</th><th>性質</th><th>帳號</th><th>狀態</th><th className="r">動作</th></tr>
+        </thead>
+        <tbody>
+          {pagedClubs.map((c) => (
+            <tr key={c.id}>
+              <td style={{ fontWeight: 500 }}>{c.name}</td>
+              <td style={{ fontSize: 13, color: 'var(--steel)' }}>{c.attribute ?? '—'}</td>
+              <td>
+                {c.username != null ? (
+                  <span className="num" style={{ color: 'var(--steel)' }}>{c.username}</span>
+                ) : (
+                  <span style={{ fontSize: 13, color: 'var(--muted)' }}>尚未建立</span>
+                )}
+              </td>
+              <td><ActiveTag active={c.isActive} /></td>
+              <td className="r" style={{ whiteSpace: 'nowrap' }}>
+                {c.username != null ? (
+                  <button type="button" className="link-btn" onClick={() => askResetClubPassword(c)}>
+                    重設密碼
+                  </button>
+                ) : (
+                  <button type="button" className="link-btn" onClick={() => openClubAccountModal(c)}>
+                    建立帳號
+                  </button>
+                )}
+                <button type="button" className="link-btn" onClick={() => toggleClubActive(c)}>
+                  {c.isActive ? '停用' : '啟用'}
+                </button>
+              </td>
+            </tr>
+          ))}
+          {clubsQuery.isError && (
+            <tr className="no-hover">
+              <td colSpan={5}>
+                <QueryError
+                  compact
+                  title="社團列表載入失敗"
+                  error={clubsQuery.error}
+                  onRetry={() => clubsQuery.refetch()}
+                />
+              </td>
+            </tr>
+          )}
+          {!clubsQuery.isPending && !clubsQuery.isError && filteredClubs.length === 0 && (
+            <tr className="no-hover">
+              <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
+                {clubKeyword ? '沒有符合搜尋的社團' : '尚無社團資料'}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+      <Pager
+        page={clubPageSafe}
+        pageSize={CLUB_PAGE_SIZE}
+        total={filteredClubs.length}
+        onChange={setClubPage}
+      />
+    </div>
+  )
+
   return (
     <div>
       <PageHeader
         title="帳號管理"
         extra={
-          <Button type="primary" onClick={() => setCreateOpen(true)}>
-            + 新增{roleLabel}
-          </Button>
+          // 社團 tab 不提供「+ 新增」:建立帳號走列上動作(僅無帳號社團)
+          tab !== 'clubs' && (
+            <Button type="primary" onClick={() => setCreateOpen(true)}>
+              + 新增{roleLabel}
+            </Button>
+          )
         }
       />
 
-      <Spin spinning={accountsQuery.isPending}>
+      <Spin spinning={tab === 'clubs' ? clubsQuery.isPending : accountsQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto', paddingTop: 8 }}>
           <Tabs
             activeKey={tab}
@@ -326,6 +513,7 @@ export default function AccountsPage() {
               { key: 'admins', label: '管理員', children: adminsTable },
               { key: 'staff', label: '工讀生', children: staffTable },
               { key: 'viewers', label: '評審', children: viewersTable },
+              { key: 'clubs', label: '社團', children: clubsTable },
             ]}
           />
         </div>
@@ -444,6 +632,36 @@ export default function AccountsPage() {
           </Modal>
         )
       })()}
+
+      {/* 建立社團帳號:僅無帳號社團;成功後顯示帳號與一次性密碼 */}
+      <Modal
+        open={clubAccountOpen}
+        afterClose={() => setClubAccountTarget(null)}
+        title={`建立社團帳號 — ${clubAccountTarget?.name ?? ''}`}
+        okText="建立帳號"
+        cancelText="取消"
+        destroyOnHidden
+        confirmLoading={clubMutations.createAccount.isPending}
+        onOk={submitClubAccount}
+        onCancel={() => setClubAccountOpen(false)}
+      >
+        <div style={{ marginTop: 8 }}>
+          <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
+            <span style={{ color: '#C13B34' }}>*</span> 帳號
+          </div>
+          <Input
+            autoFocus
+            className="num"
+            value={clubUsername}
+            onChange={(e) => setClubUsername(e.target.value)}
+            onPressEnter={submitClubAccount}
+            placeholder={USERNAME_HINT}
+          />
+          <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 8 }}>
+            建立後將產生一次性密碼；社團首次登入須立即更改密碼
+          </div>
+        </div>
+      </Modal>
 
       {pwTarget && (
         <OneTimePasswordModal

@@ -13,18 +13,19 @@ export interface SortState<K extends string> {
 
 // ---- 多欄排序(2026-07-21 需求方:點擊的「順序」直接影響最終排序結果)----
 // 規則:最後點擊的欄=最高優先,先前啟用的欄自動降為次要鍵;
-// 同欄再點:升冪→降冪→移除(移除後回落到次鍵,全空則回頁面預設鏈);至多 3 鍵。
+// 同欄再點=升降冪互換(不提供「移除」態:表格永遠有明確排序,
+// 指示器與實際生效鏈永遠一致——entries 即生效鏈,初始=頁面預設);至多 3 鍵。
 
 export type SortEntry<K extends string> = SortState<K>
 
 export function useMultiSort<K extends string>(defaults: readonly SortEntry<K>[] = []) {
-  const [stack, setStack] = useState<SortEntry<K>[]>([])
+  const [entries, setEntries] = useState<SortEntry<K>[]>([...defaults])
   const toggle = (key: K) =>
-    setStack((prev) => {
+    setEntries((prev) => {
       const idx = prev.findIndex((e) => e.key === key)
       if (idx === 0) {
-        // 主鍵:升冪→降冪→移除
-        return prev[0].dir === 1 ? [{ key, dir: -1 as const }, ...prev.slice(1)] : prev.slice(1)
+        // 主鍵:升降冪互換
+        return [{ key, dir: (prev[0].dir === 1 ? -1 : 1) as 1 | -1 }, ...prev.slice(1)]
       }
       if (idx > 0) {
         // 已啟用的次鍵:升級為主鍵(保留方向)
@@ -32,10 +33,8 @@ export function useMultiSort<K extends string>(defaults: readonly SortEntry<K>[]
       }
       return [{ key, dir: 1 as const }, ...prev].slice(0, 3)
     })
-  const clear = () => setStack([])
-  // stack=使用者點出的排序;entries=實際生效鏈(空 stack 回落頁面預設)
-  const entries = stack.length ? stack : [...defaults]
-  return { entries, stack, toggle, clear }
+  const reset = () => setEntries([...defaults])
+  return { entries, toggle, reset }
 }
 
 /** 伺服器端排序參數:'-a,b' 逗號序列(後端 parse_sort 多鍵格式);空鏈回 undefined */
@@ -59,28 +58,30 @@ export function sortRows<T, K extends string>(
   })
 }
 
-// 排序標題鈕(多欄版):啟用時顯示方向 caret;非主鍵補優先序小字(2/3)
+// 排序標題鈕(多欄版):啟用時顯示方向 caret;非主鍵補優先序小字(2/3)。
+// entries=生效排序鏈(useMultiSort 的 entries,含頁面預設)——指示器永遠反映實際排序
 export function MultiSortButton<K extends string>({
   label,
   sortKey,
-  stack,
+  entries,
   onToggle,
 }: {
   label: string
   sortKey: K
-  /** 使用者點出的排序鏈(useMultiSort 的 stack,不含頁面預設) */
-  stack: readonly SortEntry<K>[]
+  /** 生效中的排序鏈(useMultiSort 的 entries) */
+  entries: readonly SortEntry<K>[]
   onToggle: (key: K) => void
 }) {
-  const idx = stack.findIndex((e) => e.key === sortKey)
+  const idx = entries.findIndex((e) => e.key === sortKey)
   const active = idx >= 0
-  const dir = active ? stack[idx].dir : null
+  const dir = active ? entries[idx].dir : null
+  const dirText = dir === 1 ? '升冪' : '降冪'
   return (
     <button
       type="button"
       className="link-btn"
       style={{ padding: 0, fontWeight: 500 }}
-      aria-sort={active ? (dir === 1 ? 'ascending' : 'descending') : undefined}
+      title={active ? `${label}:${dirText}(第 ${idx + 1} 排序鍵)` : `依${label}排序`}
       onClick={() => onToggle(sortKey)}
     >
       {label}{' '}
@@ -93,7 +94,7 @@ export function MultiSortButton<K extends string>({
       ) : (
         <SwapOutlined rotate={90} style={{ fontSize: 11 }} />
       )}
-      {active && stack.length > 1 && idx > 0 && (
+      {active && entries.length > 1 && idx > 0 && (
         <span style={{ fontSize: 10, color: 'var(--seal)', verticalAlign: 'super' }}>{idx + 1}</span>
       )}
     </button>

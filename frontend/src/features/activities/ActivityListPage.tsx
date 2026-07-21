@@ -327,7 +327,7 @@ export default function ActivityListPage() {
   const { message } = App.useApp()
   const [semesterSel, setSemesterSel] = useState<string | null>(null)
   const [page, setPage] = useState(1)
-  const { entries, stack, toggle } = useMultiSort<ClientSortKey>([
+  const { entries, toggle } = useMultiSort<ClientSortKey>([
     { key: 'date', dir: -1 },
     { key: 'id', dir: -1 },
   ])
@@ -375,7 +375,7 @@ export default function ActivityListPage() {
   }
 
   const sortHeader = (label: string, key: SortKey) => (
-    <MultiSortButton label={label} sortKey={key} stack={stack} onToggle={toggleSort} />
+    <MultiSortButton label={label} sortKey={key} entries={entries} onToggle={toggleSort} />
   )
 
   const statusLabels = [...new Set((listQuery.data ?? []).filter((a) => a.status !== 'draft').map((a) => STATUS[a.status].label))]

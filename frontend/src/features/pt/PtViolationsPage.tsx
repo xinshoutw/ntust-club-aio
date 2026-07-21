@@ -13,7 +13,7 @@ type SortKey = 'date' | 'location' | 'items' | 'filler' | 'deadline' | 'status'
 // 預設排序=後端(未銷案在前、組內發生日升冪,與行政端違規管理一致);點欄名多欄排序(伺服器端)
 export default function PtViolationsPage() {
   const [page, setPage] = useState(1)
-  const { entries, stack, toggle } = useMultiSort<SortKey>()
+  const { entries, toggle } = useMultiSort<SortKey>()
   const listQuery = useStaffViolations(page, sortParam(entries))
   const rows = listQuery.data?.violations ?? []
   const total = listQuery.data?.total ?? 0
@@ -41,23 +41,23 @@ export default function PtViolationsPage() {
             <thead>
               <tr>
                 <th>
-                  <MultiSortButton label="發生日" sortKey="date" stack={stack} onToggle={toggleSort} />
+                  <MultiSortButton label="發生日" sortKey="date" entries={entries} onToggle={toggleSort} />
                 </th>
                 <th>社團</th>
                 <th>
-                  <MultiSortButton label="地點" sortKey="location" stack={stack} onToggle={toggleSort} />
+                  <MultiSortButton label="地點" sortKey="location" entries={entries} onToggle={toggleSort} />
                 </th>
                 <th>
-                  <MultiSortButton label="違規項目" sortKey="items" stack={stack} onToggle={toggleSort} />
+                  <MultiSortButton label="違規項目" sortKey="items" entries={entries} onToggle={toggleSort} />
                 </th>
                 <th>
-                  <MultiSortButton label="填寫人" sortKey="filler" stack={stack} onToggle={toggleSort} />
+                  <MultiSortButton label="填寫人" sortKey="filler" entries={entries} onToggle={toggleSort} />
                 </th>
                 <th>
-                  <MultiSortButton label="銷案期限" sortKey="deadline" stack={stack} onToggle={toggleSort} />
+                  <MultiSortButton label="銷案期限" sortKey="deadline" entries={entries} onToggle={toggleSort} />
                 </th>
                 <th>
-                  <MultiSortButton label="狀態" sortKey="status" stack={stack} onToggle={toggleSort} />
+                  <MultiSortButton label="狀態" sortKey="status" entries={entries} onToggle={toggleSort} />
                 </th>
               </tr>
             </thead>

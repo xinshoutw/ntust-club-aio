@@ -58,11 +58,11 @@ export default function AdminFilesPage() {
   const { message, modal } = App.useApp()
   const [moduleFilter, setModuleFilter] = useState<Exclude<ModuleKey, 'repair'> | 'all'>('all')
   // 頁面目的=清大檔:預設 -size 為後端預設,不點排序時不帶 sort(伺服器端白名單 size/created_at)
-  const { stack: largeSortStack, toggle: toggleLargeSort } = useMultiSort<'size' | 'created_at'>()
+  const { entries: largeSortEntries, toggle: toggleLargeSort } = useMultiSort<'size' | 'created_at'>()
 
   const usageQuery = useFileUsage()
   const repairQuery = useRepairFiles()
-  const largeQuery = useLargeFiles(moduleFilter, sortParam(largeSortStack))
+  const largeQuery = useLargeFiles(moduleFilter, sortParam(largeSortEntries))
   const deleteFile = useDeleteFile()
 
   const usage = usageQuery.data
@@ -302,10 +302,10 @@ export default function AdminFilesPage() {
                 <th>模組</th>
                 <th>社團</th>
                 <th className="r">
-                  <MultiSortButton label="大小" sortKey="size" stack={largeSortStack} onToggle={toggleLargeSort} />
+                  <MultiSortButton label="大小" sortKey="size" entries={largeSortEntries} onToggle={toggleLargeSort} />
                 </th>
                 <th>
-                  <MultiSortButton label="上傳日期" sortKey="created_at" stack={largeSortStack} onToggle={toggleLargeSort} />
+                  <MultiSortButton label="上傳日期" sortKey="created_at" entries={largeSortEntries} onToggle={toggleLargeSort} />
                 </th>
                 <th>狀態</th>
                 <th className="r">動作</th>

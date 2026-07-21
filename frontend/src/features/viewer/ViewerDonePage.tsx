@@ -15,7 +15,7 @@ const DONE_SORT: readonly SortEntry<SortKey>[] = [{ key: 'submitted_at', dir: -1
 // 已完成評分:伺服器分頁唯讀清單;點欄名多欄排序(伺服器端)
 export default function ViewerDonePage() {
   const [page, setPage] = useState(1)
-  const { entries, stack, toggle } = useMultiSort<SortKey>(DONE_SORT)
+  const { entries, toggle } = useMultiSort<SortKey>(DONE_SORT)
   const query = useViewerDone({
     sort: sortParam(entries),
     page,
@@ -47,16 +47,16 @@ export default function ViewerDonePage() {
             <thead>
               <tr>
                 <th>
-                  <MultiSortButton label="獎項" sortKey="award" stack={stack} onToggle={toggleSort} />
+                  <MultiSortButton label="獎項" sortKey="award" entries={entries} onToggle={toggleSort} />
                 </th>
                 <th>
-                  <MultiSortButton label="社團" sortKey="club" stack={stack} onToggle={toggleSort} />
+                  <MultiSortButton label="社團" sortKey="club" entries={entries} onToggle={toggleSort} />
                 </th>
                 <th>
-                  <MultiSortButton label="總分" sortKey="total" stack={stack} onToggle={toggleSort} />
+                  <MultiSortButton label="總分" sortKey="total" entries={entries} onToggle={toggleSort} />
                 </th>
                 <th>
-                  <MultiSortButton label="完成時間" sortKey="submitted_at" stack={stack} onToggle={toggleSort} />
+                  <MultiSortButton label="完成時間" sortKey="submitted_at" entries={entries} onToggle={toggleSort} />
                 </th>
               </tr>
             </thead>

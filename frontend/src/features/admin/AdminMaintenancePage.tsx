@@ -42,7 +42,7 @@ const DEFAULT_SORT: SortEntry<SortKey>[] = [
 
 export default function AdminMaintenancePage() {
   const { message } = App.useApp()
-  const { entries, stack, toggle } = useMultiSort<SortKey>(DEFAULT_SORT)
+  const { entries, toggle } = useMultiSort<SortKey>(DEFAULT_SORT)
   const listQuery = useAdminMaintenance()
   const queue = useMemo(() => listQuery.data ?? [], [listQuery.data])
   const updateStatus = useMaintenanceStatusMutation()
@@ -79,9 +79,9 @@ export default function AdminMaintenancePage() {
             <thead>
               <tr>
                 <th>社團</th>
-                <th><MultiSortButton label="地點" sortKey="location" stack={stack} onToggle={toggle} /></th>
+                <th><MultiSortButton label="地點" sortKey="location" entries={entries} onToggle={toggle} /></th>
                 <th>項目</th>
-                <th><MultiSortButton label="申請日" sortKey="date" stack={stack} onToggle={toggle} /></th>
+                <th><MultiSortButton label="申請日" sortKey="date" entries={entries} onToggle={toggle} /></th>
                 <th>狀態</th>
               </tr>
             </thead>

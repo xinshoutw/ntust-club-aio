@@ -45,7 +45,7 @@ export default function AdminViolationsPage() {
   const [resolving, setResolving] = useState<AdminViolation | null>(null)
   const [resolveOpen, setResolveOpen] = useState(false)
   const [form] = Form.useForm()
-  const { entries, stack, toggle } = useMultiSort<SortKey>(DEFAULT_SORT)
+  const { entries, toggle } = useMultiSort<SortKey>(DEFAULT_SORT)
   const [itemFilter, setItemFilter] = useState<string[]>([])
   const [fillerFilter, setFillerFilter] = useState<string[]>([])
   const [deadlineFilter, setDeadlineFilter] = useState<string[]>([])
@@ -107,29 +107,29 @@ export default function AdminViolationsPage() {
             <thead>
               <tr>
                 <th>社團</th>
-                <th><MultiSortButton label="日期" sortKey="date" stack={stack} onToggle={toggle} /></th>
-                <th><MultiSortButton label="地點" sortKey="location" stack={stack} onToggle={toggle} /></th>
+                <th><MultiSortButton label="日期" sortKey="date" entries={entries} onToggle={toggle} /></th>
+                <th><MultiSortButton label="地點" sortKey="location" entries={entries} onToggle={toggle} /></th>
                 <th>
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <MultiSortButton label="項目" sortKey="items" stack={stack} onToggle={toggle} />
+                    <MultiSortButton label="項目" sortKey="items" entries={entries} onToggle={toggle} />
                     <FilterButton options={itemOptions} selected={itemFilter} onChange={setItemFilter} label="篩選項目" />
                   </span>
                 </th>
                 <th>
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <MultiSortButton label="填寫" sortKey="filler" stack={stack} onToggle={toggle} />
+                    <MultiSortButton label="填寫" sortKey="filler" entries={entries} onToggle={toggle} />
                     <FilterButton options={fillerOptions} selected={fillerFilter} onChange={setFillerFilter} label="篩選填寫人" />
                   </span>
                 </th>
                 <th>
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <MultiSortButton label="銷案期限" sortKey="deadline" stack={stack} onToggle={toggle} />
+                    <MultiSortButton label="銷案期限" sortKey="deadline" entries={entries} onToggle={toggle} />
                     <FilterButton options={['未逾期', '已截止']} selected={deadlineFilter} onChange={setDeadlineFilter} label="篩選期限" />
                   </span>
                 </th>
                 <th>
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <MultiSortButton label="狀態" sortKey="status" stack={stack} onToggle={toggle} />
+                    <MultiSortButton label="狀態" sortKey="status" entries={entries} onToggle={toggle} />
                     <FilterButton options={['未銷案', '已銷案']} selected={statusFilter} onChange={setStatusFilter} label="篩選狀態" />
                   </span>
                 </th>

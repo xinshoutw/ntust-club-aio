@@ -42,7 +42,7 @@ export default function ReviewPage() {
   const [current, setCurrent] = useState<AdminActivity | null>(null)
   const [open, setOpen] = useState(false)
   // 預設審核時間新→舊(無審核紀錄者殿後);點欄位依點擊序疊加多鍵,全清除後回到預設
-  const { entries, stack, toggle } = useMultiSort<SortKey>([{ key: 'reviewed_at', dir: -1 }])
+  const { entries, toggle } = useMultiSort<SortKey>([{ key: 'reviewed_at', dir: -1 }])
   const toggleSort = (k: SortKey) => {
     toggle(k)
     setPage(1) // 伺服器端分頁:換排序回到第 1 頁
@@ -194,7 +194,7 @@ export default function ReviewPage() {
               <tr>
                 <th>
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <MultiSortButton label="社團" sortKey="club" stack={stack} onToggle={toggleSort} />
+                    <MultiSortButton label="社團" sortKey="club" entries={entries} onToggle={toggleSort} />
                     <FilterButton
                       options={clubOptions}
                       selected={clubFilter}
@@ -206,10 +206,10 @@ export default function ReviewPage() {
                     />
                   </span>
                 </th>
-                <th><MultiSortButton label="活動名稱" sortKey="name" stack={stack} onToggle={toggleSort} /></th>
+                <th><MultiSortButton label="活動名稱" sortKey="name" entries={entries} onToggle={toggleSort} /></th>
                 <th>
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <MultiSortButton label="類型" sortKey="type" stack={stack} onToggle={toggleSort} />
+                    <MultiSortButton label="類型" sortKey="type" entries={entries} onToggle={toggleSort} />
                     <FilterButton
                       options={TYPE_OPTIONS}
                       selected={typeFilter}
@@ -221,11 +221,11 @@ export default function ReviewPage() {
                     />
                   </span>
                 </th>
-                <th><MultiSortButton label="活動日期" sortKey="date" stack={stack} onToggle={toggleSort} /></th>
+                <th><MultiSortButton label="活動日期" sortKey="date" entries={entries} onToggle={toggleSort} /></th>
                 <th className="r">擬請補助</th>
                 <th>
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <MultiSortButton label="狀態" sortKey="status" stack={stack} onToggle={toggleSort} />
+                    <MultiSortButton label="狀態" sortKey="status" entries={entries} onToggle={toggleSort} />
                     <FilterButton
                       options={statusOptions}
                       selected={statusFilter}
@@ -237,7 +237,7 @@ export default function ReviewPage() {
                     />
                   </span>
                 </th>
-                <th><MultiSortButton label="審核時間" sortKey="reviewed_at" stack={stack} onToggle={toggleSort} /></th>
+                <th><MultiSortButton label="審核時間" sortKey="reviewed_at" entries={entries} onToggle={toggleSort} /></th>
                 <th aria-label="開啟" />
               </tr>
             </thead>

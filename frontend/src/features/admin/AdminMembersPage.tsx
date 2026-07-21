@@ -23,13 +23,13 @@ export default function AdminMembersPage() {
   const [page, setPage] = useState(1)
   const [semester, setSemester] = useState<string>(CURRENT_SEMESTER)
   // 名冊慣例的預設序(身份權重→學號)=後端預設:不點排序時不帶 sort
-  const { stack, toggle } = useMultiSort<SortKey>()
+  const { entries, toggle } = useMultiSort<SortKey>()
   const [exporting, setExporting] = useState(false)
   useEffect(() => setPage(1), [clubId, semester])
 
   const listQuery = useAdminClubMembers(clubId, {
     semester: semester === 'all' ? undefined : semester,
-    sort: sortParam(stack),
+    sort: sortParam(entries),
     page,
     pageSize: PAGE_SIZE,
   })
@@ -90,13 +90,13 @@ export default function AdminMembersPage() {
             <Cols widths={['15%', 100, 92, 'auto', 105, 80, 140]} />
             <thead>
               <tr>
-                <th><MultiSortButton label="姓名" sortKey="name" stack={stack} onToggle={toggleSort} /></th>
-                <th><MultiSortButton label="學號" sortKey="student_id" stack={stack} onToggle={toggleSort} /></th>
-                <th><MultiSortButton label="身份" sortKey="kind" stack={stack} onToggle={toggleSort} /></th>
-                <th><MultiSortButton label="職稱" sortKey="title" stack={stack} onToggle={toggleSort} /></th>
+                <th><MultiSortButton label="姓名" sortKey="name" entries={entries} onToggle={toggleSort} /></th>
+                <th><MultiSortButton label="學號" sortKey="student_id" entries={entries} onToggle={toggleSort} /></th>
+                <th><MultiSortButton label="身份" sortKey="kind" entries={entries} onToggle={toggleSort} /></th>
+                <th><MultiSortButton label="職稱" sortKey="title" entries={entries} onToggle={toggleSort} /></th>
                 <th>電話</th>
-                <th><MultiSortButton label="學期" sortKey="semester" stack={stack} onToggle={toggleSort} /></th>
-                <th><MultiSortButton label="更新時間" sortKey="updated_at" stack={stack} onToggle={toggleSort} /></th>
+                <th><MultiSortButton label="學期" sortKey="semester" entries={entries} onToggle={toggleSort} /></th>
+                <th><MultiSortButton label="更新時間" sortKey="updated_at" entries={entries} onToggle={toggleSort} /></th>
               </tr>
             </thead>
             <tbody>

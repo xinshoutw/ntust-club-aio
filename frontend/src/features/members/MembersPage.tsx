@@ -35,8 +35,8 @@ export default function MembersPage() {
   const [csvSemester, setCsvSemester] = useState<string>(CURRENT_SEMESTER)
   const [semester, setSemester] = useState<string>(CURRENT_SEMESTER)
   const [page, setPage] = useState(1)
-  // 預設排序=後端預設(身份權重→學號,準則 4 名冊慣例):stack 空時不送 sort 參數
-  const { stack, toggle } = useMultiSort<MemberSortKey>()
+  // 預設排序=後端預設(身份權重→學號,準則 4 名冊慣例):未點排序時不送 sort 參數
+  const { entries, toggle } = useMultiSort<MemberSortKey>()
   // 篩選值為顯示詞(社長/會長依社團名稱推導),查詢時轉回標準身份
   const [kindFilter, setKindFilter] = useState<string[]>([])
   const [editing, setEditing] = useState<{ id: number; field: 'kind' | 'title' | 'phone' } | null>(null)
@@ -54,7 +54,7 @@ export default function MembersPage() {
   const listQuery = useMembers({
     semester: semester === 'all' ? undefined : semester,
     kinds,
-    sort: sortParam(stack),
+    sort: sortParam(entries),
     page,
     pageSize: PAGE_SIZE,
   })
@@ -139,7 +139,7 @@ export default function MembersPage() {
     setPage(1)
   }
   const sortHeader = (label: string, key: MemberSortKey) => (
-    <MultiSortButton label={label} sortKey={key} stack={stack} onToggle={toggleSort} />
+    <MultiSortButton label={label} sortKey={key} entries={entries} onToggle={toggleSort} />
   )
 
   return (

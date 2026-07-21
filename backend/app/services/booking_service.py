@@ -51,14 +51,24 @@ def today_taipei(now: datetime | None = None) -> date:
 
 
 def booking_start_at(day: date, periods: list[str]) -> datetime:
-    """借用起始時刻=最早節次的起點(台北時區);periods 不保證有序,取全部節次最早者。"""
+    """借用起始時刻=最早節次的起點(台北時區);periods 不保證有序,取全部節次最早者。
+
+    periods 不得為空(schema 保證 min_length=1)。
+    """
     first = min(periods, key=PERIODS.index)
     return datetime.combine(day, PERIOD_TIMES[first][0], tzinfo=TAIPEI)
 
 
 def booking_started(day: date, periods: list[str], now: datetime | None = None) -> bool:
-    """時間是否已經過申請起始時刻(含相等=已開始)。"""
-    return booking_start_at(day, periods) <= (now or now_utc())
+    """時間是否已經過申請起始時刻(含相等=已開始)。
+
+    空 periods(正常流程不會產生)退回日粒度,與 venue_booking_started_expr 的
+    SQL 判斷一致(空陣列與任何集合皆不重疊,只剩 date < today)。
+    """
+    now = now or now_utc()
+    if not periods:
+        return day < today_taipei(now)
+    return booking_start_at(day, periods) <= now
 
 
 def started_periods(now: datetime | None = None) -> list[str]:

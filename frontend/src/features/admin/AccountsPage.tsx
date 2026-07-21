@@ -111,7 +111,8 @@ export default function AccountsPage() {
   const [newName, setNewName] = useState('')
   const [newAccount, setNewAccount] = useState('')
 
-  const roleLabel = tab === 'admins' ? '管理員' : tab === 'staff' ? '工讀生' : '評審'
+  const roleLabel =
+    tab === 'admins' ? '管理員' : tab === 'staff' ? '工讀生' : tab === 'viewers' ? '評審' : '社團'
 
   const showPassword = (title: string, account: string, password: string) => {
     setPwTarget({ title, account, password })
@@ -178,6 +179,9 @@ export default function AccountsPage() {
     })
 
   const createAccount = () => {
+    // 社團分頁無此彈窗(建立走列上動作);防禦性擋下 role=undefined 的送出
+    const role = TAB_ROLE[tab]
+    if (!role) return
     const name = newName.trim()
     const username = newAccount.trim()
     if (!name) {
@@ -189,7 +193,7 @@ export default function AccountsPage() {
       return
     }
     create.mutate(
-      { role: TAB_ROLE[tab], name, username },
+      { role, name, username },
       {
         onSuccess: ({ account, password }) => {
           setCreateOpen(false)

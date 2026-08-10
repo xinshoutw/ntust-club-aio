@@ -21,25 +21,30 @@ function csrfToken(): string {
  */
 export const UNAUTHORIZED_EVENT = 'club-aio:unauthorized'
 
-// pydantic 的 loc 前綴標的是請求的哪一段,對使用者沒有意義
-const LOC_PREFIXES = new Set(['body', 'query', 'path', 'header', 'cookie'])
+// 訊息進的是 AntD message,它不設 maxWidth;整份明細攤開會是一條讀不到的長列
+const MAX_DETAIL_ITEMS = 3
+const VALUE_ERROR_PREFIX = 'Value error, '
 
 /**
  * 後端 422 的 `meta.detail`(pydantic errors)攤成一行;非驗證錯誤回 null。
- * 自訂驗證器丟 ValueError,pydantic 會加上 "Value error, " 前綴。
+ *
+ * 只帶出自訂驗證器的訊息:那些是寫好的中文。pydantic 內建錯誤是英文,
+ * 進不了全中文介面,只報欄位位置讓使用者知道去哪改。
  */
 export function validationDetail(detail: unknown): string | null {
   if (!Array.isArray(detail)) return null
   const parts = detail.flatMap((item) => {
     const { loc, msg } = (item ?? {}) as { loc?: unknown; msg?: unknown }
     if (typeof msg !== 'string') return []
-    const text = msg.replace(/^Value error, /, '')
-    const field = Array.isArray(loc)
-      ? loc.filter((x): x is string => typeof x === 'string' && !LOC_PREFIXES.has(x)).pop()
-      : undefined
-    return [field ? `${field}:${text}` : text]
+    // loc[0] 是 body/query 這類請求段落標記,其餘逐層相連(含陣列索引,才分得出是哪一列)
+    const field = Array.isArray(loc) ? loc.slice(1).join('.') : ''
+    const text = msg.startsWith(VALUE_ERROR_PREFIX) ? msg.slice(VALUE_ERROR_PREFIX.length) : ''
+    if (!field) return text ? [text] : []
+    return [text ? `${field}:${text}` : field]
   })
-  return parts.length > 0 ? parts.join(';') : null
+  if (parts.length === 0) return null
+  const shown = parts.slice(0, MAX_DETAIL_ITEMS).join('、')
+  return parts.length > MAX_DETAIL_ITEMS ? `${shown} 等 ${parts.length} 項` : shown
 }
 
 export interface PageMeta {

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { App, Button, Input, InputNumber, Modal, Tooltip } from 'antd'
+import { App, Button, Input, InputNumber, Modal, Spin, Tooltip } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { Cols } from '../../components/ui/tableControls'
@@ -115,7 +115,8 @@ export default function AdminEvalPage() {
           />
         </div>
       ) : (
-        <>
+        // 換社團時不沿用前一社的分數,載入期間以 Spin 蓋住,不讓空表與「—」看起來像真值
+        <Spin spinning={clubId != null && detailQuery.isPending}>
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         <table className="tb fixed" style={{ minWidth: 780 }} aria-label="行政分評分項目">
           {/* 評分項目吃剩餘寬(兩行說明允許換行);分數/動作固定 px */}
@@ -232,7 +233,7 @@ export default function AdminEvalPage() {
           </tbody>
         </table>
       </div>
-        </>
+        </Spin>
       )}
 
       <Modal

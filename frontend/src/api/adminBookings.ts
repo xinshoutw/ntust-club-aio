@@ -321,7 +321,10 @@ interface RejectParams {
 
 export function useAdminBookingMutations() {
   const qc = useQueryClient()
-  const invalidate = () => void qc.invalidateQueries({ queryKey: keys.all })
+  const invalidate = () => {
+    void qc.invalidateQueries({ queryKey: keys.all })
+    void qc.invalidateQueries({ queryKey: ['adminOverview'] }) // 待審/逾期數字卡
+  }
   const post = (path: string, body?: object) =>
     api<unknown>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined })
 

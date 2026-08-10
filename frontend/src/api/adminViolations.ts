@@ -72,6 +72,9 @@ export function useResolveViolation() {
         method: 'POST',
         body: JSON.stringify({ note }),
       }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.all }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.all })
+      void qc.invalidateQueries({ queryKey: ['adminOverview'] }) // 未銷案違規數字卡
+    },
   })
 }

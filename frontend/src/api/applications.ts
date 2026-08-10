@@ -286,7 +286,8 @@ async function officerNames(semester: string, kind: MemberKind): Promise<string[
 /** 姓名預覽:依學年期+職位查成員名單(整學年=兩學期聯集);送出時後端再驗證一次 */
 export function useOfficerNames(term: string | undefined, position: MemberKind | undefined) {
   return useQuery({
-    queryKey: [...keys.certificates, 'names', term, position],
+    // 掛 members 前綴:資料來自 /club/members,改名單時 useMemberMutations 一併刷新
+    queryKey: ['members', 'officer-names', term, position],
     queryFn: async () => {
       const semesters = term!.includes('-') ? [term!] : [`${term}-1`, `${term}-2`]
       const names = await Promise.all(semesters.map((s) => officerNames(s, position!)))

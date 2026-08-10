@@ -348,14 +348,16 @@ async def approve(
             activity.is_large_approved = (
                 body.is_large_approved if body.is_large_approved is not None else False
             )
-        # 無補助案一律歸零,不讓前一輪殘留的逐項核定值加總出金額
-        activity.school_approved = (
-            0
-            if requested_total == 0
-            else sum(
+        if requested_total == 0:
+            # 逐項一併歸零:畫面的 approved_total 是逐項加總來的,只清聚合欄位
+            # 會讓兩個金額來源對不起來(遷移資料就可能是擬請 0 元卻有核定值)
+            for item in activity.budget_items:
+                item.approved_subsidy = 0
+            activity.school_approved = 0
+        else:
+            activity.school_approved = sum(
                 i.approved_subsidy for i in activity.budget_items if i.approved_subsidy is not None
             )
-        )
 
     if stage == "advisor" and requested_total > 0:
         activity.status = ActivityStatus.PENDING_CHIEF

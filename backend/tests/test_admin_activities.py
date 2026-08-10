@@ -2,7 +2,7 @@ from datetime import UTC, date, datetime, timedelta
 
 import sqlalchemy as sa
 
-from app.models import Activity, ApprovalRecord
+from app.models import Activity, ActivityBudgetItem, ApprovalRecord
 from tests.conftest import csrf_headers, login, make_club, make_user
 from tests.test_activities import close_payload, create_activity, payload, upload_photo
 
@@ -121,6 +121,18 @@ async def test_no_subsidy_case_cannot_be_granted_money(client, db):
     )
     assert resp.status_code == 422
     assert await db.scalar(sa.select(Activity.school_approved).where(Activity.id == aid)) is None
+
+    # 前一輪殘留的逐項核定值不得被加總回來 —— 送空 body 也要歸零
+    await db.execute(sa.update(ActivityBudgetItem).values(approved_subsidy=8000))
+    await db.commit()
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/approve", json={}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200
+    assert await db.scalar(sa.select(Activity.school_approved).where(Activity.id == aid)) == 0
+    assert await db.scalar(
+        sa.select(ActivityBudgetItem.approved_subsidy).where(ActivityBudgetItem.activity_id == aid)
+    ) == 0
 
 
 async def test_reject_requires_reason_and_allows_resubmit(client, db):

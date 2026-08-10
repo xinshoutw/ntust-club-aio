@@ -149,7 +149,6 @@
 
 | 編號 | 嚴重度 | 問題 |
 |---|---|---|
-| ISS-85 | 中 | **9 個 `mock.ts` 共 787 行,卻存放正式常數**。全 repo 只有 9 處 import 指向它們:值 `CELL`、`DOW_TEXT`、`CLUB_ATTRIBUTES`、函式 `roomEntryText`,型別 `CellState`、`RoomRequest`、`VenueBooking`、`EquipmentLoan`、`ReviewItem`、`Announcement`。其中 5 檔(violations / signup / members / applications / club-settings,共 188 行)**零 importer,可直接刪**;其餘 4 檔除上述符號外皆為死碼。「mock 檔名裝正式常數」持續誤導 |
 | ISS-85b | 低 | `api/adminEval.ts` 把 `attribute` 宣告為 `string`,但後端該欄可為 `None`,頁面用 `?? '—'` 兜著 —— 型別在說謊 |
 | ISS-86 | 中 | 常數重複定義造成單一真相分裂,`PERIOD_TIMES` 最危險(前端 `api/bookings.ts` / 後端 `booking_service.py` 各一份) |
 | ISS-86b | 中 | **後端註解與測試 docstring 誤稱 `club_members.updated_at` 是 ad5 的採計依據**(`members.py` 的兩處註解、`test_members.py` 的 docstring)。ad5 實際是逐學期數人頭,完全不讀 `updated_at`;「值沒變就不寫入」的真正目的是讓列表的「更新時間」可信 |

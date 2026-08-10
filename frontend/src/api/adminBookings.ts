@@ -1,6 +1,5 @@
 // 行政端借用審核 API 層:臨時場地/器材(權限鍵 abooking)+ 教室固定借用(aroom)
 // snake_case ↔ camelCase 與日期(ISO ↔ YYYY/MM/DD)轉換集中在此;
-// 轉出的資料形狀與 features/bookings/mock 的介面結構相容(BookingReviewModal 共用),
 // 另帶 apiId(數字主鍵)供 approve/reject 呼叫,頁面不顯示單號
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs, { type Dayjs } from 'dayjs'
@@ -75,7 +74,6 @@ const toGrid = (out: AvailabilityOut): AvailabilityGrid => {
 
 // ---- 臨時場地借用 ----
 
-/** 與 mock 的 VenueBooking 結構相容(BookingReviewModal 直接可用) */
 export interface AdminVenueBooking {
   id: string // 字串化 API id:列表 key 與場況格對照用,不顯示
   apiId: number
@@ -117,7 +115,7 @@ const toVenueBooking = (b: AdminVenueBookingOut): AdminVenueBooking => ({
 
 // ---- 器材借用 ----
 
-/** 與 mock 的 EquipmentLoan 結構相容;availableExcludingSelf=該區間可借數(排除本單,僅待審單) */
+/** availableExcludingSelf=該區間可借數(排除本單,僅待審單) */
 export interface AdminEquipmentLoan {
   id: string
   apiId: number
@@ -166,7 +164,7 @@ const toEquipmentLoan = (l: AdminEquipmentLoanOut): AdminEquipmentLoan => ({
 
 // ---- 教室固定借用 ----
 
-/** 與 mock 的 RoomRequest 結構相容;venueId 供衝突偵測(同場地同星期同節次) */
+/** venueId 供衝突偵測(同場地同星期同節次) */
 export interface AdminRoomRequest {
   id: string
   apiId: number

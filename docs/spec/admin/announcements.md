@@ -34,6 +34,5 @@
 
 - 公告發布後**內容與對象都不能改**,只能切蓋板或整篇刪除
 - 蓋板公告會被後續公告擠出社團端取的前 20 筆而靜默失效(見 [shared/shell.md](../shared/shell.md))
-- 性質選項常數 `CLUB_ATTRIBUTES` 來自 `features/admin/clubsMock.ts`,檔名寫 mock 卻是正式常數
 - Email/Discord 廣播無 429 處理、無重試,程序重啟即遺失;`email_logs` 只記結果不重送
 - `announcements` 表除主鍵外沒有任何索引

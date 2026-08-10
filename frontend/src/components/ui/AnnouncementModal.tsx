@@ -1,7 +1,15 @@
 import type { ReactNode } from 'react'
 import { Modal } from 'antd'
-import type { Announcement } from '../../features/activities/mock'
 import Markdown from './Markdown'
+
+// 只取顯示所需欄位,社團端 Announcement 與行政端 AdminAnnouncement 皆相容(兩者 id 型別不同)
+export interface AnnouncementView {
+  title: string
+  scope: string
+  date: string
+  content: string
+  takeoverUntil?: string
+}
 
 // 公告詳情彈窗:兩端共用,點任一公告展開完整內容(markdown)
 // footerExtra:呼叫端注入的控制列(如行政端的蓋板開關/刪除);未提供時不顯示 footer
@@ -12,7 +20,7 @@ export default function AnnouncementModal({
   afterClose,
   footerExtra,
 }: {
-  announcement: Announcement | null
+  announcement: AnnouncementView | null
   open: boolean
   onClose: () => void
   afterClose: () => void

@@ -13,9 +13,8 @@ import {
   type AdminAnnouncement,
   type AnnouncementTarget,
 } from '../../api/announcementsAdmin'
-import { useClubOptions } from '../../api/adminClubs'
+import { CLUB_ATTRIBUTES, useClubOptions } from '../../api/adminClubs'
 import ClubCascader from './ClubCascader'
-import { CLUB_ATTRIBUTES } from './clubsMock'
 
 const PAGE_SIZE = 20
 
@@ -242,7 +241,7 @@ export default function AnnouncementsPage() {
       <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
 
       <AnnouncementModal
-        announcement={shown && { ...shown, id: String(shown.id) }}
+        announcement={shown}
         open={viewOpen}
         onClose={() => setViewOpen(false)}
         afterClose={() => setViewing(null)}

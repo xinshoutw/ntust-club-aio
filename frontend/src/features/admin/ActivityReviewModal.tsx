@@ -7,8 +7,7 @@ import StampTrail, { type StampStage } from '../../components/ui/StampTrail'
 import { useModalAutoFocus } from '../../components/ui/useModalAutoFocus'
 import { fmtMoney } from '../activities/types'
 import { useAuth } from '../../app/auth'
-import { canActOn, stageOfStatus } from '../../api/adminActivities'
-import type { ReviewItem } from './reviewMock'
+import { canActOn, stageOfStatus, type ReviewItem } from '../../api/adminActivities'
 
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 

@@ -124,6 +124,9 @@ export function useAdminClubs() {
 
 // ---- 最小社團選項(任何管理員可讀;跨頁選擇器共用,完整主檔仍限 amember) ----
 
+/** 社團性質:對應後端 Club.attribute enum(GAP-11 未定案前無主檔表可查) */
+export const CLUB_ATTRIBUTES = ['自治性', '學藝性', '服務性', '聯誼性', '藝術性', '體育性'] as const
+
 export interface ClubOption {
   id: number
   name: string

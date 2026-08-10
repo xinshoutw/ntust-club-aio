@@ -32,7 +32,7 @@ import {
   type AvailabilityState,
   type Venue,
 } from '../../api/bookings'
-import { CELL, type CellState } from './mock'
+import { CELL, type CellState } from './cells'
 
 const RETURNED_PAGE = 10
 const VENUE_DAYS = 15 // 單一場地檢視:選擇日 −7 ~ +7 共 15 天(不含過去,不足往未來補)

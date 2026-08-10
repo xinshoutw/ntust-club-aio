@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api, apiPaged, qs } from './client'
 
-/** 與 features/activities/mock 的 Announcement 結構相容(AnnouncementModal 直接沿用) */
 export interface Announcement {
   id: string
   title: string

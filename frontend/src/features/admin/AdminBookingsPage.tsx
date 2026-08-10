@@ -6,7 +6,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import BookingReviewModal from './BookingReviewModal'
-import { CELL, type CellState } from '../bookings/mock'
+import { CELL, type CellState } from '../bookings/cells'
 import { PERIODS } from '../../api/bookings'
 import {
   useAdminAvailability,

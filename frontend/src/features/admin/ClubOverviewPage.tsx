@@ -3,7 +3,7 @@ import { Modal, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import type { StatusKey } from '../../lib/status'
-import { roomEntryText } from '../bookings/mock'
+import { roomEntryText } from '../../api/bookings'
 import { useAdminClubDetail } from '../../api/adminClubs'
 import {
   useAdminBookingMutations,

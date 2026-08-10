@@ -1,15 +1,39 @@
 // 行政端活動審核/結案審核 API 層:snake_case ↔ camelCase 與日期(ISO ↔ YYYY/MM/DD)
-// 轉換集中在此;列表/詳情形狀相容 ReviewItem(id=數字字串),審核彈窗可直接沿用;
-// 查詢鍵集中管理,mutation 一律 invalidate 整域 + 總覽數字卡
+// 轉換集中在此;查詢鍵集中管理,mutation 一律 invalidate 整域 + 總覽數字卡
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api, apiPaged, qs } from './client'
 import { fileUrl } from './activities'
 import type { SessionUser } from './auth'
 import type { StatusKey } from '../lib/status'
-import type { ReviewItem } from '../features/admin/reviewMock'
 
 // ---- 前端型別 ----
+
+/** 審核彈窗吃的活動形狀;三個審核頁與社團總覽的唯讀檢視共用 */
+export interface ReviewItem {
+  id: string // 數字主鍵字串化(String(activity.id))
+  club: string
+  name: string
+  type: '社課或會議' | '活動'
+  isLarge?: boolean // 社團申請大型活動
+  largeApproved?: boolean // undefined=未處理;true=已認可;false=已否准(仍以一般活動續審)
+  date: string
+  requested: number
+  status: StatusKey
+  fundSource?: string // 第一關認定的經費來源(後端 fund_source)
+  // 行政端社團總覽以社團端活動資料組出唯讀檢視,部分欄位可能缺漏(彈窗以 — 呈現)
+  detail?: {
+    timeRange?: string
+    location?: string
+    participantsIn?: number
+    participantsOut?: number
+    submittedAt?: string
+    submittedBy?: string
+    attachments: string[]
+    attachmentFiles?: { id: string; name: string; url: string }[]
+    budget: { id: number; category: string; description: string; selfFund: number; requested: number; approved: number }[]
+  }
+}
 
 /** 後端實際儲存的活動狀態(locked 為前端推導顯示鍵,不可作查詢參數) */
 export type AdminActivityStatus =

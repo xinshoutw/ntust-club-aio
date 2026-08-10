@@ -5,7 +5,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols, Pager } from '../../components/ui/tableControls'
-import { DOW_TEXT } from '../bookings/mock'
+import { DOW_TEXT } from '../../api/bookings'
 import {
   useAdminBookingMutations,
   useAdminFixedWindow,

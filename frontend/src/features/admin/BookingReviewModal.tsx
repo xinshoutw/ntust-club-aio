@@ -2,20 +2,19 @@ import { useState } from 'react'
 import { App, Button, Input, Modal } from 'antd'
 import dayjs from 'dayjs'
 import StatusPill from '../../components/ui/StatusPill'
-import {
-  DOW_TEXT,
-  type EquipmentLoan,
-  type RoomRequest,
-  type VenueBooking,
-} from '../bookings/mock'
+import { DOW_TEXT } from '../../api/bookings'
+import type {
+  AdminEquipmentLoan,
+  AdminRoomRequest,
+  AdminVenueBooking,
+} from '../../api/adminBookings'
 
-// data 允許 API 層的擴充欄位:loan 的 availableExcludingSelf(後端推導)、
-// room 的 conflictKeys(`${dow}|${period}`;呼叫端以全部審核中申請的現場資料計算,
-// 比照 AdminRoomsPage 同邏輯——衝突=兩社搶同場地同星期同節次)
+// room 的 conflictKeys(`${dow}|${period}`)由呼叫端以全部審核中申請的現場資料計算,
+// 比照 AdminRoomsPage 同邏輯——衝突=兩社搶同場地同星期同節次
 export type BookingReviewItem =
-  | { kind: 'venue'; data: VenueBooking }
-  | { kind: 'loan'; data: EquipmentLoan & { availableExcludingSelf?: number } }
-  | { kind: 'room'; data: RoomRequest & { conflictKeys?: string[] } }
+  | { kind: 'venue'; data: AdminVenueBooking }
+  | { kind: 'loan'; data: AdminEquipmentLoan }
+  | { kind: 'room'; data: AdminRoomRequest & { conflictKeys?: string[] } }
 
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 
@@ -171,21 +170,6 @@ export default function BookingReviewModal({
           </>
         )}
         <div style={detailLabel}>用途</div><div>{(item.kind === 'room' ? item.data.note : item.data.purpose) || '—'}</div>
-        {item.kind === 'loan' && item.data.returnDue && (
-          <>
-            <div style={detailLabel}>歸還期限</div><div className="num">{item.data.returnDue}</div>
-          </>
-        )}
-        {item.kind === 'loan' && item.data.borrower && (
-          <>
-            <div style={detailLabel}>借用人</div><div>{item.data.borrower}</div>
-          </>
-        )}
-        {item.kind === 'loan' && item.data.returnedBy && (
-          <>
-            <div style={detailLabel}>歸還人</div><div>{item.data.returnedBy}</div>
-          </>
-        )}
       </div>
 
       {/* 器材可借數檢核:後端以本單借用區間推導可借數(排除本單自身),不足時提醒;僅審核中需要 */}

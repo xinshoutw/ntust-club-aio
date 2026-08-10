@@ -5,20 +5,14 @@ import StatusPill from '../../components/ui/StatusPill'
 import { Cols } from '../../components/ui/tableControls'
 import { useAuth } from '../../app/auth'
 import { kindLabel, type MemberKind } from '../../lib/roles'
-import { CURRENT_SEMESTER } from '../../lib/semester'
+import { useMemberSemesters } from '../../api/members'
 import {
   termLabel,
+  termOptions,
   useCertificateMutations,
   useCertificates,
   useOfficerNames,
 } from '../../api/applications'
-
-// 當學年度全年 + 上下學期;跨學年自動更新
-const CURRENT_YEAR = CURRENT_SEMESTER.split('-')[0]
-const TERMS = [CURRENT_YEAR, `${CURRENT_YEAR}-1`, `${CURRENT_YEAR}-2`].map((value) => ({
-  value,
-  label: termLabel(value),
-}))
 
 // 可申請證明的職位:標準身份值,顯示依社團名稱推導(社長/會長)
 const POSITIONS: MemberKind[] = ['負責人', '副負責人']
@@ -29,6 +23,9 @@ export default function CertificatePage() {
   const [form] = Form.useForm()
   const term: string | undefined = Form.useWatch('term', form)
   const position: MemberKind | undefined = Form.useWatch('position', form)
+
+  const semestersQuery = useMemberSemesters()
+  const terms = termOptions(semestersQuery.data ?? [])
 
   // 依學年期 + 職位自動帶出成員(名單預覽);0 或 >1 位皆不可送出,送出時後端再驗證
   const namesQuery = useOfficerNames(term, position)
@@ -81,7 +78,12 @@ export default function CertificatePage() {
         >
           <div className="form-grid-2">
             <Form.Item name="term" label="擔任學年度或學期" rules={[{ required: true, message: '請選擇學年期' }]} style={{ marginBottom: 0 }}>
-              <Select placeholder="請選擇" options={TERMS} />
+              <Select
+                placeholder={terms.length ? '請選擇' : '名單尚無資料'}
+                options={terms}
+                loading={semestersQuery.isPending}
+                disabled={!terms.length}
+              />
             </Form.Item>
             <Form.Item name="club" label="社團名稱" style={{ marginBottom: 0 }}>
               <Input readOnly style={{ background: 'var(--paper)' }} />

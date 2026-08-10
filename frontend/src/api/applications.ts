@@ -211,6 +211,16 @@ export function termLabel(term: string): string {
   return sem ? `${year} 學年度第 ${sem} 學期` : `${year} 學年度`
 }
 
+/** 幹部證明的學年期選項:以名單實際有資料的學期為準 —— 後端逐字比對
+ *  `club_members.semester`,名單裡沒有的學年期選了也只會拿到「找不到該職位的幹部」。
+ *  整學年(如 114)含該學年兩學期。 */
+export function termOptions(semesters: string[]): { value: string; label: string }[] {
+  const years = [...new Set(semesters.map((s) => s.split('-')[0]))].sort((a, b) => b.localeCompare(a))
+  return years
+    .flatMap((year) => [year, ...semesters.filter((s) => s.startsWith(`${year}-`)).sort()])
+    .map((value) => ({ value, label: termLabel(value) }))
+}
+
 export interface CertificateRecord {
   id: number
   term: string

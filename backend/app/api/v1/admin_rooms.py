@@ -1,4 +1,4 @@
-"""行政端:教室固定借用審核(/admin/room-bookings,權限鍵 aroom)。
+"""行政端:場地固定借用審核(/admin/room-bookings,權限鍵 aroom)。
 
 固定借用=整學期每週固定時段,一單多時段(dow×節次);
 衝突由管理員整單擇一核准(不做部分核准);退回必填原因;簽核走 approval_records。
@@ -169,7 +169,7 @@ async def approve_room_booking(
         db,
         booking.club_id,
         "approve",
-        "教室固定借用已核准",
+        "場地固定借用已核准",
         f"{venue.name}({len(booking.slots)} 個每週時段)",
     )
     out = AdminRoomBookingOut.model_validate(booking)
@@ -254,7 +254,7 @@ async def reject_room_booking(
         db,
         booking.club_id,
         "reject",
-        "教室固定借用退回",
+        "場地固定借用退回",
         f"{venue.name}:{body.reason}",
     )
     return ApiResponse()

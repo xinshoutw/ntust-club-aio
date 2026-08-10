@@ -83,7 +83,7 @@ function ClubShell() {
 
 // 行政端側欄徽章=申請/結案待審數(共用審核頁查詢);
 // 側欄項目與徽章查詢皆依 permissions 過濾,受限管理員看不到無權限的頁。
-// 開放窗外的「教室固定借用」反灰並移至最末組
+// 開放窗外的「場地固定借用」反灰並移至最末組
 function AdminShell() {
   const { user } = useAuth()
   const pendingReview = usePendingActivityTotal(canAccessAdminPath(user, '/admin/review'))

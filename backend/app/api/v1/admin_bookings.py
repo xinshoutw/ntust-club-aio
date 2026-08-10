@@ -181,7 +181,7 @@ async def approve_venue_booking(
         raise conflict("該場地時段已有已核准的固定借用", code="SLOT_TAKEN")
     hit = await svc.blocked_periods(db, booking.venue_id, booking.date, booking.periods)
     if hit:
-        raise conflict(f"該時段不開放借用(節次 {','.join(hit)})", code="SLOT_BLOCKED")
+        raise conflict(f"該時段不開放借用(時段 {','.join(hit)})", code="SLOT_BLOCKED")
     booking.status = BookingStatus.APPROVED
     _record_approval(
         db, ApprovalSubject.VENUE_BOOKING, booking.id, ApprovalDecision.APPROVE, user
@@ -202,7 +202,7 @@ async def approve_venue_booking(
         booking.club_id,
         "approve",
         "臨時場地借用已核准",
-        f"{venue.name}({booking.date} 節次 {','.join(booking.periods)})",
+        f"{venue.name}({booking.date} 時段 {','.join(booking.periods)})",
     )
     out = AdminVenueBookingOut.model_validate(booking)
     out.venue_name = venue.name
@@ -535,7 +535,7 @@ async def manual_venue_booking(
         db,
         action="manual_venue_booking_created",
         user=user,
-        detail=f"{venue.name} {body.date} 節次 {','.join(body.periods)}",
+        detail=f"{venue.name} {body.date} 時段 {','.join(body.periods)}",
         ip=client_ip(request),
     )
     await db.commit()

@@ -64,23 +64,23 @@
 **空間與器材借用**
 
 - **D1 固定借用申請** `POST /club/room-bookings` · submit
-  `教室固定借用申請` / `{user.name}:{venue.name}({n} 個每週時段)`
+  `場地固定借用申請` / `{user.name}:{venue.name}({n} 個每週時段)`
 - **D2 臨時借用申請** `POST /club/venue-bookings` · submit
-  `臨時場地借用申請` / `{user.name}:{venue.name}({date} 節次 {periods})`
+  `臨時場地借用申請` / `{user.name}:{venue.name}({date} 時段 {periods})`
 - **D3 器材借用申請** `POST /club/equipment-loans` · submit
   `器材借用申請` / `{user.name}:{equipment.name} ×{qty}({start}~{end},活動:{activity.name})`
 - **D4 臨時借用已核准** `POST /admin/venue-bookings/{id}/approve` · approve
-  `臨時場地借用已核准` / `{venue.name}({date} 節次 {periods})`(無社團名)
+  `臨時場地借用已核准` / `{venue.name}({date} 時段 {periods})`(無社團名)
 - **D5 臨時借用退回** `POST /admin/venue-bookings/{id}/reject` · reject
-  `臨時場地借用退回` / `{venue.name}({date}):{body.reason}`(無社團名、無節次)
+  `臨時場地借用退回` / `{venue.name}({date}):{body.reason}`(無社團名、無時段)
 - **D6 器材借用已核准** `POST /admin/equipment-loans/{id}/approve` · approve
   `器材借用已核准` / `{equipment.name} ×{qty}({start}~{end})`(無社團名)
 - **D7 器材借用退回** `POST /admin/equipment-loans/{id}/reject` · reject
   `器材借用退回` / `{equipment.name} ×{qty}:{body.reason}`(無社團名、無區間)
 - **D8 固定借用已核准** `POST /admin/room-bookings/{id}/approve` · approve
-  `教室固定借用已核准` / `{venue.name}({n} 個每週時段)`(無社團名、無具體時段)
+  `場地固定借用已核准` / `{venue.name}({n} 個每週時段)`(無社團名、無具體時段)
 - **D9 固定借用退回** `POST /admin/room-bookings/{id}/reject` · reject
-  `教室固定借用退回` / `{venue.name}:{body.reason}`
+  `場地固定借用退回` / `{venue.name}:{body.reason}`
 - **D10 器材歸還提醒** `POST /admin/equipment-loans/{id}/remind`(super)或 `POST /staff/equipment-loans/{id}/remind`(工讀生),兩者共用 `services/loan_remind` · alert · 另寄 Email
   `器材歸還提醒` / `{club.name}:{equipment.name} ×{qty}(借用區間 {start}~{end},歸還期限 {deadline}),請儘速辦理歸還點交。`
 

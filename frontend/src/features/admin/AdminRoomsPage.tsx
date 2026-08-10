@@ -20,8 +20,8 @@ const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 // 退回原因預設文案:每次開啟退回視窗都回到此值(可修改後送出)
 const DEFAULT_REJECT_REASON = '很抱歉，目前時段無法受理。若仍有借用需求，請聯絡組長，謝謝'
 
-// 教室固定借用審核彈窗:顯示每週時段(含衝突標示),核准或退回(退回原因必填)
-// 衝突=兩社搶同教室同星期同節次;整單擇一核准,不做部分同意
+// 場地固定借用審核彈窗:顯示每週時段(含衝突標示),核准或退回(退回原因必填)
+// 衝突=兩社搶同場地同星期同時段;整單擇一核准,不做部分同意
 function RoomReviewModal({
   item,
   isConflict,
@@ -174,7 +174,7 @@ export default function AdminRoomsPage() {
   if (windowQuery.isPending) {
     return (
       <div>
-        <PageHeader title="教室固定借用" />
+        <PageHeader title="場地固定借用" />
         <div className="card" style={{ marginTop: 20, padding: '48px 24px', textAlign: 'center' }}>
           <Spin />
         </div>
@@ -186,7 +186,7 @@ export default function AdminRoomsPage() {
   if (windowQuery.isError) {
     return (
       <div>
-        <PageHeader title="教室固定借用" />
+        <PageHeader title="場地固定借用" />
         <div style={{ marginTop: 20 }}>
           <QueryError title="受理期間載入失敗" error={windowQuery.error} onRetry={() => windowQuery.refetch()} />
         </div>
@@ -198,7 +198,7 @@ export default function AdminRoomsPage() {
     const w = windowQuery.data
     return (
       <div>
-        <PageHeader title="教室固定借用" />
+        <PageHeader title="場地固定借用" />
         <div className="card" style={{ marginTop: 20, padding: '48px 24px', textAlign: 'center' }}>
           <div style={{ fontSize: 15, fontWeight: 600 }}>目前未開放申請</div>
           {w?.openFrom && w.openUntil && (
@@ -217,7 +217,7 @@ export default function AdminRoomsPage() {
   return (
     <div>
       <PageHeader
-        title="教室固定借用"
+        title="場地固定借用"
         sub={
           <>
             待審 <span className="num">{total}</span> 件
@@ -227,13 +227,13 @@ export default function AdminRoomsPage() {
 
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-          <table className="tb dense fixed" aria-label="待審教室固定借用" style={{ minWidth: 760 }}>
-            {/* 社團/教室/用途截斷、每週時段吃剩餘寬且允許換行;狀態/開啟固定 px */}
+          <table className="tb dense fixed" aria-label="待審場地固定借用" style={{ minWidth: 760 }}>
+            {/* 社團/場地/用途截斷、每週時段吃剩餘寬且允許換行;狀態/開啟固定 px */}
             <Cols widths={['16%', '15%', 'auto', '18%', 90, 32]} />
             <thead>
               <tr>
                 <th>社團</th>
-                <th>教室</th>
+                <th>場地</th>
                 <th>每週時段</th>
                 <th>用途</th>
                 <th>狀態</th>
@@ -251,18 +251,18 @@ export default function AdminRoomsPage() {
                   style={{ cursor: 'pointer' }}
                 >
                   <td className="cell-clip" title={r.club}>{r.club}</td>
-                  <td className="cell-clip" title={r.room || '未命名教室'} style={{ fontWeight: 500 }}>
+                  <td className="cell-clip" title={r.room || '未命名場地'} style={{ fontWeight: 500 }}>
                     <button
                       type="button"
                       className="row-open-btn"
-                      aria-label={`開啟 ${r.club} 借用「${r.room || '未命名教室'}」的審核`}
+                      aria-label={`開啟 ${r.club} 借用「${r.room || '未命名場地'}」的審核`}
                       onClick={(e) => {
                         e.stopPropagation()
                         setSelected(r)
                         setOpen(true)
                       }}
                     >
-                      {r.room || '未命名教室'}
+                      {r.room || '未命名場地'}
                     </button>
                   </td>
                   <td style={{ fontSize: 13 }}>

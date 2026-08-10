@@ -32,7 +32,7 @@ export default function PeriodPicker({ value, onChange, size = 'middle', nowrap 
 
   const h = size === 'small' ? 28 : 32
   return (
-    <div role="group" aria-label="節次" style={{ display: 'flex', flexWrap: nowrap ? 'nowrap' : 'wrap', overflowX: nowrap ? 'auto' : undefined, gap: 6, userSelect: 'none', paddingBottom: nowrap ? 2 : 0 }}>
+    <div role="group" aria-label="時段" style={{ display: 'flex', flexWrap: nowrap ? 'nowrap' : 'wrap', overflowX: nowrap ? 'auto' : undefined, gap: 6, userSelect: 'none', paddingBottom: nowrap ? 2 : 0 }}>
       {PERIODS.map((p) => {
         const on = value.includes(p)
         const off = disabledPeriods.includes(p)
@@ -42,7 +42,7 @@ export default function PeriodPicker({ value, onChange, size = 'middle', nowrap 
             type="button"
             aria-pressed={on}
             disabled={off}
-            title={off ? '該節次已開始' : undefined}
+            title={off ? '該時段已開始' : undefined}
             onMouseDown={(e) => {
               e.preventDefault()
               if (off) return

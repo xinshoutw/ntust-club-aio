@@ -9,12 +9,12 @@ from app.services.booking_service import MAX_FIXED_SLOTS, PERIODS
 
 def _validate_periods(periods: list[str]) -> list[str]:
     if not periods:
-        raise ValueError("至少選擇一個節次")
+        raise ValueError("至少選擇一個時段")
     invalid = [p for p in periods if p not in PERIODS]
     if invalid:
-        raise ValueError(f"無效節次:{','.join(invalid)}")
+        raise ValueError(f"無效時段:{','.join(invalid)}")
     if len(set(periods)) != len(periods):
-        raise ValueError("節次重複")
+        raise ValueError("時段重複")
     return sorted(periods, key=PERIODS.index)
 
 
@@ -48,7 +48,7 @@ class RoomSlotIn(BaseModel):
     @classmethod
     def _period(cls, v: str) -> str:
         if v not in PERIODS:
-            raise ValueError(f"無效節次:{v}")
+            raise ValueError(f"無效時段:{v}")
         return v
 
 
@@ -225,7 +225,7 @@ class ManualEquipmentLoanIn(BaseModel):
 
 
 class VenueBlockRuleIn(BaseModel):
-    """場地不開放規則:區間(單日=同日)+ 星期限定(NULL=每天)+ 節次子集。"""
+    """場地不開放規則:區間(單日=同日)+ 星期限定(NULL=每天)+ 時段子集。"""
 
     venue_id: int
     start_date: date

@@ -117,14 +117,14 @@ export function buildClubNav(window?: FixedWindow): NavGroup[] {
 
 const ADMIN_ROOM_ITEM: NavItem = {
   key: 'a-room',
-  label: '教室固定借用',
+  label: '場地固定借用',
   path: '/admin/rooms',
   icon: <ScheduleOutlined />,
 }
 
 // 側欄徽章=待審數(shell 以共用 query 提供;查詢中/失敗不顯示)。
 // 依 permissions 過濾:受限管理員只看得到自己可用的項目(路由另有 gate)。
-// 開放窗外的「教室固定借用」反灰並移至最末組。
+// 開放窗外的「場地固定借用」反灰並移至最末組。
 export function buildAdminNav(
   user: SessionUser | null,
   pendingReview?: number,

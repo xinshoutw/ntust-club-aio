@@ -38,7 +38,7 @@ DEFAULTS: dict[str, Any] = {
     "equipment_return_time": "10:30",
     # 器材借用區間緩衝(工作天):活動開始日 −before ~ 活動結束日 +after
     "equipment_workday_buffer": {"before": 2, "after": 1},
-    # 教室固定借用開放窗:日期區間;未設定即不開放,由管理員於系統設定調整
+    # 場地固定借用開放窗:日期區間;未設定即不開放,由管理員於系統設定調整
     "fixed_booking_window": {"open_from": None, "open_until": None},
     # 單檔上限(MB;magic-byte 型別驗證用的上界,管理員後台可調)
     "upload_limits": {"doc": 50, "img": 10, "zip": 100, "video": 200},

@@ -457,7 +457,7 @@ export const usePendingActivityTotal = (enabled = true) =>
 export const usePendingCloseTotal = (enabled = true) =>
   useAdminTotal('pendingClose', [countPath('/admin/activities', 'closing_pending_advisor')], enabled)
 
-/** 待審教室固定借用 */
+/** 待審場地固定借用 */
 export const usePendingRoomBookingTotal = (enabled = true) =>
   useAdminTotal('pendingRoomBookings', [countPath('/admin/room-bookings', 'pending')], enabled)
 

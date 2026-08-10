@@ -41,7 +41,7 @@ export default function VenueRulesPage() {
     reason: string
   }) => {
     if (!periods.length) {
-      message.error('請選擇至少一個不開放節次')
+      message.error('請選擇至少一個不開放時段')
       return
     }
     create.mutate(
@@ -97,7 +97,7 @@ export default function VenueRulesPage() {
             </Form.Item>
           </div>
           <div style={{ fontSize: 13, fontWeight: 500, margin: '4px 0 8px' }}>
-            不開放節次 <span style={{ color: '#C13B34' }}>*</span>
+            不開放時段 <span style={{ color: '#C13B34' }}>*</span>
           </div>
           <div style={{ background: 'var(--paper)', borderRadius: 8, padding: '10px 12px' }}>
             <PeriodPicker value={periods} onChange={setPeriods} size="small" />
@@ -120,7 +120,7 @@ export default function VenueRulesPage() {
                 <th>場地</th>
                 <th>期間</th>
                 <th>星期</th>
-                <th>節次</th>
+                <th>時段</th>
                 <th>原因</th>
                 <th className="r">動作</th>
               </tr>

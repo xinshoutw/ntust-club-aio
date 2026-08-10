@@ -9,7 +9,7 @@ from app.models.enums import BookingStatus, LoanStatus
 
 
 class RoomBookingRequest(Base, TimestampMixin):
-    """教室固定借用:整學期每週固定時段,一單多時段。
+    """場地固定借用:整學期每週固定時段,一單多時段。
 
     僅於開放窗(system_settings fixed_booking_window)受理;每社至多 10 節;
     晚間時段(第 10 節及 A–D 節)至少連續 3 節;衝突由管理員整單擇一核准。

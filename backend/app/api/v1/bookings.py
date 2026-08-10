@@ -163,7 +163,7 @@ async def availability_range(
     )
 
 
-# ---- 教室固定借用 ----
+# ---- 場地固定借用 ----
 
 
 @router.get("/room-bookings/window")
@@ -279,7 +279,7 @@ async def create_room_booking(
         background,
         db,
         user,
-        "教室固定借用申請",
+        "場地固定借用申請",
         f"{user.name}:{venue.name}({len(body.slots)} 個每週時段)",
     )
     out = RoomBookingOut.model_validate(row)
@@ -345,7 +345,7 @@ async def create_venue_booking(
     if body.date < svc.today_taipei():
         raise validation_error("借用日期不得早於今天")
     if svc.booking_started(body.date, body.periods):
-        raise validation_error("所選節次已開始,請選擇尚未開始的時段")
+        raise validation_error("所選時段已開始,請選擇尚未開始的時段")
 
     # 同社同場地同日重複申請直接擋(不同社的衝突由審核關把關)
     dup = await db.scalar(
@@ -362,7 +362,7 @@ async def create_venue_booking(
     # 場地不開放規則:申請時即擋,核准端亦驗
     hit = await svc.blocked_periods(db, venue.id, body.date, body.periods)
     if hit:
-        raise validation_error(f"所選時段不開放借用(節次 {','.join(hit)})")
+        raise validation_error(f"所選時段不開放借用(時段 {','.join(hit)})")
 
     row = VenueBooking(
         club_id=user.club_id,
@@ -381,7 +381,7 @@ async def create_venue_booking(
         db,
         user,
         "臨時場地借用申請",
-        f"{user.name}:{venue.name}({body.date} 節次 {','.join(body.periods)})",
+        f"{user.name}:{venue.name}({body.date} 時段 {','.join(body.periods)})",
     )
     out = VenueBookingOut.model_validate(row)
     out.venue_name = venue.name

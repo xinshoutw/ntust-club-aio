@@ -1,4 +1,4 @@
-// 行政端借用審核 API 層:臨時場地/器材(權限鍵 abooking)+ 教室固定借用(aroom)
+// 行政端借用審核 API 層:臨時場地/器材(權限鍵 abooking)+ 場地固定借用(aroom)
 // snake_case ↔ camelCase 與日期(ISO ↔ YYYY/MM/DD)轉換集中在此;
 // 另帶 apiId(數字主鍵)供 approve/reject 呼叫,頁面不顯示單號
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -162,7 +162,7 @@ const toEquipmentLoan = (l: AdminEquipmentLoanOut): AdminEquipmentLoan => ({
   availableExcludingSelf: l.available_excluding_self ?? undefined,
 })
 
-// ---- 教室固定借用 ----
+// ---- 場地固定借用 ----
 
 /** venueId 供衝突偵測(同場地同星期同節次) */
 export interface AdminRoomRequest {
@@ -239,7 +239,7 @@ interface FixedWindowOut {
   open_until: string | null
 }
 
-/** 固定借用開放窗(行政端):未開放時側欄「教室固定借用」反灰置底;
+/** 固定借用開放窗(行政端):未開放時側欄「場地固定借用」反灰置底;
  *  AdminShell 與 AdminRoomsPage 共用同一查詢;一般 admin 即可讀,不綁 aroom */
 export function useAdminFixedWindow(enabled = true) {
   return useQuery({

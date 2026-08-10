@@ -176,6 +176,9 @@ async def approve_venue_booking(
     )
     if taken:
         raise conflict("該場地時段已有已核准的借用", code="SLOT_TAKEN")
+    # 交叉檢核:固定借用佔的是同一間場地的同一時段,不查就會雙重核准
+    if await svc.fixed_slots_taken_on(db, booking.venue_id, booking.date, booking.periods):
+        raise conflict("該場地時段已有已核准的固定借用", code="SLOT_TAKEN")
     hit = await svc.blocked_periods(db, booking.venue_id, booking.date, booking.periods)
     if hit:
         raise conflict(f"該時段不開放借用(節次 {','.join(hit)})", code="SLOT_BLOCKED")
@@ -315,6 +318,100 @@ async def _pending_loan(db, loan_id: int) -> EquipmentLoan:
     return loan
 
 
+@router.post("/venue-bookings/{booking_id}/revoke")
+async def revoke_venue_booking(
+    booking_id: int,
+    body: RejectIn,
+    user: BookingAdmin,
+    db: DbDep,
+    request: Request,
+    background: BackgroundTasks,
+) -> ApiResponse[None]:
+    """撤銷已核准的臨時場地借用。
+
+    核准後原本沒有任何撤銷路徑(社團端取消要求開始日在今天之後),雙重核准或誤核
+    就再也解不開。狀態復用 cancelled —— 全站的佔用判定本來就排除它,不必逐點重審。
+    """
+    booking = await db.scalar(
+        sa.select(VenueBooking).where(VenueBooking.id == booking_id).with_for_update()
+    )
+    if booking is None:
+        raise not_found("找不到借用申請")
+    if booking.status != BookingStatus.APPROVED:
+        raise conflict("只有已核准的借用可以撤銷")
+    if booking.date < svc.today_taipei():
+        raise conflict("已結束的借用不需撤銷")
+    booking.status = BookingStatus.CANCELLED
+    _record_approval(
+        db, ApprovalSubject.VENUE_BOOKING, booking.id, ApprovalDecision.REVOKE, user, body.reason
+    )
+    audit.record(
+        db,
+        action="venue_booking_revoked",
+        user=user,
+        detail=f"venue_booking={booking.id};reason={body.reason}",
+        ip=client_ip(request),
+    )
+    await db.commit()
+
+    venue = await db.get(Venue, booking.venue_id)
+    await _notify_club(
+        background,
+        db,
+        booking.club_id,
+        "reject",
+        "臨時場地借用已撤銷",
+        f"{venue.name}({booking.date} 時段 {','.join(booking.periods)}):{body.reason}",
+    )
+    return ApiResponse()
+
+
+@router.post("/equipment-loans/{loan_id}/revoke")
+async def revoke_equipment_loan(
+    loan_id: int,
+    body: RejectIn,
+    user: BookingAdmin,
+    db: DbDep,
+    request: Request,
+    background: BackgroundTasks,
+) -> ApiResponse[None]:
+    """撤銷已核准但尚未借出的器材借用。
+
+    「核准後沒來領」的單子會永遠壓在工讀生的待借出清單最上方,沒有任何操作清得掉。
+    區間過期不算結束(東西還沒交出去),所以這裡不看日期;已借出的要走歸還而非撤銷。
+    """
+    loan = await db.scalar(
+        sa.select(EquipmentLoan).where(EquipmentLoan.id == loan_id).with_for_update()
+    )
+    if loan is None:
+        raise not_found("找不到借用申請")
+    if loan.status != LoanStatus.APPROVED:
+        raise conflict("只有已核准且尚未借出的借用可以撤銷")
+    loan.status = LoanStatus.CANCELLED
+    _record_approval(
+        db, ApprovalSubject.EQUIPMENT_LOAN, loan.id, ApprovalDecision.REVOKE, user, body.reason
+    )
+    audit.record(
+        db,
+        action="equipment_loan_revoked",
+        user=user,
+        detail=f"equipment_loan={loan.id};reason={body.reason}",
+        ip=client_ip(request),
+    )
+    await db.commit()
+
+    equipment = await db.get(Equipment, loan.equipment_id)
+    await _notify_club(
+        background,
+        db,
+        loan.club_id,
+        "reject",
+        "器材借用已撤銷",
+        f"{equipment.name} ×{loan.qty}({loan.start_date}~{loan.end_date}):{body.reason}",
+    )
+    return ApiResponse()
+
+
 @router.post("/equipment-loans/{loan_id}/approve")
 async def approve_equipment_loan(
     loan_id: int,
@@ -421,6 +518,8 @@ async def manual_venue_booking(
     )
     if taken:
         raise conflict("該場地時段已有已核准的借用", code="SLOT_TAKEN")
+    if await svc.fixed_slots_taken_on(db, venue.id, body.date, body.periods):
+        raise conflict("該場地時段已有已核准的固定借用", code="SLOT_TAKEN")
     row = VenueBooking(
         club_id=None,
         venue_id=venue.id,

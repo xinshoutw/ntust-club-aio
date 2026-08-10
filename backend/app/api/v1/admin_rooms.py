@@ -131,7 +131,7 @@ async def approve_room_booking(
     booking = await _pending_request(db, request_id)
     # 核准前確認同場地同學期沒有已核准單佔用相同(星期,節次);advisory lock 序列化並發核准
     # (整單擇一是人工判斷,但「已核准 vs 再核准」的重疊必須由系統擋下)
-    await svc.lock_resource(db, "room", booking.venue_id)
+    await svc.lock_resource(db, "venue", booking.venue_id)
     pairs = [(s.weekday, s.period) for s in booking.slots]
     taken = await db.scalar(
         sa.select(sa.func.count())
@@ -147,6 +147,11 @@ async def approve_room_booking(
     )
     if taken:
         raise conflict("該場地已有已核准的固定借用佔用相同時段", code="SLOT_TAKEN")
+    # 交叉檢核:整學期每週固定佔用會蓋到已核准的單日臨時借用
+    if await svc.temp_days_hitting_slots(
+        db, booking.venue_id, booking.start_date, booking.end_date, pairs
+    ):
+        raise conflict("學期內有已核准的臨時借用佔用相同時段", code="SLOT_TAKEN")
     booking.status = BookingStatus.APPROVED
     _record_approval(db, booking.id, ApprovalDecision.APPROVE, user)
     audit.record(
@@ -170,6 +175,56 @@ async def approve_room_booking(
     out = AdminRoomBookingOut.model_validate(booking)
     out.venue_name = venue.name
     return ApiResponse(data=out)
+
+
+@router.post("/{request_id}/revoke")
+async def revoke_room_booking(
+    request_id: int,
+    body: RejectIn,
+    user: RoomAdmin,
+    db: DbDep,
+    request: Request,
+    background: BackgroundTasks,
+) -> ApiResponse[None]:
+    """撤銷已核准的固定借用。
+
+    固定借用的開始日是學期起日,學期一開始社團就取消不了、行政也沒端點撤銷,教室
+    時段與該社 10 節額度整學期鎖死。狀態復用 cancelled:額度判定排除 cancelled,
+    額度自動回歸,不必另寫回歸邏輯。
+    """
+    booking = await db.scalar(
+        sa.select(RoomBookingRequest)
+        .where(RoomBookingRequest.id == request_id)
+        .options(sa.orm.selectinload(RoomBookingRequest.slots))
+        .with_for_update(of=RoomBookingRequest)
+    )
+    if booking is None:
+        raise not_found("找不到借用申請")
+    if booking.status != BookingStatus.APPROVED:
+        raise conflict("只有已核准的借用可以撤銷")
+    if booking.end_date < svc.today_taipei():
+        raise conflict("已結束的借用不需撤銷")
+    booking.status = BookingStatus.CANCELLED
+    _record_approval(db, booking.id, ApprovalDecision.REVOKE, user, body.reason)
+    audit.record(
+        db,
+        action="room_booking_revoked",
+        user=user,
+        detail=f"room_booking={booking.id};reason={body.reason}",
+        ip=client_ip(request),
+    )
+    await db.commit()
+
+    venue = await db.get(Venue, booking.venue_id)
+    await _notify_club(
+        background,
+        db,
+        booking.club_id,
+        "reject",
+        "固定場地借用已撤銷",
+        f"{venue.name}({len(booking.slots)} 個每週時段):{body.reason}",
+    )
+    return ApiResponse()
 
 
 @router.post("/{request_id}/reject")

@@ -141,14 +141,68 @@ def fixed_window_open(window: dict, now: datetime | None = None) -> bool:
 
 # 資源層 advisory lock:序列化「可用量/衝突檢核 → 寫入」的關鍵區段(隨交易釋放)。
 # 申請/核准端點的列鎖只鎖單筆申請,擋不住兩筆不同申請並發通過同一份佔用量檢核;
-# 以 (namespace, resource_id) 鎖資源本身,申請端與核准端用同一把鍵
-_LOCK_NS = {"equipment": 411001, "venue": 411002, "room": 411003}
+# 以 (namespace, resource_id) 鎖資源本身,申請端與核准端用同一把鍵。
+# 臨時借用與固定借用搶的是同一間場地,必須同一個命名空間才會互相序列化 ——
+# 分成 venue/room 兩把鍵時,就算補上交叉查詢也擋不住兩邊同時核准
+_LOCK_NS = {"equipment": 411001, "venue": 411002}
 
 
 async def lock_resource(db: AsyncSession, kind: str, resource_id: int) -> None:
     await db.execute(
         sa.text("SELECT pg_advisory_xact_lock(:ns, :id)"),
         {"ns": _LOCK_NS[kind], "id": resource_id},
+    )
+
+
+async def fixed_slots_taken_on(
+    db: AsyncSession, venue_id: int, day: date, periods: list[str]
+) -> bool:
+    """該日是否已有已核准的**固定**借用佔用這些時段。
+
+    臨時借用核准原本只查其他臨時借用,固定借用核准只查其他固定借用,兩邊互不檢核
+    —— 同一間場地同一時段可被雙重核准,DB 也沒有兜底約束。
+    """
+    return bool(
+        await db.scalar(
+            sa.select(sa.func.count())
+            .select_from(RoomBookingSlot)
+            .join(RoomBookingRequest, RoomBookingRequest.id == RoomBookingSlot.request_id)
+            .where(
+                RoomBookingRequest.venue_id == venue_id,
+                RoomBookingRequest.status == BookingStatus.APPROVED,
+                RoomBookingRequest.start_date <= day,
+                RoomBookingRequest.end_date >= day,
+                RoomBookingSlot.weekday == day.isoweekday(),
+                RoomBookingSlot.period.in_(periods),
+            )
+        )
+    )
+
+
+async def temp_days_hitting_slots(
+    db: AsyncSession, venue_id: int, start: date, end: date, pairs: list[tuple[int, str]]
+) -> bool:
+    """區間內是否有已核准的**臨時**借用落在這些 (星期, 時段) 上。"""
+    if not pairs:
+        return False
+    by_weekday: dict[int, list[str]] = {}
+    for wd, period in pairs:
+        by_weekday.setdefault(wd, []).append(period)
+    weekday = sa.cast(sa.extract("isodow", VenueBooking.date), sa.Integer)
+    clauses = [
+        sa.and_(weekday == wd, VenueBooking.periods.op("&&")(ps))
+        for wd, ps in by_weekday.items()
+    ]
+    return bool(
+        await db.scalar(
+            sa.select(sa.func.count()).where(
+                VenueBooking.venue_id == venue_id,
+                VenueBooking.status == BookingStatus.APPROVED,
+                VenueBooking.date >= start,
+                VenueBooking.date <= end,
+                sa.or_(*clauses),
+            )
+        )
     )
 
 
@@ -423,17 +477,23 @@ async def admin_availability_grid(db: AsyncSession, day: date) -> dict[int, dict
             )
 
     fixed_rows = await db.execute(
-        sa.select(RoomBookingSlot, RoomBookingRequest.venue_id)
+        sa.select(
+            RoomBookingSlot,
+            RoomBookingRequest.venue_id,
+            RoomBookingRequest.status == BookingStatus.APPROVED,
+        )
         .join(RoomBookingRequest, RoomBookingSlot.request_id == RoomBookingRequest.id)
         .where(
             RoomBookingSlot.weekday == day.isoweekday(),
-            RoomBookingRequest.status == BookingStatus.APPROVED,
+            RoomBookingRequest.status.notin_([BookingStatus.REJECTED, BookingStatus.CANCELLED]),
             RoomBookingRequest.start_date <= day,
             RoomBookingRequest.end_date >= day,
         )
     )
-    for slot, venue_id in fixed_rows:
-        mark(venue_id, slot.period, "fixed")
+    for slot, venue_id, approved in fixed_rows:
+        # 審核中的固定借用也要標:承辦人核准臨時借用時,若這格在螢幕上是空白的,
+        # 雙重核准連目視都攔不下來
+        mark(venue_id, slot.period, "fixed" if approved else "pending")
 
     for (_, vid), cells in (await blocked_map(db, day, day)).items():
         for period in cells:

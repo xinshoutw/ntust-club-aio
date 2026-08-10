@@ -166,6 +166,13 @@ export default function ClubOverviewPage() {
       : item.kind === 'loan'
         ? bookingMutations.rejectLoan.mutateAsync({ id: apiId, reason })
         : bookingMutations.rejectRoom.mutateAsync({ id: apiId, reason })
+  // 撤銷已核准:社團總覽是唯一同時看得到各類已核准借用的地方
+  const revokeBooking = (item: BookingReviewItem, apiId: number, reason: string): Promise<unknown> =>
+    item.kind === 'venue'
+      ? bookingMutations.revokeVenue.mutateAsync({ id: apiId, reason })
+      : item.kind === 'loan'
+        ? bookingMutations.revokeLoan.mutateAsync({ id: apiId, reason })
+        : bookingMutations.revokeRoom.mutateAsync({ id: apiId, reason })
 
   const activities = activitiesQuery.data ?? []
   const maintenance = (maintQuery.data ?? []).filter((m) => m.status !== 'done')
@@ -347,6 +354,7 @@ export default function ClubOverviewPage() {
           afterClose={() => setBooking(null)}
           onApprove={() => approveBooking(booking, bookingApiId)}
           onReject={(reason) => rejectBooking(booking, bookingApiId, reason)}
+          onRevoke={(reason) => revokeBooking(booking, bookingApiId, reason)}
         />
       )}
 

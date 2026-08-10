@@ -350,7 +350,33 @@ export function useAdminBookingMutations() {
       post(`/admin/room-bookings/${id}/reject`, { reason }),
     onSuccess: invalidate,
   })
-  return { approveVenue, rejectVenue, approveLoan, rejectLoan, approveRoom, rejectRoom }
+  // 撤銷已核准:狀態落 cancelled(佔用判定本來就排除),原因必填
+  const revokeVenue = useMutation({
+    mutationFn: ({ id, reason }: RejectParams) =>
+      post(`/admin/venue-bookings/${id}/revoke`, { reason }),
+    onSuccess: invalidate,
+  })
+  const revokeLoan = useMutation({
+    mutationFn: ({ id, reason }: RejectParams) =>
+      post(`/admin/equipment-loans/${id}/revoke`, { reason }),
+    onSuccess: invalidate,
+  })
+  const revokeRoom = useMutation({
+    mutationFn: ({ id, reason }: RejectParams) =>
+      post(`/admin/room-bookings/${id}/revoke`, { reason }),
+    onSuccess: invalidate,
+  })
+  return {
+    approveVenue,
+    rejectVenue,
+    revokeVenue,
+    approveLoan,
+    rejectLoan,
+    revokeLoan,
+    approveRoom,
+    rejectRoom,
+    revokeRoom,
+  }
 }
 
 

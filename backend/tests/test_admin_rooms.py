@@ -176,3 +176,68 @@ async def test_room_approve_blocks_approved_overlap(client, db):
     resp = await client.post(f"{URL}/{second.id}/approve", headers=csrf_headers(client))
     assert resp.status_code == 409
     assert resp.json()["meta"]["code"] == "SLOT_TAKEN"
+
+
+async def test_revoke_frees_the_slot_and_the_quota(client, db):
+    """已核准的固定借用要撤得掉。
+
+    開始日是學期起日,學期一開就社團取消不了、行政也沒端點 —— 教室時段與該社 10 節
+    額度整學期鎖死。撤銷落 cancelled,額度判定本來就排除它,額度自動回歸。
+    """
+    first, _, done = await seed(client, db)
+
+    # 已核准單佔著週五第 1 節,同時段的新申請核准不了
+    clash = RoomBookingRequest(
+        club_id=first.club_id,
+        venue_id=done.venue_id,
+        purpose="想借同一格",
+        start_date=done.start_date,
+        end_date=done.end_date,
+    )
+    clash.slots = [RoomBookingSlot(weekday=5, period="1")]
+    db.add(clash)
+    await db.commit()
+    await db.refresh(clash)
+    resp = await client.post(f"{URL}/{clash.id}/approve", headers=csrf_headers(client))
+    assert resp.status_code == 409
+
+    # 撤銷必填原因
+    assert (
+        await client.post(f"{URL}/{done.id}/revoke", json={}, headers=csrf_headers(client))
+    ).status_code == 422
+
+    resp = await client.post(
+        f"{URL}/{done.id}/revoke", json={"reason": "誤核"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+    assert (
+        await db.scalar(
+            sa.select(RoomBookingRequest.status).where(RoomBookingRequest.id == done.id)
+        )
+    ).value == "cancelled"
+    assert await db.scalar(
+        sa.select(ApprovalRecord.id).where(
+            ApprovalRecord.subject_type == ApprovalSubject.ROOM_BOOKING,
+            ApprovalRecord.subject_id == done.id,
+            ApprovalRecord.decision == "revoke",
+        )
+    ) is not None
+    assert await db.scalar(
+        sa.select(AuditLog.id).where(AuditLog.action == "room_booking_revoked")
+    ) is not None
+
+    # 格子空出來了
+    resp = await client.post(f"{URL}/{clash.id}/approve", headers=csrf_headers(client))
+    assert resp.status_code == 200, resp.text
+
+    # 待審單與已撤銷單都不能再撤
+    assert (
+        await client.post(
+            f"{URL}/{first.id}/revoke", json={"reason": "x"}, headers=csrf_headers(client)
+        )
+    ).status_code == 409
+    assert (
+        await client.post(
+            f"{URL}/{done.id}/revoke", json={"reason": "x"}, headers=csrf_headers(client)
+        )
+    ).status_code == 409

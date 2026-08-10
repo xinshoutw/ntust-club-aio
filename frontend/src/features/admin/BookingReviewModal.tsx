@@ -28,6 +28,7 @@ export default function BookingReviewModal({
   afterClose,
   onApprove,
   onReject,
+  onRevoke,
 }: {
   item: BookingReviewItem
   open: boolean
@@ -35,18 +36,21 @@ export default function BookingReviewModal({
   afterClose: () => void
   onApprove?: () => Promise<unknown>
   onReject?: (reason: string) => Promise<unknown>
+  onRevoke?: (reason: string) => Promise<unknown>
 }) {
   const { message } = App.useApp()
-  const [rejectOpen, setRejectOpen] = useState(false)
+  // 同一個原因彈窗兩用:退回(待審)與撤銷(已核准)
+  const [reasonMode, setReasonMode] = useState<'reject' | 'revoke' | null>(null)
   const [reason, setReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const canReview = item.data.status === 'pending'
+  const canRevoke = item.data.status === 'approved' && !!onRevoke
   const title =
     item.kind === 'venue' ? item.data.venue : item.kind === 'room' ? item.data.room : `${item.data.equipment} ×${item.data.qty}`
   const roomConflict = item.kind === 'room' && canReview && (item.data.conflictKeys?.length ?? 0) > 0
 
-  const closeReject = () => {
-    setRejectOpen(false)
+  const closeReason = () => {
+    setReasonMode(null)
     setReason('')
   }
 
@@ -66,15 +70,18 @@ export default function BookingReviewModal({
     onClose()
   }
 
-  const submitReject = async () => {
-    if (!reason.trim()) {
-      message.error('退回原因為必填')
+  const submitReason = async () => {
+    const revoking = reasonMode === 'revoke'
+    const trimmed = reason.trim()
+    if (!trimmed) {
+      message.error(revoking ? '撤銷原因為必填' : '退回原因為必填')
       return
     }
-    if (onReject) {
+    const action = revoking ? onRevoke : onReject
+    if (action) {
       setSubmitting(true)
       try {
-        await onReject(reason.trim())
+        await action(trimmed)
       } catch (e) {
         message.error(e instanceof Error ? e.message : '操作失敗')
         return
@@ -82,8 +89,8 @@ export default function BookingReviewModal({
         setSubmitting(false)
       }
     }
-    message.success('已退回借用申請')
-    closeReject()
+    message.success(revoking ? '已撤銷借用' : '已退回借用申請')
+    closeReason()
     onClose()
   }
 
@@ -102,16 +109,20 @@ export default function BookingReviewModal({
       footer={
         canReview ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Button danger style={{ height: 38 }} disabled={submitting} onClick={() => setRejectOpen(true)}>退回</Button>
+            <Button danger style={{ height: 38 }} disabled={submitting} onClick={() => setReasonMode('reject')}>退回</Button>
             <Button
               type="primary"
               style={{ height: 38 }}
-              loading={submitting && !rejectOpen}
+              loading={submitting && reasonMode === null}
               onClick={() => void submitApprove()}
             >
               核准
             </Button>
           </div>
+        ) : canRevoke ? (
+          <Button danger style={{ height: 38 }} disabled={submitting} onClick={() => setReasonMode('revoke')}>
+            撤銷借用
+          </Button>
         ) : (
           <div style={{ fontSize: 12, color: 'var(--steel)' }}>非待審核申請，僅供查看</div>
         )
@@ -194,23 +205,25 @@ export default function BookingReviewModal({
       )}
 
       <Modal
-        open={rejectOpen}
-        title="退回借用申請"
-        okText="確認退回"
+        open={reasonMode !== null}
+        title={reasonMode === 'revoke' ? '撤銷已核准的借用' : '退回借用申請'}
+        okText={reasonMode === 'revoke' ? '確認撤銷' : '確認退回'}
         destroyOnHidden
         confirmLoading={submitting}
         okButtonProps={{ danger: true }}
         cancelText="取消"
-        onOk={() => void submitReject()}
-        onCancel={closeReject}
+        onOk={() => void submitReason()}
+        onCancel={closeReason}
       >
-        <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 8 }}>退回原因(必填,通知社團)</div>
+        <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 8 }}>
+          {reasonMode === 'revoke' ? '撤銷原因(必填,通知社團)' : '退回原因(必填,通知社團)'}
+        </div>
         <Input.TextArea
           autoFocus
           rows={3}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="例:所選時段已有其他社團借用"
+          placeholder={reasonMode === 'revoke' ? '例:場地整修,該時段停止開放' : '例:所選時段已有其他社團借用'}
         />
       </Modal>
     </Modal>

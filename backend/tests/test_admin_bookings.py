@@ -397,3 +397,133 @@ async def test_venue_approve_blocks_approved_overlap(client, db):
     )
     assert resp.status_code == 200
 
+
+
+async def test_temp_and_fixed_approval_cross_check(client, db):
+    """臨時與固定搶的是同一間場地:兩邊核准必須互相檢核。
+
+    原本臨時只查臨時、固定只查固定,DB 也沒有兜底約束,同一格可被雙重核准。
+    """
+    club, other_club = await seed(client, db)
+    venue = await make_venue(db, name="S304", allow_fixed=True, allow_temp=True)
+    activity = await make_activity(db, club, day=date.today() + timedelta(days=40))
+    day = date.today() + timedelta(days=40)
+
+    fixed = RoomBookingRequest(
+        club_id=other_club.id,
+        venue_id=venue.id,
+        purpose="樂團練習",
+        status="approved",
+        start_date=day - timedelta(days=10),
+        end_date=day + timedelta(days=10),
+    )
+    fixed.slots = [RoomBookingSlot(weekday=day.isoweekday(), period="3")]
+    booking = VenueBooking(
+        club_id=club.id,
+        venue_id=venue.id,
+        activity_id=activity.id,
+        date=day,
+        periods=["3"],
+        purpose="擺攤",
+    )
+    db.add_all([fixed, booking])
+    await db.commit()
+    await db.refresh(booking)
+
+    resp = await client.post(
+        f"/api/v1/admin/venue-bookings/{booking.id}/approve", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 409
+    assert resp.json()["meta"]["code"] == "SLOT_TAKEN"
+
+    # 反向:已核准的單日臨時借用同樣擋得下整學期的固定借用
+    await make_user(db, username="roomadmin", role="admin", permissions=["aroom"])
+    fixed.status = "cancelled"
+    booking.status = "approved"
+    pending_fixed = RoomBookingRequest(
+        club_id=other_club.id,
+        venue_id=venue.id,
+        purpose="想借整學期",
+        start_date=day - timedelta(days=10),
+        end_date=day + timedelta(days=10),
+    )
+    pending_fixed.slots = [RoomBookingSlot(weekday=day.isoweekday(), period="3")]
+    db.add(pending_fixed)
+    await db.commit()
+    await db.refresh(pending_fixed)
+
+    await login(client, "roomadmin")
+    resp = await client.post(
+        f"/api/v1/admin/room-bookings/{pending_fixed.id}/approve", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 409, resp.text
+    assert resp.json()["meta"]["code"] == "SLOT_TAKEN"
+
+
+async def test_revoke_approved_venue_booking_and_stale_loan(client, db):
+    club, _ = await seed(client, db)
+    venue = await make_venue(db)
+    equipment = await make_equipment(db)
+    activity = await make_activity(db, club, day=date.today() + timedelta(days=20))
+    day = date.today() + timedelta(days=20)
+
+    booking = VenueBooking(
+        club_id=club.id, venue_id=venue.id, activity_id=activity.id,
+        date=day, periods=["5"], purpose="擺攤", status="approved",
+    )
+    # 「核准後沒來領」:區間已過但仍卡在待借出清單,必須清得掉
+    loan = EquipmentLoan(
+        club_id=club.id, equipment_id=equipment.id, activity_id=activity.id, qty=1,
+        start_date=date.today() - timedelta(days=30),
+        end_date=date.today() - timedelta(days=25),
+        purpose="上個月核准沒來領", status="approved",
+    )
+    db.add_all([booking, loan])
+    await db.commit()
+    await db.refresh(booking)
+    await db.refresh(loan)
+
+    base = "/api/v1/admin"
+    assert (
+        await client.post(
+            f"{base}/venue-bookings/{booking.id}/revoke", json={}, headers=csrf_headers(client)
+        )
+    ).status_code == 422  # 原因必填
+
+    resp = await client.post(
+        f"{base}/venue-bookings/{booking.id}/revoke",
+        json={"reason": "場地整修"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    resp = await client.post(
+        f"{base}/equipment-loans/{loan.id}/revoke",
+        json={"reason": "逾期未領"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+
+    await db.refresh(booking)
+    await db.refresh(loan)
+    assert booking.status.value == "cancelled"
+    assert loan.status.value == "cancelled"
+    assert await db.scalar(
+        sa.select(AuditLog.id).where(AuditLog.action == "venue_booking_revoked")
+    ) is not None
+    assert await db.scalar(
+        sa.select(ApprovalRecord.id).where(
+            ApprovalRecord.subject_type == ApprovalSubject.EQUIPMENT_LOAN,
+            ApprovalRecord.decision == "revoke",
+        )
+    ) is not None
+
+    # 已借出的要走歸還,不是撤銷
+    loan.status = "checked_out"
+    await db.commit()
+    assert (
+        await client.post(
+            f"{base}/equipment-loans/{loan.id}/revoke",
+            json={"reason": "x"},
+            headers=csrf_headers(client),
+        )
+    ).status_code == 409

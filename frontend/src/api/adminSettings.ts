@@ -4,6 +4,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api } from './client'
+import { keys as bookingKeys } from './adminBookings'
 import type { BudgetCategory } from './clubConfig'
 
 const DATE_FMT = 'YYYY/MM/DD'
@@ -111,6 +112,10 @@ export function useUpdateSettings() {
           budget_categories: v.budgetCats,
         }),
       }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.all }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.all })
+      // 受理期間也決定側欄「固定場地借用」是否反灰,那份開放窗查詢另屬借用 domain
+      void qc.invalidateQueries({ queryKey: bookingKeys.fixedWindow })
+    },
   })
 }

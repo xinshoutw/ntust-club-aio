@@ -223,7 +223,7 @@ const toRoomRequest = (r: AdminRoomBookingOut): AdminRoomRequest => ({
 
 // ---- queries ----
 
-const keys = {
+export const keys = {
   all: ['adminBookings'] as const,
   venues: ['adminBookings', 'venues'] as const,
   availability: (date: string) => ['adminBookings', 'availability', date] as const,

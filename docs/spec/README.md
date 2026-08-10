@@ -45,7 +45,7 @@
 | [club/certificate.md](club/certificate.md) | `/certificates` |
 | [club/eval-docs.md](club/eval-docs.md) | `/eval` |
 | [club/eval-award.md](club/eval-award.md) | `/eval/award/:award` |
-| [club/eval-result.md](club/eval-result.md) | `/eval/result` |
+| [club/eval-result.md](club/eval-result.md) | `/eval/result`(未實作) |
 | [club/violations.md](club/violations.md) | `/violations` |
 
 ## 行政端(`admin`)

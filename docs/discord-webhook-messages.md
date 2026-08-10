@@ -166,7 +166,7 @@ D4–D7 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政手動借用)
 | 線上申請 | `/maintenance`、`/postal`、`/certificates` | `/admin/applications`、`/admin/maintenance` |
 | 線上報名 | `/signup`、`/signup/:id` | `/admin/signups` |
 | 違規 | `/violations` | `/admin/violations` |
-| 評鑑 | `/eval`、`/eval/result` | `/admin/eval` |
+| 評鑑 | `/eval` | `/admin/eval` |
 | 公告 | `/`(總覽) | `/admin/announcements` |
 
 除上列外前端無 per-id 詳情路由(詳情皆為列表內彈窗),深連結大多只能到列表頁。

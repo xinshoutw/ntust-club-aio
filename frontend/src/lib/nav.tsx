@@ -101,7 +101,6 @@ export function buildClubNav(window?: FixedWindow): NavGroup[] {
       label: '社團評鑑',
       items: [
         { key: 'eval-docs', label: '資料總覽', path: '/eval', icon: <FolderOpenOutlined /> },
-        { key: 'eval-result', label: '評鑑結果', path: '/eval/result', icon: <TrophyOutlined /> },
       ],
     },
     {

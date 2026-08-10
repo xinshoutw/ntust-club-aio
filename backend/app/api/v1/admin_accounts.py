@@ -17,7 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from app.api.pagination import Pagination
 from app.core.deps import CurrentUser, DbDep, client_ip, require_super
 from app.core.errors import conflict, not_found, validation_error
-from app.core.security import generate_password, hash_password
+from app.core.security import generate_password, hash_password_async
 from app.models import PasswordHistory, Session, User
 from app.models.enums import UserRole
 from app.schemas.accounts import (
@@ -84,7 +84,7 @@ async def create_account(
     target = User(
         role=UserRole(body.role),
         username=body.username,
-        password_hash=hash_password(password),
+        password_hash=await hash_password_async(password),
         name=body.name,
         email=body.email,
         is_super=False,  # 最高權限不開放由 API 建立
@@ -166,7 +166,7 @@ async def reset_password(
     password = generate_password()
     if target.password_hash:
         db.add(PasswordHistory(user_id=target.id, password_hash=target.password_hash))
-    target.password_hash = hash_password(password)
+    target.password_hash = await hash_password_async(password)
     target.must_change_password = True  # 首登強制改密
     target.failed_login_attempts = 0
     target.locked_until = None

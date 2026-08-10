@@ -19,7 +19,7 @@ from app.api.v1.members import _DEFAULT_ORDER as _MEMBER_DEFAULT_ORDER
 from app.api.v1.members import _SORTABLE as _MEMBER_SORTABLE
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission, require_role
 from app.core.errors import conflict, not_found
-from app.core.security import generate_password, hash_password
+from app.core.security import generate_password, hash_password_async
 from app.models import Club, ClubMember, PasswordHistory, Session, User
 from app.models.enums import ClubKind, MemberKind, UserRole
 from app.schemas.accounts import PasswordResetOut
@@ -234,7 +234,7 @@ async def create_club_account(
     account = User(
         role=UserRole.CLUB,
         username=body.username,
-        password_hash=hash_password(password),
+        password_hash=await hash_password_async(password),
         name=club.name,
         club_id=club.id,
         must_change_password=True,  # 首登強制改密
@@ -271,7 +271,7 @@ async def reset_club_password(
     password = generate_password()
     if account.password_hash:
         db.add(PasswordHistory(user_id=account.id, password_hash=account.password_hash))
-    account.password_hash = hash_password(password)
+    account.password_hash = await hash_password_async(password)
     account.must_change_password = True  # 首登強制改密
     account.failed_login_attempts = 0
     account.locked_until = None

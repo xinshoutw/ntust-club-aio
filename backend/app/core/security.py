@@ -13,6 +13,7 @@ from datetime import timedelta
 
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
+from starlette.concurrency import run_in_threadpool
 
 from app.core.errors import validation_error
 
@@ -40,6 +41,17 @@ def verify_password(password_hash: str | None, password: str) -> bool:
         return password_hash is not None
     except VerifyMismatchError:
         return False
+
+
+# argon2 是刻意設計成慢的:在 async 端點直接呼叫會佔住唯一的事件迴圈,
+# 登入尖峰時整站停止回應。argon2-cffi 進 C 時會放掉 GIL,丟執行緒真的能平行。
+# 同步版留給 seed 腳本與測試(離線、單執行緒,包一層只是多餘開銷)。
+async def hash_password_async(password: str) -> str:
+    return await run_in_threadpool(hash_password, password)
+
+
+async def verify_password_async(password_hash: str | None, password: str) -> bool:
+    return await run_in_threadpool(verify_password, password_hash, password)
 
 
 def needs_rehash(password_hash: str) -> bool:

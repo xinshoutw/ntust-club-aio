@@ -12,10 +12,10 @@ from app.core.security import (
     MAX_FAILED_LOGIN_ATTEMPTS,
     PASSWORD_HISTORY_GENERATIONS,
     SESSION_TTL,
-    hash_password,
+    hash_password_async,
     needs_rehash,
     validate_password_strength,
-    verify_password,
+    verify_password_async,
 )
 from app.models import PasswordHistory, Session, User
 from app.services import audit
@@ -33,18 +33,18 @@ async def login(
     now = datetime.now(UTC)
 
     if user is None or not user.is_active:
-        verify_password(None, password)  # 時間等化,防帳號探測
+        await verify_password_async(None, password)  # 時間等化,防帳號探測
         audit.record(db, action="login_failed", role=None, detail=f"username={username}", ip=ip)
         await db.commit()
         raise unauthenticated(_GENERIC_LOGIN_ERROR)
 
     if user.locked_until and user.locked_until > now:
-        verify_password(None, password)  # 時間等化:鎖定路徑不得比錯密路徑快
+        await verify_password_async(None, password)  # 時間等化:鎖定路徑不得比錯密路徑快
         audit.record(db, action="login_locked", user=user, ip=ip)
         await db.commit()
         raise forbidden("登入失敗次數過多,帳號已鎖定 15 分鐘", code="ACCOUNT_LOCKED")
 
-    if not verify_password(user.password_hash, password):
+    if not await verify_password_async(user.password_hash, password):
         # 原子累加:並發失敗登入不得互相覆蓋而低估次數
         attempts = await db.scalar(
             sa.update(User)
@@ -65,7 +65,7 @@ async def login(
         raise unauthenticated(_GENERIC_LOGIN_ERROR)
 
     if needs_rehash(user.password_hash):
-        user.password_hash = hash_password(password)
+        user.password_hash = await hash_password_async(password)
 
     user.failed_login_attempts = 0
     user.locked_until = None
@@ -98,7 +98,7 @@ async def change_password(
     new_password: str,
     ip: str | None,
 ) -> None:
-    if not verify_password(user.password_hash, old_password):
+    if not await verify_password_async(user.password_hash, old_password):
         raise validation_error("目前密碼錯誤", code="PASSWORD_MISMATCH")
     validate_password_strength(new_password)
 
@@ -110,13 +110,14 @@ async def change_password(
         .limit(PASSWORD_HISTORY_GENERATIONS - 1)
     )
     reused = [h.password_hash for h in recent] + [user.password_hash]
-    if any(verify_password(h, new_password) for h in reused):
+    reuse_checks = [await verify_password_async(h, new_password) for h in reused]
+    if any(reuse_checks):
         raise validation_error(
             f"新密碼不得與最近 {PASSWORD_HISTORY_GENERATIONS} 代密碼相同", code="PASSWORD_REUSED"
         )
 
     db.add(PasswordHistory(user_id=user.id, password_hash=user.password_hash))
-    user.password_hash = hash_password(new_password)
+    user.password_hash = await hash_password_async(new_password)
     user.must_change_password = False
     # 改密後撤銷其他裝置的 session(保留當前)
     await db.execute(

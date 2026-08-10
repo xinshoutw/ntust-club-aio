@@ -25,11 +25,17 @@
 - ISS-14b:`requested_total == 0` 時不接受 `body.budget`、不寫 `school_approved`
 - ISS-53:三處都補 `_aware()`
 
-**A2 高嚴重度** — ISS-05、ISS-06、ISS-13b、ISS-15+ISS-16(合為一項)、ISS-18、ISS-32、ISS-38b、ISS-45、ISS-46、ISS-77b
+**A2 高嚴重度** — ISS-05、ISS-06、ISS-13(含 ISS-55)、ISS-13b、ISS-15+ISS-16、ISS-18、ISS-32、ISS-36、ISS-45、ISS-46、ISS-74b+ISS-38+ISS-38b、ISS-77b
 
 - ISS-15+16 必須一起修:清 `approved_subsidy` 要同時涵蓋 PUT 編輯與 `submit_activity` 直接重送兩條路徑,只修一條會留下「逐項核定已清、`school_approved` 是舊值」。前端預填不動
 - ISS-18 只鋪既有的 `useUnsavedGuard`;頁內導航要等資料 router(見 B)
 - ISS-32 四處都要改(社團端檢核、器材主檔可借數、待審單可借數、行政手動借用)
+
+**2026-08-10 定案的三條**(原列 B,已解)
+
+- **ISS-13**:三旗標語意是「承辦認不認可採計」,不是「有沒有繳」——照片與學習心得在送出結案時後端就強制存在(`schemas/activities.py:121` `min_length=3`),故維持預設採計。修法:`CloseApproveIn` 改必填、`close_approve` 一律明寫三值,`report_confirmed` 改與 `activity_reports` 是否存在連動(一併解掉 ISS-55)。model 的 `server_default` 留作審核前佔位,加註解
+- **ISS-36**:承辦人與組長在學務處是不同人,硬擋。寫入前查同一案前一關的 `approval_records.actor`,相同即 403;**super 也適用**(現行 super 直通 advisor/chief 才是最大漏洞)。學務長關的本人保護不動
+- **ISS-74b**:行政端加撤銷端點,狀態**復用 `cancelled`**(額度判定已排除 cancelled,額度自動回歸,零 migration)。權限與核准同權(臨時/器材 `abooking`、固定 `aroom`);必填原因、寫 `approval_records` + `audit.record`、通知社團;已結束的借用不得撤銷。**ISS-38 因此解開**:核准時撞到另一類已核准借用一律硬擋 409,承辦撤一張再核准(與 DEC-04 器材只警示刻意不同調——器材可再調度,場地不行)
 
 **A3 其餘**(可上線後補)
 
@@ -51,7 +57,6 @@
 |---|---|
 | ISS-09 | 報修/郵局附件:前端改非必填對齊後端,還是後端改必填並補逐列補傳入口 |
 | ISS-10 | 郵局新代理人必填條件以哪端為準(牽 DEC-06) |
-| ISS-13 | 三旗標改 fail-closed 後,承辦漏勾即把該活動 ad2/ad3/ad4 歸零且無回復路徑。「預設不勾照樣可核准」與「未勾不得核准」是相反的失效模式 |
 | ISS-14 | 核定金額可否高於擬請補助(= DEC-09) |
 | ISS-19 | `MemberOut` 加回 `created_at` 之後,那欄標「入社日期」(對新建列語意不符)還是另加 `joined_on` |
 | ISS-23 | 檔案下載要拆成哪幾類、哪個權限鍵看哪類 |
@@ -60,16 +65,12 @@
 | ISS-30 | 結案逾鎖定期限的退回件可否自行重送 |
 | ISS-31 | 開放窗結束後承辦要不要還能審(= DEC-03) |
 | ISS-33 | 開放窗跨學期時目標學期以何為準 |
-| ISS-36 | 要不要硬擋同一人連簽、擋相鄰還是所有關卡、super 是否例外。承辦兼組長時硬擋會讓整條簽核卡死 |
-| ISS-38 | 補交叉查詢後,一天的臨時借用會讓整學期固定借用永遠核准不了;衝突時誰讓步卡在 ISS-74b |
 | ISS-43 | 磁碟 TOCTOU:改預留配額還是上傳前置閘 |
 | ISS-51 | 上傳大小改 streaming 檢查還是中介層擋 |
 | ISS-54 | 大型活動認可可否於後續關卡補正 |
-| ISS-55 | 無 `activity_reports` 的已結案活動該不該拿 ad2 照片分 |
 | ISS-55b | 序號跨單去重:應用層 `&&` 檢核,還是拆子表 + 回填 + 改寫點交端點(`serials` 是 `ARRAY(Text)`,PG 建不了跨列 UNIQUE) |
 | ISS-65 | Discord/Email 重試:記憶體重試還是落地佇列表 |
 | ISS-66 | 提醒次數上限(牽 DEC-11) |
-| ISS-74b | 已核准借用撤銷的語意與 10 節額度回歸。**ISS-38 卡在這** |
 | ISS-74c | `aclose` 是否涵蓋結案核准(= DEC-05) |
 | ISS-83 | 要不要自架 Noto Serif TC |
 | ISS-86 | `PERIOD_TIMES` 單一真相:後端出端點還是共用產生器 |

@@ -15,6 +15,27 @@ function csrfToken(): string {
   return match ? decodeURIComponent(match[1]) : ''
 }
 
+// pydantic 的 loc 前綴標的是請求的哪一段,對使用者沒有意義
+const LOC_PREFIXES = new Set(['body', 'query', 'path', 'header', 'cookie'])
+
+/**
+ * 後端 422 的 `meta.detail`(pydantic errors)攤成一行;非驗證錯誤回 null。
+ * 自訂驗證器丟 ValueError,pydantic 會加上 "Value error, " 前綴。
+ */
+export function validationDetail(detail: unknown): string | null {
+  if (!Array.isArray(detail)) return null
+  const parts = detail.flatMap((item) => {
+    const { loc, msg } = (item ?? {}) as { loc?: unknown; msg?: unknown }
+    if (typeof msg !== 'string') return []
+    const text = msg.replace(/^Value error, /, '')
+    const field = Array.isArray(loc)
+      ? loc.filter((x): x is string => typeof x === 'string' && !LOC_PREFIXES.has(x)).pop()
+      : undefined
+    return [field ? `${field}:${text}` : text]
+  })
+  return parts.length > 0 ? parts.join(';') : null
+}
+
 export interface PageMeta {
   page: number
   page_size: number
@@ -90,7 +111,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResp
     throw new Error(`HTTP ${res.status}`)
   }
   if (!res.ok || !body.success) {
-    throw new Error(body.error ?? `HTTP ${res.status}`)
+    const error = body.error ?? `HTTP ${res.status}`
+    const detail = validationDetail((body.meta as { detail?: unknown } | null)?.detail)
+    throw new Error(detail ? `${error}:${detail}` : error)
   }
   return body
 }

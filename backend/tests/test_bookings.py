@@ -12,7 +12,7 @@ from app.models import (
     SystemSetting,
     Venue,
 )
-from app.models.enums import ActivityStatus, VenueCategory
+from app.models.enums import ActivityStatus, LoanStatus, VenueCategory
 from app.services.booking_service import next_workday, overdue_deadline
 from tests.conftest import csrf_headers, login, make_club, make_user
 
@@ -765,3 +765,41 @@ async def test_seed_creates_19_venues(db):
     assert by_name["S204 共享食堂"].capacity == 60
     assert by_name["練團室"].capacity == 15
     assert sum(1 for v in venues if v.allow_fixed) == 11  # 教室 9 + 練習空間 2
+
+
+async def test_overdue_loan_still_occupies_stock(client, db):
+    """逾期未還的器材必須照樣佔用可借數。
+
+    只比對區間重疊的話,借出中但原區間已過的單子會被算成沒佔用 —— 東西實體還在
+    別人手上,系統卻把同一批再借給下一個社團。
+    """
+    club = await setup_session(client, db)
+    eq = await make_equipment(db, name="投影機", total_qty=2)
+    other = await make_club(db, name="吉他社")
+
+    past = date.today() - timedelta(days=30)
+    db.add(
+        EquipmentLoan(
+            club_id=other.id,
+            equipment_id=eq.id,
+            qty=2,
+            start_date=past,
+            end_date=past + timedelta(days=1),
+            status=LoanStatus.CHECKED_OUT,
+            purpose="上個月借走沒還",
+        )
+    )
+    await db.commit()
+
+    activity = await make_activity(db, club)
+    resp = await client.get(f"/api/v1/club/equipment?activity_id={activity.id}")
+    row = next(e for e in resp.json()["data"] if e["id"] == eq.id)
+    assert row["available"] == 0
+
+    resp = await client.post(
+        "/api/v1/club/equipment-loans",
+        json={"equipment_id": eq.id, "activity_id": activity.id, "qty": 1, "purpose": "營隊",
+              "phone": "0912000111"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 409

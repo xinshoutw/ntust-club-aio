@@ -172,7 +172,10 @@ async def equipment_available_in_window(
     *,
     exclude_loan_id: int | None = None,
 ) -> int:
-    """指定區間可借數 = total − 區間重疊之未歸還且未退回借用量(pending/approved/checked_out)。
+    """指定區間可借數 = total − 佔用量(pending/approved/checked_out)。
+
+    佔用 = 區間重疊者,**外加所有已借出未歸還者**。逾期未還的單子原區間已過,只比對
+    區間重疊會把它算成沒佔用 —— 東西實體還在別人手上,可借數卻照常給,直接超賣。
 
     exclude_loan_id:行政端審核檢核時排除本單(避免把待審單自己算進佔用)。
     """
@@ -181,8 +184,10 @@ async def equipment_available_in_window(
         EquipmentLoan.status.notin_(
             [LoanStatus.REJECTED, LoanStatus.RETURNED, LoanStatus.CANCELLED]
         ),
-        EquipmentLoan.start_date <= end,
-        EquipmentLoan.end_date >= start,
+        sa.or_(
+            EquipmentLoan.status == LoanStatus.CHECKED_OUT,
+            sa.and_(EquipmentLoan.start_date <= end, EquipmentLoan.end_date >= start),
+        ),
     )
     if exclude_loan_id is not None:
         query = query.where(EquipmentLoan.id != exclude_loan_id)

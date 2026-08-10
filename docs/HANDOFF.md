@@ -47,4 +47,4 @@
 
 - host 5432 被 OrbStack VM 佔用:db 走 **55432**(`compose.override.yml` 不入版控 + `.env` `POSTGRES_PORT=55432`);pnpm 走 corepack
 - 測試庫可平行:`CLUB_AIO_TEST_DB=<name>` 覆寫(多 worktree 各用一庫)
-- 未進版控且刻意不入的檔案:`compose.override.yml`、`start-dev.sh`
+- 未進版控且刻意不入的檔案:`start-dev.sh`(db 埠若被佔用另加 `compose.override.yml`)

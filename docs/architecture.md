@@ -43,7 +43,7 @@ Python 3.14 lazy annotation:欄位名與型別同名時型別須別名(`import d
 
 ### 3.2 檔案
 
-- 存 bind mount `/srv/club-aio/uploads`,佈局 `{模組}/{年}/{月}/{uuid}`;DB 存中介資料
+- 容器內路徑 `/srv/uploads`(compose 現用具名 volume `uploads`;是否改 bind mount 以便備份工具直接同步,見 DEPLOY_CHECKLIST 待決 3),佈局 `{模組}/{年}/{月}/{uuid}`;DB 存中介資料
 - 一律經帶權限檢查的 API 存取,不裸 serve(競賽資料與結案附件有社團隔離與評審匿名邊界)
 - 上傳串流寫盤(1MB chunk,VM 僅 4GB RAM),邊寫邊算 sha256 與檢查上限;副檔名 × 魔術位元組須一致,client 宣稱的 MIME 一律不信
 - 上限全在 `system_settings`:單檔依類型(文件 50 / 圖片 10 / 壓縮檔 100 / 維修影片 200 MB);加總依申請性質(活動申請附件 15、空間報修 100、結案照片 10 MB)。成果與宣傳影片不收檔,填外部連結

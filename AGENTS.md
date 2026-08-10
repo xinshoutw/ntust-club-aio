@@ -1,291 +1,113 @@
 # club-aio — 新版社團管理系統(All-in-One)
 
-全新開發(前端 + 後端)的臺科大社團管理系統,**2026 年 9 月前需上線**,屆時取代兩套退役舊系統:
+全新開發的臺科大社團管理系統,**2026 年 9 月前上線**,取代兩套退役舊系統:
 
 - `../../legacy/ClubManagementSystem`(Django,clubs.ntust.edu.tw)
 - `../../legacy/clubclass`(PHP,教室與器材借用)
 
-**新系統功能必須至少涵蓋兩套舊系統的全部功能**。舊系統僅作功能對照與資料遷移參考;其架構設計已過時,**完全不參考**。`project/lostSystem` 與本專案無關。
+**新系統功能必須至少涵蓋兩套舊系統的全部功能**。舊系統僅作功能對照與資料遷移參考,架構設計**完全不參考**。
 
 ## 開工前先讀
 
-1. **`docs/HANDOFF.md`** — 「現在進行到哪、接下來做什麼」的交接快照。**每個 session 一開始就讀這份**,本檔(AGENTS.md)只記永久性知識,不記進度
-2. **`docs/review-2026-07-25.html`** — 全面 code review 報告,119 項 findings 尚未修;每項有編號(BUG/DEC/GAP/OPS/IMP-xx)
+1. **`docs/HANDOFF.md`** — 現在進行到哪、接下來做什麼。本檔只記永久知識,不記進度
+2. **`docs/review-2026-07-25.html`** — 全面 code review 報告,119 項 findings 尚未修
 
-## 需求來源與設計文件
+## 文件分工
 
-- **唯一需求規格**:`docs/社團管理系統_優化原型_v6.html`(學校負責人提供,單檔含完整 UI 與模擬邏輯;檔內 title 寫 v4,以檔名 v6 為準)
-- `docs/architecture.md` — 系統架構(含決議紀錄與未決事項)
-- `docs/data-model.md` — 資料模型(含原型/舊系統實體對照、狀態機、設計原則)
-- `docs/design-guide.md` — 視覺與互動規範;`docs/discord-webhook-messages.md` — 通知訊息清冊
-- `docs/DEPLOY_CHECKLIST.md` — 上線檢查表(**2026-07-17 版已嚴重過期,見 HANDOFF 的「文件狀態提醒」**)
+| 文件 | 內容 |
+|------|------|
+| `docs/社團管理系統_優化原型_v6.html` | **唯一需求規格**(學校負責人提供;檔內 title 寫 v4,以檔名 v6 為準) |
+| `docs/architecture.md` | 系統架構、API 契約、部署 |
+| `docs/data-model.md` | 資料表、狀態機、行政分規則、system_settings |
+| `docs/design-guide.md` | 視覺與互動規範、全站元件慣例 |
+| `docs/discord-webhook-messages.md` | 通知訊息清冊 |
+| `docs/DEPLOY_CHECKLIST.md` | 上線檢查表 |
 
-## 角色(四種)
+## 角色
 
 | 角色 | 代號 | 說明 |
 |------|------|------|
-| 管理員 | `admin` | 學務處承辦;`super` 最高權限 + 一般管理員依頁面權限鍵(permissions)分權 |
-| 工讀生 | `staff` | 違規勸導填寫/查詢、器材借出與歸還點交、逾期追蹤 |
-| 社團 | `club` | 一社一帳號(幹部/社員為名單資料,非登入者) |
-| 評審 | `viewer` | 競賽評分,對社團匿名(依分組排序顯示為評審A/B) |
+| 管理員 | `admin` | 學務處承辦;`super` 最高權限,一般管理員依頁面權限鍵分權 |
+| 工讀生 | `staff` | 違規勸導、器材借出與歸還點交、逾期追蹤 |
+| 社團 | `club` | 一社一帳號(幹部與社員是名單資料,非登入者) |
+| 評審 | `viewer` | 競賽評分;評審代號對社團匿名(依分組排序顯示為評審A/B) |
 
 ## 功能模組
 
-**社團端(2026-07-13 重整後的資訊架構,取代原型 NAV;過度設計已修剪)**:
+**社團端**
 
-| 分組 | 頁面 | 備註 |
-|------|------|------|
-| — | 社團總覽 | 公告 + 各類申請的進度一眼可見(「我的申請進度」頁已裁撤,狀態分散到各類別) |
-| 活動管理 | 活動申請、活動列表 | 「活動結案」「退回列表」頁裁撤:**結案是活動列表上的動作**、**退回是列表上的狀態** |
-| 社團管理 | 成員列表、管理項目 | 指導老師、社團簡介併入「管理項目」 |
-| 空間與器材借用 | 借用總覽、固定場地借用、臨時場地借用、器材借用 | 「我的借用與歸還」併入各借用頁 |
-| 線上申請 | 線上報名、空間報修、郵局帳戶異動、幹部證明 | 線上報名**全面重設計**:管理員自由建立活動項目 + 自訂表單欄位(如姓名、葷素單選、備註);社團點活動進子頁填寫;允許多人的活動可逐人新增至上限 |
-| 社團評鑑 | 資料總覽、評鑑結果 | |
-| 其他 | 違規勸導紀錄 | |
+| 分組 | 頁面 |
+|------|------|
+| — | 總覽(公告 + 各類申請進度) |
+| 活動管理 | 活動申請、活動結案、活動列表 |
+| 社團管理 | 成員列表、管理項目(含指導老師、社團簡介、聯絡與通知、改密) |
+| 空間與器材借用 | 借用總覽、固定場地借用、臨時場地借用、器材借用 |
+| 線上申請 | 線上報名、空間報修、郵局帳戶異動、幹部證明 |
+| 社團評鑑 | 資料總覽、評鑑結果 |
+| 其他 | 違規勸導紀錄 |
+
+結案是活動列表上的動作,退回是列表上的狀態,兩者不另設頁面。
 
 **評審端**:我負責的評分、評分(依獎項)、已完成評分
 
 **工讀生端**:違規勸導填寫、違規紀錄查詢、器材借出點交、器材歸還點交、逾期追蹤
 
-**行政端**:總覽、活動申請審核、結案審核、報名管理(含報名窗設定)、發布公告、分組與評審指派、競賽資料完成度、社團活動統計、臨時場地器材借用審核、教室固定借用審核、成員管理、帳號管理(管理員/社團/工讀生/評審)、社團空間維修管理、違規勸導管理、待審申請彙整;**最高權限專屬**:教室/器材主檔與手動借用、逾期追蹤與停權管理、競賽成績總表、稽核軌跡
+**行政端**:總覽、活動申請審核、結案審核、報名管理、發布公告、分組與評審指派、競賽資料完成度、社團活動統計、臨時場地器材借用審核、教室固定借用審核、成員管理、帳號管理(管理員/社團/工讀生/評審)、社團空間維修管理、違規勸導管理、待審申請彙整、檔案管理;**最高權限專屬**:教室器材主檔與手動借用、場地不開放規則、逾期追蹤與停權管理、競賽成績總表、系統設定、稽核軌跡
 
-## UI 設計規範(需求方指定)
+## 核心業務規則
 
-- **全面禁用 emoji**:圖示一律用 AntD SVG icon 或符號/向量圖(原型 NAV 的 emoji 全部替換)
-- **UI 文字精簡**:避免堆疊說明文字,輔助說明收進 Tooltip/Popover
-- **全站內容寬統一**:由 shell 統一約束(現為 1200px,`shell.css .shell-main > *`),**頁面不得自設 maxWidth**(2026-07-14 需求方指定)
+- **學期起訖**:上學期 8–1 月、下學期 2–7 月(原型的推導函式寫反,勿照抄);規則放 `system_settings`
+- **活動簽核**:有申請補助 → 三關(承辦人 → 組長 → 學務長);無補助 → 承辦人單關即核准。第一關認定經費來源與逐項核定金額;退回必填原因;學務長為本人操作(受限權限帳號,僅簽核權)。顯示詞為「承辦人」,程式鍵維持 `advisor`/`approve_advisor`/`pending_advisor`
+- **結案**:承辦人單關;活動結束日 +1 個月未結案即鎖定(推導,管理員可解鎖);結案通過才計入競賽行政分
+- **競賽五獎項**:最佳社團(行政 40% + 營運 60% 加權)/財務/活動/成果發表/負責人;財務、活動、負責人含現場簡報 20 分;行政資料 ad1–ad8 系統自動評分 + 人工調整
+- **器材逾期**:結束日之隔天**上班日**(排除政府行事曆假日)10:30 前未歸還即逾期;可觸發停權
+- **節次制**:場地借用用 14 節次(第 1–10 節、A–D 節);`PERIOD_TIMES` 權威來源是舊 clubclass
+- **申請時間禁過去**(前後端皆驗);行政手動借用不受限,供補登使用
 
-## 核心業務規則(原型定義)
+## 技術
 
-- **學期起訖**:上學期 8–1 月、下學期 2–7 月(原型的推導函式寫反,勿照抄);規則放 system_settings
-- **活動簽核**:有申請補助 → 三關(承辦人→組長→學務長);無補助 → 承辦人單關即核准;第一關認定經費來源與逐項核定金額;退回必填原因;**學務長本人操作**(受限權限帳號,僅簽核權)。第一關顯示詞 2026-07-21 由「輔導老師」改「**承辦人**」(輔導老師退出流程;程式鍵 advisor/approve_advisor/pending_advisor 不變)
-- **結案**:承辦人單關;活動日 +1 個月未結案 → 鎖定(推導,管理員可解鎖);結案通過才計入競賽行政分
-- **競賽五獎項**:最佳社團(行政40%+營運60%加權)/財務/活動/成果發表/負責人;財務、活動、負責人含現場簡報 20 分;行政資料(ad1–ad8)系統自動評分+人工調整
-- **器材逾期**:結束日之隔天**上班日**(排除政府行事曆假日)10:30 前未歸還即逾期;逾期可觸發停權管理
-- **節次制**:場地借用用 14 節次(第1–10節、A–D節)
+前端 Vite + React + TS + Ant Design 6 + TanStack Query + pnpm;後端 FastAPI + Python 3.14 + uv + SQLAlchemy 2(async)+ Alembic + PostgreSQL 18;Docker Compose 部署於 GCE。無特殊理由一律用最新穩定版。細節見 `docs/architecture.md`。
 
-## Commit 與分支慣例
+三條 UI 硬規則(其餘見 `docs/design-guide.md`):**全站禁用 emoji**,圖示一律 AntD SVG icon;**UI 文字精簡**,說明收進 Tooltip/Popover;**內容寬由 shell 統一約束**,頁面不得自設 maxWidth。
 
-- 一律英文、conventional format;一個 commit 一個行為(多個修正分開 commit);標題描述變更行為本身,不寫「review fixes」之類的元描述
-- **開發推 `dev` 分支**(避免草稿觸發 main 的 CI 映像發佈);穩定後才合併 `main`
+## 開發慣例
 
-## 後端現況(2026-07-14,session 交接用)
+**分支**:開發推 `dev`,穩定後才合併 `main`(避免草稿觸發 main 的 CI 映像發佈)。
 
-- **44 表 models + Alembic 初始 migration 已落地**(照 data-model.md;政策補充欄位已回寫該文件);API 慣例(信封/錯誤碼/分頁/排序/CSRF)在 `docs/architecture.md` §4.1
-- **社團端 API 全數完成**+pytest(獨立 `club_aio_test` 庫):auth/成員含 CSV/活動申請與結案(含 DB 草稿)/三種借用/三種申請/違規/報名含草稿/評鑑 overview 與五獎上傳/公告;**管理端**只做已定案流程(活動三關/單關、結案審核、解鎖、行政分調整 `aeval`)
-- 結構:`app/core`(config/db/deps/security/errors/rate_limit/semesters)、`app/models`、`app/schemas`、`app/api/v1`(社團端 `/club/*`、管理端 `/admin/*`)、`app/services`(業務與推導:scoring/evaluation/activity/booking/signup/files/notify/pdf/audit/settings)
-- 慣例:推導不儲存(可借數/逾期/鎖定/行政分);簽核走 `approval_records`;高風險操作 `audit.record`(add 不 commit,隨交易);事件推 Discord(`notify.club_event`=全域+社團自設 webhook);列表一律分頁+排序白名單;錯誤用 `core/errors` 工廠
-- 測試慣例:`tests/conftest.py` 於 import app 前切 `club_aio_test`;factories(make_club/make_user)、`csrf_headers()`;每測試 TRUNCATE;`asyncio_default_*_loop_scope=session`(連線池綁 loop)
-- PDF:成果報告表/心得於下載時生成(`services/pdf.py`,內嵌 Noto Sans TC);seed:`uv run python scripts/seed.py`
+**指令**
 
-## 前端現況(2026-07-13 建立,狀態已於第十四輪後更新)
+```bash
+# 後端(backend/)
+CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q   # 平行 worktree 各用一庫
+uv run ruff check .
+uv run python scripts/reset_db.py --yes                # 清空 → head → 基礎 seed + superadmin
+uv run python scripts/seed_mock.py --yes               # reset 後灌全模組 mock
 
-- **52 頁全數實作且全部接線 TanStack Query**(`src/api/client.ts` 為信封解包層);四個 panel(社團/行政/工讀生/評審)API 皆已完成。**唯一仍顯示假資料的正式路徑是 `features/eval/EvalResultPage.tsx`**(整頁硬編,見審查報告 BUG-01)
-- 已過六輪交叉審查(codex ×4、opus ×2),發現均已修或記錄;第四次(2026-07-14,gpt-5.6-sol)涵蓋第三、四輪 UI,16 項全修;第五次(2026-07-14,opus)涵蓋評鑑重構,6 項全修;第六次(2026-07-14,gpt-5.6-sol)涵蓋結案以降段落,10 項全修(em dash 時間解析、結案照片卸載釋放與大小/魔術位元組驗證、影片連結格式、時間先後、借用 query 日期嚴格驗證、行政分切社團殘留編輯、重送保留附件、popup 預計值未填/分隔符誤判)
-- 原「待辦(後端接入時)」四項:super/permissions 路由 guard **已完成**(`lib/permissions.ts` 20 條 ROUTE_KEYS 與後端逐條相符)、表格排序/篩選 **已完成**(第十四輪 `useMultiSort`)、真實檔案上傳與草稿 API **已完成**;**讀屏語意仍未完成**(235/309 個 `th` 無 scope、3 頁可點列無鍵盤入口,見報告 BUG-51)
-- **成員列表**:第三輪調整已實作;需求方表示後續仍有追加項目
+# 前端(frontend/)
+pnpm exec tsc -b        # --noEmit 是空檢查,不要用
+pnpm test               # vitest
+pnpm run lint
+```
 
-## 全面 code review(2026-07-25)—— findings 尚未修
+**後端**
 
-- 報告:**`docs/review-2026-07-25.html`**(單檔 HTML,可依嚴重度/分類篩選;每項有編號 BUG/DEC/GAP/OPS/IMP-xx)
-- 11 個獨立審查者(Opus ×10 + codex ×2)平行審查,共 **119 項:9 阻擋上線、35 高、68 中、7 低**;**目前一項都還沒修**
-- 實測驗證(非引用文件):後端 262 passed / 覆蓋率 95% / ruff 全綠;前端 tsc 0 錯 / 35 tests / lint 僅既有 warning;`.env` 與 `migration/out` 從未進版控
-- 已逐條比對確認正確,**不必重審**:前後端計分邏輯 100% 等價;`PERIOD_TIMES` 與舊 clubclass 三方零差異;守衛覆蓋率 100%;社團端零 IDOR;44 表 models ↔ migration 欄位/索引/約束零差異;密碼政策全數落地;`add_months` 月底夾底與 PG `interval` 同義;金額全整數不需 Decimal
-- 新增面向:**舊系統功能涵蓋度稽核**(專案硬需求),找到 16 項未涵蓋,詳見報告 GAP-04~GAP-12
+- 業務推導集中在 `services/`,不儲存推導值(可借數、逾期、鎖定、行政分)
+- 簽核一律寫 `approval_records`;高風險操作 `audit.record`(add 不 commit,隨交易)
+- 事件推 Discord:`notify.club_event` = 全域 webhook + 社團自設各一份
+- 列表一律分頁 + 排序白名單;錯誤用 `core/errors` 工廠
+- 測試:`tests/conftest.py` 於 import app 前切測試庫;factories(`make_club`/`make_user`)、`csrf_headers()`;每測試 TRUNCATE;`asyncio_default_*_loop_scope=session`(連線池綁 loop)
 
-## UI 調整決議(2026-07-13 第二輪,已實作)
+**前端**
 
-- 全站頁面內容水平置中(不再靠左)
-- 社團端 header:無學年度下拉、帳號處顯示**社團名稱**、鈴鐺點擊開通知面板(讀後清除紅點)
-- 活動申請:名稱獨佔全寬;地點必填;活動內容選填、上限 150 字、textarea 加高;**工作分配與經費明細自動增列**(尾端保證一列空白,清空即自動移除);經費科目九項(指導老師/教練費、保險費、交通費、膳食費、印刷費、比賽獎勵品、雜支、其他、活動收入)含科目提示文字;經費+附件移至右欄(雙欄佈局);金額輸入靠右;暫存草稿寫入活動列表並跳轉
-- **活動類型改為「社課/活動/會議」,預設社課**——`data-model.md` 的 activities.type 與行政分「大型活動加權」規則**待同步/與承辦確認**
-- 活動列表:不顯示單號、整列點擊即編輯/查看(僅保留送出/刪除/結案動作)
+- `src/api/{domain}.ts` 為接線範本(見 `api/members.ts` + `MembersPage`)
+- 元件與互動慣例一律照 `docs/design-guide.md` §6,不要自刻替代品
+- `PERIOD_TIMES` 前後端各一份(`booking_service.py` / `api/bookings.ts`),改動須同步
 
-## UI 調整決議(2026-07-13 第三輪,已實作)
+**平行開發**
 
-- Header:sticky 加陰影與內容區隔;移除使用者頭像
-- 活動申請:換經費科目不再重設空列;工作分配改「工作項目/負責人」兩欄自動增列;參加人數(校內/校外)與活動時間必填;時間選擇免按確定、可鍵入 1203 自動成 12:03;**草稿不保存附件**(有附件時跳確認框捨棄)——已與需求方確認
-- 活動列表:草稿獨立區置頂;每頁 20 筆分頁;名稱/類型/日期/經費/狀態可排序、類型/狀態可篩選;動作改邊框按鈕;$0/$0 顯示 –;「+活動申請」換成學期下拉(114-2 預設,依資料列出);點列改開**狀態感知預覽彈窗**(已結案顯示成果檔案)。註:先前的手機卡片版被表格+彈窗取代
-- 成員列表:身份四種(社員/幹部/副社長／副會長/社長／會長,社員無職稱);CSV 匯入(檔案或貼上,格式 姓名,學號,身份[,職稱]);學期下拉含「全部學期」;每頁 50 筆;身份/職稱可排序、身份可篩選;點身份/職稱**行內編輯**
-- 管理項目:新增 Discord Webhook URL 欄位(格式驗證);Telegram Bot 低優先待做
-- 借用總覽:新增**場地借用情形色格圖**(可借淺灰/不開放深灰/審核中橙/臨時借用淺紅/固定借用深紅/自己借用綠,附圖例與日期選擇);「已歸還」獨立區置底、每頁 10 筆;各表不顯示 ID
-- 固定/臨時場地借用:無 ID、近 5 筆;固定借用時段列自動增列、節次改按鈕且**支援拖曳批量選取**(PeriodPicker 共用)
-- 器材借用:無 ID、近 5 筆;可借 0 灰底且下拉禁選;點器材列自動帶入表單
-- 線上報名:整卡點擊(移除按鈕);子頁顯示活動 description;新增「儲存草稿」按鈕
-- 空間報修:無 ID、近 5 筆
-- 郵局帳戶異動:事由改 checkbox 複選 + 新增「存簿密碼異動」;互斥組合(更換代理人×新開戶、新開戶×結清銷戶、更換代理人×結清銷戶)與條件欄位為**先行判斷,待需求方確認**
-- 幹部證明:學年期改下拉(114學年度/114-1/114-2);姓名由成員名單依職位+學期**自動帶出**,0 或多位皆擋送出;無 ID、近 5 筆
-- 本輪為連續迭代中途,**交叉檢查留待迭代收斂後一併執行**
+- 多 agent 平行時**絕不可 `git stash`**;pytest 必包 timeout;各 worktree 設自己的 `CLUB_AIO_TEST_DB`
 
-## UI 調整決議(2026-07-13 第四輪,已實作)
+## Roadmap
 
-- 自動增列的空列刪除改為 **blur 時觸發**(打字中不再消失);草稿捨棄附件確認框可點遮罩取消
-- 活動類型選「活動」時出現「大型活動申請」checkbox(Tooltip:大型活動在行政資料能夠獲得較高的評分);`Activity.isLarge` 欄位新增,列表類型旁顯示「大」標記——**呼應行政分大型加權,資料模型 activities 需加 is_large**
-- 活動列表:預覽彈窗修復關閉漸變(open/afterClose 分離);預設學期=資料中最新
-- 成員列表:排序啟用變色;正副社長職稱顯示 —(僅幹部可編輯,鉛筆圖示);行內修改**自動儲存**
-- 借用總覽:臨時借用色加深(#F0A899);格子 hover 顯示借用社團名;場地情形=全校、下方整併為單一「我的借用(進行中)」表
-- 固定/臨時場地借用:同構版面(場地|用途 → 盒內日期+單行時段);「教室」改「場地」、「節次/借用時段」統一「時段」;時段單行可拖曳
-- 線上報名:「報名截止」改「截止日」;違規勸導紀錄去 ID
-- **待辦**:資料總覽與評鑑結果重設計(等需求方規格);下一階段=社團評鑑判斷邏輯與架構重構 → 後端開發
-
-## 社團評鑑重構決議(2026-07-14,依 `docs/社團評鑑/` 各 PDF)
-
-- **行政分 ad1–ad8 + 加減分規則定案**,可執行規格=`frontend/src/features/eval/scoring.ts`(vitest 測試同檔目錄;規則明細表在 `data-model.md` §3.8):結案始算、一天至多計 1 件、大型 ×3、名單 0/2.5/5 分級、**網頁經營有連結即 5 分**(需求方簡化)、會議/幹訓依出席、未銷案勸導每筆 −1 上限 −10、表現優良 +5 由學務處登錄
-- **大型活動**:申請時勾選(僅類型=活動),**管理員審核認可(`largeApproved`)後才計 ×3**;列表「大」標記實底=已認可、外框=待認可
-- **報名活動類型**:`SignupKind`(普通/幹訓/社團負責人會議),管理員建立時指定,社團端卡片顯示彩色標記;幹訓/負責人會議報名出席餵 ad7/ad8
-- **資料總覽(/eval)重建**:頂部=自動評分各項(含依據說明、管理員調整標示、來源頁連結);(二)成果區=每結案活動一列(照片/影片、成果單、心得上傳);底部=五獎項卡片(進度 x/y)→ `/eval/award/:key` 詳細頁(每評分細項一個上傳槽位,含配分與評分重點)
-- **照片重複偵測**:前端 SHA-256,跨活動比對,重複即拒絕(檔名不同也擋);files 表加 sha256 欄
-- **檔案即時預覽**(FilePreview):圖片 img、PDF 瀏覽器原生 iframe、docx 動態載入 mammoth + DOMPurify 白名單;舊版 .doc 僅下載
-- **管理員「行政分審核」頁**(/admin/eval):逐項「手動調整分數」/「回到自動計算結果」,表現優良加分直接輸入;調整即時反映社團端
-- **活動結案(2026-07-14 實作,原型內容+需求方改版)**:**側欄「活動管理」項目(位於活動申請與活動列表之間)**,路由 `/activities/close`,頁內下拉選擇已核准活動(列表結案鈕/預覽「前往結案」以 `?id=` 預選);**列表點列一律開活動詳情預覽 popup**。版面:一(成果調查)與二三(心得、附件經費)左右並排。調查欄位:實際社員/非社員人數+實際開始/結束時間**同一列小欄位**(placeholder=申請預期值)、實際地點(**預填申請值,placeholder 同**)、活動重點/達成目標/其他(textarea 4 列)、檢討會(**預設否**,選「是」才出現日期欄);學習心得 ≥3 位(單層列:姓名/系級窄欄+段落 textarea,自動增列);照片(JPG/PNG、SHA-256 去重、<5 張且無影片連結警告不計分)、影片連結(**唯一選填**,其餘全必填)、實際支出;**可儲存草稿(照片捨棄,確認框)**,重開預填;送出 → `closing_pending_advisor`,成果餵 ad2–ad4(成果報告/心得由表單生成)
-- **活動詳情預覽 popup(2026-07-14 二次改版)**:有結案資料時寬 1080 **雙欄**——左=基本資料/經費/照片縮圖(點擊放大)/結案檔案(檔名預覽+下載鈕,含申請附件企劃書),右=活動重點/達成目標/其他成果**全文**+學習心得**逐則全文卡**;實際人數/時間/地點**與申請相同就不顯示**,有差異才在申請值後以括號+琥珀色標「(實際 …)」;無關閉鈕(遮罩/X 關閉);右上**橫向**省略號選單(與 X 對齊):「下載照片檔(zip,僅 archive 不壓縮,自製 store-only zip 於 `eval/files.ts` 附測試)/下載學習心得檔案/下載活動成果報告」——**成果報告與心得 PDF 之後依需求方模板於下載時動態生成**;draft/rejected 顯示編輯鈕、approved 顯示「前往結案」
-- **審核文字統一(社團端)**:三關一律「申請待審核」、結案「結案待審核」,不顯示關卡老師;活動列表狀態篩選改以標籤去重
-- **檔案預覽**:Modal 寬 1100、高 76vh、`zIndex 1100`(避免被其他 popup 蓋住);PDF iframe 帶 `#pagemode=none&navpanes=0` 預設收起目錄
-- **資料總覽(2026-07-14 定版)**:上半=行政分**唯讀分數字卡**(大分數+依據+調整標記,無任何可操作內容),點卡跳轉資料來源頁(ad1→活動列表、ad2–4→活動結案、ad5→成員、ad6→管理項目、ad7/8→線上報名、加減分→違規紀錄);下半=五獎項卡片
-- 固定/臨時場地借用:日期與節次同一列;**借用總覽色格圖的「可借/審核中」格可點**,原地 Popover「固定/臨時場地借用」(場地不支援者 disabled),跳轉並帶入場地/日期/時段(query 參數)
-- **結案資格**:已核准**且活動已結束**(date+timeRange 結束時刻,未填時間以當日 23:59 計;`activities/utils.ts canClose`)才可結案;未結束的已核准列顯示「未開始/進行中」
-- **popup 差異呈現(2026-07-14 三改)**:實際時間/地點/人數與申請不同時**直接以實際值取代**原值(琥珀色+虛線底線,hover 立即顯示「預計 …」);相同則不顯示實際值;有開檢討會才顯示「檢討」列(日期),無則整項隱藏;結案檔案橫向排列
-- 活動申請經費明細:每列兩行(類別/自籌/擬請 + 說明整行),容器改淺色底無邊框(避免與輸入框雙重外框;借用時段列同)
-- 草稿/退回件「繼續編輯/編輯重送」走 `/activities/:id/edit`,整筆預填後原地置換;activities mock 的申請附件改 EvalFile(可預覽/下載);檔案工具集中於 `features/eval/files.ts`
-- **2026-07-14 需求方拍板**:各獎項評分細項**一律以獨立評分標準 PDF 為準**(與實施計畫衝突亦同;最佳活動獎=執行 35%/經費運用 5%,前端已同步);違規扣分**只計未銷案**;郵局互斥維持先行判斷;評鑑視窗預設 116 年(2026/02/01–2027/01/31)入 system_settings;結案/報名**草稿寫 DB 跨裝置續填**(照片不隨草稿);成果報告/心得 PDF 依 `docs/模板_社團活動成果報告表.docx`、`docs/模板_社團活動學習心得.docx` 於下載時動態生成(版型可調)
-- **通知**:Discord webhook 推送公告/通知/審核/通過/拒絕等全部事件(URL 走 `.env` 的 `DISCORD_WEBHOOK_URL`,**絕不入版控**;現值為測試群組可實測);Email aiosmtplib+.env,無憑證降級 log-only,之後套需求方模板
-- **密碼/Session 政策(定案)**:密碼 ≥10 碼含大小寫+數字+特殊符號、3 代不重用、連錯 5 次鎖 15 分、首登強制改密;session DB cookie 7 天滑動效期、允許多裝置並行
-- 待需求方:評鑑結果頁重設計規格;Email 模板
-- 待辦(接後端時):結案審核頁(aclose)顯示完整結案資料與「照片/成果/心得繳交確認」勾選(原型:未繳交項目以 0 分計)
-
-## UI/規則調整決議(2026-07-15 第五輪,前端已實作;後端待同步項見 data-model.md 內「後端待同步」標記)
-
-- **活動申請**:活動日期改**時間區間**(開始日期/時間、結束日期/時間四欄,結束須晚於開始,選開始日自動帶結束日);「大型活動申請」改名「**大型活動**」,旁加 InfoCircle 圖示,懸停/點擊顯示說明卡(認可後行政分 ×3)
-- **活動結案**:「事後是否召開檢討會」自成果調查抽出,獨立為「**二、檢討會議**」section;勾「是」時**檢討會日期、與會人數、討論事項、內容決議皆必填**;後續 section 順延編號;詳情 popup 於結案成果欄呈現檢討會議全文
-- **借用總覽改版**:不開放格**不畫方框、不列圖例**;固定借用改**深灰**(原不開放色);審核中僅顯示臨時借用且**不可點**;可借格點擊**直接前往臨時場地借用**(廢除固定/臨時 Popover 選單);場地主檔定案 **19 處含容納人數**(前端 mock+後端 seed 待同步,數量後台可調);版面撐滿內容寬,單日檢視加 `<`/`>`(±1 天)與 `<<<`/`>>>`(±1 週)與「今天」;**點場地名稱**進入該場地 14 天檢視(上一頁/下一頁翻 14 天)
-- **固定場地借用重做**:固定借用=整學期每週固定時段,表單改**星期(週一~週日)× 節次**點選網格(空心→實心);**每社至多 10 節**;**第 10 節及 A–D 節需至少連續 3 節**(合法 9–A、8–10、A–C、B–D;不合法 9–10、C–D);衝突由管理員整單擇一(無部分同意);僅於**開放窗**(system_settings,預設 6 月、1 月)可訪問,未開放時側欄反灰移至「其他」(mock `FIXED_BOOKING_WINDOW.adminOpenNow=true` 供 7 月審閱,關閉即可看到反灰態)
-- **場地借用**:臨時、固定的「用途」皆**必填**
-- **器材借用**:移除自選借用區間,改選**審核通過活動**,區間推導=活動開始日 −2 個工作天 ~ 結束日 +1 個工作天(工作天緩衝進 system_settings);借用紀錄顯示**借用人/歸還人**(點交時登記)
-- **線上報名/評鑑**:活動結束後**管理員於報名管理登錄簽到**(負責人會議記場次、其餘打勾),評鑑僅採計簽到、僅報名不計分;**ad7 改每場 1.25 分**(每學期 2 場、全學年 4 場滿分 5);**行政資料總分上限 100**(滿分合計恰 100,表現優良加分不破頂)
-- **郵局帳戶異動**:申請紀錄顯示**完整局號帳號**(不遮罩)
-- **違規勸導**:開立 **1 個月內須銷案,逾期截止**(不再受理銷案,−1 成立);兩端列表顯示期限,管理端逾期停用銷案鈕(推導不儲存)
-- **後台「檔案管理」頁**(`/admin/files`,新):空間利用視覺化(依模組分段比例條+圖例,配色過 dataviz 檢查)、大型檔案清單(模組篩選);**報修檔案可直接刪除**(影片佔用大),其餘依歸檔政策
-
-## UI 調整決議(2026-07-15 第六輪,club panel,前端已實作)
-
-- 側欄「社團總覽」改名「**總覽**」;Header 帳號選單登出上方新增「**設定**」捷徑(跳管理項目,僅社團角色)
-- **管理項目重構**:單一表單、右下角統一「儲存」;被修改欄位以**橘黃外框**標示(`.field-dirty`,box-shadow 方案避開 AntD cssinjs);新增**聯絡 Email**(至多 3、第 1 組必填)與**更換密碼**(須輸入原密碼;新密碼套密碼政策;填任一密碼欄即三欄連動必填);指導老師與社團簡介**並排**;Webhook 併入「聯絡與通知」
-- **臨時場地借用**:新增「借用活動(限審核通過)」必選欄位(與器材借用同源同格式)
-- **固定場地借用**:週次網格支援**按住拖曳批量選取**(與 PeriodPicker 同手感)
-- **借用總覽**:`<`/`<<<` 佔位字元換 **Left/DoubleLeft 系 icon**(需求方:隨手打的符號勿直接用);日期欄移除 calendar suffix icon、顯示**星期**(format function,rc-picker 自動轉唯讀輸入);場地名稱 hover 改**整字圓角反白**(`.venue-btn`,取代底線);場地檢視改「**檢視日 −7 ~ +7 共 15 天**」,過去日不顯示(後端不提供過去場況)、天數固定不足往未來補;兩種檢視的日期導航都不可早於今天
-
-## UI 調整決議(2026-07-15 第七輪:admin panel 第一版 + club 補強)
-
-- club:總覽頁標題同步改「總覽」;管理項目**未存檔警告**(dirty 時 beforeunload + 側欄/頂欄導航攔截確認;宣告式 router 無 useBlocker,接資料 router 後再收斂);固定借用週次網格**移除節次表頭列**(按鈕內已有數字)
-- admin Header:移除學年度下拉;帳號選單=設定(`/admin/settings`)+稽核軌跡+登出;**稽核軌跡自側欄移除**(需求方定案)
-- **系統設定頁 `/admin/settings`**(入口僅帳號選單):報名時間窗(自報名管理移入)、固定借用開放月份+手動加開、器材工作天緩衝、結案鎖定月數、上傳上限、評鑑年度、違規項目目錄、經費科目
-- **活動申請審核**:側欄 Drawer 改 **popup Modal**(需求方:不要 drawer 要 popup);移除單號;類型一律顯示社課/活動/會議,大型狀態以共用 `LargeBadge` 表達——空心=申請待處理、**空心+斜線=申請被否准**、實心=已認可(含未申請但管理員逕行核定);社團/名稱/類型/日期/狀態 sort+filter(類型 filter 將「大型活動」視為獨立選項);審核 popup 內可勾「認可為大型活動」
-- 結案審核移除單號;**全部審核 Modal 統一 open+afterClose 常駐模式**,修復點遮罩關閉沒有退場動畫的問題(`{selected && <Modal open>}` 為反模式,勿再用)
-- **社團下拉跨頁同步**:`AdminClubContext`(sessionStorage)+共用 `ClubSelect`(單一下拉、性質→社團兩層、可搜尋);社團總覽/成員列表/管理項目/行政分審核共用同一選取
-- **社團管理群組**:社團總覽(唯讀,比照 club panel)、成員列表(唯讀)、管理項目(社團自管資料唯讀;行政可改社團名稱/帳號/啟停用/重設密碼)、逾期追蹤與停權;**社團帳號頁自「帳號與權限」移除併入管理項目**(需求方:保留功能、簡化頁面)
-- **一次性密碼**(共用 `OneTimePasswordModal`):重設密碼/新建帳號時產生,預設隱藏、有複製鈕,**關閉視窗即消失**;帳號之後仍可查看;首登強制改密
-- **帳號管理合一頁 `/admin/accounts`**:tabs 管理員/工讀生/評審,新增/刪除/停權/重設密碼同頁;一般管理員「權限…」popup 勾選頁面權限鍵;新增評審即產生帳密(一次性顯示)
-- **空間審核頁頂部場況圖**:佔用 mock(每週固定+特定日臨時)抽成 `bookings/mock.cellInfo` 共用;admin 版**僅「審核中」橘格可點**,點擊直接開該筆審核 popup;器材審核 popup 顯示綁定活動、可借數不足時紅字警示
-
-## UI/規則調整決議(2026-07-16 第八輪:需求方全批回饋,前端已實作)
-
-- **前端不允許顯示任何「單號(ID)」,僅稽核軌跡允許**(需求方定案;全站已 sweep:固定借用/臨時借用/逾期/結案審核/違規/維修/總覽)
-- **確認彈窗一律走 `lib/confirm.ts` 的 `confirmDialog`**:AntD `Modal.confirm` 預設 `maskClosable:false` 與全站「點遮罩=取消(留在原地)」慣例相反,過去多次在新呼叫點復發,勿再直呼 `modal.confirm`
-- **確認型 popup 開啟即聚焦確認鈕**(Enter 直接送出;`destroyOnHidden` 確保每次開啟重新聚焦);必填輸入型 popup 改聚焦輸入框
-- **器材借用可借數為動態推導**:須先選「關聯活動」→ 推導借用區間 → 該區間可借數 =總數 − 重疊之未歸還未退回借用量(`bookings/mock.availableInWindow`;未選活動前顯示 —、品項禁選);管理端審核檢核同邏輯(排除本單)
-- 稽核軌跡:每頁 20 筆;操作者/角色/動作 皆可篩選
-- 違規管理:預設未銷案在上、時間升冪;日期/地點/項目/填寫/期限/狀態可排序,項目/填寫/期限/狀態可過濾。維修管理:預設 待處理→處理中→已完成;地點/申請日可排序
-- 檔案管理:佔用空間加「**文字內容**」段(整個 DB 算一類,後端以 pg_database_size 估);**有報修檔案時報修段排第一**(檔案大、迭代快)
-- 權限彈窗:變更項橘框標示(比照 `.field-dirty` 視覺)、按「儲存」才生效、未存關閉跳確認
-- 系統設定:**移除線上報名時間窗**(改由各報名活動自訂起訖);固定場地借用開放改為**日期區間**(RangePicker,取代開放月份+手動加開);違規項目目錄/經費科目改**無下拉的 TagListInput**(Select mode=tags 的下拉需求方不要;open=false 會壞 Enter,故自製)
-- 報名活動建立:名額上限必填 min 1;活動時間/報名開始/報名截止=日期+時間;地點移到活動時間前;**審核制 checkbox**(報名須管理員核准);資訊調查欄位**把手拖曳排序**;「對象說明」改「活動描述」段落欄;報名開始預設今天
-- **公告系統**:性質可多選;單一社團用資料夾式 `ClubCascader`;**蓋板** checkbox+截止日必填 → 社團**每次登入**全版蓋板(`TakeoverOverlay`,5 秒後右上 X 可關;`auth.login` 清 sessionStorage 使下次登入再顯示);**通知** checkbox(Email 給聯絡人+社團自設 Discord webhook);**所有公告可點開 popup 檢視完整內容,內容支援 Markdown**(marked+DOMPurify,共用 `Markdown`/`AnnouncementModal`)
-- `ClubSelect` 改 **Cascader 資料夾式二級選單**(第一層性質、展開選社團,備援 60+ 社團);行政端社團總覽所有項目可點開唯讀詳情 popup;行政端成員列表加學期下拉+匯出 CSV(比照社團端)
-- 行政端管理項目:帳號狀態開關**切換時不警告**,切到停用後**按儲存才確認**;重設密碼鈕緊鄰儲存鈕;一次性密碼彈窗按鈕改「**確認重設**」(重設不需按儲存)
-- **三頁重設計**:活動申請審核=「待審佇列(送件早在前)+其他狀態表」+雙欄審核彈窗(左基本資料/右經費核定,章軌移標題列);結案審核=完整結案資料(實支 vs 核定、照片/影片/心得、檢討會議)+**繳交確認勾選(未確認項評鑑以 0 分計)**;報名管理=總表(類型徽章/截止/已報名/每社上限)+單活動管理彈窗(名單/確認報名/簽到登錄/匯出 CSV)
-- 活動申請:附件加總上限 50MB(接後端改讀 system_settings)即時驗證+「已使用 X/50 MB」;結案照片放寬為**所有常見影像格式**(JPEG/PNG/GIF/WebP/BMP/TIFF/HEIC/AVIF 魔術位元組驗證)
-
-## UI/規則調整決議(2026-07-16 第九輪:全面收斂 + 後端落地 + 接線)
-
-- **PageHeader 等高**:標題列固定 `minHeight: 40`(=全域 controlHeight);header 內按鈕不再覆寫 36 高;評鑑分數塊限高 40
-- **分頁全站統一 `Pager`**(tableControls):AntD Pagination `simple` 模式(上一頁/可輸入跳頁的 x / y/下一頁)、置中、**只有一頁也顯示**;禁再用數字頁碼鈕
-- **可點卡片/列 hover 一律變色**:共用 `.click-tint`(!important 蓋 inline background)
-- **排序僅 sort icon 變色**:SortButton/FilterButton(tableControls)為唯一正解,自刻版已收斂
-- **上傳全站統一**:`lib/uploads.ts`(sha256/影像/PDF/影片魔術位元組、IMAGE_ACCEPT 含 HEIC/HEIF/AVIF)+ `components/ui/AttachmentArea`(拖放、SHA-256 內容去重、單檔/加總容量驗證、「已使用 X/Y MB」標示);套用:活動申請附件、報修、郵局、獎項槽位;結案照片沿專屬管線但共用驗證;**所有允許圖片處一律含 HEIC/HEIF**
-- **送出驗證紅框機制**:errors Set + AntD `status="error"` + 區塊紅框 `.area-error`(常駐透明邊框防位移),修改該欄即解除、捲動到第一個錯誤;已套:結案(全欄位)、申請工作分配、固定/臨時借用時段、報修/郵局上傳區、報名活動建立;結案「自籌+擬請皆 0 → 實際支出預填 0」
-- **成員身份標準值**:負責人/副負責人/幹部/社員(`lib/roles.ts`);顯示詞依社團名稱末字推導(kindLabel);**社團名稱強制以「社」或「會」結尾,無例外**(前後端皆驗);「社長/會長」複合形式廢除;CSV 匯出用顯示詞、匯入雙向相容
-- SignupBuilder 資訊調查拖曳改 **pointer 事件自製即時重排**(HTML5 DnD 廢除:drop 才換位、ghost 突兀、不支援觸控)
-- 公告 popup(admin)內建控制項:蓋板 Switch(開啟須選截止日)+ 刪除(confirmDialog);AnnouncementModal 增 `footerExtra`
-- **行政端社團總覽 popup 重用專屬審核彈窗**:DetailModal→`ActivityReviewModal`、BookingReviewModal 抽檔共用;待審項 popup 直接可核准/退回,其餘唯讀;線上申請列有專屬唯讀詳情
-- 行政端管理項目:dirty 橘框 + useUnsavedGuard + 切換社團未存確認;重設密碼=一次性密碼彈窗
-- 系統設定違規項目/經費科目:**AntD 官方可編輯標籤模式**(closable Tag + 虛線「+ 新增」Tag 點開小輸入框),取代自製常駐輸入框
-- 檔案管理:報修檔案專屬區塊(位於大型檔案前,可直接刪除);大型檔案清單排除報修
-- **後端第九輪**:三 migration(signup year 廢除/成員四值身份/semester 快照,皆可逆);admin routers 補齊(clubs/bookings/rooms/overdue/公告蓋板 PATCH/維修狀態);`UserOut.club_name`;成員多值 kind 篩選與 /semesters
-- **DB 指令**:`uv run python scripts/reset_db.py --yes`(清空→head→基礎 seed+superadmin 一次性密碼);`scripts/seed_mock.py --yes`(reset 後灌全模組 mock,帳密印出)
-- **接線慣例**:`src/api/{domain}.ts` 集中 snake↔camel 與日期(ISO↔YYYY/MM/DD)轉換、query keys、mutation onSuccess invalidate;分頁 `apiPaged`+`qs`;**範本=api/members.ts + MembersPage**;auth 走 session cookie(`/auth/me` 開機恢復、首登強制改密頁 `/change-password`、staff/viewer 導 `/coming-soon`)
-
-## UI/規則調整決議(2026-07-17 第十輪:需求方連續回饋,前後端已落地)
-
-- **品牌**:`frontend/public/logo.svg`(NTUST 藍 #005bac)為 favicon 與 header 最左側圖示;`logo.png` 供 Discord webhook 頭貼(`notify._with_identity` 為每則加 `username`+`avatar_url=SITE_URL/logo.png`,開發站無法解析時 Discord 略過頭貼)
-- **登入頁**:全高 wrapper 補 `box-sizing:border-box`(content-box + padding 造成整頁捲軸);版權「Copyright © 2026 國立臺灣科技大學」,跨年自動變 `2026-{今年}`;右側 InfoCircle popover(維護者/Discord 連結/mailto)
-- **公告**:蓋板「不再顯示」持久化到 DB(`announcement_dismissals(announcement_id,club_id)` cascade;`POST /club/announcements/{id}/dismiss` 冪等、不可見公告 404);鈴鐺已讀改**水位線** `clubs.announcements_read_at`(created_at 晚於水位線=未讀;`POST /club/announcements/read` 用 DB now() 前移;開鈴鐺或進總覽即標已讀);蓋板右上倒數環轉滿變 X;總覽公告預覽渲染 markdown 並鉗兩行(grid item 補 `min-width:0`、`.md-body` 加 `overflow-wrap:anywhere` 防爆寬)
-- **活動申請**:草稿可**部分填寫**(至少一欄;`activities.date/end_date` 改 nullable + status-scoped CHECK `ck_activities_draft_partial_only`;`ActivityIn` 放寬必填、`_require_complete()` 於 submit 與非草稿 update 檢核並列缺漏);**Python 3.14 lazy annotation 坑**:欄位名 `date` 會遮蔽 `datetime.date`,`Mapped[date|None]` 被解析成 SQL OR 而靜默 NOT NULL,pydantic 直接 TypeError → model/schema 一律用 `dt.date` 別名
-- **活動結案**:照片改「**送出結案時才上傳、不進草稿**」——前端 `PhotoBag` 暫存(預覽 URL + SHA-256 去重 + 加總上限),送出時逐張 upload,失敗 `Promise.allSettled` 回滾已上傳者(避免孤兒 + 後端 slot 去重擋重送);結案草稿 `close_draft` 是**前端 opaque camelCase JSON**(鍵名須同 `buildDraftReport()`,seed 曾誤用 snake_case 使 reflections.name 為 undefined→整頁白畫面;前端 hydrate 一律補空字串防護)
-- **借用場況**:availability grid 每格改 `{status, club}`,本社**已核准**才 mine、審核中(含本社臨時、**pending 固定借用**)一律 pending、他社已核准 temp/fixed;占用格 hover Tooltip 顯示「社團名・狀態」;新增 `GET /club/bookings/availability-range`(區間逐日,上限 31 天,起訖顛倒 422)取代單一場地 15 天檢視的逐日 15 請求;最近借用/器材清單改依 date/start_date 降冪
-- **上傳上限**:從「依檔案類型」改為「**依申請性質給加總上限**」(活動申請 15MB、空間報修 100MB、結案照片 10MB;`system_settings` 三個 `*_total_mb`);共用 `files.total_uploaded()`,各上傳端點鎖列 + 預檢 + 串流後結算超額回滾;前端常數全移除,改讀 **`GET /club/config`**(`useClubConfig()`;後端仍權威)
-- **儲存配額**:移除邏輯容量 `capacity_gib` 與保留空間 `reserve_gib`,系統總量改用**實際磁碟可用空間** `shutil.disk_usage(upload_root).free`(容量不足告警之後人為介入);per-club 配額保留;`/admin/files/usage` 回磁碟 total/free
-- **經費科目**:`budget_categories` 改 **`[{name, hint}]`**(hint 由後台維護,社團填申請選到該科目時顯示),移出前端硬編碼;系統設定頁改 name+hint 逐列編輯器
-- **器材**:**移除類別欄**(`equipment.category` + enum 刪除,migration `33e4dcd04463`);點交方式改由既有 `needs_serial` 表達(**一般 / 依序點交**);新增 `/admin/equipment` super CRUD(list/create/patch,刪除=停用保外鍵),系統設定頁「器材主檔」逐列即時 PATCH;器材主檔 17 項(seed)
-- **系統設定頁**:器材主檔卡片置於設定表單**之前**,讓表單「儲存」按鈕留在整頁最底
-- **新 migration(皆可逆)**:`4290719adc82`(announcement_dismissals)、`007931f1afc7`(announcements_read_at)、`ccb5bc27926e`(活動部分草稿)、`33e4dcd04463`(移除器材類別)
-
-## 規則調整與舊系統資料遷移(2026-07-21 第十三輪,前後端已落地)
-
-- **活動類型二分**:「社課或會議」與「活動」(僅活動可勾大型),取代原 社課/活動/會議 三分;舊資料 course/conference→社課或會議、extra→活動
-- **社團 kind(社團/學會)**:新欄位,負責人顯示詞(社長/會長)推導依據;名稱結尾社/會自動推導、推導不到手動指定(行政端管理項目有類型下拉)——**廢除「社團名稱強制社/會結尾」規則**(舊系統有 全校不分系、根與芽 等現役名稱)
-- **成員**:新增 phone 欄(CSV 匯入/匯出第 5 欄選填);**職稱放寬為各身份皆可有**(幹部仍必填);舊系統入社日期遷入 updated_at
-- **指導老師**:校內/校外各至多一位(clubs.advisor_* / advisor_out_*)
-- **社團英文名 en_name**(管理項目可編輯);**attribute 改 NULL-able**(停社舊社團原性質不可考)
-- **人數語彙統一「社員/非社員」**(原申請表「校內/校外」;與舊系統語意一致)
-- **資料遷移**:`migration/cms_import.py`(idempotent,legacy_id_map;範圍與 TODO 見 `migration/README.md` 與 data-model.md §1.2)。全帳號重發一次性密碼(輸出 `migration/out/*.csv`,不入版控)+首登強制改密
-- 待需求方:評鑑檔案庫/行政歷史文件是否歸檔(TODO,需求方後續給);舊機 media 檔案實體(TODO)。帳號 `800` 衝突已解:偽社團「學務處就輔組」不遷
-- **clubclass 遷移(同日第二批拍板,已落地)**:`migration/cc_import.py` 遷入 教室借用 15,634、器材借用 7,173(對映見 migration/README.md);連動五個新 feature:
-  - **取消借用**:Booking/Loan 新狀態 `cancelled`;社團可取消審核中或已核准未開始的借用(借用總覽動作欄;鎖列後驗狀態)
-  - **手動借用**(`/admin/manual-booking`,僅 super):行政直接借用臨時場地/器材,免審直接核准;club_id NULL、顯示「學務處」
-  - **場地不開放規則 Rule Page**(`/admin/venue-rules`,僅 super):`venue_block_rules`(區間×星期×節次+原因);場況圖「不開放」蓋過一切、社團申請 422、核准 409 SLOT_BLOCKED;行政手動借用不受限
-  - **器材單次可借上限** `equipment.max_lease_count`(NULL=不限;主檔卡可編;申請端檢核)
-  - **借用聯絡電話** phone(臨時場地/器材申請選填;舊資料遷入)
-  - migration `b3e7d40a95c1`(可逆;downgrade 刪行政借用列、cancelled→rejected)
-
-## 第十四輪決議(2026-07-21,需求方 15 項,前後端已落地)
-
-- **第一關全面改稱「承辦人」**(顯示層;程式鍵 `advisor/approve_advisor/pending_advisor` 不動,待簽核重做輪整併);**單關(無補助)不畫章軌**;章字 承/組/長
-- **工讀生端(pt)與評審端(viewer)實裝**(role 代號仍為 staff/viewer):`/staff/*`、`/viewer/*` API 全套;五獎 rubric 依評分標準 PDF seed(年度化,`award_rubric_items`);`eval_groups.award_id` 為分組所屬獎項;**現場簡報 20 分為選填、可於簡報後補登**(表格標「簡報未評」;待需求方追認);評審對受評社團不匿名(匿名方向=評審代號對社團)
-- **申請時間禁過去**(前後端):節次時刻表 `PERIOD_TIMES`(權威=舊 clubclass);臨時場地「正在申請/可取消」邊界=**申請起始時刻**(最早節次起點);手動借用不擋(補登用)
-- **行政端固定借用窗外反灰置底**(比照社團端;窗外殘留 pending 需先調系統設定;待追認)
-- **申請審核「最近審核」**:預設依最後簽核時間新到舊(`reviewed_at`);結案審核逾期區含已解鎖、全列可點,兩區 25/頁
-- **帳號管理含社團 tab**(與「管理項目」雙入口;建立社團帳號=`POST /admin/clubs/{id}/account`)
-- **表格全站慣例**:資料表一律 `tb fixed`+`<Cols>` 固定欄寬;排序 `useMultiSort`(點擊序=優先序;同欄再點=升降互換、無移除態,指示器=實際生效鏈;≤3 鍵)+`MultiSortButton`;伺服器分頁一律補 id tiebreak;後端 `sort` 逗號多鍵;預設排序五準則=佇列公平(送件早在前)/急迫優先(期限近、逾越久在前)/時間就近(新在前)/名冊慣例(身份權重、主檔手動序)/需求方拍板不動
-- **高彈窗一律 `useModalAutoFocus`**(preventScroll,標題保持可見;禁原生 autoFocus);彈窗「點擊即開、內容 Skeleton 補齊」為標準模式;全域 motionUnit 0.06
-- webhook 訊息清冊=`docs/discord-webhook-messages.md`(需求方設計風格後回頭套 notify.py)
-
-## Roadmap(需求方 2026-07-15 宣告)
-
-- 未來還有 **staff panel(工讀生端)** 與 **viewer panel(評審端)** 要實作(頁面清單見上方功能模組)
-- **首頁將改為導覽頁**:展示所有社團、圖片、介紹,右上角登入鈕→dashboard;現行 `/` 直接是登入頁為過渡做法
-
-## 技術決策(詳見 `docs/architecture.md`)
-
-- 版本策略:無特殊理由一律用最新穩定版,優先挑支援週期長的
-- 前端:**Vite + React + TS**、Ant Design 6、TanStack Query、React Router、pnpm;測試 vitest(`pnpm test`);檔案預覽用 mammoth + dompurify
-- 後端:**FastAPI**、Python 3.14、uv、SQLAlchemy 2(async)+ Alembic、PostgreSQL 18
-- 認證:行政建帳號(argon2id + DB session cookie、密碼歷史、首登強制改密);**SSO 僅預留(`auth_provider`),前端不顯示**
-- Email:aiosmtplib + BackgroundTasks;SMTP 全走 `.env`(暫用開發者 iCloud+ 信箱,relay 未定)
-- 容器:Docker Compose(`compose.yml`);開發只起 db,前後端本機熱重載
-- 本機開發位址統一 IPv4:前端 `http://127.0.0.1:5173`,後端 `http://127.0.0.1:8000`;Vite `/api` 同源代理到後端,不直連 API、不開 CORS
-- 部署:GCE 單台 e2-medium(web/backend/db 同機),前面是既有 edge proxy VM(TLS/白名單,設定見 `../nginx/`,開發者有權限改);網域復用 `clubs.ntust.edu.tw`
-- 上傳:文件 50MB/圖片 10MB/壓縮檔 100MB/維修影片 200MB;成果影片一律外部連結
-- 檔案佈局 `{模組}/{年}/{月}/{uuid}`(月份分類);非競賽採計檔案由行政定期備份後**自系統刪除**(`files.archived_at` 標記),競賽採計檔案保留
-- 設定分層:恆不變 → `.env`;會變/可能變 → `system_settings`(管理員後台可調)
-- 版控:git,remote 個人 GitHub;映像 GHCR → 之後 Google Artifact Registry
-- 遷移:承辦提供舊 DB dump,`migration/` 寫客製 idempotent scripts;只搬社團資料/成員名單/固定設施主檔
+- **首頁改導覽頁**:展示所有社團、圖片、介紹,右上角登入鈕進 dashboard。現行 `/` 直接是登入頁為過渡做法
+- Telegram Bot 通知(低優先)

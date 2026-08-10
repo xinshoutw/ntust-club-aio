@@ -165,7 +165,8 @@ class UploadPolicy:
     settings_key: str | None = None  # system_settings upload_limits 的鍵;None=固定上限
 
 
-# 上傳上限的預設值;實際上限走 system_settings upload_limits。
+# 上傳上限的預設值;帶 settings_key 者實際上限走 system_settings upload_limits,
+# 未帶者(PASSBOOK、api/v1/eval.EVAL_POLICY)為固定上限,後台調不到。
 # 影像收所有常見格式,與前端 isImageFile 對齊
 IMAGE = UploadPolicy(
     "image",
@@ -223,7 +224,7 @@ async def save_upload(
     sniff, mime = _SIGNATURES[ext]
     max_size = await _policy_max_size(db, policy)
 
-    # 配額檢查:系統總量以實際磁碟可用空間為準,不足時只告警、由人介入,無自動強制。
+    # 配額檢查:系統總量以實際磁碟可用空間為準,不足即回 507 擋下上傳(擴容仍須人介入)。
     # 此處先做「無鎖」預檢,
     # per-club 權威結算在串流完成後取 advisory lock 再重算
     # (避免慢速上傳在串流期間霸佔全域鎖)

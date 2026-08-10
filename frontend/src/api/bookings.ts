@@ -414,7 +414,8 @@ async function fetchAllPages<T>(
   return out
 }
 
-// 正在借用:伺服器端 active=true——審核中/未過期已核准(器材含借出中);
+// 正在借用:伺服器端 active=true。三類的判定不同 —— 固定借用看學期結束日、
+// 臨時場地看最早節次的起始時刻、器材只看狀態(pending/approved/checked_out)。
 // 不含大量歷史紀錄,逐頁抓齊完整呈現、不限長度
 export function useActiveRoomBookings() {
   return useQuery({

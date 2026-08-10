@@ -21,7 +21,8 @@ from app.models.enums import AwardKind, UserRole, VenueCategory
 from app.services.evaluation import get_eval_window
 from app.services.scoring import AD_MAX, ADMIN_TOTAL_MAX
 
-# 五獎項(原型 AWARDS;rubric 逐年由行政建立/複製)。
+# 五獎項(原型 AWARDS)。rubric 逐年版本化,但「複製上年再修改」的介面尚未實作:
+# 目前只能改 eval_window 年度後重跑 seed,或直接操作 DB。
 # 存純資料、Award 列於 seed() 內建構:模組層 ORM 實例會在第一次 seed 後轉 persistent,
 # 之後(如測試重跑)再 add 會被當成既有列而靜默跳過 INSERT
 # (id, name, kind, has_presentation, is_weighted, sort)
@@ -209,7 +210,7 @@ def verify_rubrics() -> None:
 
 
 # 場地主檔 19 處,與 frontend/src/features/bookings/mock.ts VENUES 對齊;
-# 之後由管理員後台維護,數量與容納人數可調
+# 場地主檔 CRUD 尚未實作(審查報告 GAP-04),異動目前只能改此處或直接操作 DB
 # (名稱, 類別, 容納人數, allow_fixed, allow_temp)
 VENUES: list[tuple[str, VenueCategory, int, bool, bool]] = [
     ("S204 共享食堂", VenueCategory.CLASSROOM, 60, True, True),

@@ -224,7 +224,7 @@ export function buildAdminNav(
     .filter((g) => g.items.length > 0)
 }
 
-// 工讀生端:目前為骨架(role 代號之後隨後端改 pt)
+// 工讀生端(URL 前綴 /pt;登入角色鍵維持 staff)
 export function buildPtNav(): NavGroup[] {
   return [
     {
@@ -245,7 +245,7 @@ export function buildPtNav(): NavGroup[] {
   ]
 }
 
-// 評審端:目前為骨架
+// 評審端
 export function buildViewerNav(): NavGroup[] {
   return [
     {

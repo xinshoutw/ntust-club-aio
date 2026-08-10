@@ -3,8 +3,8 @@ import type { CSSProperties } from 'react'
 import { Dropdown, Pagination } from 'antd'
 import { CaretDownFilled, CaretUpFilled, FilterOutlined, SwapOutlined } from '@ant-design/icons'
 
-// 手刻表格的排序/篩選控制:點標題切換 升冪→降冪→無;漏斗圖示開多選篩選
-// (ReviewPage 首創的模式,抽出共用)
+// 手刻表格的排序/篩選控制:點主鍵切換升降冪(無移除態,清除走 reset),
+// 點其他欄位插為主鍵;漏斗圖示開多選篩選
 
 export interface SortState<K extends string> {
   key: K

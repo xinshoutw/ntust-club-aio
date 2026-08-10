@@ -12,7 +12,7 @@ interface SidebarProps {
 
 /**
  * 側欄:群組標題與可點項目在視覺上必須明顯區分。
- * - 項目:icon + 文字、圓角塊、hover 浮起;選中 = 淡紅底 + 紅字 + 左側短紅條
+ * - 項目:icon + 文字、圓角塊、hover 變色;選中 = 淡紅底 + 紅字 + 左側短紅條
  * - 群組標題:縮小、加字距、上方留白拉開,明顯「不可點」
  */
 export default function Sidebar({ groups, onNavigate }: SidebarProps) {

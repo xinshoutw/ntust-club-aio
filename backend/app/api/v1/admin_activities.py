@@ -150,7 +150,7 @@ _REVIEWED_SUBQ = (
 )
 _REVIEWED_AT = _REVIEWED_SUBQ.c.reviewed_at
 
-# 排序白名單(2026-07-21:清單改伺服器端分頁,14k+ 筆不再整批撈取);
+# 排序白名單(清單改伺服器端分頁,14k+ 筆不再整批撈取);
 # reviewed_at 包 NullsLast:不論鍵位/升降冪皆 NULLS LAST(無審核紀錄者殿後),
 # 出現於任一鍵位時 list_activities 另補 id 降冪 tiebreak
 _SORTABLE = {
@@ -190,7 +190,7 @@ async def list_activities(
 ) -> ApiResponse[list[ActivityOut]]:
     # status/club_id/type 可重複帶多值;locked=true 僅回逾期鎖定(已核准+超過結案期限+未解鎖);
     # overdue=true 回全部逾期未結案(不分是否已解鎖,結案審核頁逾期表);
-    # sort 走白名單(預設 id 降冪)——清單一律伺服器端分頁(2026-07-21)
+    # sort 走白名單(預設 id 降冪)——清單一律伺服器端分頁
     query = (
         sa.select(Activity, Club.name)
         .join(Club, Activity.club_id == Club.id)
@@ -335,7 +335,7 @@ async def approve(
             missing = [i for i in activity.budget_items if i.approved_subsidy is None]
             if missing:
                 raise validation_error("尚有經費項目未核定金額")
-        # 大型活動認可:實心=已認可(含未申請但管理員逕行核定,2026-07-15 第七輪)
+        # 大型活動認可:實心=已認可(含未申請但管理員逕行核定)
         if body.is_large_approved:
             if activity.type != ActivityType.EVENT:
                 raise validation_error("僅類型為「活動」的案件可認定為大型活動")

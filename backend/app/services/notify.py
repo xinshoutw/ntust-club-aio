@@ -3,7 +3,7 @@
 - Discord:讀 .env DISCORD_WEBHOOK_URL,空值即停用;失敗只記 log,絕不影響業務交易
 - Email:aiosmtplib;無 SMTP 憑證時降級 log-only;結果一律寫 email_logs
 - 一律由 FastAPI BackgroundTasks 呼叫(fire-and-forget),不阻塞回應
-- 公告通知(2026-07-16 第八輪):Email 基礎 HTML 模板 + Discord Components V2
+- 公告通知:Email 基礎 HTML 模板 + Discord Components V2
 """
 
 import html as html_escape
@@ -92,7 +92,7 @@ async def club_event(
         await discord_to(club_webhook, kind, title, description)
 
 
-# ---- 公告通知(2026-07-16 第八輪) ----
+# ---- 公告通知 ----
 
 
 def announcement_components(title: str, content: str, date: str) -> dict[str, Any]:

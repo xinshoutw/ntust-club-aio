@@ -1,4 +1,4 @@
-"""帳號管理(/admin/accounts,僅 super;2026-07-16 第八輪)。
+"""帳號管理(/admin/accounts,僅 super)。
 
 管理員/工讀生/評審三類帳號;社團帳號走 /admin/clubs(帳號管理「社團」分頁與管理項目),不在此管理。
 """
@@ -24,7 +24,7 @@ PERMISSION_KEYS = frozenset(
         "amember",  # 社團管理
         "aeval",  # 行政分審核
         "amaint",  # 維修管理
-        "aapply",  # 線上申請管理(幹部證明/郵局帳戶異動,2026-07-17)
+        "aapply",  # 線上申請管理(幹部證明/郵局帳戶異動)
         "aviol",  # 違規管理
         "afiles",  # 檔案管理
         # 既有後端鍵(前後端鍵名待統一,先兩者皆收)

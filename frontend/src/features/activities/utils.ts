@@ -19,7 +19,7 @@ export function activityEndAt(a: { date?: string; endDate?: string; timeRange?: 
   return parsed.isValid() ? parsed : dayjs(`${day} 23:59`, 'YYYY/MM/DD HH:mm')
 }
 
-/** 活動是否已結束(借用「關聯活動」下拉排除已結束者;2026-07-21) */
+/** 活動是否已結束(借用「關聯活動」下拉排除已結束者) */
 export const activityEnded = (a: { date?: string; endDate?: string; timeRange?: string }): boolean => {
   const end = activityEndAt(a)
   return !!end && end.isBefore(dayjs())

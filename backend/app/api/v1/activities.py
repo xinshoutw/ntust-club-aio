@@ -59,7 +59,7 @@ _SORTABLE = {
 
 
 async def _validate_categories(db, items) -> None:
-    # budget_categories 為 [{name, hint}](2026-07-17);校驗僅比對名稱
+    # budget_categories 為 [{name, hint}];校驗僅比對名稱
     allowed = {c["name"] for c in await get_budget_categories(db)}
     for item in items:
         if item.category not in allowed:
@@ -95,7 +95,7 @@ def _require_complete(activity: Activity) -> None:
 
 
 def _require_future_start(activity: Activity) -> None:
-    """過去時間全面禁止(2026-07-21):送審/退回重送的開始時刻不得早於現在。
+    """過去時間全面禁止:送審/退回重送的開始時刻不得早於現在。
 
     於 _require_complete 之後呼叫(日期/時間必然齊備);草稿不擋。
     schema 允許空時間時以當日 00:00 保守處理,不放行部分過去的申請。
@@ -111,7 +111,7 @@ async def list_activities(
     db: DbDep,
     page: Pagination,
     semester: str | None = Query(None, pattern=r"^\d{3}-[12]$"),
-    # 可重複帶多值(總覽頁一次查非 closed 各狀態,避免整表撈取;2026-07-21)
+    # 可重複帶多值(總覽頁一次查非 closed 各狀態,避免整表撈取)
     status: Annotated[list[ActivityStatus] | None, Query()] = None,
     type: ActivityType | None = None,
     sort: str | None = None,

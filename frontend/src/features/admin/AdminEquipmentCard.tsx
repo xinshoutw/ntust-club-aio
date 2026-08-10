@@ -79,7 +79,7 @@ function EquipmentRow({ item }: { item: EquipmentItem }) {
         placeholder="不限"
         onChange={setCap}
         onBlur={() => {
-          // 單次可借上限(2026-07-21):清空=不限(送 null 清除)
+          // 單次可借上限:清空=不限(送 null 清除)
           if (cap !== (item.maxLeaseCount ?? null)) patch({ maxLeaseCount: cap })
         }}
         style={{ width: 90, flexShrink: 0 }}
@@ -141,7 +141,7 @@ function AddEquipment() {
   )
 }
 
-// 器材主檔:管理員可設各器材總數(2026-07-17 需求方);停用不刪列以保既有借用外鍵
+// 器材主檔:管理員可設各器材總數;停用不刪列以保既有借用外鍵
 export default function AdminEquipmentCard() {
   const query = useAdminEquipment()
 

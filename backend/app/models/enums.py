@@ -14,7 +14,7 @@ class AuthProvider(StrEnum):
 
 
 class ClubKind(StrEnum):
-    """社團/學會(2026-07-21 需求方拍板):負責人顯示詞由此推導(社團→社長、學會→會長)。
+    """社團/學會:負責人顯示詞由此推導(社團→社長、學會→會長)。
 
     建立/改名時名稱結尾「社」→社團、「會」→學會自動推導;推導不到時必須手動指定。
     """
@@ -90,14 +90,14 @@ class BookingStatus(StrEnum):
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
-    CANCELLED = "cancelled"  # 社團自行取消(審核中或已核准未開始;2026-07-21)
+    CANCELLED = "cancelled"  # 社團自行取消(審核中或已核准未開始)
 
 
 class LoanStatus(StrEnum):
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
-    CANCELLED = "cancelled"  # 社團自行取消(審核中或已核准未開始;2026-07-21)
+    CANCELLED = "cancelled"  # 社團自行取消(審核中或已核准未開始)
     CHECKED_OUT = "checked_out"
     RETURNED = "returned"
 
@@ -108,7 +108,7 @@ class CertPosition(StrEnum):
 
 
 class PostalReason(StrEnum):
-    """郵局帳戶異動事由(2026-07-13 前端定案:複選 + 存簿密碼異動)。"""
+    """郵局帳戶異動事由(複選 + 存簿密碼異動)。"""
 
     CHANGE_AGENT = "更換代理人"
     NEW_ACCOUNT = "新開戶"
@@ -125,7 +125,7 @@ class MaintenanceStatus(StrEnum):
 
 
 class ApplicationStatus(StrEnum):
-    """幹部證明/郵局帳戶異動(2026-07-17 需求方拍板):
+    """幹部證明/郵局帳戶異動:
     審核中 → 處理中 → 請洽學務處(完成);無退回,學務處線下溝通後直接處理。"""
 
     PENDING = "pending"

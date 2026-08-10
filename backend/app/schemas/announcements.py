@@ -1,4 +1,4 @@
-"""公告(2026-07-16 第八輪):管理端建立/列表 schema。"""
+"""公告:管理端建立/列表 schema。"""
 
 from datetime import date, datetime
 
@@ -11,7 +11,7 @@ _VALID_ATTRS = {a.value for a in ClubAttribute}
 
 
 def _takeover_not_past(v: date | None) -> date | None:
-    """過去時間全面禁止(2026-07-21):過去截止日=蓋板永不顯示,不得早於今天(台北)。"""
+    """過去時間全面禁止:過去截止日=蓋板永不顯示,不得早於今天(台北)。"""
     if v is not None and v < datetime.now(TAIPEI).date():
         raise ValueError("蓋板截止日期不得早於今天")
     return v

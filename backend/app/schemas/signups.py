@@ -79,7 +79,7 @@ class SignupDraftIn(BaseModel):
         return v
 
 
-# ---- 管理端:報名活動建立與管理(2026-07-16 第八輪) ----
+# ---- 管理端:報名活動建立與管理 ----
 
 
 class SignupFieldIn(BaseModel):
@@ -144,7 +144,7 @@ class SignupItemCreateIn(BaseModel):
         start = self.signup_start or now
         if self.signup_end <= start:
             raise ValueError("報名截止須晚於報名開始")
-        # 過去時間全面禁止(2026-07-21):活動時間與報名截止不得早於現在
+        # 過去時間全面禁止:活動時間與報名截止不得早於現在
         if self.event_at < now:
             raise ValueError("活動時間不得早於現在")
         if self.signup_end < now:

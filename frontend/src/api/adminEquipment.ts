@@ -6,7 +6,7 @@ export interface EquipmentItem {
   id: number
   name: string
   totalQty: number
-  /** 單次可借上限;undefined=不限(2026-07-21) */
+  /** 單次可借上限;undefined=不限 */
   maxLeaseCount?: number
   needsSerial: boolean // False=一般、True=依序點交
   isActive: boolean
@@ -30,7 +30,7 @@ const toItem = (o: EquipmentOut): EquipmentItem => ({
   isActive: o.is_active,
 })
 
-// 點交方式(取代原「類別」;2026-07-17):一般 / 依序點交(needs_serial)
+// 點交方式(取代原「類別」):一般 / 依序點交(needs_serial)
 export const HANDOVER_OPTIONS = [
   { value: false, label: '一般' },
   { value: true, label: '依序點交' },

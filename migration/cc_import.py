@@ -7,7 +7,7 @@
     uv run python ../migration/cc_import.py
 
 前置:cms_import.py 已跑完(club/activity 對照仰賴 legacy_id_map system=cms)。
-對映規則(2026-07-21 需求方拍板)見 migration/README.md。
+對映規則見 migration/README.md。
 """
 
 # ruff: noqa: E402 - sys.path 調整必須先於 app 匯入(同 cms_import.py)

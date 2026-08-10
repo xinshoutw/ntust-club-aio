@@ -45,7 +45,7 @@ class ActivityIn(BaseModel):
         self.name = self.name.strip()
         self.location = self.location.strip()
         if self.end_date is None:
-            self.end_date = self.date  # 未跨日 end_date=date(2026-07-15)
+            self.end_date = self.date  # 未跨日 end_date=date
         # 填了的欄位仍須自洽;未填者留待 submit 檢核
         if self.date and self.end_date and self.end_date < self.date:
             raise ValueError("結束日期不得早於開始日期")
@@ -132,7 +132,7 @@ class CloseSubmitIn(BaseModel):
         # 實際時間先後不在此比較:跨日活動(如 18:00–翌日 10:00)是合法輸入,
         # 需要活動起訖日期才能判斷,由 submit_close 端點檢核(與 ActivityIn 同精神)
         if self.review_meeting:
-            # 2026-07-15:檢討會議獨立 section,日期/與會人數/討論事項/內容決議皆必填
+            # 檢討會議獨立 section,日期/與會人數/討論事項/內容決議皆必填
             if self.review_date is None:
                 raise ValueError("有召開檢討會時必須填寫檢討會日期")
             if self.review_attendees is None:

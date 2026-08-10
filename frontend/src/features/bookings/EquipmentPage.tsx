@@ -30,7 +30,7 @@ export default function EquipmentPage() {
   // 換活動時沿用舊列表避免表格閃空,但可借數在新活動資料就緒前一律視為未知(顯示 —)
   const loanWindow = activityId != null && !equipmentQuery.isPlaceholderData ? equipmentQuery.data?.window ?? null : null
 
-  // 正在借用=進行中全部(不限長度、可取消);最近借用=歸還/退回/取消 近 5 筆(2026-07-21)
+  // 正在借用=進行中全部(不限長度、可取消);最近借用=歸還/退回/取消 近 5 筆
   const activeQuery = useActiveEquipmentLoans()
   const activeRows = activeQuery.data ?? []
   const recentQuery = useRecentEquipmentLoans()

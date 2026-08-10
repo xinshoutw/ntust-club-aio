@@ -39,7 +39,7 @@ class ClubProfileUpdate(BaseModel):
     intro: str | None = Field(None, max_length=2000)
     en_name: str | None = Field(None, max_length=200)
     website_url: str | None = Field(None, max_length=500)
-    # 聯絡 Email:至多 3 組、第 1 組必填(公告通知寄送對象;2026-07-16 第八輪)
+    # 聯絡 Email:至多 3 組、第 1 組必填(公告通知寄送對象)
     contact_emails: list[str] | None = Field(None, min_length=1, max_length=MAX_CONTACT_EMAILS)
     discord_webhook_url: str | None = Field(None, max_length=200)
     advisor_name: str | None = Field(None, max_length=50)

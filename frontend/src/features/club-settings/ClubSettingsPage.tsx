@@ -175,7 +175,7 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
         <div className="form-grid-2" style={{ marginTop: 20, alignItems: 'stretch' }}>
           <div className="card" style={{ padding: 24 }}>
             <div style={sectionTitle}>指導老師</div>
-            {/* 校內/校外各至多一位(2026-07-21) */}
+            {/* 校內/校外各至多一位 */}
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--steel)', marginBottom: 8 }}>校內</div>
             <div className="form-grid-2">
               <Form.Item

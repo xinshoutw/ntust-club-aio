@@ -14,7 +14,7 @@ from app.models.enums import (
 
 
 class Announcement(Base, TimestampMixin):
-    """公告(2026-07-16 第八輪):content 存 markdown 原文(前端渲染,後端僅存)。"""
+    """公告:content 存 markdown 原文(前端渲染,後端僅存)。"""
 
     __tablename__ = "announcements"
 

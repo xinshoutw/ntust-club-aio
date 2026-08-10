@@ -80,7 +80,7 @@ def started_periods(now: datetime | None = None) -> list[str]:
 def venue_booking_started_expr(now: datetime | None = None) -> sa.ColumnElement[bool]:
     """SQL 條件:臨時借用已開始(申請起始時刻=最早節次起點 ≤ now)。
 
-    正在申請/最近申請的分界(2026-07-21 需求方):時間經過申請起始時刻即移到「最近」。
+    正在申請/最近申請的分界:時間經過申請起始時刻即移到「最近」。
     遷移自舊系統的資料 periods 未必有序,不能只看陣列第一個元素;
     以「與今天已開始節次集合重疊(&&)」逐元素比對,結果與元素順序無關
     (新資料由 VenueBookingIn 依節次順序排序後存入,兩種資料皆正確)。
@@ -95,7 +95,7 @@ def venue_booking_started_expr(now: datetime | None = None) -> sa.ColumnElement[
         )
     return expr
 
-# 固定借用規則(2026-07-15 需求方定案)
+# 固定借用規則
 MAX_FIXED_SLOTS = 10  # 每社至多 10 節(1 節 = 1 小時)
 LATE_PERIODS = frozenset({"10", "A", "B", "C", "D"})  # 晚間時段:需至少連續 3 節起借
 MIN_LATE_RUN = 3
@@ -129,7 +129,7 @@ def late_rule_error(periods: list[str]) -> str | None:
 def fixed_window_open(window: dict, now: datetime | None = None) -> bool:
     """固定借用開放窗:日期區間 open_from/open_until(含頭含尾;台北時區)。
 
-    2026-07-16 第八輪:取代「開放月份+手動加開」;未設定區間即不開放。
+    取代「開放月份+手動加開」;未設定區間即不開放。
     """
     today = (now or datetime.now(UTC)).astimezone(TAIPEI).date()
     open_from = window.get("open_from")
@@ -310,7 +310,7 @@ async def availability_grids(
     status:pending(審核中)/temp(臨時)/fixed(固定)/mine(自己已核准);club=借用社團名(hover 顯示)。
 
     - 只回傳被佔用/審核中的格子;其餘由前端依 venue 開放旗標補 available/closed
-    - 固定借用僅在其目標學期起訖內顯示(2026-07-17:先前無學期界限,未退回申請永久佔格);
+    - 固定借用僅在其目標學期起訖內顯示(先前無學期界限,未退回申請永久佔格);
       已核准標 fixed/mine,審核中標 pending
     - 審核中(含本社)一律標 pending;本社已核准才標 mine(2026-07-17 修正:自己審核中不再誤標我的借用)
     - 區間一次撈(單一場地 15 天檢視原逐日 15 請求,2026-07-17 改批次);

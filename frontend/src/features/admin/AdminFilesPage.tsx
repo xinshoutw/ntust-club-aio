@@ -72,7 +72,7 @@ export default function AdminFilesPage() {
   // 模組順序由 API 決定(有報修檔案時 repair 排第一);報修歸零時整段自比例條與圖例移除
   const modules = (usage?.modules ?? []).filter((m) => m.key !== 'repair' || m.count > 0)
   const usedMb = usage?.totalMb ?? 0
-  // 實際磁碟總量/可用空間(2026-07-17 起);磁碟還有 OS 與其他程式的佔用,
+  // 實際磁碟總量/可用空間;磁碟還有 OS 與其他程式的佔用,
   // 比例條以「其他佔用」段呈現(diskTotal − diskFree − 系統自身)
   const diskTotalMb = usage?.diskTotalMb ?? 0
   const diskFreeMb = usage?.diskFreeMb ?? 0

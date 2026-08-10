@@ -257,12 +257,12 @@ export const canActOnClose = (user: SessionUser | null): boolean =>
 // ---- 查詢 ----
 
 export interface AdminActivityListParams {
-  /** 可帶多值(後端 status 多選;2026-07-21) */
+  /** 可帶多值(後端 status 多選) */
   statuses?: AdminActivityStatus[]
   clubId?: number
 }
 
-/** 伺服器端分頁查詢(2026-07-21:14k+ 筆禁止整批撈取) */
+/** 伺服器端分頁查詢(14k+ 筆禁止整批撈取) */
 export interface AdminActivityPageParams {
   statuses?: AdminActivityStatus[]
   clubIds?: number[]

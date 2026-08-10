@@ -1,6 +1,6 @@
 """社團端:線上報名(一社一單、不得更改;草稿寫 DB 跨裝置續填)。
 
-2026-07-16 第八輪:報名窗檢核改 signup_start <= now <= signup_end;
+報名窗檢核改 signup_start <= now <= signup_end;
 審核制活動(requires_confirmation)報名後狀態=待確認,管理員確認後才算報名成功。
 """
 

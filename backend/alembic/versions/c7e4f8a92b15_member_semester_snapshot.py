@@ -1,4 +1,4 @@
-"""club_members 加 semester(2026-07-16 第九輪:名單按學期快照)
+"""club_members 加 semester(名單按學期快照)
 
 前端語意為「按學期各自一份名單 + CSV 可匯入到指定學期」;
 updated_at 推導無法表達「匯入到過去學期」,改為明確欄位。

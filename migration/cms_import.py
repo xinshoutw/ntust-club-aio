@@ -50,7 +50,7 @@ from app.models.enums import (
 TAIPEI = ZoneInfo("Asia/Taipei")
 
 # ---------------------------------------------------------------------------
-# 對映規則(2026-07-21 需求方拍板)
+# 對映規則
 # ---------------------------------------------------------------------------
 
 # 不遷移的舊社團(行政單位/測試帳號)
@@ -474,7 +474,7 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
             end_date=end_d,
             start_time=local_time(a.StartTime),
             end_time=local_time(a.EndTime),
-            # 舊制即為 社員/非社員 人數,語彙已統一(2026-07-21)
+            # 舊制即為 社員/非社員 人數,語彙已統一
             participants_in=a.ExpectedMemberNumber or 0,
             participants_out=a.ExpectedNotMemberNumber or 0,
             staff_text=";".join(staffs.get(a.id, [])),

@@ -1,4 +1,4 @@
-"""器材主檔維護 schema(行政端 CRUD;2026-07-17)。
+"""器材主檔維護 schema(行政端 CRUD)。
 
 點交方式以 needs_serial 表達:False=一般、True=依序點交(移除類別後為唯一分類)。
 """
@@ -12,7 +12,7 @@ class EquipmentMasterOut(BaseModel):
     id: int
     name: str
     total_qty: int
-    max_lease_count: int | None  # 單次可借上限;NULL=不限(2026-07-21)
+    max_lease_count: int | None  # 單次可借上限;NULL=不限
     needs_serial: bool
     is_active: bool
 

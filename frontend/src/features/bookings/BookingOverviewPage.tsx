@@ -132,7 +132,7 @@ export default function BookingOverviewPage() {
     for (const q of listsErrored) void q.refetch()
   }
 
-  // 取消(2026-07-21):審核中隨時可取消;已核准僅開始日前可取消(後端亦驗)
+  // 取消:審核中隨時可取消;已核准僅開始日前可取消(後端亦驗)
   const confirmCancel = (title: string, run: () => void) =>
     confirmDialog(modal, {
       title,
@@ -333,7 +333,7 @@ export default function BookingOverviewPage() {
         </Spin>
       </div>
 
-      {/* 正在借用:單卡整併(固定/臨時/器材)、完整呈現不限長度(2026-07-21) */}
+      {/* 正在借用:單卡整併(固定/臨時/器材)、完整呈現不限長度 */}
       <Spin spinning={listsPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在借用</div>

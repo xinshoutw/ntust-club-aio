@@ -1,7 +1,7 @@
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 
-// 專屬消毒實例:公告連結一律開新分頁(2026-07-21 需求方)。
+// 專屬消毒實例:公告連結一律開新分頁。
 // 不可在全域 DOMPurify 上 addHook——docx 預覽(FilePreview)共用同一單例,會被外溢影響
 const purifier = DOMPurify(window)
 purifier.addHook('afterSanitizeAttributes', (node) => {

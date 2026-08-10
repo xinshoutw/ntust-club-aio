@@ -1,6 +1,6 @@
 """幹部證明/郵局異動改 application_status(pending/processing/completed)
 
-2026-07-17 需求方拍板:兩類線上申請的審核流=審核中 → 處理中 → 請洽學務處(完成)。
+兩類線上申請的審核流=審核中 → 處理中 → 請洽學務處(完成)。
 原欄位借用 booking_status(pending/approved/rejected),但從無任何寫入端點,
 既有資料只可能是 pending,值域相容、免回填。
 

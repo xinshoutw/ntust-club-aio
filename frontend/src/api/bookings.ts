@@ -92,7 +92,7 @@ export interface EquipmentItem {
   totalQty: number
   needsSerial: boolean // False=一般、True=依序點交(2026-07-17 移除類別)
   available: number
-  /** 單次可借上限(undefined=不限;2026-07-21) */
+  /** 單次可借上限(undefined=不限) */
   maxLeaseCount?: number
 }
 
@@ -414,7 +414,7 @@ async function fetchAllPages<T>(
   return out
 }
 
-// 正在借用(2026-07-21):伺服器端 active=true——審核中/未過期已核准(器材含借出中);
+// 正在借用:伺服器端 active=true——審核中/未過期已核准(器材含借出中);
 // 不含大量歷史紀錄,逐頁抓齊完整呈現、不限長度
 export function useActiveRoomBookings() {
   return useQuery({
@@ -555,7 +555,7 @@ export function useBookingMutations() {
       }),
     onSuccess: invalidate,
   })
-  // 取消(2026-07-21):審核中隨時可取消;已核准僅開始日前可取消
+  // 取消:審核中隨時可取消;已核准僅開始日前可取消
   const cancelRoomBooking = useMutation({
     mutationFn: (id: number) =>
       api<null>(`/club/room-bookings/${id}/cancel`, { method: 'POST' }),

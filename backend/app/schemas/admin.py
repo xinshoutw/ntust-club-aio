@@ -93,7 +93,7 @@ class MeritIn(BaseModel):
     _strip = field_validator("reason")(_strip_reason)
 
 
-# ---- 報名簽到登錄(2026-07-15:評鑑僅採計簽到,活動結束後由管理員登錄) ----
+# ---- 報名簽到登錄(評鑑僅採計簽到,活動結束後由管理員登錄) ----
 
 
 class AttendanceIn(BaseModel):
@@ -169,7 +169,7 @@ class AdminMaintenanceOut(BaseModel):
     created_at: datetime
 
 
-# ---- 線上申請管理(/admin/applications,權限鍵 aapply,2026-07-17) ----
+# ---- 線上申請管理(/admin/applications,權限鍵 aapply) ----
 
 
 class AdminOfficerCertOut(BaseModel):

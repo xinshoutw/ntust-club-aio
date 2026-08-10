@@ -85,7 +85,7 @@ class PostalChangeOut(BaseModel):
     id: int
     reasons: list[PostalReason]
     account_name: str
-    account_number: str  # 2026-07-15 需求方:社團端申請紀錄顯示完整局號帳號(不遮罩)
+    account_number: str  # 社團端申請紀錄顯示完整局號帳號(不遮罩)
     new_agent_name: str | None
     new_agent_phone: str | None  # 電話仍依決議 §6-11 遮罩(末 3 碼)
     status: ApplicationStatus

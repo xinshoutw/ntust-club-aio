@@ -231,7 +231,7 @@ function ActivityForm({
       message.error('活動結束時間須晚於開始時間')
       return false
     }
-    // 過去時間全面禁止(2026-07-21):送出/重送擋過去開始時刻(草稿不走此檢核;後端亦擋)
+    // 過去時間全面禁止:送出/重送擋過去開始時刻(草稿不走此檢核;後端亦擋)
     if (start.isBefore(dayjs())) {
       message.error('活動開始時間早於現在，請調整活動日期與時間')
       return false

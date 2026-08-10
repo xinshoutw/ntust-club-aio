@@ -13,17 +13,17 @@ class Club(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(sa.Text, unique=True)
-    # 社團/學會(2026-07-21):名稱結尾社/會自動推導,推導不到手動指定;
+    # 社團/學會:名稱結尾社/會自動推導,推導不到手動指定;
     # 負責人顯示詞(社長/會長)由此決定,取代原「名稱強制社/會結尾」規則
     kind: Mapped[ClubKind] = mapped_column(db_enum(ClubKind, "club_kind"))
-    en_name: Mapped[str | None] = mapped_column(sa.Text)  # 英文名(舊系統遷入,2026-07-21)
+    en_name: Mapped[str | None] = mapped_column(sa.Text)  # 英文名(舊系統遷入)
     # 停社的舊社團原性質不可考 → NULL(2026-07-21;僅 is_active=false 者)
     attribute: Mapped[ClubAttribute | None] = mapped_column(
         db_enum(ClubAttribute, "club_attribute")
     )
     intro: Mapped[str] = mapped_column(sa.Text, default="")
     website_url: Mapped[str | None] = mapped_column(sa.Text)  # 行政分 ad6 依據
-    # 聯絡 Email(管理項目,至多 3 組;公告通知寄送對象,2026-07-16 第八輪)
+    # 聯絡 Email(管理項目,至多 3 組;公告通知寄送對象)
     contact_emails: Mapped[list[str]] = mapped_column(
         ARRAY(sa.Text), default=list, server_default=sa.text("'{}'::text[]")
     )
@@ -47,7 +47,7 @@ class Club(Base, TimestampMixin):
 
 
 class ClubMember(Base, TimestampMixin):
-    """社員名單:按學期各自一份快照(同學號可跨學期出現;2026-07-16 第九輪定案)。"""
+    """社員名單:按學期各自一份快照(同學號可跨學期出現)。"""
 
     __tablename__ = "club_members"
     __table_args__ = (sa.UniqueConstraint("club_id", "student_id", "semester"),)
@@ -59,5 +59,5 @@ class ClubMember(Base, TimestampMixin):
     kind: Mapped[MemberKind] = mapped_column(db_enum(MemberKind, "member_kind"))
     # 幹部必填;其他身份選填(2026-07-21 放寬,原僅幹部可有職稱)
     title: Mapped[str | None] = mapped_column(sa.Text)
-    phone: Mapped[str | None] = mapped_column(sa.Text)  # 舊系統遷入(2026-07-21 新增)
+    phone: Mapped[str | None] = mapped_column(sa.Text)  # 舊系統遷入
     semester: Mapped[str] = mapped_column(sa.Text, index=True)  # 如 114-2

@@ -30,7 +30,7 @@ AnyAdmin = Annotated[CurrentUser, Depends(require_role(UserRole.ADMIN))]
 
 @router.get("/window")
 async def fixed_window(user: AnyAdmin, db: DbDep) -> ApiResponse[FixedWindowOut]:
-    """固定借用開放窗狀態:未開放時行政端側欄項目反灰置底、頁面顯示未開放(2026-07-21)。"""
+    """固定借用開放窗狀態:未開放時行政端側欄項目反灰置底、頁面顯示未開放。"""
     window = await get_setting(db, "fixed_booking_window")
     return ApiResponse(
         data=FixedWindowOut(

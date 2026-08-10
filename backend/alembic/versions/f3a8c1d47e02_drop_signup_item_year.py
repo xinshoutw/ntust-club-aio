@@ -1,4 +1,4 @@
-"""drop signup_items.year(2026-07-16 第九輪:年度改推導)
+"""drop signup_items.year(年度改推導)
 
 ad7/ad8 出席採計改以「場次日期落在評鑑視窗」推導,不再儲存學年度;
 根治 signup_items.year(114)與 eval_window.year(116)不對齊的隱患。

@@ -69,7 +69,7 @@ export interface Activity {
   attachments?: EvalFile[] // 申請附件(企劃書、估價單等,可預覽/下載)
 }
 
-// 經費科目與提示已移至後端 system_settings(2026-07-17);由 /club/config 供給,
+// 經費科目與提示已移至後端 system_settings;由 /club/config 供給,
 // 前端不再維護硬編碼清單(見 api/clubConfig.ts)
 
 export function budgetTotals(items: BudgetItem[]): { self: number; requested: number } {

@@ -20,7 +20,7 @@ class Activity(Base, TimestampMixin):
     __table_args__ = (
         sa.Index("ix_activities_club_status", "club_id", "status"),
         sa.Index("ix_activities_date", "date"),
-        # 草稿可部分填寫(2026-07-17);非草稿列的完整性仍由 DB 收口
+        # 草稿可部分填寫;非草稿列的完整性仍由 DB 收口
         sa.CheckConstraint(
             "status = 'draft' OR (date IS NOT NULL AND end_date IS NOT NULL"
             " AND name <> '' AND location <> '')",
@@ -36,7 +36,7 @@ class Activity(Base, TimestampMixin):
     type: Mapped[ActivityType] = mapped_column(db_enum(ActivityType, "activity_type"))
     is_large: Mapped[bool] = mapped_column(default=False)  # 僅 type=活動 可勾
     is_large_approved: Mapped[bool | None] = mapped_column()  # 管理員認可後行政分才享 ×3
-    # 起訖區間(2026-07-15:單日改時間區間;未跨日 end_date=date;學期歸屬與 ad1 皆以開始日推導)
+    # 起訖區間(單日改時間區間;未跨日 end_date=date;學期歸屬與 ad1 皆以開始日推導)
     # 僅草稿可為 NULL(見 CheckConstraint;submit 端點另檢核必填)。
     # dt.date:lazy annotation 下欄位名 date 遮蔽 datetime.date,
     # `date | None` 會被解析成 InstrumentedAttribute 的 SQL OR,靜默推成 NOT NULL
@@ -79,7 +79,7 @@ class ActivityBudgetItem(Base, TimestampMixin):
 
 
 class ActivityReport(Base, TimestampMixin):
-    """結案成果調查(2026-07-14 需求方改版);除 video_url 外全必填。"""
+    """結案成果調查;除 video_url 外全必填。"""
 
     __tablename__ = "activity_reports"
 
@@ -103,7 +103,7 @@ class ActivityReport(Base, TimestampMixin):
     video_url: Mapped[str | None] = mapped_column(sa.Text)  # 唯一選填;http(s) 驗證
     expense: Mapped[int] = mapped_column()  # 實際支出(核銷依據)
     submitted_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
-    # 結案審核繳交確認(2026-07-16 第九輪):承辦人核准時逐項確認,
+    # 結案審核繳交確認:承辦人核准時逐項確認,
     # 未確認之項目評鑑以 0 分計(scoring 讀取;照片確認同時涵蓋影片連結)
     photos_confirmed: Mapped[bool] = mapped_column(default=True, server_default=sa.true())
     report_confirmed: Mapped[bool] = mapped_column(default=True, server_default=sa.true())

@@ -1,4 +1,4 @@
-"""行政端:報名管理(2026-07-16 第八輪)+ 簽到登錄(2026-07-15 定案)。
+"""行政端:報名管理+ 簽到登錄。
 
 - 建立報名活動(自訂表單欄位含順序)、列表(已報名社團數/人數、待確認數)
 - 審核制活動:報名後待確認,管理員確認(confirm)後才算報名成功
@@ -60,7 +60,7 @@ async def _default_session(db, item: SignupItem) -> SignupItemSession:
     return session
 
 
-# ---- 報名活動建立與列表(2026-07-16 第八輪) ----
+# ---- 報名活動建立與列表 ----
 
 
 @router.post("", status_code=201)
@@ -240,10 +240,10 @@ async def confirm_registration(
     return ApiResponse()
 
 
-# ---- 簽到登錄(2026-07-15 定案) ----
+# ---- 簽到登錄 ----
 
 
-# ---- 場次(負責人會議逐場簽到;2026-07-16 第九輪) ----
+# ---- 場次(負責人會議逐場簽到) ----
 
 
 @router.get("/{item_id}/sessions")

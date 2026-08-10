@@ -1,4 +1,4 @@
-"""clubclass 遷移前置 schema(2026-07-21 需求方拍板)
+"""clubclass 遷移前置 schema
 
 - Booking/Loan 加 cancelled 狀態:社團可取消審核中或已核准未開始的借用
 - venue_bookings / equipment_loans:club_id 改 NULL(NULL=行政手動借用)、加 phone(聯絡電話)

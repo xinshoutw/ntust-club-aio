@@ -35,7 +35,7 @@ class EquipmentOut(BaseModel):
     id: int
     name: str
     total_qty: int
-    max_lease_count: int | None = None  # 單次可借上限;NULL=不限(2026-07-21)
+    max_lease_count: int | None = None  # 單次可借上限;NULL=不限
     needs_serial: bool  # False=一般、True=依序點交(2026-07-17 移除類別後為唯一分類)
     available: int = 0  # 推導(帶 activity_id 查詢時=該活動借用區間內的可借數)
 
@@ -54,7 +54,7 @@ class RoomSlotIn(BaseModel):
 
 class RoomBookingIn(BaseModel):
     venue_id: int
-    purpose: str = Field(min_length=1, max_length=200)  # 用途必填(2026-07-15)
+    purpose: str = Field(min_length=1, max_length=200)  # 用途必填
     slots: list[RoomSlotIn] = Field(min_length=1, max_length=MAX_FIXED_SLOTS)
 
     @field_validator("slots")
@@ -90,7 +90,7 @@ class RoomBookingOut(BaseModel):
 class FixedWindowOut(BaseModel):
     """固定借用開放窗狀態(未開放時前端側欄反灰移至「其他」)。
 
-    2026-07-16 第八輪:改日期區間(系統設定 RangePicker),取代開放月份+手動加開。
+    改日期區間(系統設定 RangePicker),取代開放月份+手動加開。
     """
 
     open: bool
@@ -98,7 +98,7 @@ class FixedWindowOut(BaseModel):
     open_until: date | None
 
 
-# 聯絡電話僅允許 數字與 - ( ) * #(2026-07-21 需求方)
+# 聯絡電話僅允許 數字與 -  * #
 _PHONE_RE = re.compile(r"^[0-9\-()*#]+$")
 
 
@@ -123,8 +123,8 @@ class VenueBookingIn(BaseModel):
     activity_id: int  # 借用活動(限審核通過;2026-07-15 第六輪必選)
     date: date
     periods: list[str] = Field(min_length=1, max_length=14)
-    purpose: str = Field(min_length=1, max_length=200)  # 用途必填(2026-07-15)
-    phone: str = Field(min_length=1, max_length=30)  # 聯絡電話必填(2026-07-21 需求方)
+    purpose: str = Field(min_length=1, max_length=200)  # 用途必填
+    phone: str = Field(min_length=1, max_length=30)  # 聯絡電話必填
 
     _phone = field_validator("phone")(_validate_phone_required)
 
@@ -151,13 +151,13 @@ class VenueBookingOut(BaseModel):
 
 
 class EquipmentLoanIn(BaseModel):
-    """借用區間不再自選:由所綁定審核通過活動的起訖 ± 工作天緩衝推導(2026-07-15)。"""
+    """借用區間不再自選:由所綁定審核通過活動的起訖 ± 工作天緩衝推導。"""
 
     equipment_id: int
     activity_id: int
     qty: int = Field(ge=1, le=1000)
     purpose: str = Field(min_length=1, max_length=200)
-    phone: str = Field(min_length=1, max_length=30)  # 聯絡電話必填(2026-07-21 需求方)
+    phone: str = Field(min_length=1, max_length=30)  # 聯絡電話必填
 
     _phone = field_validator("phone")(_validate_phone_required)
 
@@ -185,7 +185,7 @@ class EquipmentLoanOut(BaseModel):
     overdue: bool = False  # 推導
 
 
-# ---- 行政手動借用 / 場地不開放規則(2026-07-21 需求方拍板) ----
+# ---- 行政手動借用 / 場地不開放規則 ----
 
 
 class ManualVenueBookingIn(BaseModel):

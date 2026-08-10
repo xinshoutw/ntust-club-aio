@@ -45,7 +45,7 @@ AnyAdmin = Annotated[CurrentUser, Depends(require_role(UserRole.ADMIN))]
 def derive_kind(name: str) -> ClubKind | None:
     """名稱結尾推導 社團/學會;推導不到回 None(由呼叫端手動指定或沿用)。
 
-    2026-07-21 需求方拍板:取代原「社團名稱必須以社/會結尾」強制規則。
+    取代原「社團名稱必須以社/會結尾」強制規則。
     """
     if name.endswith("社"):
         return ClubKind.CLUB

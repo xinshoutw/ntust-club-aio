@@ -33,7 +33,7 @@ export default function PostalPage() {
 
   const listQuery = usePostalList()
   const records = listQuery.data?.records ?? []
-  // 正在申請=未完成全部(不限長度);最近申請=已完成 近 5 筆(2026-07-21)
+  // 正在申請=未完成全部(不限長度);最近申請=已完成 近 5 筆
   const activeRows = records.filter((r) => r.status !== 'completed')
   const recentRows = records.filter((r) => r.status === 'completed').slice(0, 5)
   const { submit } = usePostalMutations()

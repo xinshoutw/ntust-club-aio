@@ -11,7 +11,7 @@ const { RangePicker } = DatePicker
 const sectionTitle: React.CSSProperties = { fontSize: 15, fontWeight: 600, marginBottom: 14 }
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : '送出失敗')
 
-// 最高權限手動借用(2026-07-21 需求方):行政直接借用臨時場地或器材,
+// 最高權限手動借用:行政直接借用臨時場地或器材,
 // 免審核直接核准、不掛社團(場況圖與列表顯示「學務處」)
 export default function ManualBookingPage() {
   const { message } = App.useApp()

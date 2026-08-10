@@ -13,7 +13,7 @@ LARGE_MULTIPLIER = 3
 MERIT_MAX = 5
 PENALTY_MAX = 10
 LEADER_MEETING_POINTS = 1.25  # 負責人會議每場簽到 1.25 分(每學期 2 場、全學年 4 場滿分 5)
-ADMIN_TOTAL_MAX = 100  # 行政資料總分上限(2026-07-15 定案:加分後仍以 100 封頂)
+ADMIN_TOTAL_MAX = 100  # 行政資料總分上限(加分後仍以 100 封頂)
 
 AD_MAX: dict[str, float] = {
     "ad1": 15,
@@ -110,7 +110,7 @@ def compute_ad_scores(i: ScoringInput) -> list[AdScore]:
     # ad6 網頁經營:有連結即給滿分(需求方 2026-07-14 簡化,不追蹤更新時間)
     ad6 = AD_MAX["ad6"] if i.has_website else 0
 
-    # ad7/ad8 會議與幹訓:以管理員活動後登錄之簽到為準,僅報名不計分(2026-07-15)
+    # ad7/ad8 會議與幹訓:以管理員活動後登錄之簽到為準,僅報名不計分
     # ad7 每場 1.25 分(每學期 2 場、全學年 4 場滿分);ad8 簽到即滿分
     ad7 = min(i.leader_meeting_sessions * LEADER_MEETING_POINTS, AD_MAX["ad7"])
     ad8 = AD_MAX["ad8"] if i.cadre_training_attended else 0

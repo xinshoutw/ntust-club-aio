@@ -15,7 +15,7 @@ import {
 } from '../../api/adminActivities'
 import ActivityReviewModal from './ActivityReviewModal'
 
-// 一頁最多 25 筆(2026-07-21 需求方:50 筆太長,減半)、活動時間新在前
+// 一頁最多 25 筆(50 筆太長,減半)、活動時間新在前
 const PAGE_SIZE = 25
 
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
@@ -298,7 +298,7 @@ export default function CloseReviewPage() {
 
   const [pendingPage, setPendingPage] = useState(1)
   const [overduePage, setOverduePage] = useState(1)
-  // 伺服器端分頁+排序:活動時間新在前(2026-07-21)
+  // 伺服器端分頁+排序:活動時間新在前
   const pendingQuery = useAdminActivitiesPaged({
     statuses: ['closing_pending_advisor'],
     sort: '-date',

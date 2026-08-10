@@ -62,7 +62,7 @@ export default function FixedRoomPage() {
   // 開放窗由後端提供(與側欄共用同一查詢);未開放時直接輸入網址也只顯示說明
   const windowQuery = useFixedWindow()
   const venuesQuery = useVenues()
-  // 正在申請=進行中全部(不限長度、可取消);最近申請=已結束/退回/取消 近 5 筆(2026-07-21)
+  // 正在申請=進行中全部(不限長度、可取消);最近申請=已結束/退回/取消 近 5 筆
   const activeQuery = useActiveRoomBookings()
   const activeRows = activeQuery.data ?? []
   const recentQuery = useRecentRoomBookings()

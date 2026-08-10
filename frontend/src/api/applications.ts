@@ -61,7 +61,7 @@ const toMaintenance = (m: MaintenanceOut): MaintenanceRecord => ({
 export function useMaintenanceList() {
   return useQuery({
     queryKey: [...keys.maintenance, 'list'],
-    // 全量(申請量小):頁面自行切分 正在申請(全部)/最近申請(近 5 筆)(2026-07-21)
+    // 全量(申請量小):頁面自行切分 正在申請(全部)/最近申請(近 5 筆)
     queryFn: () =>
       fetchAllPages<MaintenanceOut>('/club/maintenance').then((rows) => ({
         records: rows.map(toMaintenance),

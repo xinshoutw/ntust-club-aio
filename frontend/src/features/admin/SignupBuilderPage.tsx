@@ -136,7 +136,7 @@ export default function SignupBuilderPage() {
     if (missing.length === 0 && signupStart && signupEnd && !signupEnd.isAfter(signupStart)) {
       missing.push(['signupEnd', '報名截止須晚於報名開始'])
     }
-    // 過去時間全面禁止(2026-07-21):活動時間/報名截止不得早於現在(後端亦擋)
+    // 過去時間全面禁止:活動時間/報名截止不得早於現在(後端亦擋)
     if (missing.length === 0 && eventTime?.isBefore(dayjs())) {
       missing.push(['eventTime', '活動時間不得早於現在'])
     }

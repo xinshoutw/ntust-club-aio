@@ -173,7 +173,7 @@ async def fixed_window(user: ClubUser, db: DbDep) -> ApiResponse[FixedWindowOut]
 async def list_room_bookings(
     user: ClubUser, db: DbDep, page: Pagination, active: bool | None = None
 ) -> ApiResponse[list[RoomBookingOut]]:
-    # active=true 僅回「正在借用」(審核中或學期未結束的已核准);false 僅回其餘(2026-07-21)
+    # active=true 僅回「正在借用」(審核中或學期未結束的已核准);false 僅回其餘
     query = (
         sa.select(RoomBookingRequest, Venue.name)
         .join(Venue, RoomBookingRequest.venue_id == Venue.id)
@@ -228,7 +228,7 @@ async def create_room_booking(
         if error:
             raise validation_error(f"週{'一二三四五六日'[weekday - 1]}:{error}")
 
-    # 申請自動歸屬「下一學期」(2026-07-17 拍板),起訖快照存入申請單
+    # 申請自動歸屬「下一學期」,起訖快照存入申請單
     sem_start, sem_end = next_semester_range(datetime.now(TAIPEI).date())
 
     # 每社至多 10 節/學期:同目標學期的未退回申請(審核中+已核准)合計
@@ -285,7 +285,7 @@ async def list_venue_bookings(
     user: ClubUser, db: DbDep, page: Pagination, active: bool | None = None
 ) -> ApiResponse[list[VenueBookingOut]]:
     # active=true=「正在申請」:審核中或已核准,且申請起始時刻(最早節次起點)未到;
-    # 起始時刻一過即移到「最近申請」(active=false 為其補集;2026-07-21 需求方)
+    # 起始時刻一過即移到「最近申請」(active=false 為其補集)
     query = (
         sa.select(VenueBooking, Venue.name, Activity.name)
         .join(Venue, VenueBooking.venue_id == Venue.id)
@@ -329,7 +329,7 @@ async def create_venue_booking(
         raise validation_error("該場地不開放臨時借用")
     activity = await _approved_activity(db, user, body.activity_id)
 
-    # 過去時間全面禁止(2026-07-21):過去日期直接擋;
+    # 過去時間全面禁止:過去日期直接擋;
     # 今天則以節次時刻表擋「最早節次已開始」的申請
     if body.date < svc.today_taipei():
         raise validation_error("借用日期不得早於今天")
@@ -389,7 +389,7 @@ async def list_equipment_loans(
     active: bool | None = None,
     status: LoanStatus | None = None,
 ) -> ApiResponse[list[EquipmentLoanOut]]:
-    # active=true=審核中/已核准/借出中;false=其餘;status=精確過濾(已歸還分頁用)(2026-07-21)
+    # active=true=審核中/已核准/借出中;false=其餘;status=精確過濾(已歸還分頁用)
     query = (
         sa.select(EquipmentLoan, Equipment.name, Activity.name)
         .join(Equipment, EquipmentLoan.equipment_id == Equipment.id)
@@ -440,7 +440,7 @@ async def create_equipment_loan(
         raise validation_error(f"{equipment.name} 單次至多借用 {equipment.max_lease_count} 件")
     activity = await _approved_activity(db, user, body.activity_id)
 
-    # 過去時間全面禁止(2026-07-21):已結束的活動不可再借器材
+    # 過去時間全面禁止:已結束的活動不可再借器材
     if activity_service.end_datetime(activity) < svc.now_utc():
         raise validation_error("所選活動已結束,無法申請器材借用")
 
@@ -485,7 +485,7 @@ async def create_equipment_loan(
     return ApiResponse(data=out)
 
 
-# ---- 取消(2026-07-21 需求方:審核中或已核准未開始者可取消) ----
+# ---- 取消(審核中或已核准未開始者可取消) ----
 
 
 def _ensure_cancellable(status: object, pending: object, approved: object, start: date) -> None:

@@ -13,7 +13,7 @@ import type { ReviewItem } from './reviewMock'
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 
 // 章軌由單據狀態推導;僅三關(有申請補助)畫章軌——
-// 無補助=承辦人單關即核准(後端規則),單關不畫章軌(2026-07-21 需求方拍板)
+// 無補助=承辦人單關即核准(後端規則),單關不畫章軌
 function stagesOf(status: ReviewItem['status']): StampStage[] {
   const mk = (advisor: StampStage['state'], chief: StampStage['state'], dean: StampStage['state']): StampStage[] => [
     { char: '承', label: '承辦人', state: advisor, note: noteOf(advisor) },
@@ -64,7 +64,7 @@ export interface ActivityApprovePayload {
 // 活動申請審核彈窗(申請審核頁與行政端社團總覽共用):
 // 章軌、基本資料、經費來源與逐項核定、大型活動認可;待本關者可簽核/退回,其餘唯讀
 // onApprove/onReject:接 API 的頁面傳入 mutateAsync 回呼(成功 message+關彈窗、失敗 message.error)
-// item 可為 null:點擊即開彈窗、詳情到位前顯示 Skeleton(不等網路才開窗,2026-07-21 需求方)
+// item 可為 null:點擊即開彈窗、詳情到位前顯示 Skeleton(不等網路才開窗)
 export default function ActivityReviewModal({
   item,
   pendingName,

@@ -39,7 +39,7 @@ export const STATUS: Record<StatusKey, StatusStyle> = {
   cancelled: { label: '已取消', fg: '#5B6472', bg: '#EEF0F3' },
   pending: { label: '待審核', fg: '#8A5A00', bg: '#FFF3D6' },
   closing_due: { label: '待結案', fg: '#8A5A00', bg: '#FFF3D6' },
-  // 需求方 2026-07-14:社團端不顯示審核關卡,三關統一「申請待審核」
+  // 需求方 社團端不顯示審核關卡,三關統一「申請待審核」
   pending_advisor: { label: '待審核', fg: '#8A5A00', bg: '#FFF3D6' },
   pending_chief: { label: '待審核', fg: '#8A5A00', bg: '#FFF3D6' },
   pending_dean: { label: '待審核', fg: '#8A5A00', bg: '#FFF3D6' },
@@ -51,7 +51,7 @@ export const STATUS: Record<StatusKey, StatusStyle> = {
   // 逾期未結案但管理員已解鎖(結案審核頁逾期表):社團可補送結案,行政待其行動
   unlocked: { label: '已解鎖', fg: '#1D5A9E', bg: '#E8F0FB' },
   in_progress: { label: '處理中', fg: '#1D5A9E', bg: '#E8F0FB' },
-  // 幹部證明/郵局帳戶異動(2026-07-17 需求方拍板):審核中 → 處理中 → 請洽學務處
+  // 幹部證明/郵局帳戶異動:審核中 → 處理中 → 請洽學務處
   processing: { label: '處理中', fg: '#1D5A9E', bg: '#E8F0FB' },
   completed: { label: '請洽學務處', fg: '#1F6B45', bg: '#E3F2E9', border: 'rgba(31,107,69,.4)' },
   open: { label: '開放中', fg: '#1F6B45', bg: '#E3F2E9', border: 'rgba(31,107,69,.4)' },

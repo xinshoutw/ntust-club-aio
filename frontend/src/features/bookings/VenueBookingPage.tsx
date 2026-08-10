@@ -42,10 +42,10 @@ export default function VenueBookingPage() {
   const venuesQuery = useVenues()
   const venues = venuesQuery.data ?? []
   const tempVenues = venues.filter((v) => v.allowTemp)
-  // 借用需綁定審核通過之活動(與器材借用一致;共用活動域查詢);排除已結束活動(2026-07-21)
+  // 借用需綁定審核通過之活動(與器材借用一致;共用活動域查詢);排除已結束活動
   const activitiesQuery = useActivityList({ status: 'approved' })
   const approved = (activitiesQuery.data ?? []).filter((a) => !activityEnded(a))
-  // 正在申請=進行中全部(不限長度、可取消);最近申請=已結束/退回/取消 近 5 筆(2026-07-21)
+  // 正在申請=進行中全部(不限長度、可取消);最近申請=已結束/退回/取消 近 5 筆
   const activeQuery = useActiveVenueBookings()
   const activeRows = activeQuery.data ?? []
   const recentQuery = useRecentVenueBookings()
@@ -53,7 +53,7 @@ export default function VenueBookingPage() {
   const { createVenueBooking, cancelVenueBooking } = useBookingMutations()
   const todayStart = dayjs().startOf('day')
 
-  // 過去時間全面禁止(2026-07-21):過去日期不可選;選「今天」時已開始節次禁選(後端亦擋)
+  // 過去時間全面禁止:過去日期不可選;選「今天」時已開始節次禁選(後端亦擋)
   const dateValue = Form.useWatch('date', form) as Dayjs | undefined
   const disabledPeriods = dateValue?.isSame(todayStart, 'day') ? startedPeriods() : []
   const disabledKey = disabledPeriods.join(',')

@@ -14,7 +14,7 @@ _TEXT_MAX = 1000
 
 
 def window_open(item: SignupItem, now: datetime | None = None) -> bool:
-    """報名窗(2026-07-16 第八輪):is_open 且 signup_start <= now <= signup_end。"""
+    """報名窗:is_open 且 signup_start <= now <= signup_end。"""
     now = now or datetime.now(UTC)
     if not item.is_open:
         return False

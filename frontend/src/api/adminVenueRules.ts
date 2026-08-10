@@ -1,4 +1,4 @@
-// 場地不開放規則 API 層(Rule Page,僅 super;2026-07-21):GET/POST/DELETE /admin/venue-rules
+// 場地不開放規則 API 層(Rule Page,僅 super):GET/POST/DELETE /admin/venue-rules
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs, { type Dayjs } from 'dayjs'
 import { api, qs } from './client'

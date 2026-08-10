@@ -43,7 +43,7 @@ router = APIRouter(prefix="/club", tags=["applications"])
 
 MAX_EVIDENCE_PER_REQUEST = 5  # 每筆報修佐證檔上限(影片 200MB,防磁碟耗盡)
 
-# 職位對應標準身份(2026-07-16 第九輪:正副負責人為一級身份,不再靠職稱字串比對)
+# 職位對應標準身份(正副負責人為一級身份,不再靠職稱字串比對)
 _POSITION_KIND: dict[CertPosition, MemberKind] = {
     CertPosition.LEADER: MemberKind.PRESIDENT,
     CertPosition.VICE_LEADER: MemberKind.VICE_PRESIDENT,
@@ -113,7 +113,7 @@ async def create_cert(
 
 
 def _postal_out(row: PostalAccountChange) -> PostalChangeOut:
-    # 2026-07-15 需求方:社團端申請紀錄顯示完整局號帳號(不遮罩);電話仍遮罩
+    # 社團端申請紀錄顯示完整局號帳號(不遮罩);電話仍遮罩
     out = PostalChangeOut.model_validate(row)
     out.new_agent_phone = mask_phone(row.new_agent_phone)
     return out

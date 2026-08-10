@@ -1,4 +1,4 @@
-"""系統設定(/admin/settings,僅 super;2026-07-16 第八輪)。
+"""系統設定(/admin/settings,僅 super)。
 
 管理的鍵與 services/settings_service.DEFAULTS 對齊;PUT 為部分更新
 (僅寫入有帶的鍵),值以 JSON 存 system_settings(日期一律 ISO 字串)。
@@ -53,7 +53,7 @@ class UploadLimitsIn(BaseModel):
 
 class StorageLimitsIn(BaseModel):
     """儲存配額(GiB):系統總量改用實際磁碟空間,此處僅單一社團未歸檔檔案上限
-    (2026-07-17 需求方:移除邏輯容量與保留空間)。"""
+    (移除邏輯容量與保留空間)。"""
 
     per_club_gib: int = Field(ge=1, le=1024)
 

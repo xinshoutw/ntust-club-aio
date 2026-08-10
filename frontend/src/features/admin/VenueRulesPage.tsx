@@ -21,7 +21,7 @@ const weekdaysText = (r: VenueRule): string =>
 
 const errMsg = (e: unknown) => (e instanceof Error ? e.message : '操作失敗')
 
-// 場地不開放規則(Rule Page,僅 super;2026-07-21 需求方):
+// 場地不開放規則(Rule Page,僅 super):
 // 場況圖顯示「不開放」並蓋過其他狀態;社團申請與行政核准命中規則即擋
 export default function VenueRulesPage() {
   const { message, modal } = App.useApp()

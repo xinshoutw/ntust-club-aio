@@ -22,7 +22,7 @@ class OfficerCertificate(Base, TimestampMixin):
 
 
 class PostalAccountChange(Base, TimestampMixin):
-    """郵局帳戶異動;事由複選(2026-07-13 前端定案),互斥組合由應用層驗證。"""
+    """郵局帳戶異動;事由複選,互斥組合由應用層驗證。"""
 
     __tablename__ = "postal_account_changes"
 

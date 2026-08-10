@@ -1,4 +1,4 @@
-"""drop equipment.category(2026-07-17 需求方:器材移除類別)
+"""drop equipment.category(器材移除類別)
 
 器材不再分類;點交方式改由既有 needs_serial 表達(一般/依序點交)。
 category 欄位(VARCHAR + CHECK)整欄移除。

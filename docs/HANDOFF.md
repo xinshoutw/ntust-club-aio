@@ -8,6 +8,7 @@
 2. **全面 code review(2026-07-25)已完成**:11 個獨立審查者平行審查,119 項 findings。原始 HTML 報告已刪除,結論全數併入 `issues.md` / `gaps.md`;需要逐項檔案行號時到 git 歷史取回
 3. **頁面規格(2026-08-10)**:逐頁盤點全部 51 個頁面 → `docs/spec/`;問題與缺口彙整為 `issues.md`(104 項)與 `gaps.md`
 4. **問題分堆(2026-08-10)**:全部條目依「修法是否唯一」分成下方 A/B/C 三堆,經一輪跨模型交叉審查修正
+6. **A2 十二項全數修畢(2026-08-10)**:ISS-05、06、13(含 55)、13b、15+16、18、32、36、45、46、74b+38+38b、77b,已從 `issues.md` 移除。後端 272 passed、`ruff` 全綠;前端 `tsc -b` 0 錯、`pnpm test` 41 passed
 5. **A1 五項全數修畢(2026-08-10)**:ISS-01、ISS-02、ISS-03、ISS-14b、ISS-53,已從 `issues.md` 移除;跨模型交叉審查後又補了六處(見下)。後端 264 passed、`ruff` 全綠;前端 `tsc -b` 0 錯、`pnpm test` 41 passed
 
 **DEC-01 已定案:這學年評鑑要在新系統跑,但學年末才用** —— 2026-09 上線當下只需競賽報名(ISS-01)可用,整條彙總鏈排在上線之後。其餘 DEC-02~12 仍無答案。
@@ -27,17 +28,15 @@
 - 獎項全停用時社團會看到一張永遠過不了 required 的空卡,改為顯示說明
 - `.gitignore` 的 `start-dev.sh` 未錨定,會連帶吃掉版控中的 `backend/`、`frontend/` 同名腳本
 
-**A2 高嚴重度** — ISS-05、ISS-06、ISS-13(含 ISS-55)、ISS-13b、ISS-15+ISS-16、ISS-18、ISS-32、ISS-36、ISS-45、ISS-46、ISS-74b+ISS-38+ISS-38b、ISS-77b
+**A2 高嚴重度 — 已全數修畢**
 
-- ISS-15+16 必須一起修:清 `approved_subsidy` 要同時涵蓋 PUT 編輯與 `submit_activity` 直接重送兩條路徑,只修一條會留下「逐項核定已清、`school_approved` 是舊值」。前端預填不動
-- ISS-18 只鋪既有的 `useUnsavedGuard`;頁內導航要等資料 router(見 B)
-- ISS-32 四處都要改(社團端檢核、器材主檔可借數、待審單可借數、行政手動借用)
+段落中值得記著的幾點:
 
-**2026-08-10 定案的三條**(原列 B,已解)
-
-- **ISS-13**:三旗標語意是「承辦認不認可採計」,不是「有沒有繳」——照片與學習心得在送出結案時後端就強制存在(`schemas/activities.py:121` `min_length=3`),故維持預設採計。修法:`CloseApproveIn` 改必填、`close_approve` 一律明寫三值,`report_confirmed` 改與 `activity_reports` 是否存在連動(一併解掉 ISS-55)。model 的 `server_default` 留作審核前佔位,加註解
-- **ISS-36**:承辦人與組長在學務處是不同人,硬擋。寫入前查同一案前一關的 `approval_records.actor`,相同即 403;**super 也適用**(現行 super 直通 advisor/chief 才是最大漏洞)。學務長關的本人保護不動
-- **ISS-74b**:行政端加撤銷端點,狀態**復用 `cancelled`**(額度判定已排除 cancelled,額度自動回歸,零 migration)。權限與核准同權(臨時/器材 `abooking`、固定 `aroom`);必填原因、寫 `approval_records` + `audit.record`、通知社團;已結束的借用不得撤銷。**ISS-38 因此解開**:核准時撞到另一類已核准借用一律硬擋 409,承辦撤一張再核准(與 DEC-04 器材只警示刻意不同調——器材可再調度,場地不行)
+- ISS-46 的 O(n²) 不在 Paragraph 而在 Table:`splitInRow` 每次分頁重算整張表。心得移出表格交給 frame 流排後,合法上限(100 篇 × 5000 字)由 307 秒降到 1.95 秒。表格只放得下有界的內容
+- ISS-13 三旗標的語意是「承辦認不認可採計」不是「有沒有繳」—— 照片與心得在送出結案時後端就強制存在,fail-closed 只會製造無回復的歸零
+- ISS-74b 撤銷落 `cancelled` 果然零 migration:額度與可借數判定本來就排除它。器材的「已結束」不看日期 —— 核准後沒來領的單區間過了也還沒交出去,那正是要清的對象
+- ISS-38 的兩個 advisory lock 命名空間已合一(`venue`),否則補了交叉查詢也不會互相序列化
+- ISS-18 的 `useFormUnsavedGuard` 要吃 Form 之外的 local state(時段選取、待上傳附件),那些才是離開後救不回來的
 
 **A3 其餘**(可上線後補)
 

@@ -5,7 +5,7 @@ import { LeftOutlined, RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols, Pager } from '../../components/ui/tableControls'
-import BookingReviewModal from './BookingReviewModal'
+import BookingReviewModal, { type BookingReviewItem } from './BookingReviewModal'
 import { CELL, type CellState } from '../bookings/cells'
 import { PERIODS } from '../../api/bookings'
 import {
@@ -14,8 +14,6 @@ import {
   useAdminVenues,
   usePendingEquipmentLoans,
   usePendingVenueBookings,
-  type AdminEquipmentLoan,
-  type AdminVenueBooking,
 } from '../../api/adminBookings'
 
 const GRID_LEGEND: CellState[] = ['free', 'reviewing', 'temp', 'fixed']
@@ -30,13 +28,9 @@ const CELL_STATE = {
   blocked: 'closed', // 不開放規則(Rule Page):不畫方框
 } as const
 
-type ReviewItem =
-  | { kind: 'venue'; data: AdminVenueBooking }
-  | { kind: 'loan'; data: AdminEquipmentLoan }
-
 export default function AdminBookingsPage() {
   const { message } = App.useApp()
-  const [selected, setSelected] = useState<ReviewItem | null>(null)
+  const [selected, setSelected] = useState<BookingReviewItem | null>(null)
   const [open, setOpen] = useState(false)
   const [gridDate, setGridDate] = useState<Dayjs>(() => dayjs())
   const [venuePage, setVenuePage] = useState(1)
@@ -55,7 +49,7 @@ export default function AdminBookingsPage() {
   const pendingLoans = loanQuery.data?.loans ?? []
   const loanTotal = loanQuery.data?.total ?? 0
 
-  const openReview = (item: ReviewItem) => {
+  const openReview = (item: BookingReviewItem) => {
     setSelected(item)
     setOpen(true)
   }

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode, type RefObject } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 
 // 未存檔守衛:頁面註冊 dirty 狀態,shell(側欄/頂欄)導航前查詢並彈確認;
 // 關閉分頁/重新整理由 beforeunload 攔截。SPA 內部其餘導航(react-router 宣告式
@@ -33,6 +33,22 @@ export function useUnsavedGuard(isDirty: boolean): void {
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [isDirty])
+}
+
+/** AntD Form 版:掛上 onValuesChange 即可,送出成功後(頁面不離開時)呼叫 clear。
+ *
+ * extraDirty 給 Form 之外的輸入(時段選取、待上傳附件這類 local state)—— 那些
+ * 往往才是離開後救不回來的東西,onValuesChange 看不到。 */
+export function useFormUnsavedGuard(extraDirty = false): {
+  onValuesChange: () => void
+  clear: () => void
+} {
+  const [dirty, setDirty] = useState(false)
+  useUnsavedGuard(dirty || extraDirty)
+  return {
+    onValuesChange: useCallback(() => setDirty(true), []),
+    clear: useCallback(() => setDirty(false), []),
+  }
 }
 
 // shell 端:導航前查詢是否需要確認

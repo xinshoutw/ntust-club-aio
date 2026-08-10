@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import dayjs from 'dayjs'
 import { App, Button, Form, Input, InputNumber, Select, Spin } from 'antd'
+import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
 import { confirmDialog } from '../../lib/confirm'
 import QueryError from '../../components/ui/QueryError'
@@ -18,6 +19,7 @@ import { activityEnded } from '../activities/utils'
 export default function EquipmentPage() {
   const { message, modal } = App.useApp()
   const [form] = Form.useForm()
+  const guard = useFormUnsavedGuard()
 
   // 器材借用綁定審核通過之活動,借用區間由活動推導;
   // 可借數與借用區間由後端依所選活動推導(GET /club/equipment?activity_id=);
@@ -179,6 +181,7 @@ export default function EquipmentPage() {
             onFinish={submit}
             requiredMark
             onValuesChange={(changed) => {
+              guard.onValuesChange()
               if ('equipment' in changed) form.resetFields(['qty'])
               // 換活動=換借用區間:數量一律重填(原選品項的清除待新資料就緒後於 effect 處理)
               if ('activity' in changed) form.resetFields(['qty'])

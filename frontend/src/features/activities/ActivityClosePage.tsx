@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router'
 import { App, Button, DatePicker, Input, InputNumber, Select, Spin, TimePicker, Tooltip, Upload } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { InfoCircleOutlined, RightOutlined, UploadOutlined } from '@ant-design/icons'
+import { useUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { blurLeavesRow } from '../../lib/form'
@@ -252,6 +253,17 @@ function CloseForm({
     setPhotos(next)
   }
   const [processing, setProcessing] = useState(0)
+
+  // 未存檔守衛:與載入草稿時的快照比對。這頁沒有 AntD Form 可掛 onValuesChange,
+  // 而照片是離開後唯一救不回來的東西(草稿不含檔案),必須納入比對
+  const snapshot = JSON.stringify([
+    memberCount, nonMemberCount, actualStart, actualEnd, actualLocation,
+    highlights, goals, others, reviewMeeting, reviewDate, reviewAttendees,
+    reviewTopics, reviewConclusion, videoLink, expense, reflects,
+    existing.map((f) => f.id), photos.length,
+  ])
+  const loadedRef = useRef(snapshot)
+  useUnsavedGuard(snapshot !== loadedRef.current)
 
   // 卸載時釋放所有預覽 URL(避免記憶體洩漏)
   useEffect(() => () => photosRef.current.forEach((p) => URL.revokeObjectURL(p.url)), [])

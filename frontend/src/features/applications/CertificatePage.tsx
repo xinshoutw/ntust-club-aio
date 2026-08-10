@@ -1,4 +1,5 @@
 import { App, Button, Form, Input, Select, Spin } from 'antd'
+import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
@@ -21,6 +22,7 @@ export default function CertificatePage() {
   const { user } = useAuth()
   const { message } = App.useApp()
   const [form] = Form.useForm()
+  const guard = useFormUnsavedGuard()
   const term: string | undefined = Form.useWatch('term', form)
   const position: MemberKind | undefined = Form.useWatch('position', form)
 
@@ -59,6 +61,7 @@ export default function CertificatePage() {
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
         <Form
+          onValuesChange={guard.onValuesChange}
           form={form}
           layout="vertical"
           requiredMark

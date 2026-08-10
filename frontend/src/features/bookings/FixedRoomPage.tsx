@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import dayjs from 'dayjs'
 import { App, Button, Form, Input, Select, Spin } from 'antd'
+import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
 import { confirmDialog } from '../../lib/confirm'
 import QueryError from '../../components/ui/QueryError'
@@ -53,6 +54,7 @@ export default function FixedRoomPage() {
   const [form] = Form.useForm()
   // 已選時段:'dow|period'(dow 1=週一 … 7=週日)
   const [slots, setSlots] = useState<ReadonlySet<string>>(new Set())
+  const guard = useFormUnsavedGuard(slots.size > 0)
   // 拖曳批量選取(與 PeriodPicker 同手感):按下起點決定「選取/取消」,掃過即套用
   const [dragTo, setDragTo] = useState<boolean | null>(null)
   const [slotsError, setSlotsError] = useState(false)
@@ -189,7 +191,7 @@ export default function FixedRoomPage() {
       <PageHeader title="固定場地借用" />
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
-        <Form form={form} layout="vertical" onFinish={submit} requiredMark>
+        <Form onValuesChange={guard.onValuesChange} form={form} layout="vertical" onFinish={submit} requiredMark>
           <div className="form-grid-2">
             <Form.Item name="room" label="場地" rules={[{ required: true, message: '請選擇場地' }]} style={{ marginBottom: 0 }}>
               <Select

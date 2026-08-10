@@ -4,6 +4,7 @@ import { App, Button, Checkbox, DatePicker, Form, Input, InputNumber, Popconfirm
 import { confirmDialog } from '../../lib/confirm'
 import dayjs from 'dayjs'
 import { FileTextOutlined, InfoCircleOutlined } from '@ant-design/icons'
+import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import AttachmentArea, { type BagFile } from '../../components/ui/AttachmentArea'
@@ -135,6 +136,7 @@ function ActivityForm({
   const defaultCat = categories[0]?.name ?? ''
   const hintOf = (name: string) => categories.find((c) => c.name === name)?.hint
   const [form] = Form.useForm<FormValues>()
+  const guard = useFormUnsavedGuard()
   const activityType = Form.useWatch('type', form)
   const [files, setFiles] = useState<BagFile[]>([])
   // 既有附件(編輯重送保留,可逐一移除;新選檔於送出時上傳)
@@ -378,6 +380,7 @@ function ActivityForm({
         requiredMark
         scrollToFirstError
         onValuesChange={(changed) => {
+          guard.onValuesChange()
           // 單日活動居多:選開始日期時,結束日期未填就自動帶同一天
           if ('date' in changed && changed.date && !form.getFieldValue('endDate')) {
             form.setFieldValue('endDate', changed.date)

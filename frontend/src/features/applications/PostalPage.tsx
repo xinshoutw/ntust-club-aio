@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { App, Button, Checkbox, Form, Input, Spin } from 'antd'
+import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
 import AttachmentArea, { type BagFile } from '../../components/ui/AttachmentArea'
 import QueryError from '../../components/ui/QueryError'
@@ -28,6 +29,7 @@ export default function PostalPage() {
   const { message } = App.useApp()
   const [form] = Form.useForm<PostalFormValues>()
   const [files, setFiles] = useState<BagFile[]>([])
+  const guard = useFormUnsavedGuard(files.length > 0)
   const [filesError, setFilesError] = useState(false)
   const reasons: string[] = Form.useWatch('reasons', form) ?? []
 
@@ -52,6 +54,7 @@ export default function PostalPage() {
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
         <Form
+          onValuesChange={guard.onValuesChange}
           form={form}
           layout="vertical"
           requiredMark

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { App, Button, Form, Input, Spin } from 'antd'
+import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
 import AttachmentArea, { type BagFile } from '../../components/ui/AttachmentArea'
 import QueryError from '../../components/ui/QueryError'
@@ -27,6 +28,7 @@ export default function MaintenancePage() {
   const { message } = App.useApp()
   const [form] = Form.useForm()
   const [files, setFiles] = useState<BagFile[]>([])
+  const guard = useFormUnsavedGuard(files.length > 0)
   const [filesError, setFilesError] = useState(false)
 
   const configQuery = useClubConfig()
@@ -65,6 +67,7 @@ export default function MaintenancePage() {
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
         <Form
+          onValuesChange={guard.onValuesChange}
           form={form}
           layout="vertical"
           requiredMark

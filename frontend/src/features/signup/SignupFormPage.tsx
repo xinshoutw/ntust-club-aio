@@ -1,6 +1,7 @@
 import { Link, useNavigate, useParams } from 'react-router'
 import { App, Button, Checkbox, Form, Input, Radio, Select, Spin } from 'antd'
 import { LeftOutlined } from '@ant-design/icons'
+import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
@@ -39,6 +40,7 @@ export default function SignupFormPage() {
   const navigate = useNavigate()
   const { message } = App.useApp()
   const [form] = Form.useForm()
+  const guard = useFormUnsavedGuard()
   const itemId = Number(id)
   const isValidId = Number.isInteger(itemId) && itemId > 0
   const itemQuery = useSignupItem(isValidId ? itemId : undefined)
@@ -183,6 +185,7 @@ export default function SignupFormPage() {
 
       {/* 草稿存 DB 跨裝置續填:載入時以草稿內容預填 */}
       <Form
+        onValuesChange={guard.onValuesChange}
         form={form}
         layout="vertical"
         onFinish={onFinish}

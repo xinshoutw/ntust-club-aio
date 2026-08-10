@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import dayjs, { type Dayjs } from 'dayjs'
 import { App, Button, DatePicker, Form, Input, Select, Spin } from 'antd'
+import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
 import { confirmDialog } from '../../lib/confirm'
 import QueryError from '../../components/ui/QueryError'
@@ -37,6 +38,7 @@ export default function VenueBookingPage() {
       : undefined
   const qPeriod = params.get('period')
   const [periods, setPeriods] = useState<string[]>(() => (qPeriod && PERIODS.includes(qPeriod) ? [qPeriod] : []))
+  const guard = useFormUnsavedGuard(periods.length > 0)
   const [periodsError, setPeriodsError] = useState(false)
 
   const venuesQuery = useVenues()
@@ -119,6 +121,7 @@ export default function VenueBookingPage() {
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
         <Form
+          onValuesChange={guard.onValuesChange}
           form={form}
           layout="vertical"
           onFinish={submit}

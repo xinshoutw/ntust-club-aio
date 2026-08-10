@@ -27,7 +27,6 @@
 
 ## 規則
 
-- **本頁與行政端的「管理項目」是全站僅有兩個註冊未存檔守衛的頁面**
 - 密碼三欄只要填了任一欄就三欄一起驗;密碼與 profile 是兩支 API,profile 成功而改密失敗時只有密碼欄維持 dirty
 - 網頁連結填了即得 ad6 的 5 分(不追蹤更新時間)
 - Discord Webhook 前端驗 `https://discord.com/api/webhooks/…`;該社事件會在全域 webhook 之外另推一份到這裡

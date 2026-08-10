@@ -6,7 +6,7 @@ import QueryError from '../../components/ui/QueryError'
 import { Cols, FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
 import { downloadCsv } from '../../lib/csv'
 import { MEMBER_KINDS, kindLabel, type MemberKind } from '../../lib/roles'
-import { CURRENT_SEMESTER } from '../../lib/semester'
+import { currentSemester } from '../../lib/semester'
 import { useAuth } from '../../app/auth'
 import {
   fetchAllMembers,
@@ -32,8 +32,8 @@ export default function MembersPage() {
   const [csvText, setCsvText] = useState('')
   const [exportOpen, setExportOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
-  const [csvSemester, setCsvSemester] = useState<string>(CURRENT_SEMESTER)
-  const [semester, setSemester] = useState<string>(CURRENT_SEMESTER)
+  const [csvSemester, setCsvSemester] = useState<string>(currentSemester())
+  const [semester, setSemester] = useState<string>(currentSemester())
   const [page, setPage] = useState(1)
   // 預設排序=後端預設(身份權重→學號,準則 4 名冊慣例):未點排序時不送 sort 參數
   const { entries, toggle } = useMultiSort<MemberSortKey>()
@@ -45,7 +45,7 @@ export default function MembersPage() {
 
   const semestersQuery = useMemberSemesters()
   // 學期下拉:名單既有學期 + 當前學期(可能尚無資料)
-  const semesters = [...new Set([CURRENT_SEMESTER, ...(semestersQuery.data ?? [])])].sort().reverse()
+  const semesters = [...new Set([currentSemester(), ...(semestersQuery.data ?? [])])].sort().reverse()
   const semesterOpts = semesters.map((s) => ({ value: s, label: s }))
   const kinds = kindFilter.length
     ? MEMBER_KINDS.filter((k) => kindFilter.includes(label(k)))
@@ -64,7 +64,7 @@ export default function MembersPage() {
   const { create, update, remove, importCsv } = useMemberMutations()
 
   // 頁面目前顯示的學期(「全部學期」時退回當前學期),作為各對話框的預設
-  const pageSemester = semester === 'all' ? CURRENT_SEMESTER : semester
+  const pageSemester = semester === 'all' ? currentSemester() : semester
 
   const onAdd = (values: { name: string; studentId: string; kind: MemberKind; title?: string; phone?: string; semester: string }) => {
     create.mutate(values, {
@@ -341,7 +341,7 @@ export default function MembersPage() {
         onOk={() => form.submit()}
         okText="新增"
       >
-        <Form form={form} layout="vertical" onFinish={onAdd} initialValues={{ kind: '社員', semester: CURRENT_SEMESTER }}>
+        <Form form={form} layout="vertical" onFinish={onAdd} initialValues={{ kind: '社員', semester: currentSemester() }}>
           <Form.Item name="name" label="姓名" rules={[{ required: true, message: '請輸入姓名' }]}>
             <Input />
           </Form.Item>

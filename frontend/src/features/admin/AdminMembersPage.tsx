@@ -5,7 +5,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import { Cols, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
 import { downloadCsv } from '../../lib/csv'
 import { kindLabel } from '../../lib/roles'
-import { CURRENT_SEMESTER, semesterOptions } from '../../lib/semester'
+import { currentSemester, semesterOptions } from '../../lib/semester'
 import { fetchAllAdminMembers, useAdminClubMembers } from '../../api/adminClubs'
 import ClubSelect from './ClubSelect'
 import { useAdminClub } from './clubContext'
@@ -21,7 +21,7 @@ export default function AdminMembersPage() {
   const { club, clubId, clubKind } = useAdminClub()
   const { message } = App.useApp()
   const [page, setPage] = useState(1)
-  const [semester, setSemester] = useState<string>(CURRENT_SEMESTER)
+  const [semester, setSemester] = useState<string>(currentSemester())
   // 名冊慣例的預設序(身份權重→學號)=後端預設:不點排序時不帶 sort
   const { entries, toggle } = useMultiSort<SortKey>()
   const [exporting, setExporting] = useState(false)

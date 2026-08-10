@@ -1,7 +1,7 @@
 import { Link } from 'react-router'
 import type { UseQueryResult } from '@tanstack/react-query'
 import PageHeader from '../../components/ui/PageHeader'
-import { CURRENT_SEMESTER } from '../../lib/semester'
+import { currentSemester } from '../../lib/semester'
 import { useAuth } from '../../app/auth'
 import { canAccessAdminPath } from '../../lib/permissions'
 import {
@@ -40,7 +40,7 @@ export default function AdminHomePage() {
 
   return (
     <div>
-      <PageHeader title="總覽" sub={semesterLabel(CURRENT_SEMESTER)} />
+      <PageHeader title="總覽" sub={semesterLabel(currentSemester())} />
       <div
         style={{
           marginTop: 20,

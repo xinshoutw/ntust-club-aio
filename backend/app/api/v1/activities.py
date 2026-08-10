@@ -249,6 +249,12 @@ async def submit_activity(
         raise conflict("此活動已送審或已核准")
     _require_complete(activity)
     _require_future_start(activity)
+    # 重新送審=前一輪的核定全部作廢。逐項與總額必須一起清,而且要清在這裡而不是
+    # 編輯路徑:退回件直接重送(不走 PUT)本來完全不動核定值,承辦人送空 body 就
+    # 能通過「必須逐項核定」的檢核、原封不動再核一次舊金額
+    for item in activity.budget_items:
+        item.approved_subsidy = None
+    activity.school_approved = None
     activity.status = ActivityStatus.PENDING_ADVISOR
     club = await _club_of(db, user)
     audit.record(

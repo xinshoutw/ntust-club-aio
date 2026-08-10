@@ -662,3 +662,58 @@ async def test_large_type_filter_and_locked_boundary(client, db):
     names = {a["name"] for a in resp.json()["data"]}
     assert "期限已過一天" in names
     assert "期限日當天" not in names
+
+
+async def test_resubmitting_a_rejected_case_voids_the_previous_decision(client, db):
+    """退回件重送:逐項核定與總額都得歸零。
+
+    社團可以不編輯直接重送,那條路徑不經 PUT/replace_budget_items;舊值留著的話,
+    承辦人送空 body 就能通過「必須逐項核定」的檢核,把上一輪的金額原封不動再核一次。
+    """
+    await seed(client, db)
+    aid = await submit_activity(client, db)
+
+    await login(client, "advisor")
+    detail = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]
+    await client.post(
+        f"/api/v1/admin/activities/{aid}/approve",
+        json={
+            "fund_source": "學務處經費",
+            "budget": [
+                {"item_id": i["id"], "approved_subsidy": 1000} for i in detail["budget_items"]
+            ],
+        },
+        headers=csrf_headers(client),
+    )
+    # 第一關過後停在組長關,由組長退回
+    await login(client, "chief")
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/reject",
+        json={"reason": "經費不符"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+
+    # 不編輯,直接重送
+    await login(client, "club01")
+    resp = await client.post(
+        f"/api/v1/club/activities/{aid}/submit", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+
+    assert await db.scalar(sa.select(Activity.school_approved).where(Activity.id == aid)) is None
+    remaining = (
+        await db.scalars(
+            sa.select(ActivityBudgetItem.approved_subsidy).where(
+                ActivityBudgetItem.activity_id == aid
+            )
+        )
+    ).all()
+    assert set(remaining) == {None}
+
+    # 舊值清掉後,空 body 不再能矇混過「必須逐項核定」
+    await login(client, "advisor")
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/approve", json={}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 422

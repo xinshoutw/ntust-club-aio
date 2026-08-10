@@ -144,7 +144,7 @@ async def update_member(
     member_id: int, body: MemberUpdate, user: ClubUser, db: DbDep
 ) -> ApiResponse[MemberOut]:
     member = await _own_member(db, user, member_id)
-    # 行內編輯自動儲存常送未變值;寫回會蓋掉 updated_at,列表的「更新時間」就不再可信
+    # 行內編輯自動儲存會把整列原封送回;不濾掉未變值,下面的重複學號檢查會查到自己而 409
     changed = {
         field: value
         for field, value in body.model_dump(exclude_unset=True).items()
@@ -246,7 +246,7 @@ async def import_members(
             )
             created += 1
         elif (member.name, member.kind, member.title, member.phone) != (name, kind, title, phone):
-            # 同上:no-op 重匯不得改動 updated_at
+            # 值沒變不計入 updated:重匯同一份名單要回報 0 筆更新,不能謊報整份都動過
             member.name, member.kind, member.title, member.phone = name, kind, title, phone
             updated += 1
 

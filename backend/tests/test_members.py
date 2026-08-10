@@ -92,6 +92,15 @@ async def test_member_crud_and_scoping(client, db):
     assert resp.status_code == 200
     assert resp.json()["data"]["title"] == "總務"
 
+    # 行內編輯整列送回時學號原封不動:重複學號檢查不得把自己算成重複
+    resp = await client.patch(
+        f"/api/v1/club/members/{member_id}",
+        json={"name": "陳大文", "student_id": "B11109001", "title": "副社長"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["data"]["title"] == "副社長"
+
     # 他社帳號看不到、也改不到
     other = await make_club(db, name="吉他社")
     await make_user(db, username="club02", club_id=other.id)
@@ -179,7 +188,7 @@ async def test_member_default_order_by_role_weight(client, db):
 
 
 async def test_noop_reimport_keeps_updated_at(client, db):
-    """重匯同一份 CSV 不得改動 updated_at(列表顯示的「更新時間」)。"""
+    """重匯同一份 CSV 回報 0 筆更新,且不動 updated_at(列表顯示的「更新時間」)。"""
     await setup_club_session(client, db)
     csv_text = "陳大文,B11109001,社長\n李小明,B11109002,社員"
     await client.post(

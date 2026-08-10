@@ -78,7 +78,7 @@ export function computeAdScores(i: ScoringInput): AdScore[] {
   const semesterScore = (count: number) => (count <= 0 ? 0 : count <= 9 ? 2.5 : 5)
   const ad5 = cap(semesters.reduce((s, [, c]) => s + semesterScore(c), 0), AD_MAX.ad5)
 
-  // ad6 網頁經營:有連結即給滿分(需求方 2026-07-14 簡化,不追蹤更新時間)
+  // ad6 網頁經營:有連結即給滿分,不追蹤更新時間
   const ad6 = i.hasWebsite ? AD_MAX.ad6 : 0
 
   // ad7/ad8 會議與幹訓:以管理員活動後之簽到為準,僅報名不計分

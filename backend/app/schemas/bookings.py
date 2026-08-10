@@ -36,7 +36,7 @@ class EquipmentOut(BaseModel):
     name: str
     total_qty: int
     max_lease_count: int | None = None  # 單次可借上限;NULL=不限
-    needs_serial: bool  # False=一般、True=依序點交(2026-07-17 移除類別後為唯一分類)
+    needs_serial: bool  # False=一般、True=依序點交
     available: int = 0  # 推導(帶 activity_id 查詢時=該活動借用區間內的可借數)
 
 
@@ -120,7 +120,7 @@ def _validate_phone_required(v: str) -> str:
 
 class VenueBookingIn(BaseModel):
     venue_id: int
-    activity_id: int  # 借用活動(限審核通過;2026-07-15 第六輪必選)
+    activity_id: int  # 借用活動(限審核通過)
     date: date
     periods: list[str] = Field(min_length=1, max_length=14)
     purpose: str = Field(min_length=1, max_length=200)  # 用途必填

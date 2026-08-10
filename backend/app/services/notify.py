@@ -34,7 +34,7 @@ def _with_identity(payload: dict[str, Any]) -> dict[str, Any]:
     """為 webhook payload 補上統一的顯示名稱與頭貼(不覆蓋既有值)。"""
     return {"username": SYSTEM_NAME, "avatar_url": WEBHOOK_AVATAR_URL, **payload}
 
-# Discord Components V2(需求方指定格式;flags 1<<15 = IS_COMPONENTS_V2)
+# Discord Components V2(flags 1<<15 = IS_COMPONENTS_V2)
 IS_COMPONENTS_V2 = 1 << 15
 _CONTAINER = 17  # Container
 _TEXT_DISPLAY = 10  # Text Display

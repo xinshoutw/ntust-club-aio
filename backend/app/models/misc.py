@@ -72,7 +72,7 @@ class AuditLog(Base, TimestampMixin):
     __table_args__ = (sa.Index("ix_audit_logs_created_at", "created_at"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    # SET NULL:刪除帳號時稽核紀錄保留(2026-07-16 第八輪帳號管理)
+    # SET NULL:刪除帳號時稽核紀錄保留
     user_id: Mapped[int | None] = mapped_column(
         sa.ForeignKey("users.id", ondelete="SET NULL"), index=True
     )

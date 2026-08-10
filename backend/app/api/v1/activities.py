@@ -296,7 +296,7 @@ async def upload_photo(
     if activity.status != ActivityStatus.APPROVED:
         raise conflict("僅結案準備中(已核准)的活動可上傳照片")
 
-    # 結案照片加總上限(2026-07-17 改依申請性質給總量;預設 10MB,system_settings 可調)
+    # 結案照片加總上限(預設 10MB,system_settings 可調)
     cap_mb = int(await get_setting(db, "close_photo_total_mb"))
     cap = cap_mb * 1024 * 1024
     existing = await file_service.total_uploaded(
@@ -361,7 +361,7 @@ async def upload_attachment(
     if activity.status not in _EDITABLE:
         raise conflict("僅草稿或退回件可上傳附件")
 
-    # 附件加總上限(2026-07-17 改依申請性質給總量;預設 15MB,system_settings 可調)
+    # 附件加總上限(預設 15MB,system_settings 可調)
     cap_mb = int(await get_setting(db, "activity_attachment_total_mb"))
     cap = cap_mb * 1024 * 1024
     existing = await file_service.total_uploaded(

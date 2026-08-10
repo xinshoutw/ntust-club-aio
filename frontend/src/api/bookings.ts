@@ -90,7 +90,7 @@ export interface EquipmentItem {
   id: number
   name: string
   totalQty: number
-  needsSerial: boolean // False=一般、True=依序點交(2026-07-17 移除類別)
+  needsSerial: boolean // False=一般、True=依序點交
   available: number
   /** 單次可借上限(undefined=不限) */
   maxLeaseCount?: number
@@ -357,7 +357,7 @@ export function useAvailability(date: Dayjs) {
   })
 }
 
-/** 多日場況(單一場地 15 天檢視):批次端點一次撈整段區間(2026-07-17,取代逐日 15 請求);
+/** 多日場況(單一場地 15 天檢視):批次端點一次撈整段區間,不逐日發 15 個請求;
  *  venue 給定時後端 SQL 即縮小到該場地 */
 export function useAvailabilityDays(dates: Dayjs[], venueId?: number) {
   const startIso = dates.length ? toIso(dates[0]) : ''

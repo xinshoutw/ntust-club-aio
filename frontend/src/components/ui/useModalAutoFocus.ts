@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react'
 
-// 確認型彈窗開啟即聚焦確認鈕(Enter 直接送出,第八輪慣例)。
-// 不用原生 autoFocus:瀏覽器原生 focus 會把 footer 捲入視野,
-// 彈窗比視窗高時畫面落在中下段、標題被捲走(2026-07-21 需求方回報)。
-// 改 focus({ preventScroll: true }),聚焦但維持捲動在彈窗頂端。
+// 確認型彈窗開啟即聚焦確認鈕(Enter 直接送出)。
+// 不用原生 autoFocus:它會把 footer 捲入視野,彈窗比視窗高時標題會被捲走。
+// focus({ preventScroll: true }) 聚焦但維持捲動在彈窗頂端。
 export function useModalAutoFocus(open: boolean) {
   const ref = useRef<HTMLButtonElement | null>(null)
   useEffect(() => {

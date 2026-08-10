@@ -44,7 +44,7 @@ class Activity(Base, TimestampMixin):
     end_date: Mapped[dt.date | None] = mapped_column(sa.Date)  # 活動結束日
     start_time: Mapped[time | None] = mapped_column(sa.Time)  # 開始時間屬 date
     end_time: Mapped[time | None] = mapped_column(sa.Time)  # 結束時間屬 end_date
-    participants_in: Mapped[int] = mapped_column(default=0)  # 社員人數(2026-07-21 語彙統一)
+    participants_in: Mapped[int] = mapped_column(default=0)  # 社員人數
     participants_out: Mapped[int] = mapped_column(default=0)  # 非社員人數
     staff_text: Mapped[str] = mapped_column(sa.Text, default="")
     fund_source: Mapped[str | None] = mapped_column(sa.Text)  # 承辦人第一關認定
@@ -94,7 +94,7 @@ class ActivityReport(Base, TimestampMixin):
     highlights: Mapped[str] = mapped_column(sa.Text)
     goals: Mapped[str] = mapped_column(sa.Text)
     others: Mapped[str] = mapped_column(sa.Text)
-    # 檢討會議(2026-07-15 獨立 section):true 時日期/與會人數/討論事項/內容決議皆必填(應用層)
+    # 檢討會議:true 時日期/與會人數/討論事項/內容決議皆必填(應用層)
     review_meeting: Mapped[bool] = mapped_column()
     review_date: Mapped[date | None] = mapped_column(sa.Date)
     review_attendees: Mapped[int | None] = mapped_column()  # 與會人數

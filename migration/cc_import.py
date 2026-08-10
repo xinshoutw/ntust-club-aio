@@ -41,7 +41,7 @@ from cms_import import IdMap
 TAIPEI = ZoneInfo("Asia/Taipei")
 PERIOD_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "A", "B", "C", "D"]
 
-# 舊 Classroom.id → 新場地名稱(seed 19 處);一舍 B2 一律拆成 樓梯+白板 兩筆(需求方拍板)
+# 舊 Classroom.id → 新場地名稱(seed 19 處);一舍 B2 一律拆成 樓梯+白板 兩筆
 VENUE_MAP: dict[int, list[str]] = {
     1: ["S301"],
     2: ["S302/S303"],
@@ -70,7 +70,7 @@ LEGACY_VENUES: dict[int, tuple[str, VenueCategory]] = {
     21: ("學生活動中心1F走廊（摩斯漢堡對面）", VenueCategory.OUTDOOR),
 }
 
-# 舊 Device 名稱正規化(現行 17 項主檔名稱;2026-07-17 需求方清單)
+# 舊 Device 名稱正規化,對到現行 17 項主檔名稱
 DEVICE_RENAME = {
     "10M  延長線": "10M 延長線",
     "15M 延長線總數目": "15M 延長線",
@@ -263,7 +263,7 @@ async def import_device_loans(
             continue
         if end < start:
             end = start
-        # 舊系統無點交:已核准且區間已過 → 視為已歸還(需求方拍板)
+        # 舊系統無點交:已核准且區間已過 → 視為已歸還
         if status == LoanStatus.APPROVED and end < today:
             status = LoanStatus.RETURNED
         created_at = epoch_dt(head["created_at"])

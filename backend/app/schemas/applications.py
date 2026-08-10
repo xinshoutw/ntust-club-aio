@@ -12,7 +12,7 @@ from app.models.enums import (
 
 _TERM_RE = re.compile(r"^\d{3}(-[12])?$")  # 114 / 114-1 / 114-2
 
-# 郵局事由互斥組合(2026-07-13 前端先行判斷,後端同規則)
+# 郵局事由互斥組合(前後端同規則)
 _POSTAL_EXCLUSIVE: tuple[tuple[PostalReason, PostalReason], ...] = (
     (PostalReason.CHANGE_AGENT, PostalReason.NEW_ACCOUNT),
     (PostalReason.NEW_ACCOUNT, PostalReason.CLOSE_ACCOUNT),

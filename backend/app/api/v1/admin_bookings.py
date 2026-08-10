@@ -325,7 +325,7 @@ async def approve_equipment_loan(
 ) -> ApiResponse[AdminEquipmentLoanOut]:
     loan = await _pending_loan(db, loan_id)
     equipment = await db.get(Equipment, loan.equipment_id)
-    # 可借數不足仍可核准(管理員裁量,列表紅字警示提示);是否改硬性檢核待需求方拍板
+    # 可借數不足仍可核准:屬管理員裁量,列表以紅字警示
     loan.status = LoanStatus.APPROVED
     _record_approval(db, ApprovalSubject.EQUIPMENT_LOAN, loan.id, ApprovalDecision.APPROVE, user)
     audit.record(
@@ -395,7 +395,7 @@ async def availability(user: BookingAdmin, db: DbDep, date: date) -> ApiResponse
     return ApiResponse(data={"date": date.isoformat(), "grid": grid})
 
 
-# ---- 最高權限手動借用(2026-07-21 需求方拍板;club NULL=行政,顯示「學務處」) ----
+# ---- 最高權限手動借用:club NULL=行政,顯示「學務處」 ----
 # 刻意不擋過去日期(社團端申請已全面禁止):補登歷史資料是本功能的用途之一,
 # 舊系統遷移後的資料補正也靠這裡回填
 

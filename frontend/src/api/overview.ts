@@ -53,7 +53,7 @@ export function useOverviewActivities() {
   return useQuery({
     queryKey: overviewKeys.activities,
     queryFn: async () => {
-      // 排除已結案(歷史大宗,總覽的待辦/進行中皆用不到;2026-07-21 SQL 分批要求)
+      // 排除已結案:歷史大宗,總覽的待辦與進行中皆用不到
       const data = await fetchAllPages<ActivityOut>('/club/activities', {
         status: [
           'draft',

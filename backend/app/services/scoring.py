@@ -107,7 +107,7 @@ def compute_ad_scores(i: ScoringInput) -> list[AdScore]:
     semesters = list((i.roster_by_semester or {}).items())
     ad5 = min(sum(_semester_score(c) for _, c in semesters), AD_MAX["ad5"])
 
-    # ad6 網頁經營:有連結即給滿分(需求方 2026-07-14 簡化,不追蹤更新時間)
+    # ad6 網頁經營:有連結即給滿分,不追蹤更新時間
     ad6 = AD_MAX["ad6"] if i.has_website else 0
 
     # ad7/ad8 會議與幹訓:以管理員活動後登錄之簽到為準,僅報名不計分

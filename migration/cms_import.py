@@ -54,10 +54,10 @@ TAIPEI = ZoneInfo("Asia/Taipei")
 # ---------------------------------------------------------------------------
 
 # 不遷移的舊社團(行政單位/測試帳號)
-# 學務處就輔組:帳號「800」與 staff 侍筱鳳同名,需求方 2026-07-21 拍板移除偽社團
+# 學務處就輔組:帳號「800」與 staff 侍筱鳳同名,此偽社團不遷
 SKIP_CLUBS = {"國際事務處", "testclub", "學務處就輔組"}
 
-# 名稱結尾推導不到時的手動指定(需求方逐一給定);其餘推導不到者預設 社團
+# 名稱結尾推導不到時的手動指定;未列出者預設 社團
 KIND_OVERRIDES = {
     "全校不分系": ClubKind.ASSOCIATION,
     "國際親善大使團": ClubKind.CLUB,
@@ -371,7 +371,7 @@ async def import_members(legacy, db: AsyncSession, ids: IdMap, clubs) -> None:
         if ids.get("Club_student", row.id) is not None:
             continue
         kind, title = member_kind(row.Identity, row.Title)
-        joined = row.Date  # 入社日期 → 更新時間欄(需求方 2026-07-21)
+        joined = row.Date  # 入社日期 → 更新時間欄
         stamp = datetime.combine(joined, time(12, 0), tzinfo=TAIPEI) if joined else None
         member = ClubMember(
             club_id=clubs[legacy_club_id][0],
@@ -499,7 +499,7 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
             )
 
         # 結案(核銷中/已完成):舊制僅有 實際人數/時間 + 單一檢討文字 + 繳交旗標,
-        # 寬鬆匯入 — 缺欄留空(需求方 2026-07-21 拍板)
+        # 寬鬆匯入 — 缺欄留空
         if a.status in (5, 6):
             meta = metas.get(a.id, {})
             db.add(

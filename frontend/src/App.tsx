@@ -74,7 +74,7 @@ function RequireRole({ roles, children }: { roles: Role[]; children: ReactNode }
   return children
 }
 
-// 社團端側欄的「固定場地」依後端開放窗顯示/反灰(nav 原為模組常數,改由查詢結果組合);
+// 社團端側欄的「固定場地」依後端開放窗顯示或反灰;
 // 查詢未完成前先視為未開放,載入後自動更新
 function ClubShell() {
   const windowQuery = useFixedWindow()
@@ -83,8 +83,8 @@ function ClubShell() {
 }
 
 // 行政端側欄徽章=申請/結案待審數(共用審核頁查詢);
-// 側欄項目與徽章查詢皆依 permissions 過濾,受限管理員不再看到整排 403 頁。
-// 固定借用開放窗外「教室固定借用」反灰移至最末組(2026-07-21 比照社團端)
+// 側欄項目與徽章查詢皆依 permissions 過濾,受限管理員看不到無權限的頁。
+// 開放窗外的「教室固定借用」反灰並移至最末組
 function AdminShell() {
   const { user } = useAuth()
   const pendingReview = usePendingActivityTotal(canAccessAdminPath(user, '/admin/review'))

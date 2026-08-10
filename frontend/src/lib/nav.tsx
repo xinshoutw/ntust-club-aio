@@ -50,7 +50,7 @@ const FIXED_BOOKING_ITEM: NavItem = {
   icon: <ScheduleOutlined />,
 }
 
-// 社團端資訊架構(2026-07-13 需求方重整版,非設計稿的舊版)。
+// 社團端資訊架構。
 // 固定場地借用開放窗由後端系統設定提供(GET /club/room-bookings/window),
 // nav 因此無法再是模組層級常數:改為 builder,由 App 的 ClubShell 以 useFixedWindow() 查詢後組合;
 // 未開放(或查詢未完成)時項目反灰並移至「其他」。
@@ -125,7 +125,7 @@ const ADMIN_ROOM_ITEM: NavItem = {
 
 // 側欄徽章=待審數(shell 以共用 query 提供;查詢中/失敗不顯示)。
 // 依 permissions 過濾:受限管理員只看得到自己可用的項目(路由另有 gate)。
-// 固定借用開放窗外「教室固定借用」反灰移至最末組(2026-07-21 比照社團端)。
+// 開放窗外的「教室固定借用」反灰並移至最末組。
 export function buildAdminNav(
   user: SessionUser | null,
   pendingReview?: number,
@@ -224,7 +224,7 @@ export function buildAdminNav(
     .filter((g) => g.items.length > 0)
 }
 
-// 工讀生端(2026-07-17 基礎原型;role 代號之後隨後端改 pt)
+// 工讀生端(role 代號之後隨後端改 pt)
 export function buildPtNav(): NavGroup[] {
   return [
     {
@@ -245,7 +245,7 @@ export function buildPtNav(): NavGroup[] {
   ]
 }
 
-// 評審端(2026-07-17 基礎原型)
+// 評審端
 export function buildViewerNav(): NavGroup[] {
   return [
     {

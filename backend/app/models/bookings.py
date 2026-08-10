@@ -46,7 +46,7 @@ class RoomBookingSlot(Base, TimestampMixin):
     request_id: Mapped[int] = mapped_column(
         sa.ForeignKey("room_booking_requests.id", ondelete="CASCADE"), index=True
     )
-    weekday: Mapped[int] = mapped_column()  # 1=週一 … 7=週日(2026-07-15 取代 date)
+    weekday: Mapped[int] = mapped_column()  # 1=週一 … 7=週日
     period: Mapped[str] = mapped_column(sa.String(2))  # 1–10、A–D(14 節次)
 
 
@@ -60,7 +60,7 @@ class VenueBooking(Base, TimestampMixin):
     # NULL=最高權限手動借用(行政)
     club_id: Mapped[int | None] = mapped_column(sa.ForeignKey("clubs.id"), index=True)
     venue_id: Mapped[int] = mapped_column(sa.ForeignKey("venues.id"))  # allow_temp
-    # 綁定審核通過活動(2026-07-15 第六輪前端必選;NULL 容舊資料,新申請應用層必填)
+    # 綁定審核通過活動;NULL 容舊資料,新申請於應用層必填
     activity_id: Mapped[int | None] = mapped_column(sa.ForeignKey("activities.id"))
     date: Mapped[dt.date] = mapped_column(sa.Date)
     periods: Mapped[list[str]] = mapped_column(ARRAY(sa.String(2)))  # 複選節次

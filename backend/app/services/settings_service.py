@@ -8,8 +8,7 @@ from app.models import SystemSetting
 
 # 預設值(DB 無該 key 時採用;行政調整後以 DB 為準)
 DEFAULTS: dict[str, Any] = {
-    # 經費科目九項;2026-07-17 起每項含 hint(選填),
-    # 社團填申請時依所選科目顯示;{name, hint} 由行政後台維護
+    # 經費科目九項;hint 選填,社團填申請選到該科目時顯示,由行政後台維護
     "budget_categories": [
         {"name": "指導老師、教練費", "hint": "請在下方加註講師相關專業工作背景"},
         {
@@ -39,12 +38,11 @@ DEFAULTS: dict[str, Any] = {
     "equipment_return_time": "10:30",
     # 器材借用區間緩衝(工作天):活動開始日 −before ~ 活動結束日 +after
     "equipment_workday_buffer": {"before": 2, "after": 1},
-    # 教室固定借用開放窗:日期區間(2026-07-16 第八輪,取代開放月份+手動加開);
-    # 未設定即不開放,由管理員於系統設定調整
+    # 教室固定借用開放窗:日期區間;未設定即不開放,由管理員於系統設定調整
     "fixed_booking_window": {"open_from": None, "open_until": None},
-    # 單檔上限(MB;magic-byte 型別驗證用的上界,architecture.md §3.5;管理員後台可調)
+    # 單檔上限(MB;magic-byte 型別驗證用的上界,管理員後台可調)
     "upload_limits": {"doc": 50, "img": 10, "zip": 100, "video": 200},
-    # 各申請性質的「附件加總上限」(MB;2026-07-17 改依申請性質給總量,取代單看檔案類型):
+    # 各申請性質的附件加總上限(MB):
     # 活動申請附件 15、空間報修佐證 100(含影片)、活動結案照片 10
     "activity_attachment_total_mb": 15,
     "maintenance_total_mb": 100,
@@ -53,7 +51,7 @@ DEFAULTS: dict[str, Any] = {
     # 容量不足告警之後人為介入);此處僅保留單一社團未歸檔檔案上限
     "storage_limits": {"per_club_gib": 2},
     # 評鑑視窗(預設 116 年,2026/02/01–2027/01/31)
-    # ad7/ad8 以「場次日期落在視窗」採計(2026-07-16 第九輪,無年度對齊問題)
+    # ad7/ad8 以「場次日期落在視窗」採計
     "eval_window": {"year": 116, "start": "2026-02-01", "end": "2027-01-31"},
     # 目前學年度(報名等年輪資料寫入時取用)
     "current_year": 114,

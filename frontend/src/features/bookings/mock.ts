@@ -23,7 +23,7 @@ export interface Venue {
   allowTemp: boolean
 }
 
-// 場地主檔(2026-07-15 需求方定案 19 處;之後由管理員後台維護,數量/容納人數可調)
+// 場地主檔 19 處;數量與容納人數由管理員後台維護
 export const VENUES: Venue[] = [
   { name: 'S204 共享食堂', category: '教室', capacity: 60, allowFixed: true, allowTemp: true },
   { name: 'S207', category: '教室', capacity: 60, allowFixed: true, allowTemp: true },

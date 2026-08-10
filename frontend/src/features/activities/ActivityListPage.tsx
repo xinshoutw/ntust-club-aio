@@ -69,7 +69,7 @@ function SectionTitle({ children, first }: { children: React.ReactNode; first?: 
   )
 }
 
-// 與申請不一致的實際值:直接取代原值並以色彩標示,hover 立即顯示預計值
+// 與申請不一致的實際值:直接取代申請值並以色彩標示,hover 顯示預計值
 function ActualValue({ actual, planned }: { actual: React.ReactNode; planned: string }) {
   return (
     <Tooltip mouseEnterDelay={0} title={<span style={{ fontSize: 14 }}>預計 {planned}</span>}>
@@ -112,7 +112,7 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
     { key: 'report', label: '下載活動成果報告', disabled: !rep },
   ]
   const onDownload = ({ key }: { key: string }) => {
-    // 照片打包成 zip(僅 archive);成果報告/心得由後端依需求方模板於下載時動態生成 PDF
+    // 照片打包成 zip(僅 archive);成果報告與心得的 PDF 由後端於下載時動態生成
     if (key === 'photos') void downloadPhotosZip(`${a.name}_照片`, photos)
     if (key === 'feedback' && rep) downloadEvalFile(activityReflectionsPdf(a, rep.submittedAt))
     if (key === 'report' && rep) downloadEvalFile(activityReportPdf(a, rep.submittedAt))

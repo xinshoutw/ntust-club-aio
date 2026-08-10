@@ -233,7 +233,7 @@ export default function MembersPage() {
                         style={{ width: '100%' }}
                         options={kindOptions}
                         onChange={(v) => {
-                          // 職稱各身份皆可保留(2026-07-21 放寬)
+                          // 職稱各身份皆可保留
                           patchMember(m.id, { kind: v })
                           setEditing(null)
                         }}

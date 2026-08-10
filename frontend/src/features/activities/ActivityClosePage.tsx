@@ -71,8 +71,8 @@ export default function ActivityClosePage() {
   const selectedId = rawId ? Number(rawId) : undefined
   const activity = closable.find((a) => a.id === selectedId)
   const detailQuery = useActivityDetail(activity?.id)
-  // 照片加總上限來自後端組態(system_settings 為權威);表單以組態載入為前置條件,
-  // 不再用前端保底常數(與 ActivityFormPage 的組態 gate 一致)
+  // 照片加總上限來自後端組態(system_settings 為權威);
+  // 表單以組態載入為前置條件,前端不放保底常數
   const configQuery = useClubConfig()
 
   return (
@@ -233,7 +233,7 @@ function CloseForm({
     return [...saved, ...Array.from({ length: blanks }, () => ({ key: nextKey(), name: '', dept: '', text: '' }))]
   })
 
-  // 照片一律「送出結案時」才上傳,不進草稿;此前僅暫存於前端。
+  // 照片一律於送出結案時才上傳,不進草稿,在此之前僅暫存於前端。
   // 頁內去重以 SHA-256、加總容量上限皆於選檔時檢核;跨活動重複由後端 sha256 於送出時拒絕。
   // APPROVED 狀態下 detail.photos 只會是「前次送出失敗殘留」的孤兒照片:
   // 顯示為可移除的既有照片(佔加總與張數),使用者才能回收額度、避免重選同張被去重卡死

@@ -237,7 +237,7 @@ interface FixedWindowOut {
   open_until: string | null
 }
 
-/** 固定借用開放窗(行政端):未開放時側欄「教室固定借用」反灰置底(2026-07-21 比照社團端);
+/** 固定借用開放窗(行政端):未開放時側欄「教室固定借用」反灰置底;
  *  AdminShell 與 AdminRoomsPage 共用同一查詢;一般 admin 即可讀,不綁 aroom */
 export function useAdminFixedWindow(enabled = true) {
   return useQuery({
@@ -354,7 +354,7 @@ export function useAdminBookingMutations() {
 }
 
 
-// ---- 最高權限手動借用(2026-07-21;club NULL=行政,顯示「學務處」,直接核准) ----
+// ---- 最高權限手動借用:club NULL=行政,顯示「學務處」,直接核准 ----
 
 export interface ManualVenueInput {
   venueId: number

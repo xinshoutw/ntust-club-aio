@@ -348,7 +348,7 @@ async def create_venue_booking(
     if dup:
         raise conflict("同一場地同一天已有申請")
 
-    # 不開放規則(2026-07-21 Rule Page):申請時即擋,核准端亦驗
+    # 場地不開放規則:申請時即擋,核准端亦驗
     hit = await svc.blocked_periods(db, venue.id, body.date, body.periods)
     if hit:
         raise validation_error(f"所選時段不開放借用(節次 {','.join(hit)})")
@@ -435,7 +435,7 @@ async def create_equipment_loan(
     equipment = await db.get(Equipment, body.equipment_id)
     if equipment is None or not equipment.is_active:
         raise validation_error("找不到該器材")
-    # 單次可借上限(2026-07-21;NULL=不限)
+    # 單次可借上限(NULL=不限)
     if equipment.max_lease_count is not None and body.qty > equipment.max_lease_count:
         raise validation_error(f"{equipment.name} 單次至多借用 {equipment.max_lease_count} 件")
     activity = await _approved_activity(db, user, body.activity_id)

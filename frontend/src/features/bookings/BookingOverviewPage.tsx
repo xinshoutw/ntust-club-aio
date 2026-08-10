@@ -116,7 +116,7 @@ export default function BookingOverviewPage() {
   )
   const rangeQuery = useAvailabilityDays(venueDef ? venueDates : [], venueDef?.id)
 
-  // 正在借用:伺服器端 active=true 過濾(2026-07-21,原整批撈取後前端篩選)
+  // 正在借用:伺服器端 active=true 過濾
   const roomsQuery = useActiveRoomBookings()
   const venueBookingsQuery = useActiveVenueBookings()
   const loansQuery = useActiveEquipmentLoans()

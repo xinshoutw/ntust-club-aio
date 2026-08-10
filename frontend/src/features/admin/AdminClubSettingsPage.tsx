@@ -99,7 +99,7 @@ export default function AdminClubSettingsPage() {
     }
   }, [form, detail, club, lastClub])
 
-  // 開關本身不警告;切到「停用」後按「儲存」才確認(需求方 2026-07-16)
+  // 開關本身不警告;切到「停用」後按「儲存」才確認
   const save = () => {
     if (!form || !saved || clubId == null) return
     const name = form.name.trim()

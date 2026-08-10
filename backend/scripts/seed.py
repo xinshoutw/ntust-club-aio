@@ -34,7 +34,7 @@ AWARDS: list[tuple[str, str, AwardKind, bool, bool, int]] = [
 ]
 
 # ---------------------------------------------------------------------------
-# 五獎項評分細項(rubric;2026-07-14 需求方拍板「一律以各獎項評分標準 PDF 為準」)
+# 五獎項評分細項(rubric):一律以各獎項的評分標準 PDF 為準
 #
 # 逐年版本化(award_rubric_items):此處建立預設評鑑年(services/evaluation.get_eval_window
 # 同源,目前 116)的一份;之後年度由行政「複製上年再修改」。
@@ -45,8 +45,8 @@ AWARDS: list[tuple[str, str, AwardKind, bool, bool, int]] = [
 #            配分=services/scoring.AD_MAX ad1–ad8)+ 社團營運 100(最佳社團獎-社團營運.pdf);
 #            行政 40% / 營運 60% 加權(awards.is_weighted)
 #   finance  細項合計 100 + 簡報 20 = 120(最佳財務獎評分標準.pdf)
-#   activity 細項合計  90 + 簡報 20 = 110(最佳活動獎評分標準.pdf;2026-07-14 拍板以此
-#            PDF 為準:活動執行 35%/經費運用 5%,與實施計畫版的 45%/15% 衝突時亦同)
+#   activity 細項合計  90 + 簡報 20 = 110(最佳活動獎評分標準.pdf:活動執行 35%/
+#            經費運用 5%;與實施計畫版的 45%/15% 衝突時仍以 PDF 為準)
 #   result   細項合計  95,無簡報專欄(最佳成果發表獎評分標準.pdf;
 #            「四、現場發表 15」屬 PDF 細項,建為一般 rubric item)
 #   leader   細項合計 100 + 簡報 20 = 120(最佳社團負責人獎評分標準.pdf)
@@ -208,7 +208,7 @@ def verify_rubrics() -> None:
             assert admin_sum == 0, award_id  # 行政資料項僅存在於最佳社團獎
 
 
-# 場地主檔(2026-07-15 需求方定案 19 處,與 frontend/src/features/bookings/mock.ts VENUES 對齊;
+# 場地主檔 19 處,與 frontend/src/features/bookings/mock.ts VENUES 對齊;
 # 之後由管理員後台維護,數量/容納人數可調)
 # (名稱, 類別, 容納人數, allow_fixed, allow_temp)
 VENUES: list[tuple[str, VenueCategory, int, bool, bool]] = [

@@ -241,7 +241,7 @@ async def upload_evidence(
     if (existing_count or 0) >= MAX_EVIDENCE_PER_REQUEST:
         raise validation_error(f"每筆報修至多 {MAX_EVIDENCE_PER_REQUEST} 個佐證檔案")
 
-    # 佐證加總上限(2026-07-17 改依申請性質給總量;預設 100MB 含影片,system_settings 可調)
+    # 佐證加總上限(預設 100MB 含影片,system_settings 可調)
     cap_mb = int(await get_setting(db, "maintenance_total_mb"))
     cap = cap_mb * 1024 * 1024
     existing_bytes = await file_service.total_uploaded(

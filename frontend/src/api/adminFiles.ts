@@ -23,7 +23,7 @@ export interface FileUsage {
   modules: UsageModule[] // 順序由後端決定(有報修檔案時 repair 第一)
   dbSizeMb: number // 「文字內容」:整個 DB 的估算大小
   totalMb: number // 檔案 + DB(系統自身佔用)
-  // 實際磁碟空間(2026-07-17 起,不再有邏輯容量):
+  // 實際磁碟空間:
   // diskTotal ≠ total + diskFree,差額是 OS 與同機其他程式的佔用
   diskTotalMb: number
   diskFreeMb: number

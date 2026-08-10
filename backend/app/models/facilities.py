@@ -32,9 +32,9 @@ class Equipment(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(sa.Text, unique=True)
     total_qty: Mapped[int] = mapped_column(default=0)
-    # 單次可借上限(NULL=不限;2026-07-21 自舊系統引入)
+    # 單次可借上限(NULL=不限)
     max_lease_count: Mapped[int | None] = mapped_column()
-    # 點交方式:False=一般、True=依序點交(需登記序號);2026-07-17 移除類別後為唯一分類欄
+    # 點交方式:False=一般、True=依序點交(需登記序號);器材的唯一分類欄
     needs_serial: Mapped[bool] = mapped_column(default=False)
     sort: Mapped[int] = mapped_column(default=0)
     is_active: Mapped[bool] = mapped_column(default=True)

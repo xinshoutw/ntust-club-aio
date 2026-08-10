@@ -165,8 +165,8 @@ class UploadPolicy:
     settings_key: str | None = None  # system_settings upload_limits 的鍵;None=固定上限
 
 
-# 上傳上限(architecture.md §3.5 定案的預設;實際上限走 system_settings upload_limits)
-# 影像放寬為所有常見格式(2026-07-16 第八輪,對齊前端 isImageFile)
+# 上傳上限的預設值;實際上限走 system_settings upload_limits。
+# 影像收所有常見格式,與前端 isImageFile 對齊
 IMAGE = UploadPolicy(
     "image",
     frozenset(
@@ -179,8 +179,8 @@ IMAGE = UploadPolicy(
 DOCUMENT = UploadPolicy(
     "document", frozenset({".pdf", ".doc", ".docx"}), 50 * _MB, settings_key="doc"
 )
-# 郵局存簿/申請書:掃描件常為 PDF,也收影像(2026-07-17 需求方拍板 PDF+Image);
-# 上限對齊前端 PostalPage 的 50MB,固定值(不入 upload_limits)
+# 郵局存簿與申請書:掃描件常為 PDF,也收影像;
+# 上限固定 50MB(不入 upload_limits),與前端 PostalPage 一致
 PASSBOOK = UploadPolicy("passbook", IMAGE.extensions | frozenset({".pdf"}), 50 * _MB)
 ARCHIVE = UploadPolicy("archive", frozenset({".zip"}), 100 * _MB, settings_key="zip")
 VIDEO = UploadPolicy("video", frozenset({".mp4", ".mov"}), 200 * _MB, settings_key="video")
@@ -356,7 +356,7 @@ async def can_access(db: AsyncSession, file: File, user: User) -> bool:
         case UserRole.ADMIN:
             return True
         case UserRole.STAFF:
-            # 最小權限(2026-07-16 資安審查):工讀生職務=報修/違規/器材點交,
+            # 最小權限:工讀生職務=報修/違規/器材點交,
             # 郵局存簿、活動附件、評鑑上傳等敏感檔不開放
             return file.subject_type in {"maintenance", "violation"}
         case UserRole.CLUB:

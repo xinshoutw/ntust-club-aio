@@ -66,7 +66,7 @@ _KIND_ALIASES = {
 def _validate_member(kind: MemberKind, title: str | None) -> str | None:
     if kind == MemberKind.OFFICER and not title:
         raise validation_error("幹部必須填寫職稱")
-    return title or None  # 幹部必填;其他身份選填(2026-07-21 放寬)
+    return title or None  # 幹部必填,其他身份選填
 
 
 @router.get("")

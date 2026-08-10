@@ -30,7 +30,7 @@ const toItem = (o: EquipmentOut): EquipmentItem => ({
   isActive: o.is_active,
 })
 
-// 點交方式(取代原「類別」):一般 / 依序點交(needs_serial)
+// 點交方式:一般 / 依序點交(needs_serial)
 export const HANDOVER_OPTIONS = [
   { value: false, label: '一般' },
   { value: true, label: '依序點交' },

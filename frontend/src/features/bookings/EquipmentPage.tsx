@@ -21,7 +21,7 @@ export default function EquipmentPage() {
 
   // 器材借用綁定審核通過之活動,不再自選日期區間;
   // 可借數與借用區間由後端依所選活動推導(GET /club/equipment?activity_id=);
-  // 排除已結束活動(2026-07-21,後端亦擋)
+  // 排除已結束活動(後端亦擋)
   const activitiesQuery = useActivityList({ status: 'approved' })
   const approved = (activitiesQuery.data ?? []).filter((a) => !activityEnded(a))
   const activityId = Form.useWatch('activity', form) as number | undefined
@@ -54,7 +54,7 @@ export default function EquipmentPage() {
 
   const selectedId = Form.useWatch('equipment', form) as number | undefined
   const selectedAvail = loanWindow != null && selectedId != null ? items.find((e) => e.id === selectedId)?.available ?? null : null
-  // 單次可借上限(2026-07-21;undefined=不限):與可借數取小作為數量上限
+  // 單次可借上限(undefined=不限):與可借數取小作為數量上限
   const selectedCap = selectedId != null ? items.find((e) => e.id === selectedId)?.maxLeaseCount ?? null : null
   const qtyMax = selectedAvail != null && selectedCap != null
     ? Math.min(selectedAvail, selectedCap)

@@ -21,7 +21,7 @@ from app.models.enums import BookingStatus, LoanStatus
 # 14 節次(原型 PERIODS/BK_SLOTS)
 PERIODS: tuple[str, ...] = ("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "A", "B", "C", "D")
 
-# 節次起訖時刻(退役舊系統 clubclass 的權威對照,2026-07-21 需求方確認;
+# 節次起訖時刻(權威來源為舊系統 clubclass;
 # 前端鏡射於 frontend/src/api/bookings.ts 的 PERIOD_TIMES,改動須同步)
 PERIOD_TIMES: dict[str, tuple[time, time]] = {
     "1": (time(8, 10), time(9, 0)),

@@ -70,7 +70,7 @@ async def usage(user: FilesAdmin, db: DbDep) -> ApiResponse[FileUsageOut]:
         stats[key]["size"] += int(size)
         stats[key]["count"] += int(count)
 
-    # 有空間報修檔案時 repair 排第一,其餘模組在後(2026-07-16 需求方指示)
+    # 有空間報修檔案時 repair 排第一(檔案大、迭代快),其餘模組在後
     order = list(_BASE_ORDER)
     if stats["repair"]["count"] > 0:
         order = ["repair", *[k for k in _BASE_ORDER if k != "repair"]]

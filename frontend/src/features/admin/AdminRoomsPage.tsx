@@ -146,7 +146,7 @@ export default function AdminRoomsPage() {
   const [open, setOpen] = useState(false)
   const [page, setPage] = useState(1)
 
-  // 開放窗外不提供審核面板(2026-07-21 比照社團端);與側欄反灰共用同一查詢
+  // 開放窗外不提供審核面板;與側欄反灰共用同一查詢
   const windowQuery = useAdminFixedWindow()
   const windowOpen = windowQuery.data?.open === true
   const listQuery = usePendingRoomBookings({ page, pageSize: PAGE_SIZE }, windowOpen)

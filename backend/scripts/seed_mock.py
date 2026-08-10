@@ -159,7 +159,7 @@ CSIE_MEMBERS: dict[str, list[tuple[str, str, MemberKind, str | None]]] = {
     ],
 }
 
-# 器材主檔(2026-07-17 需求方提供 17 項總數;數量與點交方式由管理員後台維護)
+# 器材主檔 17 項;數量與點交方式由管理員後台維護
 # (名稱, 總數, 依序點交);依序點交=需登記序號逐台清點
 EQUIPMENT_MASTER: list[tuple[str, int, bool]] = [
     ("帳篷", 6, True),
@@ -655,8 +655,8 @@ async def _create_activities(
         budget=(("膳食費", "茶點與飲料", 1500, 0, None),),
     )
     # 11. 已核准・已結束・存有結案草稿(照片不隨草稿)。
-    # close_draft 為前端 opaque JSON,鍵名須與前端 buildDraftReport() 的 camelCase 一致
-    # (曾誤用 snake_case,導致結案頁讀 reflections.name 為 undefined 而整頁白畫面)
+    # close_draft 為前端 opaque JSON,鍵名須與前端 buildDraftReport() 的 camelCase 一致;
+    # 用 snake_case 會讓結案頁讀到 undefined 而整頁白畫面
     acts["close_draft"] = _add_activity(
         db, csie, csie_user,
         name="暑期程式馬拉松", type_=ActivityType.EVENT,

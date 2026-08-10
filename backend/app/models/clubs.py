@@ -14,10 +14,10 @@ class Club(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(sa.Text, unique=True)
     # 社團/學會:名稱結尾社/會自動推導,推導不到手動指定;
-    # 負責人顯示詞(社長/會長)由此決定,取代原「名稱強制社/會結尾」規則
+    # 負責人顯示詞(社長/會長)由此決定
     kind: Mapped[ClubKind] = mapped_column(db_enum(ClubKind, "club_kind"))
     en_name: Mapped[str | None] = mapped_column(sa.Text)  # 英文名(舊系統遷入)
-    # 停社的舊社團原性質不可考 → NULL(2026-07-21;僅 is_active=false 者)
+    # 停社的舊社團原性質不可考 → NULL(僅 is_active=false 者)
     attribute: Mapped[ClubAttribute | None] = mapped_column(
         db_enum(ClubAttribute, "club_attribute")
     )
@@ -29,7 +29,7 @@ class Club(Base, TimestampMixin):
     )
     # 社團自設的 Discord webhook(管理項目;該社事件另推一份到這裡)
     discord_webhook_url: Mapped[str | None] = mapped_column(sa.Text)
-    # 指導老師:校內/校外各至多一位(2026-07-21 需求方拍板;社團自行維護)
+    # 指導老師:校內/校外各至多一位,社團自行維護
     advisor_name: Mapped[str | None] = mapped_column(sa.Text)  # 校內
     advisor_dept: Mapped[str | None] = mapped_column(sa.Text)
     advisor_email: Mapped[str | None] = mapped_column(sa.Text)
@@ -57,7 +57,7 @@ class ClubMember(Base, TimestampMixin):
     name: Mapped[str] = mapped_column(sa.Text)
     student_id: Mapped[str] = mapped_column(sa.Text)
     kind: Mapped[MemberKind] = mapped_column(db_enum(MemberKind, "member_kind"))
-    # 幹部必填;其他身份選填(2026-07-21 放寬,原僅幹部可有職稱)
+    # 幹部必填,其他身份選填
     title: Mapped[str | None] = mapped_column(sa.Text)
     phone: Mapped[str | None] = mapped_column(sa.Text)  # 舊系統遷入
     semester: Mapped[str] = mapped_column(sa.Text, index=True)  # 如 114-2

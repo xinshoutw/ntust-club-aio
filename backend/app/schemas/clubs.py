@@ -87,7 +87,7 @@ class MemberOut(BaseModel):
     name: str
     student_id: str
     kind: MemberKind
-    title: str | None  # 幹部必填;其他身份選填(2026-07-21 放寬)
+    title: str | None  # 幹部必填,其他身份選填
     phone: str | None
     semester: str
     updated_at: datetime

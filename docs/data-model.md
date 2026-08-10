@@ -2,7 +2,7 @@
 
 PostgreSQL 18;schema 以 Alembic migration 為準,本文件是設計依據與欄位語意說明。
 
-慣例:表名 snake_case 複數;主鍵 `id`(整數自增,對外資源用 uuid 者註明);所有表都有 `created_at`/`updated_at`(TIMESTAMPTZ);金額用 `integer`(新台幣元,無小數)。
+慣例:表名 snake_case 複數;主鍵預設為整數自增的 `id`,少數表以業務鍵或複合鍵為主鍵(下方逐表註明),`files`/`sessions` 用 uuid;所有表都有 `created_at`/`updated_at`(TIMESTAMPTZ);金額用 `integer`(新台幣元,無小數)。
 
 ## 0. 設計原則
 

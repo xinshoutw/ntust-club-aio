@@ -15,6 +15,12 @@ function csrfToken(): string {
   return match ? decodeURIComponent(match[1]) : ''
 }
 
+/**
+ * session 失效時廣播,由 AuthProvider 清掉登入狀態、路由 gate 接手導向登入頁。
+ * 走 window event 而非在此 import context,是為了讓 API 層不依賴 React。
+ */
+export const UNAUTHORIZED_EVENT = 'club-aio:unauthorized'
+
 // pydantic 的 loc 前綴標的是請求的哪一段,對使用者沒有意義
 const LOC_PREFIXES = new Set(['body', 'query', 'path', 'header', 'cookie'])
 
@@ -111,6 +117,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResp
     throw new Error(`HTTP ${res.status}`)
   }
   if (!res.ok || !body.success) {
+    if (res.status === 401) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT))
     const error = body.error ?? `HTTP ${res.status}`
     const detail = validationDetail((body.meta as { detail?: unknown } | null)?.detail)
     throw new Error(detail ? `${error}:${detail}` : error)

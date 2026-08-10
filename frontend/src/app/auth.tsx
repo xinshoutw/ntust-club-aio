@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { TAKEOVER_DISMISSED_KEY } from '../components/layout/TakeoverOverlay'
+import { UNAUTHORIZED_EVENT } from '../api/client'
 import { loginApi, logoutApi, meApi, type Role, type SessionUser } from '../api/auth'
 
 export type { Role, SessionUser }
@@ -26,6 +27,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(setUser)
       .catch(() => setUser(null))
       .finally(() => setBooting(false))
+  }, [])
+
+  // 任一請求收到 401 即視為 session 過期:清掉登入狀態,RequireRole 會導回登入頁
+  useEffect(() => {
+    const expire = () => setUser(null)
+    window.addEventListener(UNAUTHORIZED_EVENT, expire)
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, expire)
   }, [])
 
   const login = useCallback(async (username: string, password: string): Promise<SessionUser> => {

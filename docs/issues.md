@@ -149,7 +149,6 @@
 
 | 編號 | 嚴重度 | 問題 |
 |---|---|---|
-| ISS-85b | 低 | `api/adminEval.ts` 把 `attribute` 宣告為 `string`,但後端該欄可為 `None`,頁面用 `?? '—'` 兜著 —— 型別在說謊 |
 | ISS-86 | 中 | 常數重複定義造成單一真相分裂,`PERIOD_TIMES` 最危險(前端 `api/bookings.ts` / 後端 `booking_service.py` 各一份) |
 | ISS-86b | 中 | **後端註解與測試 docstring 誤稱 `club_members.updated_at` 是 ad5 的採計依據**(`members.py` 的兩處註解、`test_members.py` 的 docstring)。ad5 實際是逐學期數人頭,完全不讀 `updated_at`;「值沒變就不寫入」的真正目的是讓列表的「更新時間」可信 |
 | ISS-87 | 中 | 違規銷案期限判定同時存在 Python 與 SQL 兩份實作,規則變動須同步兩處 |

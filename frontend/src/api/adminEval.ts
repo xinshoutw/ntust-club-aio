@@ -11,7 +11,7 @@ import type { AdKey, FinalScore } from '../features/eval/scoring'
 interface AdminEvalClubOut {
   club_id: number
   club_name: string
-  attribute: string
+  attribute: string | null
   year: number
   total: number
   scores: AdScoreOut[]
@@ -40,7 +40,7 @@ interface AdminEvalDetailOut {
 export interface AdminEvalClub {
   clubId: number
   clubName: string
-  attribute: string
+  attribute: string | null
   year: number
   total: number
 }

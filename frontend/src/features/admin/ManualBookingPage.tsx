@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { App, Button, DatePicker, Form, Input, InputNumber, Select, Spin } from 'antd'
-import dayjs, { type Dayjs } from 'dayjs'
+import { type Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
 import PeriodPicker from '../bookings/PeriodPicker'
 import { useAdminEquipment } from '../../api/adminEquipment'
@@ -77,12 +77,9 @@ export default function ManualBookingPage() {
                   placeholder="請選擇"
                 />
               </Form.Item>
+              {/* 不擋過去日期:手動借用的用途就是補登歷史資料,後端亦刻意放行 */}
               <Form.Item name="date" label="日期" rules={[{ required: true, message: '請選擇日期' }]}>
-                <DatePicker
-                  style={{ width: '100%' }}
-                  format="YYYY/MM/DD"
-                  disabledDate={(d) => d.isBefore(dayjs().startOf('day'))}
-                />
+                <DatePicker style={{ width: '100%' }} format="YYYY/MM/DD" />
               </Form.Item>
               <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 8 }}>
                 時段 <span style={{ color: '#C13B34' }}>*</span>

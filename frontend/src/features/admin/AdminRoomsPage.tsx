@@ -18,7 +18,7 @@ const PAGE_SIZE = 50
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 
 // 退回原因預設文案:每次開啟退回視窗都回到此值(可修改後送出)
-const DEFAULT_REJECT_REASON = '很抱歉，目前時段無法受理。若仍有借用需求，請聯絡組長，謝謝'
+const DEFAULT_REJECT_REASON = '目前時段無法受理,若仍有借用需求請聯絡組長'
 
 // 場地固定借用審核彈窗:顯示每週時段(含衝突標示),核准或退回(退回原因必填)
 // 衝突=兩社搶同場地同星期同時段;整單擇一核准,不做部分同意

@@ -38,7 +38,7 @@
 | ISS-13b | 高 | **臨時場地借用完全不擋「已結束的活動」**。`_approved_activity` 只驗本社 + 已核准,`create_venue_booking` 沒有任何時間關聯檢核;器材端有擋、前端下拉也濾掉了,所以「借用須綁審核通過活動」實質只剩前端在守。直呼 API 帶一個去年辦完的活動 id,就能無限預約未來任何場地 |
 | ISS-14 | 高 | **承辦人核定金額不受「擬請補助」上限約束**。前端 `InputNumber max` 只擋鍵入,API 完全不擋 |
 | ISS-14b | 阻擋 | **無補助案可由承辦人單關核定任意金額,完全不經組長與學務長**。`approve` 套用 `body.budget` 與加總寫入 `school_approved` 都是無條件執行,`requested_total > 0` 只 gate 驗證;而 `requested_total == 0` 時狀態直接轉 `approved`。一張擬請 0 元的案子,承辦人一關就能核定出任意補助金額。現有測試送的是空 body,沒有覆蓋這條路徑 |
-| ISS-15 | 高 | 退回件若社團**直接重送不編輯**,舊的逐項核定金額會沿用(只有走 PUT 才會被 `replace_budget_items` 歸零),承辦人送空 body 就能通過「必須逐項核定」的檢核。實際更糟:審核彈窗會把舊的核定值**預填回輸入框**,承辦人看到的是一份「已填好」的核定表,順手按核准就原封不動再送一次 |
+| ISS-15 | 高 | 退回件若社團**直接重送不編輯**,舊的逐項核定金額會沿用(只有走 PUT 才會被 `replace_budget_items` 歸零),承辦人送空 body 就能通過「必須逐項核定」的檢核。實際更糟:審核彈窗預填 `approved_subsidy ?? requested_subsidy`(`adminActivities.ts:224`),承辦人看到的是一份「已填好」的核定表,順手按核准就原封不動再送一次。預填本身是刻意設計(未核定前落回擬請值),後端重送時清掉 `approved_subsidy` 即可,不必動前端 |
 | ISS-16 | 中 | 社團編輯退回件後 `activities.school_approved` 未同步清除,仍是上一輪的核定總額 |
 | ISS-17 | 中 | **一次性密碼彈窗在缺 `password` 時會用前端 `genPassword()` 產生假密碼並顯示**。目前兩個呼叫端都必傳 API 回來的明碼,所以產不出假密碼 —— 是未拆除的地雷,不是現行缺陷。修法:`password` 改必填、刪掉 fallback 與 `genPassword` |
 
@@ -46,7 +46,7 @@
 
 | 編號 | 嚴重度 | 問題 |
 |---|---|---|
-| ISS-18 | 高 | **全站只有兩頁註冊未存檔守衛**(社團端與行政端的「管理項目」)。活動申請、活動結案、報名建立、三個借用表單、三個線上申請表單離開即靜默丟失全部輸入;結案頁的照片救不回 |
+| ISS-18 | 高 | **全站只有兩頁註冊未存檔守衛**(社團端與行政端的「管理項目」)。活動申請、活動結案、報名建立、三個借用表單、三個線上申請表單離開即靜默丟失全部輸入;結案頁的照片救不回。共用 hook `useUnsavedGuard`(`app/unsaved.tsx:16`)已存在,只是沒鋪開;但它只攔側欄導航與 beforeunload,SPA 頁內導航要等改資料 router 才攔得到 |
 | ISS-19 | 高 | 成員列表**行內編輯 blur 即送出 PATCH**,沒有確認也沒有復原。後端已略過未變更欄位,所以誤觸未改值不會動 `updated_at`;但只要真的改了值,`onupdate=func.now()` 就會蓋掉 `updated_at` —— 而遷移是把舊系統的**入社日期**寫進 `created_at` 與 `updated_at`,`MemberOut` 又只吐 `updated_at` 並在畫面顯示為「更新時間」。也就是說:一次行內編輯就永久蓋掉那份入社日期的可見副本(`created_at` 裡的那份還在,但 API 從不回傳) |
 | ISS-20 | 高 | **評審評分沒有截止或凍結機制**。成績公布後仍可覆寫,`review_scores` 只有一列、舊分數不留痕 |
 | ISS-21 | 中 | `presentation_score` 是 PUT 全量取代語意,任何省略該欄位的請求都會把已登的簡報分清成 NULL |
@@ -58,7 +58,7 @@
 |---|---|---|
 | ISS-23 | 阻擋 | **檔案下載對 admin 一律放行**:`can_access` 對 `UserRole.ADMIN` 直接 `return True`。只持「檔案管理」權限的管理員可下載全系統檔案,包含郵局存簿影本這類個資 |
 | ISS-24 | 高 | **權限鍵前後端命名未統一**(`areview`/`aact`、`asignup`/`areg`),靠 any-of 硬撐 —— 報名管理走 `require_permission("areg","asignup")`,活動審核則是 `admin_activities._reviewer` 自訂的 any-of。後端白名單兩套都收,DB 裡兩套鍵皆合法。**必須在正式建帳號之前統一**,否則之後改要動所有既有帳號的 `permissions` |
-| ISS-25 | 中 | 社團帳號重設密碼在帳號管理頁需 super、在管理項目頁只需 `amember`,兩處門檻不一致 |
+| ISS-25 | 中 | 社團帳號重設密碼在兩個頁面的**頁面門檻**不一致(帳號管理頁需 super、管理項目頁只需 `amember`),但兩處打的是同一支 `/admin/clubs/{id}/reset-password`(`AccountsPage.tsx:221` 與 `AdminClubSettingsPage.tsx:165` 同用 `useAdminClubMutations`)。`_MANAGED_ROLES` 不含 `CLUB`,super 那支 `/admin/accounts/{id}/reset-password` 重設不了社團帳號 —— 待決的是這個動作該歸 super 還是 `amember` |
 | ISS-26 | 中 | 資料庫層沒有「一社一帳號」唯一約束,只靠應用層檢查,而遷移腳本又繞過應用層 |
 | ISS-27 | 中 | **401 不會導回登入頁**:`client.ts` 解包時丟掉 HTTP 狀態與 `meta.code`,session 過期後畫面停在錯誤訊息 |
 | ISS-28 | 中 | **登入/登出不清 TanStack Query 快取**,同一台電腦換人登入會先看到前一位使用者的資料 |
@@ -72,7 +72,7 @@
 | ISS-31 | 高 | **固定借用開放窗一結束,承辦人就審不了已收到的申請** —— `/admin/rooms` 整頁被鎖,待審單無處可審 |
 | ISS-32 | 高 | **逾期未還的器材不計入佔用**:可借數只看區間重疊,借出中但原區間已過的單子不算,導致超賣。`features/bookings/mock.ts` 的舊實作反而有無條件計入。**四處全部低估**:社團端申請檢核、器材主檔可借數、行政端待審單的「該區間可借數」、行政手動借用 |
 | ISS-33 | 中 | 固定借用開放窗跨學期邊界時,同一輪申請會落到不同目標學期,10 節額度跟著重置 |
-| ISS-34 | 中 | 行政總覽的學期由前端 `new Date()` 在模組載入時算一次,長時間開著的分頁跨學期後不會更新;後端另有 `system_settings.current_year`,兩者可能不一致 |
+| ISS-34 | 中 | 行政總覽的學期由前端 `new Date()` 在模組載入時算一次,長時間開著的分頁跨學期後不會更新。**不能改讀後端** —— `system_settings.current_year` 全 repo 只有 `settings_service.py:56` 那個預設值、零讀取者、不在 `MANAGED_KEYS`,且值是 int 學年度而畫面要的是學期標籤 |
 | ISS-35 | 中 | 改完「固定場地借用受理期間」後,行政端側欄的開放狀態整個 session 不會更新 |
 
 ## 7. 併發與競態
@@ -107,7 +107,7 @@
 
 | 編號 | 嚴重度 | 問題 |
 |---|---|---|
-| ISS-53 | 阻擋 | **遷移腳本三處時間欄位未轉時區**,在 UTC 主機執行會讓 14,236 筆活動時間整批偏移 8 小時 |
+| ISS-53 | 阻擋 | **遷移腳本三處時間欄位未過 `_aware()`**:`cms_import.py:483` `activities.created_at`、`:518` `activity_reports.submitted_at`、`:552` `announcements.created_at`。在 UTC 主機執行整批偏移 8 小時。活動起訖時間走 `local_date`/`local_time`,不在此列 |
 | ISS-54 | 中 | 大型活動認可只能在第一關寫入;承辦人忘了勾就永久固化為「否准」,後續關卡與退回重送都無法補正 |
 | ISS-55 | 中 | 無 `activity_reports` 的已結案活動仍可拿 ad2 照片分,分數依據互相矛盾 |
 | ISS-55b | 中 | **器材序號只在單張借用單內去重**:`EquipmentLoan.serials` 是裸 array、無任何約束,同一台實體機的序號可以同時掛在兩張 `checked_out` 的單上。件數檢核管不到,依序點交的追蹤價值歸零 |

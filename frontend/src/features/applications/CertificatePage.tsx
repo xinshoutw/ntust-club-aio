@@ -5,6 +5,7 @@ import StatusPill from '../../components/ui/StatusPill'
 import { Cols } from '../../components/ui/tableControls'
 import { useAuth } from '../../app/auth'
 import { kindLabel, type MemberKind } from '../../lib/roles'
+import { CURRENT_SEMESTER } from '../../lib/semester'
 import {
   termLabel,
   useCertificateMutations,
@@ -12,7 +13,12 @@ import {
   useOfficerNames,
 } from '../../api/applications'
 
-const TERMS = ['114', '114-1', '114-2'].map((value) => ({ value, label: termLabel(value) }))
+// 當學年度全年 + 上下學期;跨學年自動更新
+const CURRENT_YEAR = CURRENT_SEMESTER.split('-')[0]
+const TERMS = [CURRENT_YEAR, `${CURRENT_YEAR}-1`, `${CURRENT_YEAR}-2`].map((value) => ({
+  value,
+  label: termLabel(value),
+}))
 
 // 可申請證明的職位:標準身份值,顯示依社團名稱推導(社長/會長)
 const POSITIONS: MemberKind[] = ['負責人', '副負責人']

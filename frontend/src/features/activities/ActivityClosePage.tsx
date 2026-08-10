@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { App, Button, DatePicker, Input, InputNumber, Select, Spin, TimePicker, Upload } from 'antd'
+import { App, Button, DatePicker, Input, InputNumber, Select, Spin, TimePicker, Tooltip, Upload } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
-import { RightOutlined, UploadOutlined } from '@ant-design/icons'
+import { InfoCircleOutlined, RightOutlined, UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { blurLeavesRow } from '../../lib/form'
@@ -714,7 +714,10 @@ function CloseForm({
             <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>四、附件與經費</div>
             <div>
               <div style={label}>
-                活動照片(≥{MIN_PHOTOS} 張){requiredMark}
+                活動照片{requiredMark}
+                <Tooltip title={`至少 1 張即可送出;達 ${MIN_PHOTOS} 張或附影片連結,評鑑「照片 / 影片」項才計分`}>
+                  <InfoCircleOutlined style={{ marginLeft: 6, color: 'var(--steel)' }} />
+                </Tooltip>
               </div>
               <div
                 className={errors.has('photos') ? 'area-error' : undefined}

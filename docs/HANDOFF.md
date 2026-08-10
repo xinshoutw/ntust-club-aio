@@ -6,11 +6,11 @@
 
 1. **第十四輪(2026-07-21)已完成**:pt/viewer 雙面板實裝、需求方 15 項、全站表格排序與欄寬
 2. **全面 code review(2026-07-25)已完成**:11 個獨立審查者平行審查,119 項 findings。原始 HTML 報告已刪除,結論全數併入 `issues.md` / `gaps.md`;需要逐項檔案行號時到 git 歷史取回
-3. **頁面規格(2026-08-10)**:逐頁盤點全部 51 個頁面 → `docs/spec/`;問題與缺口彙整為 `issues.md`(104 項)與 `gaps.md`
+3. **頁面規格(2026-08-10)**:逐頁盤點全部 51 個頁面 → `docs/spec/`;問題與缺口彙整為 `issues.md`(當時 104 項)與 `gaps.md`
 4. **問題分堆(2026-08-10)**:全部條目依「修法是否唯一」分成下方 A/B/C 三堆,經一輪跨模型交叉審查修正
 5. **A1 五項全數修畢(2026-08-10)**:ISS-01、ISS-02、ISS-03、ISS-14b、ISS-53,已從 `issues.md` 移除;跨模型交叉審查後又補了六處(見下)。驗證數字見下方「驗證現況」
 6. **A2 十二項全數修畢(2026-08-10)**:ISS-05、06、13(含 55)、13b、15+16、18、32、36、45、46、74b+38+38b、77b,已從 `issues.md` 移除。驗證數字見下方「驗證現況」
-7. **A3 開工(2026-08-10)**:只完成 ISS-17。其餘 58 項見下方 A3 清單,尚未動
+7. **A3 進行中(2026-08-11)**:已完成 13 項(ISS-17 + 兩個子批次共 12 項),其餘 46 項見下方 A3 清單
 
 **DEC-01 已定案:這學年評鑑要在新系統跑,但學年末才用** —— 2026-09 上線當下只需競賽報名(ISS-01)可用,整條彙總鏈排在上線之後。其餘 DEC-02~12 仍無答案。
 
@@ -39,19 +39,27 @@
 - ISS-38 的兩個 advisory lock 命名空間已合一(`venue`),否則補了交叉查詢也不會互相序列化
 - ISS-18 的 `useFormUnsavedGuard` 要吃 Form 之外的 local state(時段選取、待上傳附件),那些才是離開後救不回來的
 
-**A3 其餘**(可上線後補)
+**A3 已修**:ISS-17;一致性文案子批次 ISS-85、85b、86b、78、79;前端錯誤處理與快取子批次 ISS-22、27、28、34、35、58、88。兩個子批次各跑一輪跨模型交叉審查(7 條 + 20 條 findings,全數處理完)
+
+**A3 其餘 46 項**(可上線後補)
 
 - 併發與完整性:ISS-37、ISS-39(鎖鍵 `club_id` 非 `venue_id`)、ISS-40、ISS-41、ISS-42、ISS-44、ISS-26
 - 效能:ISS-47、ISS-48、ISS-49、ISS-50、ISS-52
-- 正確性與錯誤處理:ISS-21、ISS-22、ISS-27、ISS-28、ISS-34(前端改為每次 render 計算)、ISS-35、ISS-57、ISS-58、ISS-59、ISS-60、ISS-87(`_DEADLINE_SQL` 搬進 `violation_service` 與 `RESOLVE_MONTHS` 共用)
+- 正確性與錯誤處理:ISS-21、ISS-57、ISS-59、ISS-60、ISS-87(`_DEADLINE_SQL` 搬進 `violation_service` 與 `RESOLVE_MONTHS` 共用)
 - 畫面與資料落差:ISS-07、ISS-08、ISS-11、ISS-12、ISS-12b、ISS-68~ISS-73、ISS-74、ISS-74d、ISS-74e、ISS-75、ISS-76、ISS-77、ISS-77c
 - 稽核:ISS-61~ISS-64
-- 文案樣式無障礙:ISS-78、ISS-79、ISS-80、ISS-81、ISS-82、ISS-84
-- 一致性:ISS-85、ISS-85b、ISS-86b、ISS-88
+- 文案樣式無障礙:ISS-80、ISS-81、ISS-82、ISS-84
 - 維運:OPS-02、OPS-08、OPS-09、OPS-10
 - 補做:GAP-05 場地主檔 CRUD(照抄器材主檔)
 
 含新增 Alembic revision 的:ISS-26、ISS-44、ISS-50。
+
+已修兩批中,交叉審查抓到、值得記著的坑:
+
+- ISS-78 第一版把行政端改成「場地固定借用」,而社團端/系統設定/spec 檔名一直是「**固定場地借用**」—— 同一個功能兩個名字,`admin_rooms.py` 一個檔就有三則 Discord 標題各用一種。定案詞彙只說「用場地不用教室」,沒說詞序,改名前要先數哪個是既有多數
+- ISS-86b 的第一版註解換了個同樣不正確的理由:SQLAlchemy 對「賦值等於原值」根本不發 UPDATE,`updated_at` 從來沒有危險。那個守衛真正擋的是 PATCH 的重複學號檢查查到自己(行內編輯整列送回就會 409),而這條路徑當時零測試覆蓋
+- ISS-22 的原始描述指向 AntD Button,但 `handleClick` 在 `innerLoading` 時就 `preventDefault()`,隱含送出派給 default button 的 click 一樣被擋。真正會重複送出的是**表單裡根本沒有 submit 鈕**(Modal `onOk` + `form.submit()`)與 `onPressEnter` 直接接 mutation;`signup_item_sessions` 沒有唯一約束,那條是真的會落兩筆
+- 前端無 DOM 測試環境(ISS-89),這兩批的 UI 類修法(ISS-22/27/28/35/88)**沒有測試護欄**,只有純函式(`validationDetail`、`currentSemester`)有
 
 ## B — 需決定
 
@@ -104,10 +112,10 @@
 | GAP-16 | 社團導覽首頁 |
 | ISS-67 / GAP-18 | 行政/工讀生/評審端通知鈴鐺 |
 
-## 驗證現況(2026-08-10 實測)
+## 驗證現況(2026-08-11 實測)
 
 - 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → 273 passed;`ruff check .` 全綠;覆蓋率上次量測 95%(較低者:notify 73%、audit 77%、signup_service 82%)
-- 前端 `pnpm exec tsc -b --force` → 0 錯;`pnpm test` → 41 passed;`pnpm run lint` → 9 個 fast-refresh warning(全為既有的 `only-export-components` 類)
+- 前端 `pnpm exec tsc -b --force` → 0 錯;`pnpm test` → 49 passed;`pnpm run lint` → **8** 個 fast-refresh warning(全為既有的 `only-export-components` 類;先前記的 9 個是誤記,已用 `git archive` 對舊 commit 跑同一顆 oxlint 核對過)
 - `git log --all` 確認 `.env` 與 `migration/out` 從未進版控
 
 ## 其他待處理

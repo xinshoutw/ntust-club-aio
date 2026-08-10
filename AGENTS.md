@@ -7,11 +7,18 @@
 
 **新系統功能必須至少涵蓋兩套舊系統的全部功能**。舊系統僅作功能對照與資料遷移參考;其架構設計已過時,**完全不參考**。`project/lostSystem` 與本專案無關。
 
+## 開工前先讀
+
+1. **`docs/HANDOFF.md`** — 「現在進行到哪、接下來做什麼」的交接快照。**每個 session 一開始就讀這份**,本檔(AGENTS.md)只記永久性知識,不記進度
+2. **`docs/review-2026-07-25.html`** — 全面 code review 報告,119 項 findings 尚未修;每項有編號(BUG/DEC/GAP/OPS/IMP-xx)
+
 ## 需求來源與設計文件
 
 - **唯一需求規格**:`docs/社團管理系統_優化原型_v6.html`(學校負責人提供,單檔含完整 UI 與模擬邏輯;檔內 title 寫 v4,以檔名 v6 為準)
 - `docs/architecture.md` — 系統架構(含決議紀錄與未決事項)
 - `docs/data-model.md` — 資料模型(含原型/舊系統實體對照、狀態機、設計原則)
+- `docs/design-guide.md` — 視覺與互動規範;`docs/discord-webhook-messages.md` — 通知訊息清冊
+- `docs/DEPLOY_CHECKLIST.md` — 上線檢查表(**2026-07-17 版已嚴重過期,見 HANDOFF 的「文件狀態提醒」**)
 
 ## 角色(四種)
 
@@ -69,15 +76,22 @@
 - 結構:`app/core`(config/db/deps/security/errors/rate_limit/semesters)、`app/models`、`app/schemas`、`app/api/v1`(社團端 `/club/*`、管理端 `/admin/*`)、`app/services`(業務與推導:scoring/evaluation/activity/booking/signup/files/notify/pdf/audit/settings)
 - 慣例:推導不儲存(可借數/逾期/鎖定/行政分);簽核走 `approval_records`;高風險操作 `audit.record`(add 不 commit,隨交易);事件推 Discord(`notify.club_event`=全域+社團自設 webhook);列表一律分頁+排序白名單;錯誤用 `core/errors` 工廠
 - 測試慣例:`tests/conftest.py` 於 import app 前切 `club_aio_test`;factories(make_club/make_user)、`csrf_headers()`;每測試 TRUNCATE;`asyncio_default_*_loop_scope=session`(連線池綁 loop)
-- **前端尚未接線**(使用者回來後逐頁換 TanStack Query);工讀生端/評審端/管理端其餘頁面 API 未做
 - PDF:成果報告表/心得於下載時生成(`services/pdf.py`,內嵌 Noto Sans TC);seed:`uv run python scripts/seed.py`
 
-## 前端現況(2026-07-13,session 交接用)
+## 前端現況(2026-07-13 建立,狀態已於第十四輪後更新)
 
-- **全部 26 頁 + shell 已實作**(社團端 12、行政端 14),資料皆 mock、動作以 toast 提示;後端 API 完成後逐頁換 TanStack Query(`src/api/client.ts` 為信封解包層)
+- **52 頁全數實作且全部接線 TanStack Query**(`src/api/client.ts` 為信封解包層);四個 panel(社團/行政/工讀生/評審)API 皆已完成。**唯一仍顯示假資料的正式路徑是 `features/eval/EvalResultPage.tsx`**(整頁硬編,見審查報告 BUG-01)
 - 已過六輪交叉審查(codex ×4、opus ×2),發現均已修或記錄;第四次(2026-07-14,gpt-5.6-sol)涵蓋第三、四輪 UI,16 項全修;第五次(2026-07-14,opus)涵蓋評鑑重構,6 項全修;第六次(2026-07-14,gpt-5.6-sol)涵蓋結案以降段落,10 項全修(em dash 時間解析、結案照片卸載釋放與大小/魔術位元組驗證、影片連結格式、時間先後、借用 query 日期嚴格驗證、行政分切社團殘留編輯、重送保留附件、popup 預計值未填/分隔符誤判)
-- **待辦(後端接入時)**:super/permissions 路由 guard、部分無 thead 表格的讀屏語意、表格排序/篩選、真實檔案上傳與草稿 API
+- 原「待辦(後端接入時)」四項:super/permissions 路由 guard **已完成**(`lib/permissions.ts` 20 條 ROUTE_KEYS 與後端逐條相符)、表格排序/篩選 **已完成**(第十四輪 `useMultiSort`)、真實檔案上傳與草稿 API **已完成**;**讀屏語意仍未完成**(235/309 個 `th` 無 scope、3 頁可點列無鍵盤入口,見報告 BUG-51)
 - **成員列表**:第三輪調整已實作;需求方表示後續仍有追加項目
+
+## 全面 code review(2026-07-25)—— findings 尚未修
+
+- 報告:**`docs/review-2026-07-25.html`**(單檔 HTML,可依嚴重度/分類篩選;每項有編號 BUG/DEC/GAP/OPS/IMP-xx)
+- 11 個獨立審查者(Opus ×10 + codex ×2)平行審查,共 **119 項:9 阻擋上線、35 高、68 中、7 低**;**目前一項都還沒修**
+- 實測驗證(非引用文件):後端 262 passed / 覆蓋率 95% / ruff 全綠;前端 tsc 0 錯 / 35 tests / lint 僅既有 warning;`.env` 與 `migration/out` 從未進版控
+- 已逐條比對確認正確,**不必重審**:前後端計分邏輯 100% 等價;`PERIOD_TIMES` 與舊 clubclass 三方零差異;守衛覆蓋率 100%;社團端零 IDOR;44 表 models ↔ migration 欄位/索引/約束零差異;密碼政策全數落地;`add_months` 月底夾底與 PG `interval` 同義;金額全整數不需 Decimal
+- 新增面向:**舊系統功能涵蓋度稽核**(專案硬需求),找到 16 項未涵蓋,詳見報告 GAP-04~GAP-12
 
 ## UI 調整決議(2026-07-13 第二輪,已實作)
 

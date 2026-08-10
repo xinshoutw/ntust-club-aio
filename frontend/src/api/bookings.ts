@@ -142,7 +142,7 @@ interface AvailabilityOut {
   grid: AvailabilityGrid
 }
 
-// ---- 場地固定借用 ----
+// ---- 固定場地借用 ----
 
 export interface FixedWindow {
   open: boolean

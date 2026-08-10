@@ -163,7 +163,7 @@ async def availability_range(
     )
 
 
-# ---- 場地固定借用 ----
+# ---- 固定場地借用 ----
 
 
 @router.get("/room-bookings/window")
@@ -279,7 +279,7 @@ async def create_room_booking(
         background,
         db,
         user,
-        "場地固定借用申請",
+        "固定場地借用申請",
         f"{user.name}:{venue.name}({len(body.slots)} 個每週時段)",
     )
     out = RoomBookingOut.model_validate(row)

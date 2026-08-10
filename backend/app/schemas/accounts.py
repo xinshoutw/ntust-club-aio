@@ -20,7 +20,7 @@ PERMISSION_KEYS = frozenset(
         "asignup",  # 報名管理
         "aannounce",  # 發布公告
         "abooking",  # 臨時場地器材借用審核
-        "aroom",  # 場地固定借用審核
+        "aroom",  # 固定場地借用審核
         "amember",  # 社團管理
         "aeval",  # 行政分審核
         "amaint",  # 維修管理

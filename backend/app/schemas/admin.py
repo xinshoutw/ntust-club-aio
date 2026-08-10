@@ -362,7 +362,7 @@ class AdminEquipmentLoanOut(BaseModel):
     available_excluding_self: int | None = None
 
 
-# ---- 場地固定借用審核(/admin/room-bookings,權限鍵 aroom) ----
+# ---- 固定場地借用審核(/admin/room-bookings,權限鍵 aroom) ----
 
 
 class AdminRoomBookingOut(BaseModel):

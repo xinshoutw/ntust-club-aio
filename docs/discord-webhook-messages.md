@@ -64,7 +64,7 @@
 **空間與器材借用**
 
 - **D1 固定借用申請** `POST /club/room-bookings` · submit
-  `場地固定借用申請` / `{user.name}:{venue.name}({n} 個每週時段)`
+  `固定場地借用申請` / `{user.name}:{venue.name}({n} 個每週時段)`
 - **D2 臨時借用申請** `POST /club/venue-bookings` · submit
   `臨時場地借用申請` / `{user.name}:{venue.name}({date} 時段 {periods})`
 - **D3 器材借用申請** `POST /club/equipment-loans` · submit
@@ -78,9 +78,9 @@
 - **D7 器材借用退回** `POST /admin/equipment-loans/{id}/reject` · reject
   `器材借用退回` / `{equipment.name} ×{qty}:{body.reason}`(無社團名、無區間)
 - **D8 固定借用已核准** `POST /admin/room-bookings/{id}/approve` · approve
-  `場地固定借用已核准` / `{venue.name}({n} 個每週時段)`(無社團名、無具體時段)
+  `固定場地借用已核准` / `{venue.name}({n} 個每週時段)`(無社團名、無具體時段)
 - **D9 固定借用退回** `POST /admin/room-bookings/{id}/reject` · reject
-  `場地固定借用退回` / `{venue.name}:{body.reason}`
+  `固定場地借用退回` / `{venue.name}:{body.reason}`
 - **D10 器材歸還提醒** `POST /admin/equipment-loans/{id}/remind`(super)或 `POST /staff/equipment-loans/{id}/remind`(工讀生),兩者共用 `services/loan_remind` · alert · 另寄 Email
   `器材歸還提醒` / `{club.name}:{equipment.name} ×{qty}(借用區間 {start}~{end},歸還期限 {deadline}),請儘速辦理歸還點交。`
 

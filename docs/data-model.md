@@ -51,7 +51,7 @@ erDiagram
   activity_reports ||--o{ activity_reflections : "心得≥3"
   clubs ||--o{ venue_bookings : "臨時場地"
   clubs ||--o{ equipment_loans : "器材"
-  clubs ||--o{ room_booking_requests : "固定教室"
+  clubs ||--o{ room_booking_requests : "固定場地"
   room_booking_requests ||--o{ room_booking_slots : ""
   venues ||--o{ venue_bookings : ""
   venues ||--o{ venue_block_rules : "不開放規則"
@@ -238,7 +238,7 @@ approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,�
 **room_booking_requests**(id, club_id, venue_id, purpose, start_date, end_date, status enum(pending,approved,rejected,cancelled))
 **room_booking_slots**(id, request_id, weekday int(1=週一…7=週日), period varchar(2):1–10、A–D;UNIQUE(request, weekday, period))
 
-教室**固定**借用 = 整學期每週固定時段,選星期 × 節次而非日期。規則:
+固定場地借用 = 整學期每週固定時段,選星期 × 時段而非日期。規則:
 
 - 僅於開放窗(`system_settings.fixed_booking_window` 日期區間)受理;未開放時社團端入口反灰移至「其他」
 - 每社至多 **10 節**(1 節=1 小時);額度以「同一目標學期、狀態非 rejected/cancelled」的時段數合計,審核中與已核准都佔額度

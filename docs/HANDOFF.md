@@ -10,7 +10,7 @@
 2. **全面 code review(2026-07-25)已完成**:11 個獨立審查者平行審查,119 項 findings。原始 HTML 報告已刪除,結論全數併入 `issues.md` / `gaps.md`;需要逐項檔案行號時到 git 歷史取回
 3. **頁面規格(2026-08-10)**:逐頁盤點全部 51 個頁面 → `docs/spec/`;問題與缺口彙整為 `issues.md`(104 項)與 `gaps.md`
 4. **問題分堆(2026-08-10)**:全部條目依「修法是否唯一」分成下方 A/B/C 三堆,經一輪跨模型交叉審查修正
-5. **A1 五項全數修畢(2026-08-10)**:ISS-01、ISS-02、ISS-03、ISS-14b、ISS-53,已從 `issues.md` 移除。後端 263 passed、`ruff` 全綠;前端 `tsc -b` 0 錯、`pnpm test` 35 passed
+5. **A1 五項全數修畢(2026-08-10)**:ISS-01、ISS-02、ISS-03、ISS-14b、ISS-53,已從 `issues.md` 移除;跨模型交叉審查後又補了六處(見下)。後端 264 passed、`ruff` 全綠;前端 `tsc -b` 0 錯、`pnpm test` 41 passed
 
 **DEC-01 已定案:這學年評鑑要在新系統跑,但學年末才用** —— 2026-09 上線當下只需競賽報名(ISS-01)可用,整條彙總鏈排在上線之後。其餘 DEC-02~12 仍無答案。
 
@@ -19,6 +19,15 @@
 修法唯一、不需任何人決策,改動限於程式碼 + 必要時單一 Alembic revision。
 
 **A1 上線阻擋 — 已全數修畢**(ISS-01/GAP-09、ISS-02、ISS-03、ISS-14b、ISS-53)
+
+交叉審查後補的六處,踩過的坑值得記著:
+
+- ISS-03 第一版只推「當學年」三項,而名單全是 114-*,`applications.py` 逐字比對 `club_members.semester` 反而全查不到 —— 學年期選項只能以名單實際有的學期為來源(`api/applications.ts` `termOptions`)
+- ISS-14b 只清 `school_approved` 不夠:畫面的 `approved_total` 是逐項加總,兩個金額來源會打架,逐項也要歸零
+- ISS-01 的 `signup_awards` 原本只寫不讀,`RegistrationOut` 補 `awards`(管理彈窗 + CSV),否則學務處收了資料也看不到
+- 報名紀錄的獎項改由後端連名稱一起回,不靠啟用中清單反查(獎項停用就會退化成 slug)
+- 獎項全停用時社團會看到一張永遠過不了 required 的空卡,改為顯示說明
+- `.gitignore` 的 `start-dev.sh` 未錨定,會連帶吃掉版控中的 `backend/`、`frontend/` 同名腳本
 
 **A2 高嚴重度** — ISS-05、ISS-06、ISS-13(含 ISS-55)、ISS-13b、ISS-15+ISS-16、ISS-18、ISS-32、ISS-36、ISS-45、ISS-46、ISS-74b+ISS-38+ISS-38b、ISS-77b
 

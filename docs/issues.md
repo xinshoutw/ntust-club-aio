@@ -70,7 +70,6 @@
 
 | 編號 | 嚴重度 | 問題 |
 |---|---|---|
-| ISS-36 | 高 | **缺「相鄰關卡簽核人須不同」的約束**。列鎖 + 重讀狀態已擋住同一關被重放,但 `_require_stage_key` 對 advisor/chief 一律放行,所以連續兩次 POST 會走完 advisor→chief。**組長關卡不是被跳過**(照樣寫了一筆 `stage="chief"` 的 `approval_records`,actor 是同一人),而是變成「同一人連簽兩關」。不限 super —— 任何同時持 `approve_advisor` + `approve_chief` 的管理員都一樣;學務長關有本人簽核保護,所以最多連過兩關 |
 | ISS-37 | 低 | 行政分審核彈窗的 `clubId` 綁在 context 上而非開窗當下的快照,理論上「換社團 → 送出」會落錯庫。**實測不可觸發**:AntD Modal 的遮罩擋掉滑鼠、focus trap 擋掉鍵盤,彈窗開著期間到不了下方表格,自動刷新路徑也被 `staleTime`/`refetchOnWindowFocus:false` 排除。屬缺防禦而非缺陷,修法是開窗時快照 clubId 或 `key={clubId}` |
 | ISS-38 | 高 | **同一場地同時段可被雙重核准**:臨時借用核准只檢查其他臨時借用,固定借用核准只檢查其他固定借用,兩者互不檢核;手動借用也有同樣缺口。DB 層的唯一約束只到 `(request_id, weekday, period)`,沒有兜底。**修的時候要一起改鎖**:兩端用的 advisory lock 命名空間不同(`venue`=411002 / `room`=411003),就算補上交叉查詢也不會互相序列化 |
 | ISS-38b | 高 | **行政端場況圖完全不顯示審核中的固定借用**(`admin_availability_grid` 的 fixed 查詢寫死只取已核准,社團端則會標成 `pending`)。承辦人核准臨時借用時,那一格在螢幕上是空白的 —— 與 ISS-38 疊加後,雙重核准連目視都攔不下來 |

@@ -717,3 +717,36 @@ async def test_resubmitting_a_rejected_case_voids_the_previous_decision(client, 
         f"/api/v1/admin/activities/{aid}/approve", json={}, headers=csrf_headers(client)
     )
     assert resp.status_code == 422
+
+
+async def test_adjacent_stages_cannot_share_a_signer(client, db):
+    """相鄰關卡須不同人。
+
+    列鎖只擋得住同一關被重放;同時持兩個關卡鍵的帳號連按兩次會走完 advisor → chief,
+    組長關並非被跳過,而是寫了一筆 actor 相同的紀錄。super 直通那兩關,風險最大。
+    """
+    await seed(client, db)
+    await make_user(
+        db, username="both", role="admin", permissions=["approve_advisor", "approve_chief", "aact"]
+    )
+    await make_user(db, username="root", role="admin", is_super=True)
+
+    for actor in ("both", "root"):
+        aid = await submit_activity(client, db)
+        await login(client, actor)
+        assert (await approve_first_stage(client, aid)).status_code == 200
+        resp = await client.post(
+            f"/api/v1/admin/activities/{aid}/approve", json={}, headers=csrf_headers(client)
+        )
+        assert resp.status_code == 403, f"{actor}: {resp.text}"
+        assert resp.json()["meta"]["code"] == "SAME_ACTOR"
+        assert (
+            await db.scalar(sa.select(Activity.status).where(Activity.id == aid))
+        ).value == "pending_chief"
+
+    # 換人就能簽
+    await login(client, "chief")
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/approve", json={}, headers=csrf_headers(client)
+    )
+    assert resp.json()["data"]["status"] == "pending_dean"

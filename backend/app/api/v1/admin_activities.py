@@ -74,6 +74,37 @@ def _require_stage_key(user, key: str) -> None:
         raise forbidden("沒有此簽核關卡的權限")
 
 
+_PREVIOUS_STAGE = {"chief": "advisor", "dean": "chief"}
+
+
+async def _require_different_actor(db, activity: Activity, stage: str, user) -> None:
+    """相鄰關卡不得由同一人簽核。
+
+    列鎖只擋得住同一關被重放;同時持 approve_advisor + approve_chief 的帳號連按兩次
+    就會走完 advisor → chief,組長關照樣寫一筆 actor 是同一人的紀錄。super 一樣適用
+    —— 現行 _require_stage_key 讓 super 直通這兩關,反而是最容易發生的路徑。
+    """
+    previous = _PREVIOUS_STAGE.get(stage)
+    if previous is None:
+        return
+    actor_id = await db.scalar(
+        sa.select(ApprovalRecord.actor_id)
+        .where(
+            ApprovalRecord.subject_type == ApprovalSubject.ACTIVITY,
+            ApprovalRecord.subject_id == activity.id,
+            ApprovalRecord.stage == previous,
+            ApprovalRecord.decision == ApprovalDecision.APPROVE,
+        )
+        .order_by(ApprovalRecord.id.desc())
+        .limit(1)
+    )
+    if actor_id == user.id:
+        raise forbidden(
+            f"「{_STAGE_LABEL[previous]}」關卡已由本人簽核,不得再簽「{_STAGE_LABEL[stage]}」",
+            code="SAME_ACTOR",
+        )
+
+
 def _visible_statuses(user) -> set[ActivityStatus] | None:
     """受限關卡帳號只看得到自己關卡相關的狀態;None=不限(super 或持活動審核頁權限)。"""
     if user.is_super or any(k in user.permissions for k in _FULL_VIEW_KEYS):
@@ -316,6 +347,7 @@ async def approve(
         raise conflict("此活動不在待審狀態")
     key, stage = stage_info
     _require_stage_key(user, key)
+    await _require_different_actor(db, activity, stage, user)
 
     requested_total = sum(i.requested_subsidy for i in activity.budget_items)
     if stage == "advisor":

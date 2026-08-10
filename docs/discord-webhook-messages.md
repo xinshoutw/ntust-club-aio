@@ -33,7 +33,7 @@
 
 ## 2. 事件與現行文案
 
-32 個事件(4 個依狀態有兩種文案)。目的地未註明者=全域必推 + 該社團有設 webhook 才推。
+35 個事件(4 個依狀態有兩種文案)。目的地未註明者=全域必推 + 該社團有設 webhook 才推。
 
 **公告**
 
@@ -46,7 +46,7 @@
 - **B1 活動申請送審** `POST /club/activities/{id}/submit` · submit
   `活動申請送審` / `{club.name}:{activity.name}({date} @ {location})`
 - **B2 活動申請核准** `POST /admin/activities/{id}/approve` · 終關 approve、中間關 submit
-  `活動申請已核准` 或 `活動申請通過關卡` / `{activity.name}(關卡:{stage})` —— `stage` 為 `advisor`/`chief`/`dean` 英文代碼直出
+  `活動申請已核准` 或 `活動申請通過關卡` / `{activity.name}(關卡:{stage})` —— stage 經 `_STAGE_LABEL` 轉為 承辦人/組長/學務長
 - **B3 活動申請退回** `POST /admin/activities/{id}/reject` · reject
   `活動申請退回` / `{activity.name}:{body.reason}`
 
@@ -81,7 +81,7 @@
   `教室固定借用已核准` / `{venue.name}({n} 個每週時段)`(無社團名、無具體時段)
 - **D9 固定借用退回** `POST /admin/room-bookings/{id}/reject` · reject
   `教室固定借用退回` / `{venue.name}:{body.reason}`
-- **D10 器材歸還提醒** `POST /admin/equipment-loans/{id}/remind`(super 手動)· alert · 另寄 Email
+- **D10 器材歸還提醒** `POST /admin/equipment-loans/{id}/remind`(super)或 `POST /staff/equipment-loans/{id}/remind`(工讀生),兩者共用 `services/loan_remind` · alert · 另寄 Email
   `器材歸還提醒` / `{club.name}:{equipment.name} ×{qty}(借用區間 {start}~{end},歸還期限 {deadline}),請儘速辦理歸還點交。`
 
 D4–D7 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政手動借用)或社團不存在時直接跳過不通知。
@@ -110,6 +110,8 @@ D4–D7 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政手動借用)
 
 **違規**
 
+- **G0 違規勸導開立** `POST /staff/violations` · alert
+  `違規勸導開立` / `{club.name}:{occurred_on} {location}({items}),請於 {期限} 前完成銷案。`
 - **G1 違規勸導已銷案** `POST /admin/violations/{id}/resolve` · approve
   `違規勸導已銷案` / `{club.name}:{occurred_on} {location}`
 
@@ -122,6 +124,15 @@ D4–D7 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政手動借用)
 - **H3 表現優良加分登錄** `POST /admin/eval/clubs/{id}/merit` · alert
   `表現優良加分登錄` / `{club.name}:+{score}({reason})`
 
+**器材點交(工讀生端)**
+
+- **J1 器材已借出** `POST /staff/equipment-loans/{id}/checkout` · alert
+  `器材已借出` / `{equipment.name} ×{qty}(借用人 {borrower_name},借用區間 {start}~{end})`
+- **J2 器材已歸還** `POST /staff/equipment-loans/{id}/checkin` · approve
+  `器材已歸還` / `{equipment.name} ×{qty}(歸還人 {returner_name})`
+
+行政手動借用(`club_id` NULL)不通知。
+
 **帳號與停權**
 
 - **I1 社團停權** `POST /admin/clubs/{id}/suspend` · alert
@@ -129,7 +140,7 @@ D4–D7 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政手動借用)
 - **I2 停權解除** `DELETE /admin/clubs/{id}/suspend` · alert
   `社團停權解除` / `{club.name}:即日起恢復借用申請`
 
-**目前不發通知的相近動作**(設計時可問需求方是否要補):三種借用的社團自行取消、違規勸導開立(僅銷案通知)、行政手動借用建立、報名簽到登錄、公告蓋板切換與刪除、活動草稿儲存與刪除、器材借出與歸還點交。
+**目前不發通知的相近動作**(設計時可問需求方是否要補):三種借用的社團自行取消、行政手動借用建立、報名簽到登錄、公告蓋板切換與刪除、活動草稿儲存與刪除。
 
 ## 3. 模板可取用的資料
 

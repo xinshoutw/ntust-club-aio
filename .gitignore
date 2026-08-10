@@ -27,5 +27,6 @@ migration/out/
 .idea/
 
 # 本機開發啟動腳本(每台機器不同,刻意不入版控)
-start-dev.sh
-compose.override.yml
+# 錨定根目錄:backend/ 與 frontend/ 的同名腳本是版控的一部分
+/start-dev.sh
+/compose.override.yml

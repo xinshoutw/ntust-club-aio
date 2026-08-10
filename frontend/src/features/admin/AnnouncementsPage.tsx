@@ -168,7 +168,7 @@ export default function AnnouncementsPage() {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-            <Button type="primary" htmlType="submit" loading={create.isPending}>發布</Button>
+            <Button type="primary" htmlType="submit" loading={create.isPending} disabled={create.isPending}>發布</Button>
           </div>
         </Form>
       </div>

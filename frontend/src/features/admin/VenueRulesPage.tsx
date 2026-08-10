@@ -103,7 +103,7 @@ export default function VenueRulesPage() {
             <PeriodPicker value={periods} onChange={setPeriods} size="small" />
           </div>
           <div style={{ textAlign: 'right', marginTop: 14 }}>
-            <Button type="primary" htmlType="submit" loading={create.isPending}>
+            <Button type="primary" htmlType="submit" loading={create.isPending} disabled={create.isPending}>
               新增規則
             </Button>
           </div>

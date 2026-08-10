@@ -303,7 +303,7 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-        <Button type="primary" htmlType="submit" loading={update.isPending}>儲存</Button>
+        <Button type="primary" htmlType="submit" loading={update.isPending} disabled={update.isPending}>儲存</Button>
       </div>
     </Form>
   )

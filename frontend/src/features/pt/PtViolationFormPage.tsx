@@ -104,7 +104,7 @@ export default function PtViolationFormPage() {
               <Input.TextArea rows={3} maxLength={500} placeholder="選填" />
             </Form.Item>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button type="primary" htmlType="submit" loading={fileViolation.isPending}>
+              <Button type="primary" htmlType="submit" loading={fileViolation.isPending} disabled={fileViolation.isPending}>
                 送出勸導
               </Button>
             </div>

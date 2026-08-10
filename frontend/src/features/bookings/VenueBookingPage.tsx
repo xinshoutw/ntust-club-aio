@@ -200,7 +200,7 @@ export default function VenueBookingPage() {
             </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-            <Button type="primary" htmlType="submit" loading={createVenueBooking.isPending}>送出申請</Button>
+            <Button type="primary" htmlType="submit" loading={createVenueBooking.isPending} disabled={createVenueBooking.isPending}>送出申請</Button>
           </div>
         </Form>
       </div>

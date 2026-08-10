@@ -38,7 +38,6 @@
 | ISS-19 | 高 | 成員列表**行內編輯 blur 即送出 PATCH**,沒有確認也沒有復原。後端已略過未變更欄位,所以誤觸未改值不會動 `updated_at`;但只要真的改了值,`onupdate=func.now()` 就會蓋掉 `updated_at` —— 而遷移是把舊系統的**入社日期**寫進 `created_at` 與 `updated_at`,`MemberOut` 又只吐 `updated_at` 並在畫面顯示為「更新時間」。也就是說:一次行內編輯就永久蓋掉那份入社日期的可見副本(`created_at` 裡的那份還在,但 API 從不回傳) |
 | ISS-20 | 高 | **評審評分沒有截止或凍結機制**。成績公布後仍可覆寫,`review_scores` 只有一列、舊分數不留痕 |
 | ISS-21 | 中 | `presentation_score` 是 PUT 全量取代語意,任何省略該欄位的請求都會把已登的簡報分清成 NULL |
-| ISS-22 | 中 | AntD Button 的 `loading` 不設 DOM `disabled`,按 Enter 可重複送出建立兩筆申請 |
 
 ## 5. 權限與資料邊界
 

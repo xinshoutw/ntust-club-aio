@@ -287,7 +287,7 @@ export default function SignupFormPage() {
           <Button onClick={onSaveDraft} loading={saveDraft.isPending}>
             儲存草稿
           </Button>
-          <Button type="primary" htmlType="submit" loading={submit.isPending}>
+          <Button type="primary" htmlType="submit" loading={submit.isPending} disabled={submit.isPending}>
             送出報名
           </Button>
         </div>

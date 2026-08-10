@@ -78,7 +78,7 @@ export default function ChangePasswordPage() {
             <Input.Password value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" />
           </label>
           {error && <div style={{ fontSize: 13, color: '#C13B34' }}>{error}</div>}
-          <Button type="primary" htmlType="submit" loading={submitting} style={{ height: 42, marginTop: 4 }}>
+          <Button type="primary" htmlType="submit" loading={submitting} disabled={submitting} style={{ height: 42, marginTop: 4 }}>
             更新密碼
           </Button>
           <Button type="text" style={{ height: 36 }} onClick={() => void logout()}>

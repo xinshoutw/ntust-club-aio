@@ -358,7 +358,7 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
               尚未儲存
             </span>
           )}
-          <Button type="primary" htmlType="submit" loading={saving}>儲存</Button>
+          <Button type="primary" htmlType="submit" loading={saving} disabled={saving}>儲存</Button>
         </div>
       </Form>
     </div>

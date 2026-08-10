@@ -115,7 +115,7 @@ export default function CertificatePage() {
             </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-            <Button type="primary" htmlType="submit" disabled={matchState !== 'ok'} loading={create.isPending}>
+            <Button type="primary" htmlType="submit" disabled={matchState !== 'ok' || create.isPending} loading={create.isPending}>
               送出申請
             </Button>
           </div>

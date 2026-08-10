@@ -671,7 +671,7 @@ function ActivityForm({
               <Button loading={busy === 'draft'} disabled={busy === 'submit'} onClick={() => void saveDraft()}>
                 暫存草稿
               </Button>
-              <Button type="primary" htmlType="submit" loading={busy === 'submit'} disabled={busy === 'draft'}>
+              <Button type="primary" htmlType="submit" loading={busy === 'submit'} disabled={busy !== null}>
                 送出申請
               </Button>
             </div>

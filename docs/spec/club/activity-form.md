@@ -45,5 +45,4 @@
 - **工作分配與參加人數是純前端必填**:後端 `_require_complete` 只檢核名稱、起訖日期、起訖時間、地點,`staff_text` 與人數完全不驗
 - 活動已過期的退回件無法重送:日期選擇器與後端都禁過去時刻,社團只能竄改成未來日期或放棄
 - 附件區的「已使用 X/Y MB」顯示的是剩餘額度而非總上限
-- AntD Button 的 `loading` 不設 DOM `disabled`,連按 Enter 可送出兩筆申請
 - 承辦人核定金額不受「擬請補助」上限約束(見 [admin/review.md](../admin/review.md))

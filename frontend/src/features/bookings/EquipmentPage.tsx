@@ -256,7 +256,7 @@ export default function EquipmentPage() {
               <Input className="num" placeholder="申請聯絡人電話" maxLength={30} />
             </Form.Item>
 
-            <Button type="primary" htmlType="submit" block loading={createEquipmentLoan.isPending}>
+            <Button type="primary" htmlType="submit" block loading={createEquipmentLoan.isPending} disabled={createEquipmentLoan.isPending}>
               送出申請
             </Button>
           </Form>

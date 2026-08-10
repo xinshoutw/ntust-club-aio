@@ -110,7 +110,7 @@ export default function LoginPage() {
             />
           </label>
           {error && <div style={{ fontSize: 13, color: '#C13B34' }}>{error}</div>}
-          <Button type="primary" htmlType="submit" loading={submitting} style={{ height: 42, marginTop: 4, fontSize: 15 }}>
+          <Button type="primary" htmlType="submit" loading={submitting} disabled={submitting} style={{ height: 42, marginTop: 4, fontSize: 15 }}>
             登入
           </Button>
         </form>

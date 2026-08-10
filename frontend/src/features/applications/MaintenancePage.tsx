@@ -114,7 +114,7 @@ export default function MaintenancePage() {
             />
           </Form.Item>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <Button type="primary" htmlType="submit" loading={submit.isPending}>送出報修</Button>
+            <Button type="primary" htmlType="submit" loading={submit.isPending} disabled={submit.isPending}>送出報修</Button>
           </div>
         </Form>
       </div>

@@ -138,7 +138,7 @@ export default function PostalPage() {
             />
           </Form.Item>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-            <Button type="primary" htmlType="submit" loading={submit.isPending}>送出申請</Button>
+            <Button type="primary" htmlType="submit" loading={submit.isPending} disabled={submit.isPending}>送出申請</Button>
           </div>
         </Form>
       </div>

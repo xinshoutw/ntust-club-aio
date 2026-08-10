@@ -94,7 +94,7 @@ export default function ManualBookingPage() {
                 <Input className="num" placeholder="選填" maxLength={30} />
               </Form.Item>
               <div style={{ textAlign: 'right' }}>
-                <Button type="primary" htmlType="submit" loading={createVenue.isPending}>
+                <Button type="primary" htmlType="submit" loading={createVenue.isPending} disabled={createVenue.isPending}>
                   建立借用
                 </Button>
               </div>
@@ -124,7 +124,7 @@ export default function ManualBookingPage() {
                 <Input className="num" placeholder="選填" maxLength={30} />
               </Form.Item>
               <div style={{ textAlign: 'right' }}>
-                <Button type="primary" htmlType="submit" loading={createEquipment.isPending}>
+                <Button type="primary" htmlType="submit" loading={createEquipment.isPending} disabled={createEquipment.isPending}>
                   建立借用
                 </Button>
               </div>

@@ -144,10 +144,11 @@ async def update_member(
     member_id: int, body: MemberUpdate, user: ClubUser, db: DbDep
 ) -> ApiResponse[MemberOut]:
     member = await _own_member(db, user, member_id)
+    # 行內編輯自動儲存常送未變值;寫回會蓋掉 updated_at,列表的「更新時間」就不再可信
     changed = {
         field: value
         for field, value in body.model_dump(exclude_unset=True).items()
-        if getattr(member, field) != value  # 行內編輯自動儲存常送未變值,不得動 updated_at
+        if getattr(member, field) != value
     }
     if "student_id" in changed:
         dup = await db.scalar(
@@ -245,7 +246,7 @@ async def import_members(
             )
             created += 1
         elif (member.name, member.kind, member.title, member.phone) != (name, kind, title, phone):
-            # 值沒變就不觸碰:no-op 重匯不得改動 updated_at(ad5 名單更新依據)
+            # 同上:no-op 重匯不得改動 updated_at
             member.name, member.kind, member.title, member.phone = name, kind, title, phone
             updated += 1
 

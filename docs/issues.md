@@ -150,7 +150,6 @@
 | 編號 | 嚴重度 | 問題 |
 |---|---|---|
 | ISS-86 | 中 | 常數重複定義造成單一真相分裂,`PERIOD_TIMES` 最危險(前端 `api/bookings.ts` / 後端 `booking_service.py` 各一份) |
-| ISS-86b | 中 | **後端註解與測試 docstring 誤稱 `club_members.updated_at` 是 ad5 的採計依據**(`members.py` 的兩處註解、`test_members.py` 的 docstring)。ad5 實際是逐學期數人頭,完全不讀 `updated_at`;「值沒變就不寫入」的真正目的是讓列表的「更新時間」可信 |
 | ISS-87 | 中 | 違規銷案期限判定同時存在 Python 與 SQL 兩份實作,規則變動須同步兩處 |
 | ISS-88 | 中 | 跨 domain 的資料變更沒有 invalidate 對應查詢,畫面會顯示過期值;另有兩處 `keepPreviousData` 造成「顯示舊資料且可操作」 |
 | ISS-89 | 中 | 前端 25,000+ 行只有 8 個測試檔 35 個測試,元件測試環境根本沒建 |

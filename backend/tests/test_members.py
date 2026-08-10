@@ -179,7 +179,7 @@ async def test_member_default_order_by_role_weight(client, db):
 
 
 async def test_noop_reimport_keeps_updated_at(client, db):
-    """重匯同一份 CSV 不得改動 updated_at(ad5 名單更新分數的依據)。"""
+    """重匯同一份 CSV 不得改動 updated_at(列表顯示的「更新時間」)。"""
     await setup_club_session(client, db)
     csv_text = "陳大文,B11109001,社長\n李小明,B11109002,社員"
     await client.post(

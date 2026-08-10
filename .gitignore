@@ -25,3 +25,7 @@ migration/out/
 
 # IDE
 .idea/
+
+# 本機開發啟動腳本(每台機器不同,刻意不入版控)
+start-dev.sh
+compose.override.yml

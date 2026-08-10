@@ -8,33 +8,105 @@
 
 1. **第十四輪(2026-07-21)已完成**:pt/viewer 雙面板實裝、需求方 15 項、全站表格排序與欄寬
 2. **全面 code review(2026-07-25)已完成**:11 個獨立審查者平行審查,119 項 findings。原始 HTML 報告已刪除,結論全數併入 `issues.md` / `gaps.md`;需要逐項檔案行號時到 git 歷史取回
-3. **文件整理(2026-08-10)**:設計文件重寫為 spec 形式;程式碼註解移除日期戳與對話殘留
-4. **頁面規格(2026-08-10)**:逐頁盤點全部 51 個頁面 → `docs/spec/`;問題與缺口重新彙整為 `docs/issues.md`(104 項)與 `docs/gaps.md`。**一項都還沒修**
+3. **頁面規格(2026-08-10)**:逐頁盤點全部 51 個頁面 → `docs/spec/`;問題與缺口彙整為 `issues.md`(104 項)與 `gaps.md`
+4. **問題分堆(2026-08-10)**:全部條目依「修法是否唯一」分成下方 A/B/C 三堆,經一輪跨模型交叉審查修正。**一項都還沒修**
 
-## 第一件事
+**DEC-01 已定案:這學年評鑑要在新系統跑,但學年末才用** —— 2026-09 上線當下只需競賽報名(ISS-01)可用,整條彙總鏈排在上線之後。其餘 DEC-02~12 仍無答案。
 
-**有一批 commit 只存在這台 Mac**(`git rev-list --count origin/dev..dev` 查現值);`main` 也遠遠落後 `dev`。這是目前最大的單點故障,零成本可解 —— 先 push。
+## A — 保證可修
+
+修法唯一、不需任何人決策,改動限於程式碼 + 必要時單一 Alembic revision。
+
+**A1 上線阻擋** — ISS-01(含 GAP-09)、ISS-02、ISS-03、ISS-14b、ISS-53
+
+- ISS-01:補「列出啟用中獎項」端點 + 建立頁 `is_eval` 開關 + 社團端獎項複選(複選由 `signup_awards` 複合主鍵定死)
+- ISS-02:移除側欄入口 + 刪假頁;真頁屬 GAP-04
+- ISS-03:`CertificatePage.tsx:15` 的 `TERMS` 改由 `lib/semester.ts` 推導,維持現行三項形狀
+- ISS-14b:`requested_total == 0` 時不接受 `body.budget`、不寫 `school_approved`
+- ISS-53:三處都補 `_aware()`
+
+**A2 高嚴重度** — ISS-05、ISS-06、ISS-13b、ISS-15+ISS-16(合為一項)、ISS-18、ISS-32、ISS-38b、ISS-45、ISS-46、ISS-77b
+
+- ISS-15+16 必須一起修:清 `approved_subsidy` 要同時涵蓋 PUT 編輯與 `submit_activity` 直接重送兩條路徑,只修一條會留下「逐項核定已清、`school_approved` 是舊值」。前端預填不動
+- ISS-18 只鋪既有的 `useUnsavedGuard`;頁內導航要等資料 router(見 B)
+- ISS-32 四處都要改(社團端檢核、器材主檔可借數、待審單可借數、行政手動借用)
+
+**A3 其餘**(可上線後補)
+
+- 併發與完整性:ISS-37、ISS-39(鎖鍵 `club_id` 非 `venue_id`)、ISS-40、ISS-41、ISS-42、ISS-44、ISS-26
+- 效能:ISS-47、ISS-48、ISS-49、ISS-50、ISS-52
+- 正確性與錯誤處理:ISS-21、ISS-22、ISS-27、ISS-28、ISS-34(前端改為每次 render 計算)、ISS-35、ISS-57、ISS-58、ISS-59、ISS-60、ISS-87(`_DEADLINE_SQL` 搬進 `violation_service` 與 `RESOLVE_MONTHS` 共用)
+- 畫面與資料落差:ISS-07、ISS-08、ISS-11、ISS-12、ISS-12b、ISS-68~ISS-73、ISS-74、ISS-74d、ISS-74e、ISS-75、ISS-76、ISS-77、ISS-77c
+- 稽核:ISS-61~ISS-64
+- 文案樣式無障礙:ISS-78、ISS-79、ISS-80、ISS-81、ISS-82、ISS-84
+- 一致性:ISS-17、ISS-85、ISS-85b、ISS-86b、ISS-88
+- 維運:OPS-02、OPS-08、OPS-09、OPS-10
+- 補做:GAP-05 場地主檔 CRUD(照抄器材主檔)
+
+含新增 Alembic revision 的:ISS-26、ISS-44、ISS-50。
+
+## B — 需決定
+
+| 編號 | 要決定什麼 |
+|---|---|
+| ISS-09 | 報修/郵局附件:前端改非必填對齊後端,還是後端改必填並補逐列補傳入口 |
+| ISS-10 | 郵局新代理人必填條件以哪端為準(牽 DEC-06) |
+| ISS-13 | 三旗標改 fail-closed 後,承辦漏勾即把該活動 ad2/ad3/ad4 歸零且無回復路徑。「預設不勾照樣可核准」與「未勾不得核准」是相反的失效模式 |
+| ISS-14 | 核定金額可否高於擬請補助(= DEC-09) |
+| ISS-19 | `MemberOut` 加回 `created_at` 之後,那欄標「入社日期」(對新建列語意不符)還是另加 `joined_on` |
+| ISS-23 | 檔案下載要拆成哪幾類、哪個權限鍵看哪類 |
+| ISS-25 | 重設社團密碼歸 super 還是 `amember` |
+| ISS-29 | 過期退回件重送:允許保留原日期,還是強制改未來 |
+| ISS-30 | 結案逾鎖定期限的退回件可否自行重送 |
+| ISS-31 | 開放窗結束後承辦要不要還能審(= DEC-03) |
+| ISS-33 | 開放窗跨學期時目標學期以何為準 |
+| ISS-36 | 要不要硬擋同一人連簽、擋相鄰還是所有關卡、super 是否例外。承辦兼組長時硬擋會讓整條簽核卡死 |
+| ISS-38 | 補交叉查詢後,一天的臨時借用會讓整學期固定借用永遠核准不了;衝突時誰讓步卡在 ISS-74b |
+| ISS-43 | 磁碟 TOCTOU:改預留配額還是上傳前置閘 |
+| ISS-51 | 上傳大小改 streaming 檢查還是中介層擋 |
+| ISS-54 | 大型活動認可可否於後續關卡補正 |
+| ISS-55 | 無 `activity_reports` 的已結案活動該不該拿 ad2 照片分 |
+| ISS-55b | 序號跨單去重:應用層 `&&` 檢核,還是拆子表 + 回填 + 改寫點交端點(`serials` 是 `ARRAY(Text)`,PG 建不了跨列 UNIQUE) |
+| ISS-65 | Discord/Email 重試:記憶體重試還是落地佇列表 |
+| ISS-66 | 提醒次數上限(牽 DEC-11) |
+| ISS-74b | 已核准借用撤銷的語意與 10 節額度回歸。**ISS-38 卡在這** |
+| ISS-74c | `aclose` 是否涵蓋結案核准(= DEC-05) |
+| ISS-83 | 要不要自架 Noto Serif TC |
+| ISS-86 | `PERIOD_TIMES` 單一真相:後端出端點還是共用產生器 |
+| — | 前端要不要改資料 router(決定 ISS-18 能否攔頁內導航) |
+| — | 幹部證明要不要能選歷史學年期(ISS-03 之外的功能問題) |
+| GAP-06 | 政府行事曆假日的資料來源與匯入格式 |
+| GAP-08 | 檔案歸檔政策 |
+| GAP-10 | 報名活動修改/關閉時已報名者怎麼處理 |
+| GAP-11 | `Club.attribute` 是 PG enum 不是主檔表,`ClubProfileUpdate` 也沒這欄:要 enum 轉查表,還是只做「指派社團性質」 |
+| GAP-12 | 逾時待審自動駁回的天數與適用類別 |
+| GAP-13 | 批次核准/衝突連鎖自動駁回的規則 |
+| GAP-15 | 待審申請彙整要併哪些類別 |
+| GAP-17 | 公開頁要做哪幾頁 |
+| GAP-18 | 7 類未發通知的動作與文案 |
+| OPS-01 | 備份標的、保留週期、存放位置 |
+| OPS-04 | 正式器材主檔的實際清單資料從哪來 |
+| OPS-05 | Edge proxy 六項切換的執行時點 |
+| OPS-06 | SMTP relay 用哪個 |
+| OPS-07 | 容量告警門檻與通報管道 |
+| MIG-01~07 · DEC-02~12 | 全部待決 |
+
+## C — 單獨排程
+
+| 項目 | 內容 |
+|---|---|
+| 評鑑彙總鏈 | GAP-01 → 02 → 03 → 04,連帶 ISS-04、ISS-20、ISS-12c/GAP-08b、GAP-07、GAP-19。當**單一開發段落**規劃,不要拆散;學年末前完成即可 |
+| ISS-24 | 權限鍵 `areview`/`aact`、`asignup`/`areg` 統一。**死線在正式建帳號之前,比上線還早** |
+| ISS-89 / ISS-90 | 前端元件測試環境 + 併發/權限矩陣/時區邊界測試 |
+| GAP-14 | 統計與匯出 |
+| GAP-16 | 社團導覽首頁 |
+| ISS-67 / GAP-18 | 行政/工讀生/評審端通知鈴鐺 |
 
 ## 驗證現況(2026-07-25 實測)
 
 - 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → 262 passed;`ruff check .` 全綠;覆蓋率 95%(較低者:notify 73%、audit 77%、signup_service 82%)
 - 前端 `pnpm exec tsc -b` → 0 錯;`pnpm test` → 35 passed;`pnpm run lint` → 僅 8 個既有 fast-refresh warning
 - `git log --all` 確認 `.env` 與 `migration/out` 從未進版控
-
-## 下一輪待辦
-
-1. **零成本**:push 未推的 commit(`gaps.md` OPS-03)
-2. **一次問完承辦**:`gaps.md` §6 的 12 項待決。其中 `DEC-01`(**這學年評鑑要不要在新系統跑**)決定整條評鑑彙總鏈是不是硬阻擋,牽動整個上線排程
-3. **不需等人、約一天的小修**:`issues.md` ISS-02(移除評鑑結果頁入口)、ISS-17(假密碼 fallback)、ISS-03(幹部證明學年期改推導)、ISS-53(遷移三處補時區)、ISS-06(手動借用移掉 `disabledDate`)、`gaps.md` OPS-02(ENV guard)、OPS-08(CI 補 test/lint + SHA tag)
-4. **上線前必辦、工作量較大**:OPS-01 備份機制、GAP-06 假日匯入、OPS-04 器材主檔進正式 seed、**ISS-14b 無補助案單關核定任意金額**、ISS-23 檔案下載權限收斂、ISS-13b 臨時借用不擋已結束活動、ISS-47 行政分 N+1 與分頁、ISS-24 權限鍵統一(**要在正式建帳號之前**)、OPS-05 edge 切換演練、GAP-05 場地主檔 CRUD、GAP-12 逾時待審自動駁回
-
-   `issues.md` 現有 6 項標「阻擋」:ISS-01(競賽報名走不通)、ISS-02(評鑑結果頁假分數)、ISS-03(幹部證明學年期硬編)、ISS-14b(無補助案單關核定)、ISS-23(檔案下載權限)、ISS-53(遷移時區)
-5. **競賽報名整條路徑走不通**(ISS-01):`is_eval` 建不出來、社團端也送不出獎項。要跑競賽報名就得先修這條
-6. **「這學年要跑評鑑」才需要的大工程**:`gaps.md` §1 的 GAP-01→04 四項同屬「評鑑成績彙總鏈」,`services/evaluation.py` 目前只有行政分自動計算、完全沒有跨評審彙總這一層,建議當單一開發段落規劃,不要拆散
-
-## 已逐條比對確認正確,不要重審
-
-前後端計分邏輯 100% 等價(14 項規則);`PERIOD_TIMES` 前端/後端/舊 clubclass 三方零差異;守衛覆蓋率 100%(除 `/health` 與 `/auth/login`);社團端零 IDOR;viewer 收斂到「分組×獎項×年度」;models ↔ migration 欄位/索引/約束零差異(46 表);17 個 migration 單一線性鏈且全部有 downgrade;密碼政策全數落地;首登強制改密無法繞過;`add_months` 月底夾底與 PG `interval '1 month'` 同義;金額全為整數元;檔案路徑穿越/下載 XSS/Content-Disposition injection 皆不成立;時區全程台北無 naive/aware 混用。
 
 ## 其他待處理
 
@@ -46,3 +118,4 @@
 - db 預設走 5432;OrbStack VM 佔用該埠時改 55432(`.env` `POSTGRES_PORT` + `compose.override.yml`,兩者皆不入版控)。pnpm 走 corepack
 - 測試庫可平行:`CLUB_AIO_TEST_DB=<name>` 覆寫(多 worktree 各用一庫)
 - 未進版控且刻意不入的檔案:`start-dev.sh`(db 埠若被佔用另加 `compose.override.yml`)
+</content>

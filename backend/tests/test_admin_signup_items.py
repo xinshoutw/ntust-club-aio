@@ -4,7 +4,8 @@ from datetime import UTC, datetime, timedelta
 
 import sqlalchemy as sa
 
-from app.models import AuditLog, Signup, SignupEntry
+from app.models import AuditLog, Award, Signup, SignupEntry
+from app.models.enums import AwardKind
 from tests.conftest import csrf_headers, login, make_club, make_user
 
 URL = "/api/v1/admin/signup-items"
@@ -67,6 +68,34 @@ async def test_create_item_defaults_and_field_keys(client, db):
     assert await db.scalar(
         sa.select(AuditLog.id).where(AuditLog.action == "signup_item_created")
     ) is not None
+
+
+async def test_registrations_expose_awards_for_eval_items(client, db):
+    """學務處要看得出哪個社團報了哪個獎項,否則競賽報名收了資料也用不到。"""
+    club = await seed(client, db)
+    db.add(Award(id="club", name="最佳社團獎", kind=AwardKind.GROUP))
+    await db.commit()
+    item_id = (
+        await client.post(
+            URL, json=body(name="社團競賽報名", is_eval=True), headers=csrf_headers(client)
+        )
+    ).json()["data"]["id"]
+
+    await login(client, "club01")
+    resp = await client.post(
+        f"/api/v1/club/signup-items/{item_id}/signup",
+        json={
+            "participants": [{"answers": {"f1": "0912", "f2": "葷"}}],
+            "awards": ["club"],
+        },
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201, resp.text
+
+    await login(client, "regadmin")
+    regs = (await client.get(f"{URL}/{item_id}/registrations")).json()["data"]
+    assert regs[0]["club_id"] == club.id
+    assert regs[0]["awards"] == ["最佳社團獎"]
 
 
 async def test_create_item_validations(client, db):

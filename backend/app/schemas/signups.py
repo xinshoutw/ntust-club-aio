@@ -178,3 +178,4 @@ class RegistrationOut(BaseModel):
     created_at: datetime
     attended_sessions: int = 0  # 已簽到場次數(場次制);非場次制 0/1
     entries: list[EntryOut] = []
+    awards: list[str] = []  # 競賽報名勾選的獎項名(依 Award.sort)

@@ -18,7 +18,16 @@ from app.api.pagination import Pagination
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, not_found, validation_error
 from app.core.semesters import TAIPEI, semester_of
-from app.models import Club, SessionAttendance, Signup, SignupEntry, SignupItem, SignupItemSession
+from app.models import (
+    Award,
+    Club,
+    SessionAttendance,
+    Signup,
+    SignupAward,
+    SignupEntry,
+    SignupItem,
+    SignupItemSession,
+)
 from app.models.enums import SignupKind
 from app.schemas.admin import AttendanceIn, SessionAttendanceOut, SessionIn, SessionOut
 from app.schemas.common import ApiResponse
@@ -183,6 +192,17 @@ async def list_registrations(
     for club_id, count in rows:
         attended[club_id] = int(count)
 
+    awards: dict[int, list[str]] = {}
+    if item.is_eval:
+        award_rows = await db.execute(
+            sa.select(SignupAward.signup_id, Award.name)
+            .join(Award, Award.id == SignupAward.award_id)
+            .where(SignupAward.signup_id.in_([s.id for s in signups] or [0]))
+            .order_by(Award.sort, Award.id)
+        )
+        for signup_id, name in award_rows:
+            awards.setdefault(signup_id, []).append(name)
+
     data = [
         RegistrationOut(
             club_id=s.club_id,
@@ -192,6 +212,7 @@ async def list_registrations(
             created_at=s.created_at,
             attended_sessions=attended.get(s.club_id, 0),
             entries=[EntryOut.model_validate(e) for e in s.entries],
+            awards=awards.get(s.id, []),
         )
         for s in signups
     ]

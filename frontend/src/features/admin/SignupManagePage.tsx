@@ -61,10 +61,19 @@ function ManageModal({
       return
     }
     downloadCsv(`報名名單_${item.name}.csv`, [
-      ['社團', '姓名', '學號', '系級', ...item.fields.map((f) => f.label), '報名狀態'],
+      [
+        '社團',
+        ...(item.isEval ? ['參賽獎項'] : []),
+        '姓名',
+        '學號',
+        '系級',
+        ...item.fields.map((f) => f.label),
+        '報名狀態',
+      ],
       ...regs.flatMap((r) =>
         r.participants.map((p) => [
           r.club,
+          ...(item.isEval ? [r.awards.join('、')] : []),
           answerText(p.name),
           answerText(p.studentId),
           answerText(p.dept),
@@ -231,7 +240,12 @@ function ManageModal({
           {regs.map((r) => (
             <div key={r.clubId} style={{ padding: '10px 14px', borderTop: '1px solid var(--line)', marginTop: -1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                <div style={{ fontSize: 14, flex: 1, minWidth: 140 }}>{r.club}</div>
+                <div style={{ fontSize: 14, flex: 1, minWidth: 140 }}>
+                  {r.club}
+                  {r.awards.length > 0 && (
+                    <span style={{ fontSize: 12, color: 'var(--steel)', marginLeft: 8 }}>{r.awards.join('、')}</span>
+                  )}
+                </div>
                 <div className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>{r.count} 人</div>
                 {/* 簽到:評鑑僅採計簽到;負責人會議逐場登錄,出席場次數=各場加總 */}
                 {item.sessionBased ? (

@@ -32,6 +32,7 @@ export interface AdminSignupItem {
   peopleCount: number
   pendingCount: number // 審核制:待確認的報名社團數
   sessionBased: boolean
+  isEval: boolean // 競賽報名:名單帶參賽獎項
   eventAt?: string // 活動時間 YYYY/MM/DD HH:mm
   eventEnded: boolean // 活動日已過(可登錄簽到;後端以場次/活動日檢核)
   fields: SignupField[] // 自訂欄位(已排除基本欄位)
@@ -53,6 +54,7 @@ interface AdminSignupItemOut {
   signup_end: string | null
   max_participants: number
   session_based: boolean
+  is_eval: boolean
   accepting: boolean
   clubs_count: number
   people_count: number
@@ -79,6 +81,7 @@ const toItem = (s: AdminSignupItemOut): AdminSignupItem => ({
   peopleCount: s.people_count,
   pendingCount: s.pending_count,
   sessionBased: s.session_based,
+  isEval: s.is_eval,
   eventAt: s.event_at ? dayjs(s.event_at).format(DATETIME_FMT) : undefined,
   eventEnded: !s.event_at || !dayjs(s.event_at).isAfter(dayjs(), 'day'),
   fields: s.fields.filter((f) => !BASE_KEYS.has(f.key)).map(toField),
@@ -93,6 +96,7 @@ export interface Registration {
   confirmed: boolean
   attendedSessions: number
   participants: Record<string, unknown>[] // 每人填答:{name, studentId, dept, ...自訂欄位}
+  awards: string[] // 競賽報名勾選的獎項名;非競賽報名為空
 }
 
 interface RegistrationOut {
@@ -103,6 +107,7 @@ interface RegistrationOut {
   created_at: string
   attended_sessions: number
   entries: { id: number; answers: Record<string, unknown> }[]
+  awards: string[]
 }
 
 const toRegistration = (r: RegistrationOut): Registration => ({
@@ -112,6 +117,7 @@ const toRegistration = (r: RegistrationOut): Registration => ({
   confirmed: r.confirmed,
   attendedSessions: r.attended_sessions,
   participants: r.entries.map((e) => e.answers),
+  awards: r.awards ?? [],
 })
 
 // ---- 場次(負責人會議等場次制活動的逐場簽到) ----

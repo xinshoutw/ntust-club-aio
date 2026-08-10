@@ -192,16 +192,23 @@ export default function SignupFormPage() {
         {/* 競賽報名:獎項可複選,後端要求至少一項 */}
         {item.isEval && (
           <div className="card" style={{ marginTop: 16, padding: '18px 24px' }}>
-            <Form.Item
-              name="awards"
-              label="參賽獎項"
-              rules={[{ required: true, message: '請至少勾選一個參賽獎項' }]}
-              style={{ marginBottom: 0 }}
-            >
-              <Checkbox.Group
-                options={item.awardOptions.map((a) => ({ value: a.id, label: a.name }))}
-              />
-            </Form.Item>
+            {item.awardOptions.length ? (
+              <Form.Item
+                name="awards"
+                label="參賽獎項"
+                rules={[{ required: true, message: '請至少勾選一個參賽獎項' }]}
+                style={{ marginBottom: 0 }}
+              >
+                <Checkbox.Group
+                  options={item.awardOptions.map((a) => ({ value: a.id, label: a.name }))}
+                />
+              </Form.Item>
+            ) : (
+              // 獎項全停用時 required 規則永遠過不了,直接說明而不是讓表單無解
+              <div style={{ fontSize: 13, color: 'var(--steel)' }}>
+                目前沒有開放中的參賽獎項,請洽學務處。
+              </div>
+            )}
           </div>
         )}
 

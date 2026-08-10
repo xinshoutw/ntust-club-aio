@@ -79,8 +79,8 @@ REST JSON,前綴 `/api/v1`。回應信封:
 | 403 | `CSRF_FAILED` | CSRF 驗證失敗 |
 | 403 | `PASSWORD_CHANGE_REQUIRED` | 首登未改密(僅放行改密/登出/me) |
 | 403 | `ACCOUNT_LOCKED` | 連錯 5 次鎖 15 分 |
-| 404 | `NOT_FOUND` | 資源不存在或不屬於該社團(不區分,避免探測) |
 | 403 | `CLUB_SUSPENDED` | 社團停權中,借用申請被擋 |
+| 404 | `NOT_FOUND` | 資源不存在或不屬於該社團(不區分,避免探測) |
 | 409 | `CONFLICT` | 狀態衝突(重複報名、重複時段) |
 | 409 | `SLOT_TAKEN` | 時段已被借走 |
 | 409 | `SLOT_BLOCKED` | 時段落在場地不開放規則 |

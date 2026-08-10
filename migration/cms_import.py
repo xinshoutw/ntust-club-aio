@@ -122,6 +122,10 @@ def local_time(dt: datetime | None) -> time | None:
     return _aware(dt).astimezone(TAIPEI).time().replace(second=0, microsecond=0) if dt else None
 
 
+def local_dt(dt: datetime | None) -> datetime | None:
+    return _aware(dt) if dt else None
+
+
 # ---------------------------------------------------------------------------
 # legacy_id_map 快取
 # ---------------------------------------------------------------------------
@@ -480,7 +484,7 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
             staff_text=";".join(staffs.get(a.id, [])),
             status=status,
             created_by=user_id,
-            **({"created_at": a.SetupTime} if a.SetupTime else {}),
+            **({"created_at": local_dt(a.SetupTime)} if a.SetupTime else {}),
         )
         db.add(activity)
         await db.flush()
@@ -515,7 +519,9 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
                     others="",
                     review_meeting=False,
                     expense=sum(f.TotalExpense or 0 for f in funds.get(a.id, [])),
-                    submitted_at=a.FinishTime or a.EndTime or datetime.now(TAIPEI),
+                    submitted_at=local_dt(a.FinishTime)
+                    or local_dt(a.EndTime)
+                    or datetime.now(TAIPEI),
                     photos_confirmed=meta.get("photo", True),
                     report_confirmed=meta.get("performance_report", True),
                     reflections_confirmed=meta.get("experience_feedback", True),
@@ -549,7 +555,7 @@ async def import_news(legacy, db: AsyncSession, ids: IdMap) -> None:
             content=f"[{row.title}]({row.url})" if row.url else row.title,
             target_type=AnnouncementTarget.ALL,
             created_by=creator,
-            **({"created_at": row.create_date} if row.create_date else {}),
+            **({"created_at": local_dt(row.create_date)} if row.create_date else {}),
         )
         db.add(ann)
         await db.flush()

@@ -91,6 +91,7 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
   onGoClose: () => void
   onPreviewFile: (f: EvalFile) => void
 }) {
+  const { message } = App.useApp()
   if (!a) return null
   const editable = a.status === 'draft' || a.status === 'rejected'
   const rep = a.status === 'closed' || a.status === 'closing_pending_advisor' ? detail?.report : undefined
@@ -114,7 +115,11 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
   const onDownload = ({ key }: { key: string }) => {
     // 照片打包成 zip(僅 archive);成果報告與心得的 PDF 由後端依 docs/模板_*.docx
     // 於下載時動態生成,版面不可自由設計
-    if (key === 'photos') void downloadPhotosZip(`${a.name}_照片`, photos)
+    if (key === 'photos') {
+      downloadPhotosZip(`${a.name}_照片`, photos).catch((e: unknown) =>
+        message.error(e instanceof Error ? e.message : '照片下載失敗'),
+      )
+    }
     if (key === 'feedback' && rep) downloadEvalFile(activityReflectionsPdf(a, rep.submittedAt))
     if (key === 'report' && rep) downloadEvalFile(activityReportPdf(a, rep.submittedAt))
   }

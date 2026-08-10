@@ -97,10 +97,15 @@ export function zipStore(entries: { name: string; data: Uint8Array }[]): Blob {
 // 照片打包下載(zip 僅 archive 不壓縮;檔名加序號避免重名)
 export async function downloadPhotosZip(zipName: string, files: EvalFile[]): Promise<void> {
   const entries = await Promise.all(
-    files.map(async (f, i) => ({
-      name: `${String(i + 1).padStart(2, '0')}_${f.name}`,
-      data: new Uint8Array(await (await fetch(f.url)).arrayBuffer()),
-    })),
+    files.map(async (f, i) => {
+      const res = await fetch(f.url, { credentials: 'same-origin' })
+      // 不檢查就把錯誤信封的 JSON 當照片打進 zip:使用者拿到一包壞檔卻毫無提示
+      if (!res.ok) throw new Error(`無法取得 ${f.name}(HTTP ${res.status})`)
+      return {
+        name: `${String(i + 1).padStart(2, '0')}_${f.name}`,
+        data: new Uint8Array(await res.arrayBuffer()),
+      }
+    }),
   )
   const url = URL.createObjectURL(zipStore(entries))
   const a = document.createElement('a')

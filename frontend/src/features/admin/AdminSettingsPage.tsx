@@ -16,7 +16,8 @@ const sectionTitle: React.CSSProperties = { fontSize: 15, fontWeight: 600, margi
 const DATE_FMT = 'YYYY/MM/DD'
 
 // AntD 原生「可編輯標籤」模式(官方 Tag 範例):closable Tag + 虛線「新增」Tag,
-// 點擊變成小輸入框,Enter 或失焦即新增
+// 點擊變成小輸入框,Enter 或失焦即新增。
+// 不可改用 Select 或自製風格輸入:需求方要的是 AntD 內建的可編輯標籤
 function TagListInput({ value = [], onChange }: { value?: string[]; onChange?: (next: string[]) => void }) {
   const [adding, setAdding] = useState(false)
   const [draft, setDraft] = useState('')

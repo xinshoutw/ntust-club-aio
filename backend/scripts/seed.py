@@ -209,7 +209,7 @@ def verify_rubrics() -> None:
 
 
 # 場地主檔 19 處,與 frontend/src/features/bookings/mock.ts VENUES 對齊;
-# 之後由管理員後台維護,數量/容納人數可調)
+# 之後由管理員後台維護,數量與容納人數可調
 # (名稱, 類別, 容納人數, allow_fixed, allow_temp)
 VENUES: list[tuple[str, VenueCategory, int, bool, bool]] = [
     ("S204 共享食堂", VenueCategory.CLASSROOM, 60, True, True),

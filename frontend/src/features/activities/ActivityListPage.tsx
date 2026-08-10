@@ -112,7 +112,8 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
     { key: 'report', label: '下載活動成果報告', disabled: !rep },
   ]
   const onDownload = ({ key }: { key: string }) => {
-    // 照片打包成 zip(僅 archive);成果報告與心得的 PDF 由後端於下載時動態生成
+    // 照片打包成 zip(僅 archive);成果報告與心得的 PDF 由後端依 docs/模板_*.docx
+    // 於下載時動態生成,版面不可自由設計
     if (key === 'photos') void downloadPhotosZip(`${a.name}_照片`, photos)
     if (key === 'feedback' && rep) downloadEvalFile(activityReflectionsPdf(a, rep.submittedAt))
     if (key === 'report' && rep) downloadEvalFile(activityReportPdf(a, rep.submittedAt))

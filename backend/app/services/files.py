@@ -223,7 +223,8 @@ async def save_upload(
     sniff, mime = _SIGNATURES[ext]
     max_size = await _policy_max_size(db, policy)
 
-    # 配額檢查:系統總量以實際磁碟可用空間為準。此處先做「無鎖」預檢,
+    # 配額檢查:系統總量以實際磁碟可用空間為準,不足時只告警、由人介入,無自動強制。
+    # 此處先做「無鎖」預檢,
     # per-club 權威結算在串流完成後取 advisory lock 再重算
     # (避免慢速上傳在串流期間霸佔全域鎖)
     limits = await get_setting(db, "storage_limits")
@@ -356,7 +357,7 @@ async def can_access(db: AsyncSession, file: File, user: User) -> bool:
         case UserRole.ADMIN:
             return True
         case UserRole.STAFF:
-            # 最小權限:工讀生職務=報修/違規/器材點交,
+            # 最小權限(資安審查結論,擴權須重審):工讀生職務=報修/違規/器材點交,
             # 郵局存簿、活動附件、評鑑上傳等敏感檔不開放
             return file.subject_type in {"maintenance", "violation"}
         case UserRole.CLUB:

@@ -98,7 +98,7 @@ class FixedWindowOut(BaseModel):
     open_until: date | None
 
 
-# 聯絡電話僅允許 數字與 -  * #
+# 聯絡電話僅允許 數字與 - ( ) * #
 _PHONE_RE = re.compile(r"^[0-9\-()*#]+$")
 
 

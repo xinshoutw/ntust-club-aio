@@ -46,7 +46,7 @@ createRoot(document.getElementById('root')!).render(
           fontSize: 14,
           fontFamily: FONT_FAMILY,
           controlHeight: 40,
-          // 全域動畫加速(再快一點):預設 motionUnit 0.1 → Fast/Mid/Slow
+          // 全域動畫加速:預設 motionUnit 0.1 → Fast/Mid/Slow
           // = 0.1/0.2/0.3s,改 0.06 → 0.06/0.12/0.18s(Modal 進出場吃 Slow)
           motionUnit: 0.06,
         },

@@ -325,7 +325,8 @@ async def approve_equipment_loan(
 ) -> ApiResponse[AdminEquipmentLoanOut]:
     loan = await _pending_loan(db, loan_id)
     equipment = await db.get(Equipment, loan.equipment_id)
-    # 可借數不足仍可核准:屬管理員裁量,列表以紅字警示
+    # 可借數不足仍可核准:屬管理員裁量,列表以紅字警示。
+    # 是否改為硬性檢核尚未拍板,勿逕行加擋
     loan.status = LoanStatus.APPROVED
     _record_approval(db, ApprovalSubject.EQUIPMENT_LOAN, loan.id, ApprovalDecision.APPROVE, user)
     audit.record(

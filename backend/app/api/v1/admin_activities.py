@@ -437,7 +437,7 @@ async def close_approve(
     db: DbDep,
     request: Request,
     background: BackgroundTasks,
-    body: CloseApproveIn | None = None,
+    body: CloseApproveIn,
 ) -> ApiResponse[None]:
     activity = await _get_activity(db, activity_id, for_update=True)
     if activity.status != ActivityStatus.CLOSING_PENDING_ADVISOR:
@@ -445,13 +445,13 @@ async def close_approve(
     _require_stage_key(user, "approve_advisor")  # 結案:承辦人單關
 
     activity.status = ActivityStatus.CLOSED
-    # 繳交確認:未確認之項目評鑑以 0 分計(寫入 report,scoring 讀取)
-    if body is not None:
-        report = await db.get(ActivityReport, activity.id)
-        if report is not None:
-            report.photos_confirmed = body.photos_confirmed
-            report.report_confirmed = body.report_confirmed
-            report.reflections_confirmed = body.reflections_confirmed
+    # 繳交確認:未確認之項目評鑑以 0 分計(寫入 report,scoring 讀取)。
+    # body 必填且三值一律明寫,model 的 server_default 只是審核前的佔位值
+    report = await db.get(ActivityReport, activity.id)
+    if report is not None:
+        report.photos_confirmed = body.photos_confirmed
+        report.report_confirmed = body.report_confirmed
+        report.reflections_confirmed = body.reflections_confirmed
     _record(db, activity, ApprovalSubject.ACTIVITY_CLOSE, "advisor", ApprovalDecision.APPROVE, user)
     audit.record(
         db,

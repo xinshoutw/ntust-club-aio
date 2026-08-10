@@ -345,7 +345,9 @@ async def test_close_review_flow(client, db):
 
     await login(client, "advisor")
     resp = await client.post(
-        f"/api/v1/admin/activities/{aid}/close-approve", headers=csrf_headers(client)
+        f"/api/v1/admin/activities/{aid}/close-approve",
+        json={"photos_confirmed": True, "report_confirmed": True, "reflections_confirmed": True},
+        headers=csrf_headers(client),
     )
     assert resp.status_code == 200
     assert (await db.scalar(sa.select(Activity.status).where(Activity.id == aid))).value == "closed"
@@ -443,9 +445,22 @@ async def test_close_approve_persists_submission_confirmations(client, db):
     assert resp.status_code == 200
 
     await login(client, "advisor")
+    # 三項皆必填:省略欄位等於預設全採計,直呼 API 就能繞過整個確認動作
+    for partial in ({"photos_confirmed": False, "reflections_confirmed": False}, {}):
+        resp = await client.post(
+            f"/api/v1/admin/activities/{aid}/close-approve",
+            json=partial,
+            headers=csrf_headers(client),
+        )
+        assert resp.status_code == 422
+
     resp = await client.post(
         f"/api/v1/admin/activities/{aid}/close-approve",
-        json={"photos_confirmed": False, "reflections_confirmed": False},
+        json={
+            "photos_confirmed": False,
+            "report_confirmed": True,
+            "reflections_confirmed": False,
+        },
         headers=csrf_headers(client),
     )
     assert resp.status_code == 200

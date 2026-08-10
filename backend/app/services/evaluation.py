@@ -111,8 +111,9 @@ async def gather_scoring_input(db: AsyncSession, club_id: int, window: EvalWindo
 
     # 結案審核的繳交確認:未確認之項目以 0 分計(照片確認同時涵蓋影片連結)
     def _confirmed(aid: int, field: str) -> bool:
+        # 沒有成果報告表就沒有繳交可言:照片分不得繞過報告表存在與否
         report = reports.get(aid)
-        return bool(getattr(report, field)) if report is not None else True
+        return bool(getattr(report, field)) if report is not None else False
 
     results = tuple(
         ActivityResult(

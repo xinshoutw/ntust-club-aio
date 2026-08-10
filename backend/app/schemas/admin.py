@@ -54,11 +54,16 @@ class RejectIn(BaseModel):
 
 
 class CloseApproveIn(BaseModel):
-    """結案核准繳交確認:未確認之項目評鑑以 0 分計(照片確認涵蓋影片連結)。"""
+    """結案核准繳交確認:未確認之項目評鑑以 0 分計(照片確認涵蓋影片連結)。
 
-    photos_confirmed: bool = True
-    report_confirmed: bool = True
-    reflections_confirmed: bool = True
+    三項皆必填 —— 送出結案時後端就強制照片 ≥1 張、心得 ≥3 篇,所以這裡確認的是
+    「承辦認不認可採計」而非「有沒有繳」。省略欄位等於預設全採計,直呼 API 就能
+    繞過整個確認動作,故不給預設值。
+    """
+
+    photos_confirmed: bool
+    report_confirmed: bool
+    reflections_confirmed: bool
 
 
 class ScoreOverrideIn(BaseModel):

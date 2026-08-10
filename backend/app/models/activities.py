@@ -104,7 +104,9 @@ class ActivityReport(Base, TimestampMixin):
     expense: Mapped[int] = mapped_column()  # 實際支出(核銷依據)
     submitted_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True))
     # 結案審核繳交確認:承辦人核准時逐項確認,
-    # 未確認之項目評鑑以 0 分計(scoring 讀取;照片確認同時涵蓋影片連結)
+    # 未確認之項目評鑑以 0 分計(scoring 讀取;照片確認同時涵蓋影片連結)。
+    # 預設 True 只是「尚未審核」的佔位值 —— close_approve 的 body 必填且一律三值全寫,
+    # 活動要轉 CLOSED 只有那條路,所以已結案的列不會留著這個預設值
     photos_confirmed: Mapped[bool] = mapped_column(default=True, server_default=sa.true())
     report_confirmed: Mapped[bool] = mapped_column(default=True, server_default=sa.true())
     reflections_confirmed: Mapped[bool] = mapped_column(default=True, server_default=sa.true())

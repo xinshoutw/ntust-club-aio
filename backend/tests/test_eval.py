@@ -29,7 +29,9 @@ async def setup(client, db):
     return club, user, admin
 
 
-async def seed_closed_activity(db, club, user, *, day, large=False, photos=0, video=None):
+async def seed_closed_activity(
+    db, club, user, *, day, large=False, photos=0, video=None, with_report=True
+):
     activity = Activity(
         club_id=club.id,
         name="活動",
@@ -46,7 +48,7 @@ async def seed_closed_activity(db, club, user, *, day, large=False, photos=0, vi
     )
     db.add(activity)
     await db.flush()
-    report = ActivityReport(
+    report = with_report and ActivityReport(
         activity_id=activity.id,
         member_count=10,
         non_member_count=0,
@@ -61,9 +63,12 @@ async def seed_closed_activity(db, club, user, *, day, large=False, photos=0, vi
         expense=0,
         submitted_at=datetime.now(UTC),
     )
-    db.add(report)
-    for i in range(3):
-        db.add(ActivityReflection(report_id=activity.id, student_name=f"s{i}", dept="d", body="b"))
+    if report:
+        db.add(report)
+        for i in range(3):
+            db.add(
+                ActivityReflection(report_id=activity.id, student_name=f"s{i}", dept="d", body="b")
+            )
     for i in range(photos):
         db.add(
             File(
@@ -374,3 +379,20 @@ async def test_upload_locked_by_eval_settings(client, db):
         headers=csrf_headers(client),
     )
     assert resp.status_code == 409
+
+
+async def test_photo_score_needs_a_report_row(client, db):
+    """無 activity_reports 的已結案活動不得拿 ad2 照片分。
+
+    繳交確認旗標存在 report 上,沒有 report 就沒有「已繳交」可言;先前缺表時
+    一律視為已確認,照片分照給,與 ad3「有無報告表」的判定互相矛盾。
+    """
+    club, user, admin = await setup(client, db)
+    await seed_closed_activity(
+        db, club, user, day=date(2026, 3, 1), photos=9, with_report=False
+    )
+
+    data = (await client.get("/api/v1/club/eval/overview")).json()["data"]
+    by_key = {s["key"]: s for s in data["scores"]}
+    assert by_key["ad2"]["auto"] == 0
+    assert by_key["ad3"]["auto"] == 0

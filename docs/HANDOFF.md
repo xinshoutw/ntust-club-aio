@@ -1,50 +1,61 @@
-# Session Handoff(2026-07-21,第十四輪:pt/viewer 雙面板實裝 + 需求方 15 項 + 全站表格排序/欄寬)
+# Session Handoff(2026-08-10:第十四輪已完成 + 全面 code review 已產出,findings 尚未開修)
 
 > 給下一個 session 的交接快照。永久性專案知識在三層 `AGENTS.md` 與 `docs/architecture.md`、`docs/data-model.md`、`docs/design-guide.md`;本檔只記「現在進行到哪、接下來做什麼」。過期即刪。
 
-## 本輪已完成(分支 `dev`,需求方 15 項全數落地;**尚未 push,待使用者確認**)
+## 現在在哪
 
-1. **工讀生端(pt)實裝**:後端新 `/staff/*` router(社團/違規目錄/違規開立/違規查詢/器材借出與歸還點交(依序點交序號、去重)/逾期清單/發送提醒——提醒與 admin 共用 `services/loan_remind.py`);前端五頁全接線、mock 移除;行政借用(club NULL)顯示「學務處」且提醒鈕停用
-2. **評審端(viewer)實裝**:migration `f6d2b81c47a9`(eval_groups.award_id);**五獎 rubric 依評分標準 PDF seed(年 116,48 細項,seed 對帳 assert)**——社團端 AwardDetailPage 上傳槽位隨之可用;`/viewer/*` API(assignments/detail/score upsert/done,指派=分組×獎項×年度,檔案下載同維度收斂);前端三頁接線,評分彈窗=雙欄(左受評檔案 FilePreview、右逐項評分+評語+簡報),「儲存並下一社團」流水線;**現場簡報分選填可後補**(表格顯示「簡報未評」,待需求方追認);seed_mock 建兩分組+viewer01/02
-3. **禁過去申請時間(前後端)**:`PERIOD_TIMES` 節次時刻表落地(權威=舊 clubclass,14 節);臨時場地(含今天已開始節次)/器材(區間已過、活動已結束)/活動 submit 與重送/報名建立/公告蓋板全擋;**手動借用刻意不擋**(補登歷史);草稿不擋
-4. **臨時場地「正在申請/取消」邊界改申請起始時刻**:active=未開始(SQL 以 periods 陣列重疊比對,與序無關);pending/approved 未開始皆可取消,起始時刻一過移「最近申請」不可取消;器材/固定維持日粒度
-5. **行政端固定借用窗外反灰置底**(比照社團端;`GET /admin/room-bookings/window`)——**行為反轉待需求方追認**:窗外整頁鎖住,殘留 pending 需先到系統設定延長區間才能審
-6. **審核頁四項**:「其他狀態」→「最近審核」,`reviewed_at`(approval_records max,彙總 join)入列表+排序白名單,預設 -reviewed_at;**輔導老師全面改稱承辦人**(顯示層;程式鍵 advisor/pending_advisor 不動),單關不畫章軌;結案審核兩區 50→25/頁,逾期區改 `overdue=true`(含已解鎖)全列可點開唯讀詳情
-7. **帳號管理加「社團」tab**(搜尋+分頁 20;建立帳號=新 `POST /admin/clubs/{id}/account`、重設密碼、啟停(社團+帳號連動,文案明示);一社一帳號以鎖列+IntegrityError 守並發)
-8. **彈窗/動畫**:全域 motionUnit 0.06(Fast/Mid/Slow=0.06/0.12/0.18s);活動詳情 popup 640→840;高彈窗改 `useModalAutoFocus`(focus preventScroll,標題保持可見;**禁再用原生 autoFocus 於高彈窗**);社團總覽點列即開審核彈窗(ActivityReviewModal 支援 item=null+Skeleton,largeApproved/fundSource 補種)
-9. **全站表格改造(需求方 1、11 項)**:後端 `sort` 逗號多鍵(≤3,白名單 422);前端 `useMultiSort`(**最後點擊=最高優先**,同欄升→降→移除)+`MultiSortButton`(方向 caret+優先序小字)+`sortRows`+`Cols`;**全部資料表 `tb fixed`+colgroup 固定欄寬**(行內編輯不再變形);預設排序依五準則逐表定案(佇列公平/急迫優先/時間就近/名冊慣例/需求方拍板),成員預設=身份權重→學號、違規=未銷案+期限近、active 借用=開始日近、逾期=逾越最久在前
-10. **Discord webhook 訊息清冊**:`docs/discord-webhook-messages.md`(32 事件/36 文案變體,含可用資料欄位)——**待需求方據此設計風格後回頭改 notify.py**
-11. **資料遷移重演練於本機完成**(159 社/30,477 成員/14,234 活動/15,634+7,173 借用);dev 庫已升 `f6d2b81c47a9` 並 seed rubric
-12. **交叉審查**:Opus×7(viewer 全套、pt+審核+彈窗、各分支自審)+codex×1(表格 sweep);findings 全修(檔案下載獎項維度、簡報必填改策略、group 鍵、reviewed_at 彙總 join、序號去重、骨架聚焦)
+**程式碼狀態自 2026-07-21 起沒有任何變動**(HEAD `0d38de1`,無新 commit)。這中間做的是一次全面 code review,產出報告但**尚未動手修任何東西**。
 
-## 驗證現況(全綠)
+1. **第十四輪(2026-07-21)已完成**:pt/viewer 雙面板實裝、需求方 15 項、全站表格排序與欄寬。決議明細已收進 `AGENTS.md`「第十四輪決議」段落,不在此重複。
+2. **全面 code review(2026-07-25)已完成**:報告 = **`docs/review-2026-07-25.html`**(單檔 HTML,瀏覽器開,可依嚴重度/分類篩選、點列展開)。
+   - 11 個獨立審查者(Opus ×10 + codex gpt-5.6-sol ×2)平行審查
+   - **119 項:9 阻擋上線、35 高、68 中、7 低**
+   - 每項有唯一編號(`BUG-xx` / `DEC-xx` / `GAP-xx` / `OPS-xx` / `IMP-xx`),含檔案:行號、具體失敗情境、建議修法
+   - **一項都還沒修**
 
-- 後端 `timeout 300 uv run pytest -q` **262 passed**、`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b` 0 錯、`pnpm test` 35 passed、lint 僅既有 fast-refresh warning
-- viewer/staff 端對端煙霧測試過(scratch 庫 club_aio_smoke + uvicorn 8001:登入→指派→評分→done、開違規、點交、逾期、跨角色 403)
-- **測試庫可平行**:`CLUB_AIO_TEST_DB=<name>` 覆寫(多 worktree 各用一庫)
+## ⚠ 第一件事
 
-## 本機環境(此台 Mac,2026-07-21 起用)
+**51 個 commit 只存在這台 Mac**(`git rev-list --count origin/dev..dev` = 51,整個第十四輪);`main` 落後 `dev` 497 個 commit。這是目前最大的單點故障,零成本可解 —— 先 push(報告編號 `OPS-03`)。
 
-- host 5432 被 OrbStack VM 佔用:db 走 **55432**(`compose.override.yml` 不入版控 + `.env` `POSTGRES_PORT=55432`);pnpm 走 corepack shim
+未進版控的檔案:`docs/review-2026-07-25.html`(建議 commit)、`compose.override.yml` 與 `start-dev.sh`(本機專用,刻意不入版控)、`backend/.coverage`(應加 gitignore)。
 
-## 待需求方拍板/追認
+## 驗證現況(2026-07-25 實測,非引用文件)
 
-- 簡報分數選填可後補(§2);行政端固定借用窗外整頁鎖(§5);手動借用可回填過去(§3);webhook 風格模板(§10);評鑑檔案庫/行政歷史文件歸檔;`aclose` 範圍、器材核准硬性檢核(前輪遺留)
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **262 passed**;`ruff check .` 全綠
+- 後端覆蓋率(pytest-cov)→ **95%**(5734 statements / 295 missed);較低者:notify 73%、audit 77%、signup_service 82%
+- 前端 `pnpm exec tsc -b` → 0 錯;`pnpm test` → 8 檔 35 passed;`pnpm run lint` → 僅 8 個既有 fast-refresh warning
+- 無秘密外洩:`git log --all` 確認 `.env` 與 `migration/out` 從未進版控
 
-## 下一輪待辦
+## 下一輪待辦 —— 依報告的「建議處理順序」
 
-- **舊機 media 目錄**(~8.7 萬檔)抓回後寫檔案匯入(migration/README.md TODO)
-- **簽核流程重做餘項**(2026-07-17 拍板):角色代號改名(admin→staff、staff→pt)、頭銜欄位、superadmin sh 腳本、**退回=退上一級狀態機**、社團端關卡人員顯示(逐項核定 UI 已有)
-- **行政端「分組與評審指派」頁**:viewer 面板已實裝但生產環境無法指派(現只有 seed);需 eval_groups CRUD+指派 UI(表與 API 模型已就緒)
-- REVIEW_full P2/P3(lib 測試補強、mock 死碼清除含 bookings/mock 瘦身、AGENTS 重組、文件對齊)
-- 競賽成績總表(super)、報名競賽斷鏈、統計頁、Email 模板、首頁導覽
+報告頁面內有完整的四批排序,摘要:
+
+1. **零成本**:`OPS-03` push 51 個 commit
+2. **一次問完承辦**(不決定就排不了程):`DEC-07`(**這學年評鑑要不要在新系統跑 —— 這題決定 GAP-01/GAP-03/BUG-01 是不是硬阻擋,牽動整個上線排程**)、`DEC-06` 舊機 media 8.7 萬檔何時交付、`DEC-05` 舊評鑑檔案庫 12,752 檔要不要遷、`DEC-01` 簡報可否後補、`DEC-02` 窗外整頁鎖、`DEC-03` 器材超借要不要硬擋、`DEC-04` aclose 權限範圍
+3. **不需等人、約一天的小修**:`BUG-01` 移除評鑑結果頁入口、`BUG-07` 拿掉假密碼 fallback、`OPS-02` 加 ENV guard、`OPS-07` CI 補 test/lint + SHA tag、`BUG-03` 遷移三處補 `_aware()`、`BUG-12` 幹部證明學年期改推導、`OPS-12` 修 DEPLOY_CHECKLIST 過期與容量語義、結案草稿 hydrate 加 `Array.isArray`、手動借用移掉 `disabledDate`
+4. **上線前必辦、工作量較大**:`OPS-01` 備份機制、`GAP-02` 假日匯入、`OPS-04` 器材主檔進正式 seed、`BUG-02` 檔案下載權限收斂、`BUG-41` 行政分 N+1 與分頁、`IMP-02` 權限鍵統一(**要在正式建帳號之前**)、`OPS-05` edge 切換演練、`GAP-04` 場地主檔 CRUD、`GAP-05` 逾時待審自動駁回
+5. **「這學年要跑評鑑」才需要的大工程**:`GAP-01` 分組與評審指派 → `BUG-14` 評審代號 → `GAP-03` 成績總表 → `BUG-01` 評鑑結果頁。四者同屬「評鑑成績彙總鏈」,`services/evaluation.py` 目前只處理行政分自動計算、**完全沒有跨評審彙總這一層**,建議當單一開發段落規劃,不要拆散
+
+## 已逐條比對確認正確,不要重審
+
+前後端計分邏輯 100% 等價(14 項規則逐條比對);`PERIOD_TIMES` 前端/後端/舊 clubclass 三方零差異;守衛覆蓋率 100%(除 `/health` 與 `/auth/login`);社團端零 IDOR;viewer 收斂到「分組×獎項×年度」;44 表 models ↔ migration 欄位/索引/約束零差異;17 個 migration 單一線性鏈且全部有 downgrade;密碼政策全數落地;首登強制改密無法繞過;`add_months` 月底夾底與 PG `interval '1 month'` 同義;金額全為整數元、不需 Decimal;檔案路徑穿越/下載 XSS/Content-Disposition injection 皆不成立;時區全程台北無 naive/aware 混用。
+
+## 文件狀態提醒
+
+- `docs/DEPLOY_CHECKLIST.md` **已嚴重過期**(寫於 2026-07-17,之後跑了十三、十四兩輪):A1/A2 說評審端與工讀生端「完全未實作」實際皆已實裝;C 說「沒有 migration/ 目錄」實際已有且演練完成。**且其容量語義與程式碼方向相反**(文件寫 `capacity_gib 40`/`reserve_gib 10`,實際已移除、改讀實體磁碟)。這是上線操作手冊,照它做會做錯 —— 見 `OPS-12`
+- `docs/data-model.md` 主表定義有 15 處落後於實作(清單在報告 BUG 區與盤點段落);其 `:450` 記的索引名是被否決的方案
+- `AGENTS.md` 已 277 行 / 42KB,決議流水帳式堆疊,舊決議與新決議衝突時難判斷(例:「社團名稱強制社/會結尾」第九輪定案、第十三輪廢除,兩段都還在)。建議獨立一輪重組、決議史移 `docs/decisions.md`(`OPS-13`)
+
+## 本機環境(此台 Mac)
+
+- host 5432 被 OrbStack VM 佔用:db 走 **55432**(`compose.override.yml` 不入版控 + `.env` `POSTGRES_PORT=55432`);pnpm 走 corepack
+- 測試庫可平行:`CLUB_AIO_TEST_DB=<name>` 覆寫(多 worktree 各用一庫)
 
 ## 環境與慣例提醒
 
 - 多 agent 平行絕不可 `git stash`;pytest 必包 timeout;平行 worktree 各設 `CLUB_AIO_TEST_DB`
-- 前端 `pnpm exec tsc -b`(--noEmit 是空檢查);lint=`pnpm run lint`
-- 確認彈窗一律 `lib/confirm.ts`;Modal open+afterClose 常駐;**高彈窗聚焦一律 `useModalAutoFocus`**;不顯示單號;UI 禁 emoji;Commit 英文一行為一 commit、禁元描述
+- 前端 `pnpm exec tsc -b`(`--noEmit` 是空檢查);lint = `pnpm run lint`
+- 確認彈窗一律 `lib/confirm.ts`;Modal open+afterClose 常駐;高彈窗一律 `useModalAutoFocus`;不顯示單號;UI 禁 emoji;Commit 英文、一行為一 commit、禁元描述
 - **表格慣例**:資料表一律 `tb fixed`+`<Cols>`;排序一律 `useMultiSort`+`MultiSortButton`(伺服器端 `sortParam`);新表照五準則給預設排序
-- Python 3.14 lazy annotation:欄位名與型別同名須別名(dt.date)
-- `PERIOD_TIMES` 前後端各一份(booking_service.py / api/bookings.ts),改動須同步
+- Python 3.14 lazy annotation:欄位名與型別同名須別名(`dt.date`)。**唯一漏網之魚 `models/signups.py:60`**(目前碰巧正確,見 `IMP-10`)
+- `PERIOD_TIMES` 前後端各一份(`booking_service.py` / `api/bookings.ts`),改動須同步(`IMP-04` 建議改由後端下發)

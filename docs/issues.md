@@ -48,7 +48,6 @@
 | ISS-24 | 高 | **權限鍵前後端命名未統一**(`areview`/`aact`、`asignup`/`areg`),靠 any-of 硬撐 —— 報名管理走 `require_permission("areg","asignup")`,活動審核則是 `admin_activities._reviewer` 自訂的 any-of。後端白名單兩套都收,DB 裡兩套鍵皆合法。**必須在正式建帳號之前統一**,否則之後改要動所有既有帳號的 `permissions` |
 | ISS-25 | 中 | 社團帳號重設密碼在兩個頁面的**頁面門檻**不一致(帳號管理頁需 super、管理項目頁只需 `amember`),但兩處打的是同一支 `/admin/clubs/{id}/reset-password`(`AccountsPage.tsx:221` 與 `AdminClubSettingsPage.tsx:165` 同用 `useAdminClubMutations`)。`_MANAGED_ROLES` 不含 `CLUB`,super 那支 `/admin/accounts/{id}/reset-password` 重設不了社團帳號 —— 待決的是這個動作該歸 super 還是 `amember` |
 | ISS-26 | 中 | 資料庫層沒有「一社一帳號」唯一約束,只靠應用層檢查,而遷移腳本又繞過應用層 |
-| ISS-28 | 中 | **登入/登出不清 TanStack Query 快取**,同一台電腦換人登入會先看到前一位使用者的資料 |
 
 ## 6. 時間與日期的判定
 

@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { TAKEOVER_DISMISSED_KEY } from '../components/layout/TakeoverOverlay'
 import { UNAUTHORIZED_EVENT } from '../api/client'
 import { loginApi, logoutApi, meApi, type Role, type SessionUser } from '../api/auth'
@@ -18,6 +19,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const qc = useQueryClient()
   const [user, setUser] = useState<SessionUser | null>(null)
   const [booting, setBooting] = useState(true)
 
@@ -36,13 +38,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, expire)
   }, [])
 
-  const login = useCallback(async (username: string, password: string): Promise<SessionUser> => {
-    const next = await loginApi(username, password)
-    // 蓋板公告「每次登入」都要重新顯示:清掉上次登入的關閉紀錄
-    sessionStorage.removeItem(TAKEOVER_DISMISSED_KEY)
-    setUser(next)
-    return next
-  }, [])
+  const login = useCallback(
+    async (username: string, password: string): Promise<SessionUser> => {
+      const next = await loginApi(username, password)
+      // 蓋板公告「每次登入」都要重新顯示:清掉上次登入的關閉紀錄
+      sessionStorage.removeItem(TAKEOVER_DISMISSED_KEY)
+      // 同一台電腦換人登入時,前一位使用者的快取不得外流到新 session
+      qc.clear()
+      setUser(next)
+      return next
+    },
+    [qc],
+  )
 
   const logout = useCallback(async () => {
     try {
@@ -50,8 +57,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       // session 已失效也視為登出成功
     }
+    qc.clear()
     setUser(null)
-  }, [])
+  }, [qc])
 
   const refresh = useCallback(async () => {
     try {

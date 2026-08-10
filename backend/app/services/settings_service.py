@@ -47,8 +47,7 @@ DEFAULTS: dict[str, Any] = {
     "activity_attachment_total_mb": 15,
     "maintenance_total_mb": 100,
     "close_photo_total_mb": 10,
-    # 儲存配額(GiB):系統總量改用後端可取得的實際磁碟空間(不再設邏輯容量與保留空間,
-    # 容量不足告警之後人為介入);此處僅保留單一社團未歸檔檔案上限
+    # 儲存配額(GiB):系統總量取實際磁碟可用空間,此處只設單一社團未歸檔檔案上限
     "storage_limits": {"per_club_gib": 2},
     # 評鑑視窗(預設 116 年,2026/02/01–2027/01/31)
     # ad7/ad8 以「場次日期落在視窗」採計

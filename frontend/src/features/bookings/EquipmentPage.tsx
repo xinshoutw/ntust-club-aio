@@ -19,7 +19,7 @@ export default function EquipmentPage() {
   const { message, modal } = App.useApp()
   const [form] = Form.useForm()
 
-  // 器材借用綁定審核通過之活動,不再自選日期區間;
+  // 器材借用綁定審核通過之活動,借用區間由活動推導;
   // 可借數與借用區間由後端依所選活動推導(GET /club/equipment?activity_id=);
   // 排除已結束活動(後端亦擋)
   const activitiesQuery = useActivityList({ status: 'approved' })

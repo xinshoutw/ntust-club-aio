@@ -43,7 +43,7 @@ router = APIRouter(prefix="/club", tags=["applications"])
 
 MAX_EVIDENCE_PER_REQUEST = 5  # 每筆報修佐證檔上限(影片 200MB,防磁碟耗盡)
 
-# 職位對應標準身份(正副負責人為一級身份,不再靠職稱字串比對)
+# 職位對應標準身份:正副負責人為一級身份,不比對職稱字串
 _POSITION_KIND: dict[CertPosition, MemberKind] = {
     CertPosition.LEADER: MemberKind.PRESIDENT,
     CertPosition.VICE_LEADER: MemberKind.VICE_PRESIDENT,

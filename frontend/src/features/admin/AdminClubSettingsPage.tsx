@@ -152,8 +152,8 @@ export default function AdminClubSettingsPage() {
     doSave()
   }
 
-  // 重設密碼:一次性明碼由後端產生(重設當下即生效、撤銷 session),
-  // 故改為先確認再打 API,回傳明碼以彈窗一次性顯示(關閉即消失)
+  // 重設密碼:一次性明碼由後端產生,重設當下即生效並撤銷 session,
+  // 故先確認再打 API;回傳明碼以彈窗一次性顯示,關閉即消失
   const doResetPassword = () => {
     if (clubId == null) return
     confirmDialog(modal, {

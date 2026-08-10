@@ -153,8 +153,8 @@ export default function BookingOverviewPage() {
   }
 
   const gridPending = venueDef ? rangeQuery.isPending : venuesQuery.isPending || dayQuery.isPending
-  // 場況圖來源查詢失敗時整卡顯示錯誤,不畫預設色格
-  // (15 天檢視為單一批次區間查詢:失敗即整卡錯誤,重試重抓整段區間)
+  // 場況圖來源查詢失敗時整卡顯示錯誤,不畫預設色格;
+  // 15 天檢視為單一批次查詢,重試即重抓整段區間
   const gridError = venuesQuery.isError
     ? { error: venuesQuery.error, retry: () => void venuesQuery.refetch() }
     : !venueDef && dayQuery.isError

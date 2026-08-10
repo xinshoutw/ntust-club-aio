@@ -77,7 +77,7 @@ async def usage(user: FilesAdmin, db: DbDep) -> ApiResponse[FileUsageOut]:
 
     db_size = await file_service.database_size(db)
     files_total = sum(s["size"] for s in stats.values())
-    # 容量改用後端可取得的實際磁碟空間(不再設邏輯容量)
+    # 容量取實際磁碟空間
     disk = shutil.disk_usage(file_service.upload_root())
     return ApiResponse(
         data=FileUsageOut(

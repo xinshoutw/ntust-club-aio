@@ -53,7 +53,7 @@ export default function ReviewPage() {
   const [page, setPage] = useState(1)
 
   // 待審佇列:僅撈登入者可簽核的狀態(小結果集);最近審核表改伺服器端分頁,
-  // 不再整批撈取 14k+ 筆(SQL 存取必須分批)
+  // 14k+ 筆必須分批,不得整批撈取
   const queueStatuses = useMemo(
     () => ALL_STATUSES.filter((st) => canActOn(user, st)),
     [user],

@@ -150,7 +150,7 @@ _REVIEWED_SUBQ = (
 )
 _REVIEWED_AT = _REVIEWED_SUBQ.c.reviewed_at
 
-# 排序白名單(清單改伺服器端分頁,14k+ 筆不再整批撈取);
+# 排序白名單(伺服器端分頁;14k+ 筆不得整批撈取);
 # reviewed_at 包 NullsLast:不論鍵位/升降冪皆 NULLS LAST(無審核紀錄者殿後),
 # 出現於任一鍵位時 list_activities 另補 id 降冪 tiebreak
 _SORTABLE = {

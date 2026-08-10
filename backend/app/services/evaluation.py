@@ -145,7 +145,7 @@ async def gather_scoring_input(db: AsyncSession, club_id: int, window: EvalWindo
         )
 
     # ad7/ad8 皆以管理員活動後登錄之「簽到」為準,僅報名不計分;
-    # 採計範圍=場次日期落在評鑑視窗(推導不儲存,取代 signup_items.year)
+    # 採計範圍=場次日期落在評鑑視窗(推導不儲存)
     async def _attended_sessions(kind: SignupKind) -> int:
         return (
             await db.scalar(

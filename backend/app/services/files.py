@@ -223,9 +223,9 @@ async def save_upload(
     sniff, mime = _SIGNATURES[ext]
     max_size = await _policy_max_size(db, policy)
 
-    # 配額檢查(系統總量改用實際磁碟可用空間,不再設邏輯容量與保留空間;
-    # 容量不足告警之後人為介入)。此處先做「無鎖」預檢;per-club 權威結算在串流完成後取
-    # advisory lock 再重算(避免慢速上傳在串流期間霸佔全域鎖)
+    # 配額檢查:系統總量以實際磁碟可用空間為準。此處先做「無鎖」預檢,
+    # per-club 權威結算在串流完成後取 advisory lock 再重算
+    # (避免慢速上傳在串流期間霸佔全域鎖)
     limits = await get_setting(db, "storage_limits")
     club_remaining = None
     if club_id is not None:

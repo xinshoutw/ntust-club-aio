@@ -16,17 +16,17 @@
 
 - [ ] 阻擋 `ENV=prod`(啟用 prod 防呆與 cookie Secure)
 - [ ] 阻擋 `SECRET_KEY` = `openssl rand -base64 48`
-- [ ] 阻擋 `POSTGRES_PASSWORD` = 強密碼(db 與 backend 兩處同步)
+- [ ] 阻擋 `POSTGRES_PASSWORD` = 強密碼(compose 以同一個變數插值到 db 與 backend)
 - [ ] 阻擋 `FORWARDED_ALLOW_IPS` = `172.28.0.0/24` + edge VM 內網 IP。**絕不可用 `*`**,否則登入限流可被繞過、稽核 IP 可被投毒。值需與內層 web nginx 的 `set_real_ip_from` 一起核對
 - [ ] 待決 `DISCORD_WEBHOOK_URL`:現值為測試群組,prod 換正式頻道;**絕不入版控**
-- [ ] 待決 `SMTP_*`:`SMTP_PASSWORD` 為空時寄信降級 log-only(不報錯,但信不會寄出)
+- [ ] 待決 `SMTP_*`:host / username / password 任一為空即降級 log-only(不報錯,但信不會寄出)
 - [ ] 應辦 `BACKEND_IMAGE` / `WEB_IMAGE` = GHCR 映像路徑
 - [ ] 應辦 `WEB_PORT`(預設 8080)—— edge upstream 要帶埠號
 
 ## C. 資料準備
 
 - [ ] 器材主檔、政府行事曆(見 A)
-- [ ] 應辦 **評鑑 rubric**:`award_rubric_items` 逐年由行政複製上年再修改,基礎 seed 不建。競賽開始前確認該學年已建
+- [ ] 應辦 **評鑑 rubric**:`seed.py` 只建預設評鑑年(`eval_window.year`)的 rubric,其餘年度由行政複製上年再修改。競賽開始前確認該學年已建
 - [ ] 待決 **場地主檔**:已 seed 19 處含容納人數,上線前確認與現況相符
 - [ ] 待決 **舊資料遷移**:`migration/cms_import.py`(社團/帳號/成員/活動/公告)與 `cc_import.py`(教室與器材借用)已可執行且 idempotent;上線前以正式 dump 再演練一次,確認筆數與 `legacy_id_map`
 - [ ] `reset_db.py` 建立 superadmin 並印出一次性密碼(首登強制改密)
@@ -61,9 +61,15 @@
 6. `.env` 的保管與輪替方式
 7. 監控/告警方案
 8. 政府行事曆假日由誰於上線年度匯入
-9. HTTPS:edge certbot 已管 `clubs.ntust.edu.tw`,確認自動續期正常;內層走 HTTP(僅 compose 內網)
+9. HTTPS:確認 edge 上 `clubs.ntust.edu.tw` 的憑證來源與自動續期(現行憑證路徑不是 certbot 慣例的 `/etc/letsencrypt/live/`,不能假設);內層走 HTTP(僅 compose 內網)
 
-## G. 上線流程
+## G. 已知限制
+
+- `alembic downgrade base` 在含 seed 資料的庫上會於 venues category CHECK 收窄那一輪失敗;回滾演練請逐版降,不要一路降到 base
+- migration 的 enum 欄位用 `native_enum=False, create_constraint=True`,Alembic 於 `add_column` 時會自動補 CHECK。**不要再顯式補**,會 `DuplicateObject`
+- E2E 必須打 web 容器的 `:8080`,直接打 `:8000` 會繞過 nginx 層的上傳上限、登入限流、`auth_request` 與安全標頭
+
+## H. 上線流程
 
 1. 承辦提供:器材清單、正式 DB dump、正式 Discord 頻道、SMTP relay 決定
 2. 建立備份排程(A),補 backend healthcheck(D)

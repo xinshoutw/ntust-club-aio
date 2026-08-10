@@ -72,6 +72,16 @@ async def _approved_activity(db, user, activity_id: int) -> Activity:
     return activity
 
 
+def _require_not_ended(activity: Activity, what: str) -> None:
+    """已結束的活動不得再借。
+
+    「借用須綁審核通過活動」若不看時間就形同虛設:帶一個去年辦完的活動 id
+    就能預約未來任何時段。前端下拉雖已濾掉,但那只是 UI。
+    """
+    if activity_service.end_datetime(activity) < svc.now_utc():
+        raise validation_error(f"所選活動已結束,無法申請{what}")
+
+
 # ---- 主檔 ----
 
 
@@ -328,6 +338,7 @@ async def create_venue_booking(
     if venue is None or not venue.is_active or not venue.allow_temp:
         raise validation_error("該場地不開放臨時借用")
     activity = await _approved_activity(db, user, body.activity_id)
+    _require_not_ended(activity, "場地借用")
 
     # 過去時間全面禁止:過去日期直接擋;
     # 今天則以節次時刻表擋「最早節次已開始」的申請
@@ -439,10 +450,7 @@ async def create_equipment_loan(
     if equipment.max_lease_count is not None and body.qty > equipment.max_lease_count:
         raise validation_error(f"{equipment.name} 單次至多借用 {equipment.max_lease_count} 件")
     activity = await _approved_activity(db, user, body.activity_id)
-
-    # 過去時間全面禁止:已結束的活動不可再借器材
-    if activity_service.end_datetime(activity) < svc.now_utc():
-        raise validation_error("所選活動已結束,無法申請器材借用")
+    _require_not_ended(activity, "器材借用")
 
     # 借用區間=活動起訖 ± 工作天緩衝(申請當下推導後寫入,設定調整不回溯)
     buffer = await get_setting(db, "equipment_workday_buffer")

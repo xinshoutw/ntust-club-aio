@@ -55,13 +55,15 @@ async def make_activity(
     club,
     *,
     name="迎新宿營",
-    day=date(2026, 3, 10),
+    # 預設未來日:借用一律綁「尚未結束」的活動,已結束的活動要測就明寫過去日期
+    day=None,
     end_day=None,
     status=ActivityStatus.APPROVED,
 ):
     from app.models import User
 
     creator = await db.scalar(sa.select(User.id).order_by(User.id).limit(1))
+    day = day or date.today() + timedelta(days=30)
     activity = Activity(
         club_id=club.id,
         name=name,
@@ -329,6 +331,18 @@ async def test_venue_booking_requires_approved_activity(client, db):
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
+
+    # 已結束的活動 → 422:不看時間的話,帶一個去年辦完的活動就能預約未來任何時段
+    ended = await make_activity(
+        db, club, name="去年辦完的活動", day=date.today() - timedelta(days=60)
+    )
+    resp = await client.post(
+        "/api/v1/club/venue-bookings",
+        json={**body, "date": (day + timedelta(days=4)).isoformat(), "activity_id": ended.id},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    assert "已結束" in resp.json()["error"]
 
     # 缺 activity_id → 422(必填)
     resp = await client.post(

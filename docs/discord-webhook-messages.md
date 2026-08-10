@@ -83,8 +83,14 @@
   `固定場地借用退回` / `{venue.name}:{body.reason}`
 - **D10 器材歸還提醒** `POST /admin/equipment-loans/{id}/remind`(super)或 `POST /staff/equipment-loans/{id}/remind`(工讀生),兩者共用 `services/loan_remind` · alert · 另寄 Email
   `器材歸還提醒` / `{club.name}:{equipment.name} ×{qty}(借用區間 {start}~{end},歸還期限 {deadline}),請儘速辦理歸還點交。`
+- **D11 固定借用已撤銷** `POST /admin/room-bookings/{id}/revoke` · reject
+  `固定場地借用已撤銷` / `{venue.name}({n} 個每週時段):{body.reason}`
+- **D12 臨時借用已撤銷** `POST /admin/venue-bookings/{id}/revoke` · reject
+  `臨時場地借用已撤銷` / `{venue.name}({date} 時段 {periods}):{body.reason}`
+- **D13 器材借用已撤銷** `POST /admin/equipment-loans/{id}/revoke` · reject
+  `器材借用已撤銷` / `{equipment.name} ×{qty}({start}~{end}):{body.reason}`
 
-D4–D7 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政手動借用)或社團不存在時直接跳過不通知。
+D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政手動借用)或社團不存在時直接跳過不通知。
 
 **線上申請**
 

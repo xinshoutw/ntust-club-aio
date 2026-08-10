@@ -136,7 +136,6 @@ function ActivityForm({
   const defaultCat = categories[0]?.name ?? ''
   const hintOf = (name: string) => categories.find((c) => c.name === name)?.hint
   const [form] = Form.useForm<FormValues>()
-  const guard = useFormUnsavedGuard()
   const activityType = Form.useWatch('type', form)
   const [files, setFiles] = useState<BagFile[]>([])
   // 既有附件(編輯重送保留,可逐一移除;新選檔於送出時上傳)
@@ -161,6 +160,12 @@ function ActivityForm({
     }))
     return [...base, emptyBudget(base.length + 1, defaultCat)]
   })
+
+  // 工作分配、經費編列與附件都在 Form 之外,onValuesChange 看不到 —— 只改這幾塊
+  // 就離開,正是未存檔守衛要擋的情境。與載入時的快照比對
+  const localSnapshot = JSON.stringify([works, budget, files.length, existing.map((f) => f.id)])
+  const loadedRef = useRef(localSnapshot)
+  const guard = useFormUnsavedGuard(localSnapshot !== loadedRef.current)
 
   // 輸入時只增列;空列的移除延後到 blur(避免打字中列被吃掉)
   const setWork = (key: number, patch: Partial<Omit<WorkRow, 'key'>>) => {

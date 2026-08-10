@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { App, Button, Input, Modal } from 'antd'
+import dayjs from 'dayjs'
 import StatusPill from '../../components/ui/StatusPill'
 import {
   DOW_TEXT,
@@ -44,7 +45,10 @@ export default function BookingReviewModal({
   const [reason, setReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const canReview = item.data.status === 'pending'
-  const canRevoke = item.data.status === 'approved' && !!onRevoke
+  // 後端對臨時場地擋「日期已過」;過期單顯示撤銷鈕只會換來 409
+  const notPast =
+    item.kind !== 'venue' || !dayjs(item.data.date, 'YYYY/MM/DD').isBefore(dayjs(), 'day')
+  const canRevoke = item.data.status === 'approved' && !!onRevoke && notPast
   const title =
     item.kind === 'venue' ? item.data.venue : item.kind === 'room' ? item.data.room : `${item.data.equipment} ×${item.data.qty}`
   const roomConflict = item.kind === 'room' && canReview && (item.data.conflictKeys?.length ?? 0) > 0

@@ -179,6 +179,7 @@ export default function FixedRoomPage() {
         onSuccess: () => {
           message.success('已送出固定借用申請')
           form.resetFields()
+          guard.clear()
           setSlots(new Set())
         },
         onError: (e) => message.error(e.message),

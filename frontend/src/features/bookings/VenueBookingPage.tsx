@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import dayjs, { type Dayjs } from 'dayjs'
 import { App, Button, DatePicker, Form, Input, Select, Spin } from 'antd'
@@ -38,7 +38,9 @@ export default function VenueBookingPage() {
       : undefined
   const qPeriod = params.get('period')
   const [periods, setPeriods] = useState<string[]>(() => (qPeriod && PERIODS.includes(qPeriod) ? [qPeriod] : []))
-  const guard = useFormUnsavedGuard(periods.length > 0)
+  // 從場況圖點格進來時 periods 已有初值,與初值相同不算 dirty(否則一進頁就被攔)
+  const initialPeriods = useRef(periods.join())
+  const guard = useFormUnsavedGuard(periods.join() !== initialPeriods.current)
   const [periodsError, setPeriodsError] = useState(false)
 
   const venuesQuery = useVenues()
@@ -108,6 +110,7 @@ export default function VenueBookingPage() {
         onSuccess: () => {
           message.success(`已送出「${venueName}」借用申請（${periods.join('、')}）`)
           form.resetFields()
+          guard.clear()
           setPeriods([])
         },
         onError: (e) => message.error(e.message),

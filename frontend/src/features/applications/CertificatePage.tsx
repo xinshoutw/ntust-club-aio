@@ -72,6 +72,7 @@ export default function CertificatePage() {
                 onSuccess: (r) => {
                   message.success(`幹部證明申請已送出(${r.applicantName})`)
                   form.resetFields(['term', 'position'])
+                  guard.clear()
                 },
                 onError: (e) => message.error(e.message),
               },

@@ -84,6 +84,7 @@ export default function MaintenancePage() {
                 onSuccess: () => {
                   message.success('已送出報修')
                   form.resetFields()
+                  guard.clear()
                   setFiles([])
                 },
                 onError: (e) => message.error(e.message),

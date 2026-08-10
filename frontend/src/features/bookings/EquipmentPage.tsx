@@ -87,6 +87,7 @@ export default function EquipmentPage() {
         onSuccess: () => {
           message.success(`已送出「${equipmentName} ×${values.qty}」借用申請(${activityName})`)
           form.resetFields()
+          guard.clear()
         },
         onError: (e) => message.error(e.message),
       },

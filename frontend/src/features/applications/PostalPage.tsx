@@ -78,6 +78,7 @@ export default function PostalPage() {
                 onSuccess: () => {
                   message.success('已送出郵局帳戶異動申請')
                   form.resetFields()
+                  guard.clear()
                   setFiles([])
                 },
                 onError: (e) => message.error(e.message),

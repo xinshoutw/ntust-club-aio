@@ -139,7 +139,9 @@ export default function AdminBookingsPage() {
                         cell?.bookingId != null
                           ? pendingVenues.find((b) => b.apiId === cell.bookingId)?.club
                           : undefined
-                      const label = `${v.name} 第${p}節:${CELL[state].label}${club ? `(${club})` : ''}`
+                      // 固定借用的審核中格點不了(要到「場地固定借用審核」),標示上要說清楚
+                      const kindNote = state === 'reviewing' && cell?.kind === 'fixed' ? '(固定借用)' : ''
+                      const label = `${v.name} 第${p}節:${CELL[state].label}${kindNote}${club ? `(${club})` : ''}`
                       const base: React.CSSProperties = { width: '100%', height: 24, borderRadius: 4, background: CELL[state].bg, display: 'block' }
                       const el =
                         state === 'reviewing' && cell?.bookingId != null ? (

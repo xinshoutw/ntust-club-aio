@@ -147,7 +147,7 @@ theme: {
 - 動態列(經費明細、工作分配、借用時段)自動增列,尾端保證一列空白;空列於 blur 時移除,打字中不消失
 - 上傳一律 `lib/uploads.ts` + `components/ui/AttachmentArea`:魔術位元組驗證、SHA-256 內容去重、單檔與加總容量驗證、顯示「已使用 X/Y MB」。允許圖片處含 HEIC/HEIF/AVIF(評鑑上傳例外,後端只收 jpg/png)
 - 上限值讀 `GET /club/config`,前端不放容量常數(郵局與獎項上傳頁仍各自硬編碼 50MB,待收斂)
-- 送出鈕 `loading` 與 `disabled` 一律成對:AntD 的 `loading` 只擋 React onClick、不設 DOM `disabled`,輸入框按 Enter 觸發的隱含送出會整個繞過去
+- 送出動作一律要擋 in-flight,三種寫法各有各的漏法:`htmlType="submit"` 的鈕 `loading` 與 `disabled` 成對(AntD 的 `loading` 只擋 React onClick、不設 DOM `disabled`);**表單一定要有一顆 submit 鈕**,別用 Modal `onOk` + `form.submit()` 代替 —— 沒有 submit 鈕時 Enter 會直接送 form,`confirmLoading` 攔不到;`onPressEnter` 直接接 mutation 的地方自己擋 `isPending`
 
 **其他**
 

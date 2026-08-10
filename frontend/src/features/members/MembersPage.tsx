@@ -67,6 +67,8 @@ export default function MembersPage() {
   const pageSemester = semester === 'all' ? currentSemester() : semester
 
   const onAdd = (values: { name: string; studentId: string; kind: MemberKind; title?: string; phone?: string; semester: string }) => {
+    // 表單無 submit 鈕,Enter 會直接送 form;confirmLoading 只擋 OK 鈕,攔不到
+    if (create.isPending) return
     create.mutate(values, {
       onSuccess: () => {
         setAddOpen(false)

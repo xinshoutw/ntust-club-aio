@@ -262,6 +262,8 @@ export default function AccountsPage() {
   }
 
   const submitClubAccount = () => {
+    // 同上:Enter 走 onPressEnter 直接進來,confirmLoading 攔不到
+    if (clubMutations.createAccount.isPending) return
     if (!clubAccountTarget) return
     const username = clubUsername.trim()
     if (!USERNAME_RE.test(username)) {

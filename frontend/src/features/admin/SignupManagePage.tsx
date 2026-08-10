@@ -108,6 +108,8 @@ function ManageModal({
   }
 
   const addSession = () => {
+    // Enter 直接叫這裡,繞過鈕的 loading;場次表沒有唯一約束,連按就落兩筆同名場次
+    if (createSession.isPending) return
     const name = newSessionName.trim()
     if (!name || !newSessionDate) return
     createSession.mutate(

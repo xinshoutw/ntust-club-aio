@@ -3,7 +3,7 @@
 取代舊版社團管理系統與教室器材借用系統的新版整合系統。
 
 - 設計文件:[docs/architecture.md](docs/architecture.md)、[docs/data-model.md](docs/data-model.md)
-- 需求原型:`docs/社團管理系統_優化原型_v6.html`
+- 逐頁規格:[docs/spec/](docs/spec/README.md)
 
 ## 技術棧
 

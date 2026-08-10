@@ -63,7 +63,7 @@ def _para(text: str, style=_BODY) -> Paragraph:
     return Paragraph(_escape(text), style)
 
 
-def _build(title: str, rows: list[tuple[str, Paragraph]]) -> bytes:
+def _build(title: str, rows: list[tuple[str, Paragraph]], extra: list | None = None) -> bytes:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf,
@@ -78,11 +78,12 @@ def _build(title: str, rows: list[tuple[str, Paragraph]]) -> bytes:
         [[_para(label, _LABEL), content] for label, content in rows],
         colWidths=[32 * mm, 142 * mm],
         style=_TABLE_STYLE,
-        # 合法上限的長文(心得 3×5000 字)會超過單頁,必須允許列內跨頁
+        # 成果報告表的「課程執行狀況」上限約 6000 字會超過單頁,必須允許列內跨頁。
+        # 只放得下有界的內容 —— 筆數會成長的內容(心得)一律走 extra,見 reflections_pdf
         splitByRow=1,
         splitInRow=1,
     )
-    doc.build([Paragraph(title, _TITLE), Spacer(1, 2 * mm), table])
+    doc.build([Paragraph(title, _TITLE), Spacer(1, 2 * mm), table, *(extra or [])])
     return buf.getvalue()
 
 
@@ -130,12 +131,15 @@ def reflections_pdf(
 ) -> bytes:
     """社團活動學習心得。"""
     year, sem = _semester_title(activity)
-    parts = [
-        f"參與同學姓名/系級:{r.student_name} / {r.dept}\n{r.body}" for r in reflections
-    ]
     rows = [
         ("社團名稱", _para(club.name)),
         ("課程/活動名稱", _para(activity.name)),
-        ("心得分享", _para("\n\n".join(parts))),
     ]
-    return _build(f"國立台灣科技大學{year}學年第{sem}學期 社團活動學習心得", rows)
+    # 心得排在表格之外、一篇一個 Paragraph:塞進表格單元格會讓 reportlab 的
+    # splitInRow 每次分頁都重算整張表,合法上限(100 篇 × 5000 字)是 O(n²)——
+    # 實測 n=40 要 49 秒、n=100 要 5 分鐘。交給正常 frame 流排則是線性。
+    extra: list = [Spacer(1, 5 * mm), Paragraph("心得分享", _LABEL)]
+    for r in reflections:
+        extra.append(Spacer(1, 3 * mm))
+        extra.append(_para(f"參與同學姓名/系級:{r.student_name} / {r.dept}\n{r.body}"))
+    return _build(f"國立台灣科技大學{year}學年第{sem}學期 社團活動學習心得", rows, extra)

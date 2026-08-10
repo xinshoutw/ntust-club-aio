@@ -1,8 +1,10 @@
+import time
 from datetime import date, timedelta
 
 import sqlalchemy as sa
 
-from app.models import Activity
+from app.models import Activity, ActivityReflection, Club
+from app.services.pdf import reflections_pdf
 from tests.conftest import csrf_headers, login, make_club, make_user
 from tests.test_activities import close_payload, create_activity, upload_photo
 
@@ -96,3 +98,21 @@ async def test_pdf_scoped_to_own_club(client, db):
     await login(client, "club02")
     resp = await client.get(f"/api/v1/club/activities/{aid}/report-pdf")
     assert resp.status_code == 404
+
+
+def test_reflections_pdf_stays_linear_at_the_legal_maximum():
+    """100 篇 × 5000 字是 schema 容許的上限。
+
+    心得曾塞在表格單元格內,reportlab 每次分頁重算整張表 → O(n²),這個輸入要 5 分鐘
+    CPU,少量並行就整站無回應。改走 frame 流排後約 2 秒;門檻留 15 倍餘裕。
+    """
+    club = Club(name="測試社")
+    activity = Activity(name="活動", date=date(2026, 3, 1), staff_text="")
+    reflections = [
+        ActivityReflection(student_name=f"社員{i}", dept="資工三", body="感" * 5000)
+        for i in range(100)
+    ]
+    started = time.perf_counter()
+    out = reflections_pdf(club, activity, reflections)
+    assert out.startswith(b"%PDF")
+    assert time.perf_counter() - started < 30

@@ -1,7 +1,7 @@
 // 行政端社團主檔 API 層(/admin/clubs,權限鍵 amember):
 // snake_case ↔ camelCase 與日期(ISO → YYYY/MM/DD)轉換集中在此,頁面只碰 camelCase 型別;
 // 主檔列表不分頁(全校 <200 筆),供 ClubCascader/AdminClubContext/管理項目共用
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api, apiPaged, qs } from './client'
 import type { MemberKind } from '../lib/roles'
@@ -193,7 +193,9 @@ export function useAdminClubMembers(clubId: number | null, p: AdminMemberParams)
       apiPaged<MemberOut[]>(
         `/admin/clubs/${clubId}/members${qs({ semester: p.semester, sort: p.sort, page: p.page, page_size: p.pageSize })}`,
       ).then(({ data, total }) => ({ members: data.map(toMember), total })),
-    placeholderData: keepPreviousData,
+    // 同社團翻頁/換學期才沿用舊資料;換社團時清空,否則會顯示前一社的名單
+    placeholderData: (prev, prevQuery) =>
+      prevQuery?.queryKey[2] === (clubId ?? 0) ? prev : undefined,
   })
 }
 

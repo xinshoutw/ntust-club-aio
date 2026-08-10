@@ -1,6 +1,6 @@
 // 行政端行政分審核 API 層(/admin/eval,權限鍵 aeval):
 // 分數計算/調整套用皆在後端,前端只讀 FinalScore;調整留痕於 eval_adjustments(revert=註銷不硬刪)
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api } from './client'
 import { toFinalScores, type AdScoreOut } from './eval'
@@ -131,8 +131,9 @@ export function useAdminEvalDetail(clubId: number | null) {
   return useQuery({
     queryKey: keys.detail(clubId ?? 0),
     enabled: clubId != null,
+    // 不留前一社的資料:這份查詢只以 clubId 為鍵,沿用舊值等於把 A 社的分數
+    // 攤在 B 社的彈窗上,而彈窗的調整動作照樣可按
     queryFn: () => api<AdminEvalDetailOut>(`/admin/eval/clubs/${clubId}`).then(toDetail),
-    placeholderData: keepPreviousData,
   })
 }
 

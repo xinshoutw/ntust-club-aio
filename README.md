@@ -32,8 +32,8 @@ pnpm dev
 ### 測試
 
 ```bash
-cd backend && uv run pytest
-cd frontend && pnpm build   # 型別檢查 + 建置
+cd backend  && uv run pytest && uv run ruff check .
+cd frontend && pnpm exec tsc -b && pnpm test && pnpm run lint
 ```
 
 ## 正式部署(GCE 單機)

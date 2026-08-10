@@ -480,10 +480,12 @@ async def close_approve(
     # 繳交確認:未確認之項目評鑑以 0 分計(寫入 report,scoring 讀取)。
     # body 必填且三值一律明寫,model 的 server_default 只是審核前的佔位值
     report = await db.get(ActivityReport, activity.id)
-    if report is not None:
-        report.photos_confirmed = body.photos_confirmed
-        report.report_confirmed = body.report_confirmed
-        report.reflections_confirmed = body.reflections_confirmed
+    if report is None:
+        # 沒有結案資料就沒有東西可確認;放行只會產生一筆評鑑全零又無人知情的已結案
+        raise conflict("結案資料不存在,無法核准")
+    report.photos_confirmed = body.photos_confirmed
+    report.report_confirmed = body.report_confirmed
+    report.reflections_confirmed = body.reflections_confirmed
     _record(db, activity, ApprovalSubject.ACTIVITY_CLOSE, "advisor", ApprovalDecision.APPROVE, user)
     audit.record(
         db,

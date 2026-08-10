@@ -46,6 +46,7 @@ export type GridStatus = 'pending' | 'temp' | 'fixed' | 'blocked'
 export interface GridCell {
   status: GridStatus
   bookingId: number | null // 僅審核中的臨時借用帶申請 id(點格開審核彈窗)
+  kind: 'temp' | 'fixed' | null // 審核中格是哪一種借用;固定借用要到 /admin/rooms 審
 }
 
 /** venue_id → 節次 → 格值;未列出的格=可借 */
@@ -53,7 +54,10 @@ export type AvailabilityGrid = Record<string, Record<string, GridCell>>
 
 interface AvailabilityOut {
   date: string
-  grid: Record<string, Record<string, { status: GridStatus; booking_id: number | null }>>
+  grid: Record<
+    string,
+    Record<string, { status: GridStatus; booking_id: number | null; kind: 'temp' | 'fixed' | null }>
+  >
 }
 
 const toGrid = (out: AvailabilityOut): AvailabilityGrid => {
@@ -62,7 +66,7 @@ const toGrid = (out: AvailabilityOut): AvailabilityGrid => {
     grid[venueId] = Object.fromEntries(
       Object.entries(cells).map(([period, c]) => [
         period,
-        { status: c.status, bookingId: c.booking_id },
+        { status: c.status, bookingId: c.booking_id, kind: c.kind },
       ]),
     )
   }

@@ -110,11 +110,12 @@ async def change_password(
         .limit(PASSWORD_HISTORY_GENERATIONS - 1)
     )
     reused = [h.password_hash for h in recent] + [user.password_hash]
-    reuse_checks = [await verify_password_async(h, new_password) for h in reused]
-    if any(reuse_checks):
-        raise validation_error(
-            f"新密碼不得與最近 {PASSWORD_HISTORY_GENERATIONS} 代密碼相同", code="PASSWORD_REUSED"
-        )
+    for old_hash in reused:  # 命中即停:每次比對都是一輪 argon2
+        if await verify_password_async(old_hash, new_password):
+            raise validation_error(
+                f"新密碼不得與最近 {PASSWORD_HISTORY_GENERATIONS} 代密碼相同",
+                code="PASSWORD_REUSED",
+            )
 
     db.add(PasswordHistory(user_id=user.id, password_hash=user.password_hash))
     user.password_hash = await hash_password_async(new_password)

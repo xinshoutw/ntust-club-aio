@@ -185,6 +185,10 @@ async def temp_days_hitting_slots(
     """區間內是否有已核准的**臨時**借用落在這些 (星期, 時段) 上。"""
     if not pairs:
         return False
+    # 學期已開始後才核准的固定借用,不該被學期內早已過去的臨時借用擋死
+    start = max(start, today_taipei())
+    if start > end:
+        return False
     by_weekday: dict[int, list[str]] = {}
     for wd, period in pairs:
         by_weekday.setdefault(wd, []).append(period)
@@ -228,20 +232,22 @@ async def equipment_available_in_window(
 ) -> int:
     """指定區間可借數 = total − 佔用量(pending/approved/checked_out)。
 
-    佔用 = 區間重疊者,**外加所有已借出未歸還者**。逾期未還的單子原區間已過,只比對
-    區間重疊會把它算成沒佔用 —— 東西實體還在別人手上,可借數卻照常給,直接超賣。
+    佔用 = 區間重疊者。**查詢區間涵蓋今天或未來時,再加上所有已借出未歸還者** ——
+    逾期未還的單子原區間已過,只比對區間重疊會把它算成沒佔用,東西實體還在別人手上
+    可借數卻照常給,直接超賣。反過來,補登歷史借用問的是「當時借不借得到」,
+    不該被今天實體借出中的數量擋死。
 
     exclude_loan_id:行政端審核檢核時排除本單(避免把待審單自己算進佔用)。
     """
+    occupied = [sa.and_(EquipmentLoan.start_date <= end, EquipmentLoan.end_date >= start)]
+    if end >= today_taipei():
+        occupied.append(EquipmentLoan.status == LoanStatus.CHECKED_OUT)
     query = sa.select(sa.func.coalesce(sa.func.sum(EquipmentLoan.qty), 0)).where(
         EquipmentLoan.equipment_id == equipment_id,
         EquipmentLoan.status.notin_(
             [LoanStatus.REJECTED, LoanStatus.RETURNED, LoanStatus.CANCELLED]
         ),
-        sa.or_(
-            EquipmentLoan.status == LoanStatus.CHECKED_OUT,
-            sa.and_(EquipmentLoan.start_date <= end, EquipmentLoan.end_date >= start),
-        ),
+        sa.or_(*occupied),
     )
     if exclude_loan_id is not None:
         query = query.where(EquipmentLoan.id != exclude_loan_id)
@@ -447,18 +453,25 @@ async def availability_grids(
 async def admin_availability_grid(db: AsyncSession, day: date) -> dict[int, dict[str, dict]]:
     """行政端全校單日場況:格值 {status, booking_id}。
 
-    - status:pending(審核中臨時借用)/temp(已核准臨時借用)/fixed(已核准固定借用)
+    - status:pending(審核中)/temp(已核准臨時借用)/fixed(已核准固定借用)
+    - kind:pending 格是哪一種借用(temp 可點格開審核彈窗,fixed 要到 /admin/rooms 審)
     - booking_id:僅審核中的臨時借用帶申請 id(供點格開審核彈窗);其餘為 None
     - 無「自己借用」概念;已核准蓋過審核中(與 club 端同權重規則)
     """
     grid: dict[int, dict[str, dict]] = {}
     rank = {"pending": 0, "temp": 1, "fixed": 1, "blocked": 2}
 
-    def mark(venue_id: int, period: str, status: str, booking_id: int | None = None) -> None:
+    def mark(
+        venue_id: int,
+        period: str,
+        status: str,
+        booking_id: int | None = None,
+        kind: str | None = None,
+    ) -> None:
         cell = grid.setdefault(venue_id, {})
         current = cell.get(period)
         if current is None or rank[status] > rank[current["status"]]:
-            cell[period] = {"status": status, "booking_id": booking_id}
+            cell[period] = {"status": status, "booking_id": booking_id, "kind": kind}
 
     temp_rows = await db.execute(
         sa.select(VenueBooking).where(
@@ -474,6 +487,7 @@ async def admin_availability_grid(db: AsyncSession, day: date) -> dict[int, dict
                 period,
                 "temp" if approved else "pending",
                 None if approved else booking.id,
+                "temp",
             )
 
     fixed_rows = await db.execute(
@@ -493,7 +507,7 @@ async def admin_availability_grid(db: AsyncSession, day: date) -> dict[int, dict
     for slot, venue_id, approved in fixed_rows:
         # 審核中的固定借用也要標:承辦人核准臨時借用時,若這格在螢幕上是空白的,
         # 雙重核准連目視都攔不下來
-        mark(venue_id, slot.period, "fixed" if approved else "pending")
+        mark(venue_id, slot.period, "fixed" if approved else "pending", None, "fixed")
 
     for (_, vid), cells in (await blocked_map(db, day, day)).items():
         for period in cells:

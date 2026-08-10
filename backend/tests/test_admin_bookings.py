@@ -347,10 +347,35 @@ async def test_admin_availability_grid_with_booking_ids(client, db):
     grid = (
         await client.get("/api/v1/admin/bookings/availability", params={"date": "2026-03-05"})
     ).json()["data"]["grid"]
-    # 審核中格帶申請 id(供點格開審核彈窗);已核准不帶
-    assert grid[str(venue.id)]["3"] == {"status": "pending", "booking_id": pending.id}
-    assert grid[str(venue.id)]["7"] == {"status": "temp", "booking_id": None}
-    assert grid[str(fixed_venue.id)]["5"] == {"status": "fixed", "booking_id": None}
+    # 審核中格帶申請 id(供點格開審核彈窗);已核准不帶。kind 區分臨時/固定
+    assert grid[str(venue.id)]["3"] == {
+        "status": "pending",
+        "booking_id": pending.id,
+        "kind": "temp",
+    }
+    assert grid[str(venue.id)]["7"] == {"status": "temp", "booking_id": None, "kind": "temp"}
+    assert grid[str(fixed_venue.id)]["5"] == {
+        "status": "fixed",
+        "booking_id": None,
+        "kind": "fixed",
+    }
+
+    # 審核中的固定借用也要標,否則承辦核准臨時借用時那格是空白的(點不了,要到 /admin/rooms 審)
+    pending_fixed = RoomBookingRequest(
+        club_id=club.id, venue_id=fixed_venue.id, purpose="待審社課",
+        start_date=date(2026, 2, 1), end_date=date(2026, 7, 31),
+    )
+    pending_fixed.slots = [RoomBookingSlot(weekday=4, period="6")]
+    db.add(pending_fixed)
+    await db.commit()
+    grid = (
+        await client.get("/api/v1/admin/bookings/availability", params={"date": "2026-03-05"})
+    ).json()["data"]["grid"]
+    assert grid[str(fixed_venue.id)]["6"] == {
+        "status": "pending",
+        "booking_id": None,
+        "kind": "fixed",
+    }
 
     # 不同星期:固定借用不佔用
     grid = (

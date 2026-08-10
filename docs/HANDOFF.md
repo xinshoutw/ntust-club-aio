@@ -8,8 +8,8 @@
 2. **全面 code review(2026-07-25)已完成**:11 個獨立審查者平行審查,119 項 findings。原始 HTML 報告已刪除,結論全數併入 `issues.md` / `gaps.md`;需要逐項檔案行號時到 git 歷史取回
 3. **頁面規格(2026-08-10)**:逐頁盤點全部 51 個頁面 → `docs/spec/`;問題與缺口彙整為 `issues.md`(104 項)與 `gaps.md`
 4. **問題分堆(2026-08-10)**:全部條目依「修法是否唯一」分成下方 A/B/C 三堆,經一輪跨模型交叉審查修正
-6. **A2 十二項全數修畢(2026-08-10)**:ISS-05、06、13(含 55)、13b、15+16、18、32、36、45、46、74b+38+38b、77b,已從 `issues.md` 移除。後端 272 passed、`ruff` 全綠;前端 `tsc -b` 0 錯、`pnpm test` 41 passed
-5. **A1 五項全數修畢(2026-08-10)**:ISS-01、ISS-02、ISS-03、ISS-14b、ISS-53,已從 `issues.md` 移除;跨模型交叉審查後又補了六處(見下)。後端 264 passed、`ruff` 全綠;前端 `tsc -b` 0 錯、`pnpm test` 41 passed
+5. **A1 五項全數修畢(2026-08-10)**:ISS-01、ISS-02、ISS-03、ISS-14b、ISS-53,已從 `issues.md` 移除;跨模型交叉審查後又補了六處(見下)。驗證數字見下方「驗證現況」
+6. **A2 十二項全數修畢(2026-08-10)**:ISS-05、06、13(含 55)、13b、15+16、18、32、36、45、46、74b+38+38b、77b,已從 `issues.md` 移除。驗證數字見下方「驗證現況」
 
 **DEC-01 已定案:這學年評鑑要在新系統跑,但學年末才用** —— 2026-09 上線當下只需競賽報名(ISS-01)可用,整條彙總鏈排在上線之後。其餘 DEC-02~12 仍無答案。
 
@@ -105,8 +105,8 @@
 
 ## 驗證現況(2026-08-10 實測)
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → 264 passed;`ruff check .` 全綠;覆蓋率上次量測 95%(較低者:notify 73%、audit 77%、signup_service 82%)
-- 前端 `pnpm exec tsc -b` → 0 錯;`pnpm test` → 41 passed;`pnpm run lint` → 僅 8 個既有 fast-refresh warning
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → 273 passed;`ruff check .` 全綠;覆蓋率上次量測 95%(較低者:notify 73%、audit 77%、signup_service 82%)
+- 前端 `pnpm exec tsc -b --force` → 0 錯;`pnpm test` → 41 passed;`pnpm run lint` → 9 個 fast-refresh warning(全為既有的 `only-export-components` 類)
 - `git log --all` 確認 `.env` 與 `migration/out` 從未進版控
 
 ## 其他待處理

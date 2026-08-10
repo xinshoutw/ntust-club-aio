@@ -255,6 +255,9 @@ async def submit_activity(
     for item in activity.budget_items:
         item.approved_subsidy = None
     activity.school_approved = None
+    # fund_source 一併清:approve 只在 body 帶值時覆寫,留著上一輪的值會讓
+    # 「有補助案件必須認定經費來源」的檢核吃到殘值而放行
+    activity.fund_source = None
     activity.status = ActivityStatus.PENDING_ADVISOR
     club = await _club_of(db, user)
     audit.record(

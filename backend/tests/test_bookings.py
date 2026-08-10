@@ -13,6 +13,7 @@ from app.models import (
     Venue,
 )
 from app.models.enums import ActivityStatus, LoanStatus, VenueCategory
+from app.services import booking_service
 from app.services.booking_service import next_workday, overdue_deadline
 from tests.conftest import csrf_headers, login, make_club, make_user
 
@@ -803,3 +804,42 @@ async def test_overdue_loan_still_occupies_stock(client, db):
         headers=csrf_headers(client),
     )
     assert resp.status_code == 409
+
+
+async def test_backdated_manual_loan_ignores_todays_checked_out(client, db):
+    """補登歷史借用問的是「當時借不借得到」。
+
+    逾期未還者計入佔用是為了防未來超賣;若連過去的區間也算進去,補登歷史資料
+    (手動借用的用途之一)就會被今天實體借出中的數量擋死。
+    """
+    club = await setup_session(client, db)
+    eq = await make_equipment(db, name="音響", total_qty=1)
+    db.add(
+        EquipmentLoan(
+            club_id=club.id,
+            equipment_id=eq.id,
+            qty=1,
+            start_date=date.today() - timedelta(days=5),
+            end_date=date.today() + timedelta(days=5),
+            status=LoanStatus.CHECKED_OUT,
+            purpose="現在借出中",
+        )
+    )
+    await db.commit()
+
+    past_start = date.today() - timedelta(days=200)
+    past_end = date.today() - timedelta(days=198)
+    assert (
+        await booking_service.equipment_available_in_window(
+            db, eq.id, eq.total_qty, past_start, past_end
+        )
+        == 1
+    )
+    # 未來區間照樣被佔用
+    assert (
+        await booking_service.equipment_available_in_window(
+            db, eq.id, eq.total_qty, date.today() + timedelta(days=60),
+            date.today() + timedelta(days=61),
+        )
+        == 0
+    )

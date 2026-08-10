@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { toSignupItem } from './signups'
+import { toDetail, toSignupItem } from './signups'
 
 const base = {
   id: 1,
@@ -39,5 +39,33 @@ describe('toSignupItem', () => {
       fields: [{ key: 'x', label: '未知', type: 'magic' }],
     })
     expect(item.fields[0]).toEqual({ key: 'x', label: '未知', type: 'text', required: false, options: undefined })
+  })
+})
+
+describe('toDetail', () => {
+  const detail = { ...base, is_eval: true, my_signup: null, my_draft: null, award_options: [] }
+
+  it('帶出可選獎項', () => {
+    const out = toDetail({ ...detail, award_options: [{ id: 'club', name: '最佳社團獎' }] })
+    expect(out.awardOptions).toEqual([{ id: 'club', name: '最佳社團獎' }])
+  })
+
+  it('報名紀錄的獎項自帶名稱,不靠可選清單反查 —— 獎項事後停用仍顯示得出來', () => {
+    const out = toDetail({
+      ...detail,
+      award_options: [],
+      my_signup: {
+        confirmed: true,
+        created_at: '2026-09-01T10:00:00',
+        entries: [{ id: 1, answers: { name: '甲' } }],
+        awards: [{ id: 'finance', name: '最佳財務獎' }],
+      },
+    })
+    expect(out.mySignup?.awards).toEqual([{ id: 'finance', name: '最佳財務獎' }])
+  })
+
+  it('後端未帶欄位時退回空陣列', () => {
+    const out = toDetail({ ...detail, award_options: undefined as never })
+    expect(out.awardOptions).toEqual([])
   })
 })

@@ -90,17 +90,17 @@ async def get_item(
         .options(sa.orm.selectinload(Signup.entries))
     )
     if signup is not None:
-        awards = [
-            a
-            for a in await db.scalars(
-                sa.select(SignupAward.award_id).where(SignupAward.signup_id == signup.id)
-            )
-        ]
+        awards = await db.execute(
+            sa.select(Award.id, Award.name)
+            .join(SignupAward, SignupAward.award_id == Award.id)
+            .where(SignupAward.signup_id == signup.id)
+            .order_by(Award.sort, Award.id)
+        )
         out.my_signup = MySignupOut(
             confirmed=signup.confirmed,
             created_at=signup.created_at,
             entries=signup.entries,
-            awards=awards,
+            awards=[AwardOptionOut(id=i, name=n) for i, n in awards],
         )
         out.my_status = _my_status(item, signup)
         return ApiResponse(data=out)

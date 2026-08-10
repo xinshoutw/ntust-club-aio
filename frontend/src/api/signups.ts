@@ -32,8 +32,8 @@ export interface MySignup {
   confirmed: boolean
   submittedAt: string
   participants: Participant[]
-  /** 競賽報名勾選的獎項 id */
-  awards: string[]
+  /** 競賽報名勾選的獎項(帶名稱,不受事後停用影響) */
+  awards: AwardOption[]
 }
 
 export interface AwardOption {
@@ -77,7 +77,7 @@ interface SignupItemDetailOut extends SignupItemOut {
     confirmed: boolean
     created_at: string
     entries: { id: number; answers: Participant }[]
-    awards: string[]
+    awards: AwardOption[]
   } | null
   my_draft: Participant[] | null
   award_options: AwardOption[]
@@ -109,7 +109,7 @@ export const toSignupItem = (s: SignupItemOut): SignupItem => ({
   fields: s.fields.map(toField),
 })
 
-const toDetail = (s: SignupItemDetailOut): SignupItemDetail => ({
+export const toDetail = (s: SignupItemDetailOut): SignupItemDetail => ({
   ...toSignupItem(s),
   mySignup: s.my_signup
     ? {

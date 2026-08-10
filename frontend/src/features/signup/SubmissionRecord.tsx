@@ -17,8 +17,7 @@ export default function SubmissionRecord({ item }: { item: SignupItemDetail }) {
       </div>
       {item.isEval && (
         <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>
-          參賽獎項{' '}
-          {sub.awards.map((id) => item.awardOptions.find((a) => a.id === id)?.name ?? id).join('、') || '—'}
+          參賽獎項 {sub.awards.map((a) => a.name).join('、') || '—'}
         </div>
       )}
       {sub.participants.map((p, i) => (

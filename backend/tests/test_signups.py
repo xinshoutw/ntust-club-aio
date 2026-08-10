@@ -242,7 +242,7 @@ async def test_eval_signup_requires_awards(client, db):
     assert resp.status_code == 201
 
     detail = (await client.get(f"/api/v1/club/signup-items/{item.id}")).json()["data"]
-    assert detail["my_signup"]["awards"] == ["club"]
+    assert detail["my_signup"]["awards"] == [{"id": "club", "name": "最佳社團獎"}]
 
 
 async def test_list_shows_my_status(client, db):

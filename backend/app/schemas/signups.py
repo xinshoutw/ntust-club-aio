@@ -45,18 +45,19 @@ class EntryOut(BaseModel):
     answers: dict[str, Any]
 
 
-class MySignupOut(BaseModel):
-    confirmed: bool
-    created_at: datetime
-    entries: list[EntryOut]
-    awards: list[str] = []
-
-
 class AwardOptionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
     name: str
+
+
+class MySignupOut(BaseModel):
+    confirmed: bool
+    created_at: datetime
+    entries: list[EntryOut]
+    # 帶名稱一起回:獎項事後被停用時,報名紀錄仍顯示得出當初選的是什麼
+    awards: list[AwardOptionOut] = []
 
 
 class SignupItemDetailOut(SignupItemOut):
@@ -71,7 +72,8 @@ class ParticipantIn(BaseModel):
 
 class SignupSubmitIn(BaseModel):
     participants: list[ParticipantIn] = Field(min_length=1, max_length=500)
-    awards: list[str] = Field(default_factory=list, max_length=5)  # 競賽報名勾選
+    # 純輸入上限,實際合法值由啟用中的獎項決定(新增獎項時不必跟著改)
+    awards: list[str] = Field(default_factory=list, max_length=50)
 
 
 class SignupDraftIn(BaseModel):

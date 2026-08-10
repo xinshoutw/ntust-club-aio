@@ -101,6 +101,26 @@ async def test_single_stage_without_subsidy(client, db):
         f"/api/v1/admin/activities/{aid}/approve", json={}, headers=csrf_headers(client)
     )
     assert resp.json()["data"]["status"] == "approved"  # 無補助單關
+    assert await db.scalar(sa.select(Activity.school_approved).where(Activity.id == aid)) == 0
+
+
+async def test_no_subsidy_case_cannot_be_granted_money(client, db):
+    """無補助案是承辦人單關即核准 —— 不得藉核定金額繞過組長與學務長。"""
+    await seed(client, db)
+    no_subsidy = payload(
+        budget_items=[{"category": "雜支", "self_fund": 500, "requested_subsidy": 0}]
+    )
+    aid = await submit_activity(client, db, **no_subsidy)
+
+    await login(client, "advisor")
+    detail = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/approve",
+        json={"budget": [{"item_id": detail["budget_items"][0]["id"], "approved_subsidy": 99999}]},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    assert await db.scalar(sa.select(Activity.school_approved).where(Activity.id == aid)) is None
 
 
 async def test_reject_requires_reason_and_allows_resubmit(client, db):

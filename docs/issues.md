@@ -36,7 +36,6 @@
 | ISS-13 | 高 | **結案「繳交確認」四層全部 fail-open**:前端初值三項全勾 → 後端 `body` 可整個省略 → schema 三旗標預設 `True` → **model 欄位本身也是 `default=True, server_default=true`**。承辦人不看就按核准,等於全部視為已繳,直接影響評鑑分數 |
 | ISS-13b | 高 | **臨時場地借用完全不擋「已結束的活動」**。`_approved_activity` 只驗本社 + 已核准,`create_venue_booking` 沒有任何時間關聯檢核;器材端有擋、前端下拉也濾掉了,所以「借用須綁審核通過活動」實質只剩前端在守。直呼 API 帶一個去年辦完的活動 id,就能無限預約未來任何場地 |
 | ISS-14 | 高 | **承辦人核定金額不受「擬請補助」上限約束**。前端 `InputNumber max` 只擋鍵入,API 完全不擋 |
-| ISS-14b | 阻擋 | **無補助案可由承辦人單關核定任意金額,完全不經組長與學務長**。`approve` 套用 `body.budget` 與加總寫入 `school_approved` 都是無條件執行,`requested_total > 0` 只 gate 驗證;而 `requested_total == 0` 時狀態直接轉 `approved`。一張擬請 0 元的案子,承辦人一關就能核定出任意補助金額。現有測試送的是空 body,沒有覆蓋這條路徑 |
 | ISS-15 | 高 | 退回件若社團**直接重送不編輯**,舊的逐項核定金額會沿用(只有走 PUT 才會被 `replace_budget_items` 歸零),承辦人送空 body 就能通過「必須逐項核定」的檢核。實際更糟:審核彈窗預填 `approved_subsidy ?? requested_subsidy`(`adminActivities.ts:224`),承辦人看到的是一份「已填好」的核定表,順手按核准就原封不動再送一次。預填本身是刻意設計(未核定前落回擬請值),後端重送時清掉 `approved_subsidy` 即可,不必動前端 |
 | ISS-16 | 中 | 社團編輯退回件後 `activities.school_approved` 未同步清除,仍是上一輪的核定總額 |
 | ISS-17 | 中 | **一次性密碼彈窗在缺 `password` 時會用前端 `genPassword()` 產生假密碼並顯示**。目前兩個呼叫端都必傳 API 回來的明碼,所以產不出假密碼 —— 是未拆除的地雷,不是現行缺陷。修法:`password` 改必填、刪掉 fallback 與 `genPassword` |

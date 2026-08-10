@@ -320,6 +320,9 @@ async def approve(
     requested_total = sum(i.requested_subsidy for i in activity.budget_items)
     if stage == "advisor":
         # 第一關:經費來源、逐項核定、大型活動認可
+        if requested_total == 0 and any(a.approved_subsidy for a in body.budget):
+            # 無補助案是承辦人單關即核准,不經組長與學務長 —— 核定金額必須維持 0
+            raise validation_error("未申請補助的案件不得核定補助金額")
         if body.fund_source is not None:
             activity.fund_source = body.fund_source
         items_by_id = {i.id: i for i in activity.budget_items}
@@ -345,8 +348,13 @@ async def approve(
             activity.is_large_approved = (
                 body.is_large_approved if body.is_large_approved is not None else False
             )
-        activity.school_approved = sum(
-            i.approved_subsidy for i in activity.budget_items if i.approved_subsidy is not None
+        # 無補助案一律歸零,不讓前一輪殘留的逐項核定值加總出金額
+        activity.school_approved = (
+            0
+            if requested_total == 0
+            else sum(
+                i.approved_subsidy for i in activity.budget_items if i.approved_subsidy is not None
+            )
         )
 
     if stage == "advisor" and requested_total > 0:

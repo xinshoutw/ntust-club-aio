@@ -111,6 +111,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResp
     headers,
   })
 
+  // 先廣播再解析:edge proxy 之類回的 401 不是 JSON 信封,解析失敗會先丟出去
+  if (res.status === 401) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT))
+
   let body: ApiResponse<T>
   try {
     body = (await res.json()) as ApiResponse<T>
@@ -122,7 +125,6 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResp
     throw new Error(`HTTP ${res.status}`)
   }
   if (!res.ok || !body.success) {
-    if (res.status === 401) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT))
     const error = body.error ?? `HTTP ${res.status}`
     const detail = validationDetail((body.meta as { detail?: unknown } | null)?.detail)
     throw new Error(detail ? `${error}:${detail}` : error)

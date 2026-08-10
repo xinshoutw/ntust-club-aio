@@ -4,8 +4,6 @@
 
 ## 現在在哪
 
-功能程式碼自 2026-07-21 起沒有變動(其後只動過註解與文件)。
-
 1. **第十四輪(2026-07-21)已完成**:pt/viewer 雙面板實裝、需求方 15 項、全站表格排序與欄寬
 2. **全面 code review(2026-07-25)已完成**:11 個獨立審查者平行審查,119 項 findings。原始 HTML 報告已刪除,結論全數併入 `issues.md` / `gaps.md`;需要逐項檔案行號時到 git 歷史取回
 3. **頁面規格(2026-08-10)**:逐頁盤點全部 51 個頁面 → `docs/spec/`;問題與缺口彙整為 `issues.md`(104 項)與 `gaps.md`
@@ -79,7 +77,6 @@
 | ISS-83 | 要不要自架 Noto Serif TC |
 | ISS-86 | `PERIOD_TIMES` 單一真相:後端出端點還是共用產生器 |
 | — | 前端要不要改資料 router(決定 ISS-18 能否攔頁內導航) |
-| — | 幹部證明要不要能選歷史學年期(ISS-03 之外的功能問題) |
 | GAP-06 | 政府行事曆假日的資料來源與匯入格式 |
 | GAP-08 | 檔案歸檔政策 |
 | GAP-10 | 報名活動修改/關閉時已報名者怎麼處理 |
@@ -107,10 +104,10 @@
 | GAP-16 | 社團導覽首頁 |
 | ISS-67 / GAP-18 | 行政/工讀生/評審端通知鈴鐺 |
 
-## 驗證現況(2026-07-25 實測)
+## 驗證現況(2026-08-10 實測)
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → 262 passed;`ruff check .` 全綠;覆蓋率 95%(較低者:notify 73%、audit 77%、signup_service 82%)
-- 前端 `pnpm exec tsc -b` → 0 錯;`pnpm test` → 35 passed;`pnpm run lint` → 僅 8 個既有 fast-refresh warning
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → 264 passed;`ruff check .` 全綠;覆蓋率上次量測 95%(較低者:notify 73%、audit 77%、signup_service 82%)
+- 前端 `pnpm exec tsc -b` → 0 錯;`pnpm test` → 41 passed;`pnpm run lint` → 僅 8 個既有 fast-refresh warning
 - `git log --all` 確認 `.env` 與 `migration/out` 從未進版控
 
 ## 其他待處理

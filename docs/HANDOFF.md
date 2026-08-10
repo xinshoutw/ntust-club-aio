@@ -9,7 +9,8 @@
 1. **第十四輪(2026-07-21)已完成**:pt/viewer 雙面板實裝、需求方 15 項、全站表格排序與欄寬
 2. **全面 code review(2026-07-25)已完成**:11 個獨立審查者平行審查,119 項 findings。原始 HTML 報告已刪除,結論全數併入 `issues.md` / `gaps.md`;需要逐項檔案行號時到 git 歷史取回
 3. **頁面規格(2026-08-10)**:逐頁盤點全部 51 個頁面 → `docs/spec/`;問題與缺口彙整為 `issues.md`(104 項)與 `gaps.md`
-4. **問題分堆(2026-08-10)**:全部條目依「修法是否唯一」分成下方 A/B/C 三堆,經一輪跨模型交叉審查修正。**一項都還沒修**
+4. **問題分堆(2026-08-10)**:全部條目依「修法是否唯一」分成下方 A/B/C 三堆,經一輪跨模型交叉審查修正
+5. **A1 五項全數修畢(2026-08-10)**:ISS-01、ISS-02、ISS-03、ISS-14b、ISS-53,已從 `issues.md` 移除。後端 263 passed、`ruff` 全綠;前端 `tsc -b` 0 錯、`pnpm test` 35 passed
 
 **DEC-01 已定案:這學年評鑑要在新系統跑,但學年末才用** —— 2026-09 上線當下只需競賽報名(ISS-01)可用,整條彙總鏈排在上線之後。其餘 DEC-02~12 仍無答案。
 
@@ -17,13 +18,7 @@
 
 修法唯一、不需任何人決策,改動限於程式碼 + 必要時單一 Alembic revision。
 
-**A1 上線阻擋** — ISS-01(含 GAP-09)、ISS-02、ISS-03、ISS-14b、ISS-53
-
-- ISS-01:補「列出啟用中獎項」端點 + 建立頁 `is_eval` 開關 + 社團端獎項複選(複選由 `signup_awards` 複合主鍵定死)
-- ISS-02:移除側欄入口 + 刪假頁;真頁屬 GAP-04
-- ISS-03:`CertificatePage.tsx:15` 的 `TERMS` 改由 `lib/semester.ts` 推導,維持現行三項形狀
-- ISS-14b:`requested_total == 0` 時不接受 `body.budget`、不寫 `school_approved`
-- ISS-53:三處都補 `_aware()`
+**A1 上線阻擋 — 已全數修畢**(ISS-01/GAP-09、ISS-02、ISS-03、ISS-14b、ISS-53)
 
 **A2 高嚴重度** — ISS-05、ISS-06、ISS-13(含 ISS-55)、ISS-13b、ISS-15+ISS-16、ISS-18、ISS-32、ISS-36、ISS-45、ISS-46、ISS-74b+ISS-38+ISS-38b、ISS-77b
 

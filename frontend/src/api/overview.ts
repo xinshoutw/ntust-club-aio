@@ -47,7 +47,9 @@ const trackedStatus = (a: ActivityOut): StatusKey => {
   return a.status as StatusKey
 }
 
-export const overviewKeys = { activities: ['overview', 'activities'] as const }
+// 掛 activities 前綴:送出/刪除活動時 useActivityMutations 的 invalidate 一併刷新總覽,
+// 否則待辦與「進行中申請」會停在動作前的狀態
+export const overviewKeys = { activities: ['activities', 'overview'] as const }
 
 export function useOverviewActivities() {
   return useQuery({

@@ -1,6 +1,7 @@
 // 器材主檔維護 API 層(僅 super):GET/POST/PATCH /admin/equipment。
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './client'
+import { keys as bookingKeys } from './adminBookings'
 
 export interface EquipmentItem {
   id: number
@@ -55,7 +56,11 @@ export interface EquipmentInput {
 
 export function useEquipmentMutations() {
   const qc = useQueryClient()
-  const invalidate = () => void qc.invalidateQueries({ queryKey: keys.all })
+  const invalidate = () => {
+    void qc.invalidateQueries({ queryKey: keys.all })
+    // 待審借用單帶的可借數由總數推導,改主檔後審核頁會拿舊數字判斷夠不夠借
+    void qc.invalidateQueries({ queryKey: bookingKeys.all })
+  }
 
   const create = useMutation({
     mutationFn: (b: EquipmentInput) =>

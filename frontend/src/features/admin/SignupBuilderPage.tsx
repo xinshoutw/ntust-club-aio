@@ -34,6 +34,7 @@ export default function SignupBuilderPage() {
   const [signupStart, setSignupStart] = useState<Dayjs | null>(dayjs()) // 報名開始預設今天
   const [signupEnd, setSignupEnd] = useState<Dayjs | null>(null)
   const [needsReview, setNeedsReview] = useState(false) // 審核制:報名送出後須管理員核准
+  const [isEval, setIsEval] = useState(false) // 競賽報名:社團須勾選參賽獎項
   const [description, setDescription] = useState('')
   const [fields, setFields] = useState<BuilderField[]>([])
   const [nextKey, setNextKey] = useState(1)
@@ -167,6 +168,7 @@ export default function SignupBuilderPage() {
         signupEnd: signupEnd.format('YYYY/MM/DD HH:mm'),
         maxParticipants: cap,
         requiresConfirmation: needsReview,
+        isEval,
         // 陣列順序=顯示順序(拖曳排序後整包送)
         fields: named.map((f) => ({ label: f.label.trim(), type: f.type, required: f.required, options: f.options })),
       },
@@ -283,6 +285,11 @@ export default function SignupBuilderPage() {
               <div style={{ gridColumn: '1 / -1' }}>
                 <Checkbox checked={needsReview} onChange={(e) => setNeedsReview(e.target.checked)}>
                   審核制(報名送出後須管理員核准才算報名成功)
+                </Checkbox>
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Checkbox checked={isEval} onChange={(e) => setIsEval(e.target.checked)}>
+                  競賽報名(社團須勾選參賽獎項,至少一項)
                 </Checkbox>
               </div>
               <label style={{ gridColumn: '1 / -1' }}>

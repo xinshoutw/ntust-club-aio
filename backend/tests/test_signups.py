@@ -212,6 +212,13 @@ async def test_eval_signup_requires_awards(client, db):
     db.add(Award(id="club", name="最佳社團獎", kind=AwardKind.GROUP))
     await db.commit()
     item = await make_item(db, admin.id, name="社團競賽報名", is_eval=True)
+    plain = await make_item(db, admin.id, name="一般報名")
+
+    # 社團端要選得出獎項,詳情就得帶啟用中的獎項清單;非競賽報名不帶
+    detail = (await client.get(f"/api/v1/club/signup-items/{item.id}")).json()["data"]
+    assert detail["award_options"] == [{"id": "club", "name": "最佳社團獎"}]
+    plain_detail = (await client.get(f"/api/v1/club/signup-items/{plain.id}")).json()["data"]
+    assert plain_detail["award_options"] == []
 
     resp = await client.post(
         f"/api/v1/club/signup-items/{item.id}/signup",

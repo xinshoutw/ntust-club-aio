@@ -51,11 +51,18 @@ async def test_create_item_defaults_and_field_keys(client, db):
     assert data["max_participants"] == 5
     assert data["requires_confirmation"] is True
     assert data["session_based"] is False  # 僅負責人會議為場次制
+    assert data["is_eval"] is False
 
     leader = await client.post(
         URL, json=body(name="負責人會議", kind="leader_meeting"), headers=csrf_headers(client)
     )
     assert leader.json()["data"]["session_based"] is True
+
+    # 競賽報名由建立頁的勾選框決定,沒有它社團端就送不出獎項
+    evaluation = await client.post(
+        URL, json=body(name="社團競賽報名", is_eval=True), headers=csrf_headers(client)
+    )
+    assert evaluation.json()["data"]["is_eval"] is True
 
     assert await db.scalar(
         sa.select(AuditLog.id).where(AuditLog.action == "signup_item_created")

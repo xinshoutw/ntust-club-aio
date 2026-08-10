@@ -15,6 +15,12 @@ export default function SubmissionRecord({ item }: { item: SignupItemDetail }) {
         送出時間 <span className="num">{sub.submittedAt}</span>
         {item.requiresConfirmation && !sub.confirmed && <span>(待管理員確認)</span>}
       </div>
+      {item.isEval && (
+        <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>
+          參賽獎項{' '}
+          {sub.awards.map((id) => item.awardOptions.find((a) => a.id === id)?.name ?? id).join('、') || '—'}
+        </div>
+      )}
       {sub.participants.map((p, i) => (
         <div key={i} style={{ marginTop: 10, padding: '12px 14px', background: 'var(--paper)', borderRadius: 6 }}>
           {sub.participants.length > 1 && (

@@ -32,11 +32,20 @@ export interface MySignup {
   confirmed: boolean
   submittedAt: string
   participants: Participant[]
+  /** 競賽報名勾選的獎項 id */
+  awards: string[]
+}
+
+export interface AwardOption {
+  id: string
+  name: string
 }
 
 export interface SignupItemDetail extends SignupItem {
   mySignup?: MySignup
   myDraft?: Participant[]
+  /** 僅競賽報名(isEval)有值 */
+  awardOptions: AwardOption[]
 }
 
 interface SignupFieldOut {
@@ -68,8 +77,10 @@ interface SignupItemDetailOut extends SignupItemOut {
     confirmed: boolean
     created_at: string
     entries: { id: number; answers: Participant }[]
+    awards: string[]
   } | null
   my_draft: Participant[] | null
+  award_options: AwardOption[]
 }
 
 const DATETIME_FMT = 'YYYY/MM/DD HH:mm'
@@ -105,9 +116,11 @@ const toDetail = (s: SignupItemDetailOut): SignupItemDetail => ({
         confirmed: s.my_signup.confirmed,
         submittedAt: dayjs(s.my_signup.created_at).format(DATETIME_FMT),
         participants: s.my_signup.entries.map((e) => e.answers),
+        awards: s.my_signup.awards ?? [],
       }
     : undefined,
   myDraft: s.my_draft ?? undefined,
+  awardOptions: s.award_options ?? [],
 })
 
 const keys = {
@@ -147,10 +160,18 @@ export function useSignupMutations() {
     onSuccess: invalidate,
   })
   const submit = useMutation({
-    mutationFn: ({ id, participants }: { id: number; participants: Participant[] }) =>
+    mutationFn: ({
+      id,
+      participants,
+      awards = [],
+    }: {
+      id: number
+      participants: Participant[]
+      awards?: string[]
+    }) =>
       api<null>(`/club/signup-items/${id}/signup`, {
         method: 'POST',
-        body: JSON.stringify({ participants: participants.map((answers) => ({ answers })), awards: [] }),
+        body: JSON.stringify({ participants: participants.map((answers) => ({ answers })), awards }),
       }),
     onSuccess: invalidate,
   })

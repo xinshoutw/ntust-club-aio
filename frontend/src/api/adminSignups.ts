@@ -200,6 +200,7 @@ export interface SignupItemInput {
   signupEnd: string
   maxParticipants: number
   requiresConfirmation: boolean
+  isEval: boolean // 競賽報名:社團送出時須勾選至少一個獎項
   fields: SignupFieldInput[] // 陣列順序=顯示順序(拖曳排序後整包送)
 }
 
@@ -223,6 +224,7 @@ export function useSignupItemMutations() {
           signup_end: toNaiveIso(b.signupEnd),
           max_participants: b.maxParticipants,
           requires_confirmation: b.requiresConfirmation,
+          is_eval: b.isEval,
           // 基本欄位前置(見檔頭);自訂欄位不帶 key,由後端依序補 f1、f2…
           fields: [
             ...BASE_FIELDS.map((f) => ({ key: f.key, label: f.label, type: f.type, required: f.required })),

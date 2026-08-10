@@ -52,9 +52,17 @@ class MySignupOut(BaseModel):
     awards: list[str] = []
 
 
+class AwardOptionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+
+
 class SignupItemDetailOut(SignupItemOut):
     my_signup: MySignupOut | None = None
     my_draft: list[dict[str, Any]] | None = None
+    award_options: list[AwardOptionOut] = []  # 僅競賽報名(is_eval)有值
 
 
 class ParticipantIn(BaseModel):

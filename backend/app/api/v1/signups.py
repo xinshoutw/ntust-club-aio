@@ -13,6 +13,7 @@ from app.core.errors import conflict, not_found, validation_error
 from app.models import Award, Club, Signup, SignupAward, SignupDraft, SignupEntry, SignupItem
 from app.schemas.common import ApiResponse
 from app.schemas.signups import (
+    AwardOptionOut,
     MySignupOut,
     SignupDraftIn,
     SignupItemDetailOut,
@@ -75,6 +76,13 @@ async def get_item(
     item = await _get_item(db, item_id)
     out = SignupItemDetailOut.model_validate(item)
     out.accepting = svc.window_open(item)
+    if item.is_eval:
+        out.award_options = [
+            AwardOptionOut.model_validate(a)
+            for a in await db.scalars(
+                sa.select(Award).where(Award.is_active.is_(True)).order_by(Award.sort, Award.id)
+            )
+        ]
 
     signup = await db.scalar(
         sa.select(Signup)

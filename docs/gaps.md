@@ -22,7 +22,6 @@
 | GAP-07 | 逐年 rubric 與獎項主檔管理 | `award_rubric_items` 綁 `(award, year)`,設計上新學年複製上年再修改,**介面未做**。117 學年度只能改 code |
 | GAP-08 | 檔案歸檔 | `files.archived_at` 的語意、下載 410、不計配額都實作了,**沒有任何地方可以設這個欄位**。磁碟只增不減 |
 | GAP-08b | 評鑑上傳鎖 / 評語公布 | `eval_settings.unlocked` 與 `comment_released` 全後端**只有讀、沒有任何寫入端點或 UI**。要凍結某獎項的資料上傳只能直接動 DB |
-| GAP-09 | 競賽報名 | `signup_items.is_eval` 與 `signup_awards` 表都在,但建立頁沒有 `is_eval` 控制項、社團端沒有獎項選擇 UI。詳見 [issues.md](issues.md) ISS-01 |
 | GAP-10 | 報名活動修改 / 關閉 | 只有 `POST`,沒有 `PUT`/`PATCH`/`DELETE`。打錯字或要提前截止只能動 DB |
 | GAP-11 | 社團性質(自治性/學藝性…)維護 | 是公告分眾與統計的依據,**API 與 UI 都改不了** |
 

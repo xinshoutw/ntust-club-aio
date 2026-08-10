@@ -86,7 +86,7 @@ erDiagram
 | email | text NULL | |
 | club_id | FK clubs NULL | 僅 role=club(一社一帳號) |
 | is_super | bool | 僅 admin:最高權限 |
-| permissions | text[] | 僅 admin:頁面權限鍵(aact/aclose/aapply/areg/abooking/aroom/amaint/aviol/amember/afiles…)+ 簽核關卡鍵(`approve_advisor`/`approve_chief`/`approve_dean`)。學務長為本人操作,開僅持 `approve_dean` 的帳號 |
+| permissions | text[] | 僅 admin。頁面鍵:`areview`(活動申請審核)、`aclose`、`asignup`、`aannounce`、`abooking`、`aroom`、`amember`、`aeval`、`amaint`、`aapply`、`aviol`、`afiles`;`aact`/`areg` 為尚未統一的舊鍵,暫時併收。簽核關卡鍵:`approve_advisor`/`approve_chief`/`approve_dean`,學務長為本人操作,開僅持 `approve_dean` 的帳號。白名單在 `schemas/accounts.PERMISSION_KEYS` |
 | can_view_eval | bool | 僅 viewer |
 | must_change_password | bool | 預設 true,首登強制改密 |
 | is_active | bool | 停用而非刪除 |
@@ -130,7 +130,7 @@ erDiagram
 
 `needs_serial` 是唯一分類欄:false=一般點交、true=依序點交(登記序號)。`max_lease_count` 為單次可借上限,NULL=不限。可借數推導不儲存。
 
-**venue_block_rules**(id, venue_id, start_date, end_date, weekdays smallint[] NULL, periods text[], reason, created_by)
+**venue_block_rules**(id, venue_id, start_date, end_date, weekdays smallint[] NULL, periods varchar(2)[], reason, created_by)
 
 場地不開放規則。`weekdays` 為 ISO 1–7,NULL=區間內每天;`periods` 為不開放的節次子集。場況圖標示不開放、社團申請 422、核准 409 `SLOT_BLOCKED`;行政手動借用不受限。刪除為硬刪,異動走 `audit_logs`。
 
@@ -158,7 +158,7 @@ erDiagram
 | close_unlocked | bool | 逾期鎖定的管理員解鎖旗標 |
 | close_draft | jsonb NULL | 結案草稿(跨裝置續填),不含照片;送出結案時清除 |
 
-四個日期時間欄位僅草稿可為 NULL,由 CHECK `draft_partial_only` 收口(`status='draft' OR (date, end_date 非空 AND name, location 非空字串)`);送出與非草稿更新另於應用層檢核完整性。
+`date`/`end_date` 與 `name`/`location` 僅草稿可空,由 CHECK `ck_activities_draft_partial_only` 收口(`status='draft' OR (date, end_date 非空 AND name, location 非空字串)`);`start_time`/`end_time` 任何狀態皆可為 NULL,完整性由應用層在送出與非草稿更新時檢核。
 
 狀態機:
 
@@ -193,7 +193,7 @@ approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,�
 | submitted_at | timestamptz | |
 | photos_confirmed / report_confirmed / reflections_confirmed | bool 預設 true | 承辦人核准結案時逐項確認繳交;**未確認者評鑑以 0 分計**(照片確認同時涵蓋影片連結) |
 
-照片走 `files`(slot=`report_photo`),限 JPG/PNG,魔術位元組與大小後端重驗,sha256 於同社團內跨活動拒重複。成果報告與心得 PDF 依模板於下載時動態生成,不落檔。
+照片走 `files`(slot=`report_photo`),收所有常見影像格式(jpg/png/gif/webp/bmp/tiff/heic/heif/avif),魔術位元組與大小後端重驗,sha256 於同社團內跨活動拒重複。成果報告與心得 PDF 依模板於下載時動態生成,不落檔。
 
 **activity_reflections**(id, report_id, student_name, dept, body)— 送審驗證 ≥3 筆,三欄皆必填。
 
@@ -236,17 +236,17 @@ approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,�
 ### 3.5 借用
 
 **room_booking_requests**(id, club_id, venue_id, purpose, start_date, end_date, status enum(pending,approved,rejected,cancelled))
-**room_booking_slots**(id, request_id, weekday int(1=週一…7=週日), period char(1–10、A–D);UNIQUE(request, weekday, period))
+**room_booking_slots**(id, request_id, weekday int(1=週一…7=週日), period varchar(2):1–10、A–D;UNIQUE(request, weekday, period))
 
 教室**固定**借用 = 整學期每週固定時段,選星期 × 節次而非日期。規則:
 
 - 僅於開放窗(`system_settings.fixed_booking_window` 日期區間)受理;未開放時社團端入口反灰移至「其他」
-- 每社至多 **10 節**(1 節=1 小時),額度計入本單與其他審核中申請
+- 每社至多 **10 節**(1 節=1 小時);額度以「同一目標學期、狀態非 rejected/cancelled」的時段數合計,審核中與已核准都佔額度
 - **晚間時段(第 10 節及 A–D 節)至少連續 3 節**:合法如 9–A、8–10、A–C、B–D;不合法如 9–10、C–D
 - 多社可申請同時段,衝突由管理員**整單擇一核准**,不存在部分同意
 - `start_date`/`end_date` 是申請時自動歸屬的下一學期起訖快照;場況圖僅在此區間顯示已核准的固定借用,學期結束即不再佔格
 
-**venue_bookings**(id, club_id NULL, venue_id, activity_id NULL, date, periods char[], purpose, phone NULL, status)
+**venue_bookings**(id, club_id NULL, venue_id, activity_id NULL, date, periods varchar(2)[], purpose, phone NULL, status)
 
 臨時場地借用,單日多節次;綁定審核通過的活動。`club_id` NULL = 最高權限手動借用(顯示「學務處」),`activity_id` NULL 僅容舊資料與手動借用。
 
@@ -260,9 +260,9 @@ approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,�
 | purpose | |
 | status | enum(pending, approved, rejected, cancelled, checked_out, returned) |
 | checkout_by / at / serials / borrower_name | 借出點交(工讀生;需序號類登記序號) |
-| checkin_by / at / note / returner_name | 歸還點交 |
+| checkin_by / checkin_at / checkin_note / returner_name | 歸還點交 |
 
-**逾期為推導**:status=checked_out 且 now > (end_date 之隔天上班日 10:30)。逾期追蹤、停權管理、社團逾期數全查這裡;逾期未還的借用視為持續佔用,不論原區間是否已過。
+**逾期為推導**:status=checked_out 且 now ≥ (end_date 之隔天上班日的 `equipment_return_time`,預設 10:30)。逾期追蹤、停權管理、社團逾期數全查這裡;逾期未還的借用視為持續佔用,不論原區間是否已過。
 
 社團可取消審核中或已核准未開始的借用(狀態 `cancelled`);臨時場地的可取消邊界是申請起始時刻(最早節次起點)。
 
@@ -292,12 +292,13 @@ approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,�
 | is_open | 管理員可提前關閉 |
 | event_at, place | 活動時間與地點 |
 | signup_start / signup_end | 報名窗(建立時預設今天開始);各活動自訂,無全域報名窗 |
-| max_participants | 每社名額上限,CHECK ≥1 |
+| max_participants | 每社名額上限,CHECK `ck_signup_items_capacity_min` ≥1 |
 | fields | jsonb:`[{key, label, type(text/textarea/radio/checkbox/select), options[], required}]`,陣列順序即顯示順序 |
 | kind | enum(normal, cadre_training, leader_meeting);幹訓與負責人會議餵行政分 ad7/ad8 |
 | session_based | 場次採計(負責人會議) |
 | requires_confirmation | 審核制:報名後 confirmed=false,管理員確認才成立;未確認不可登錄簽到 |
 | is_eval | 競賽報名項 |
+| created_by | FK users |
 
 **signup_item_sessions**(id, item_id, name, date, semester)— 場次。
 **signups**(id, item_id, club_id, confirmed;UNIQUE(item_id, club_id))— 一社一單,**一經報名不得更改**。
@@ -343,7 +344,7 @@ approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,�
 | ad6 網頁經營 5 | 有連結即 5 分(不追蹤更新時間) | clubs.website_url |
 | ad7 負責人會議 5 | 每場簽到 1.25 分(每學期 2 場、全學年 4 場滿分) | session_attendance(leader_meeting) |
 | ad8 幹訓 5 | 簽到即 5 分 | session_attendance(cadre_training) |
-| 加減分 | 表現優良最多 +5;**未銷案**勸導每筆 −1、上限 −10 | eval_adjustments.merit_bonus、violations |
+| 加減分 | 表現優良最多 +5;**未銷案**(status=open)且發生日落在評鑑視窗的勸導每筆 −1、上限 −10,與是否逾期無關 | eval_adjustments.merit_bonus、violations |
 
 - 各項滿分合計恰為 100,**行政資料總分上限 100**,加計表現優良後仍以 100 封頂
 - 僅採計簽到,**僅報名不計分**;簽到由管理員於報名管理登錄
@@ -370,7 +371,7 @@ approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,�
 ## 4. 學年、學期與設定分層
 
 - **上學期 = 8–1 月、下學期 = 2–7 月**
-- 「目前學年度」與學期起訖放 `system_settings`,年輪資料寫入時取當前設定,不寫死
+- 學期起訖規則實作在 `core/semesters.py`,後台不可調;`system_settings.current_year` 只存目前學年度
 - 活動只存日期,統計與行政分依當年度區間篩選,學年度規則變動不影響歷史資料
 
 設定分層:**恆不變** → `.env`(DB 連線、SMTP、secret key);**會變/可能變** → `system_settings`,管理員後台即時調整。目前的 key:

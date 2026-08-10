@@ -12,7 +12,7 @@
 
 ## 第一件事
 
-**12 個 commit 只存在這台 Mac**(`git rev-list --count origin/dev..dev`);`main` 落後 `dev` 512 個 commit。這是目前最大的單點故障,零成本可解 —— 先 push(報告編號 `OPS-03`)。
+**有一批 commit 只存在這台 Mac**(`git rev-list --count origin/dev..dev` 查現值);`main` 也遠遠落後 `dev`。這是目前最大的單點故障,零成本可解 —— 先 push(報告編號 `OPS-03`)。
 
 ## 驗證現況(2026-07-25 實測)
 

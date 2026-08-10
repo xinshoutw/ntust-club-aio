@@ -145,8 +145,8 @@ theme: {
 - 送出驗證:errors Set + AntD `status="error"` + 區塊紅框 `.area-error`(常駐透明邊框防位移);修改該欄即解除,並捲動到第一個錯誤
 - 被修改但未儲存的欄位以橘黃外框 `.field-dirty` 標示;dirty 時離開頁面須確認
 - 動態列(經費明細、工作分配、借用時段)自動增列,尾端保證一列空白;空列於 blur 時移除,打字中不消失
-- 上傳一律 `lib/uploads.ts` + `components/ui/AttachmentArea`:魔術位元組驗證、SHA-256 內容去重、單檔與加總容量驗證、顯示「已使用 X/Y MB」。允許圖片處一律含 HEIC/HEIF/AVIF
-- 上限值一律讀 `GET /club/config`,前端不放容量常數
+- 上傳一律 `lib/uploads.ts` + `components/ui/AttachmentArea`:魔術位元組驗證、SHA-256 內容去重、單檔與加總容量驗證、顯示「已使用 X/Y MB」。允許圖片處含 HEIC/HEIF/AVIF(評鑑上傳例外,後端只收 jpg/png)
+- 上限值讀 `GET /club/config`,前端不放容量常數(郵局與獎項上傳頁仍各自硬編碼 50MB,待收斂)
 
 **其他**
 

@@ -26,7 +26,7 @@
 ## C. 資料準備
 
 - [ ] 器材主檔、政府行事曆(見 A)
-- [ ] 應辦 **評鑑 rubric**:`seed.py` 只建預設評鑑年(`eval_window.year`)的 rubric,其餘年度由行政複製上年再修改。競賽開始前確認該學年已建
+- [ ] 應辦 **評鑑 rubric**:`seed.py` 只建預設評鑑年(`eval_window.year`)的 rubric,且**沒有「複製上年」的介面**。換年度時須調 `eval_window` 後重跑 seed,或直接操作 DB。競賽開始前確認該學年已建
 - [ ] 待決 **場地主檔**:已 seed 19 處含容納人數,上線前確認與現況相符
 - [ ] 待決 **舊資料遷移**:`migration/cms_import.py`(社團/帳號/成員/活動/公告)與 `cc_import.py`(教室與器材借用)已可執行且 idempotent;上線前以正式 dump 再演練一次,確認筆數與 `legacy_id_map`
 - [ ] `reset_db.py` 建立 superadmin 並印出一次性密碼(首登強制改密)

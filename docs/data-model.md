@@ -12,7 +12,7 @@ PostgreSQL 18;schema 以 Alembic migration 為準,本文件是設計依據與欄
 4. **狀態機 + 簽核紀錄分離**:單據存目前狀態一欄;每次核准/退回/解鎖寫一列 `approval_records`。狀態欄只是快照,歷程與退回原因全在紀錄表。
 5. **檔案集中管理**:所有上傳檔進單一 `files` 表,磁碟路徑不進業務表。權限檢查、備份、日後搬物件儲存都只動一處。
 6. **帳號單表**:四種角色共用 `users`,角色專屬欄位允許 NULL。登入、session、密碼歷史、稽核都以使用者為單位,拆四張表要重複四份。
-7. **主檔不硬刪**:社團、場地、器材、獎項用 `is_active` 停用;流程單據永不刪除。
+7. **主檔不硬刪**:社團、場地、器材、獎項用 `is_active` 停用;已送審的流程單據永不刪除(草稿活動可刪,結案退回重送會整份取代)。
 8. **遷移可重跑**:`legacy_id_map` 記錄舊系統 id → 新 id,migration scripts 據此 idempotent。
 
 ## 1. 舊系統實體覆蓋對照
@@ -124,7 +124,7 @@ erDiagram
 
 **venues**(id, name UNIQUE, capacity NULL, category enum(教室,練習空間,廣場戶外,宿舍區), allow_fixed, allow_temp, sort, is_active)
 
-單一場地主檔,以旗標區分固定/臨時用途;場地清單與容納人數由管理員後台維護(初始值在 seed)。
+單一場地主檔,以旗標區分固定/臨時用途。目前只由 seed 建立,後台 CRUD 尚未實作(GAP-04),異動須改 seed 或直接操作 DB。
 
 **equipment**(id, name UNIQUE, total_qty, max_lease_count int NULL, needs_serial bool, sort, is_active)
 
@@ -134,7 +134,7 @@ erDiagram
 
 場地不開放規則。`weekdays` 為 ISO 1–7,NULL=區間內每天;`periods` 為不開放的節次子集。場況圖標示不開放、社團申請 422、核准 409 `SLOT_BLOCKED`;行政手動借用不受限。刪除為硬刪,異動走 `audit_logs`。
 
-**holidays**(date PK, name)— 政府行事曆假日,每年由行政匯入;器材逾期的「隔天上班日」與工作天緩衝都依此。
+**holidays**(date PK, name)— 政府行事曆假日;器材逾期的「隔天上班日」與工作天緩衝都依此。**尚無匯入介面**,每年需以 script 或直接操作 DB 灌入;未匯入的年度會退化成只排除週六日。
 
 **system_settings**(key PK, value jsonb)— 見 §4 設定分層。
 
@@ -278,7 +278,7 @@ approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,�
 
 幹部證明與郵局異動共用 **ApplicationStatus**:`pending`(審核中)→ `processing`(處理中)→ `completed`(請洽學務處)。**無退回**,學務處線下溝通後直接處理。
 
-三者欄位、驗證、狀態機都不同,故用三張窄表而非 applications + JSONB;「待審申請彙整」由三表 UNION,資料量小。
+三者欄位、驗證、狀態機都不同,故用三張窄表而非 applications + JSONB。「待審申請彙整」頁目前由前端合併幹部證明與郵局異動兩個端點的結果,報修另有專頁。
 
 ### 3.7 線上報名與出席
 
@@ -315,7 +315,7 @@ approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,�
 
 **award_rubric_items**(id, award_id, year, group_label, group_weight float NULL, item_key, name, max_score, help, is_admin_item, sort;UNIQUE(award_id, year, item_key))
 
-逐年版本化:新學年由行政複製上年評分表再修改。`item_key`(ad1/o1/f1…)同時是上傳槽位鍵。各獎項評分細項一律以評分標準 PDF 為準,與實施計畫衝突亦同。
+逐年版本化。`item_key`(ad1/o1/f1…)同時是上傳槽位鍵。設計上新學年由行政複製上年再修改,但**該介面尚未實作**:目前只能調 `eval_window` 年度後重跑 seed。各獎項評分細項一律以評分標準 PDF 為準,與實施計畫衝突亦同。
 
 **eval_uploads**(id, year, club_id, rubric_item_id, file_id)
 

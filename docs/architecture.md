@@ -46,8 +46,8 @@ Python 3.14 lazy annotation:欄位名與型別同名時型別須別名(`import d
 - 容器內路徑 `/srv/uploads`(compose 現用具名 volume `uploads`;是否改 bind mount 以便備份工具直接同步,見 DEPLOY_CHECKLIST 待決 3),佈局 `{模組}/{年}/{月}/{uuid}`;DB 存中介資料
 - 一律經帶權限檢查的 API 存取,不裸 serve(競賽資料與結案附件有社團隔離與評審匿名邊界)
 - 上傳串流寫盤(1MB chunk,VM 僅 4GB RAM),邊寫邊算 sha256 與檢查上限;副檔名 × 魔術位元組須一致,client 宣稱的 MIME 一律不信
-- 上限全在 `system_settings`:單檔依類型(文件 50 / 圖片 10 / 壓縮檔 100 / 維修影片 200 MB);加總依申請性質(活動申請附件 15、空間報修 100、結案照片 10 MB)。成果與宣傳影片不收檔,填外部連結
-- 配額:單一社團未歸檔檔案 2 GiB;系統總量讀實體磁碟可用空間(`shutil.disk_usage`),不足告警後人為介入
+- 單檔上限依類型(文件 50 / 圖片 10 / 壓縮檔 100 / 維修影片 200 MB),加總上限依申請性質(活動申請附件 15、空間報修 100、結案照片 10 MB),皆在 `system_settings`。**例外**:郵局存簿與評鑑上傳為固定 50MB,後台調不到;評鑑上傳只收 pdf/doc/docx/jpg/png/zip。成果與宣傳影片不收檔,填外部連結
+- 配額:單一社團未歸檔檔案 2 GiB;系統總量讀實體磁碟可用空間(`shutil.disk_usage`),不足即回 507 擋下上傳。容量告警尚未建置,擴容須人介入
 - 生命週期:競賽採計中的檔案保留在系統;其餘由行政備份下載後自系統刪除,`files.archived_at` 標記,再下載回 410。月份佈局讓歸檔以整月目錄為單位打包搬走
 
 ### 3.3 通知
@@ -100,9 +100,9 @@ REST JSON,前綴 `/api/v1`。回應信封:
 | 500 | `INTERNAL` | 未預期錯誤(訊息固定,不洩漏) |
 | 507 | `INSUFFICIENT_STORAGE` | 社團配額或實體磁碟空間不足 |
 
-- **分頁**:`?page=1&page_size=20`(1-based,page_size 上限 100),回應 `meta = { page, page_size, total }`。列表端點一律分頁,不做無界查詢
+- **分頁**:`?page=1&page_size=20`(1-based,page_size 上限 100),回應 `meta = { page, page_size, total }`。歷史型列表一律分頁;主檔與選項端點為全量回傳。行政分清單 `/admin/eval/clubs` 未分頁,是已知待修(BUG-41)
 - **排序**:`?sort=field` 升冪、`-field` 降冪,逗號分隔多鍵;欄位採各端點白名單,未知欄位 422;非唯一排序鍵一律補 id tiebreak
-- **CSRF**:登入時發 `csrf_token` cookie(非 HttpOnly,double-submit 綁 session 列),所有寫入請求須帶 `X-CSRF-Token`,前端 `client.ts` 自動附帶
+- **CSRF**:登入時發 `csrf_token` cookie(非 HttpOnly,double-submit 綁 session 列);除 `/auth/login`(此時尚無 session)外,所有寫入請求須帶 `X-CSRF-Token`,前端 `client.ts` 自動附帶
 
 ## 5. Repo 結構
 
@@ -136,7 +136,7 @@ Internet ──▶ [既有 edge proxy VM]  nginx:443
 
 前後端與 DB 同機:單校規模成本優先,且切換與回滾只是 edge 改 upstream 指向,秒級可逆;要加大只需停機換 machine type,架構零改動。app VM 不公開暴露(防火牆僅允許 edge 內網來源 + IAP SSH)。
 
-4GB 記憶體預算:PostgreSQL(shared_buffers 512MB)~1.2GB、uvicorn ×2 workers ~0.6GB、nginx + OS + Docker ~0.6GB,餘 ~1.5GB 另配 2GB swap。**映像不在 VM 上 build**。
+4GB 記憶體**預算**(規劃值,非現行設定):PostgreSQL(shared_buffers 512MB)~1.2GB、uvicorn ×2 workers ~0.6GB、nginx + OS + Docker ~0.6GB,餘 ~1.5GB 另配 2GB swap。目前 compose 未調 `shared_buffers`、backend 也只起單一 worker,上線前依實測決定是否加。**映像不在 VM 上 build**。
 
 ### 6.2 備份
 
@@ -153,7 +153,7 @@ GitHub Actions:backend job 跑 `ruff check` + `pytest`(起 postgres service),fro
 
 ### 6.4 內層安全
 
-- 稽核軌跡需要真實 IP:edge → web → backend 逐層傳遞 `X-Forwarded-For`,uvicorn 開 `--proxy-headers` 且僅信任 web 容器來源
+- 稽核軌跡需要真實 IP:edge → web → backend 逐層傳遞 `X-Forwarded-For`,uvicorn 開 `--proxy-headers`,信任範圍由 `FORWARDED_ALLOW_IPS`(compose 子網 + edge IP)界定
 - 登入端點在 web 層加 `limit_req`(edge 只有地理白名單,沒有速率限制)
 - SPA 的 CSP(`script-src 'self'`)在 web 層補;edge 已有基本安全標頭
 - DB 與 backend 僅在 compose 內網互通,不映射對外 port

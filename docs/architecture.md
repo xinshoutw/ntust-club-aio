@@ -53,8 +53,8 @@ Python 3.14 lazy annotation:欄位名與型別同名時型別須別名(`import d
 ### 3.3 通知
 
 - Discord webhook:全域 + 社團自設各推一份,URL 走 `.env` 不入版控;訊息清冊見 `discord-webhook-messages.md`
-- Email:aiosmtplib + `BackgroundTasks`,SMTP 參數全走 `.env` 不綁供應商,無憑證時降級 log-only;寄送結果寫 `email_logs`
-- 觸發:審核結果、密碼重設、逾期結案與歸還提醒
+- Email:aiosmtplib + `BackgroundTasks`,SMTP 參數全走 `.env` 不綁供應商;host/username/password 任一為空即降級 log-only。寄送結果寫 `email_logs`
+- 目前只有兩個寄信點:勾了「通知」的公告、器材歸還提醒。其餘事件只推 Discord;重設密碼是當場回傳一次性密碼,不寄信
 
 ### 3.4 不引入任務佇列
 
@@ -69,7 +69,7 @@ REST JSON,前綴 `/api/v1`。回應信封:
 { "success": false, "data": null, "error": "使用者可讀訊息", "meta": { "code": "機器碼" } }
 ```
 
-`error` 一律繁中、面向使用者、不含內部細節;未攔截例外回 500 通用訊息,細節只進 log。`meta.code` 供前端分流(如導向改密頁)。
+`error` 一律繁中、面向使用者、不含內部細節;未攔截例外回 500 通用訊息,細節只進 log。`meta.code` 是機器可讀錯誤碼;前端 `client.ts` 目前只取 `error` 字串拋出、不讀 code(首登改密的導轉走 `user.mustChangePassword`),要依錯誤分流時再於該層取用。
 
 | HTTP | code | 情境 |
 |------|------|------|
@@ -80,13 +80,22 @@ REST JSON,前綴 `/api/v1`。回應信封:
 | 403 | `PASSWORD_CHANGE_REQUIRED` | 首登未改密(僅放行改密/登出/me) |
 | 403 | `ACCOUNT_LOCKED` | 連錯 5 次鎖 15 分 |
 | 404 | `NOT_FOUND` | 資源不存在或不屬於該社團(不區分,避免探測) |
+| 403 | `CLUB_SUSPENDED` | 社團停權中,借用申請被擋 |
 | 409 | `CONFLICT` | 狀態衝突(重複報名、重複時段) |
+| 409 | `SLOT_TAKEN` | 時段已被借走 |
 | 409 | `SLOT_BLOCKED` | 時段落在場地不開放規則 |
+| 409 | `SLOT_LIMIT` | 固定借用超過每社節數上限 |
+| 409 | `WINDOW_CLOSED` | 不在開放窗/報名窗內 |
+| 409 | `INVALID_STATUS_TRANSITION` | 單據狀態不允許此操作 |
+| 409 | `RESOLVE_EXPIRED` | 違規勸導已過銷案期限 |
+| 409 | `DUPLICATE_FILE` | 相同 sha256 的檔案已存在 |
+| 410 | `FILE_ARCHIVED` | 檔案已歸檔並自磁碟刪除 |
 | 413 | `FILE_TOO_LARGE` | 超過上傳上限 |
 | 415 | `UNSUPPORTED_FILE_TYPE` | 魔術位元組驗證失敗 |
 | 422 | `VALIDATION` | Pydantic 驗證失敗(`meta.detail` 附明細) |
 | 422 | `PASSWORD_POLICY` / `PASSWORD_REUSED` / `PASSWORD_MISMATCH` | 密碼政策 |
 | 422 | `INVALID_SORT` | 排序欄位不在白名單 |
+| 422 | `SERIALS_REQUIRED` / `SERIALS_NOT_ALLOWED` / `SERIALS_DUPLICATED` | 器材點交序號 |
 | 429 | `RATE_LIMITED` | 超過速率限制 |
 | 500 | `INTERNAL` | 未預期錯誤(訊息固定,不洩漏) |
 | 507 | `INSUFFICIENT_STORAGE` | 社團配額或實體磁碟空間不足 |
@@ -140,7 +149,7 @@ Internet ──▶ [既有 edge proxy VM]  nginx:443
 
 ### 6.3 CI/CD
 
-GitHub Actions:lint/test → build 前後端映像 → push GHCR(校方就緒後改 Artifact Registry,只換位址與認證)。部署以 `gcloud compute ssh` 執行 `docker compose pull && up -d`;backend 容器啟動時自動 `alembic upgrade head`(單 instance 無競態)。
+GitHub Actions:backend job 跑 `ruff check` + `pytest`(起 postgres service),frontend job 目前只跑 `pnpm build`,**尚未跑 lint 與 test**。`main` 分支推送時 build 前後端映像 → push GHCR(校方就緒後改 Artifact Registry,只換位址與認證)。部署以 `gcloud compute ssh` 執行 `docker compose pull && up -d`;backend 容器啟動時自動 `alembic upgrade head`(單 instance 無競態)。
 
 ### 6.4 內層安全
 
@@ -167,8 +176,9 @@ GitHub Actions:lint/test → build 前後端映像 → push GHCR(校方就緒後
 ## 8. 測試
 
 - 後端 pytest + httpx,主力放 API 整合測試(申請 → 審核 → 結案全流程);獨立測試庫,`CLUB_AIO_TEST_DB` 可覆寫庫名以支援平行 worktree
-- 前端 vitest + React Testing Library(工具與關鍵元件)
+- 前端 vitest(工具與純函式為主)
 - 覆蓋率目標依全域規範 80%
+- **E2E 必須打 web 容器的 `:8080`**:上傳大小上限、登入限流、`auth_request` 前置認證、CSP 與檔案 framing 標頭全在 nginx 層,直接打 backend 的 `:8000` 會整組繞過
 
 ## 9. 未定
 

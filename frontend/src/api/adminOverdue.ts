@@ -1,7 +1,7 @@
 // 行政端逾期追蹤與停權(僅最高權限):歸還提醒、停權/解除;
 // 逾期列表沿用 adminClubOverview 的 useAdminEquipmentLoanList({ status: 'overdue' })
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import type { Dayjs } from 'dayjs'
+import dayjs, { type Dayjs } from 'dayjs'
 import { api } from './client'
 import { adminClubKeys, fetchAdminClubDetail, fetchAdminClubs } from './adminClubs'
 
@@ -19,7 +19,12 @@ export function useSuspendedClubs() {
     queryKey: adminClubKeys.suspended,
     queryFn: async (): Promise<SuspendedClub[]> => {
       const clubs = await fetchAdminClubs()
-      const suspended = clubs.filter((c) => c.suspendedUntil != null)
+      // 與後端攔截同界(bookings.py:57 是 suspended_until >= today):
+      // 停權日已過的社團實際上早就不再被擋,不該再列在停權中
+      const today = dayjs().startOf('day')
+      const suspended = clubs.filter(
+        (c) => c.suspendedUntil != null && !dayjs(c.suspendedUntil, 'YYYY/MM/DD').isBefore(today),
+      )
       const details = await Promise.all(suspended.map((c) => fetchAdminClubDetail(c.id)))
       return details.map((d) => ({
         id: d.id,

@@ -280,7 +280,7 @@ async def test_fixed_occupancy_lists_all_three_conflict_sources(client, db):
     from app.core.semesters import next_semester_range
     from app.models import RoomBookingRequest, RoomBookingSlot, User, VenueBlockRule, VenueBooking
 
-    club = await setup_session(client, db)
+    await setup_session(client, db)
     await open_fixed_window(db)
     venue = await make_venue(db, allow_temp=True)
     sem_start, sem_end = next_semester_range(date.today())

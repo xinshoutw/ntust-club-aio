@@ -18,6 +18,7 @@ from app.api.v1 import (
     admin_settings,
     admin_signups,
     admin_venue_rules,
+    admin_venues,
     admin_violations,
     applications,
     auth,
@@ -53,6 +54,7 @@ router.include_router(admin_announcements.router)
 router.include_router(admin_bookings.router)
 router.include_router(admin_clubs.router)
 router.include_router(admin_equipment.router)
+router.include_router(admin_venues.router)
 router.include_router(admin_venue_rules.router)
 router.include_router(admin_overdue.router)
 router.include_router(admin_rooms.router)

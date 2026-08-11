@@ -3,7 +3,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.models.enums import BookingStatus, LoanStatus
+from app.models.enums import BookingStatus, LoanStatus, VenueCategory
 from app.services.booking_service import MAX_FIXED_SLOTS, PERIODS
 
 
@@ -27,6 +27,44 @@ class VenueOut(BaseModel):
     category: str
     allow_fixed: bool
     allow_temp: bool
+
+
+class VenueMasterOut(VenueOut):
+    """主檔維護視角:另帶啟用旗標(社團端的 VenueOut 只看得到啟用中的場地)。"""
+
+    is_active: bool
+
+
+def _clean_venue_name(v: str | None) -> str | None:
+    if v is None:
+        return None
+    v = " ".join(v.split())
+    if not v:
+        raise ValueError("場地名稱不得為空白")
+    return v
+
+
+class VenueIn(BaseModel):
+    name: str = Field(min_length=1, max_length=50)
+    capacity: int | None = Field(None, ge=0, le=100_000)
+    category: VenueCategory
+    allow_fixed: bool = False
+    allow_temp: bool = False
+
+    _clean = field_validator("name")(_clean_venue_name)
+
+
+class VenueUpdateIn(BaseModel):
+    """部分更新:只改有帶的欄位(停用亦走此處,不硬刪)。"""
+
+    name: str | None = Field(None, min_length=1, max_length=50)
+    capacity: int | None = Field(None, ge=0, le=100_000)
+    category: VenueCategory | None = None
+    allow_fixed: bool | None = None
+    allow_temp: bool | None = None
+    is_active: bool | None = None
+
+    _clean = field_validator("name")(_clean_venue_name)
 
 
 class EquipmentOut(BaseModel):

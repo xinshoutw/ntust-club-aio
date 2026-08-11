@@ -6,7 +6,7 @@
 
 ## 用途
 
-`system_settings` 的後台編輯,加上器材主檔 CRUD。
+`system_settings` 的後台編輯,加上場地與器材主檔 CRUD。
 
 ## 資料來源
 
@@ -14,6 +14,7 @@
 |---|---|
 | 讀取 | `GET /admin/settings`(回全部受管鍵,無值則回預設) |
 | 儲存 | `PUT /admin/settings`(部分更新,只寫有帶的鍵) |
+| 場地主檔 | `GET /admin/venues?include_inactive=true`、`POST /admin/venues`、`PATCH /admin/venues/{id}` |
 | 器材主檔 | `GET\|POST /admin/equipment`、`PATCH /admin/equipment/{id}` |
 
 ## 畫面
@@ -27,18 +28,19 @@
 | 儲存空間 | 單一社團限制(GiB) |
 | 違規項目目錄 | AntD 可編輯標籤(closable Tag + 虛線「新增」;逗號/頓號即分隔) |
 | 經費項目 | 每列名稱 + 提示(選填),可增刪 |
+| 場地主檔 | 名稱 / 類別 / 容納人數(空=未設)/ 開放固定借用 / 開放臨時借用 / 啟用開關,底部一列新增 |
 | 器材主檔 | 名稱 / 點交方式 / 總數 / 單次可借上限(空=不限)/ 啟用開關,底部一列新增 |
 
 ## 規則
 
 - 受管鍵共 11 個(見 `admin_settings.MANAGED_KEYS`),`.env` 只放恆不變的連線與密鑰
-- 器材主檔的「刪除」是停用(`is_active=false`),避免既有借用外鍵斷裂;每列 blur 有差異才 PATCH,點交方式與啟用是離散控制、變更即送
+- 兩份主檔的「刪除」都是停用(`is_active=false`),避免既有借用單(場地另含不開放規則)的外鍵斷裂;每列 blur 有差異才 PATCH,離散控制(類別/借用型態/點交方式/啟用)變更即送
+- `GET /admin/venues` 一支兩用:預設只回啟用中(場況圖與手動借用的列首),主檔維護頁帶 `include_inactive=true`;讀取權限 `abooking`,新增與修改限 super
 - 違規項目與經費科目都不可存成空清單
 - 設定變更寫 `audit_logs`:逐鍵記改前改後值(清單型只記增減,值太長會截斷),值沒變的鍵不留紀錄
 
 ## 未完成 / 問題
 
 - **`holidays` 表沒有匯入介面**:政府行事曆假日只能靠 script 或直接動 DB,未匯入年度的器材逾期判定會退化成只排除週六日
-- **場地主檔完全沒有 CRUD**:新增或停用任一場地都要改 seed 並重新部署(器材主檔有,場地沒有)
 - 評鑑年度改了之後,該年度的 rubric 要另外 seed;沒有「複製上年 rubric」的介面
 - 郵局存簿與評鑑上傳固定 50MB,**在此調不到**,與其他上限的可調性不一致

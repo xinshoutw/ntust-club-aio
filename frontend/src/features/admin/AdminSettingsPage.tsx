@@ -5,6 +5,7 @@ import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import TagListInput from '../../components/ui/TagListInput'
 import AdminEquipmentCard from './AdminEquipmentCard'
+import AdminVenueCard from './AdminVenueCard'
 import type { BudgetCategory } from '../../api/clubConfig'
 import {
   evalYearLabel,
@@ -260,6 +261,7 @@ export default function AdminSettingsPage() {
       <PageHeader title="系統設定" />
       {/* 器材主檔各列即時 PATCH(獨立於 system_settings);置於設定表單前,
           讓表單的「儲存」按鈕留在整頁最底,不被下方卡片夾在中間 */}
+      <AdminVenueCard />
       <AdminEquipmentCard />
       {settingsQuery.isPending ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>

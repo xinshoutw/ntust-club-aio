@@ -17,7 +17,6 @@
 
 | 編號 | 功能 | 現況 |
 |---|---|---|
-| GAP-05 | 場地主檔 CRUD | 器材主檔有完整 CRUD([spec/admin/settings.md](spec/admin/settings.md)),**場地沒有**。新增或停用任一場地都要改 seed 並重新部署 |
 | GAP-06 | 政府行事曆假日匯入 | `holidays` 表**有讀無寫**,沒有匯入介面。未匯入年度的器材逾期判定退化成只排除週六日 |
 | GAP-07 | 逐年 rubric 與獎項主檔管理 | `award_rubric_items` 綁 `(award, year)`,設計上新學年複製上年再修改,**介面未做**。117 學年度只能改 code |
 | GAP-08 | 檔案歸檔 | `files.archived_at` 的語意、下載 410、不計配額都實作了,**沒有任何地方可以設這個欄位**。磁碟只增不減 |

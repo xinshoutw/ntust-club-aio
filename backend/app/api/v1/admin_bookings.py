@@ -32,7 +32,7 @@ from app.models.enums import (
     LoanStatus,
 )
 from app.schemas.admin import AdminEquipmentLoanOut, AdminVenueBookingOut, RejectIn
-from app.schemas.bookings import ManualEquipmentLoanIn, ManualVenueBookingIn, VenueOut
+from app.schemas.bookings import ManualEquipmentLoanIn, ManualVenueBookingIn
 from app.schemas.common import ApiResponse
 from app.services import audit, notify
 from app.services import booking_service as svc
@@ -89,18 +89,6 @@ def _record_approval(db, subject: ApprovalSubject, subject_id: int, decision, us
             reason=reason,
         )
     )
-
-
-# ---- 場地主檔(場況圖列首) ----
-
-
-@router.get("/venues")
-async def list_venues(user: BookingAdmin, db: DbDep) -> ApiResponse[list[VenueOut]]:
-    """啟用中場地(沿用社團端 VenueOut):場況圖以 venue_id 對照列首名稱與容納人數。"""
-    rows = await db.scalars(
-        sa.select(Venue).where(Venue.is_active.is_(True)).order_by(Venue.sort, Venue.id)
-    )
-    return ApiResponse(data=[VenueOut.model_validate(v) for v in rows])
 
 
 # ---- 臨時場地借用審核 ----

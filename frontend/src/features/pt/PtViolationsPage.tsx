@@ -95,8 +95,8 @@ export default function PtViolationsPage() {
               )}
             </tbody>
           </table>
-          <Pager page={page} pageSize={STAFF_PAGE_SIZE} total={total} onChange={setPage} />
         </LoadingBlock>
+          <Pager page={page} pageSize={STAFF_PAGE_SIZE} total={total} onChange={setPage} />
       </div>
     </div>
   )

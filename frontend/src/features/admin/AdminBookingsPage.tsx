@@ -269,8 +269,8 @@ export default function AdminBookingsPage() {
               )}
             </tbody>
           </table>
-          <Pager page={venuePage} pageSize={PAGE_SIZE} total={venueTotal} onChange={setVenuePage} />
         </LoadingBlock>
+          <Pager page={venuePage} pageSize={PAGE_SIZE} total={venueTotal} onChange={setVenuePage} />
       </div>
 
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
@@ -339,8 +339,8 @@ export default function AdminBookingsPage() {
               )}
             </tbody>
           </table>
-          <Pager page={loanPage} pageSize={PAGE_SIZE} total={loanTotal} onChange={setLoanPage} />
         </LoadingBlock>
+          <Pager page={loanPage} pageSize={PAGE_SIZE} total={loanTotal} onChange={setLoanPage} />
       </div>
 
       {/* Modal 常駐至關閉動畫結束(afterClose)才卸載 */}

@@ -150,8 +150,8 @@ export default function AdminMaintenancePage() {
               )}
             </tbody>
           </table>
-          <Pager page={page} pageSize={MAINTENANCE_PAGE_SIZE} total={total} onChange={setPage} />
         </LoadingBlock>
+          <Pager page={page} pageSize={MAINTENANCE_PAGE_SIZE} total={total} onChange={setPage} />
       </div>
     </div>
   )

@@ -376,8 +376,8 @@ export default function AdminFilesPage() {
               )}
             </tbody>
           </table>
-          <Pager page={largePage} pageSize={LARGE_PAGE_SIZE} total={largeTotal} onChange={setLargePage} />
         </LoadingBlock>
+          <Pager page={largePage} pageSize={LARGE_PAGE_SIZE} total={largeTotal} onChange={setLargePage} />
       </div>
     </div>
   )

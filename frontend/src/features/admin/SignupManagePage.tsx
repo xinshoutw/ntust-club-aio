@@ -419,8 +419,8 @@ export default function SignupManagePage() {
               )}
             </tbody>
           </table>
-          <Pager page={page} pageSize={SIGNUP_PAGE_SIZE} total={total} onChange={setPage} />
         </LoadingBlock>
+          <Pager page={page} pageSize={SIGNUP_PAGE_SIZE} total={total} onChange={setPage} />
       </div>
 
       {/* Modal 常駐至關閉動畫結束(afterClose)才卸載 */}

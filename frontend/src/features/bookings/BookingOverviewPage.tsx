@@ -507,8 +507,8 @@ export default function BookingOverviewPage() {
               )}
             </tbody>
           </table>
-          <Pager page={returnedPage} pageSize={RETURNED_PAGE} total={returnedTotal} onChange={setReturnedPage} style={{ padding: '10px 0 14px' }} />
         </LoadingBlock>
+          <Pager page={returnedPage} pageSize={RETURNED_PAGE} total={returnedTotal} onChange={setReturnedPage} style={{ padding: '10px 0 14px' }} />
       </div>
     </div>
   )

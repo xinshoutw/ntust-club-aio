@@ -401,8 +401,8 @@ export default function CloseReviewPage() {
               {pendingQuery.isError ? `載入失敗:${pendingQuery.error.message}` : '目前沒有待審結案'}
             </div>
           )}
-          <Pager page={pendingPage} pageSize={PAGE_SIZE} total={pendingTotal} onChange={setPendingPage} />
         </LoadingBlock>
+          <Pager page={pendingPage} pageSize={PAGE_SIZE} total={pendingTotal} onChange={setPendingPage} />
       </div>
 
       {/* 逾期未結案:已鎖定與已解鎖皆列出(狀態欄區分),整列可點開活動詳情 */}
@@ -477,8 +477,8 @@ export default function CloseReviewPage() {
               )}
             </tbody>
           </table>
-          <Pager page={overduePage} pageSize={PAGE_SIZE} total={overdueTotal} onChange={setOverduePage} />
         </LoadingBlock>
+          <Pager page={overduePage} pageSize={PAGE_SIZE} total={overdueTotal} onChange={setOverduePage} />
       </div>
 
       {/* Modal 常駐至關閉動畫結束(afterClose)才卸載 */}

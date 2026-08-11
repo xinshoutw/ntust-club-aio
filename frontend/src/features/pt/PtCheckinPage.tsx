@@ -119,8 +119,8 @@ export default function PtCheckinPage() {
               )}
             </tbody>
           </table>
-          <Pager page={page} pageSize={STAFF_PAGE_SIZE} total={total} onChange={setPage} />
         </LoadingBlock>
+          <Pager page={page} pageSize={STAFF_PAGE_SIZE} total={total} onChange={setPage} />
       </div>
 
       <Modal

@@ -222,8 +222,8 @@ export default function AdminViolationsPage() {
               )}
             </tbody>
           </table>
-          <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} />
         </LoadingBlock>
+          <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} />
       </div>
 
       <Modal

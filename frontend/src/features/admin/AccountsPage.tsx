@@ -341,6 +341,7 @@ export default function AccountsPage() {
 
   const adminsTable = (
     <>
+    <LoadingBlock pending={accountsLoading} rows={6}>
     <table className="tb fixed" style={{ minWidth: 760 }}>
       {/* 頁面權限吃剩餘寬且允許換行;姓名/帳號截斷;層級/狀態/動作固定 px */}
       <Cols widths={['13%', 110, 90, 'auto', 84, 216]} />
@@ -377,12 +378,14 @@ export default function AccountsPage() {
         {accountRows.length === 0 && emptyRow(6)}
       </tbody>
     </table>
+    </LoadingBlock>
       {accountPager}
     </>
   )
 
   const staffTable = (
     <>
+    <LoadingBlock pending={accountsLoading} rows={6}>
     <table className="tb fixed" style={{ minWidth: 560 }}>
       <Cols widths={['24%', 'auto', 84, 178]} />
       <thead>
@@ -401,6 +404,7 @@ export default function AccountsPage() {
         {accountRows.length === 0 && emptyRow(4)}
       </tbody>
     </table>
+    </LoadingBlock>
       {accountPager}
     </>
   )
@@ -408,6 +412,7 @@ export default function AccountsPage() {
   // 負責獎項/分組資料由「分組與評審指派」功能管理(後端尚未提供),先以 — 佔位
   const viewersTable = (
     <>
+    <LoadingBlock pending={accountsLoading} rows={6}>
     <table className="tb fixed" style={{ minWidth: 760 }}>
       <Cols widths={['14%', '16%', 'auto', 90, 84, 178]} />
       <thead>
@@ -428,6 +433,7 @@ export default function AccountsPage() {
         {accountRows.length === 0 && emptyRow(6)}
       </tbody>
     </table>
+    </LoadingBlock>
       {accountPager}
     </>
   )
@@ -465,6 +471,7 @@ export default function AccountsPage() {
           }}
         />
       </div>
+      <LoadingBlock pending={clubsQuery.isPending} rows={6}>
       <table className="tb fixed" style={{ minWidth: 760 }}>
         <Cols widths={['auto', 110, '20%', 140, 160]} />
         <thead>
@@ -530,6 +537,7 @@ export default function AccountsPage() {
           )}
         </tbody>
       </table>
+      </LoadingBlock>
       <Pager
         page={clubPageSafe}
         pageSize={CLUB_PAGE_SIZE}
@@ -563,10 +571,10 @@ export default function AccountsPage() {
           }}
           style={{ padding: '0 20px' }}
           items={[
-            { key: 'admins', label: '管理員', children: <LoadingBlock pending={accountsLoading}>{adminsTable}</LoadingBlock> },
-            { key: 'staff', label: '工讀生', children: <LoadingBlock pending={accountsLoading}>{staffTable}</LoadingBlock> },
-            { key: 'viewers', label: '評審', children: <LoadingBlock pending={accountsLoading}>{viewersTable}</LoadingBlock> },
-            { key: 'clubs', label: '社團', children: <LoadingBlock pending={clubsQuery.isPending}>{clubsTable}</LoadingBlock> },
+            { key: 'admins', label: '管理員', children: adminsTable },
+            { key: 'staff', label: '工讀生', children: staffTable },
+            { key: 'viewers', label: '評審', children: viewersTable },
+            { key: 'clubs', label: '社團', children: clubsTable },
           ]}
         />
       </div>

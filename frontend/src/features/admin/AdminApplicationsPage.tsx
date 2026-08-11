@@ -126,13 +126,13 @@ export default function AdminApplicationsPage() {
               )}
             </tbody>
           </table>
+        </LoadingBlock>
           <Pager
             page={certPage}
             pageSize={APPLICATIONS_PAGE_SIZE}
             total={certsQuery.data?.total ?? 0}
             onChange={setCertPage}
           />
-        </LoadingBlock>
       </div>
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
@@ -202,13 +202,13 @@ export default function AdminApplicationsPage() {
               )}
             </tbody>
           </table>
+        </LoadingBlock>
           <Pager
             page={postalPage}
             pageSize={APPLICATIONS_PAGE_SIZE}
             total={postalQuery.data?.total ?? 0}
             onChange={setPostalPage}
           />
-        </LoadingBlock>
       </div>
     </div>
   )

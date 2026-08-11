@@ -164,8 +164,8 @@ export default function ViewerScorePage() {
                 )}
               </tbody>
             </table>
-            <Pager page={page} pageSize={PAGE_SIZE} total={clubs.length} onChange={setPage} />
           </LoadingBlock>
+            <Pager page={page} pageSize={PAGE_SIZE} total={clubs.length} onChange={setPage} />
         </div>
       )}
 

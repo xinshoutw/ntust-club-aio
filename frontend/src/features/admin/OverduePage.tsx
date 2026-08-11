@@ -128,13 +128,13 @@ export default function OverduePage() {
               )}
             </tbody>
           </table>
+        </LoadingBlock>
           <Pager
             page={overduePage}
             pageSize={OVERDUE_PAGE_SIZE}
             total={overdueQuery.data?.total ?? 0}
             onChange={setOverduePage}
           />
-        </LoadingBlock>
       </div>
 
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>

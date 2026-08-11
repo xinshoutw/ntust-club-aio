@@ -1,15 +1,17 @@
-import { useMemo } from 'react'
+import { useState } from 'react'
 import { App, Select, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
-import { Cols } from '../../components/ui/tableControls'
+import { Cols, Pager } from '../../components/ui/tableControls'
 import { fileDownloadUrl } from '../../api/adminFiles'
 import {
+  APPLICATIONS_PAGE_SIZE,
   NEXT_STATUS,
   useAdminOfficerCerts,
   useAdminPostalChanges,
   useApplicationStatusMutation,
+  usePendingApplicationTotal,
   type ApplicationKind,
   type ApplicationStatus,
 } from '../../api/adminApplications'
@@ -60,13 +62,14 @@ function StatusCell({
 }
 
 export default function AdminApplicationsPage() {
-  const certsQuery = useAdminOfficerCerts()
-  const postalQuery = useAdminPostalChanges()
-  const certs = useMemo(() => certsQuery.data ?? [], [certsQuery.data])
-  const postals = useMemo(() => postalQuery.data ?? [], [postalQuery.data])
-  const pendingCount =
-    certs.filter((c) => c.status === 'pending').length +
-    postals.filter((p) => p.status === 'pending').length
+  // 兩張表各自分頁(是兩種申請、兩支端點,頁碼不共用)
+  const [certPage, setCertPage] = useState(1)
+  const [postalPage, setPostalPage] = useState(1)
+  const certsQuery = useAdminOfficerCerts(certPage)
+  const postalQuery = useAdminPostalChanges(postalPage)
+  const certs = certsQuery.data?.rows ?? []
+  const postals = postalQuery.data?.rows ?? []
+  const pendingTotal = usePendingApplicationTotal()
 
   return (
     <div>
@@ -74,7 +77,7 @@ export default function AdminApplicationsPage() {
         title="線上申請管理"
         sub={
           <>
-            待處理 <span className="num">{pendingCount}</span> 件
+            待處理 <span className="num">{pendingTotal.data ?? 0}</span> 件
           </>
         }
       />
@@ -122,6 +125,12 @@ export default function AdminApplicationsPage() {
               )}
             </tbody>
           </table>
+          <Pager
+            page={certPage}
+            pageSize={APPLICATIONS_PAGE_SIZE}
+            total={certsQuery.data?.total ?? 0}
+            onChange={setCertPage}
+          />
         </div>
       </Spin>
 
@@ -192,6 +201,12 @@ export default function AdminApplicationsPage() {
               )}
             </tbody>
           </table>
+          <Pager
+            page={postalPage}
+            pageSize={APPLICATIONS_PAGE_SIZE}
+            total={postalQuery.data?.total ?? 0}
+            onChange={setPostalPage}
+          />
         </div>
       </Spin>
     </div>

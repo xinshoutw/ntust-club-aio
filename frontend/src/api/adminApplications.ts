@@ -1,10 +1,9 @@
 // 行政端線上申請管理 API 層(權限鍵 aapply):幹部證明/郵局帳戶異動。
-// 列表一次抓全量(量級小)沿用前端排序;狀態流轉走後端狀態機:
+// 兩張表各自伺服器端分頁(排序由後端固定);狀態流轉走後端狀態機:
 // 僅允許單步前進(審核中→處理中→請洽學務處),UI 也只開放下一步選項。
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
-import { api } from './client'
-import { fetchAllPages } from './fetchAll'
+import { api, apiPaged, qs } from './client'
 
 export type ApplicationStatus = 'pending' | 'processing' | 'completed'
 
@@ -86,42 +85,67 @@ const toPostalRow = (p: AdminPostalChangeOut): PostalChangeRow => ({
 
 const keys = {
   all: ['adminApplications'] as const,
-  certs: ['adminApplications', 'certs'] as const,
-  postal: ['adminApplications', 'postal'] as const,
+  certs: (page: number) => ['adminApplications', 'certs', page] as const,
+  postal: (page: number) => ['adminApplications', 'postal', page] as const,
+  pendingTotal: ['adminApplications', 'pendingTotal'] as const,
 }
 
-export function useAdminOfficerCerts() {
-  return useQuery({
-    queryKey: keys.certs,
-    queryFn: () =>
-      fetchAllPages<AdminOfficerCertOut>('/admin/officer-certificates').then((rows) =>
-        rows.map(toCertRow),
-      ),
-  })
-}
-
-export function useAdminPostalChanges() {
-  return useQuery({
-    queryKey: keys.postal,
-    queryFn: () =>
-      fetchAllPages<AdminPostalChangeOut>('/admin/postal-changes').then((rows) =>
-        rows.map(toPostalRow),
-      ),
-  })
-}
+export const APPLICATIONS_PAGE_SIZE = 50
 
 export type ApplicationKind = 'cert' | 'postal'
 
-const STATUS_PATH: Record<ApplicationKind, string> = {
+const KIND_PATH: Record<ApplicationKind, string> = {
   cert: '/admin/officer-certificates',
   postal: '/admin/postal-changes',
+}
+
+const pagePath = (kind: ApplicationKind, page: number) =>
+  `${KIND_PATH[kind]}${qs({ page, page_size: APPLICATIONS_PAGE_SIZE })}`
+
+/** 兩張表皆為後端固定排序(審核中→處理中→完成,組內申請日升冪),無 sort 參數 */
+export function useAdminOfficerCerts(page: number) {
+  return useQuery({
+    queryKey: keys.certs(page),
+    queryFn: () =>
+      apiPaged<AdminOfficerCertOut[]>(pagePath('cert', page)).then(({ data, total }) => ({
+        rows: data.map(toCertRow),
+        total,
+      })),
+  })
+}
+
+export function useAdminPostalChanges(page: number) {
+  return useQuery({
+    queryKey: keys.postal(page),
+    queryFn: () =>
+      apiPaged<AdminPostalChangeOut[]>(pagePath('postal', page)).then(({ data, total }) => ({
+        rows: data.map(toPostalRow),
+        total,
+      })),
+  })
+}
+
+/** 兩類待處理件數合計(page_size=1 只取 meta.total;分頁後算不出全域數字) */
+export function usePendingApplicationTotal() {
+  return useQuery({
+    queryKey: keys.pendingTotal,
+    queryFn: async () => {
+      const totals = await Promise.all(
+        (['cert', 'postal'] as ApplicationKind[]).map(async (kind) =>
+          (await apiPaged<unknown[]>(`${KIND_PATH[kind]}${qs({ status: 'pending', page_size: 1 })}`))
+            .total,
+        ),
+      )
+      return totals.reduce((sum, n) => sum + n, 0)
+    },
+  })
 }
 
 export function useApplicationStatusMutation() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ kind, id, status }: { kind: ApplicationKind; id: number; status: ApplicationStatus }) =>
-      api(`${STATUS_PATH[kind]}/${id}/status`, {
+      api(`${KIND_PATH[kind]}/${id}/status`, {
         method: 'POST',
         body: JSON.stringify({ status }),
       }),

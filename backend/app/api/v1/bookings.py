@@ -349,6 +349,11 @@ async def create_venue_booking(
     if svc.booking_started(body.date, body.periods):
         raise validation_error("所選時段已開始,請選擇尚未開始的時段")
 
+    # 場地不開放規則:申請時即擋,核准端亦驗(與社團無關,放在鎖外)
+    hit = await svc.blocked_periods(db, venue.id, body.date, body.periods)
+    if hit:
+        raise validation_error(f"所選時段不開放借用(時段 {','.join(hit)})")
+
     # 同社同場地同日重複申請直接擋(不同社的衝突由審核關把關)。
     # 先鎖住這個社團:守門是先查再寫,雙擊送出的第二筆會查不到第一筆
     await svc.lock_resource(db, "club", user.club_id)
@@ -362,11 +367,6 @@ async def create_venue_booking(
     )
     if dup:
         raise conflict("同一場地同一天已有申請")
-
-    # 場地不開放規則:申請時即擋,核准端亦驗
-    hit = await svc.blocked_periods(db, venue.id, body.date, body.periods)
-    if hit:
-        raise validation_error(f"所選時段不開放借用(時段 {','.join(hit)})")
 
     row = VenueBooking(
         club_id=user.club_id,

@@ -248,7 +248,7 @@ ISS-99(審核彈窗詳情失敗永遠停在 Skeleton;新增 `detailError`/`onRet
 ## 驗證現況(2026-08-11 實測)
 
 - 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → 333 passed(含 `test_migrations.py`:另開一個庫跑 `alembic upgrade head`,比對欄位、索引名與 CHECK 名 —— 後兩者是子集斷言,擋的是「模型有、revision 漏了」;`test_migration_helpers.py`:兩支匯入腳本的純函式);`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` → 0 錯;`pnpm test` → 82 passed(20 檔);`pnpm run lint` → **8** 個 fast-refresh warning(全為既有的 `only-export-components` 類)
+- 前端 `pnpm exec tsc -b --force` → 0 錯;`pnpm test` → 88 passed(21 檔);`pnpm run lint` → **8** 個 fast-refresh warning(全為既有的 `only-export-components` 類)
 - `git log --all` 確認 `.env` 與 `migration/out` 從未進版控
 
 ## 其他待處理

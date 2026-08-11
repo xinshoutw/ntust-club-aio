@@ -79,6 +79,28 @@ export function useClubProfile() {
   })
 }
 
+export interface ClubSuspension {
+  /** 停權中(含到期當日);與後端 `suspended_until >= today` 一致 */
+  suspended: boolean
+  /** YYYY/MM/DD;未停權為空字串 */
+  until: string
+  reason: string
+}
+
+/**
+ * 停權中(含到期當日)。解除停權是把日期清成 null,但過期未清的殘留值不該顯示成停權中,
+ * 判定與後端 `suspended_until >= today` 一致。
+ */
+export const suspendedNow = (until: string): boolean =>
+  until !== '' && !dayjs(until, 'YYYY/MM/DD').isBefore(dayjs(), 'day')
+
+/** 停權狀態:借用四頁與管理項目共用(見 features/club-settings/SuspensionNote)。 */
+export function useClubSuspension(): ClubSuspension {
+  const { data } = useClubProfile()
+  const until = data?.suspendedUntil ?? ''
+  return { suspended: suspendedNow(until), until, reason: data?.suspendReason ?? '' }
+}
+
 export interface ClubProfileInput {
   intro: string
   enName: string

@@ -8,6 +8,8 @@ import { confirmDialog } from '../../lib/confirm'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols } from '../../components/ui/tableControls'
+import SuspensionNote from '../club-settings/SuspensionNote'
+import { useClubSuspension } from '../../api/clubProfile'
 import {
   PERIODS,
   bookingStarted,
@@ -25,6 +27,7 @@ import PeriodPicker from './PeriodPicker'
 export default function VenueBookingPage() {
   const { message, modal } = App.useApp()
   const [form] = Form.useForm()
+  const { suspended } = useClubSuspension()
   // 借用總覽格子點入時自動帶入場地、日期、時段
   const [params] = useSearchParams()
   const qVenueId = Number(params.get('venue'))
@@ -120,7 +123,7 @@ export default function VenueBookingPage() {
 
   return (
     <div>
-      <PageHeader title="臨時場地借用" />
+      <PageHeader title="臨時場地借用" sub={<SuspensionNote />} />
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
         <Form
@@ -200,7 +203,7 @@ export default function VenueBookingPage() {
             </div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-            <Button type="primary" htmlType="submit" loading={createVenueBooking.isPending} disabled={createVenueBooking.isPending}>送出申請</Button>
+            <Button type="primary" htmlType="submit" loading={createVenueBooking.isPending} disabled={createVenueBooking.isPending || suspended}>送出申請</Button>
           </div>
         </Form>
       </div>

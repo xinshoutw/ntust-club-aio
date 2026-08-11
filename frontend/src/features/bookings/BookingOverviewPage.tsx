@@ -10,6 +10,7 @@ import {
   RightOutlined,
 } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
+import SuspensionNote from '../club-settings/SuspensionNote'
 import QueryError from '../../components/ui/QueryError'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import StatusPill from '../../components/ui/StatusPill'
@@ -167,7 +168,7 @@ export default function BookingOverviewPage() {
 
   return (
     <div>
-      <PageHeader title="借用總覽" />
+      <PageHeader title="借用總覽" sub={<SuspensionNote />} />
 
       {/* 場地借用情形:單日全場地 / 單一場地 15 天(−7~+7),兩種檢視 */}
       <div className="card" style={{ marginTop: 20, padding: '16px 20px 20px' }}>

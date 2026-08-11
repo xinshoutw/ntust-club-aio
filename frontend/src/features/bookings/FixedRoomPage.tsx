@@ -7,6 +7,8 @@ import { confirmDialog } from '../../lib/confirm'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols } from '../../components/ui/tableControls'
+import SuspensionNote from '../club-settings/SuspensionNote'
+import { useClubSuspension } from '../../api/clubProfile'
 import {
   DOW_TEXT,
   PERIODS,
@@ -52,6 +54,7 @@ function lateRuleError(dow: number, periods: string[]): string | null {
 export default function FixedRoomPage() {
   const { message, modal } = App.useApp()
   const [form] = Form.useForm()
+  const { suspended } = useClubSuspension()
   // 已選時段:'dow|period'(dow 1=週一 … 7=週日)
   const [slots, setSlots] = useState<ReadonlySet<string>>(new Set())
   const guard = useFormUnsavedGuard(slots.size > 0)
@@ -189,7 +192,7 @@ export default function FixedRoomPage() {
 
   return (
     <div>
-      <PageHeader title="固定場地借用" />
+      <PageHeader title="固定場地借用" sub={<SuspensionNote />} />
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
         <Form onValuesChange={guard.onValuesChange} form={form} layout="vertical" onFinish={submit} requiredMark>
@@ -282,7 +285,7 @@ export default function FixedRoomPage() {
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-            <Button type="primary" htmlType="submit" loading={createRoomBooking.isPending} disabled={createRoomBooking.isPending}>送出申請</Button>
+            <Button type="primary" htmlType="submit" loading={createRoomBooking.isPending} disabled={createRoomBooking.isPending || suspended}>送出申請</Button>
           </div>
         </Form>
       </div>

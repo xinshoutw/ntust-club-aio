@@ -7,6 +7,8 @@ import { confirmDialog } from '../../lib/confirm'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols } from '../../components/ui/tableControls'
+import SuspensionNote from '../club-settings/SuspensionNote'
+import { useClubSuspension } from '../../api/clubProfile'
 import {
   useBookingMutations,
   useEquipmentList,
@@ -20,6 +22,7 @@ export default function EquipmentPage() {
   const { message, modal } = App.useApp()
   const [form] = Form.useForm()
   const guard = useFormUnsavedGuard()
+  const { suspended } = useClubSuspension()
 
   // 器材借用綁定審核通過之活動,借用區間由活動推導;
   // 可借數與借用區間由後端依所選活動推導(GET /club/equipment?activity_id=);
@@ -96,7 +99,7 @@ export default function EquipmentPage() {
 
   return (
     <div>
-      <PageHeader title="器材借用" />
+      <PageHeader title="器材借用" sub={<SuspensionNote />} />
 
       <div className="overview-grid" style={{ marginTop: 20 }}>
         <div className="card" style={{ overflowX: 'auto' }}>
@@ -256,7 +259,7 @@ export default function EquipmentPage() {
               <Input className="num" placeholder="申請聯絡人電話" maxLength={30} />
             </Form.Item>
 
-            <Button type="primary" htmlType="submit" block loading={createEquipmentLoan.isPending} disabled={createEquipmentLoan.isPending}>
+            <Button type="primary" htmlType="submit" block loading={createEquipmentLoan.isPending} disabled={createEquipmentLoan.isPending || suspended}>
               送出申請
             </Button>
           </Form>

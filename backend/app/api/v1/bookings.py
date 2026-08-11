@@ -27,10 +27,10 @@ from app.models import (
 )
 from app.models.enums import ActivityStatus, BookingStatus, LoanStatus
 from app.schemas.bookings import (
+    ClubFixedWindowOut,
     EquipmentLoanIn,
     EquipmentLoanOut,
     EquipmentOut,
-    FixedWindowOut,
     RoomBookingIn,
     RoomBookingOut,
     VenueBookingIn,
@@ -166,15 +166,37 @@ async def availability_range(
 # ---- 固定場地借用 ----
 
 
+async def _used_fixed_periods(db, club_id: int, sem_start) -> int:
+    """該社在目標學期已佔用的固定借用節數(審核中+已核准;退回/取消不算)。"""
+    return (
+        await db.scalar(
+            sa.select(sa.func.count())
+            .select_from(RoomBookingSlot)
+            .join(RoomBookingRequest, RoomBookingSlot.request_id == RoomBookingRequest.id)
+            .where(
+                RoomBookingRequest.club_id == club_id,
+                RoomBookingRequest.status.notin_(
+                    [BookingStatus.REJECTED, BookingStatus.CANCELLED]
+                ),
+                RoomBookingRequest.start_date == sem_start,
+            )
+        )
+        or 0
+    )
+
+
 @router.get("/room-bookings/window")
-async def fixed_window(user: ClubUser, db: DbDep) -> ApiResponse[FixedWindowOut]:
+async def fixed_window(user: ClubUser, db: DbDep) -> ApiResponse[ClubFixedWindowOut]:
     """開放窗狀態:系統設定的日期區間(open_from/open_until),期間外不受理。"""
     window = await get_setting(db, "fixed_booking_window")
+    sem_start, _ = next_semester_range(datetime.now(TAIPEI).date())
     return ApiResponse(
-        data=FixedWindowOut(
+        data=ClubFixedWindowOut(
             open=svc.fixed_window_open(window),
             open_from=window.get("open_from"),
             open_until=window.get("open_until"),
+            used_periods=await _used_fixed_periods(db, user.club_id, sem_start),
+            max_periods=svc.MAX_FIXED_SLOTS,
         )
     )
 
@@ -244,21 +266,7 @@ async def create_room_booking(
     # 每社至多 10 節/學期:同目標學期的未退回申請(審核中+已核准)合計。
     # 先鎖住這個社團的額度,兩張並發送出的申請才不會各自通過同一份合計
     await svc.lock_resource(db, "club", user.club_id)
-    used_count = (
-        await db.scalar(
-            sa.select(sa.func.count())
-            .select_from(RoomBookingSlot)
-            .join(RoomBookingRequest, RoomBookingSlot.request_id == RoomBookingRequest.id)
-            .where(
-                RoomBookingRequest.club_id == user.club_id,
-                RoomBookingRequest.status.notin_(
-                    [BookingStatus.REJECTED, BookingStatus.CANCELLED]
-                ),
-                RoomBookingRequest.start_date == sem_start,
-            )
-        )
-        or 0
-    )
+    used_count = await _used_fixed_periods(db, user.club_id, sem_start)
     if used_count + len(body.slots) > svc.MAX_FIXED_SLOTS:
         raise conflict(
             f"每社團固定借用至多 {svc.MAX_FIXED_SLOTS} 節"

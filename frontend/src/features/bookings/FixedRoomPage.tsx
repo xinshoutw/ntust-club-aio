@@ -21,7 +21,7 @@ import {
   venueLabel,
 } from '../../api/bookings'
 
-const MAX_PERIODS = 10 // 每社團至多 10 節(1 節 = 1 小時)
+const MAX_PERIODS = 10 // 每社團至多 10 節(1 節 = 1 小時;後端 max_periods 為權威)
 const LATE = new Set(['10', 'A', 'B', 'C', 'D']) // 晚間時段:需至少連續 3 節起借
 
 // 依 PERIODS 順序把已選節次切成連續區段
@@ -119,6 +119,10 @@ export default function FixedRoomPage() {
   }
 
   const window_ = windowQuery.data
+  const maxPeriods = window_?.maxPeriods ?? MAX_PERIODS
+  const usedPeriods = window_?.usedPeriods ?? 0
+  const remainingPeriods = Math.max(0, maxPeriods - usedPeriods)
+  const overQuota = slots.size > remainingPeriods
   if (!window_?.open) {
     return (
       <div>
@@ -156,9 +160,11 @@ export default function FixedRoomPage() {
       message.error('請至少選擇一個時段')
       return
     }
-    if (slots.size > MAX_PERIODS) {
+    if (overQuota) {
       setSlotsError(true)
-      message.error(`每社團固定借用至多 ${MAX_PERIODS} 節，目前已選 ${slots.size} 節`)
+      message.error(
+        `每社團固定借用至多 ${maxPeriods} 節，本學期已申請 ${usedPeriods} 節、本次已選 ${slots.size} 節`,
+      )
       return
     }
     for (let dow = 1; dow <= 7; dow++) {
@@ -216,8 +222,10 @@ export default function FixedRoomPage() {
               每週時段 <span style={{ color: '#C13B34' }}>*</span>
             </span>
             <span style={{ flex: 1 }} />
-            <span className="num" style={{ fontSize: 12, color: slots.size > MAX_PERIODS ? '#C13B34' : 'var(--steel)' }}>
-              已選 {slots.size} / {MAX_PERIODS} 節
+            {/* 額度是跨申請單合計:只算當次表單的話,社團要按下送出才知道早就用完了 */}
+            <span className="num" style={{ fontSize: 12, color: overQuota ? '#C13B34' : 'var(--steel)' }}>
+              {usedPeriods > 0 && `本學期已申請 ${usedPeriods} 節・`}
+              已選 {slots.size} / 可用 {remainingPeriods} 節
             </span>
           </div>
           <div className={slotsError ? 'area-error' : undefined} style={{ overflowX: 'auto', border: '1px solid transparent', borderRadius: 6 }}>

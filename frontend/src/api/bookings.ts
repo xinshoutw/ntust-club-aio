@@ -151,10 +151,18 @@ export interface FixedWindow {
   openUntil?: string
 }
 
+/** 社團端另帶額度:跨申請單合計,與後端送出檢核同一份判定 */
+export interface ClubFixedWindow extends FixedWindow {
+  usedPeriods: number
+  maxPeriods: number
+}
+
 interface FixedWindowOut {
   open: boolean
   open_from: string | null
   open_until: string | null
+  used_periods: number
+  max_periods: number
 }
 
 export interface RoomEntry {
@@ -387,10 +395,12 @@ export function useFixedWindow() {
     queryKey: keys.fixedWindow,
     queryFn: () =>
       api<FixedWindowOut>('/club/room-bookings/window').then(
-        (w): FixedWindow => ({
+        (w): ClubFixedWindow => ({
           open: w.open,
           openFrom: w.open_from ? fromIso(w.open_from) : undefined,
           openUntil: w.open_until ? fromIso(w.open_until) : undefined,
+          usedPeriods: w.used_periods,
+          maxPeriods: w.max_periods,
         }),
       ),
   })

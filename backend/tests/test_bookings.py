@@ -180,7 +180,13 @@ async def test_room_booking_window_gate(client, db):
     assert resp.json()["meta"]["code"] == "WINDOW_CLOSED"
 
     window = (await client.get("/api/v1/club/room-bookings/window")).json()["data"]
-    assert window == {"open": False, "open_from": None, "open_until": None}
+    assert window == {
+        "open": False,
+        "open_from": None,
+        "open_until": None,
+        "used_periods": 0,
+        "max_periods": 10,
+    }
 
     await open_fixed_window(db)
     window = (await client.get("/api/v1/club/room-bookings/window")).json()["data"]
@@ -267,6 +273,10 @@ async def test_room_booking_slot_limit(client, db):
         headers=csrf_headers(client),
     )
     assert resp.status_code == 201
+
+    # 額度是跨申請單合計:畫面要在送出前就看得到已佔用多少(與檢核同一份判定)
+    window = (await client.get("/api/v1/club/room-bookings/window")).json()["data"]
+    assert (window["used_periods"], window["max_periods"]) == (6, 10)
 
     five = [{"weekday": 2, "period": str(i)} for i in range(1, 6)]
     resp = await client.post(

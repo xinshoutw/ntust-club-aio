@@ -98,6 +98,14 @@ class FixedWindowOut(BaseModel):
     open_until: date | None
 
 
+class ClubFixedWindowOut(FixedWindowOut):
+    """社團端另帶額度:畫面只算當次表單的話,社團要按下送出才知道額度早就用掉了。"""
+
+    # 本社在下一目標學期已佔用的節數(審核中+已核准),與送出時的檢核同一份判定
+    used_periods: int
+    max_periods: int
+
+
 # 聯絡電話僅允許 數字與 - ( ) * #
 _PHONE_RE = re.compile(r"^[0-9\-()*#]+$")
 

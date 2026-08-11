@@ -197,7 +197,9 @@ async def test_confirm_waits_for_the_signup_row_lock(client, db):
 
     # 另一次確認已寫入但還沒 commit:這支請求必須等它落地後重讀,才會看到已確認
     async with async_session_factory() as first:
-        row = await first.scalar(sa.select(Signup).with_for_update())
+        row = await first.scalar(
+            sa.select(Signup).where(Signup.club_id == club.id).with_for_update()
+        )
         row.confirmed = True
         await first.flush()
         second = asyncio.create_task(client.put(confirm_url, headers=csrf_headers(client)))

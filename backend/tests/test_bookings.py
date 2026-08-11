@@ -320,34 +320,40 @@ async def test_room_booking_waits_for_the_club_lock(client, db):
             )
 
 
-async def test_venue_booking_waits_for_the_club_lock(client, db):
-    """「同社同場地同日只能一張」是先查再寫,沒鎖的話雙擊送出會落兩筆。"""
-    import asyncio
-
-    from app.core.db import async_session_factory
+async def test_venue_booking_locks_before_the_duplicate_check(client, db):
+    """「同社同場地同日只能一張」是先查再寫:鎖必須取在查之前,否則雙擊送出會落兩筆。"""
+    from app.core.db import engine
 
     club = await setup_session(client, db)
     venue = await make_venue(db, name="精誠廣場", allow_fixed=False, allow_temp=True)
     activity = await make_activity(db, club)
 
-    async with async_session_factory() as holder:
-        await booking_service.lock_resource(holder, "club", club.id)
-        with pytest.raises(TimeoutError):
-            await asyncio.wait_for(
-                client.post(
-                    "/api/v1/club/venue-bookings",
-                    json={
-                        "venue_id": venue.id,
-                        "activity_id": activity.id,
-                        "date": (date.today() + timedelta(days=14)).isoformat(),
-                        "periods": ["3", "4"],
-                        "purpose": "擺攤",
-                        "phone": "0912000111",
-                    },
-                    headers=csrf_headers(client),
-                ),
-                timeout=1,
-            )
+    statements: list[str] = []
+
+    def record(conn, cursor, statement, *args):
+        statements.append(" ".join(statement.split()))
+
+    sa.event.listen(engine.sync_engine, "before_cursor_execute", record)
+    try:
+        resp = await client.post(
+            "/api/v1/club/venue-bookings",
+            json={
+                "venue_id": venue.id,
+                "activity_id": activity.id,
+                "date": (date.today() + timedelta(days=14)).isoformat(),
+                "periods": ["3", "4"],
+                "purpose": "擺攤",
+                "phone": "0912000111",
+            },
+            headers=csrf_headers(client),
+        )
+    finally:
+        sa.event.remove(engine.sync_engine, "before_cursor_execute", record)
+    assert resp.status_code == 201, resp.text
+
+    locked = next(i for i, s in enumerate(statements) if "pg_advisory_xact_lock" in s)
+    checked = next(i for i, s in enumerate(statements) if "FROM venue_bookings" in s)
+    assert locked < checked
 
 
 async def test_venue_booking_requires_approved_activity(client, db):

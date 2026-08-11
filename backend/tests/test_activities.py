@@ -556,11 +556,12 @@ async def test_partial_draft_and_submit_completeness(client, db):
 
     # 人數兩欄可以有一欄是 0(只有社員或只有校外人士),合計 0 才算沒填
     future = (date.today() + timedelta(days=30)).isoformat()
-    await client.put(
+    resp = await client.put(
         f"/api/v1/club/activities/{draft['id']}",
         json=payload(date=future, participants_in=0, participants_out=0),
         headers=csrf_headers(client),
     )
+    assert resp.status_code == 200, resp.text  # 這支若掛了,下面的 422 會是別的原因
     resp = await client.post(
         f"/api/v1/club/activities/{draft['id']}/submit", headers=csrf_headers(client)
     )

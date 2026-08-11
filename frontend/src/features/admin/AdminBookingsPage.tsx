@@ -16,7 +16,7 @@ import {
   usePendingVenueBookings,
 } from '../../api/adminBookings'
 
-const GRID_LEGEND: CellState[] = ['free', 'reviewing', 'temp', 'fixed', 'fixedOnly', 'closed']
+const GRID_LEGEND: CellState[] = ['free', 'fixedOnly', 'closed', 'reviewing', 'temp', 'fixed']
 const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
 const PAGE_SIZE = 50
 

@@ -37,7 +37,7 @@ import { CELL, emptyCellState, type CellState } from './cells'
 const RETURNED_PAGE = 10
 const VENUE_DAYS = 15 // 單一場地檢視:選擇日 −7 ~ +7 共 15 天(不含過去,不足往未來補)
 
-const LEGEND: CellState[] = ['free', 'reviewing', 'temp', 'fixed', 'mine', 'fixedOnly', 'closed']
+const LEGEND: CellState[] = ['free', 'fixedOnly', 'closed', 'reviewing', 'temp', 'fixed', 'mine']
 const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
 
 // 後端場況狀態 → 色格狀態;未佔用格依場地開放旗標補 可借/不開放

@@ -230,7 +230,7 @@ export default function AdminFilesPage() {
         )}
       </Spin>
 
-      {/* 空間報修:檔案大且迭代最快,全數列出、可直接刪除;歸零時整個 section 消失(查詢失敗時顯示錯誤,不可誤判為無報修檔案) */}
+      {/* 空間報修:檔案大且迭代最快,可直接刪除;歸零時整個 section 消失(查詢失敗時顯示錯誤,不可誤判為無報修檔案) */}
       {repairQuery.isError ? (
         <div style={{ marginTop: 16 }}>
           <QueryError

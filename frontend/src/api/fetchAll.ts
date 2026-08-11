@@ -1,4 +1,4 @@
-// 小量清單抓全量:100/頁迴圈補滿 total(呼叫端保證資料量級小,如違規/維修/帳號)
+// 小量清單抓全量:100/頁迴圈補滿 total(呼叫端保證資料量級小,如草稿活動、單社的進行中申請)
 import { apiPaged, qs } from './client'
 
 const PAGE_SIZE = 100

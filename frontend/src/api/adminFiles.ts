@@ -3,7 +3,7 @@
 // - 兩張表都走伺服器分頁(每頁 50,預設依大小降冪):報修檔案可直接刪除,大型檔案唯讀
 //   「全部模組」= 明列報修以外的模組交給後端篩(module 收多值),前端不自行過濾
 // - 下載走通用 GET /files/{id}(admin 全通);已歸檔檔案已離盤(410),前端停用下載
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { API_BASE, api, apiPaged, qs } from './client'
 
@@ -93,6 +93,7 @@ export function useFileUsage() {
   })
 }
 
+/** 兩張表共用的每頁筆數(報修表與大型檔案表) */
 export const LARGE_PAGE_SIZE = 50
 
 /** 空間報修檔案:可直接刪除(檔案大、迭代快,清理空間的主要對象);排序=後端預設大小降冪 */
@@ -103,6 +104,9 @@ export function useRepairFiles(page: number) {
       apiPaged<AdminFileOut[]>(
         `/admin/files${qs({ module: 'repair', page, page_size: LARGE_PAGE_SIZE })}`,
       ).then(({ data, total }) => ({ rows: data.map(toFile), total })),
+    // 這張表只有頁碼會變(沒有篩選也沒有排序),沿用上一頁的 total 才不會在換頁瞬間
+    // 讓 total 掉回 0 —— 那會讓整張「空間報修」卡片連同分頁器一起消失再冒出來
+    placeholderData: keepPreviousData,
   })
 }
 

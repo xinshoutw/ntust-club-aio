@@ -6,7 +6,11 @@ import { Cols, MultiSortButton, Pager, sortParam, useMultiSort } from '../../com
 import { downloadCsv } from '../../lib/csv'
 import { kindLabel } from '../../lib/roles'
 import { currentSemester, semesterOptions } from '../../lib/semester'
-import { fetchAllAdminMembers, useAdminClubMembers } from '../../api/adminClubs'
+import {
+  fetchAllAdminMembers,
+  useAdminClubMemberSemesters,
+  useAdminClubMembers,
+} from '../../api/adminClubs'
 import ClubSelect from './ClubSelect'
 import { useAdminClub } from './clubContext'
 
@@ -16,7 +20,6 @@ const PAGE_SIZE = 50
 type SortKey = 'name' | 'student_id' | 'kind' | 'title' | 'semester' | 'updated_at'
 
 // 唯讀:名單由社團自行維護,行政僅查閱;可選學期、排序、匯出 CSV(比照社團端成員列表)
-// 學期下拉:admin 端無 semesters 子端點,先以「當前學期+全部學期」簡化
 export default function AdminMembersPage() {
   const { club, clubId, clubKind } = useAdminClub()
   const { message } = App.useApp()
@@ -27,6 +30,8 @@ export default function AdminMembersPage() {
   const [exporting, setExporting] = useState(false)
   useEffect(() => setPage(1), [clubId, semester])
 
+  // 學期下拉以該社名單實際有的學期為來源(只放當前學期的話查不到歷史名單)
+  const semestersQuery = useAdminClubMemberSemesters(clubId)
   const listQuery = useAdminClubMembers(clubId, {
     semester: semester === 'all' ? undefined : semester,
     sort: sortParam(entries),
@@ -73,7 +78,8 @@ export default function AdminMembersPage() {
               value={semester}
               onChange={setSemester}
               style={{ width: 120 }}
-              options={semesterOptions([], true)}
+              options={semesterOptions(semestersQuery.data ?? [], true)}
+              loading={semestersQuery.isPending && clubId != null}
             />
             <Button icon={<DownloadOutlined />} loading={exporting} onClick={() => void exportCsv()}>
               匯出 CSV

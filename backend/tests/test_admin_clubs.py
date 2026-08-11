@@ -323,6 +323,11 @@ async def test_members_readonly_list(client, db):
     ).status_code == 422
     assert (await client.get(f"{URL}/99999/members")).status_code == 404
 
+    # 學期下拉的來源:該社名單實際有的學期(新到舊),不含他社的
+    body = (await client.get(f"{URL}/{club.id}/members/semesters")).json()
+    assert body["data"] == ["114-2", "114-1"]
+    assert (await client.get(f"{URL}/99999/members/semesters")).status_code == 404
+
 
 async def test_defunct_club_null_attribute(client, db):
     """停社社團 attribute=NULL(2026-07-21):列表/選項/詳情不得 500,回 null。"""

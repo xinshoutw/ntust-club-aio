@@ -106,6 +106,7 @@ export const adminClubKeys = {
   options: ['adminClubs', 'options'] as const,
   detail: (id: number) => ['adminClubs', 'detail', id] as const,
   members: (id: number, p: AdminMemberParams) => ['adminClubs', 'members', id, p] as const,
+  memberSemesters: (id: number) => ['adminClubs', 'memberSemesters', id] as const,
   suspended: ['adminClubs', 'suspended'] as const,
 }
 
@@ -197,6 +198,15 @@ export function useAdminClubMembers(clubId: number | null, p: AdminMemberParams)
     // 同社團翻頁/換學期才沿用舊資料;換社團時清空,否則會顯示前一社的名單
     placeholderData: (prev, prevQuery) =>
       prevQuery?.queryKey[2] === (clubId ?? 0) ? prev : undefined,
+  })
+}
+
+/** 該社名單有資料的學期(新到舊):學期下拉的來源,不然查不到歷史學期 */
+export function useAdminClubMemberSemesters(clubId: number | null) {
+  return useQuery({
+    queryKey: adminClubKeys.memberSemesters(clubId ?? 0),
+    enabled: clubId != null,
+    queryFn: () => api<string[]>(`/admin/clubs/${clubId}/members/semesters`),
   })
 }
 

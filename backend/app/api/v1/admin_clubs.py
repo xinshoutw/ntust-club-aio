@@ -289,6 +289,20 @@ async def reset_club_password(
     return ApiResponse(data=PasswordResetOut(password=password))
 
 
+@router.get("/{club_id}/members/semesters")
+async def list_club_member_semesters(
+    club_id: int, user: ClubAdmin, db: DbDep
+) -> ApiResponse[list[str]]:
+    """該社名單有資料的學期(新到舊),供學期下拉(比照社團端 /club/members/semesters)。"""
+    await _club_or_404(db, club_id)
+    rows = await db.scalars(
+        sa.select(sa.distinct(ClubMember.semester))
+        .where(ClubMember.club_id == club_id)
+        .order_by(ClubMember.semester.desc())
+    )
+    return ApiResponse(data=list(rows))
+
+
 @router.get("/{club_id}/members")
 async def list_club_members(
     club_id: int,

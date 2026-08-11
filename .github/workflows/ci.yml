@@ -48,6 +48,9 @@ jobs:
           cache: pnpm
           cache-dependency-path: frontend/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
+      - run: pnpm exec tsc -b --force
+      - run: pnpm test
       - run: pnpm build
 
   # main 分支:建置並推映像(VM 上永不 build,部署只 pull)
@@ -68,13 +71,18 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # 同時打 latest 與 commit sha:出事時 VM 才有辦法 pull 回上一版
       - uses: docker/build-push-action@v6
         with:
           context: backend
           push: true
-          tags: ghcr.io/${{ steps.repo.outputs.name }}-backend:latest
+          tags: |
+            ghcr.io/${{ steps.repo.outputs.name }}-backend:latest
+            ghcr.io/${{ steps.repo.outputs.name }}-backend:${{ github.sha }}
       - uses: docker/build-push-action@v6
         with:
           context: frontend
           push: true
-          tags: ghcr.io/${{ steps.repo.outputs.name }}-web:latest
+          tags: |
+            ghcr.io/${{ steps.repo.outputs.name }}-web:latest
+            ghcr.io/${{ steps.repo.outputs.name }}-web:${{ github.sha }}

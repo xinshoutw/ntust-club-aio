@@ -151,8 +151,8 @@
 
 ## 驗證現況(2026-08-11 實測)
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → 305 passed(含新的 `test_migrations.py`:另開一個庫跑 `alembic upgrade head` 並比對欄位;`test_migration_helpers.py`:兩支匯入腳本的純函式);`ruff check .` 全綠;覆蓋率上次量測 95%(較低者:notify 73%、audit 77%、signup_service 82%)
-- 前端 `pnpm exec tsc -b --force` → 0 錯;`pnpm test` → 67 passed(16 檔);`pnpm run lint` → **8** 個 fast-refresh warning(全為既有的 `only-export-components` 類;先前記的 9 個是誤記,已用 `git archive` 對舊 commit 跑同一顆 oxlint 核對過)
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → 313 passed(含 `test_migrations.py`:另開一個庫跑 `alembic upgrade head`,比對欄位、索引名與 CHECK 名 —— 後兩者是子集斷言,擋的是「模型有、revision 漏了」;`test_migration_helpers.py`:兩支匯入腳本的純函式);`ruff check .` 全綠
+- 前端 `pnpm exec tsc -b --force` → 0 錯;`pnpm test` → 71 passed(17 檔);`pnpm run lint` → **8** 個 fast-refresh warning(全為既有的 `only-export-components` 類)
 - `git log --all` 確認 `.env` 與 `migration/out` 從未進版控
 
 ## 其他待處理

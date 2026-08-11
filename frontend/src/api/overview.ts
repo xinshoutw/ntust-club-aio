@@ -1,5 +1,5 @@
 // 總覽頁 API 層:自 GET /club/activities 推導「待辦」與「進行中申請(活動)」
-// (照原 mock 邏輯:結案期限=活動結束日 +1 個月,推導不儲存)
+// (結案期限、鎖定與可結案一律讀後端推導的欄位,鎖定月數在系統設定可調)
 import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { fetchAllPages } from './fetchAll'
@@ -75,7 +75,7 @@ export function useOverviewActivities() {
           name: a.name,
           // 期限一律用後端算的(鎖定月數在系統設定可調,前端自己 +1 個月會整片錯)
           deadline: a.close_deadline ? dayjs(a.close_deadline).format('YYYY/MM/DD') : '—',
-          daysLeft: dayjs(a.close_deadline ?? a.end_date).startOf('day').diff(today, 'day'),
+          daysLeft: a.close_deadline ? dayjs(a.close_deadline).startOf('day').diff(today, 'day') : 0,
         }))
         // 已鎖定在前,其餘依期限近到遠
         .sort((x, y) => (x.kind === y.kind ? x.daysLeft - y.daysLeft : x.kind === 'locked' ? -1 : 1))

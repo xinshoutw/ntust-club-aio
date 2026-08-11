@@ -450,7 +450,8 @@ export default function ActivityListPage() {
         }
       />
 
-      {/* 草稿卡本身就是條件渲染(有草稿才出現),沒有要撐住的版面,不需要 Skeleton */}
+      {/* 草稿卡是條件渲染又排在主列表上方:兩支分開等會讓草稿卡晚一步插進來、把列表整個推下去,
+          所以主列表的 Skeleton 連 draftsQuery 一起等(草稿本身沒有要撐住的版面,不另鋪 Skeleton) */}
       {draftsQuery.isError && (
           <div style={{ marginTop: 20 }}>
             <QueryError title="草稿載入失敗" error={draftsQuery.error} onRetry={() => void draftsQuery.refetch()} />
@@ -515,7 +516,7 @@ export default function ActivityListPage() {
 
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
         {/* 沿用上一份時整表淡化(見下方 opacity),避免看起來像是新條件的結果 */}
-        <LoadingBlock pending={listQuery.isPending} rows={8}>
+        <LoadingBlock pending={draftsQuery.isPending || listQuery.isPending} rows={8}>
           <table
             className="tb fixed"
             aria-label="活動列表"

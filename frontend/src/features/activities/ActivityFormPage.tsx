@@ -89,7 +89,15 @@ export default function ActivityFormPage() {
   // 經費科目/附件上限來自後端組態;表單初始化(預設科目)前必須先載入
   const configQuery = useClubConfig()
 
-  const skeleton = <LoadingBlock pending rows={6} />
+  // 頁首與錯誤分支一致地留著,不要載入完才整個標題冒出來
+  const skeleton = (
+    <div>
+      <PageHeader title="活動申請" />
+      <div className="card" style={{ marginTop: 20, padding: '8px 4px' }}>
+        <LoadingBlock pending rows={6} />
+      </div>
+    </div>
+  )
   const errorBox = (title: string, error: unknown, retry: () => void) => (
     <div>
       <PageHeader title="活動申請" />

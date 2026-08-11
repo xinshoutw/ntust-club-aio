@@ -175,7 +175,9 @@ export default function AdminRoomsPage() {
     return (
       <div>
         <PageHeader title="固定場地借用" />
-        <LoadingBlock pending rows={6} />
+        <div className="card" style={{ marginTop: 20, padding: '8px 4px' }}>
+          <LoadingBlock pending rows={6} />
+        </div>
       </div>
     )
   }

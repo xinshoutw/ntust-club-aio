@@ -129,8 +129,7 @@ export default function AdminFilesPage() {
       />
 
       {/* 空間利用:數字 + 依模組分段的比例條(hover 顯示明細);查詢失敗顯示錯誤而非 0/— 彙總 */}
-      <LoadingBlock pending={usageQuery.isPending}>
-        {usageQuery.isError ? (
+      {usageQuery.isError ? (
           <div style={{ marginTop: 20 }}>
             <QueryError
               title="空間使用資訊載入失敗"
@@ -140,6 +139,7 @@ export default function AdminFilesPage() {
           </div>
         ) : (
         <div className="card" style={{ marginTop: 20, padding: '20px 24px' }}>
+        <LoadingBlock pending={usageQuery.isPending} rows={4}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 24, flexWrap: 'wrap' }}>
             <div>
               <div style={{ fontSize: 12, color: 'var(--steel)' }}>系統佔用</div>
@@ -228,9 +228,9 @@ export default function AdminFilesPage() {
               可用
             </span>
           </div>
+        </LoadingBlock>
         </div>
         )}
-      </LoadingBlock>
 
       {/* 空間報修:檔案大且迭代最快,可直接刪除;歸零時整個 section 消失(查詢失敗時顯示錯誤,不可誤判為無報修檔案) */}
       {repairQuery.isError ? (

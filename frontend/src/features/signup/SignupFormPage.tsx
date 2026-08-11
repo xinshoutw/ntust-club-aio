@@ -53,7 +53,9 @@ export default function SignupFormPage() {
     return (
       <div>
         <BackLink />
-        <LoadingBlock pending rows={6} />
+        <div className="card" style={{ marginTop: 12, padding: '8px 4px' }}>
+          <LoadingBlock pending rows={6} />
+        </div>
       </div>
     )
   }

@@ -144,9 +144,9 @@ def fixed_window_open(window: dict, now: datetime | None = None) -> bool:
 # 以 (namespace, resource_id) 鎖資源本身,申請端與核准端用同一把鍵。
 # 臨時借用與固定借用搶的是同一間場地,必須同一個命名空間才會互相序列化 ——
 # 分成 venue/room 兩把鍵時,就算補上交叉查詢也擋不住兩邊同時核准
-# club_quota 鎖的是「每社額度」而不是場地:10 節上限是每社團的,
-# 照場地鎖不會讓「同社兩張不同場地的申請」互相序列化
-_LOCK_NS = {"equipment": 411001, "venue": 411002, "club_quota": 411003}
+# club 鎖的是社團自己(每社額度、同社重複申請守門),不是場地:
+# 那些檢核的鍵都是社團,照場地鎖不會讓「同社兩張不同場地的申請」互相序列化
+_LOCK_NS = {"equipment": 411001, "venue": 411002, "club": 411003}
 
 
 async def lock_resource(db: AsyncSession, kind: str, resource_id: int) -> None:

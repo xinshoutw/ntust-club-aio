@@ -289,7 +289,7 @@ async def test_room_booking_slot_limit(client, db):
 # ---- 臨時場地借用(綁定審核通過活動) ----
 
 
-async def test_room_booking_waits_for_the_club_quota_lock(client, db):
+async def test_room_booking_waits_for_the_club_lock(client, db):
     """10 節額度是「先查合計再寫入」:沒鎖的話兩張並發申請會各自通過同一份合計。
 
     直接佔住鎖再斷言請求卡住 —— 真的送兩支並發請求無法穩定重現交錯,
@@ -304,7 +304,7 @@ async def test_room_booking_waits_for_the_club_quota_lock(client, db):
     venue = await make_venue(db)
 
     async with async_session_factory() as holder:
-        await booking_service.lock_resource(holder, "club_quota", 1)  # 該社團的額度鎖
+        await booking_service.lock_resource(holder, "club", 1)  # 該社團的鎖
         with pytest.raises(TimeoutError):
             await asyncio.wait_for(
                 client.post(
@@ -313,6 +313,36 @@ async def test_room_booking_waits_for_the_club_quota_lock(client, db):
                         "venue_id": venue.id,
                         "purpose": "社課",
                         "slots": [{"weekday": 1, "period": str(i)} for i in range(1, 7)],
+                    },
+                    headers=csrf_headers(client),
+                ),
+                timeout=1,
+            )
+
+
+async def test_venue_booking_waits_for_the_club_lock(client, db):
+    """「同社同場地同日只能一張」是先查再寫,沒鎖的話雙擊送出會落兩筆。"""
+    import asyncio
+
+    from app.core.db import async_session_factory
+
+    club = await setup_session(client, db)
+    venue = await make_venue(db, name="精誠廣場", allow_fixed=False, allow_temp=True)
+    activity = await make_activity(db, club)
+
+    async with async_session_factory() as holder:
+        await booking_service.lock_resource(holder, "club", club.id)
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(
+                client.post(
+                    "/api/v1/club/venue-bookings",
+                    json={
+                        "venue_id": venue.id,
+                        "activity_id": activity.id,
+                        "date": (date.today() + timedelta(days=14)).isoformat(),
+                        "periods": ["3", "4"],
+                        "purpose": "擺攤",
+                        "phone": "0912000111",
                     },
                     headers=csrf_headers(client),
                 ),

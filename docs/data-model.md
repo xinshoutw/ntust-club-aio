@@ -376,7 +376,7 @@ approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,�
 |---|---|---|---|
 | 411001 | equipment_id | 器材可借數 | `booking_service._LOCK_NS` |
 | 411002 | venue_id | 場地時段(臨時與固定共用同一把,否則兩邊可同時核准) | `booking_service._LOCK_NS` |
-| 411003 | club_id | 固定借用每社 10 節額度(鍵是社團不是場地) | `booking_service._LOCK_NS` |
+| 411003 | club_id | 社團自己的先查再寫檢核:固定借用 10 節額度、臨時借用同場地同日重複申請(鍵是社團不是場地) | `booking_service._LOCK_NS` |
 | 411004 | club_id | 行政分/加分調整的「註銷舊值後新增」 | `evaluation._ADJUSTMENT_LOCK_NS` |
 | 單參數 `0xC1ABA105EC3` | — | 上傳配額結算(全系統一把) | `files._STORAGE_LOCK_KEY` |
 

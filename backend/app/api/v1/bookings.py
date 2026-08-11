@@ -243,7 +243,7 @@ async def create_room_booking(
 
     # 每社至多 10 節/學期:同目標學期的未退回申請(審核中+已核准)合計。
     # 先鎖住這個社團的額度,兩張並發送出的申請才不會各自通過同一份合計
-    await svc.lock_resource(db, "club_quota", user.club_id)
+    await svc.lock_resource(db, "club", user.club_id)
     used_count = (
         await db.scalar(
             sa.select(sa.func.count())
@@ -349,7 +349,9 @@ async def create_venue_booking(
     if svc.booking_started(body.date, body.periods):
         raise validation_error("所選時段已開始,請選擇尚未開始的時段")
 
-    # 同社同場地同日重複申請直接擋(不同社的衝突由審核關把關)
+    # 同社同場地同日重複申請直接擋(不同社的衝突由審核關把關)。
+    # 先鎖住這個社團:守門是先查再寫,雙擊送出的第二筆會查不到第一筆
+    await svc.lock_resource(db, "club", user.club_id)
     dup = await db.scalar(
         sa.select(VenueBooking.id).where(
             VenueBooking.club_id == user.club_id,

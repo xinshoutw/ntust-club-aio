@@ -5,6 +5,7 @@ import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { Cols, Pager, sortRows, type SortEntry } from '../../components/ui/tableControls'
+import { notFoundText } from '../../lib/selectOptions'
 import FilePreview from '../eval/FilePreview'
 import type { EvalFile } from '../eval/types'
 import {
@@ -102,6 +103,7 @@ export default function ViewerScorePage() {
                   ? `${a.awardName} · ${a.groupName}`
                   : a.awardName,
             }))}
+            notFoundContent={notFoundText(assignmentsQuery, '尚未被指派評分', '指派清單')}
           />
         }
       />

@@ -8,6 +8,7 @@ import { useUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { blurLeavesRow } from '../../lib/form'
+import { notFoundText } from '../../lib/selectOptions'
 import { IMAGE_ACCEPT, fmtMB, isImageFile, sha256 } from '../../lib/uploads'
 import {
   deleteActivityPhoto,
@@ -88,7 +89,9 @@ export default function ActivityClosePage() {
             placeholder="選擇已核准之活動"
             value={activity?.id}
             onChange={(id) => setParams({ id: String(id) }, { replace: true })}
+            loading={approvedQuery.isPending}
             options={closable.map((a) => ({ value: a.id, label: `${a.name}(${dateRangeText(a)})` }))}
+            notFoundContent={notFoundText(approvedQuery, '目前沒有可結案的活動', '活動清單')}
           />
         }
       />

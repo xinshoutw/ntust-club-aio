@@ -35,7 +35,9 @@ export default function AuditPage() {
   const operators = options.data?.operators ?? new Map<string, number>()
 
   const filters = {
-    userId: whoFilter ? operators.get(whoFilter) : undefined,
+    // 選了操作者但對照表未就緒/名稱失效 → 強制空集,不可 fail-open 回全部操作者的紀錄
+    // (漏斗是紅的、選單還顯示著勾選,看起來就是在看某一人的紀錄)
+    userId: whoFilter ? operators.get(whoFilter) ?? -1 : undefined,
     role: roleFilter ? roleKeyOf(roleFilter) : undefined,
     action: actionFilter ? actionKeyOf(actionFilter) : undefined,
     dateFrom: range?.[0].format('YYYY-MM-DD'),
@@ -171,7 +173,12 @@ export default function AuditPage() {
               )}
               {!listQuery.isPending && !listQuery.isError && logs.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>無符合篩選條件的紀錄</td>
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
+                    {/* 沒下篩選時新庫或窄區間本來就可能一筆都沒有,別說成「不符篩選條件」 */}
+                    {whoFilter || roleFilter || actionFilter || range
+                      ? '無符合篩選條件的紀錄'
+                      : '目前沒有稽核紀錄'}
+                  </td>
                 </tr>
               )}
             </tbody>

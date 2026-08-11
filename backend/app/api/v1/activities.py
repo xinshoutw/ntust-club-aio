@@ -85,6 +85,9 @@ def _require_complete(activity: Activity) -> None:
             ("開始時間", activity.start_time is not None),
             ("結束時間", activity.end_time is not None),
             ("活動地點", bool(activity.location.strip())),
+            ("工作分配", bool(activity.staff_text.strip())),
+            # 人數兩欄各自可為 0(只有社員或只有校外人士),但合計 0 等於沒填
+            ("參加人數", activity.participants_in + activity.participants_out > 0),
         )
         if not ok
     ]

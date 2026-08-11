@@ -542,12 +542,25 @@ async def test_partial_draft_and_submit_completeness(client, db):
     assert resp.status_code == 422
     msg = resp.json()["error"]
     assert "開始日期" in msg and "活動地點" in msg and "活動名稱" not in msg
+    # 畫面上除了活動內容全是必填,後端不能只擋日期地點就放行
+    assert "工作分配" in msg and "參加人數" in msg
 
-    # 補齊後可送審(送審擋過去時間,補齊時帶未來日期)
+    # 人數兩欄可以有一欄是 0(只有社員或只有校外人士),合計 0 才算沒填
     future = (date.today() + timedelta(days=30)).isoformat()
+    await client.put(
+        f"/api/v1/club/activities/{draft['id']}",
+        json=payload(date=future, participants_in=0, participants_out=0),
+        headers=csrf_headers(client),
+    )
+    resp = await client.post(
+        f"/api/v1/club/activities/{draft['id']}/submit", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 422 and "參加人數" in resp.json()["error"]
+
+    # 補齊後可送審(送審擋過去時間,補齊時帶未來日期;人數只有一欄是 0 仍算填了)
     resp = await client.put(
         f"/api/v1/club/activities/{draft['id']}",
-        json=payload(date=future),
+        json=payload(date=future, participants_in=0, participants_out=5),
         headers=csrf_headers(client),
     )
     assert resp.status_code == 200, resp.text

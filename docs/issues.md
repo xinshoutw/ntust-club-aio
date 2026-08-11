@@ -22,7 +22,6 @@
 | ISS-10 | 中 | 郵局新代理人欄位的必填條件兩端不一致:前端「更換代理人**或**新開戶」都要求,後端只在「更換代理人」時要求。直呼 API 可建立沒有代理人的新開戶申請 |
 | ISS-11 | 中 | 社團端管理項目**不顯示停權狀態**。後端 `GET /club/profile` 有回 `suspended_until` / `suspend_reason`,但 `api/clubProfile.ts` 的 `ClubProfile` 型別根本沒接這兩個欄位。社團只有在送借用撞到 403 時才知道自己被停權 |
 | ISS-12 | 中 | 社團端總覽的「進行中申請」**永遠不含借用**。`tracked` 只組活動與線上申請;`categories` 常數列了「借用」但無資料來源(該分類會被 `filter` 濾掉,畫面不會出現空標題,所以更難察覺) |
-| ISS-12b | 中 | 活動申請的**工作分配與參加人數是純前端必填**:後端 `_require_complete` 只檢核名稱、起訖日期、起訖時間、地點,`staff_text` 與人數完全不驗 |
 | ISS-12c | 中 | 評鑑上傳鎖(`eval_settings.unlocked`)**看不到也設不了**:`AwardDetailOut` 不回任何鎖定旗標,上傳鈕永遠可按,社團選完檔才吃 409;而 `EvalSetting` 全後端只有讀、沒有任何寫入端點或 UI |
 
 ## 3. 預設值讓人不小心就放行(fail-open)

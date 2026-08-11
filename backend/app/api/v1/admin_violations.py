@@ -36,10 +36,6 @@ _SORTABLE = {
     "created_at": Violation.created_at,
 }
 
-# 逾期判定的 SQL 對應(推導不儲存;與 violation_service.resolve_deadline 同義,
-# Postgres 的 +1 month 與 add_months 同樣做月底收斂)
-_DEADLINE_SQL = Violation.occurred_on + sa.func.make_interval(0, 1)
-
 
 def _to_out(v: Violation, club_name: str, filler_name: str, today: date) -> AdminViolationOut:
     out = AdminViolationOut.model_validate(v)
@@ -88,7 +84,8 @@ async def list_violations(
     if expired is not None:
         # 期限篩選僅對未銷案有意義(已銷案顯示 —)
         query = query.where(Violation.status == ViolationStatus.OPEN)
-        query = query.where(_DEADLINE_SQL < today if expired else _DEADLINE_SQL >= today)
+        deadline = violation_service.deadline_sql()
+        query = query.where(deadline < today if expired else deadline >= today)
 
     if sort:
         query = query.order_by(*parse_sort(sort, _SORTABLE, None), Violation.id)

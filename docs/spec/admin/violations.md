@@ -21,8 +21,8 @@
 
 ## 規則
 
-- **銷案期限 = 開立日 + 1 個月**,逾期即截止,後端回 409 `RESOLVE_EXPIRED`
-- 期限判定同時存在 Python(`violation_service.resolve_expired`)與 SQL(`make_interval`)兩份實作,邊界為期限當天仍可銷案
+- **銷案期限 = 開立日 + 1 個月**,逾期即截止,後端回 409 `RESOLVE_EXPIRED`;期限當天仍可銷案
+- 逾期篩選在 DB 端算(`violation_service.deadline_sql`),與 Python 端的推導共用 `RESOLVE_MONTHS`
 - 預設排序:未銷案在前,各組內發生日升冪(與工讀生端、社團端一致)
 - 銷案寫 `audit_logs` 並推 Discord
 - 未銷案且發生日落在評鑑視窗內的勸導,每筆扣行政分 1 分、上限 −10

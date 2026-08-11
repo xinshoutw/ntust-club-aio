@@ -5,6 +5,8 @@
 
 from datetime import UTC, date, datetime
 
+import sqlalchemy as sa
+
 from app.core.semesters import TAIPEI
 from app.models import Violation
 from app.services.activity_service import add_months
@@ -15,6 +17,11 @@ RESOLVE_MONTHS = 1
 def resolve_deadline(v: Violation) -> date:
     """銷案期限:開立日(occurred_on)+1 個月。"""
     return add_months(v.occurred_on, RESOLVE_MONTHS)
+
+
+def deadline_sql() -> sa.ColumnElement[date]:
+    """同一條期限的 SQL 版(逾期篩選在 DB 端算);PG 的 +N month 與 add_months 同樣做月底收斂。"""
+    return Violation.occurred_on + sa.func.make_interval(0, RESOLVE_MONTHS)
 
 
 def today_taipei() -> date:

@@ -109,6 +109,12 @@ pnpm run lint
 - 元件與互動慣例一律照 `docs/design-guide.md` §6,不要自刻替代品
 - `PERIOD_TIMES` 前後端各一份(`booking_service.py` / `api/bookings.ts`),改動須同步
 
+**修 issues.md 的條目時**(A/B/C 三堆的作業流程,見 `docs/HANDOFF.md`)
+
+- **一項一個 commit**,修完該項就從 `docs/issues.md` 刪掉那一列,並同步 `docs/spec/` 對應頁的「未完成 / 問題」段(修好的敘述要改成正面規則,不是只刪掉)
+- **每一項都要 mutation 驗證**:把修法改回舊寫法,確認新測試真的會紅。前兩批各抓到兩處恆真測試、四個「靠 bug 才通過」的既有測試
+- 交叉審查的提示詞要明確要求兩件事:**找漏掉的同類呼叫點**、**找這批新引入的問題**。四輪下來這兩類佔了 findings 的大半,其中兩輪抓到的是修的過程自己製造的錯
+
 **平行開發**
 
 - 多 agent 平行時**絕不可 `git stash`**;pytest 必包 timeout;各 worktree 設自己的 `CLUB_AIO_TEST_DB`

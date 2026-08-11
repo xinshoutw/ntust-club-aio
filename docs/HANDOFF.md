@@ -63,7 +63,11 @@
 第一輪 —— 換 Skeleton 等於「不渲染」,卡框/卡片間距/區塊標題全被吞掉(33 處)、
 行政分頁與帳號管理的 LoadingBlock 跨到別支查詢驅動的區塊;
 第二輪 —— 拆完之後行政分的社團清單反而沒了佔位、總覽三張卡仍共用一個全頁旗標、
-另外三頁同型的跨卡 LoadingBlock 漏了、分頁器被包在裡面(無 `placeholderData` 的頁換頁時真的會消失)。
+另外三頁同型的跨卡 LoadingBlock 漏了、分頁器被包在裡面(無 `placeholderData` 的頁換頁時真的會消失);
+第三輪(codex gpt-5.6-sol)—— 整頁載入分支把卡框整個換掉、活動表單載入中連頁首都沒有、
+草稿卡晚一步插到主列表上方把它推下去、彈窗詳情的查詢被算進卡片的失敗狀態、
+14 處標題計數在載入中與失敗時仍顯示 `0`(抽成 `lib/counts.countText`,附測試)。
+順手記下的兩個既有缺口:ISS-98(申請審核頁兩種失敗都沒有出口)、ISS-99(審核彈窗詳情失敗永遠停在 Skeleton)。
 
 **A3 其餘 1 項**(可上線後補;作業流程見 `AGENTS.md`「修 issues.md 的條目時」)
 
@@ -125,6 +129,8 @@
 - **spinner 換 Skeleton 不是換元件,是把「遮罩」換成「不渲染」**:`<Spin spinning>` 的 children 還在(淡化 + `pointer-events:none`),Skeleton 是整段拿掉。所以範圍要重畫 —— 卡框、卡片 marginTop、區塊標題、分頁列都得留在外面,否則同一頁兩段會塌成兩塊分不出來的灰塊,資料到位再整塊往下跳
 - **一個載入旗標蓋幾張卡就是幾張卡的載入被綁在一起**:`<Spin>` 時代跨兩張卡只是一起淡化,換成 Skeleton 就是「別支查詢還沒回來、這張卡整個不存在」。總覽的公告卡本來要等「進行中申請」那七支裡最慢的一支;行政分審核換社團時,下面由 `clubsQuery` 驅動的社團清單連分頁器一起在游標底下消失
 - 分頁器包在 Skeleton 裡,在**沒有 `placeholderData`** 的頁面就是「每次換頁分頁器自己消失」—— 而那些頁沒有 placeholderData 往往是刻意的(換篩選不留上一份)。分頁器一律留在 LoadingBlock 外面,比逐頁判斷該不該留舊資料省事
+- **整頁的載入分支也適用「只換內容」**:`if (query.isPending) return <Skeleton/>` 讀起來合理,但那一頁的 `PageHeader` 與卡框在成功與錯誤分支都在,只有載入分支沒有 —— 資料到位時整個頁首連卡片一起冒出來
+- **條件渲染的區塊排在別人上方,就不能各等各的**:活動列表的草稿卡「有草稿才出現」又排在主列表之上,兩支分開等會讓列表先到、草稿卡再插進來把它推下去。原本一個 Spin 等兩支剛好沒有這個問題
 - 計數改成「載入中顯示 —」只做了一半:`isError` 時 `isPending` 是 false,badge 會印 0 或殘缺數字,旁邊還配一句「載入失敗」。載入中與失敗對使用者是同一件事;空狀態也要讓位給錯誤說明,否則「載入失敗」與「尚無資料」同時出現
 - 觸控拖曳與捲動只能二選一:時段表在手機上都要橫向捲,設 `touch-action: none` 換來批量選取並不划算。改用 pointer 事件統一滑鼠/觸控筆,觸控維持逐格點選並在 spec 寫明是刻意的
 
@@ -182,7 +188,7 @@
 ## 驗證現況(2026-08-11 實測)
 
 - 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → 333 passed(含 `test_migrations.py`:另開一個庫跑 `alembic upgrade head`,比對欄位、索引名與 CHECK 名 —— 後兩者是子集斷言,擋的是「模型有、revision 漏了」;`test_migration_helpers.py`:兩支匯入腳本的純函式);`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` → 0 錯;`pnpm test` → 76 passed(18 檔);`pnpm run lint` → **8** 個 fast-refresh warning(全為既有的 `only-export-components` 類)
+- 前端 `pnpm exec tsc -b --force` → 0 錯;`pnpm test` → 79 passed(19 檔);`pnpm run lint` → **8** 個 fast-refresh warning(全為既有的 `only-export-components` 類)
 - `git log --all` 確認 `.env` 與 `migration/out` 從未進版控
 
 ## 其他待處理

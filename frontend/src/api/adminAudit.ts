@@ -114,6 +114,7 @@ export interface AuditLog {
   roleLabel: string
   actionLabel: string
   detail: string
+  ip: string | null
 }
 
 interface AuditLogOut {
@@ -135,6 +136,7 @@ const toLog = (l: AuditLogOut): AuditLog => ({
   roleLabel: l.role ? (ROLE_LABELS[l.role] ?? l.role) : '—',
   actionLabel: actionLabelOf(l.action),
   detail: l.detail,
+  ip: l.ip,
 })
 
 export interface AuditFilters {

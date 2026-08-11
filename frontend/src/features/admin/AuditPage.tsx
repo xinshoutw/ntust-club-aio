@@ -59,9 +59,10 @@ export default function AuditPage() {
         message.error('沒有符合篩選條件的紀錄可匯出')
         return
       }
+      // 表格排不下 IP,但事後追查最需要它
       downloadCsv(`稽核紀錄_${dayjs().format('YYYYMMDD')}.csv`, [
-        ['時間', '操作者', '角色', '動作', '內容'],
-        ...rows.map((l) => [l.time, l.who, l.roleLabel, l.actionLabel, l.detail]),
+        ['時間', '操作者', '角色', '動作', '內容', '來源 IP'],
+        ...rows.map((l) => [l.time, l.who, l.roleLabel, l.actionLabel, l.detail, l.ip ?? '']),
       ])
       message.success(`已匯出 ${rows.length} 筆`)
     } catch (e) {

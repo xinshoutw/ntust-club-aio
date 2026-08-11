@@ -36,7 +36,7 @@ import {
 import { CELL, emptyCellState, type CellState } from './cells'
 
 const RETURNED_PAGE = 10
-const VENUE_DAYS = 15 // 單一場地檢視:選擇日 −7 ~ +7 共 15 天(不含過去,不足往未來補)
+const VENUE_DAYS = 15 // 單一場地檢視:選擇日 −7 ~ +7 共 15 天
 
 const LEGEND: CellState[] = ['free', 'fixedOnly', 'closed', 'reviewing', 'temp', 'fixed', 'mine']
 const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
@@ -61,10 +61,11 @@ function cellOf(
 }
 
 // 單一場地格:可借才可點(直接前往臨時場地借用);審核中不可點;不開放不畫方框。
+// 過去日期只供查閱歷史借用,空格不是可申請的入口(bookable=false)。
 // 被佔用格 hover 顯示借用社團名(mine 顯示「我的社團」語意由色塊表達,仍附社名)
-function Cell({ state, label, club, onBook }: { state: CellState; label: string; club?: string; onBook: () => void }) {
+function Cell({ state, label, club, bookable, onBook }: { state: CellState; label: string; club?: string; bookable: boolean; onBook: () => void }) {
   const base: React.CSSProperties = { width: '100%', height: 24, borderRadius: 4, background: CELL[state].bg, display: 'block' }
-  if (state === 'free') {
+  if (state === 'free' && bookable) {
     return (
       <button
         type="button"
@@ -98,12 +99,11 @@ export default function BookingOverviewPage() {
   const { cancelRoomBooking, cancelVenueBooking, cancelEquipmentLoan } = useBookingMutations()
   const [returnedPage, setReturnedPage] = useState(1)
   const [gridDate, setGridDate] = useState<Dayjs>(() => dayjs())
-  // 場地檢視:點場地名稱進入,以當時檢視日為中心 −7~+7 共 15 天;後端不提供過去場況,
-  // 起始日不得早於今天,被截掉的天數往未來補(顯示天數固定)
+  // 場地檢視:點場地名稱進入,以當時檢視日為中心 −7~+7 共 15 天。
+  // 過去日期可查(查歷史借用紀錄的唯一入口),只是空格不能拿來申請
   const [venueView, setVenueView] = useState<number | null>(null)
   const [venueStart, setVenueStart] = useState<Dayjs>(() => dayjs().startOf('day'))
   const todayStart = dayjs().startOf('day')
-  const clampStart = (d: Dayjs) => (d.isBefore(todayStart, 'day') ? todayStart : d)
 
   const venuesQuery = useVenues()
   const venues = venuesQuery.data ?? []
@@ -150,7 +150,7 @@ export default function BookingOverviewPage() {
 
   const openVenue = (id: number) => {
     setVenueView(id)
-    setVenueStart(clampStart(gridDate.startOf('day').subtract(7, 'day')))
+    setVenueStart(gridDate.startOf('day').subtract(7, 'day'))
   }
 
   const gridPending = venueDef ? rangeQuery.isPending : venuesQuery.isPending || dayQuery.isPending
@@ -181,8 +181,7 @@ export default function BookingOverviewPage() {
                   size="small"
                   icon={<DoubleLeftOutlined />}
                   aria-label="前一週"
-                  disabled={!gridDate.isAfter(todayStart, 'day')}
-                  onClick={() => setGridDate((d) => clampStart(d.subtract(7, 'day')))}
+                  onClick={() => setGridDate((d) => d.subtract(7, 'day'))}
                 />
               </Tooltip>
               <Tooltip title="前一天">
@@ -190,8 +189,7 @@ export default function BookingOverviewPage() {
                   size="small"
                   icon={<LeftOutlined />}
                   aria-label="前一天"
-                  disabled={!gridDate.isAfter(todayStart, 'day')}
-                  onClick={() => setGridDate((d) => clampStart(d.subtract(1, 'day')))}
+                  onClick={() => setGridDate((d) => d.subtract(1, 'day'))}
                 />
               </Tooltip>
               <DatePicker
@@ -202,7 +200,6 @@ export default function BookingOverviewPage() {
                 style={{ width: 120 }}
                 styles={{ input: { textAlign: 'center' } }}
                 value={gridDate}
-                disabledDate={(d) => d.isBefore(todayStart, 'day')}
                 onChange={(d) => d && setGridDate(d)}
               />
               <Tooltip title="後一天">
@@ -231,8 +228,7 @@ export default function BookingOverviewPage() {
                   size="small"
                   icon={<LeftOutlined />}
                   aria-label={`前 ${VENUE_DAYS} 天`}
-                  disabled={!venueStart.isAfter(todayStart, 'day')}
-                  onClick={() => setVenueStart((s) => clampStart(s.subtract(VENUE_DAYS, 'day')))}
+                  onClick={() => setVenueStart((s) => s.subtract(VENUE_DAYS, 'day'))}
                 />
               </Tooltip>
               <span className="num" style={{ fontSize: 12, color: 'var(--steel)' }}>
@@ -288,7 +284,13 @@ export default function BookingOverviewPage() {
                         const label = `${v.name} 第${p}節:${CELL[state].label}`
                         return (
                           <td key={p}>
-                            <Cell state={state} label={label} club={club} onBook={() => book(v.id, gridDate, p)} />
+                            <Cell
+                              state={state}
+                              label={label}
+                              club={club}
+                              bookable={!gridDate.isBefore(todayStart, 'day')}
+                              onBook={() => book(v.id, gridDate, p)}
+                            />
                           </td>
                         )
                       })}
@@ -320,7 +322,13 @@ export default function BookingOverviewPage() {
                           const label = `${d.format('MM/DD')} 第${p}節:${CELL[state].label}`
                           return (
                             <td key={p}>
-                              <Cell state={state} label={label} club={club} onBook={() => book(venueDef.id, d, p)} />
+                              <Cell
+                                state={state}
+                                label={label}
+                                club={club}
+                                bookable={!d.isBefore(todayStart, 'day')}
+                                onBook={() => book(venueDef.id, d, p)}
+                              />
                             </td>
                           )
                         })}

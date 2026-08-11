@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { App, Button, Input, InputNumber, Modal, Spin, Tooltip } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
@@ -41,6 +41,10 @@ export default function AdminEvalPage() {
   const [reason, setReason] = useState('')
 
   const saving = override.isPending || revert.isPending || merit.isPending
+
+  // 換社團就關掉調整視窗:mutation 打的是「當下 context 的社團」,不是開窗那一刻的,
+  // 開著換社團再送出會把分數落到另一社
+  useEffect(() => setOpen(false), [clubId])
 
   const openAdjust = (m: AdjustMode) => {
     setMode(m)

@@ -190,6 +190,7 @@ export default function ClubOverviewPage() {
   // 未啟用的查詢恆為 isPending:沒有該權限的管理員會看到永遠鋪著的 Skeleton,
   // 所以每一支都要先看自己的啟用條件(與各 hook 的 enabled 同式)
   const loading = (query: { isPending: boolean }, enabled: boolean) => enabled && query.isPending
+  const anyError = (...queries: { isError: boolean }[]) => queries.some((q) => q.isError)
   const hasClub = clubId != null
   const trackedLoading =
     loading(activitiesQuery, canActivities && hasClub) || loading(maintQuery, canMaint && hasClub)
@@ -200,6 +201,9 @@ export default function ClubOverviewPage() {
     loading(loansQuery, canBookings && hasClub) ||
     loading(pendingRoomsQuery, needsConflicts) ||
     loading(approvedRoomsQuery, needsConflicts)
+  // 失敗與載入中對使用者是同一件事:計數顯示 —,空狀態讓位給錯誤說明(否則兩段同時出現)
+  const trackedFailed = anyError(activitiesQuery, maintQuery, reviewQuery)
+  const bookingFailed = anyError(roomsQuery, venuesQuery, loansQuery, pendingRoomsQuery, approvedRoomsQuery)
 
   const rowStyle: React.CSSProperties = {
     display: 'flex',
@@ -247,10 +251,10 @@ export default function ClubOverviewPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 20px 12px' }}>
             <div style={{ fontSize: 15, fontWeight: 600 }}>進行中申請</div>
             <span className="num" style={{ fontSize: 12, background: '#EEF0F3', color: 'var(--steel)', borderRadius: 999, padding: '1px 8px' }}>
-              {trackedLoading && clubId != null ? '—' : trackedCount}
+              {trackedLoading || trackedFailed || !hasClub ? '—' : trackedCount}
             </span>
           </div>
-          <LoadingBlock pending={trackedLoading && clubId != null} rows={3}>
+          <LoadingBlock pending={trackedLoading} rows={3}>
           {!canActivities && !canMaint && <NoPermission />}
           {activities.map((a) => (
             <div key={`act-${a.id}`} className="click-tint" style={rowStyle} {...clickableProps(() => openActivity(a.id, a.name))}>
@@ -271,7 +275,7 @@ export default function ClubOverviewPage() {
             </div>
           ))}
           <LoadError queries={[activitiesQuery, maintQuery, reviewQuery]} />
-          {(canActivities || canMaint) && trackedCount === 0 && (
+          {(canActivities || canMaint) && !trackedFailed && trackedCount === 0 && (
             <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
               尚無進行中的申請
             </div>
@@ -283,7 +287,7 @@ export default function ClubOverviewPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 20px 12px' }}>
             <div style={{ fontSize: 15, fontWeight: 600 }}>借用中</div>
             <span className="num" style={{ fontSize: 12, background: '#EEF0F3', color: 'var(--steel)', borderRadius: 999, padding: '1px 8px' }}>
-              {bookingLoading ? '—' : bookingCount}
+              {bookingLoading || bookingFailed || !hasClub ? '—' : bookingCount}
             </span>
           </div>
           <LoadingBlock pending={bookingLoading} rows={3}>
@@ -331,7 +335,7 @@ export default function ClubOverviewPage() {
             </div>
           ))}
           <LoadError queries={[roomsQuery, venuesQuery, loansQuery, pendingRoomsQuery, approvedRoomsQuery]} />
-          {(canRooms || canBookings) && bookingCount === 0 && (
+          {(canRooms || canBookings) && !bookingFailed && bookingCount === 0 && (
             <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
               尚無借用中的場地或器材
             </div>

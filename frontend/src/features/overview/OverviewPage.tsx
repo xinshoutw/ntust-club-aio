@@ -153,16 +153,19 @@ export default function OverviewPage() {
     for (const q of trackedErrored) void q.refetch()
   }
 
-  const loading =
-    announcementsQuery.isPending || trackedQueries.some((q) => q.isPending)
+  // 三張卡各看自己的查詢:公告不該等「進行中申請」那七支裡最慢的一支。
+  // 計數在載入中與失敗時都顯示 —— 錯誤時的 0 與殘缺數字一樣會被當成真值
+  const todosLoading = activitiesQuery.isPending
+  const announcementsLoading = announcementsQuery.isPending
+  const trackedLoading = trackedQueries.some((q) => q.isPending)
 
   return (
     <div>
       <PageHeader title="總覽" />
 
         <div className="card" style={{ marginTop: 20 }}>
-          <CardTitle title="待辦" count={loading ? '—' : todos.length} />
-          <LoadingBlock pending={loading} rows={2}>
+          <CardTitle title="待辦" count={todosLoading || activitiesQuery.isError ? '—' : todos.length} />
+          <LoadingBlock pending={todosLoading} rows={2}>
           {todos.map((t) => (
             <div key={t.id} className="todo-row">
               <StatusPill status={t.kind} />
@@ -208,8 +211,8 @@ export default function OverviewPage() {
 
         <div className="overview-grid">
           <div className="card">
-            <CardTitle title="公告" count={loading ? '—' : announcementTotal} />
-            <LoadingBlock pending={loading} rows={3}>
+            <CardTitle title="公告" count={announcementsLoading || announcementsQuery.isError ? '—' : announcementTotal} />
+            <LoadingBlock pending={announcementsLoading} rows={3}>
             {announcements.map((a) => (
               <div
                 key={a.id}
@@ -244,8 +247,8 @@ export default function OverviewPage() {
           </div>
 
           <div className="card">
-            <CardTitle title="進行中申請" count={loading ? '—' : tracked.length} />
-            <LoadingBlock pending={loading} rows={3}>
+            <CardTitle title="進行中申請" count={trackedLoading || trackedErrored.length > 0 ? '—' : tracked.length} />
+            <LoadingBlock pending={trackedLoading} rows={3}>
             {trackedErrored.length > 0 && (
               <div style={{ borderTop: '1px solid var(--line)' }}>
                 <QueryError compact title="申請進度載入失敗" error={trackedErrored[0].error} onRetry={retryTracked} />

@@ -135,7 +135,8 @@ class CloseSubmitIn(BaseModel):
             # 檢討會議獨立 section,日期/與會人數/討論事項/內容決議皆必填
             if self.review_date is None:
                 raise ValueError("有召開檢討會時必須填寫檢討會日期")
-            if self.review_attendees is None:
+            # 0 人不是「開過會」:前端 InputNumber min=1,直呼 API 也不放行
+            if not self.review_attendees:
                 raise ValueError("有召開檢討會時必須填寫與會人數")
             if not (self.review_topics or "").strip():
                 raise ValueError("有召開檢討會時必須填寫討論事項")

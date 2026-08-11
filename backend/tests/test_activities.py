@@ -345,12 +345,21 @@ async def test_close_submit_and_report(client, db):
         "review_topics": "動線與器材調度",
         "review_conclusion": "下次提前一週彩排",
     }
-    for missing in ("review_attendees", "review_topics", "review_conclusion"):
-        bad = close_payload(**{**review, missing: None})
+    async def close_error(**overrides) -> str:
+        # 此時尚未上傳照片,零照片本身就會 422 —— 要看訊息才知道擋在哪一關
         resp = await client.post(
-            f"/api/v1/club/activities/{aid}/close", json=bad, headers=csrf_headers(client)
+            f"/api/v1/club/activities/{aid}/close",
+            json=close_payload(**{**review, **overrides}),
+            headers=csrf_headers(client),
         )
-        assert resp.status_code == 422, missing
+        assert resp.status_code == 422
+        return " ".join(d["msg"] for d in resp.json()["meta"].get("detail", []))
+
+    for missing in ("review_attendees", "review_topics", "review_conclusion"):
+        assert "必須填寫" in await close_error(**{missing: None}), missing
+
+    # 與會 0 人不是「開過會」(前端 InputNumber min=1,直呼 API 也不放行)
+    assert "與會人數" in await close_error(review_attendees=0)
 
     # 零照片 → 422(照片檢核收口到後端,直呼 API 也擋)
     resp = await client.post(

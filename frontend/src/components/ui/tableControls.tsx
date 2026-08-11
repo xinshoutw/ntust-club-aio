@@ -155,7 +155,9 @@ export function FilterButton({
     <Dropdown
       trigger={['click']}
       menu={{
-        items: options.map((o) => ({ key: o, label: o })),
+        // 已選的值一律留在選單裡:選項來自另一支查詢,它失敗時 options 是空的,
+        // 少了這一行使用者連取消自己下的篩選都沒有入口(而篩選是 fail-closed 的空結果)
+        items: [...new Set([...options, ...selected])].map((o) => ({ key: o, label: o })),
         selectable: true,
         multiple: true,
         selectedKeys: selected,

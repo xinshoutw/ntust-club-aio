@@ -260,6 +260,14 @@ async def create_room_booking(
     # 申請自動歸屬「下一學期」,起訖快照存入申請單
     sem_start, sem_end = next_semester_range(datetime.now(TAIPEI).date())
 
+    # 場地不開放規則:臨時借用送出即檢核,固定借用整學期佔用更該檢核
+    blocked = await svc.fixed_slots_blocked(
+        db, venue.id, sem_start, sem_end, [(s.weekday, s.period) for s in body.slots]
+    )
+    if blocked:
+        slots = "、".join(f"週{'一二三四五六日'[wd - 1]} 第 {p} 節" for wd, p in blocked)
+        raise validation_error(f"該場地此時段不開放:{slots}")
+
     # 每社至多 10 節/學期:同目標學期的未退回申請(審核中+已核准)合計。
     # 先鎖住這個社團的額度,兩張並發送出的申請才不會各自通過同一份合計
     await svc.lock_resource(db, "club", user.club_id)

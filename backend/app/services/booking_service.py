@@ -182,6 +182,26 @@ async def fixed_slots_taken_on(
     )
 
 
+async def fixed_slots_blocked(
+    db: AsyncSession, venue_id: int, start: date, end: date, pairs: list[tuple[int, str]]
+) -> list[tuple[int, str]]:
+    """學期區間內撞到場地不開放規則的 (星期, 節次)。
+
+    以 blocked_map 逐日展開再比對,而不是直接查規則:規則帶自己的日期區間,
+    「只封 3/5 那天」的規則對整學期每週借用一樣是衝突,但「只封 3/2–3/4」對週五就不是。
+    """
+    if not pairs:
+        return []
+    blocked = await blocked_map(db, start, end, venue_id)
+    hit = {
+        (weekday, period)
+        for (day, _venue), cells in blocked.items()
+        for weekday, period in pairs
+        if day.isoweekday() == weekday and period in cells
+    }
+    return sorted(hit)
+
+
 async def temp_days_hitting_slots(
     db: AsyncSession, venue_id: int, start: date, end: date, pairs: list[tuple[int, str]]
 ) -> bool:

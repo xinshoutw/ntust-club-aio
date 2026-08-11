@@ -161,6 +161,13 @@ async def approve_room_booking(
         db, booking.venue_id, booking.start_date, booking.end_date, pairs
     ):
         raise conflict("學期內有已核准的臨時借用佔用相同時段", code="SLOT_TAKEN")
+    # 不開放規則:送出後才新增的規則,核准這關要擋下(臨時借用核准同樣檢核)
+    blocked = await svc.fixed_slots_blocked(
+        db, booking.venue_id, booking.start_date, booking.end_date, pairs
+    )
+    if blocked:
+        slots = "、".join(f"週{'一二三四五六日'[wd - 1]} 第 {p} 節" for wd, p in blocked)
+        raise conflict(f"該場地此時段不開放:{slots}", code="SLOT_BLOCKED")
     booking.status = BookingStatus.APPROVED
     _record_approval(db, booking.id, ApprovalDecision.APPROVE, user)
     audit.record(

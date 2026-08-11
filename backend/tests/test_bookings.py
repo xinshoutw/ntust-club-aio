@@ -250,6 +250,31 @@ async def test_room_booking_late_period_rule(client, db):
     assert resp.status_code == 422
 
 
+async def test_room_booking_rejects_blocked_slots(client, db):
+    """場地不開放規則:整學期每週佔用比單日臨時借用更該檢核,送出這關就要擋。"""
+    from app.core.semesters import next_semester_range
+    from app.models import User, VenueBlockRule
+
+    await setup_session(client, db)
+    await open_fixed_window(db)
+    venue = await make_venue(db)
+    sem_start, _ = next_semester_range(date.today())
+    creator = await db.scalar(sa.select(User.id).order_by(User.id).limit(1))
+    # 只封學期內某一個週三的第 3 節:整學期的週三第 3 節就撞得到
+    wednesday = sem_start + timedelta(days=(2 - sem_start.weekday()) % 7)
+    db.add(VenueBlockRule(venue_id=venue.id, start_date=wednesday, end_date=wednesday,
+                          weekdays=[], periods=["3"], reason="整修", created_by=creator))
+    await db.commit()
+
+    body = {"venue_id": venue.id, "purpose": "社課", "slots": [{"weekday": 3, "period": "3"}]}
+    resp = await client.post("/api/v1/club/room-bookings", json=body, headers=csrf_headers(client))
+    assert resp.status_code == 422, resp.text
+    # 沒被封的星期照常受理(規則只封那一天)
+    body["slots"] = [{"weekday": 4, "period": "3"}]
+    resp = await client.post("/api/v1/club/room-bookings", json=body, headers=csrf_headers(client))
+    assert resp.status_code == 201, resp.text
+
+
 async def test_room_booking_slot_limit(client, db):
     """每社至多 10 節:單筆超過擋於 422;跨審核中申請合計超過 → 409。"""
     await setup_session(client, db)

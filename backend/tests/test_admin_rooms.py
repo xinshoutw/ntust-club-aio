@@ -1,6 +1,6 @@
 """教室固定借用審核(/admin/room-bookings,權限鍵 aroom):整單擇一核准/退回。"""
 
-from datetime import date
+from datetime import date, timedelta
 
 import sqlalchemy as sa
 
@@ -10,7 +10,9 @@ from app.models import (
     AuditLog,
     RoomBookingRequest,
     RoomBookingSlot,
+    User,
     Venue,
+    VenueBlockRule,
 )
 from app.models.enums import ApprovalSubject, VenueCategory
 from tests.conftest import csrf_headers, login, make_club, make_user
@@ -116,6 +118,21 @@ async def test_list_with_weekly_slots(client, db):
 
     assert (await client.get(URL, params={"sort": "-created_at"})).status_code == 200
     assert (await client.get(URL, params={"sort": "hack"})).status_code == 422
+
+
+async def test_approve_blocked_slot_is_refused(client, db):
+    """送出後才新增的不開放規則,核准這關要擋下(整學期每週佔用,不能繞過規則)。"""
+    first, _, _ = await seed(client, db)
+    admin_id = await db.scalar(sa.select(User.id).order_by(User.id).limit(1))
+    # first 是週二 3、4 節;只封學期內某一個週二的第 3 節就足以衝突
+    tuesday = first.start_date + timedelta(days=(1 - first.start_date.weekday()) % 7)
+    db.add(VenueBlockRule(venue_id=first.venue_id, start_date=tuesday, end_date=tuesday,
+                          weekdays=[], periods=["3"], reason="整修", created_by=admin_id))
+    await db.commit()
+
+    resp = await client.post(f"{URL}/{first.id}/approve", headers=csrf_headers(client))
+    assert resp.status_code == 409
+    assert resp.json()["meta"]["code"] == "SLOT_BLOCKED"
 
 
 async def test_list_active_filters_out_finished_terms(client, db):

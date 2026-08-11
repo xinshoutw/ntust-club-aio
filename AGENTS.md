@@ -101,7 +101,7 @@ pnpm run lint
 - 簽核一律寫 `approval_records`;高風險操作 `audit.record`(add 不 commit,隨交易)
 - 事件推 Discord:`notify.club_event` = 全域 webhook + 社團自設各一份
 - 歷史型列表一律分頁 + 排序白名單(主檔與選項端點全量回傳);錯誤用 `core/errors` 工廠
-- 測試:`tests/conftest.py` 於 import app 前切測試庫;factories(`make_club`/`make_user`)、`csrf_headers()`;每測試 TRUNCATE;`asyncio_default_*_loop_scope=session`(連線池綁 loop)
+- 測試:`tests/conftest.py` 於 import app 前切測試庫;factories(`make_club`/`make_user`)、`csrf_headers()`;每測試 TRUNCATE;`asyncio_default_*_loop_scope=session`(連線池綁 loop)。測試庫是 `create_all` 建的,遷移鏈另由 `tests/test_migrations.py` 在獨立庫跑 `upgrade head` 並比對欄位
 
 **前端**
 

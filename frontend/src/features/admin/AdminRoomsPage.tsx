@@ -216,7 +216,17 @@ export default function AdminRoomsPage() {
         }
       />
 
-      <Spin spinning={listQuery.isPending}>
+      {/* 衝突標示算不出來時要說,否則畫面與「確實沒有衝突」完全一樣 */}
+      {allPendingQuery.isError && (
+        <div className="card" style={{ marginTop: 20, padding: '12px 20px', fontSize: 13, color: '#C13B34' }}>
+          衝突標示暫時無法計算(待審清單載入失敗),核准前請自行確認時段
+          <button type="button" className="link-btn" style={{ marginLeft: 8 }} onClick={() => void allPendingQuery.refetch()}>
+            重試
+          </button>
+        </div>
+      )}
+
+      <Spin spinning={listQuery.isPending || allPendingQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
           <table className="tb dense fixed" aria-label="待審固定場地借用" style={{ minWidth: 760 }}>
             {/* 社團/場地/用途截斷、每週時段吃剩餘寬且允許換行;狀態/開啟固定 px */}

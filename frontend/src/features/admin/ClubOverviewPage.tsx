@@ -174,7 +174,11 @@ export default function ClubOverviewPage() {
   const bookingCount = rooms.length + venues.length + loans.length
 
   const trackedLoading = activitiesQuery.isPending || maintQuery.isPending
-  const bookingLoading = roomsQuery.isPending || venuesQuery.isPending || loansQuery.isPending
+  // 衝突查詢也要等:先讓列可點的話,彈窗會把「尚未載入」當成「沒有衝突」凍進 state。
+  // 未啟用的查詢恆為 isPending,故先看啟用條件(與 useAllPendingRoomBookings 的 enabled 同式)
+  const conflictsLoading = canRooms && clubId != null && pendingRoomsQuery.isPending
+  const bookingLoading =
+    roomsQuery.isPending || venuesQuery.isPending || loansQuery.isPending || conflictsLoading
 
   const rowStyle: React.CSSProperties = {
     display: 'flex',
@@ -304,7 +308,7 @@ export default function ClubOverviewPage() {
               <StatusPill status={l.status} />
             </div>
           ))}
-          <LoadError queries={[roomsQuery, venuesQuery, loansQuery]} />
+          <LoadError queries={[roomsQuery, venuesQuery, loansQuery, pendingRoomsQuery]} />
           {(canRooms || canBookings) && !bookingLoading && bookingCount === 0 && (
             <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
               尚無借用中的場地或器材

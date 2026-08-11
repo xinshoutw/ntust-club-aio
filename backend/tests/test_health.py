@@ -54,6 +54,10 @@ async def test_only_race_constraints_map_to_409(db):
         await db.commit()
     await db.rollback()
 
+    # 錯誤訊息會進 log(unhandled handler 記整條 traceback),不得把繫結參數一起帶出去 ——
+    # 那是使用者送進來的原值(郵局帳號、學號姓名電話)
+    assert "[parameters:" not in str(bad_value.value)
+
     request = httpx.Request("POST", "http://test/api/v1/x")
     assert (await integrity_error_handler(request, duplicate.value)).status_code == 409
     assert (await integrity_error_handler(request, bad_value.value)).status_code == 500

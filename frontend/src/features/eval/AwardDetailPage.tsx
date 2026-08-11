@@ -2,7 +2,9 @@ import { useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { App, Button, Upload } from 'antd'
 import { LeftOutlined, UploadOutlined } from '@ant-design/icons'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import { useAuth } from '../../app/auth'
 import { fmtMB, isImageFile, sha256 } from '../../lib/uploads'
 import { useAwardDetail, useEvalUploadMutations, type AwardRubricItem, type AwardUploadFile } from '../../api/eval'
@@ -27,7 +29,7 @@ export default function AwardDetailPage() {
   const { award: awardKey } = useParams()
   const { user } = useAuth()
   const { message } = App.useApp()
-  const { data: award, isError } = useAwardDetail(awardKey)
+  const { data: award, isError, error, refetch } = useAwardDetail(awardKey)
   const { upload, remove } = useEvalUploadMutations(awardKey ?? '')
   // 本次 session 上傳檔的 SHA-256(uploadId → hash):同獎項內容去重(沿改版前跨槽位語意);
   // 後端另有未開放/型別/容量重驗,拒絕時以 message.error 顯示(跨 session 去重目前後端未做)
@@ -35,12 +37,14 @@ export default function AwardDetailPage() {
   const [preview, setPreview] = useState<EvalFile | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
 
+  // 查詢失敗顯示錯誤與重試(同 SignupFormPage):獎項 id 來自後端自己的清單,
+  // 真的「不存在」幾乎不可能,而 retry:false 讓一次網路抖動就永久停在那個結論
   if (isError) {
     return (
       <div>
         <BackLink />
-        <div className="card" style={{ marginTop: 16, padding: '40px 24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
-          找不到此獎項
+        <div style={{ marginTop: 12 }}>
+          <QueryError title="獎項資料載入失敗" error={error} onRetry={() => void refetch()} />
         </div>
       </div>
     )
@@ -50,6 +54,7 @@ export default function AwardDetailPage() {
     return (
       <div>
         <BackLink />
+        <LoadingBlock pending rows={6} />
       </div>
     )
   }

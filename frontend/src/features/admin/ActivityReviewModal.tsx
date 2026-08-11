@@ -102,6 +102,10 @@ export default function ActivityReviewModal({
   // 經費來源:有申請補助的案件由第一關認定(後端必填)
   const [fundSource, setFundSource] = useState(item?.fundSource ?? '')
   const d = item?.detail
+  // 失敗但手上已有詳情 = 背景重抓失敗(TanStack 的 error 態保留既有 data,而重開同一列
+  // staleTime 0 就會重抓):內容照舊、按鈕照舊,否則等於把讀得到的單變成不能簽,
+  // 而且按「重試」畫面毫無變化(data 還在,error 不會被清掉)
+  const detailFailed = detailError != null && !d
   // 核定金額:controlled,依預算列 id 管理
   const [approvals, setApprovals] = useState<Record<number, number>>(() =>
     Object.fromEntries((d?.budget ?? []).map((b) => [b.id, b.approved])),
@@ -214,9 +218,12 @@ export default function ActivityReviewModal({
       }
       footer={
         // 看不到詳情就不給簽核鈕:核准要靠 detail 的 budget(否則整單核定 0 元),
-        // 退回也不該在讀不到申請內容的情況下按
-        detailError != null ? (
-          <div style={{ fontSize: 12, color: 'var(--steel)' }}>詳情載入失敗,請重試後再審核</div>
+        // 退回也不該在讀不到申請內容的情況下按。唯讀開窗(逾期列、已核准單)本來就沒有鈕,
+        // 別叫人去審核
+        detailFailed ? (
+          <div style={{ fontSize: 12, color: 'var(--steel)' }}>
+            詳情載入失敗,請重試{onApprove ? '後再審核' : ''}
+          </div>
         ) : canReview ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
             <Button danger style={{ height: 38 }} disabled={submitting} onClick={() => setRejectOpen(true)}>
@@ -249,15 +256,15 @@ export default function ActivityReviewModal({
     >
       {/* 詳情載入失敗:整塊改為錯誤呈現。Skeleton 沒有終點,不接錯誤就是永遠轉圈;
           而列表列那半份基本資料也不能留 —— 經費逐項與附件都不在,「地點 —」看起來就像沒填 */}
-      {detailError != null && (
+      {detailFailed && (
         <div style={{ marginTop: 8 }}>
           <QueryError compact title="活動詳情載入失敗" error={detailError} onRetry={onRetryDetail} />
         </div>
       )}
       {/* 詳情未到位先鋪 Skeleton(彈窗立即開啟,內容漸進補齊) */}
-      {!item && detailError == null && <Skeleton active paragraph={{ rows: 6 }} style={{ marginTop: 8 }} />}
+      {!item && !detailFailed && <Skeleton active paragraph={{ rows: 6 }} style={{ marginTop: 8 }} />}
       {/* 有經費才走雙欄:左=基本資料,右=經費逐項核定 */}
-      {item && detailError == null && (
+      {item && !detailFailed && (
       <div
         style={{
           display: 'grid',

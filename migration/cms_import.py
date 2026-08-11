@@ -449,7 +449,9 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
     staffs: dict[int, list[str]] = {}
     for r in staff_rows:
         if (r.Item or "").strip() or (r.Supervisor or "").strip():
-            staffs.setdefault(r.aid, []).append(f"{(r.Item or '').strip()}>{(r.Supervisor or '').strip()}")
+            # 前端約定的格式:每列「項目:負責人」一行(api/activities.ts staffTextToWorks)
+            item, owner = (r.Item or "").strip(), (r.Supervisor or "").strip()
+            staffs.setdefault(r.aid, []).append(f"{item}:{owner}")
     metas: dict[int, dict[str, bool]] = {}
     for r in meta_rows:
         metas.setdefault(r.aid, {})[r.key] = r.value == "True"
@@ -482,7 +484,7 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
             participants_in=a.ExpectedMemberNumber or 0,
             participants_out=a.ExpectedNotMemberNumber or 0,
             # 送審必填項在遷移件也要有值,否則退回件連暫存都會被 422 擋住
-            staff_text=";".join(staffs.get(a.id, [])) or "(未填)",
+            staff_text="\n".join(staffs.get(a.id, [])) or "(未填)",
             status=status,
             created_by=user_id,
             **({"created_at": local_dt(a.SetupTime)} if a.SetupTime else {}),

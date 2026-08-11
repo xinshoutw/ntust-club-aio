@@ -101,7 +101,14 @@ ISS-99(審核彈窗詳情失敗永遠停在 Skeleton;新增 `detailError`/`onRet
 會被「無法確認登入狀態」擋住(gate 順序是 bootError 早於 user);`useClubSuspension` 的 `failed` 用 `isError`,
 背景重抓失敗會把「停權至 X」這個已知事實換成「無法確認」—— 正是同一份 design-guide 規則自己踩的。
 另外把 401 判定改成錯誤自帶 status(`ApiError`),不再依賴「事件同步派發 + effect 註冊順序」,
-並補上開機重試不再整頁變白、BootError 給「改用其他帳號登入」出口、`refresh()` 同一條規則。
+並補上開機重試不再整頁變白、BootError 給「改用其他帳號登入」出口、`refresh()` 同一條規則;
+第六輪(opus,只審登入/開機這條路徑)—— 抓到一個真的會登不進去的死鎖:`login()` 遞增世代序號會讓在途
+`verify()` 的 `finally` 整個作廢,而 `setBooting(false)` 只寫在那個 `finally` 裡 —— 慢後端下「登入完成早於
+`/auth/me` 落地」就會停在永久白畫面(書籤直接進 `/login` 很容易踩到)。同輪另修:登入端點的 401 不再觸發
+全域登出(已登入者開著 `/login` 打錯一次密碼會把自己登出)、改密後 `refresh()` 失敗改以整頁重載收尾
+(否則 `mustChangePassword` 還是舊值,會被 gate 彈回改密頁)、重試鈕加 in-flight 回饋、
+三處直接 `fetch()` 的檔案下載/預覽改走 `fetchFile` 讓 401 回到登出路徑。
+401 判定抽成 `isUnauthorized()` 並補測試(`api/client.test.ts`)。
 
 **A3 其餘 1 項**(可上線後補;作業流程見 `AGENTS.md`「修 issues.md 的條目時」)
 
@@ -181,7 +188,11 @@ ISS-99(審核彈窗詳情失敗永遠停在 Skeleton;新增 `detailError`/`onRet
 - 篩選值→id 的對照表查不到時,`undefined` 會讓那個查詢參數**整個消失**(= 列出全部):稽核的操作者篩選就是這樣 fail-open,而漏斗圖示還是紅的、選單還顯示著勾選。一律補 sentinel(`?? -1`),與 `ReviewPage` 的 `clubIds=[-1]` 同一寫法
 - **有保底值的選項清單失敗最難察覺**:`semesterOptions` 一定補當學期,查詢掛掉時下拉看起來正常,只是歷史學期全不見 —— 空選單靠 `notFoundText`,這種「不完整卻看不出來」要靠選擇器旁邊的 `OptionsError`
 - **`enabled:false` 不會清掉先前的 error**:query key 不含社團的共用查詢(全校待審/已核准固定借用)失敗後,換到不需要它的社團仍會 `isError`。把它納入某張卡的失敗判定時要一併帶上啟用條件
-- 收斂類的修法要**回頭 grep 一次再宣稱「全部」**:第二輪說「四處裸紅字已修」,第三輪 grep 出還有十處。commit message 與 HANDOFF 的「全部」是會被後人當事實讀的
+- 收斂類的修法要**回頭 grep 一次再宣稱「全部」**:第二輪說「四處裸紅字已修」,第三輪 grep 出還有十處(第四輪又抓到第十一處 —— 字樣不同,grep 抓不到)。commit message 與 HANDOFF 的「全部」是會被後人當事實讀的
+- **狀態機的「終局狀態」只有一個出口就是地雷**:`setBooting(false)` 只寫在 `verify()` 的 `finally` 裡,而世代序號會把在途請求的 `finally` 一起作廢 —— 登入成功卻停在永久白畫面。加世代/取消機制時要逐一問「這條路徑還有誰負責關掉 loading」
+- **`isError` 有兩種**:`isLoadingError`(首載失敗、手上沒資料)才該換成錯誤畫面;`isRefetchError` 換掉的是已知事實(停權日期就這樣變成「無法確認」)。TanStack 兩個旗標都有現成的,別自己用 `isError` 推
+- 全域的 401 → 登出 listener 要**排除登入端點**:那裡的 401 是「密碼錯」,已登入者開著 `/login` 打錯一次就把自己登出了
+- 繞過 `api()` 直接 `fetch()` 的地方(檔案下載、docx 預覽)不會走 401 → 登出那條路,session 過期只會顯示「無法取得檔案」。共用 `fetchFile`
 
 ## B — 需決定
 
@@ -242,6 +253,7 @@ ISS-99(審核彈窗詳情失敗永遠停在 Skeleton;新增 `detailError`/`onRet
 
 ## 其他待處理
 
+- 開機的 `/auth/me` 沒有 timeout:後端連上但不回應時,前端會白畫面到 nginx 的 `proxy_read_timeout`(預設 60 秒)才顯示「無法確認登入狀態」。要收的話得先決定 timeout 值(`AbortSignal.timeout`)與失敗文案
 - `docs/spec/admin/review.md`「未完成 / 問題」有三條可能已過期(無補助案單關核定任意金額、退回件舊核定值未清、`school_approved` 未同步清除):第三輪交叉審查說程式都已修,但**尚未逐條驗證**,動之前要自己讀一次後端(誤刪真問題比留著過期敘述糟)
 - `c7e...` migration 的 downgrade 會刪除跨學期重複成員資料,部署前需決定是否接受此語意
 - 內層 nginx 信任所有 RFC1918 網段,目前依賴 GCP firewall;正式部署可收窄至 edge/compose 實際來源

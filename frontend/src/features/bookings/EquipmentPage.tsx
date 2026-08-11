@@ -103,8 +103,8 @@ export default function EquipmentPage() {
 
       <div className="overview-grid" style={{ marginTop: 20 }}>
         <div className="card" style={{ overflowX: 'auto' }}>
+          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>器材一覽</div>
           <LoadingBlock pending={equipmentQuery.isPending}>
-            <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>器材一覽</div>
             <table className="tb fixed" aria-label="器材一覽" style={{ minWidth: 480 }}>
               <Cols widths={['auto', 100, 120]} />
               <thead>

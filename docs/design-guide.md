@@ -155,7 +155,11 @@ theme: {
 - 可點卡片/列 hover 一律變色(`.click-tint`)
 - 空狀態:一句話 + 主動作按鈕,不放插圖
 - 載入一律 `components/ui/LoadingBlock`(`pending` 傳 `isPending`,即手上一筆資料都沒有時),鋪 Skeleton 取代內容,不用 spinner;
-  翻頁與背景重抓靠 `placeholderData` 留住舊資料並以 `isPlaceholderData` 淡化,不進 LoadingBlock
+  彈窗內容例外,直接用 `<Skeleton active>`(見上方「彈窗」:點擊即開、內容補齊,沒有「載入完才有東西」的階段)
+- **LoadingBlock 只換內容,不換容器**:卡片外框、卡片間距、區塊標題、分頁列都留在它外面 ——
+  否則同一頁兩段會變成兩塊分不出來的灰塊,資料到位還整塊往下跳。範圍以「這支查詢驅動的那一塊」為準,
+  一個 LoadingBlock 不要跨兩張各有自己查詢的卡(計數之類的標題數字在載入中顯示 `—`,不要顯示 0)
+- 翻頁與背景重抓靠 `placeholderData` 留住舊資料並以 `isPlaceholderData` 淡化,不進 LoadingBlock
 - 錯誤說發生什麼 + 怎麼辦
 - 危險動作(退回、刪除、停權)要填原因
 

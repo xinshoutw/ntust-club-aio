@@ -84,8 +84,8 @@ export default function AdminApplicationsPage() {
       />
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+        <div style={{ padding: '14px 16px 0', fontSize: 15, fontWeight: 600 }}>幹部證明</div>
         <LoadingBlock pending={certsQuery.isPending}>
-          <div style={{ padding: '14px 16px 0', fontSize: 15, fontWeight: 600 }}>幹部證明</div>
           <table className="tb dense fixed" style={{ minWidth: 720 }}>
             {/* 社團吃剩餘寬並截斷;學年期/職位/申請人/申請日/狀態固定 px */}
             <Cols widths={['auto', 90, 110, 100, 96, 150]} />
@@ -136,8 +136,8 @@ export default function AdminApplicationsPage() {
       </div>
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+        <div style={{ padding: '14px 16px 0', fontSize: 15, fontWeight: 600 }}>郵局帳戶異動</div>
         <LoadingBlock pending={postalQuery.isPending}>
-          <div style={{ padding: '14px 16px 0', fontSize: 15, fontWeight: 600 }}>郵局帳戶異動</div>
           <table className="tb dense fixed" style={{ minWidth: 860 }}>
             {/* 社團截斷、事由吃剩餘寬且允許換行;戶名/帳號/代理人/申請日/狀態固定 px */}
             <Cols widths={['14%', 'auto', 100, 130, 130, 110, 96, 150]} />

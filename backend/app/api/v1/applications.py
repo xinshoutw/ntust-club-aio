@@ -1,8 +1,9 @@
 """社團端:線上申請(幹部證明/郵局帳戶異動/空間報修)+ 違規查詢 + 公告。"""
 
+from typing import Annotated
 
 import sqlalchemy as sa
-from fastapi import APIRouter, BackgroundTasks, Request, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Query, Request, UploadFile
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.api.pagination import Pagination
@@ -19,7 +20,14 @@ from app.models import (
     PostalAccountChange,
     Violation,
 )
-from app.models.enums import AnnouncementTarget, CertPosition, MemberKind, ViolationStatus
+from app.models.enums import (
+    AnnouncementTarget,
+    ApplicationStatus,
+    CertPosition,
+    MaintenanceStatus,
+    MemberKind,
+    ViolationStatus,
+)
 from app.schemas.activities import FileOut
 from app.schemas.applications import (
     AnnouncementOut,
@@ -59,13 +67,18 @@ async def _notify_submit(background: BackgroundTasks, db, user, title: str, desc
 
 @router.get("/officer-certificates")
 async def list_certs(
-    user: ClubUser, db: DbDep, page: Pagination
+    user: ClubUser,
+    db: DbDep,
+    page: Pagination,
+    status: Annotated[list[ApplicationStatus] | None, Query()] = None,  # 可重複帶多值
 ) -> ApiResponse[list[OfficerCertOut]]:
     query = (
         sa.select(OfficerCertificate)
         .where(OfficerCertificate.club_id == user.club_id)
         .order_by(OfficerCertificate.id.desc())
     )
+    if status:
+        query = query.where(OfficerCertificate.status.in_(status))
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = await db.scalars(query.offset(page.offset).limit(page.page_size))
     return ApiResponse(
@@ -120,13 +133,18 @@ def _postal_out(row: PostalAccountChange) -> PostalChangeOut:
 
 @router.get("/postal-changes")
 async def list_postal(
-    user: ClubUser, db: DbDep, page: Pagination
+    user: ClubUser,
+    db: DbDep,
+    page: Pagination,
+    status: Annotated[list[ApplicationStatus] | None, Query()] = None,  # 可重複帶多值
 ) -> ApiResponse[list[PostalChangeOut]]:
     query = (
         sa.select(PostalAccountChange)
         .where(PostalAccountChange.club_id == user.club_id)
         .order_by(PostalAccountChange.id.desc())
     )
+    if status:
+        query = query.where(PostalAccountChange.status.in_(status))
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = await db.scalars(query.offset(page.offset).limit(page.page_size))
     return ApiResponse(data=[_postal_out(r) for r in rows], meta=page.meta(total or 0))
@@ -195,13 +213,18 @@ async def upload_passbook(
 
 @router.get("/maintenance")
 async def list_maintenance(
-    user: ClubUser, db: DbDep, page: Pagination
+    user: ClubUser,
+    db: DbDep,
+    page: Pagination,
+    status: Annotated[list[MaintenanceStatus] | None, Query()] = None,  # 可重複帶多值
 ) -> ApiResponse[list[MaintenanceOut]]:
     query = (
         sa.select(MaintenanceRequest)
         .where(MaintenanceRequest.club_id == user.club_id)
         .order_by(MaintenanceRequest.id.desc())
     )
+    if status:
+        query = query.where(MaintenanceRequest.status.in_(status))
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = await db.scalars(query.offset(page.offset).limit(page.page_size))
     return ApiResponse(

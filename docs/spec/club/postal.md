@@ -10,7 +10,7 @@
 
 | 動作 | 端點 |
 |---|---|
-| 列表 | `GET /club/postal-changes`(前端逐頁抓齊) |
+| 列表 | `GET /club/postal-changes?status=`(正在申請=未完成全部;最近申請=已完成 `page_size=5`) |
 | 送出 | `POST /club/postal-changes` |
 | 上傳存簿 | `POST /club/postal-changes/{id}/passbook` |
 

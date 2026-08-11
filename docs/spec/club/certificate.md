@@ -11,7 +11,7 @@
 | 動作 | 端點 |
 |---|---|
 | 姓名預覽 | `GET /club/members?semester=&kind=`(前端逐頁抓齊) |
-| 列表 | `GET /club/officer-certificates`(前端逐頁抓齊) |
+| 列表 | `GET /club/officer-certificates?status=`(正在申請=未完成全部;最近申請=已完成 `page_size=5`) |
 | 送出 | `POST /club/officer-certificates` |
 
 ## 畫面
@@ -31,4 +31,3 @@
 ## 未完成 / 問題
 
 - **學年期下拉硬編 `['114','114-1','114-2']`**,2026/9 進入 115 學年後整個功能不可用
-- 列表靠 `fetchAllPages` 全量抓回前端再切「正在/最近」

@@ -12,6 +12,7 @@ import {
   termOptions,
   useCertificateMutations,
   useCertificates,
+  useRecentCertificates,
   useOfficerNames,
 } from '../../api/applications'
 
@@ -46,10 +47,10 @@ export default function CertificatePage() {
               : 'many'
 
   const listQuery = useCertificates()
-  const records = listQuery.data?.records ?? []
-  // 正在申請=未完成全部(不限長度);最近申請=已完成 近 5 筆
-  const activeRows = records.filter((r) => r.status !== 'completed')
-  const recentRows = records.filter((r) => r.status === 'completed').slice(0, 5)
+  const recentQuery = useRecentCertificates()
+  // 正在申請=未完成全部、最近申請=已完成近 5 筆,兩份都由後端篩好
+  const activeRows = listQuery.data?.records ?? []
+  const recentRows = recentQuery.data ?? []
   const { create } = useCertificateMutations()
 
   return (
@@ -161,7 +162,7 @@ export default function CertificatePage() {
         </div>
       </Spin>
 
-      <Spin spinning={listQuery.isPending}>
+      <Spin spinning={recentQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
           <table className="tb fixed" aria-label="幹部證明申請紀錄" style={{ minWidth: 480 }}>
@@ -183,14 +184,14 @@ export default function CertificatePage() {
                   <td><StatusPill status={c.status} /></td>
                 </tr>
               ))}
-              {listQuery.isError && (
+              {recentQuery.isError && (
                 <tr className="no-hover">
                   <td colSpan={4}>
-                    <QueryError compact title="申請紀錄載入失敗" error={listQuery.error} onRetry={() => listQuery.refetch()} />
+                    <QueryError compact title="申請紀錄載入失敗" error={recentQuery.error} onRetry={() => recentQuery.refetch()} />
                   </td>
                 </tr>
               )}
-              {!listQuery.isPending && !listQuery.isError && recentRows.length === 0 && (
+              {!recentQuery.isPending && !recentQuery.isError && recentRows.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>尚無申請紀錄</td>
                 </tr>

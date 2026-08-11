@@ -7,7 +7,11 @@ import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols } from '../../components/ui/tableControls'
 import { IMAGE_ACCEPT, isImageFile, isVideoFile } from '../../lib/uploads'
-import { useMaintenanceList, useMaintenanceMutations } from '../../api/applications'
+import {
+  useMaintenanceList,
+  useMaintenanceMutations,
+  useRecentMaintenance,
+} from '../../api/applications'
 import { useClubConfig } from '../../api/clubConfig'
 
 const MB = 1024 * 1024
@@ -33,10 +37,10 @@ export default function MaintenancePage() {
 
   const configQuery = useClubConfig()
   const listQuery = useMaintenanceList()
-  const records = listQuery.data?.records ?? []
-  // 正在申請=未完成全部(不限長度);最近申請=已完成 近 5 筆
-  const activeRows = records.filter((r) => r.status !== 'done')
-  const recentRows = records.filter((r) => r.status === 'done').slice(0, 5)
+  const recentQuery = useRecentMaintenance()
+  // 正在申請=未完成全部、最近申請=已完成近 5 筆,兩份都由後端篩好
+  const activeRows = listQuery.data?.records ?? []
+  const recentRows = recentQuery.data ?? []
   const { submit } = useMaintenanceMutations()
 
   // 上限以後端組態為權威:載入完成前不開放操作(比照 ActivityFormPage),
@@ -162,7 +166,7 @@ export default function MaintenancePage() {
         </div>
       </Spin>
 
-      <Spin spinning={listQuery.isPending}>
+      <Spin spinning={recentQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近報修</div>
           <table className="tb fixed" aria-label="空間報修紀錄" style={{ minWidth: 620 }}>
@@ -188,14 +192,14 @@ export default function MaintenancePage() {
                   <td><StatusPill status={r.status} /></td>
                 </tr>
               ))}
-              {listQuery.isError && (
+              {recentQuery.isError && (
                 <tr className="no-hover">
                   <td colSpan={3}>
-                    <QueryError compact title="報修紀錄載入失敗" error={listQuery.error} onRetry={() => listQuery.refetch()} />
+                    <QueryError compact title="報修紀錄載入失敗" error={recentQuery.error} onRetry={() => recentQuery.refetch()} />
                   </td>
                 </tr>
               )}
-              {!listQuery.isPending && !listQuery.isError && recentRows.length === 0 && (
+              {!recentQuery.isPending && !recentQuery.isError && recentRows.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={3} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>尚無報修紀錄</td>
                 </tr>

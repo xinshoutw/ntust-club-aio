@@ -2,10 +2,13 @@
 // snake↔camel、日期(ISO↔YYYY/MM/DD)與 enum 值映射集中在此,頁面只碰 camelCase 型別
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
-import { api } from './client'
+import { api, apiPaged, qs } from './client'
 import { fetchAllPages } from './fetchAll'
 import type { MemberKind } from '../lib/roles'
 import type { StatusKey } from '../lib/status'
+
+/** 「最近申請」區塊固定只顯示這幾筆(已完成者) */
+export const RECENT_LIMIT = 5
 
 // 各申請頁「最近申請」固定近 5 筆
 
@@ -58,15 +61,25 @@ const toMaintenance = (m: MaintenanceOut): MaintenanceRecord => ({
   handleNote: m.handle_note ?? undefined,
 })
 
+/** 未完成的報修(不限長度,全部列出);狀態由後端篩 */
 export function useMaintenanceList() {
   return useQuery({
     queryKey: [...keys.maintenance, 'list'],
-    // 全量(申請量小):頁面自行切分 正在申請(全部)/最近申請(近 5 筆)
     queryFn: () =>
-      fetchAllPages<MaintenanceOut>('/club/maintenance').then((rows) => ({
-        records: rows.map(toMaintenance),
-        total: rows.length,
-      })),
+      fetchAllPages<MaintenanceOut>('/club/maintenance', {
+        status: ['pending', 'in_progress'],
+      }).then((rows) => ({ records: rows.map(toMaintenance), total: rows.length })),
+  })
+}
+
+/** 最近完成的報修:只要第一頁的 RECENT_LIMIT 筆(id 降冪由後端排) */
+export function useRecentMaintenance() {
+  return useQuery({
+    queryKey: [...keys.maintenance, 'recent'],
+    queryFn: () =>
+      apiPaged<MaintenanceOut[]>(
+        `/club/maintenance${qs({ status: 'done', page_size: RECENT_LIMIT })}`,
+      ).then(({ data }) => data.map(toMaintenance)),
   })
 }
 
@@ -145,14 +158,28 @@ const toPostal = (p: PostalChangeOut): PostalRecord => ({
   status: p.status,
 })
 
+/** 未完成的郵局異動(不限長度);狀態由後端篩 */
 export function usePostalList() {
   return useQuery({
     queryKey: [...keys.postal, 'list'],
     queryFn: () =>
-      fetchAllPages<PostalChangeOut>('/club/postal-changes').then((rows) => ({
+      fetchAllPages<PostalChangeOut>('/club/postal-changes', {
+        status: ['pending', 'processing'],
+      }).then((rows) => ({
         records: rows.map(toPostal),
         total: rows.length,
       })),
+  })
+}
+
+/** 最近完成的郵局異動:只要第一頁的 RECENT_LIMIT 筆 */
+export function useRecentPostal() {
+  return useQuery({
+    queryKey: [...keys.postal, 'recent'],
+    queryFn: () =>
+      apiPaged<PostalChangeOut[]>(
+        `/club/postal-changes${qs({ status: 'completed', page_size: RECENT_LIMIT })}`,
+      ).then(({ data }) => data.map(toPostal)),
   })
 }
 
@@ -248,11 +275,14 @@ const toCertificate = (c: OfficerCertOut): CertificateRecord => ({
   status: c.status,
 })
 
+/** 未完成的幹部證明(不限長度);狀態由後端篩 */
 export function useCertificates() {
   return useQuery({
     queryKey: [...keys.certificates, 'list'],
     queryFn: () =>
-      fetchAllPages<OfficerCertOut>('/club/officer-certificates').then((rows) => ({
+      fetchAllPages<OfficerCertOut>('/club/officer-certificates', {
+        status: ['pending', 'processing'],
+      }).then((rows) => ({
         records: rows.map(toCertificate),
         total: rows.length,
       })),
@@ -270,6 +300,17 @@ export function useCertificateMutations() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.certificates }),
   })
   return { create }
+}
+
+/** 最近完成的幹部證明:只要第一頁的 RECENT_LIMIT 筆 */
+export function useRecentCertificates() {
+  return useQuery({
+    queryKey: [...keys.certificates, 'recent'],
+    queryFn: () =>
+      apiPaged<OfficerCertOut[]>(
+        `/club/officer-certificates${qs({ status: 'completed', page_size: RECENT_LIMIT })}`,
+      ).then(({ data }) => data.map(toCertificate)),
+  })
 }
 
 interface MemberNameOut {

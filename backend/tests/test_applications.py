@@ -1,6 +1,7 @@
 from datetime import date
 
-from app.models import Announcement, Violation
+from app.models import Announcement, MaintenanceRequest, OfficerCertificate, Violation
+from app.models.enums import CertPosition
 from tests.conftest import csrf_headers, login, make_club, make_user
 
 
@@ -127,6 +128,37 @@ async def test_maintenance_flow(client, db):
 
     listing = (await client.get("/api/v1/club/maintenance")).json()
     assert listing["meta"]["total"] == 1
+
+
+async def test_club_application_lists_filter_by_status(client, db):
+    """畫面分「正在申請」與「最近完成」兩區:狀態要能在後端篩,不是抓回全部再切。"""
+    club = await setup_session(client, db)
+    db.add_all(
+        [
+            MaintenanceRequest(club_id=club.id, location="社辦 B1", items="冷氣", status="pending"),
+            MaintenanceRequest(club_id=club.id, location="社辦 B2", items="門鎖", status="done"),
+            OfficerCertificate(
+                club_id=club.id, term="114-2", position=CertPosition.LEADER,
+                applicant_name="王小明", status="pending",
+            ),
+            OfficerCertificate(
+                club_id=club.id, term="114-1", position=CertPosition.LEADER,
+                applicant_name="王小明", status="completed",
+            ),
+        ]
+    )
+    await db.commit()
+
+    resp = await client.get(
+        "/api/v1/club/maintenance", params=[("status", "pending"), ("status", "in_progress")]
+    )
+    assert [r["location"] for r in resp.json()["data"]] == ["社辦 B1"]
+    assert resp.json()["meta"]["total"] == 1
+
+    resp = await client.get(
+        "/api/v1/club/officer-certificates", params={"status": "completed", "page_size": 5}
+    )
+    assert [r["term"] for r in resp.json()["data"]] == ["114-1"]
 
 
 async def test_violations_scoped_to_club(client, db):

@@ -7,7 +7,7 @@ import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols } from '../../components/ui/tableControls'
 import { IMAGE_ACCEPT, isImageFile, isPdfFile } from '../../lib/uploads'
-import { usePostalList, usePostalMutations } from '../../api/applications'
+import { usePostalList, usePostalMutations, useRecentPostal } from '../../api/applications'
 
 const REASONS = ['更換郵局存簿代理人', '新開戶', '帳戶印鑑章變更', '帳簿遺失', '存簿密碼異動', '結清銷戶']
 // 互斥組合(依承辦邏輯先行判斷,與後端同規則)
@@ -34,10 +34,10 @@ export default function PostalPage() {
   const reasons: string[] = Form.useWatch('reasons', form) ?? []
 
   const listQuery = usePostalList()
-  const records = listQuery.data?.records ?? []
-  // 正在申請=未完成全部(不限長度);最近申請=已完成 近 5 筆
-  const activeRows = records.filter((r) => r.status !== 'completed')
-  const recentRows = records.filter((r) => r.status === 'completed').slice(0, 5)
+  const recentQuery = useRecentPostal()
+  // 正在申請=未完成全部、最近申請=已完成近 5 筆,兩份都由後端篩好
+  const activeRows = listQuery.data?.records ?? []
+  const recentRows = recentQuery.data ?? []
   const { submit } = usePostalMutations()
 
   const disabled = (r: string) =>
@@ -184,7 +184,7 @@ export default function PostalPage() {
         </div>
       </Spin>
 
-      <Spin spinning={listQuery.isPending}>
+      <Spin spinning={recentQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
           <table className="tb fixed" aria-label="郵局帳戶異動申請紀錄" style={{ minWidth: 520 }}>
@@ -208,14 +208,14 @@ export default function PostalPage() {
                   <td><StatusPill status={r.status} /></td>
                 </tr>
               ))}
-              {listQuery.isError && (
+              {recentQuery.isError && (
                 <tr className="no-hover">
                   <td colSpan={4}>
-                    <QueryError compact title="申請紀錄載入失敗" error={listQuery.error} onRetry={() => listQuery.refetch()} />
+                    <QueryError compact title="申請紀錄載入失敗" error={recentQuery.error} onRetry={() => recentQuery.refetch()} />
                   </td>
                 </tr>
               )}
-              {!listQuery.isPending && !listQuery.isError && recentRows.length === 0 && (
+              {!recentQuery.isPending && !recentQuery.isError && recentRows.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>尚無申請紀錄</td>
                 </tr>

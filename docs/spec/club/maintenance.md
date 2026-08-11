@@ -11,7 +11,7 @@
 | 動作 | 端點 |
 |---|---|
 | 上傳上限 | `GET /club/config` |
-| 列表 | `GET /club/maintenance`(前端逐頁抓齊) |
+| 列表 | `GET /club/maintenance?status=`(正在申請=未完成全部;最近申請=已完成 `page_size=5`) |
 | 送出 | `POST /club/maintenance` |
 | 上傳佐證 | `POST /club/maintenance/{id}/evidence` |
 
@@ -30,4 +30,3 @@
 ## 未完成 / 問題
 
 - 佐證是必填(前端擋),但後端 `POST /club/maintenance` 允許零附件。且這是兩段式流程:佐證上傳失敗時報修單已經建立,而列表沒有逐列補傳入口,社團只能再送一張新單 → 累積無佐證的重複單
-- 列表靠 `fetchAllPages` 全量抓回前端再分「正在/最近」,分頁參數形同虛設

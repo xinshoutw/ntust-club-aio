@@ -1,8 +1,7 @@
 // 行政端帳號管理 API 層(僅 super):管理員/工讀生/評審三類。
 // 建立與重設密碼由後端產生一次性密碼(僅該次 response 回傳明文),前端交 OneTimePasswordModal 顯示。
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api } from './client'
-import { fetchAllPages } from './fetchAll'
+import { api, apiPaged, qs } from './client'
 
 export type ManagedRole = 'admin' | 'staff' | 'viewer'
 
@@ -48,13 +47,20 @@ const toAccount = (a: AccountOut): Account => ({
 
 const keys = {
   all: ['adminAccounts'] as const,
-  list: ['adminAccounts', 'list'] as const,
+  list: (role: string, page: number) => ['adminAccounts', 'list', role, page] as const,
 }
 
-export function useAccounts() {
+export const ACCOUNTS_PAGE_SIZE = 20
+
+/** 伺服器端分頁:一次一類角色(排序由後端固定為姓名升冪);role 未定時不發查詢 */
+export function useAccounts(role: ManagedRole | undefined, page: number) {
   return useQuery({
-    queryKey: keys.list,
-    queryFn: () => fetchAllPages<AccountOut>('/admin/accounts').then((rows) => rows.map(toAccount)),
+    queryKey: keys.list(role ?? '', page),
+    enabled: role != null,
+    queryFn: () =>
+      apiPaged<AccountOut[]>(
+        `/admin/accounts${qs({ role, page, page_size: ACCOUNTS_PAGE_SIZE })}`,
+      ).then(({ data, total }) => ({ rows: data.map(toAccount), total })),
   })
 }
 

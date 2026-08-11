@@ -60,7 +60,10 @@ async def list_accounts(
     page: Pagination,
     role: Annotated[ManagedRole | None, Query()] = None,
 ) -> ApiResponse[list[AccountOut]]:
-    query = sa.select(User).where(User.role.in_(_MANAGED_ROLES)).order_by(User.id)
+    # 名冊慣例:姓名升冪(id 序無語意);同名者以 id 定序,分頁才不會重複/漏列
+    query = (
+        sa.select(User).where(User.role.in_(_MANAGED_ROLES)).order_by(User.name, User.id)
+    )
     if role:
         query = query.where(User.role == UserRole(role))
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))

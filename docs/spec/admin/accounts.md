@@ -10,13 +10,13 @@
 
 | 動作 | 端點 |
 |---|---|
-| 管理員/工讀生/評審清單 | `GET /admin/accounts` |
+| 管理員/工讀生/評審清單 | `GET /admin/accounts?role=…`(伺服器端分頁,每頁 20;一次一類) |
 | 建立 / 刪除 / 啟停 / 重設密碼 / 權限 | `POST /admin/accounts`、`DELETE`、`PUT /{id}/active`、`POST /{id}/reset-password`、`PUT /{id}/permissions` |
 | 社團分頁 | `GET /admin/clubs`、`POST /admin/clubs/{id}/account`、`POST /admin/clubs/{id}/reset-password`、`PATCH /admin/clubs/{id}` |
 
 ## 畫面
 
-四個分頁:管理員 / 工讀生 / 評審 / 社團。前三類清單依姓名升冪(前端排)。社團分頁支援搜尋與前端分頁(每頁 20)。
+四個分頁:管理員 / 工讀生 / 評審 / 社團。前三類各自向後端要該角色的那一頁(姓名升冪由後端排,換分頁時頁碼歸 1)。社團分頁走不分頁的主檔端點,搜尋與分頁在前端(每頁 20)。
 
 **權限設定彈窗**(僅管理員)— 12 個頁面權限鍵的勾選框:申請審核 `areview`、結案審核 `aclose`、活動管理 `asignup`、發布公告 `aannounce`、臨時場地器材借用審核 `abooking`、固定場地借用審核 `aroom`、社團管理 `amember`、行政分審核 `aeval`、維修管理 `amaint`、線上申請管理 `aapply`、違規管理 `aviol`、檔案管理 `afiles`。彈窗外的既有鍵(簽核關卡 `approve_*`、舊鍵 `aact`/`areg`)**只顯示不可勾,儲存時原樣保留**。
 

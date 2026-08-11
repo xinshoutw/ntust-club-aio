@@ -7,6 +7,7 @@ import QueryError from '../../components/ui/QueryError'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import OneTimePasswordModal from './OneTimePasswordModal'
 import {
+  ACCOUNTS_PAGE_SIZE,
   USERNAME_HINT,
   USERNAME_RE,
   useAccountMutations,
@@ -83,13 +84,14 @@ export default function AccountsPage() {
   const { message, modal } = App.useApp()
   const [tab, setTab] = useState('admins')
 
-  const accountsQuery = useAccounts()
-  const accounts = accountsQuery.data ?? []
-  // 名冊慣例:三類帳號皆姓名升冪(後端 id 序無語意;端點小量全抓,前端排即可)
-  const byName = (a: Account, b: Account) => a.name.localeCompare(b.name, 'zh-Hant')
-  const admins = accounts.filter((a) => a.role === 'admin').sort(byName)
-  const staff = accounts.filter((a) => a.role === 'staff').sort(byName)
-  const viewers = accounts.filter((a) => a.role === 'viewer').sort(byName)
+  // 帳號三類各自伺服器端分頁(姓名升冪由後端排);社團分頁走 /admin/clubs,不在此查詢
+  const [accountPage, setAccountPage] = useState(1)
+  const accountRole: ManagedRole | undefined = TAB_ROLE[tab]
+  const accountsQuery = useAccounts(accountRole, accountPage)
+  const accountRows = accountsQuery.data?.rows ?? []
+  const accountTotal = accountsQuery.data?.total ?? 0
+  // 未啟用的查詢恆為 isPending:社團分頁不該因此一直轉圈
+  const accountsLoading = accountRole != null && accountsQuery.isPending
   const { create, remove, setActive, resetPassword, setPermissions } = useAccountMutations()
 
   // 社團 tab:資料與動作走 /admin/clubs(啟停=社團與帳號一併連動,語意與上三類的純帳號停權不同)
@@ -284,6 +286,15 @@ export default function AccountsPage() {
     )
   }
 
+  const accountPager = (
+    <Pager
+      page={accountPage}
+      pageSize={ACCOUNTS_PAGE_SIZE}
+      total={accountTotal}
+      onChange={setAccountPage}
+    />
+  )
+
   const actions = (a: Account, extra?: React.ReactNode) => (
     <td className="r" style={{ whiteSpace: 'nowrap' }}>
       {extra}
@@ -315,7 +326,7 @@ export default function AccountsPage() {
     )
 
   const emptyRow = (colSpan: number) =>
-    !accountsQuery.isPending && !accountsQuery.isError && (
+    !accountsLoading && !accountsQuery.isError && (
       <tr className="no-hover">
         <td colSpan={colSpan} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
           尚無{roleLabel}帳號
@@ -324,6 +335,7 @@ export default function AccountsPage() {
     )
 
   const adminsTable = (
+    <>
     <table className="tb fixed" style={{ minWidth: 760 }}>
       {/* 頁面權限吃剩餘寬且允許換行;姓名/帳號截斷;層級/狀態/動作固定 px */}
       <Cols widths={['13%', 110, 90, 'auto', 84, 216]} />
@@ -331,7 +343,7 @@ export default function AccountsPage() {
         <tr><th scope="col">姓名</th><th scope="col">帳號</th><th scope="col">權限層級</th><th scope="col">頁面權限</th><th scope="col">狀態</th><th scope="col" className="r">動作</th></tr>
       </thead>
       <tbody>
-        {admins.map((a) => (
+        {accountRows.map((a) => (
           <tr key={a.id}>
             <td className="cell-clip" title={a.name} style={{ fontWeight: 500 }}>{a.name}</td>
             <td className="num cell-clip" title={a.username} style={{ color: 'var(--steel)' }}>{a.username}</td>
@@ -357,19 +369,22 @@ export default function AccountsPage() {
           </tr>
         ))}
         {errorRow(6)}
-        {admins.length === 0 && emptyRow(6)}
+        {accountRows.length === 0 && emptyRow(6)}
       </tbody>
     </table>
+      {accountPager}
+    </>
   )
 
   const staffTable = (
+    <>
     <table className="tb fixed" style={{ minWidth: 560 }}>
       <Cols widths={['24%', 'auto', 84, 178]} />
       <thead>
         <tr><th scope="col">姓名</th><th scope="col">帳號</th><th scope="col">狀態</th><th scope="col" className="r">動作</th></tr>
       </thead>
       <tbody>
-        {staff.map((a) => (
+        {accountRows.map((a) => (
           <tr key={a.id}>
             <td className="cell-clip" title={a.name} style={{ fontWeight: 500 }}>{a.name}</td>
             <td className="num cell-clip" title={a.username} style={{ color: 'var(--steel)' }}>{a.username}</td>
@@ -378,20 +393,23 @@ export default function AccountsPage() {
           </tr>
         ))}
         {errorRow(4)}
-        {staff.length === 0 && emptyRow(4)}
+        {accountRows.length === 0 && emptyRow(4)}
       </tbody>
     </table>
+      {accountPager}
+    </>
   )
 
   // 負責獎項/分組資料由「分組與評審指派」功能管理(後端尚未提供),先以 — 佔位
   const viewersTable = (
+    <>
     <table className="tb fixed" style={{ minWidth: 760 }}>
       <Cols widths={['14%', '16%', 'auto', 90, 84, 178]} />
       <thead>
         <tr><th scope="col">評審</th><th scope="col">帳號</th><th scope="col">負責獎項</th><th scope="col">分組</th><th scope="col">狀態</th><th scope="col" className="r">動作</th></tr>
       </thead>
       <tbody>
-        {viewers.map((a) => (
+        {accountRows.map((a) => (
           <tr key={a.id}>
             <td className="cell-clip" title={a.name} style={{ fontWeight: 500 }}>{a.name}</td>
             <td className="num cell-clip" title={a.username} style={{ color: 'var(--steel)' }}>{a.username}</td>
@@ -402,9 +420,11 @@ export default function AccountsPage() {
           </tr>
         ))}
         {errorRow(6)}
-        {viewers.length === 0 && emptyRow(6)}
+        {accountRows.length === 0 && emptyRow(6)}
       </tbody>
     </table>
+      {accountPager}
+    </>
   )
 
   // ---- 社團 tab:前端過濾(社團名/帳號)+ client 分頁 ----
@@ -528,11 +548,14 @@ export default function AccountsPage() {
         }
       />
 
-      <Spin spinning={tab === 'clubs' ? clubsQuery.isPending : accountsQuery.isPending}>
+      <Spin spinning={tab === 'clubs' ? clubsQuery.isPending : accountsLoading}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto', paddingTop: 8 }}>
           <Tabs
             activeKey={tab}
-            onChange={setTab}
+            onChange={(next) => {
+              setTab(next)
+              setAccountPage(1) // 換分頁=換角色,頁碼不共用
+            }}
             style={{ padding: '0 20px' }}
             items={[
               { key: 'admins', label: '管理員', children: adminsTable },

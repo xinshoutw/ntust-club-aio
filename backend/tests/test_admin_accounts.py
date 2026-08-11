@@ -99,6 +99,25 @@ async def test_list_filters_by_role(client, db):
     assert {r["username"] for r in rows} >= {"root", "normal", "staff_lee", "viewer01"}
 
 
+async def test_list_orders_by_name_and_paginates(client, db):
+    """帳號管理逐類分頁:排序必須是姓名(id 序在分頁後就是隨機翻頁)。"""
+    await seed(client, db)
+    await create_account(client, role="viewer", name="陳評審", username="viewer_chen")
+    await create_account(client, role="viewer", name="王評審", username="viewer_wang")
+    await create_account(client, role="viewer", name="李評審", username="viewer_lee")
+
+    rows = (await client.get(f"{URL}?role=viewer")).json()["data"]
+    names = [r["name"] for r in rows]
+    assert names == sorted(names)
+
+    resp = await client.get(f"{URL}?role=viewer&page_size=2")
+    body = resp.json()
+    assert [r["name"] for r in body["data"]] == names[:2]
+    assert body["meta"]["total"] == 3
+    resp = await client.get(f"{URL}?role=viewer&page_size=2&page=2")
+    assert [r["name"] for r in resp.json()["data"]] == names[2:]
+
+
 async def test_set_active_revokes_sessions(client, db):
     await seed(client, db)
     data = await create_account(client)

@@ -209,6 +209,37 @@ async def test_confirm_waits_for_the_signup_row_lock(client, db):
     assert (await second).status_code == 409
 
 
+async def test_attendance_waits_for_the_item_lock(client, db):
+    """非場次制的預設場次是 get-or-create:沒鎖的話兩支並發登錄各建一個場次,簽到就散成兩半。"""
+    import asyncio
+
+    import pytest
+
+    from app.core.db import async_session_factory
+    from app.services import booking_service
+
+    club = await seed(client, db)
+    item = (
+        await client.post(
+            URL, json=body(requires_confirmation=False), headers=csrf_headers(client)
+        )
+    ).json()["data"]
+    db.add(Signup(item_id=item["id"], club_id=club.id, confirmed=True))
+    await db.commit()
+
+    async with async_session_factory() as holder:
+        await booking_service.lock_resource(holder, "signup_item", item["id"])  # 佔住鎖不放
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(
+                client.put(
+                    f"{URL}/{item['id']}/attendance",
+                    json={"club_id": club.id, "attended": True},
+                    headers=csrf_headers(client),
+                ),
+                timeout=1,
+            )
+
+
 async def test_confirm_flow_for_review_based_item(client, db):
     """審核制:社團報名後待確認 → 管理員確認 → 報名成功;重複確認 409。"""
     club = await seed(client, db)

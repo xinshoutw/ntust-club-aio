@@ -38,6 +38,7 @@ from app.schemas.signups import (
     SignupItemCreateIn,
 )
 from app.services import audit, notify
+from app.services import booking_service as booking_svc  # advisory lock 工具在此
 from app.services import signup_service as svc
 
 router = APIRouter(prefix="/admin/signup-items", tags=["admin"])
@@ -47,7 +48,12 @@ RegAdmin = Annotated[CurrentUser, Depends(require_permission("areg", "asignup"))
 
 
 async def _default_session(db, item: SignupItem) -> SignupItemSession:
-    """非場次制活動的簽到落點:單一預設場次(get or create)。"""
+    """非場次制活動的簽到落點:單一預設場次(get or create)。
+
+    先取該活動的 advisory lock:兩支簽到登錄並發時,查無場次→建立之間會彼此穿插,
+    各建一列預設場次,之後的簽到就散在兩個場次上(評鑑採計的是簽到,數字會少一半)。
+    """
+    await booking_svc.lock_resource(db, "signup_item", item.id)
     session = await db.scalar(
         sa.select(SignupItemSession)
         .where(SignupItemSession.item_id == item.id)

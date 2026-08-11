@@ -528,7 +528,17 @@ function ActivityForm({
                 <Form.Item
                   name="participantsOut"
                   label="非社員參加人數"
-                  rules={[{ required: true, message: '請輸入非社員人數' }]}
+                  dependencies={['participantsIn']}
+                  rules={[
+                    { required: true, message: '請輸入非社員人數' },
+                    // 兩欄各自可為 0(只有社員或只有校外人士),合計 0 等於沒填 —— 與後端同一條
+                    ({ getFieldValue }) => ({
+                      validator: (_, value) =>
+                        (getFieldValue('participantsIn') ?? 0) + (value ?? 0) > 0
+                          ? Promise.resolve()
+                          : Promise.reject(new Error('參加人數合計不得為 0')),
+                    }),
+                  ]}
                   style={{ marginBottom: 0 }}
                 >
                   <InputNumber style={{ width: '100%' }} min={0} precision={0} />

@@ -142,6 +142,22 @@ async def test_storage_limits_update_and_audit(client, db):
     assert "storage_limits" in audit_row.detail
 
 
+async def test_audit_records_before_and_after_values(client, db):
+    """只記鍵名的話,事後查「誰把上限改小的」還是得靠人記憶。"""
+    await seed(client, db)
+
+    async def put(payload):
+        return await client.put(URL, json=payload, headers=csrf_headers(client))
+
+    await put({"close_lock_months": 2})
+    logged = sa.select(AuditLog.detail).where(AuditLog.action == "settings_updated")
+    assert list(await db.scalars(logged)) == ["close_lock_months=1→2"]
+
+    # 送出但值沒變:沒有變更就不該留下稽核紀錄
+    await put({"close_lock_months": 2})
+    assert len(list(await db.scalars(logged))) == 1
+
+
 async def test_budget_categories_with_hints(client, db):
     """經費科目為 [{name, hint}];依名稱去重保序,寫入後可讀回。"""
     await seed(client, db)

@@ -138,6 +138,11 @@ async def approve_room_booking(
     background: BackgroundTasks,
 ) -> ApiResponse[AdminRoomBookingOut]:
     booking = await _pending_request(db, request_id)
+    # 場地停用後不得再核出借用:主檔可在系統設定頁停用,待審單卻不會自己消失,
+    # 核出去的單在場況圖上也看不到(列首只取啟用中場地)
+    venue = await db.get(Venue, booking.venue_id)
+    if venue is None or not venue.is_active:
+        raise conflict("該場地已停用,無法核准", code="VENUE_INACTIVE")
     # 核准前確認同場地同學期沒有已核准單佔用相同(星期,節次);advisory lock 序列化並發核准
     # (整單擇一是人工判斷,但「已核准 vs 再核准」的重疊必須由系統擋下)
     await svc.lock_resource(db, "venue", booking.venue_id)

@@ -155,6 +155,10 @@ async def approve_venue_booking(
     background: BackgroundTasks,
 ) -> ApiResponse[AdminVenueBookingOut]:
     booking = await _pending_venue_booking(db, booking_id)
+    # 場地停用後不得再核出借用(理由同固定借用)
+    venue = await db.get(Venue, booking.venue_id)
+    if venue is None or not venue.is_active:
+        raise conflict("該場地已停用,無法核准", code="VENUE_INACTIVE")
     # 核准前確認同場地同日時段沒有已核准的借用;advisory lock 序列化並發核准
     # (兩張互相衝突的待審單各自持有自己的列鎖,擋不住彼此)
     await svc.lock_resource(db, "venue", booking.venue_id)

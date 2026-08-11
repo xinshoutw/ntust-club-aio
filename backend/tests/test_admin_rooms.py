@@ -135,6 +135,19 @@ async def test_approve_blocked_slot_is_refused(client, db):
     assert resp.json()["meta"]["code"] == "SLOT_BLOCKED"
 
 
+async def test_approve_refuses_a_deactivated_venue(client, db):
+    """場地在系統設定頁停用之後,待審單不會自己消失:核准這關要擋,否則核出來的單
+    連場況圖都看不到(列首只取啟用中場地)。"""
+    first, _, _ = await seed(client, db)
+    venue = await db.get(Venue, first.venue_id)
+    venue.is_active = False
+    await db.commit()
+
+    resp = await client.post(f"{URL}/{first.id}/approve", headers=csrf_headers(client))
+    assert resp.status_code == 409
+    assert resp.json()["meta"]["code"] == "VENUE_INACTIVE"
+
+
 async def test_list_active_filters_out_finished_terms(client, db):
     """衝突標示只需要還佔著時段的已核准單:學期已結束的不必抓回前端。"""
     first, _, done = await seed(client, db)

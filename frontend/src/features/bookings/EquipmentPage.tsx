@@ -5,6 +5,7 @@ import LoadingBlock from '../../components/ui/LoadingBlock'
 import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
 import { confirmDialog } from '../../lib/confirm'
+import { notFoundText } from '../../lib/selectOptions'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols } from '../../components/ui/tableControls'
@@ -209,7 +210,7 @@ export default function EquipmentPage() {
                 placeholder="請選擇活動"
                 loading={activitiesQuery.isPending}
                 options={approved.map((a) => ({ value: a.id, label: a.name }))}
-                notFoundContent="無審核通過之活動"
+                notFoundContent={notFoundText(activitiesQuery, '無審核通過之活動', '活動清單')}
               />
             </Form.Item>
             <Form.Item name="equipment" label="品項" rules={[{ required: true, message: '請選擇品項' }]}>

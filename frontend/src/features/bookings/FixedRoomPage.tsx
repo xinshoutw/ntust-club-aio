@@ -5,6 +5,7 @@ import LoadingBlock from '../../components/ui/LoadingBlock'
 import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
 import { confirmDialog } from '../../lib/confirm'
+import { notFoundText } from '../../lib/selectOptions'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols } from '../../components/ui/tableControls'
@@ -231,6 +232,7 @@ export default function FixedRoomPage() {
                 options={(venuesQuery.data ?? [])
                   .filter((v) => v.allowFixed)
                   .map((v) => ({ value: v.id, label: venueLabel(v) }))}
+                notFoundContent={notFoundText(venuesQuery, '目前沒有可固定借用的場地', '場地清單')}
               />
             </Form.Item>
             <Form.Item name="note" label="用途" rules={[{ required: true, message: '請輸入用途' }]} style={{ marginBottom: 0 }}>

@@ -6,6 +6,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { Cols } from '../../components/ui/tableControls'
 import { confirmDialog } from '../../lib/confirm'
+import { notFoundText } from '../../lib/selectOptions'
 import PeriodPicker from '../bookings/PeriodPicker'
 import { useAdminVenues } from '../../api/adminBookings'
 import { useVenueRuleMutations, useVenueRules, type VenueRule } from '../../api/adminVenueRules'
@@ -85,6 +86,7 @@ export default function VenueRulesPage() {
                 showSearch
                 options={venues.map((v) => ({ value: v.id, label: v.name }))}
                 placeholder="請選擇"
+                notFoundContent={notFoundText(venuesQuery, '目前沒有場地', '場地清單')}
               />
             </Form.Item>
             <Form.Item name="range" label="期間(單日=起訖同日)" rules={[{ required: true, message: '請選擇期間' }]} style={{ marginBottom: 12 }}>

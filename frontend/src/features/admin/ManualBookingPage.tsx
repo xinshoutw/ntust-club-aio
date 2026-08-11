@@ -4,6 +4,7 @@ import LoadingBlock from '../../components/ui/LoadingBlock'
 import { type Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
 import PeriodPicker from '../bookings/PeriodPicker'
+import { notFoundText } from '../../lib/selectOptions'
 import { useAdminEquipment } from '../../api/adminEquipment'
 import { useAdminVenues, useManualBookingMutations } from '../../api/adminBookings'
 
@@ -76,6 +77,7 @@ export default function ManualBookingPage() {
                   showSearch
                   options={venues.map((v) => ({ value: v.id, label: v.name }))}
                   placeholder="請選擇"
+                  notFoundContent={notFoundText(venuesQuery, '目前沒有啟用中的場地', '場地清單')}
                 />
               </Form.Item>
               {/* 不擋過去日期:手動借用的用途就是補登歷史資料,後端亦刻意放行 */}
@@ -112,6 +114,7 @@ export default function ManualBookingPage() {
                   showSearch
                   options={equipment.map((e) => ({ value: e.id, label: `${e.name}(總數 ${e.totalQty})` }))}
                   placeholder="請選擇"
+                  notFoundContent={notFoundText(equipmentQuery, '目前沒有啟用中的器材', '器材清單')}
                 />
               </Form.Item>
               <Form.Item name="qty" label="數量" rules={[{ required: true, message: '請輸入數量' }]}>

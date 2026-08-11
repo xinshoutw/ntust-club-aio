@@ -496,7 +496,13 @@ async def admin_availability_grid(db: AsyncSession, day: date) -> dict[int, dict
                 cell["pending"].append({"id": booking.id, "club": name, "kind": "temp"})
 
     fixed_rows = await db.execute(
-        sa.select(RoomBookingSlot, RoomBookingRequest, Club.name)
+        # 一單最多 10 個時段,整個 request 會被 join 複製 10 次:只取畫格用得到的欄位
+        sa.select(
+            RoomBookingSlot.period,
+            RoomBookingRequest.venue_id,
+            RoomBookingRequest.status,
+            Club.name,
+        )
         .join(RoomBookingRequest, RoomBookingSlot.request_id == RoomBookingRequest.id)
         .join(Club, RoomBookingRequest.club_id == Club.id)
         .where(
@@ -507,11 +513,11 @@ async def admin_availability_grid(db: AsyncSession, day: date) -> dict[int, dict
         )
         .order_by(RoomBookingRequest.id)
     )
-    for slot, booking, club_name in fixed_rows:
+    for period, fixed_venue_id, status, club_name in fixed_rows:
         # 審核中的固定借用也要標:承辦人核准臨時借用時,若這格在螢幕上是空白的,
         # 雙重核准連目視都攔不下來
-        approved = booking.status == BookingStatus.APPROVED
-        cell = mark(booking.venue_id, slot.period, "fixed" if approved else "pending", club_name)
+        approved = status == BookingStatus.APPROVED
+        cell = mark(fixed_venue_id, period, "fixed" if approved else "pending", club_name)
         if not approved:
             cell["pending"].append({"id": None, "club": club_name, "kind": "fixed"})
 

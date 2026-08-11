@@ -146,7 +146,17 @@ export default function AdminBookingsPage() {
                       // 可點的是臨時借用待審單(固定借用要到「固定場地借用審核」審);
                       // 已核准蓋過審核中的格子照樣點得到底下的待審單
                       const openable = (cell?.pending ?? []).filter((x) => x.id != null)
-                      const base: React.CSSProperties = { width: '100%', height: 24, borderRadius: 4, background: CELL[state].bg, display: 'block' }
+                      // 格色被更高權重的狀態佔走時,底下壓著的待審單要看得見 —— 不開放格
+                      // 本來就是透明無框,不標的話那顆可點的格子在畫面上根本不存在
+                      const hidden = state !== 'reviewing' && (cell?.pending.length ?? 0) > 0
+                      const base: React.CSSProperties = {
+                        width: '100%',
+                        height: 24,
+                        borderRadius: 4,
+                        background: CELL[state].bg,
+                        display: 'block',
+                        boxShadow: hidden ? `inset 0 0 0 2px ${CELL.reviewing.bg}` : undefined,
+                      }
                       const el =
                         openable.length > 0 ? (
                           <button

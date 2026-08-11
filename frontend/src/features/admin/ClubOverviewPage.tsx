@@ -109,9 +109,13 @@ export default function ClubOverviewPage() {
   }
 
   // 固定借用衝突與 AdminRoomsPage 共用一份判定:對上別社的審核中申請(擇一核准)或
-  // 已核准且學期未結束的申請(核准必被擋下),兩份名單都取全量
-  const pendingRoomsQuery = useAllPendingRoomBookings(canRooms && clubId != null)
-  const approvedRoomsQuery = useApprovedRoomBookings(canRooms && clubId != null)
+  // 已核准且學期未結束的申請(核准必被擋下),兩份名單都取全量。
+  // 本社沒有待審固定借用時兩份都不抓:衝突只標在待審單上,而開放窗一年只開幾週,
+  // 平常抓回來的全校清單沒有一個字用得到,卻會拖著「借用中」卡一起轉圈
+  const hasPendingRoom = (roomsQuery.data ?? []).some((r) => r.status === 'pending')
+  const needsConflicts = canRooms && clubId != null && hasPendingRoom
+  const pendingRoomsQuery = useAllPendingRoomBookings(needsConflicts)
+  const approvedRoomsQuery = useApprovedRoomBookings(needsConflicts)
   const conflicts = roomConflictSlots(pendingRoomsQuery.data ?? [], approvedRoomsQuery.data ?? [])
   const conflictsOf = (r: AdminRoomRequest): Map<string, RoomConflictKind> | undefined =>
     r.status === 'pending' ? conflicts.get(r.apiId) : undefined
@@ -189,8 +193,8 @@ export default function ClubOverviewPage() {
     loading(roomsQuery, canRooms && hasClub) ||
     loading(venuesQuery, canBookings && hasClub) ||
     loading(loansQuery, canBookings && hasClub) ||
-    loading(pendingRoomsQuery, canRooms && hasClub) ||
-    loading(approvedRoomsQuery, canRooms && hasClub)
+    loading(pendingRoomsQuery, needsConflicts) ||
+    loading(approvedRoomsQuery, needsConflicts)
 
   const rowStyle: React.CSSProperties = {
     display: 'flex',

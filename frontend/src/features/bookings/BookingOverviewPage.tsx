@@ -242,7 +242,8 @@ export default function BookingOverviewPage() {
                   onClick={() => setVenueStart((s) => s.add(VENUE_DAYS, 'day'))}
                 />
               </Tooltip>
-              <Button size="small" onClick={() => setVenueStart(todayStart)}>今天</Button>
+              {/* 與點場地進來的定位一致:以今天為中心的 −7~+7,不是把今天當起點 */}
+              <Button size="small" onClick={() => setVenueStart(todayStart.subtract(7, 'day'))}>今天</Button>
             </>
           )}
           <div style={{ flex: 1 }} />

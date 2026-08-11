@@ -14,6 +14,7 @@ from app.models import (
     RoomBookingSlot,
     User,
     Venue,
+    VenueBlockRule,
     VenueBooking,
 )
 from app.models.enums import (
@@ -404,19 +405,20 @@ async def test_admin_grid_lists_every_pending_in_a_cell(client, db):
     activity = await make_activity(db, club)
     day = date(2026, 3, 5)
 
-    def booking(owner, periods, status="pending"):
-        return VenueBooking(club_id=owner.id, venue_id=venue.id, activity_id=activity.id,
+    def booking(owner, periods, status="pending", *, id=None):
+        return VenueBooking(id=id, club_id=owner.id, venue_id=venue.id, activity_id=activity.id,
                             date=day, periods=periods, purpose="彩排", status=status)
 
-    first, approved, second = (
-        booking(club, ["3", "5"]),
-        booking(other_club, ["3"], "approved"),
-        booking(other_club, ["5"]),
-    )
-    for row in (first, approved, second):  # 逐筆 commit 以固定 id 順序
+    # 指定 id 並讓寫入順序與 id 順序相反,盡量讓「拿掉 ORDER BY」現形。
+    # 但這條斷言測不出排序被拿掉:小表的回傳順序由 planner 決定(實測 join clubs 之後
+    # 剛好又回到 id 序),要真正壓出反序得操縱執行計畫,不值得。斷言留著是為了釘住契約
+    # ——「同一格多筆待審時,格色與 pending 順序照送件序」——ORDER BY 別在重構時被順手刪掉
+    second = booking(other_club, ["5"], id=20)
+    approved = booking(other_club, ["3"], "approved", id=30)
+    first = booking(club, ["3", "5"], id=10)
+    for row in (second, approved, first):
         db.add(row)
         await db.commit()
-        await db.refresh(row)
 
     grid = (
         await client.get("/api/v1/admin/bookings/availability", params={"date": "2026-03-05"})
@@ -435,6 +437,25 @@ async def test_admin_grid_lists_every_pending_in_a_cell(client, db):
             {"id": first.id, "club": club.name, "kind": "temp"},
             {"id": second.id, "club": other_club.name, "kind": "temp"},
         ],
+    }
+
+    # 行政手動借用沒有社團(club_id NULL),格上顯示「學務處」
+    db.add(VenueBooking(club_id=None, venue_id=venue.id, activity_id=None, date=day,
+                        periods=["7"], purpose="場地整理", status="approved"))
+    # 不開放規則蓋掉格色,但底下壓著的待審單要留著(承辦要看得到「這張得退掉」)
+    admin_id = await db.scalar(sa.select(User.id).order_by(User.id).limit(1))
+    db.add(VenueBlockRule(venue_id=venue.id, start_date=day, end_date=day,
+                          weekdays=[], periods=["3"], reason="行政徵用", created_by=admin_id))
+    await db.commit()
+
+    grid = (
+        await client.get("/api/v1/admin/bookings/availability", params={"date": "2026-03-05"})
+    ).json()["data"]["grid"]
+    assert grid[str(venue.id)]["7"] == {"status": "temp", "club": "學務處", "pending": []}
+    assert grid[str(venue.id)]["3"] == {
+        "status": "blocked",
+        "club": "行政徵用",
+        "pending": [{"id": first.id, "club": club.name, "kind": "temp"}],
     }
 
 

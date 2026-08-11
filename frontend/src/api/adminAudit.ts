@@ -134,9 +134,7 @@ const toLog = (l: AuditLogOut): AuditLog => ({
   detail: l.detail,
 })
 
-export interface AuditListParams {
-  page: number
-  pageSize: number
+export interface AuditFilters {
   userId?: number
   role?: string
   action?: string
@@ -145,23 +143,43 @@ export interface AuditListParams {
   dateTo?: string
 }
 
+export interface AuditListParams extends AuditFilters {
+  page: number
+  pageSize: number
+}
+
+const listUrl = (p: AuditListParams): string =>
+  `/admin/audit${qs({
+    page: p.page,
+    page_size: p.pageSize,
+    user_id: p.userId,
+    role: p.role,
+    action: p.action,
+    date_from: p.dateFrom,
+    date_to: p.dateTo,
+  })}`
+
 export function useAuditLogs(p: AuditListParams) {
   return useQuery({
     queryKey: ['adminAudit', 'list', p] as const,
     queryFn: () =>
-      apiPaged<AuditLogOut[]>(
-        `/admin/audit${qs({
-          page: p.page,
-          page_size: p.pageSize,
-          user_id: p.userId,
-          role: p.role,
-          action: p.action,
-          date_from: p.dateFrom,
-          date_to: p.dateTo,
-        })}`,
-      ).then(({ data, total }) => ({ logs: data.map(toLog), total })),
+      apiPaged<AuditLogOut[]>(listUrl(p)).then(({ data, total }) => ({
+        logs: data.map(toLog),
+        total,
+      })),
     placeholderData: keepPreviousData,
   })
+}
+
+/** 匯出用:依當前篩選逐頁抓完整結果(稽核只有 super 看得到,不另設上限) */
+export async function fetchAllAuditLogs(filters: AuditFilters): Promise<AuditLog[]> {
+  const out: AuditLog[] = []
+  for (let page = 1; ; page++) {
+    const { data, total } = await apiPaged<AuditLogOut[]>(listUrl({ ...filters, page, pageSize: 200 }))
+    out.push(...data.map(toLog))
+    if (data.length === 0 || out.length >= total) break
+  }
+  return out
 }
 
 // ---- 篩選選項(取自實際留下的紀錄,不是已載入的那幾頁)----

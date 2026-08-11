@@ -290,7 +290,12 @@ export default function ReviewPage() {
               )}
               {!listQuery.isPending && !listQuery.isError && !clubsQuery.isError && pagedRows.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={8} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>無符合篩選條件的申請</td>
+                  <td colSpan={8} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
+                    {/* 沒下篩選時說「無符合篩選條件」是在指責使用者的操作:新學期本來就一筆都沒有 */}
+                    {clubFilter.length || typeFilter.length || statusFilter.length
+                      ? '無符合篩選條件的申請'
+                      : '目前沒有審核紀錄'}
+                  </td>
                 </tr>
               )}
             </tbody>

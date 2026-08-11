@@ -54,8 +54,10 @@ const FIXED_BOOKING_ITEM: NavItem = {
 // 固定場地借用開放窗由後端系統設定提供(GET /club/room-bookings/window),
 // nav 因此無法再是模組層級常數:改為 builder,由 App 的 ClubShell 以 useFixedWindow() 查詢後組合;
 // 未開放(或查詢未完成)時項目反灰並移至「其他」。
-export function buildClubNav(window?: FixedWindow): NavGroup[] {
-  const fixedBookingOpen = window?.open ?? false
+export function buildClubNav(window?: FixedWindow, windowFailed = false): NavGroup[] {
+  // 查詢失敗不能說成「未開放」:開放窗一年只開幾週,那句話完全合理,
+  // 而項目一反灰,頁面裡寫好的錯誤與重試就永遠到不了(spec booking-fixed.md 也是這樣寫的)
+  const fixedBookingOpen = windowFailed || (window?.open ?? false)
   const closedHint =
     window?.openFrom && window.openUntil
       ? `未開放申請;受理期間 ${window.openFrom} – ${window.openUntil}`
@@ -130,8 +132,10 @@ export function buildAdminNav(
   pendingReview?: number,
   pendingClose?: number,
   fixedWindow?: FixedWindow,
+  fixedWindowFailed = false,
 ): NavGroup[] {
-  const fixedBookingOpen = fixedWindow?.open ?? false
+  // 同社團端:查詢失敗就讓項目可點,由頁面自己說失敗(見 buildClubNav)
+  const fixedBookingOpen = fixedWindowFailed || (fixedWindow?.open ?? false)
   const closedHint =
     fixedWindow?.openFrom && fixedWindow.openUntil
       ? `未開放申請;受理期間 ${fixedWindow.openFrom} – ${fixedWindow.openUntil}`

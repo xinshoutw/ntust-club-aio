@@ -77,7 +77,10 @@ function RequireRole({ roles, children }: { roles: Role[]; children: ReactNode }
 // 查詢未完成前先視為未開放,載入後自動更新
 function ClubShell() {
   const windowQuery = useFixedWindow()
-  const nav = useMemo(() => buildClubNav(windowQuery.data), [windowQuery.data])
+  const nav = useMemo(
+    () => buildClubNav(windowQuery.data, windowQuery.isError),
+    [windowQuery.data, windowQuery.isError],
+  )
   return <AppShell nav={nav} />
 }
 
@@ -90,8 +93,8 @@ function AdminShell() {
   const pendingClose = usePendingCloseTotal(canAccessAdminPath(user, '/admin/close-review'))
   const fixedWindow = useAdminFixedWindow(canAccessAdminPath(user, '/admin/rooms'))
   const nav = useMemo(
-    () => buildAdminNav(user, pendingReview.data, pendingClose.data, fixedWindow.data),
-    [user, pendingReview.data, pendingClose.data, fixedWindow.data],
+    () => buildAdminNav(user, pendingReview.data, pendingClose.data, fixedWindow.data, fixedWindow.isError),
+    [user, pendingReview.data, pendingClose.data, fixedWindow.data, fixedWindow.isError],
   )
   return <AppShell nav={nav} badgeLabel="行政後台" />
 }

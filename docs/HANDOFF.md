@@ -10,7 +10,7 @@
 4. **問題分堆(2026-08-10)**:全部條目依「修法是否唯一」分成下方 A/B/C 三堆,經一輪跨模型交叉審查修正
 5. **A1 五項全數修畢(2026-08-10)**:ISS-01、ISS-02、ISS-03、ISS-14b、ISS-53,已從 `issues.md` 移除;跨模型交叉審查後又補了六處(見下)。驗證數字見下方「驗證現況」
 6. **A2 十二項全數修畢(2026-08-10)**:ISS-05、06、13(含 55)、13b、15+16、18、32、36、45、46、74b+38+38b、77b,已從 `issues.md` 移除。驗證數字見下方「驗證現況」
-7. **A3 進行中(2026-08-11)**:已完成 25 項(ISS-17 + 五個子批次共 24 項),其餘 36 項見下方 A3 清單
+7. **A3 進行中(2026-08-11)**:已完成 25 項(ISS-17 + 五個子批次共 24 項),其餘 37 項(補回漏記的 ISS-56)見下方 A3 清單
 
 **DEC-01 已定案:這學年評鑑要在新系統跑,但學年末才用** —— 2026-09 上線當下只需競賽報名(ISS-01)可用,整條彙總鏈排在上線之後。其餘 DEC-02~12 仍無答案。
 
@@ -39,29 +39,33 @@
 - ISS-38 的兩個 advisory lock 命名空間已合一(`venue`),否則補了交叉查詢也不會互相序列化
 - ISS-18 的 `useFormUnsavedGuard` 要吃 Form 之外的 local state(時段選取、待上傳附件),那些才是離開後救不回來的
 
-**A3 已修**:ISS-17;一致性文案子批次 ISS-85、85b、86b、78、79;前端錯誤處理與快取子批次 ISS-22、27、28、34、35、58、88;正確性與錯誤處理子批次 ISS-21、57、59、60、87;稽核子批次 ISS-61、62、63、64;併發子批次 ISS-39、41、42。前四個子批次各跑一輪跨模型交叉審查(7、20、約 25、約 25 條 findings,全數處理完);**併發子批次尚未交叉審查**
+**A3 已修**:ISS-17;一致性文案子批次 ISS-85、85b、86b、78、79;前端錯誤處理與快取子批次 ISS-22、27、28、34、35、58、88;正確性與錯誤處理子批次 ISS-21、57、59、60、87;稽核子批次 ISS-61、62、63、64;併發子批次 ISS-39、41、42。五個子批次各跑一輪跨模型交叉審查(7、20、約 25、約 25、約 30 條 findings,全數處理完;第三輪抓到併發批自己引入的 deadlock)
 
-**A3 其餘 36 項**(可上線後補)
+**A3 其餘 37 項**(可上線後補)
 
 - 併發與完整性:ISS-37、ISS-40、ISS-44、ISS-26
 - 效能:ISS-47、ISS-48、ISS-49、ISS-50、ISS-52
+- 資料正確性:ISS-56(金額/數量非負約束,需 Alembic revision)
 - 畫面與資料落差:ISS-07、ISS-08、ISS-11、ISS-12、ISS-12b、ISS-68~ISS-73、ISS-74、ISS-74d、ISS-74e、ISS-75、ISS-76、ISS-77、ISS-77c
 - 文案樣式無障礙:ISS-80、ISS-81、ISS-82、ISS-84
 - 維運:OPS-02、OPS-08、OPS-09、OPS-10
 - 補做:GAP-05 場地主檔 CRUD(照抄器材主檔)
 
-含新增 Alembic revision 的:ISS-26、ISS-44、ISS-50。
+含新增 Alembic revision 的:ISS-26、ISS-44、ISS-50、ISS-56。
 
 已修各批中,交叉審查抓到、值得記著的坑:
 
 - ISS-78 第一版把行政端改成「場地固定借用」,而社團端/系統設定/spec 檔名一直是「**固定場地借用**」—— 同一個功能兩個名字,`admin_rooms.py` 一個檔就有三則 Discord 標題各用一種。定案詞彙只說「用場地不用教室」,沒說詞序,改名前要先數哪個是既有多數
 - ISS-86b 的第一版註解換了個同樣不正確的理由:SQLAlchemy 對「賦值等於原值」根本不發 UPDATE,`updated_at` 從來沒有危險。那個守衛真正擋的是 PATCH 的重複學號檢查查到自己(行內編輯整列送回就會 409),而這條路徑當時零測試覆蓋
 - ISS-22 的原始描述指向 AntD Button,但 `handleClick` 在 `innerLoading` 時就 `preventDefault()`,隱含送出派給 default button 的 click 一樣被擋。真正會重複送出的是**表單裡根本沒有 submit 鈕**(Modal `onOk` + `form.submit()`)與 `onPressEnter` 直接接 mutation;`signup_item_sessions` 沒有唯一約束,那條是真的會落兩筆
-- 前端無 DOM 測試環境(ISS-89),UI 類修法**沒有測試護欄**;但 `src/api/` 這層是可測的(vitest 已有 13 檔),稽核批的 `fetchAllAuditLogs` 就是靠補一支測試才擋下 `page_size=200` 超過後端上限這種「按下去必掛」的錯
-- **並發測試很容易假通過**:兩支請求各自 `await login()` 再 gather 時,argon2 會把它們完全錯開,拿掉鎖照樣綠。可靠的寫法是另開一個 session 佔住 advisory lock,再斷言請求會 timeout(見 `test_admin_eval.py`)
+- 前端無 DOM 測試環境(ISS-89),UI 類修法**沒有測試護欄**;但 `src/api/` 這層本來就可測(vitest 共 13 檔,其中 9 檔在 `src/api/`),稽核批的 `fetchAllAuditLogs` 就是靠補一支測試才擋下 `page_size=200` 超過後端上限這種「按下去必掛」的錯
+- **並發測試幾乎測不到真交錯**:兩支 HTTP 請求丟進 `asyncio.gather` 常常會自己排成序列(argon2 錯開、或先跑的那支一路領先到 commit),拿掉鎖照樣綠 —— 兩種寫法(login 在 gather 內/外)都試過。可靠的寫法是另開一個 session 佔住 advisory lock,再斷言請求會 timeout(見 `test_admin_eval.py`、`test_bookings.py`)
 - ISS-21 後端改「省略=不動」還不夠:前端原本就是「空值→省略」,等於行為沒變。要改成「只在這次動過才送」才真的擋住跨裝置覆蓋
-- ISS-60 的清理掛在 SQLAlchemy session 事件上,`after_transaction_end` 每次 commit 會觸發**兩次**(內層連線交易先於 `after_commit` 結束),只認最外層才不會把剛 commit 的檔案刪掉
+- ISS-60 的清理掛在 SQLAlchemy session 事件上,兩側都有坑:`after_transaction_end` 每次 commit 會觸發**兩次**(內層連線交易先於 `after_commit` 結束),只認最外層才不會把剛 commit 的檔案刪掉;而 `after_commit` 連 SAVEPOINT release 都會觸發,要用 `in_nested_transaction()` 擋掉
 - 稽核的動作顯示詞前後端各一份,`account_restored` 是三元運算式的 else 分支,人工比對必漏 —— 選項清單已改由 `/admin/audit/options` 從實際紀錄取,但顯示詞表仍是第二份真相(ISS-86 同類)
+
+- **加鎖會改變鎖序**:ISS-42 的 `with_for_update()` 讓登入變成「先鎖 sessions 再鎖 users」,與重設密碼/停權剛好相反,交叉審查實測重現 deadlock(40P01 不是 IntegrityError,使用者直接看到 500)。加任何列鎖前先確認同一組表在別處的取用順序
+- argon2 要 36ms,鎖不能包住它:一社一帳號共用登入,鎖在驗證外會讓同時登入的人整排排隊並佔滿連線池。改成「驗完再取鎖 + 重讀 hash 比對」
 
 ## B — 需決定
 

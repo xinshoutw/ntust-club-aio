@@ -99,8 +99,9 @@ async def validation_exception_handler(
     )
 
 
-# 唯一鍵 / 外鍵 / 排除約束:另一個交易搶先,重試才有意義
-_CONFLICT_SQLSTATES = {"23505", "23503", "23P01"}
+# 唯一鍵與排除約束:應用層先查再寫,擋下來的第二筆就是另一個交易搶先,重試才有意義。
+# 外鍵不在此列 —— 唯一會撞 FK 的刪帳號已在端點內攔下,剩下的只會是引用了不存在的 id
+_CONFLICT_SQLSTATES = {"23505", "23P01"}
 
 
 @app.exception_handler(IntegrityError)

@@ -3,8 +3,8 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from app.main import app, integrity_error_handler
-from app.models import Club
-from app.models.enums import ClubAttribute, ClubKind
+from app.models import Club, User
+from app.models.enums import ClubAttribute, ClubKind, UserRole
 from tests.conftest import make_club
 
 
@@ -49,6 +49,12 @@ async def test_only_race_constraints_map_to_409(db):
         await db.commit()
     await db.rollback()
 
+    db.add(User(role=UserRole.CLUB, username="u1", password_hash="x", name="u1", club_id=999999))
+    with pytest.raises(IntegrityError) as bad_ref:  # 外鍵:引用不存在的 id 是程式缺陷
+        await db.commit()
+    await db.rollback()
+
     request = httpx.Request("POST", "http://test/api/v1/x")
     assert (await integrity_error_handler(request, duplicate.value)).status_code == 409
     assert (await integrity_error_handler(request, bad_value.value)).status_code == 500
+    assert (await integrity_error_handler(request, bad_ref.value)).status_code == 500

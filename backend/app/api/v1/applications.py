@@ -1,13 +1,11 @@
 """社團端:線上申請(幹部證明/郵局帳戶異動/空間報修)+ 違規查詢 + 公告。"""
 
-from pathlib import Path
 
 import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Request, UploadFile
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.api.pagination import Pagination
-from app.core.config import settings
 from app.core.deps import ClubUser, DbDep, client_ip
 from app.core.errors import AppError, not_found, validation_error
 from app.models import (
@@ -270,8 +268,7 @@ async def upload_evidence(
         slot="evidence",
     )
     if existing_bytes + saved.size > cap:
-        file_service.unlink_quiet(Path(settings.upload_dir) / saved.path)
-        raise over_cap
+        raise over_cap  # 未 commit:落盤的檔案隨交易結束一起清掉
     await db.commit()
     return ApiResponse(data=FileOut.model_validate(saved))
 

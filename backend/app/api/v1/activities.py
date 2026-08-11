@@ -8,7 +8,6 @@ approved →(活動結束後)close → closing_pending_advisor → closed;退回
 """
 
 from datetime import UTC, datetime, time
-from pathlib import Path
 from typing import Annotated
 from urllib.parse import quote
 
@@ -17,7 +16,6 @@ from fastapi import APIRouter, BackgroundTasks, Query, Request, Response, Upload
 from starlette.concurrency import run_in_threadpool
 
 from app.api.pagination import Pagination, parse_sort
-from app.core.config import settings
 from app.core.deps import ClubUser, DbDep, client_ip
 from app.core.errors import AppError, conflict, not_found, validation_error
 from app.core.semesters import TAIPEI, semester_of, semester_range
@@ -328,8 +326,7 @@ async def upload_photo(
         dedup="slot",  # SHA-256 跨活動拒重複(同 slot=report_photo)
     )
     if existing + row.size > cap:
-        file_service.unlink_quiet(Path(settings.upload_dir) / row.path)
-        raise over_cap
+        raise over_cap  # 未 commit:落盤的檔案隨交易結束一起清掉
     await db.commit()
     return ApiResponse(data=FileOut.model_validate(row))
 
@@ -406,9 +403,7 @@ async def upload_attachment(
         slot=svc.ATTACHMENT_SLOT,
     )
     if existing + row.size > cap:
-        # 未 commit,DB 列隨交易回滾;磁碟檔需自行清掉
-        file_service.unlink_quiet(Path(settings.upload_dir) / row.path)
-        raise over_cap
+        raise over_cap  # 未 commit:落盤的檔案隨交易結束一起清掉
     await db.commit()
     return ApiResponse(data=FileOut.model_validate(row))
 

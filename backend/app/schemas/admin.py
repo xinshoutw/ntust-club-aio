@@ -413,6 +413,7 @@ class AuditLogOut(BaseModel):
 class AuditOperatorOut(BaseModel):
     id: int
     name: str
+    username: str  # 同名者的區辨用(校內同名並不罕見)
 
 
 class AuditOptionsOut(BaseModel):

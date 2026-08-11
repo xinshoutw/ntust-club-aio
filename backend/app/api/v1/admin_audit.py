@@ -25,7 +25,7 @@ SuperAdmin = Annotated[CurrentUser, Depends(require_super)]
 async def audit_options(user: SuperAdmin, db: DbDep) -> ApiResponse[AuditOptionsOut]:
     """篩選選項取自實際留下的紀錄:操作者不必先翻到那一頁才篩得到,動作也不會漏掉新加的。"""
     operators = await db.execute(
-        sa.select(AuditLog.user_id, User.name)
+        sa.select(AuditLog.user_id, User.name, User.username)
         .join(User, AuditLog.user_id == User.id)
         .distinct()
         .order_by(User.name)
@@ -33,7 +33,9 @@ async def audit_options(user: SuperAdmin, db: DbDep) -> ApiResponse[AuditOptions
     actions = await db.scalars(sa.select(AuditLog.action).distinct().order_by(AuditLog.action))
     return ApiResponse(
         data=AuditOptionsOut(
-            operators=[AuditOperatorOut(id=i, name=n) for i, n in operators],
+            operators=[
+                AuditOperatorOut(id=i, name=n, username=u) for i, n, u in operators
+            ],
             actions=list(actions),
         )
     )

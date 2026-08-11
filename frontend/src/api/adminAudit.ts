@@ -189,23 +189,29 @@ export async function fetchAllAuditLogs(filters: AuditFilters): Promise<AuditLog
 
 // ---- 篩選選項(取自實際留下的紀錄,不是已載入的那幾頁)----
 
-export interface AuditOptions {
-  operators: { id: number; name: string }[]
-  actionLabels: string[]
+interface Operator {
+  id: number
+  name: string
+  username: string
 }
 
 interface AuditOptionsOut {
-  operators: { id: number; name: string }[]
+  operators: Operator[]
   actions: string[]
 }
+
+/** 同名者附帳號區辨(校內同名不罕見);漏斗只收字串,label 必須唯一才篩得準 */
+const operatorLabel = (o: Operator, all: Operator[]): string =>
+  all.filter((x) => x.name === o.name).length > 1 ? `${o.name}(${o.username})` : o.name
 
 export function useAuditOptions() {
   return useQuery({
     queryKey: ['adminAudit', 'options'] as const,
     queryFn: () =>
       api<AuditOptionsOut>('/admin/audit/options').then((o) => ({
-        operators: o.operators,
+        operators: new Map(o.operators.map((x) => [operatorLabel(x, o.operators), x.id])),
         actionLabels: o.actions.map(actionLabelOf),
       })),
+    staleTime: 5 * 60_000, // 選項變動很慢,不必每次進頁都掃一次全表
   })
 }

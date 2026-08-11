@@ -12,7 +12,7 @@
 
 `GET /admin/audit?user_id&role&action&date_from&date_to&page&page_size`(每頁 20)
 
-篩選選項另走 `GET /admin/audit/options`(整張表的操作者與動作,不是已載入的那幾頁)
+篩選選項另走 `GET /admin/audit/options`(整張表的操作者與動作,不是已載入的那幾頁;操作者=所有留下過紀錄的帳號,同名者附帳號區辨)
 
 ## 畫面
 

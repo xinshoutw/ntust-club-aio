@@ -31,10 +31,10 @@ export default function AuditPage() {
   const [page, setPage] = useState(1)
   const [exporting, setExporting] = useState(false)
   const options = useAuditOptions()
-  const operators = options.data?.operators ?? []
+  const operators = options.data?.operators ?? new Map<string, number>()
 
   const filters = {
-    userId: operators.find((o) => o.name === whoFilter)?.id,
+    userId: whoFilter ? operators.get(whoFilter) : undefined,
     role: roleFilter ? roleKeyOf(roleFilter) : undefined,
     action: actionFilter ? actionKeyOf(actionFilter) : undefined,
     dateFrom: range?.[0].format('YYYY-MM-DD'),
@@ -44,7 +44,7 @@ export default function AuditPage() {
   const logs = listQuery.data?.logs ?? []
   const total = listQuery.data?.total ?? 0
 
-  const whoOptions = [...new Set(operators.map((o) => o.name))]
+  const whoOptions = [...operators.keys()]
 
   const setFilter = (setter: (next: string | null) => void, current: string | null) => (next: string[]) => {
     setter(pickSingle(current, next))
@@ -147,6 +147,19 @@ export default function AuditPage() {
                   <td style={{ fontSize: 13, color: 'var(--steel)' }}>{l.detail}</td>
                 </tr>
               ))}
+              {options.isError && (
+                <tr className="no-hover">
+                  <td colSpan={5}>
+                    {/* 選項掛掉時漏斗只會是空的,不講就等於默默少了兩個篩選 */}
+                    <QueryError
+                      compact
+                      title="篩選選項載入失敗"
+                      error={options.error}
+                      onRetry={() => options.refetch()}
+                    />
+                  </td>
+                </tr>
+              )}
               {listQuery.isError && (
                 <tr className="no-hover">
                   <td colSpan={5}>

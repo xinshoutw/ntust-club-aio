@@ -1,11 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { App, Select, Spin, Tooltip } from 'antd'
 import { DeleteOutlined, DownloadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
-import { Cols, MultiSortButton, sortParam, useMultiSort } from '../../components/ui/tableControls'
+import { Cols, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
 import { confirmDialog } from '../../lib/confirm'
 import {
+  LARGE_PAGE_SIZE,
   fileDownloadUrl,
   useDeleteFile,
   useFileUsage,
@@ -62,12 +63,17 @@ export default function AdminFilesPage() {
 
   const usageQuery = useFileUsage()
   const repairQuery = useRepairFiles()
-  const largeQuery = useLargeFiles(moduleFilter, sortParam(largeSortEntries))
+  const [largePage, setLargePage] = useState(1)
+  const largeSort = sortParam(largeSortEntries)
+  // 換排序等於換一份清單,停在第 3 頁會看到不相干的一段
+  useEffect(() => setLargePage(1), [largeSort])
+  const largeQuery = useLargeFiles(moduleFilter, largeSort, largePage)
   const deleteFile = useDeleteFile()
 
   const usage = usageQuery.data
   const repairFiles = repairQuery.data ?? []
-  const largeList = largeQuery.data ?? []
+  const largeList = largeQuery.data?.rows ?? []
+  const largeTotal = largeQuery.data?.total ?? 0
 
   // 模組順序由 API 決定(有報修檔案時 repair 排第一);報修歸零時整段自比例條與圖例移除
   const modules = (usage?.modules ?? []).filter((m) => m.key !== 'repair' || m.count > 0)
@@ -284,7 +290,10 @@ export default function AdminFilesPage() {
           <Select
             size="small"
             value={moduleFilter}
-            onChange={setModuleFilter}
+            onChange={(v) => {
+              setModuleFilter(v)
+              setLargePage(1)
+            }}
             style={{ minWidth: 140 }}
             options={[
               { value: 'all', label: '全部模組' },
@@ -356,6 +365,7 @@ export default function AdminFilesPage() {
               )}
             </tbody>
           </table>
+          <Pager page={largePage} pageSize={LARGE_PAGE_SIZE} total={largeTotal} onChange={setLargePage} />
         </Spin>
       </div>
     </div>

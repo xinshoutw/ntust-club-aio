@@ -100,16 +100,23 @@ async def list_files(
     user: FilesAdmin,
     db: DbDep,
     page: Pagination,
-    module: str | None = Query(None),
+    module: Annotated[list[str] | None, Query()] = None,  # 可重複帶多值
     sort: str | None = None,
 ) -> ApiResponse[list[AdminFileOut]]:
-    """大型檔案列表:模組篩選、預設依大小降冪(清理空間的主要對象)。"""
+    """大型檔案列表:模組篩選、預設依大小降冪(清理空間的主要對象)。
+
+    module 收多值:「報修以外的全部」在畫面上是常態需求,前端自行過濾的話
+    只會濾掉當頁的列,總數與分頁都會對不上。
+    """
     query = sa.select(File, Club.name).outerjoin(Club, File.club_id == Club.id)
-    if module is not None:
-        prefix = _PREFIX_BY_MODULE.get(module)
-        if prefix is None:
-            raise validation_error(f"未知模組:{module}")
-        query = query.where(_PREFIX_SQL == prefix)
+    if module:
+        prefixes = []
+        for key in module:
+            prefix = _PREFIX_BY_MODULE.get(key)
+            if prefix is None:
+                raise validation_error(f"未知模組:{key}")
+            prefixes.append(prefix)
+        query = query.where(_PREFIX_SQL.in_(prefixes))
     query = query.order_by(*parse_sort(sort, _SORTABLE, File.size.desc()), File.id)
 
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))

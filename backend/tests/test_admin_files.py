@@ -97,7 +97,20 @@ async def test_large_file_list_filter_and_sort(client, db):
     assert {f["original_name"] for f in data} == {"leak.mp4", "door.mov"}
     assert all(f["module"] == "repair" for f in data)
 
+    # 多值篩選:「報修以外的全部」是畫面常態,前端自行濾會濾掉當頁的列、總數也對不上
+    body = (
+        await client.get(
+            "/api/v1/admin/files",
+            params=[("module", m) for m in ("close", "eval", "apply", "apps")],
+        )
+    ).json()
+    assert {f["original_name"] for f in body["data"]} == {"photo.jpg", "doc.pdf", "old.jpg"}
+    assert body["meta"]["total"] == 3  # 分頁總數也排除報修
+
     assert (await client.get("/api/v1/admin/files", params={"module": "xxx"})).status_code == 422
+    assert (
+        await client.get("/api/v1/admin/files", params=[("module", "close"), ("module", "xxx")])
+    ).status_code == 422
     assert (await client.get("/api/v1/admin/files", params={"sort": "name"})).status_code == 422
     assert (
         await client.get("/api/v1/admin/files", params={"sort": "-created_at"})

@@ -3,7 +3,7 @@
 // - 報修檔案抓全量(全數列於頁面、可直接刪除);大型檔案取單頁 50 筆(預設依大小降冪)
 //   「全部模組」= 不帶 module 參數後前端排除報修(後端 module 為單值參數,無「除報修外」選項)
 // - 下載走通用 GET /files/{id}(admin 全通);已歸檔檔案已離盤(410),前端停用下載
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { API_BASE, api, apiPaged, qs } from './client'
 import { fetchAllPages } from './fetchAll'
@@ -74,7 +74,8 @@ const keys = {
   all: ['adminFiles'] as const,
   usage: ['adminFiles', 'usage'] as const,
   repair: ['adminFiles', 'repair'] as const,
-  large: (module: string, sort?: string) => ['adminFiles', 'large', module, sort ?? ''] as const,
+  large: (module: string, sort: string, page: number) =>
+    ['adminFiles', 'large', module, sort, page] as const,
 }
 
 export function useFileUsage() {
@@ -102,17 +103,28 @@ export function useRepairFiles() {
   })
 }
 
-const LARGE_PAGE_SIZE = 50
+export const LARGE_PAGE_SIZE = 50
 
-/** 大型檔案:單頁 50 筆(sort 走後端白名單 size/created_at,未帶=後端預設依大小降冪);
- * 'all' 前端排除報修(報修有專屬區) */
-export function useLargeFiles(module: Exclude<ModuleKey, 'repair'> | 'all', sort?: string) {
+/** 報修以外的模組(報修有專屬區,清理入口也不同) */
+const NON_REPAIR: Exclude<ModuleKey, 'repair'>[] = ['close', 'eval', 'apply', 'apps']
+
+/**
+ * 大型檔案:伺服器分頁(sort 走後端白名單 size/created_at,未帶=依大小降冪)。
+ * 「全部」= 明列報修以外的模組交給後端篩 —— 前端自行濾掉報修列的話,前 50 大剛好
+ * 都是報修影片時整張表會空掉,總數也對不上。
+ */
+export function useLargeFiles(
+  module: Exclude<ModuleKey, 'repair'> | 'all',
+  sort: string | undefined,
+  page: number,
+) {
   return useQuery({
-    queryKey: keys.large(module, sort),
+    queryKey: keys.large(module, sort ?? '', page),
     queryFn: () =>
       apiPaged<AdminFileOut[]>(
-        `/admin/files${qs({ module: module === 'all' ? undefined : module, sort, page: 1, page_size: LARGE_PAGE_SIZE })}`,
-      ).then(({ data }) => data.map(toFile).filter((f) => f.module !== 'repair')),
+        `/admin/files${qs({ module: module === 'all' ? NON_REPAIR : module, sort, page, page_size: LARGE_PAGE_SIZE })}`,
+      ).then(({ data, total }) => ({ rows: data.map(toFile), total })),
+    placeholderData: keepPreviousData,
   })
 }
 

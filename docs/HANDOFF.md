@@ -47,18 +47,28 @@
 
 **A3 第十一批(2026-08-11)已修**:場況圖組 ISS-74、73、96(96 只修得了「固定 vs 已核准固定」那一軸,另一軸拆為 ISS-97)、無障礙與文案組 ISS-84、82(色的一半)、80、81、併發組 ISS-37、44。跑了一輪 opus 交叉審查,抓到四件:blocked 格底下的待審單變成透明的隱形按鈕(本批新造)、社團總覽無條件全校撈已核准固定借用還擋著整張卡、ORDER BY 的斷言是恆真的、`學務處`/blocked 兩條新路徑零覆蓋 —— 全部已補。
 
-**A3 其餘 6 項**(可上線後補,全部不需任何人決策 —— 新 session 直接從這裡挑一批開始,作業流程見 `AGENTS.md`「修 issues.md 的條目時」)
+**A3 第十三批(2026-08-11)已修**:效能組 ISS-48(行政端 9 頁)、ISS-49(社團端 4 頁),兩頁一 commit;
+畫面與資料落差組 ISS-40 前端半 + ISS-97(新端點 `GET /club/room-bookings/occupancy`,三條軸都由後端判定);
+補做 GAP-05(場地主檔 CRUD)。跑了兩輪 opus 交叉審查,第一輪抓到三件必修(報修卡片換頁整張消失、
+帳號管理刪除後停在空白頁、四個 header 統計數字載入中顯示 0)與違規 status 排序靠字面值巧合,全部已修。
 
-建議順序:效能組 ISS-48/49(同一種修法:清單頁真的分頁,但每頁的欄位篩選、篩選選項來源都得跟著搬到後端,是剩下最大的一批)。
+**A3 其餘 2 項**(可上線後補;作業流程見 `AGENTS.md`「修 issues.md 的條目時」)
 
-- 效能:ISS-48(行政端 9 個清單頁)、ISS-49(社團端 4 個)
-- 畫面與資料落差:ISS-40 前端半(固定借用申請頁對場況全盲)、ISS-97(固定借用衝突不含臨時借用那條軸;修法牽涉「衝突判定權威放哪端」)
-- 文案樣式:ISS-82 剩下的 Skeleton 收斂(45 檔用 `<Spin>`)、ISS-83 自架明體
-- 補做:GAP-05 場地主檔 CRUD(照抄器材主檔)
+- 文案樣式:ISS-82 剩下的 Skeleton 收斂(45 檔用 `<Spin>`)—— 純樣式、無測試護欄,改動面最大
+- ISS-83 自架明體:同時列在 B 堆(要不要自架 Noto Serif TC 是決策),先問過再動
 
 
 
 已修各批中,交叉審查抓到、值得記著的坑:
+
+- **清單頁改伺服器端分頁,`?? 0` 是會說謊的預設值**:header 的數字卡改吃 `page_size=1` 的 `meta.total` 之後,查詢失敗就永遠顯示「未銷案 0 筆」而底下列著 30 筆。全站慣例是 `?? '—'`
+- 分頁查詢沒有 `placeholderData` 時,換頁瞬間 `data` 是 undefined:只要有「`total > 0` 才渲染整張卡」這種條件,卡片與分頁器會整個消失再冒出來。key 只差頁碼的表可以放心用 `keepPreviousData`(含篩選的不行,見下)
+- **刪除鍵所在的分頁表都要處理「刪掉本頁最後一列」**:留在第 3 頁而總頁數變 2,畫面顯示「尚無帳號」
+- 排序鍵直接綁列舉欄位,順序只是字面值巧合:`'open' < 'resolved'` 剛好對,`ViolationStatus` 一改名就靜默倒過來。狀態排序一律走 `sa.case`(維修、違規現在共用同一種寫法),而且測不出來 —— 只能靠等價性測試擋「顯式 sort ≠ 預設排序」
+- **判定搬到 SQL 就要留一條「兩邊同答案」的測試**:`window_open_sql`、`can_close_sql` 都是照 Python 版重寫的第二份,測試同時斷言篩選結果與逐列旗標,拿掉任一條件就會紅
+- 多值 query 參數改動不會破壞既有單值呼叫端(FastAPI 把 `?status=open` 解析成 `['open']`),但 `Literal` 型別的篩選要記得補齊列舉(`LoanStatusFilter` 原本漏了 `cancelled`,社團總覽的「未結束」集合就少一種)
+- **同一條路徑不能有兩個 router**:`/admin/venues` 原本在 `admin_bookings` 已有 GET,新增主檔 CRUD 時整條路徑要搬到同一個模組,否則先註冊的那支贏,新端點靜默失效(症狀是回應少了欄位)
+- 停用的格子只擋 `pointerdown` 不夠:容器的 `elementFromPoint` 照樣掃得到 disabled 按鈕,從別處起拖再掃過去仍然選得到
 
 - ISS-78 第一版把行政端改成「場地固定借用」,而社團端/系統設定/spec 檔名一直是「**固定場地借用**」—— 同一個功能兩個名字,`admin_rooms.py` 一個檔就有三則 Discord 標題各用一種。定案詞彙只說「用場地不用教室」,沒說詞序,改名前要先數哪個是既有多數
 - ISS-86b 的第一版註解換了個同樣不正確的理由:SQLAlchemy 對「賦值等於原值」根本不發 UPDATE,`updated_at` 從來沒有危險。那個守衛真正擋的是 PATCH 的重複學號檢查查到自己(行內編輯整列送回就會 409),而這條路徑當時零測試覆蓋
@@ -151,8 +161,8 @@
 
 ## 驗證現況(2026-08-11 實測)
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → 313 passed(含 `test_migrations.py`:另開一個庫跑 `alembic upgrade head`,比對欄位、索引名與 CHECK 名 —— 後兩者是子集斷言,擋的是「模型有、revision 漏了」;`test_migration_helpers.py`:兩支匯入腳本的純函式);`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` → 0 錯;`pnpm test` → 71 passed(17 檔);`pnpm run lint` → **8** 個 fast-refresh warning(全為既有的 `only-export-components` 類)
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → 327 passed(含 `test_migrations.py`:另開一個庫跑 `alembic upgrade head`,比對欄位、索引名與 CHECK 名 —— 後兩者是子集斷言,擋的是「模型有、revision 漏了」;`test_migration_helpers.py`:兩支匯入腳本的純函式);`ruff check .` 全綠
+- 前端 `pnpm exec tsc -b --force` → 0 錯;`pnpm test` → 76 passed(18 檔);`pnpm run lint` → **8** 個 fast-refresh warning(全為既有的 `only-export-components` 類)
 - `git log --all` 確認 `.env` 與 `migration/out` 從未進版控
 
 ## 其他待處理

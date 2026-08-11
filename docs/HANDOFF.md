@@ -57,9 +57,16 @@
 第三輪 —— 場地停用後待審單照樣核准得下去、`PATCH` 帶顯式 null 撞 NOT NULL 回 500、
 場況查詢失敗時整張時段表仍可自由選取(等於 ISS-40 的症狀重演)。
 
-**A3 其餘 2 項**(可上線後補;作業流程見 `AGENTS.md`「修 issues.md 的條目時」)
+**A3 第十四批(2026-08-11)已修**:ISS-82 剩下的 Skeleton 收斂 —— 新增 `components/ui/LoadingBlock`
+(pending 為真時不渲染 children、改鋪 `<Skeleton active>`),47 檔的 61 個 `<Spin spinning>` 與 10 個裸 `<Spin />`
+全數換掉,`frontend/src` 已無 `<Spin>`。跑了兩輪 opus 交叉審查,兩輪都抓到必修:
+第一輪 —— 換 Skeleton 等於「不渲染」,卡框/卡片間距/區塊標題全被吞掉(33 處)、
+行政分頁與帳號管理的 LoadingBlock 跨到別支查詢驅動的區塊;
+第二輪 —— 拆完之後行政分的社團清單反而沒了佔位、總覽三張卡仍共用一個全頁旗標、
+另外三頁同型的跨卡 LoadingBlock 漏了、分頁器被包在裡面(無 `placeholderData` 的頁換頁時真的會消失)。
 
-- 文案樣式:ISS-82 剩下的 Skeleton 收斂(45 檔用 `<Spin>`)—— 純樣式、無測試護欄,改動面最大
+**A3 其餘 1 項**(可上線後補;作業流程見 `AGENTS.md`「修 issues.md 的條目時」)
+
 - ISS-83 自架明體:同時列在 B 堆(要不要自架 Noto Serif TC 是決策),先問過再動
 
 
@@ -97,13 +104,13 @@
 - **把判定改成獨立查詢,就要一併決定「還沒回來」長什麼樣**:衝突標示改吃全量待審單後,查詢未就緒 = 空 Set = 畫面顯示「沒有衝突」,社團總覽還會把這個空值凍進彈窗 state。分離資料來源時,loading/error 兩態都要接
 - **前端判定的軸要對齊後端**:固定借用的衝突,後端是「同場地 × 學期區間重疊 × 已核准」,前端原本只比 `場地|星期|節次`。餵全量待審單後偽陽性反而變多(上一輪沒審完的 pending 會永久留著),補上區間重疊才對得起來
 - 效能修法的測試就寫「往返次數不隨資料量成長」:掛 SQLAlchemy `before_cursor_execute` 數 statement,1 社 vs 5 社比較。舊寫法 13 → 49,一眼就紅
-- 未啟用的 TanStack Query 恆為 `isPending`:拿它當 loading 旗標前要先 `&&` 回啟用條件,否則沒權限的管理員會看到永遠轉不完的 Spin。同一頁的四支查詢只修一支不算修完
+- 未啟用的 TanStack Query 恆為 `isPending`:拿它當 loading 旗標前要先 `&&` 回啟用條件,否則沒權限的管理員會看到永遠鋪著的 Skeleton。同一頁的四支查詢只修一支不算修完
 - **算出來的判定不要存進 state**:社團總覽把衝突清單在點擊當下算完凍進彈窗 state,查詢晚一步回來就永遠停在「沒有衝突」。改成 prop、每次 render 重算,誤點也會自動修正
 - `out.length >= total` 這個收工條件在**五個地方**各寫了一份(四支 CSV 全量抓取 + `bookings.ts` 的私有 `fetchAllPages` 副本),上一輪只修了 `fetchAll.ts` 那一份。共用 helper 抽出來之後要順手 grep `for (let page = 1`
 - 前端自行過濾後端回來的那一頁,分頁與總數一定對不上:大型檔案「全部模組」濾掉 repair 列,前 50 大剛好都是報修影片時整張表會空掉。要篩就把條件送給後端(`module` 收多值)
 - 「同社同場地同一天只能一張」少了節次條件:上午擺攤與晚上彩排是兩件事。ARRAY 欄位用 `.overlap()` 才是「節次重疊」
 - 破壞性腳本的環境防護要擋在 `--yes` 之前:`--yes` 存在的目的就是讓它不問就跑
-- `placeholderData: keepPreviousData` 只適合「同一份清單翻頁」:query key 含篩選條件時,換篩選會讓上一個模組的列留在畫面上,而且 `isPending=false` 連 Spin 都不轉。換條件要重設的不只頁碼
+- `placeholderData: keepPreviousData` 只適合「同一份清單翻頁」:query key 含篩選條件時,換篩選會讓上一個模組的列留在畫面上,而且 `isPending=false` 連 Skeleton 都不鋪。換條件要重設的不只頁碼
 - 換了資料來源的頁面要問「舊的選擇還成立嗎」:行政成員列表換社團時沿用上一社的學期,新社根本沒那個學期,查出來的空列表看起來像「這社沒人」
 - 後端補了權威值之後,前端那份 fallback 常數就是第二份真相 —— 拿掉,缺欄位視為 API 錯誤
 - **測不出來就別假裝測得出來**:「同一格多筆待審依 id 排序」寫了斷言也擋不住拿掉 `ORDER BY` —— 小表的回傳順序由 planner 決定(join `clubs` 之後剛好又回到 id 序)。指定 id 反序寫入也壓不出來,斷言只能當契約標記,別當護欄
@@ -115,6 +122,10 @@
 - `role="button"` 是 children-presentational:再給 `aria-label`,卡片裡的進度數字就全部讀不到了。整塊可點的卡片讓內容自己組名稱,別給 label
 - **alembic `op.create_check_constraint(name, ...)` 會再套一次命名慣例**:傳完整的 `ck_表_名` 會變成 `ck_表_ck_表_名`,與模型端對不上。傳短名讓慣例展開
 - 遷移鏈測試原本只比對欄位:索引與 CHECK 少了 revision 一樣測得過(這次兩支新約束就是這樣漏掉才被抓到),已補上名稱比對
+- **spinner 換 Skeleton 不是換元件,是把「遮罩」換成「不渲染」**:`<Spin spinning>` 的 children 還在(淡化 + `pointer-events:none`),Skeleton 是整段拿掉。所以範圍要重畫 —— 卡框、卡片 marginTop、區塊標題、分頁列都得留在外面,否則同一頁兩段會塌成兩塊分不出來的灰塊,資料到位再整塊往下跳
+- **一個載入旗標蓋幾張卡就是幾張卡的載入被綁在一起**:`<Spin>` 時代跨兩張卡只是一起淡化,換成 Skeleton 就是「別支查詢還沒回來、這張卡整個不存在」。總覽的公告卡本來要等「進行中申請」那七支裡最慢的一支;行政分審核換社團時,下面由 `clubsQuery` 驅動的社團清單連分頁器一起在游標底下消失
+- 分頁器包在 Skeleton 裡,在**沒有 `placeholderData`** 的頁面就是「每次換頁分頁器自己消失」—— 而那些頁沒有 placeholderData 往往是刻意的(換篩選不留上一份)。分頁器一律留在 LoadingBlock 外面,比逐頁判斷該不該留舊資料省事
+- 計數改成「載入中顯示 —」只做了一半:`isError` 時 `isPending` 是 false,badge 會印 0 或殘缺數字,旁邊還配一句「載入失敗」。載入中與失敗對使用者是同一件事;空狀態也要讓位給錯誤說明,否則「載入失敗」與「尚無資料」同時出現
 - 觸控拖曳與捲動只能二選一:時段表在手機上都要橫向捲,設 `touch-action: none` 換來批量選取並不划算。改用 pointer 事件統一滑鼠/觸控筆,觸控維持逐格點選並在 spec 寫明是刻意的
 
 ## B — 需決定

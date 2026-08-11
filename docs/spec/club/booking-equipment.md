@@ -11,7 +11,7 @@
 | 動作 | 端點 |
 |---|---|
 | 器材主檔 + 可借數 | `GET /club/equipment?activity_id=`(`meta` 回推導區間) |
-| 關聯活動下拉 | `GET /club/activities?status=approved`(前端再濾掉已結束) |
+| 關聯活動下拉 | `GET /club/activities?status=approved&ended=false`(已結束由後端篩掉);查詢失敗時下拉說「活動清單載入失敗」,不說「無審核通過之活動」 |
 | 正在借用 / 最近借用 | `GET /club/equipment-loans?active=true\|false` |
 | 送出 | `POST /club/equipment-loans` |
 | 取消 | `POST /club/equipment-loans/{id}/cancel` |

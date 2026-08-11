@@ -86,6 +86,7 @@ export function useMarkAnnouncementsRead() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: () => api<null>('/club/announcements/read', { method: 'POST' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: announcementKeys.all }),
+    // 只動已讀水位線,蓋板的篩選結果不受影響 —— 每次進總覽都重抓一次蓋板是白打的
+    onSuccess: () => qc.invalidateQueries({ queryKey: announcementKeys.list }),
   })
 }

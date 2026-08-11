@@ -1,3 +1,5 @@
+import pytest
+
 from app.models import Award
 from app.models.enums import AwardKind
 from tests.conftest import csrf_headers, login, make_club, make_user
@@ -69,6 +71,29 @@ async def test_override_revert_and_merit_flow(client, db):
     assert kinds.count("admin_score_override") == 2
     assert kinds.count("merit_bonus") == 1
     assert any(a["revoked"] for a in detail["adjustments"])
+
+
+async def test_override_waits_for_the_club_adjustment_lock(client, db):
+    """「註銷舊值 → 新增一筆」不是原子的:端點必須先取該社團的鎖,否則並發會留下兩筆生效中。"""
+    import asyncio
+
+    from app.core.db import async_session_factory
+    from app.services import evaluation
+
+    club = await seed(client, db)
+    await login(client, "evaladmin")
+
+    async with async_session_factory() as holder:
+        await evaluation.lock_adjustments(holder, club.id)  # 佔住鎖,交易不結束
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(
+                client.post(
+                    f"/api/v1/admin/eval/clubs/{club.id}/override",
+                    json={"key": "ad6", "score": 2, "reason": "並發"},
+                    headers=csrf_headers(client),
+                ),
+                timeout=1,
+            )
 
 
 async def test_override_score_capped_per_item(client, db):

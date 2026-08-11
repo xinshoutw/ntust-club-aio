@@ -126,6 +126,7 @@ async def override_score(
 ) -> ApiResponse[dict]:
     club = await _club_or_404(db, club_id)
     window = await evaluation.get_eval_window(db)
+    await evaluation.lock_adjustments(db, club.id)
     await _revoke_key(db, club.id, window.year, body.key)  # 新調整取代舊調整
     db.add(
         EvalAdjustment(
@@ -199,6 +200,7 @@ async def set_merit(
 ) -> ApiResponse[dict]:
     club = await _club_or_404(db, club_id)
     window = await evaluation.get_eval_window(db)
+    await evaluation.lock_adjustments(db, club.id)
     # 表現優良加分:最新一筆生效,舊列註銷留痕
     rows = await db.scalars(
         sa.select(EvalAdjustment).where(

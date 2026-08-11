@@ -30,6 +30,18 @@ from app.models.enums import (
 from app.services.scoring import ActivityResult, ClosedActivity, ScoringInput
 from app.services.settings_service import get_setting
 
+# 行政分/加分調整的 advisory lock:一社一把(隨交易釋放)。
+# 「註銷舊值 → 新增一筆」不是原子的,兩個並發調整各自看不到對方新增的那列,
+# 於是兩筆都留成生效中
+_ADJUSTMENT_LOCK_NS = 411004
+
+
+async def lock_adjustments(db: AsyncSession, club_id: int) -> None:
+    await db.execute(
+        sa.text("SELECT pg_advisory_xact_lock(:ns, :id)"),
+        {"ns": _ADJUSTMENT_LOCK_NS, "id": club_id},
+    )
+
 
 @dataclass(frozen=True)
 class EvalWindow:

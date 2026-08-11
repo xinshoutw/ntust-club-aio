@@ -1,7 +1,7 @@
 // 總覽頁 API 層:自 GET /club/activities 推導「待辦」與「進行中申請(活動)」
 // (照原 mock 邏輯:結案期限=活動結束日 +1 個月,推導不儲存)
 import { useQuery } from '@tanstack/react-query'
-import dayjs, { type Dayjs } from 'dayjs'
+import dayjs from 'dayjs'
 import { fetchAllPages } from './fetchAll'
 import type { StatusKey } from '../lib/status'
 
@@ -28,6 +28,7 @@ interface ActivityOut {
   end_date: string
   close_locked: boolean
   can_close: boolean
+  close_deadline: string | null
 }
 
 // 進行中=送審中/結案審核中/已核准(待辦理結案);草稿、退回、已結案不列入
@@ -38,8 +39,6 @@ const IN_PROGRESS = new Set([
   'closing_pending_advisor',
   'approved',
 ])
-
-const closeDeadline = (a: ActivityOut): Dayjs => dayjs(a.end_date).add(1, 'month')
 
 const trackedStatus = (a: ActivityOut): StatusKey => {
   if (a.close_locked) return 'locked'
@@ -74,8 +73,9 @@ export function useOverviewActivities() {
           id: a.id,
           kind: a.close_locked ? ('locked' as const) : ('closing_due' as const),
           name: a.name,
-          deadline: closeDeadline(a).format('YYYY/MM/DD'),
-          daysLeft: closeDeadline(a).startOf('day').diff(today, 'day'),
+          // 期限一律用後端算的(鎖定月數在系統設定可調,前端自己 +1 個月會整片錯)
+          deadline: a.close_deadline ? dayjs(a.close_deadline).format('YYYY/MM/DD') : '—',
+          daysLeft: dayjs(a.close_deadline ?? a.end_date).startOf('day').diff(today, 'day'),
         }))
         // 已鎖定在前,其餘依期限近到遠
         .sort((x, y) => (x.kind === y.kind ? x.daysLeft - y.daysLeft : x.kind === 'locked' ? -1 : 1))

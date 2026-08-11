@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import dayjs, { type Dayjs } from 'dayjs'
-import { App, Button, DatePicker, Spin, Tooltip } from 'antd'
+import { App, Button, DatePicker, Dropdown, Spin, Tooltip } from 'antd'
 import { LeftOutlined, RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
@@ -14,6 +14,7 @@ import {
   useAdminVenues,
   usePendingEquipmentLoans,
   usePendingVenueBookings,
+  type GridCell,
 } from '../../api/adminBookings'
 
 const GRID_LEGEND: CellState[] = ['free', 'fixedOnly', 'closed', 'reviewing', 'temp', 'fixed']
@@ -27,6 +28,17 @@ const CELL_STATE = {
   fixed: 'fixed',
   blocked: 'closed', // 不開放規則(Rule Page):不畫方框
 } as const
+
+/** 格的說明文字:格色所屬(不開放格為原因)+ 該格所有待審單。
+ *  已核准蓋過審核中,但底下壓著誰的申請正是承辦要看見的衝突,不能只剩顏色。 */
+function cellText(state: CellState, cell: GridCell | undefined): string {
+  const parts = [`${CELL[state].label}${cell?.club && state !== 'reviewing' ? `(${cell.club})` : ''}`]
+  if (cell?.pending.length) {
+    const who = cell.pending.map((p) => (p.kind === 'fixed' ? `${p.club}(固定借用)` : p.club))
+    parts.push(`待審:${who.join('、')}`)
+  }
+  return parts.join(' · ')
+}
 
 export default function AdminBookingsPage() {
   const { message } = App.useApp()
@@ -54,13 +66,13 @@ export default function AdminBookingsPage() {
     setOpen(true)
   }
 
-  // 場況「審核中」格點擊:以 booking_id 對照待審列表資料開審核彈窗
-  const openReviewByGrid = (bookingId: number) => {
+  // 場況格點擊:以申請 id 對照待審列表資料開審核彈窗(列表只有本頁,找不到就指路)
+  const openReviewByGrid = (bookingId: number, club: string) => {
     const booking = pendingVenues.find((v) => v.apiId === bookingId)
     if (booking) {
       openReview({ kind: 'venue', data: booking })
     } else {
-      message.error('找不到對應的待審申請,請於下方待審列表開啟')
+      message.error(`「${club}」的待審申請不在目前這一頁,請於下方待審列表翻頁開啟`)
     }
   }
 
@@ -129,34 +141,53 @@ export default function AdminBookingsPage() {
                       const cell = grid[String(v.id)]?.[p]
                       // 未列出的格不是一律可借:場地可能只開放固定借用,或整個不開放
                       const state: CellState = cell ? CELL_STATE[cell.status] : emptyCellState(v)
-                      // API 格值僅審核中帶申請 id;社團名以待審列表對照(其餘格無社團資訊)
-                      const club =
-                        cell?.bookingId != null
-                          ? pendingVenues.find((b) => b.apiId === cell.bookingId)?.club
-                          : undefined
-                      // 固定借用的審核中格點不了(要到「固定場地借用審核」),標示上要說清楚
-                      const kindNote = state === 'reviewing' && cell?.kind === 'fixed' ? '(固定借用)' : ''
-                      const label = `${v.name} 第${p}節:${CELL[state].label}${kindNote}${club ? `(${club})` : ''}`
+                      const text = cellText(state, cell)
+                      const label = `${v.name} 第${p}節:${text}`
+                      // 可點的是臨時借用待審單(固定借用要到「固定場地借用審核」審);
+                      // 已核准蓋過審核中的格子照樣點得到底下的待審單
+                      const openable = (cell?.pending ?? []).filter((x) => x.id != null)
                       const base: React.CSSProperties = { width: '100%', height: 24, borderRadius: 4, background: CELL[state].bg, display: 'block' }
                       const el =
-                        state === 'reviewing' && cell?.bookingId != null ? (
+                        openable.length > 0 ? (
                           <button
                             type="button"
                             aria-label={`${label},點擊開啟審核`}
-                            onClick={() => openReviewByGrid(cell.bookingId!)}
+                            onClick={
+                              openable.length === 1
+                                ? () => openReviewByGrid(openable[0].id!, openable[0].club)
+                                : undefined
+                            }
                             style={{ ...base, border: 'none', padding: 0, cursor: 'pointer' }}
                           />
                         ) : (
                           <div role="img" aria-label={label} style={base} />
                         )
+                      // 同一格多筆待審(兩社搶同一格):每一筆都要點得到,不能只留一筆
+                      const clickable =
+                        openable.length > 1 ? (
+                          <Dropdown
+                            trigger={['click']}
+                            menu={{
+                              items: openable.map((x) => ({
+                                key: String(x.id),
+                                label: `審核 ${x.club} 的申請`,
+                                onClick: () => openReviewByGrid(x.id!, x.club),
+                              })),
+                            }}
+                          >
+                            {el}
+                          </Dropdown>
+                        ) : (
+                          el
+                        )
                       return (
                         <td key={p}>
-                          {club ? (
-                            <Tooltip title={<span style={{ fontSize: 14 }}>{club}</span>} mouseEnterDelay={0}>
-                              {el}
+                          {cell ? (
+                            <Tooltip title={<span style={{ fontSize: 14 }}>{text}</span>} mouseEnterDelay={0}>
+                              {clickable}
                             </Tooltip>
                           ) : (
-                            el
+                            clickable
                           )}
                         </td>
                       )

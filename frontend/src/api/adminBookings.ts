@@ -43,34 +43,26 @@ const toVenue = (v: VenueOut): AdminVenue => ({
 
 export type GridStatus = 'pending' | 'temp' | 'fixed' | 'blocked'
 
+/** 該格的一筆待審單;id 僅臨時借用有(點格開審核彈窗),固定借用要到 /admin/rooms 審 */
+export interface GridPending {
+  id: number | null
+  club: string
+  kind: 'temp' | 'fixed'
+}
+
 export interface GridCell {
   status: GridStatus
-  bookingId: number | null // 僅審核中的臨時借用帶申請 id(點格開審核彈窗)
-  kind: 'temp' | 'fixed' | null // 審核中格是哪一種借用;固定借用要到 /admin/rooms 審
+  club: string | null // 決定格色的借用社團(blocked 格為不開放原因)
+  pending: GridPending[] // 該格全部待審單;已核准蓋過審核中時,被蓋掉的仍在這裡
 }
 
 /** venue_id → 節次 → 格值;未列出的格=可借 */
 export type AvailabilityGrid = Record<string, Record<string, GridCell>>
 
+// 格值欄位皆為 snake_case 無關的單字,直接沿用回應形狀(不需轉換層)
 interface AvailabilityOut {
   date: string
-  grid: Record<
-    string,
-    Record<string, { status: GridStatus; booking_id: number | null; kind: 'temp' | 'fixed' | null }>
-  >
-}
-
-const toGrid = (out: AvailabilityOut): AvailabilityGrid => {
-  const grid: AvailabilityGrid = {}
-  for (const [venueId, cells] of Object.entries(out.grid)) {
-    grid[venueId] = Object.fromEntries(
-      Object.entries(cells).map(([period, c]) => [
-        period,
-        { status: c.status, bookingId: c.booking_id, kind: c.kind },
-      ]),
-    )
-  }
-  return grid
+  grid: AvailabilityGrid
 }
 
 // ---- 臨時場地借用 ----
@@ -315,7 +307,7 @@ export function useAdminAvailability(date: string) {
   return useQuery({
     queryKey: keys.availability(date),
     queryFn: () =>
-      api<AvailabilityOut>(`/admin/bookings/availability${qs({ date })}`).then(toGrid),
+      api<AvailabilityOut>(`/admin/bookings/availability${qs({ date })}`).then((out) => out.grid),
     placeholderData: keepPreviousData,
   })
 }

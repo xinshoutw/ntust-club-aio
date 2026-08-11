@@ -351,17 +351,21 @@ async def test_admin_availability_grid_with_booking_ids(client, db):
     grid = (
         await client.get("/api/v1/admin/bookings/availability", params={"date": "2026-03-05"})
     ).json()["data"]["grid"]
-    # 審核中格帶申請 id(供點格開審核彈窗);已核准不帶。kind 區分臨時/固定
+    # 待審單帶申請 id(供點格開審核彈窗);已核准格只有社團名。kind 區分臨時/固定
     assert grid[str(venue.id)]["3"] == {
         "status": "pending",
-        "booking_id": pending.id,
-        "kind": "temp",
+        "club": club.name,
+        "pending": [{"id": pending.id, "club": club.name, "kind": "temp"}],
     }
-    assert grid[str(venue.id)]["7"] == {"status": "temp", "booking_id": None, "kind": "temp"}
+    assert grid[str(venue.id)]["7"] == {
+        "status": "temp",
+        "club": other_club.name,
+        "pending": [],
+    }
     assert grid[str(fixed_venue.id)]["5"] == {
         "status": "fixed",
-        "booking_id": None,
-        "kind": "fixed",
+        "club": other_club.name,
+        "pending": [],
     }
 
     # 審核中的固定借用也要標,否則承辦核准臨時借用時那格是空白的(點不了,要到 /admin/rooms 審)
@@ -377,8 +381,8 @@ async def test_admin_availability_grid_with_booking_ids(client, db):
     ).json()["data"]["grid"]
     assert grid[str(fixed_venue.id)]["6"] == {
         "status": "pending",
-        "booking_id": None,
-        "kind": "fixed",
+        "club": club.name,
+        "pending": [{"id": None, "club": club.name, "kind": "fixed"}],
     }
 
     # 不同星期:固定借用不佔用
@@ -391,6 +395,47 @@ async def test_admin_availability_grid_with_booking_ids(client, db):
     assert (
         await client.get("/api/v1/admin/bookings/availability", params={"date": "bad"})
     ).status_code == 422
+
+
+async def test_admin_grid_lists_every_pending_in_a_cell(client, db):
+    """一格多筆待審:已核准蓋過審核中之後仍點得到底下的待審單,兩社搶同一格也兩筆都在。"""
+    club, other_club = await seed(client, db)
+    venue = await make_venue(db)
+    activity = await make_activity(db, club)
+    day = date(2026, 3, 5)
+
+    def booking(owner, periods, status="pending"):
+        return VenueBooking(club_id=owner.id, venue_id=venue.id, activity_id=activity.id,
+                            date=day, periods=periods, purpose="彩排", status=status)
+
+    first, approved, second = (
+        booking(club, ["3", "5"]),
+        booking(other_club, ["3"], "approved"),
+        booking(other_club, ["5"]),
+    )
+    for row in (first, approved, second):  # 逐筆 commit 以固定 id 順序
+        db.add(row)
+        await db.commit()
+        await db.refresh(row)
+
+    grid = (
+        await client.get("/api/v1/admin/bookings/availability", params={"date": "2026-03-05"})
+    ).json()["data"]["grid"]
+    # 格色是已核准的,但被蓋掉的待審單仍在 pending —— 承辦點得到、也看得到是誰的
+    assert grid[str(venue.id)]["3"] == {
+        "status": "temp",
+        "club": other_club.name,
+        "pending": [{"id": first.id, "club": club.name, "kind": "temp"}],
+    }
+    # 兩社搶同一格:兩筆都要點得到,順序依 id(不隨 PG 回傳順序變動)
+    assert grid[str(venue.id)]["5"] == {
+        "status": "pending",
+        "club": club.name,
+        "pending": [
+            {"id": first.id, "club": club.name, "kind": "temp"},
+            {"id": second.id, "club": other_club.name, "kind": "temp"},
+        ],
+    }
 
 
 # ---- 核准衝突/可借數硬性檢核(2026-07-17 第十二輪) ----

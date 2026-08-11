@@ -382,6 +382,7 @@ async def availability_grids(
     - 審核中(含本社)一律標 pending;本社已核准才標 mine(2026-07-17 修正:自己審核中不再誤標我的借用)
     - 區間一次撈(單一場地 15 天檢視原逐日 15 請求,2026-07-17 改批次);
       venue_id 給定時(單一場地檢視)SQL 端即縮小到該場地
+    - 兩查詢皆 ORDER BY id:同一格多筆待審時,hover 顯示哪一社不隨 PG 回傳順序變動
     """
     grids: dict[date, dict[int, dict[str, dict]]] = {
         start + timedelta(days=i): {} for i in range((end - start).days + 1)
@@ -403,6 +404,7 @@ async def availability_grids(
             VenueBooking.date <= end,
             VenueBooking.status.notin_([BookingStatus.REJECTED, BookingStatus.CANCELLED]),
         )
+        .order_by(VenueBooking.id)
     )
     if venue_id is not None:
         temp_query = temp_query.where(VenueBooking.venue_id == venue_id)
@@ -427,6 +429,7 @@ async def availability_grids(
             RoomBookingRequest.end_date >= start,
             RoomBookingSlot.weekday.in_({d.isoweekday() for d in grids}),
         )
+        .order_by(RoomBookingRequest.id)
     )
     if venue_id is not None:
         fixed_query = fixed_query.where(RoomBookingRequest.venue_id == venue_id)
@@ -453,66 +456,66 @@ async def availability_grids(
 
 
 async def admin_availability_grid(db: AsyncSession, day: date) -> dict[int, dict[str, dict]]:
-    """行政端全校單日場況:格值 {status, booking_id}。
+    """行政端全校單日場況:格值 {status, club, pending}。
 
-    - status:pending(審核中)/temp(已核准臨時借用)/fixed(已核准固定借用)
-    - kind:pending 格是哪一種借用(temp 可點格開審核彈窗,fixed 要到 /admin/rooms 審)
-    - booking_id:僅審核中的臨時借用帶申請 id(供點格開審核彈窗);其餘為 None
-    - 無「自己借用」概念;已核准蓋過審核中(與 club 端同權重規則)
+    - status:pending(審核中)/temp(已核准臨時借用)/fixed(已核准固定借用)/blocked(不開放)
+    - club:決定該格顏色的借用社團名(行政手動借用為「學務處」;blocked 格為不開放原因)
+    - pending:該格**全部**待審單 [{id, club, kind}];id 僅臨時借用有(供點格開審核彈窗),
+      固定借用要到 /admin/rooms 審
+    - 無「自己借用」概念;已核准蓋過審核中(與 club 端同權重規則)——但被蓋掉的待審單
+      仍留在 pending 裡:承辦最需要看見的正是「這格已被核准,底下還壓著誰的申請」
+    - 兩查詢皆 ORDER BY id:同一格多筆待審時,誰決定格色與列表順序才不隨 PG 回傳順序變動
     """
     grid: dict[int, dict[str, dict]] = {}
     rank = {"pending": 0, "temp": 1, "fixed": 1, "blocked": 2}
 
-    def mark(
-        venue_id: int,
-        period: str,
-        status: str,
-        booking_id: int | None = None,
-        kind: str | None = None,
-    ) -> None:
-        cell = grid.setdefault(venue_id, {})
-        current = cell.get(period)
-        if current is None or rank[status] > rank[current["status"]]:
-            cell[period] = {"status": status, "booking_id": booking_id, "kind": kind}
+    def mark(venue_id: int, period: str, status: str, club: str | None) -> dict:
+        cell = grid.setdefault(venue_id, {}).setdefault(
+            period, {"status": status, "club": club, "pending": []}
+        )
+        if rank[status] > rank[cell["status"]]:
+            cell["status"], cell["club"] = status, club
+        return cell
 
     temp_rows = await db.execute(
-        sa.select(VenueBooking).where(
+        sa.select(VenueBooking, Club.name)
+        .outerjoin(Club, VenueBooking.club_id == Club.id)  # NULL club=行政手動借用
+        .where(
             VenueBooking.date == day,
             VenueBooking.status.notin_([BookingStatus.REJECTED, BookingStatus.CANCELLED]),
         )
+        .order_by(VenueBooking.id)
     )
-    for booking in temp_rows.scalars():
+    for booking, club_name in temp_rows:
         approved = booking.status == BookingStatus.APPROVED
+        name = club_name or "學務處"
         for period in booking.periods:
-            mark(
-                booking.venue_id,
-                period,
-                "temp" if approved else "pending",
-                None if approved else booking.id,
-                "temp",
-            )
+            cell = mark(booking.venue_id, period, "temp" if approved else "pending", name)
+            if not approved:
+                cell["pending"].append({"id": booking.id, "club": name, "kind": "temp"})
 
     fixed_rows = await db.execute(
-        sa.select(
-            RoomBookingSlot,
-            RoomBookingRequest.venue_id,
-            RoomBookingRequest.status == BookingStatus.APPROVED,
-        )
+        sa.select(RoomBookingSlot, RoomBookingRequest, Club.name)
         .join(RoomBookingRequest, RoomBookingSlot.request_id == RoomBookingRequest.id)
+        .join(Club, RoomBookingRequest.club_id == Club.id)
         .where(
             RoomBookingSlot.weekday == day.isoweekday(),
             RoomBookingRequest.status.notin_([BookingStatus.REJECTED, BookingStatus.CANCELLED]),
             RoomBookingRequest.start_date <= day,
             RoomBookingRequest.end_date >= day,
         )
+        .order_by(RoomBookingRequest.id)
     )
-    for slot, venue_id, approved in fixed_rows:
+    for slot, booking, club_name in fixed_rows:
         # 審核中的固定借用也要標:承辦人核准臨時借用時,若這格在螢幕上是空白的,
         # 雙重核准連目視都攔不下來
-        mark(venue_id, slot.period, "fixed" if approved else "pending", None, "fixed")
+        approved = booking.status == BookingStatus.APPROVED
+        cell = mark(booking.venue_id, slot.period, "fixed" if approved else "pending", club_name)
+        if not approved:
+            cell["pending"].append({"id": None, "club": club_name, "kind": "fixed"})
 
     for (_, vid), cells in (await blocked_map(db, day, day)).items():
-        for period in cells:
-            mark(vid, period, "blocked")
+        for period, reason in cells.items():
+            mark(vid, period, "blocked", reason)
 
     return grid

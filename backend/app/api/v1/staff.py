@@ -13,11 +13,11 @@ import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
 
 from app.api.pagination import Pagination, parse_sort
-from app.api.v1.admin_violations import _FILLER, _SORTABLE, _to_out
+from app.api.v1.admin_violations import _FILLER, _SORTABLE, _STATUS_ORDER, _to_out
 from app.core.deps import CurrentUser, DbDep, client_ip, require_staff
 from app.core.errors import conflict, not_found, validation_error
 from app.models import Club, Equipment, EquipmentLoan, Violation
-from app.models.enums import LoanStatus, ViolationStatus
+from app.models.enums import LoanStatus
 from app.schemas.admin import AdminViolationOut
 from app.schemas.common import ApiResponse
 from app.schemas.staff import (
@@ -124,9 +124,8 @@ async def list_violations(
     if sort:
         query = query.order_by(*parse_sort(sort, _SORTABLE, None), Violation.id)
     else:
-        # 預設排序:未銷案在前,各組內時間升冪(與行政端一致)
-        open_first = sa.case((Violation.status == ViolationStatus.OPEN, 0), else_=1)
-        query = query.order_by(open_first, Violation.occurred_on.asc(), Violation.id)
+        # 預設排序:未銷案在前,各組內時間升冪(與行政端共用同一個排序表達式)
+        query = query.order_by(_STATUS_ORDER, Violation.occurred_on.asc(), Violation.id)
 
     today = violation_service.today_taipei()
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))

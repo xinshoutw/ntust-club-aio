@@ -133,6 +133,25 @@ async def test_multi_value_filters_and_options(client, db):
     assert resp.json()["meta"]["total"] == 3
 
 
+async def test_status_sort_follows_resolution_progress(client, db):
+    """畫面預設會顯式送 sort=status,date,那條路徑必須等同不帶 sort 的預設排序。
+
+    等價性這一段是護欄(拿掉預設分支的 _STATUS_ORDER 會紅);「未銷案在前」那兩條
+    目前只是契約標記 —— 現行列舉剛好 'open' < 'resolved',換回列舉欄位排序照樣綠。
+    """
+    await seed(client, db)
+
+    default = (await client.get("/api/v1/admin/violations")).json()["data"]
+    explicit = (
+        await client.get("/api/v1/admin/violations", params={"sort": "status,date"})
+    ).json()["data"]
+    assert [d["id"] for d in explicit] == [d["id"] for d in default]
+    # 未銷案在前是業務語意,不是 'open' < 'resolved' 的字面值巧合
+    assert [d["status"] for d in explicit] == ["open", "open", "resolved"]
+    resp = await client.get("/api/v1/admin/violations", params={"sort": "-status"})
+    assert [d["status"] for d in resp.json()["data"]] == ["resolved", "open", "open"]
+
+
 async def test_options_requires_permission(client, db):
     await seed(client, db)
     await make_user(db, username="nope-admin", role="admin", permissions=["aact"])

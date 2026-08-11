@@ -30,6 +30,9 @@ ViolationAdmin = Annotated[CurrentUser, Depends(require_permission("aviol"))]
 
 _FILLER = sa.orm.aliased(User)
 
+# 未銷案在前(業務語意),不是列舉字面值 —— 目前 'open' < 'resolved' 只是巧合
+_STATUS_ORDER = sa.case((Violation.status == ViolationStatus.OPEN, 0), else_=1)
+
 # 排序白名單:期限=開立日+1 個月(單調),以開立日排序等價
 _SORTABLE = {
     "date": Violation.occurred_on,
@@ -37,7 +40,7 @@ _SORTABLE = {
     "items": sa.func.array_to_string(Violation.items, "、"),
     "filler": _FILLER.name,
     "deadline": Violation.occurred_on,
-    "status": Violation.status,
+    "status": _STATUS_ORDER,
     "created_at": Violation.created_at,
 }
 
@@ -116,8 +119,7 @@ async def list_violations(
         query = query.order_by(*parse_sort(sort, _SORTABLE, None), Violation.id)
     else:
         # 預設排序:未銷案在前,各組內時間升冪
-        open_first = sa.case((Violation.status == ViolationStatus.OPEN, 0), else_=1)
-        query = query.order_by(open_first, Violation.occurred_on.asc(), Violation.id)
+        query = query.order_by(_STATUS_ORDER, Violation.occurred_on.asc(), Violation.id)
 
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = await db.execute(query.offset(page.offset).limit(page.page_size))

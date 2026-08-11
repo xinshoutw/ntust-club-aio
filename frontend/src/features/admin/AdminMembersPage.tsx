@@ -13,6 +13,7 @@ import {
   fetchAllAdminMembers,
   useAdminClubMemberSemesters,
   useAdminClubMembers,
+  useClubOptions,
 } from '../../api/adminClubs'
 import ClubSelect from './ClubSelect'
 import { useAdminClub } from './clubContext'
@@ -37,6 +38,8 @@ export default function AdminMembersPage() {
 
   // 學期下拉以該社名單實際有的學期為來源(只放當前學期的話查不到歷史名單)
   const semestersQuery = useAdminClubMemberSemesters(clubId)
+  // clubId 為 null 時要分辨「還沒選」與「選項載不到」(已快取,零成本)
+  const clubsQuery = useClubOptions()
   const listQuery = useAdminClubMembers(clubId, {
     semester: semester === 'all' ? undefined : semester,
     sort: sortParam(entries),
@@ -142,11 +145,18 @@ export default function AdminMembersPage() {
                   </td>
                 </tr>
               )}
-              {/* 未選社團時查詢未啟用、isPending 恆真:那時 tbody 會整個空白,所以與 :91 一樣要帶 clubId */}
+              {/* 未選社團時查詢未啟用、isPending 恆真:那時 tbody 會整個空白,所以空狀態也要帶 clubId
+                  (與上方 listQuery 的 LoadingBlock pending 同一個條件)。
+                  而 clubId 為 null 有兩個原因:還沒選,或社團選項載不到 —— 後者叫人「請先選擇社團」
+                  是做不到的指示,選擇器已經被 OptionsError 取代了 */}
               {(clubId == null || (!listQuery.isPending && !listQuery.isError)) && members.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
-                    {clubId == null ? '請先選擇社團' : `${club} 尚未建立成員名單`}
+                    {clubsQuery.isError
+                      ? '社團清單載入失敗,請以頁首的重試鈕重新載入'
+                      : clubId == null
+                        ? '請先選擇社團'
+                        : `${club} 尚未建立成員名單`}
                   </td>
                 </tr>
               )}

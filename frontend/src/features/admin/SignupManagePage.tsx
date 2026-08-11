@@ -60,6 +60,11 @@ function ManageModal({
 
   // 逐人匯出:固定欄位+該活動全部自訂欄位(依欄位順序)
   const exportCsv = () => {
+    // 匯出鈕在 LoadingBlock 外面:載入中按下去會落到「尚無報名名單」那句假答案
+    if (regsQuery.isPending) {
+      message.error('報名名單尚在載入,請稍候再匯出')
+      return
+    }
     if (regsQuery.isError) {
       message.error('報名名單載入失敗,無法匯出;請重試後再匯出')
       return

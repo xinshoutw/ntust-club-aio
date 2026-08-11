@@ -200,7 +200,7 @@ export function useAwardDetail(awardId: string | undefined) {
     queryKey: keys.award(awardId ?? ''),
     enabled: !!awardId,
     queryFn: () => api<AwardDetailOut>(`/club/eval/awards/${awardId}`).then(toAwardDetail),
-    retry: false, // 不存在的獎項直接顯示找不到,不重試
+    retry: false, // 真的不存在(404)不必重試;失敗由頁面給重試鈕(AwardDetailPage)
   })
 }
 

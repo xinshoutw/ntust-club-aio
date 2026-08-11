@@ -37,24 +37,20 @@ export default function AwardDetailPage() {
   const [preview, setPreview] = useState<EvalFile | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
 
-  // 查詢失敗顯示錯誤與重試(同 SignupFormPage):獎項 id 來自後端自己的清單,
-  // 真的「不存在」幾乎不可能,而 retry:false 讓一次網路抖動就永久停在那個結論
-  if (isError) {
-    return (
-      <div>
-        <BackLink />
-        <div style={{ marginTop: 12 }}>
-          <QueryError title="獎項資料載入失敗" error={error} onRetry={() => void refetch()} />
-        </div>
-      </div>
-    )
-  }
-
+  // 手上還沒有資料才換成錯誤(同 ClubSettingsPage):上傳/刪除都會 invalidate,
+  // 那次重抓失敗不該把整頁連已上傳清單一起換掉。真的「不存在」幾乎不可能 ——
+  // 獎項 id 來自後端自己的清單,所以失敗一律當錯誤處理、給重試
   if (!award) {
     return (
       <div>
         <BackLink />
-        <LoadingBlock pending rows={6} />
+        {isError ? (
+          <div style={{ marginTop: 12 }}>
+            <QueryError title="獎項資料載入失敗" error={error} onRetry={() => void refetch()} />
+          </div>
+        ) : (
+          <LoadingBlock pending rows={6} />
+        )}
       </div>
     )
   }

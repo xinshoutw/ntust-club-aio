@@ -22,7 +22,10 @@ interface AttachmentAreaProps {
   /** 魔術位元組等單檔驗證:回傳錯誤訊息或 null */
   validate?: (f: File) => Promise<string | null>
   maxFileBytes?: number
+  /** 加總上限(總量,不是扣掉已用的剩餘量) */
   maxTotalBytes?: number
+  /** 已佔用但不在 value 裡的量(如單據上既有的附件),計入顯示與加總檢核 */
+  usedBytes?: number
   maxCount?: number
   /** 送出驗證未通過時的紅框標示 */
   error?: boolean
@@ -36,6 +39,7 @@ export default function AttachmentArea({
   validate,
   maxFileBytes,
   maxTotalBytes,
+  usedBytes = 0,
   maxCount,
   error,
 }: AttachmentAreaProps) {
@@ -63,7 +67,8 @@ export default function AttachmentArea({
           message.error(`「${f.name}」超過單檔 ${Math.round(maxFileBytes / 1024 / 1024)} MB 上限`)
           return
         }
-        if (maxTotalBytes != null && cur.reduce((s, b) => s + b.file.size, 0) + f.size > maxTotalBytes) {
+        const staged = usedBytes + cur.reduce((s, b) => s + b.file.size, 0)
+        if (maxTotalBytes != null && staged + f.size > maxTotalBytes) {
           message.error({ content: `檔案合計超過 ${Math.round(maxTotalBytes / 1024 / 1024)} MB 上限`, key: 'attach-total' })
           return
         }
@@ -84,7 +89,7 @@ export default function AttachmentArea({
     })
   }
 
-  const totalBytes = value.reduce((s, b) => s + b.file.size, 0)
+  const totalBytes = usedBytes + value.reduce((s, b) => s + b.file.size, 0)
 
   return (
     <div>

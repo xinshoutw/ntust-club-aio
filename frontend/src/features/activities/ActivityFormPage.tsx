@@ -663,7 +663,8 @@ function ActivityForm({
                 accept=".pdf"
                 hint="拖放 PDF 檔案"
                 validate={async (f) => ((await isPdfFile(f)) ? null : '不是有效的 PDF 檔')}
-                maxTotalBytes={Math.max(0, attachmentTotalBytes - existingBytes)}
+                maxTotalBytes={attachmentTotalBytes}
+                usedBytes={existingBytes}
               />
             </div>
 

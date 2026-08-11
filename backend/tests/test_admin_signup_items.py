@@ -176,6 +176,37 @@ async def test_list_with_registration_stats(client, db):
     assert by_club[club.name]["entries"][0]["answers"] == {"f1": "0912"}
 
 
+async def test_confirm_waits_for_the_signup_row_lock(client, db):
+    """確認是先讀 confirmed 再寫:沒鎖的話雙擊送出兩次都會通過,推兩則 Discord。"""
+    import asyncio
+
+    from app.core.db import async_session_factory
+    from app.models import Signup
+
+    club = await seed(client, db)
+    item = (await client.post(URL, json=body(), headers=csrf_headers(client))).json()["data"]
+    await login(client, "club01")
+    await client.post(
+        f"/api/v1/club/signup-items/{item['id']}/signup",
+        json={"participants": [{"answers": {"f1": "0912", "f2": "素"}}]},
+        headers=csrf_headers(client),
+    )
+    await login(client, "regadmin")
+
+    confirm_url = f"{URL}/{item['id']}/registrations/{club.id}/confirm"
+
+    # 另一次確認已寫入但還沒 commit:這支請求必須等它落地後重讀,才會看到已確認
+    async with async_session_factory() as first:
+        row = await first.scalar(sa.select(Signup).with_for_update())
+        row.confirmed = True
+        await first.flush()
+        second = asyncio.create_task(client.put(confirm_url, headers=csrf_headers(client)))
+        await asyncio.sleep(0.2)  # 讓它跑到讀取那一步
+        await first.commit()
+
+    assert (await second).status_code == 409
+
+
 async def test_confirm_flow_for_review_based_item(client, db):
     """審核制:社團報名後待確認 → 管理員確認 → 報名成功;重複確認 409。"""
     club = await seed(client, db)

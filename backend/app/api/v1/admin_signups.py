@@ -232,8 +232,11 @@ async def confirm_registration(
     item = await db.get(SignupItem, item_id)
     if item is None:
         raise not_found("找不到報名活動")
+    # 鎖住這張報名單再判定:兩次點擊都讀到未確認的話,兩邊都會推一則 Discord
     signup = await db.scalar(
-        sa.select(Signup).where(Signup.item_id == item.id, Signup.club_id == club_id)
+        sa.select(Signup)
+        .where(Signup.item_id == item.id, Signup.club_id == club_id)
+        .with_for_update()
     )
     if signup is None:
         raise not_found("該社團未報名此活動")

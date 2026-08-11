@@ -157,6 +157,13 @@ async def test_audit_records_before_and_after_values(client, db):
     await put({"close_lock_months": 2})
     assert len(list(await db.scalars(logged))) == 1
 
+    # 長清單:整份寫出來會超長,只記增減才看得出動了哪一項
+    await put({"violation_items": ["未經申請使用場地", "其他", "翻牆進入校園"]})
+    details = list(await db.scalars(logged))
+    assert "+\"翻牆進入校園\"" in details[1]
+    assert "-\"場地使用後未復原\"" in details[1]
+    assert len(details[1]) < 300  # 不得把整份清單塞進稽核
+
 
 async def test_budget_categories_with_hints(client, db):
     """經費科目為 [{name, hint}];依名稱去重保序,寫入後可讀回。"""

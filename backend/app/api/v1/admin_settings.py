@@ -47,12 +47,26 @@ def _to_json(value: Any) -> Any:
 
 
 _BRIEF_MAX = 200
+_MAX_DIFF_ITEMS = 5
 
 
 def _brief(value: Any) -> str:
     """稽核要看得出改前改後,但科目/違規項目這類長清單不該把稽核表格撐爆。"""
     text = json.dumps(value, ensure_ascii=False, sort_keys=True)
     return text if len(text) <= _BRIEF_MAX else f"{text[:_BRIEF_MAX]}…"
+
+
+def _diff(before: Any, after: Any) -> str:
+    """清單只記增減:整份寫出來會超長,而截斷後改前改後會塌成同一段字,等於什麼都沒記。"""
+    if not (isinstance(before, list) and isinstance(after, list)):
+        return f"{_brief(before)}→{_brief(after)}"
+    parts = [f"-{_brief(x)}" for x in before if x not in after]
+    parts += [f"+{_brief(x)}" for x in after if x not in before]
+    if not parts:
+        return "順序調整"
+    if len(parts) > _MAX_DIFF_ITEMS:
+        return "、".join(parts[:_MAX_DIFF_ITEMS]) + f"…等 {len(parts)} 項"
+    return "、".join(parts)
 
 
 @router.get("")
@@ -72,7 +86,7 @@ async def update_settings(
         value = _to_json(getattr(body, key))
         before = await get_setting(db, key)  # 必須在寫入前讀:set_setting 就地改同一列
         if before != value:
-            diffs.append(f"{key}={_brief(before)}→{_brief(value)}")
+            diffs.append(f"{key}={_diff(before, value)}")
         await set_setting(db, key, value)
     if diffs:
         audit.record(

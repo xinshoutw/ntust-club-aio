@@ -86,13 +86,20 @@ export interface ClubSuspension {
   /** YYYY/MM/DD;未停權為空字串 */
   until: string
   reason: string
+  /** 查詢失敗:`suspended` 這時等於「不知道」,不是「沒有停權」 */
+  failed: boolean
 }
 
-/** 停權狀態:借用四頁與管理項目共用(見 features/club-settings/SuspensionNote)。 */
+/** 停權狀態:借用四頁與管理項目共用(見 components/ui/SuspensionNote)。 */
 export function useClubSuspension(): ClubSuspension {
-  const { data } = useClubProfile()
+  const { data, isError } = useClubProfile()
   const until = data?.suspendedUntil ?? ''
-  return { suspended: suspendedNow(until), until, reason: data?.suspendReason ?? '' }
+  return {
+    suspended: suspendedNow(until),
+    until,
+    reason: data?.suspendReason ?? '',
+    failed: isError,
+  }
 }
 
 export interface ClubProfileInput {

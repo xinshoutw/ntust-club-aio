@@ -6,7 +6,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import BookingReviewModal, { type BookingReviewItem } from './BookingReviewModal'
-import { CELL, type CellState } from '../bookings/cells'
+import { CELL, emptyCellState, type CellState } from '../bookings/cells'
 import { PERIODS } from '../../api/bookings'
 import {
   useAdminAvailability,
@@ -16,7 +16,7 @@ import {
   usePendingVenueBookings,
 } from '../../api/adminBookings'
 
-const GRID_LEGEND: CellState[] = ['free', 'reviewing', 'temp', 'fixed']
+const GRID_LEGEND: CellState[] = ['free', 'reviewing', 'temp', 'fixed', 'fixedOnly', 'closed']
 const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
 const PAGE_SIZE = 50
 
@@ -127,7 +127,8 @@ export default function AdminBookingsPage() {
                     </td>
                     {PERIODS.map((p) => {
                       const cell = grid[String(v.id)]?.[p]
-                      const state: CellState = cell ? CELL_STATE[cell.status] : 'free'
+                      // 未列出的格不是一律可借:場地可能只開放固定借用,或整個不開放
+                      const state: CellState = cell ? CELL_STATE[cell.status] : emptyCellState(v)
                       // API 格值僅審核中帶申請 id;社團名以待審列表對照(其餘格無社團資訊)
                       const club =
                         cell?.bookingId != null

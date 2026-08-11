@@ -323,6 +323,19 @@ async def test_list_semesters_distinct_desc(client, db):
     assert resp.json()["data"] == ["114-2", "114-1", "113-2"]
 
 
+async def test_csv_import_undoes_formula_neutralizing_quote(client, db):
+    """匯出→匯入往返:匯出端補的單引號要脫掉,不然每來回一次多一個。"""
+    await setup_club_session(client, db)
+    resp = await client.post(
+        "/api/v1/club/members/import",
+        json={"semester": "114-2", "csv_text": "陳大文,B11109001,社員,,'+886912345678"},
+        headers=csrf_headers(client),
+    )
+    assert resp.json()["data"]["created"] == 1
+    phone = await db.scalar(sa.select(ClubMember.phone))
+    assert phone == "+886912345678"
+
+
 async def test_csv_import_strips_bom(client, db):
     """匯出檔前置 UTF-8 BOM(Excel 相容),原樣匯入時首列姓名不得被 BOM 污染。"""
     await setup_club_session(client, db)

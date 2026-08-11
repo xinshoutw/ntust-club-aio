@@ -1,12 +1,11 @@
 // 行政端檔案管理 API 層(權限鍵 afiles)。
 // - 空間彙總 GET /admin/files/usage:模組分段(有報修檔案時 repair 排第一)+「文字內容」= pg_database_size
-// - 報修檔案抓全量(全數列於頁面、可直接刪除);大型檔案走伺服器分頁(每頁 50,預設依大小降冪)
+// - 兩張表都走伺服器分頁(每頁 50,預設依大小降冪):報修檔案可直接刪除,大型檔案唯讀
 //   「全部模組」= 明列報修以外的模組交給後端篩(module 收多值),前端不自行過濾
 // - 下載走通用 GET /files/{id}(admin 全通);已歸檔檔案已離盤(410),前端停用下載
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { API_BASE, api, apiPaged, qs } from './client'
-import { fetchAllPages } from './fetchAll'
 
 export type ModuleKey = 'close' | 'eval' | 'apply' | 'apps' | 'repair'
 
@@ -73,7 +72,7 @@ export const fileDownloadUrl = (id: string): string => `${API_BASE}/files/${id}`
 const keys = {
   all: ['adminFiles'] as const,
   usage: ['adminFiles', 'usage'] as const,
-  repair: ['adminFiles', 'repair'] as const,
+  repair: (page: number) => ['adminFiles', 'repair', page] as const,
   large: (module: string, sort: string, page: number) =>
     ['adminFiles', 'large', module, sort, page] as const,
 }
@@ -94,16 +93,18 @@ export function useFileUsage() {
   })
 }
 
-/** 空間報修檔案:全數列出(檔案大、迭代快,清理空間的主要對象) */
-export function useRepairFiles() {
+export const LARGE_PAGE_SIZE = 50
+
+/** 空間報修檔案:可直接刪除(檔案大、迭代快,清理空間的主要對象);排序=後端預設大小降冪 */
+export function useRepairFiles(page: number) {
   return useQuery({
-    queryKey: keys.repair,
+    queryKey: keys.repair(page),
     queryFn: () =>
-      fetchAllPages<AdminFileOut>('/admin/files', { module: 'repair' }).then((rows) => rows.map(toFile)),
+      apiPaged<AdminFileOut[]>(
+        `/admin/files${qs({ module: 'repair', page, page_size: LARGE_PAGE_SIZE })}`,
+      ).then(({ data, total }) => ({ rows: data.map(toFile), total })),
   })
 }
-
-export const LARGE_PAGE_SIZE = 50
 
 /** 報修以外的模組(報修有專屬區,清理入口也不同) */
 const NON_REPAIR: Exclude<ModuleKey, 'repair'>[] = ['close', 'eval', 'apply', 'apps']

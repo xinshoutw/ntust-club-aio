@@ -62,7 +62,8 @@ export default function AdminFilesPage() {
   const { entries: largeSortEntries, toggle: toggleLargeSort } = useMultiSort<'size' | 'created_at'>()
 
   const usageQuery = useFileUsage()
-  const repairQuery = useRepairFiles()
+  const [repairPage, setRepairPage] = useState(1)
+  const repairQuery = useRepairFiles(repairPage)
   const [largePage, setLargePage] = useState(1)
   // 換排序等於換一份清單:與頁碼同一次更新,才不會先送出一次「新排序 + 舊頁碼」
   const toggleLargeSortAndReset = (key: 'size' | 'created_at') => {
@@ -73,7 +74,8 @@ export default function AdminFilesPage() {
   const deleteFile = useDeleteFile()
 
   const usage = usageQuery.data
-  const repairFiles = repairQuery.data ?? []
+  const repairFiles = repairQuery.data?.rows ?? []
+  const repairTotal = repairQuery.data?.total ?? 0
   const largeList = largeQuery.data?.rows ?? []
   const largeTotal = largeQuery.data?.total ?? 0
 
@@ -99,7 +101,11 @@ export default function AdminFilesPage() {
       cancelText: '取消',
       onOk: () => {
         deleteFile.mutate(f.id, {
-          onSuccess: () => message.success(`已刪除「${f.name}」(${fmtSize(f.sizeMb)})`),
+          onSuccess: () => {
+            message.success(`已刪除「${f.name}」(${fmtSize(f.sizeMb)})`)
+            // 刪掉的是本頁最後一列時退回前一頁,不要停在空白頁
+            if (repairFiles.length === 1 && repairPage > 1) setRepairPage(repairPage - 1)
+          },
           onError: (e) => message.error(e.message),
         })
       },
@@ -233,7 +239,7 @@ export default function AdminFilesPage() {
             onRetry={() => repairQuery.refetch()}
           />
         </div>
-      ) : repairFiles.length > 0 && (
+      ) : repairTotal > 0 && (
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px 8px', flexWrap: 'wrap' }}>
             <span style={{ width: 10, height: 10, borderRadius: 3, background: MODULE_COLORS.repair }} />
@@ -241,8 +247,9 @@ export default function AdminFilesPage() {
             <div style={{ fontSize: 12, color: 'var(--steel)' }}>檔案大、迭代快,可直接刪除釋放空間</div>
             <div style={{ flex: 1 }} />
             <span style={{ fontSize: 12, color: 'var(--steel)' }}>
-              共 <span className="num">{repairFiles.length}</span> 個 ·{' '}
-              <span className="num">{fmtSize(repairUsage?.sizeMb ?? repairFiles.reduce((s, f) => s + f.sizeMb, 0))}</span>
+              共 <span className="num">{repairTotal}</span> 個
+              {/* 佔用只認 usage 的權威值:分頁後這一頁的加總不是總量,已歸檔者也不佔空間 */}
+              {repairUsage && <> · <span className="num">{fmtSize(repairUsage.sizeMb)}</span></>}
             </span>
           </div>
           <table className="tb fixed" style={{ minWidth: 680 }}>
@@ -281,6 +288,7 @@ export default function AdminFilesPage() {
               ))}
             </tbody>
           </table>
+          <Pager page={repairPage} pageSize={LARGE_PAGE_SIZE} total={repairTotal} onChange={setRepairPage} />
         </div>
       )}
 

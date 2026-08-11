@@ -9,12 +9,10 @@ import type {
   AdminVenueBooking,
 } from '../../api/adminBookings'
 
-// room 的 conflictKeys(`${dow}|${period}`)由呼叫端以全部審核中申請的現場資料計算,
-// 比照 AdminRoomsPage 同邏輯——衝突=兩社搶同場地同星期同節次
 export type BookingReviewItem =
   | { kind: 'venue'; data: AdminVenueBooking }
   | { kind: 'loan'; data: AdminEquipmentLoan }
-  | { kind: 'room'; data: AdminRoomRequest & { conflictKeys?: string[] } }
+  | { kind: 'room'; data: AdminRoomRequest }
 
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 
@@ -23,6 +21,7 @@ const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 // onApprove/onReject:接 API 的頁面傳入 mutateAsync 回呼(成功 message+關彈窗、失敗 message.error)
 export default function BookingReviewModal({
   item,
+  conflictKeys,
   open,
   onClose,
   afterClose,
@@ -31,6 +30,9 @@ export default function BookingReviewModal({
   onRevoke,
 }: {
   item: BookingReviewItem
+  /** 固定借用衝突的 `dow|period`;由呼叫端每次 render 算(見 roomConflictSlots)——
+   *  存成快照的話,衝突清單晚一步回來就會永遠停在「沒有衝突」 */
+  conflictKeys?: string[]
   open: boolean
   onClose: () => void
   afterClose: () => void
@@ -50,7 +52,7 @@ export default function BookingReviewModal({
   const canRevoke = item.data.status === 'approved' && !!onRevoke && notPast
   const title =
     item.kind === 'venue' ? item.data.venue : item.kind === 'room' ? item.data.room : `${item.data.equipment} ×${item.data.qty}`
-  const roomConflict = item.kind === 'room' && canReview && (item.data.conflictKeys?.length ?? 0) > 0
+  const roomConflict = item.kind === 'room' && canReview && (conflictKeys?.length ?? 0) > 0
 
   const closeReason = () => {
     setReasonMode(null)
@@ -147,7 +149,7 @@ export default function BookingReviewModal({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {item.data.entries.flatMap((e) =>
                 e.periods.map((p) => {
-                  const conflict = canReview && (item.data.conflictKeys?.includes(`${e.dow}|${p}`) ?? false)
+                  const conflict = canReview && (conflictKeys?.includes(`${e.dow}|${p}`) ?? false)
                   return (
                     <span key={`${e.dow}-${p}`} className="num" style={{ color: conflict ? '#C13B34' : undefined, fontWeight: conflict ? 500 : undefined }}>
                       週{DOW_TEXT[e.dow]} 第 {p} 節{conflict && '（衝突）'}

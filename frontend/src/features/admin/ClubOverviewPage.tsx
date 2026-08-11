@@ -169,12 +169,18 @@ export default function ClubOverviewPage() {
   const loans = (loansQuery.data ?? []).filter((l) => l.status !== 'returned' && l.status !== 'rejected')
   const bookingCount = rooms.length + venues.length + loans.length
 
-  const trackedLoading = activitiesQuery.isPending || maintQuery.isPending
-  // 衝突查詢也要等:先讓列可點的話,彈窗會把「尚未載入」當成「沒有衝突」凍進 state。
-  // 未啟用的查詢恆為 isPending,故先看啟用條件(與 useAllPendingRoomBookings 的 enabled 同式)
-  const conflictsLoading = canRooms && clubId != null && pendingRoomsQuery.isPending
+  // 未啟用的查詢恆為 isPending:沒有該權限的管理員會看到永遠轉不完的 Spin,
+  // 所以每一支都要先看自己的啟用條件(與各 hook 的 enabled 同式)
+  const loading = (query: { isPending: boolean }, enabled: boolean) => enabled && query.isPending
+  const hasClub = clubId != null
+  const trackedLoading =
+    loading(activitiesQuery, canActivities && hasClub) || loading(maintQuery, canMaint && hasClub)
+  // 衝突查詢也要等:資料沒到就等於「沒有衝突」,核准鈕卻已經可以按
   const bookingLoading =
-    roomsQuery.isPending || venuesQuery.isPending || loansQuery.isPending || conflictsLoading
+    loading(roomsQuery, canRooms && hasClub) ||
+    loading(venuesQuery, canBookings && hasClub) ||
+    loading(loansQuery, canBookings && hasClub) ||
+    loading(pendingRoomsQuery, canRooms && hasClub)
 
   const rowStyle: React.CSSProperties = {
     display: 'flex',
@@ -253,13 +259,13 @@ export default function ClubOverviewPage() {
           )}
         </div>
 
+        <Spin spinning={bookingLoading}>
         <div className="card">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 20px 12px' }}>
             <div style={{ fontSize: 15, fontWeight: 600 }}>借用中</div>
             <span className="num" style={{ fontSize: 12, background: '#EEF0F3', color: 'var(--steel)', borderRadius: 999, padding: '1px 8px' }}>
               {bookingCount}
             </span>
-            {bookingLoading && clubId != null && <Spin size="small" />}
           </div>
           {!canRooms && !canBookings && <NoPermission />}
           {rooms.map((r) => (
@@ -267,7 +273,7 @@ export default function ClubOverviewPage() {
               key={`room-${r.id}`}
               className="click-tint"
               style={rowStyle}
-              {...clickableRow(() => openBooking({ kind: 'room', data: { ...r, conflictKeys: conflictSlotsOf(r) } }, r.apiId))}
+              {...clickableRow(() => openBooking({ kind: 'room', data: r }, r.apiId))}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14 }}>{r.room}</div>
@@ -311,6 +317,7 @@ export default function ClubOverviewPage() {
             </div>
           )}
         </div>
+        </Spin>
       </div>
 
       {/* 活動申請審核彈窗(與申請審核頁同版面);點列立即開啟、詳情補齊;
@@ -340,6 +347,7 @@ export default function ClubOverviewPage() {
         <BookingReviewModal
           key={booking.data.id}
           item={booking}
+          conflictKeys={booking.kind === 'room' ? conflictSlotsOf(booking.data) : undefined}
           open={bookingOpen}
           onClose={() => setBookingOpen(false)}
           afterClose={() => setBooking(null)}

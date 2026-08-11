@@ -60,6 +60,9 @@ async def _post_webhook(
         async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
             resp = await client.post(url, json=_with_identity(payload), params=params)
             resp.raise_for_status()
+    except httpx.HTTPStatusError as err:
+        # 不記整條例外:httpx 的訊息含完整 webhook URL,那串路徑就是憑證
+        logger.warning("discord webhook rejected (%s): %s", err.response.status_code, label)
     except Exception:  # noqa: BLE001 - 通知失敗不得影響業務
         logger.exception("discord webhook failed: %s", label)
 

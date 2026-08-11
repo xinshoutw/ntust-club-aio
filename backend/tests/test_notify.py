@@ -39,7 +39,7 @@ async def test_discord_disabled_without_url(monkeypatch):
     await notify.discord("announce", "title")  # no-op,不應丟例外
 
 
-async def test_discord_failure_is_swallowed(monkeypatch):
+async def test_discord_failure_is_swallowed(monkeypatch, caplog):
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(500)
 
@@ -51,8 +51,11 @@ async def test_discord_failure_is_swallowed(monkeypatch):
         return original(**kw)
 
     monkeypatch.setattr(httpx, "AsyncClient", patched)
-    monkeypatch.setattr(settings, "discord_webhook_url", "https://discord.test/webhook")
+    monkeypatch.setattr(settings, "discord_webhook_url", "https://discord.test/webhook/s3cr3t")
     await notify.discord("reject", "title")  # 失敗只記 log,不往外拋
+
+    # webhook URL 的尾段就是憑證,不得因為推送失敗而落進 log
+    assert "s3cr3t" not in caplog.text
 
 
 async def test_send_email_log_only_without_credentials(db, monkeypatch):

@@ -96,6 +96,7 @@ from app.models.enums import (
     UserRole,
     ViolationStatus,
 )
+from scripts._safety import refuse_on_prod
 from scripts.reset_db import drop_all, upgrade_head
 from scripts.seed import seed
 
@@ -1311,6 +1312,8 @@ async def main() -> None:
     parser.add_argument("--admin-username", default="super")
     parser.add_argument("--admin-password", default=DEFAULT_SUPER_PASSWORD)
     args = parser.parse_args()
+
+    refuse_on_prod("重灌 mock 資料")
 
     if not args.yes:
         answer = input("此操作會刪除資料庫全部資料並重灌 mock 資料,輸入 YES 繼續:")

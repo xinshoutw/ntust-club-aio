@@ -24,6 +24,7 @@ sys.path.insert(0, str(BACKEND_DIR))  # 讓 scripts/ 可 import app
 import sqlalchemy as sa
 
 from app.core.db import engine
+from scripts._safety import refuse_on_prod
 from scripts.seed import seed
 
 
@@ -59,6 +60,8 @@ async def main() -> None:
     parser.add_argument("--admin-username", default="super")
     parser.add_argument("--admin-password", default=None)
     args = parser.parse_args()
+
+    refuse_on_prod("還原資料庫")
 
     if not args.yes:
         answer = input("此操作會刪除資料庫全部資料,輸入 YES 繼續:")

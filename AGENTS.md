@@ -87,7 +87,7 @@
 CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q   # 平行 worktree 各用一庫
 uv run ruff check .
 uv run python scripts/reset_db.py --yes                # 清空 → head → 基礎 seed + superadmin
-uv run python scripts/seed_mock.py --yes               # reset 後灌全模組 mock
+uv run python scripts/seed_mock.py --yes               # reset 後灌全模組 mock(兩者在 ENV=prod 會拒絕執行)
 
 # 前端(frontend/)
 pnpm exec tsc -b        # --noEmit 是空檢查,不要用

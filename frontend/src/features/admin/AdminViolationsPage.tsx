@@ -196,19 +196,23 @@ export default function AdminViolationsPage() {
                   </td>
                 </tr>
               ))}
-              {listQuery.isError && (
+              {/* 選項失敗也要說出來:漏斗會靜靜地變成空選單,看起來像「沒有任何項目」 */}
+              {(listQuery.isError || optionsQuery.isError) && (
                 <tr className="no-hover">
                   <td colSpan={8}>
                     <QueryError
                       compact
-                      title="違規勸導紀錄載入失敗"
-                      error={listQuery.error}
-                      onRetry={() => listQuery.refetch()}
+                      title={listQuery.isError ? '違規勸導紀錄載入失敗' : '篩選選項載入失敗'}
+                      error={listQuery.error ?? optionsQuery.error}
+                      onRetry={() => {
+                        if (listQuery.isError) void listQuery.refetch()
+                        if (optionsQuery.isError) void optionsQuery.refetch()
+                      }}
                     />
                   </td>
                 </tr>
               )}
-              {!loading && !listQuery.isError && rows.length === 0 && (
+              {!loading && !listQuery.isError && !optionsQuery.isError && rows.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={8} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
                     {filtered ? '沒有符合篩選條件的紀錄' : '目前沒有違規勸導紀錄'}

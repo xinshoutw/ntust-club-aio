@@ -89,6 +89,43 @@ async def test_successful_logins_do_not_consume_rate_limit(client, db):
         assert (await login(client, "club01")).status_code == 200
 
 
+async def test_password_reset_beats_a_login_already_in_flight(db, monkeypatch):
+    """重設密碼撤銷所有 session 後,不得留下一個用舊密碼建立的 session。"""
+    import asyncio
+
+    from app.core.db import async_session_factory
+    from app.core.security import hash_password
+    from app.services import auth as auth_service
+
+    user = await make_user(db, username="club01")
+
+    real_verify = auth_service.verify_password_async
+
+    async def slow_verify(password_hash, password):
+        await asyncio.sleep(0.3)  # 撐開驗證期間,讓重設剛好落在中間
+        return await real_verify(password_hash, password)
+
+    monkeypatch.setattr(auth_service, "verify_password_async", slow_verify)
+
+    async def sign_in():
+        async with async_session_factory() as session:
+            await auth_service.login(
+                session, username="club01", password=PASSWORD, ip=None, user_agent=None
+            )
+
+    async def reset_password():  # 與兩支 reset-password 端點同樣的寫法
+        await asyncio.sleep(0.1)
+        async with async_session_factory() as session:
+            target = await session.get(User, user.id)
+            target.password_hash = hash_password("BrandNew!2345")
+            await session.execute(sa.delete(Session).where(Session.user_id == user.id))
+            await session.commit()
+
+    await asyncio.gather(sign_in(), reset_password())
+
+    assert await db.scalar(sa.select(sa.func.count()).select_from(Session)) == 0
+
+
 async def test_csrf_required_on_state_changing_requests(client, db):
     await make_user(db, username="club01")
     await login(client, "club01")

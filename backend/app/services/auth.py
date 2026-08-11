@@ -29,7 +29,9 @@ async def login(
     # 過期 session 順手清掉(單機低流量,不排程)
     await db.execute(sa.delete(Session).where(Session.expires_at <= sa.func.now()))
 
-    user = await db.scalar(sa.select(User).where(User.username == username))
+    # 鎖住這一列再驗密碼:同時進行的重設密碼會等到本次登入結束才改 hash 並撤銷 session,
+    # 否則「用舊密碼建立的 session」會在重設之後才寫進去,重設等於沒撤銷
+    user = await db.scalar(sa.select(User).where(User.username == username).with_for_update())
     now = datetime.now(UTC)
 
     if user is None or not user.is_active:

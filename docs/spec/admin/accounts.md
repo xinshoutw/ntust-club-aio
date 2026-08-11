@@ -37,4 +37,3 @@
 - 權限鍵前後端命名未統一(`areview`/`aact`、`asignup`/`areg`),靠 any-of 硬撐 —— 報名管理走 `require_permission("areg","asignup")`,活動審核則是 `admin_activities._reviewer` 自訂的 any-of。後端白名單兩套都收,DB 裡兩套鍵皆合法;**正式建帳號之前必須先統一**
 - 社團帳號重設密碼在此需 super,在管理項目頁只需 `amember`,兩處門檻不一致
 - 資料庫層沒有「一社一帳號」唯一約束,只靠應用層檢查,遷移腳本又繞過應用層
-- 密碼重設與登入可競態,可能產生「重設後舊密碼仍有效」的 session

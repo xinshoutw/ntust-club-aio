@@ -31,10 +31,10 @@
 - session 存 DB,cookie `session_id` 為 HttpOnly;7 天滑動效期,剩餘 < 6 天 23 小時才續期,續期時一併重送 cookie
 - CSRF double-submit:`csrf_token` cookie 非 HttpOnly,前端 `client.ts` 對 POST/PUT/PATCH/DELETE 自動附 `X-CSRF-Token`
 - 登入限流在應用層(`login_limiter`,只計失敗)與 nginx `limit_req` 各一道;帳號本身連錯 5 次鎖 15 分
+- 驗密碼期間鎖住該帳號列:同時進行的重設密碼會等本次登入結束,撤銷 session 才不會漏掉剛建立的那一個
 - 登入成功會清 `sessionStorage` 的蓋板已關閉紀錄,使蓋板公告每次登入重新顯示
 
 ## 未完成 / 問題
 
 - Argon2 雜湊在事件迴圈同步執行,登入尖峰會阻塞整站
-- 密碼重設與登入可競態,產生「重設後舊密碼仍有效」的 session
 - `/coming-soon` 是死路由,四角色皆有面板

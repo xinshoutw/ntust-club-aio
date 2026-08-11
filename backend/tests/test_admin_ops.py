@@ -210,14 +210,24 @@ async def test_audit_options_cover_every_record(client, db):
     """選項來自整張表:操作者不必先翻到那一頁,動作也不會漏掉新加的。"""
     super_admin = await make_user(db, username="root", role="admin", is_super=True)
     staff = await make_user(db, username="staff01", role="staff", name="李工讀")
+    old_hand = await make_user(db, username="staff02", role="staff", name="陳工讀")
+    # 只出現在最舊那一列的操作者與動作:選項若只取第一頁就會漏掉
+    db.add(
+        AuditLog(
+            user_id=old_hand.id,
+            role="staff",
+            action="account_deleted",
+            created_at=datetime(2020, 1, 1, tzinfo=UTC),
+        )
+    )
     db.add_all(
         [AuditLog(user_id=staff.id, role="staff", action="violation_filed", detail=str(i))
-         for i in range(25)]  # 超過一頁,確保不是靠翻頁累積
+         for i in range(25)]  # 把那一列推到第二頁之後
     )
     await db.commit()
 
     await login(client, "root")
     data = (await client.get("/api/v1/admin/audit/options")).json()["data"]
-    assert {o["id"] for o in data["operators"]} == {super_admin.id, staff.id}
-    assert "violation_filed" in data["actions"]
+    assert {o["id"] for o in data["operators"]} == {super_admin.id, staff.id, old_hand.id}
+    assert {"violation_filed", "account_deleted"} <= set(data["actions"])
     assert len(data["actions"]) == len(set(data["actions"]))

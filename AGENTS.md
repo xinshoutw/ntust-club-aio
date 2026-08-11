@@ -107,7 +107,8 @@ pnpm run lint
 
 - `src/api/{domain}.ts` 為接線範本(見 `api/members.ts` + `MembersPage`)
 - 元件與互動慣例一律照 `docs/design-guide.md` §6,不要自刻替代品
-- `PERIOD_TIMES` 前後端各一份(`booking_service.py` / `api/bookings.ts`),改動須同步
+- `PERIOD_TIMES` 前後端各一份(`booking_service.py` / `api/bookings.ts`),改動須同步;
+  `VenueCategory` 同樣兩份(`models/enums.py` / `api/adminVenues.ts`,後端是 PG enum,新增值另需 revision)
 
 **修 issues.md 的條目時**(A/B/C 三堆的作業流程,見 `docs/HANDOFF.md`)
 

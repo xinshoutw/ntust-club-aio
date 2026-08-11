@@ -42,6 +42,8 @@ class MemberKind(StrEnum):
 
 
 class VenueCategory(StrEnum):
+    """場地類別;前端 `api/adminVenues.ts` 的 VENUE_CATEGORIES 是第二份,改動須同步。"""
+
     CLASSROOM = "教室"
     PRACTICE = "練習空間"
     OUTDOOR = "廣場戶外"

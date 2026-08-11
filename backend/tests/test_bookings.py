@@ -310,7 +310,7 @@ async def test_fixed_occupancy_lists_all_three_conflict_sources(client, db):
     assert cells[(5, "7")] == "temp"  # ISS-97:臨時借用那條軸畫面本來完全看不到
     assert body["meta"]["start_date"] == sem_start.isoformat()
 
-    # 標出來的格子送出去一定會被擋 —— 畫面與檢核必須同一份判定
+    # 不開放規則那條在送出關就擋(固定/臨時是核准關才擋,見 admin_rooms 的 SLOT_TAKEN)
     resp = await client.post(
         "/api/v1/club/room-bookings",
         json={"venue_id": venue.id, "purpose": "社課", "slots": [{"weekday": 3, "period": "3"}]},

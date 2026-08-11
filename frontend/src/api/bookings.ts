@@ -396,7 +396,8 @@ export type OccupancyReason = 'blocked' | 'fixed' | 'temp'
 
 export const OCCUPANCY_TEXT: Record<OccupancyReason, string> = {
   blocked: '此時段場地不開放',
-  fixed: '已有其他社團的固定借用',
+  // 不寫「其他社團」:本社已核准的借用同樣佔著時段,也同樣不能再申請
+  fixed: '此時段已有已核准的固定借用',
   temp: '學期內有已核准的臨時借用',
 }
 
@@ -408,7 +409,10 @@ interface FixedOccupancyOut {
 
 /**
  * 該場地下一學期每週時段的佔用:key 為 'dow|period'。
- * 前端不自行推導 —— 臨時借用要逐日展開、不開放規則帶自己的日期區間,兩者都算不對。
+ *
+ * 三條與**核准**關的檢核同一份判定(送出關只擋不開放規則,固定/臨時是核准時才擋 —— 多社
+ * 競爭同一時段本來就允許,由承辦整單擇一)。前端不自行推導:臨時借用要逐日展開、
+ * 不開放規則帶自己的日期區間,兩者都算不對。
  */
 export function useFixedOccupancy(venueId: number | null) {
   return useQuery({

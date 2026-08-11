@@ -65,7 +65,10 @@ export default function FixedRoomPage() {
   const slotsRef = useRef(slots)
   slotsRef.current = slots
 
+  const occupiedRef = useRef<ReadonlyMap<string, string> | undefined>(undefined)
   const apply = (key: string, to: boolean) => {
+    // 自守一層:格子的 disabled 屬性與拖曳判定之外,套用本身也不接受被佔用的格
+    if (occupiedRef.current?.has(key)) return
     const has = slotsRef.current.has(key)
     if (to === has) return
     setSlotsError(false)
@@ -82,18 +85,24 @@ export default function FixedRoomPage() {
   // 拖曳批量選取:與 PeriodPicker 共用同一份手感(hook 必須在下方 early return 之前呼叫)
   const { containerProps, cellProps } = useDragSelect(apply)
 
-  // 場況:選了場地才查(佔用原因由後端判定,與送出/核准兩關同一份檢核)
+  // 場況:選了場地才查(佔用原因由後端判定,與核准關同一份檢核)
   const venueId = Form.useWatch<number | undefined>('room', form)
   const occupancyQuery = useFixedOccupancy(venueId ?? null)
+  // 場況查不到就不知道哪些格不能選,整表停用比讓人選了再被退好
+  const occupancyUnknown = venueId != null && occupancyQuery.isError
   const occupied = occupancyQuery.data
-  // 換場地時,原本選好的格子可能在新場地已被佔用:直接拿掉,不要讓人送出去吃 422
+  occupiedRef.current = occupied
+  // 換場地時,原本選好的格子可能在新場地已被佔用:直接拿掉(並說一聲),
+  // 不要讓人帶著注定被退的時段送出
   useEffect(() => {
     if (!occupied) return
     setSlots((prev) => {
       const next = new Set([...prev].filter((key) => !occupied.has(key)))
-      return next.size === prev.size ? prev : next
+      if (next.size === prev.size) return prev
+      message.info(`已移除 ${prev.size - next.size} 個在此場地不可借的時段`)
+      return next
     })
-  }, [occupied])
+  }, [occupied, message])
 
   // 開放窗由後端提供(與側欄共用同一查詢);未開放時直接輸入網址也只顯示說明
   const windowQuery = useFixedWindow()
@@ -249,8 +258,9 @@ export default function FixedRoomPage() {
               />
             </div>
           )}
-          {/* 場況未就緒時不讓人選:空的佔用表看起來就是「整週都可借」 */}
+          {/* 場況未就緒(載入中或失敗)時不讓人選:空的佔用表看起來就是「整週都可借」 */}
           <Spin spinning={venueId != null && occupancyQuery.isPending}>
+          <fieldset disabled={occupancyUnknown} style={{ border: 0, padding: 0, margin: 0 }}>
           <div className={slotsError ? 'area-error' : undefined} style={{ overflowX: 'auto', border: '1px solid transparent', borderRadius: 6 }}>
             <table aria-label="每週時段選擇" {...containerProps} style={{ borderCollapse: 'separate', borderSpacing: 4, width: '100%', tableLayout: 'fixed', minWidth: 640, userSelect: 'none' }}>
               {/* 不設表頭:每格按鈕本身已標節次,星期由列首標示 */}
@@ -303,6 +313,7 @@ export default function FixedRoomPage() {
               </tbody>
             </table>
           </div>
+          </fieldset>
           </Spin>
           {venueId != null && occupied && occupied.size > 0 && (
             <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, fontSize: 12, color: 'var(--steel)' }}>
@@ -316,7 +327,7 @@ export default function FixedRoomPage() {
           )}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
-            <Button type="primary" htmlType="submit" loading={createRoomBooking.isPending} disabled={createRoomBooking.isPending || suspended}>送出申請</Button>
+            <Button type="primary" htmlType="submit" loading={createRoomBooking.isPending} disabled={createRoomBooking.isPending || suspended || occupancyUnknown}>送出申請</Button>
           </div>
         </Form>
       </div>

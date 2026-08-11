@@ -4,7 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, qs } from './client'
 import { keys as bookingKeys } from './adminBookings'
 
-/** 場地類別(後端 VenueCategory 列舉,值即顯示詞) */
+/** 場地類別:與後端 `models/enums.py` 的 `VenueCategory` 各一份,**改動須同步**
+ *  (後端是 PG enum,新增值另需一支 Alembic revision) */
 export const VENUE_CATEGORIES = ['教室', '練習空間', '廣場戶外', '宿舍區'] as const
 export type VenueCategory = (typeof VENUE_CATEGORIES)[number]
 

@@ -1,5 +1,3 @@
-import dayjs, { type Dayjs } from 'dayjs'
-
 // 時間區間分隔符:系統寫 en dash,匯入/舊資料可能是 hyphen 或 em dash
 export const TIME_RANGE_SEP = /[–—-]/
 
@@ -9,18 +7,5 @@ export function dateRangeText(a: { date?: string; endDate?: string }): string {
   return a.endDate && a.endDate !== a.date ? `${a.date} – ${a.endDate}` : a.date
 }
 
-// 活動結束時刻:結束日(未填=開始日)+ timeRange 結束時刻(未填以 23:59 計)
-// 與後端 activity_service.end_datetime 同規則;無日期(部分草稿)回 undefined
-export function activityEndAt(a: { date?: string; endDate?: string; timeRange?: string }): Dayjs | undefined {
-  const day = a.endDate ?? a.date
-  if (!day) return undefined
-  const end = a.timeRange?.split(TIME_RANGE_SEP)[1]?.trim()
-  const parsed = dayjs(`${day} ${end || '23:59'}`, 'YYYY/MM/DD HH:mm')
-  return parsed.isValid() ? parsed : dayjs(`${day} 23:59`, 'YYYY/MM/DD HH:mm')
-}
-
-/** 活動是否已結束(借用「關聯活動」下拉排除已結束者) */
-export const activityEnded = (a: { date?: string; endDate?: string; timeRange?: string }): boolean => {
-  const end = activityEndAt(a)
-  return !!end && end.isBefore(dayjs())
-}
+// 「活動是否已結束」的判定只留後端一份(GET /club/activities?ended=false):
+// 前端這份複本原本只服務借用的關聯活動下拉,兩份規則一有出入就是下拉少一筆或多一筆

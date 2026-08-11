@@ -1,7 +1,7 @@
 // 活動申請/結案 API 層:snake_case ↔ camelCase 轉換集中在此,頁面只碰 camelCase 型別;
 // 日期後端 ISO(YYYY-MM-DD / datetime)↔ 前端顯示 YYYY/MM/DD、時間 HH:mm;
 // 查詢鍵集中管理,mutation 一律 invalidate 整域
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { API_BASE, api, apiPaged, qs } from './client'
 import { fetchAllPages } from './fetchAll'
@@ -353,7 +353,9 @@ export function useActivityList(params: ActivityListParams) {
           page_size: params.pageSize,
         })}`,
       ).then(({ data, total }) => ({ rows: data.map(toActivity), total })),
-    // 不留上一份:query key 含學期與篩選,沿用舊資料等於把別的條件的結果當成這次的
+    // 沿用上一份,換頁/換條件時才不會整表閃成「本學期尚無活動」、分頁器閃成「2 / 1」;
+    // 呼叫端以 isPlaceholderData 淡化舊資料,空狀態則等 isFetching 結束才顯示
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -368,14 +370,15 @@ export function useDraftActivities() {
   })
 }
 
-/** 已核准活動:借用綁定的下拉選項來源 */
+/** 已核准且尚未結束的活動:借用綁定的下拉選項來源(已結束的借不了,由後端篩) */
 export function useApprovedActivities() {
   return useQuery({
     queryKey: keys.approved,
     queryFn: () =>
-      fetchAllPages<ActivityOut>('/club/activities', { status: 'approved' }).then((rows) =>
-        rows.map(toActivity),
-      ),
+      fetchAllPages<ActivityOut>('/club/activities', {
+        status: 'approved',
+        ended: false,
+      }).then((rows) => rows.map(toActivity)),
   })
 }
 

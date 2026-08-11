@@ -33,7 +33,5 @@
 - 聯絡信箱是公告 Email 通知的收件人
 - 社團名稱與屬性(自治性/學藝性…)不可自行修改,只能由行政端改
 - profile 變更寫 `audit_logs`
+- 停權中時頁首顯示停權 pill 與到期日,停權原因收在 Tooltip
 
-## 未完成 / 問題
-
-- 停權狀態(`suspended_until` / `suspend_reason`)後端有回傳,但 `api/clubProfile.ts` 的 `ClubProfile` 型別根本沒接;社團只有在送借用撞到 403 `CLUB_SUSPENDED` 時才知道自己被停權

@@ -1,6 +1,9 @@
 // 管理項目 API 層:社團簡介/指導老師/聯絡與通知(GET/PATCH /club/profile)
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import dayjs from 'dayjs'
 import { api } from './client'
+
+const slashDate = (iso: string): string => dayjs(iso).format('YYYY/MM/DD')
 
 export interface ClubProfile {
   name: string
@@ -20,6 +23,9 @@ export interface ClubProfile {
   advisorOutDept: string
   advisorOutEmail: string
   advisorOutPhone: string
+  /** 停權中才有值(YYYY/MM/DD);社團要看得到自己被停權,而不是送借用撞 403 才知道 */
+  suspendedUntil: string | null
+  suspendReason: string
 }
 
 interface ClubProfileOut {
@@ -60,6 +66,8 @@ const toProfile = (c: ClubProfileOut): ClubProfile => ({
   advisorOutDept: c.advisor_out_dept ?? '',
   advisorOutEmail: c.advisor_out_email ?? '',
   advisorOutPhone: c.advisor_out_phone ?? '',
+  suspendedUntil: c.suspended_until ? slashDate(c.suspended_until) : null,
+  suspendReason: c.suspend_reason ?? '',
 })
 
 export const clubProfileKeys = { profile: ['club-profile'] as const }

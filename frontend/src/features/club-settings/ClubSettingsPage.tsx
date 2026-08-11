@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { App, Button, Form, Input, Spin } from 'antd'
+import { App, Button, Form, Input, Spin, Tooltip } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
+import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
 import { useUnsavedGuard } from '../../app/unsaved'
 import { changePasswordApi } from '../../api/auth'
@@ -158,7 +159,20 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
 
   return (
     <div>
-      <PageHeader title="管理項目" />
+      {/* 停權只在送借用撞 403 時才顯形 —— 社團自己的頁面要看得到,原因收進 Tooltip */}
+      <PageHeader
+        title="管理項目"
+        sub={
+          profile.suspendedUntil && (
+            <Tooltip title={profile.suspendReason || undefined}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <StatusPill status="suspended" />
+                停權至 {profile.suspendedUntil}
+              </span>
+            </Tooltip>
+          )
+        }
+      />
       <Form
         form={form}
         layout="vertical"

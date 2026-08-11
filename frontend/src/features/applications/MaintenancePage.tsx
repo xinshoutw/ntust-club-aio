@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { App, Button, Form, Input, Spin } from 'antd'
+import { App, Button, Form, Input } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
 import AttachmentArea, { type BagFile } from '../../components/ui/AttachmentArea'
@@ -49,9 +50,7 @@ export default function MaintenancePage() {
     return (
       <div>
         <PageHeader title="空間報修" />
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-          <Spin />
-        </div>
+        <LoadingBlock pending rows={6} />
       </div>
     )
   if (configQuery.isError)
@@ -123,7 +122,7 @@ export default function MaintenancePage() {
         </Form>
       </div>
 
-      <Spin spinning={listQuery.isPending}>
+      <LoadingBlock pending={listQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在報修</div>
           <table className="tb fixed" aria-label="空間報修紀錄" style={{ minWidth: 620 }}>
@@ -164,9 +163,9 @@ export default function MaintenancePage() {
             </tbody>
           </table>
         </div>
-      </Spin>
+      </LoadingBlock>
 
-      <Spin spinning={recentQuery.isPending}>
+      <LoadingBlock pending={recentQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近報修</div>
           <table className="tb fixed" aria-label="空間報修紀錄" style={{ minWidth: 620 }}>
@@ -207,7 +206,7 @@ export default function MaintenancePage() {
             </tbody>
           </table>
         </div>
-      </Spin>
+      </LoadingBlock>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { App, Form, Input, Modal, Spin, Tooltip } from 'antd'
+import { App, Form, Input, Modal, Tooltip } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
@@ -129,7 +130,7 @@ export default function AdminViolationsPage() {
         }
       />
 
-      <Spin spinning={loading}>
+      <LoadingBlock pending={loading}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
           <table className="tb dense fixed" aria-label="違規勸導紀錄" style={{ minWidth: 760 }}>
             {/* 社團/地點截斷、項目吃剩餘寬且允許換行;日期/填寫/期限/狀態/動作固定 px */}
@@ -223,7 +224,7 @@ export default function AdminViolationsPage() {
           </table>
           <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} />
         </div>
-      </Spin>
+      </LoadingBlock>
 
       <Modal
         open={resolveOpen}

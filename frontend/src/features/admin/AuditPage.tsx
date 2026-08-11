@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Button, DatePicker, Spin, message } from 'antd'
+import { Button, DatePicker, message } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { DownloadOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
@@ -94,7 +95,7 @@ export default function AuditPage() {
         }
       />
 
-      <Spin spinning={listQuery.isPending}>
+      <LoadingBlock pending={listQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
           <table className="tb dense fixed" style={{ minWidth: 760 }}>
             {/* 操作者截斷、內容吃剩餘寬且允許換行;時間/角色/動作固定 px */}
@@ -177,7 +178,7 @@ export default function AuditPage() {
           </table>
           <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} />
         </div>
-      </Spin>
+      </LoadingBlock>
     </div>
   )
 }

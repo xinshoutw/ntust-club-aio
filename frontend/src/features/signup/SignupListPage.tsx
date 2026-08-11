@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Button, Modal, Spin } from 'antd'
+import { Button, Modal } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
@@ -41,7 +42,7 @@ export default function SignupListPage() {
     <div>
       <PageHeader title="線上報名" />
 
-      <Spin spinning={listQuery.isPending}>
+      <LoadingBlock pending={listQuery.isPending}>
         <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
           {listQuery.isError && (
             <QueryError title="報名活動載入失敗" error={listQuery.error} onRetry={() => listQuery.refetch()} />
@@ -88,7 +89,7 @@ export default function SignupListPage() {
             </div>
           )}
         </div>
-      </Spin>
+      </LoadingBlock>
       <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
 
       <Modal
@@ -99,9 +100,7 @@ export default function SignupListPage() {
         footer={<Button onClick={() => setRecordOpen(false)}>關閉</Button>}
       >
         {recordQuery.isPending ? (
-          <div style={{ padding: '24px 0', textAlign: 'center' }}>
-            <Spin />
-          </div>
+          <LoadingBlock pending rows={4} />
         ) : recordQuery.isError ? (
           <QueryError compact title="報名紀錄載入失敗" error={recordQuery.error} onRetry={() => recordQuery.refetch()} />
         ) : recordQuery.data ? (

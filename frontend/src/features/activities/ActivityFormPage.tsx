@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router'
-import { App, Button, Checkbox, DatePicker, Form, Input, InputNumber, Popconfirm, Popover, Select, Spin, TimePicker } from 'antd'
+import { App, Button, Checkbox, DatePicker, Form, Input, InputNumber, Popconfirm, Popover, Select, TimePicker } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { confirmDialog } from '../../lib/confirm'
 import dayjs from 'dayjs'
 import { FileTextOutlined, InfoCircleOutlined } from '@ant-design/icons'
@@ -88,11 +89,7 @@ export default function ActivityFormPage() {
   // 經費科目/附件上限來自後端組態;表單初始化(預設科目)前必須先載入
   const configQuery = useClubConfig()
 
-  const spin = (
-    <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
-      <Spin />
-    </div>
-  )
+  const skeleton = <LoadingBlock pending rows={6} />
   const errorBox = (title: string, error: unknown, retry: () => void) => (
     <div>
       <PageHeader title="活動申請" />
@@ -102,13 +99,13 @@ export default function ActivityFormPage() {
     </div>
   )
 
-  if (configQuery.isPending) return spin
+  if (configQuery.isPending) return skeleton
   if (configQuery.isError) return errorBox('系統組態載入失敗', configQuery.error, () => void configQuery.refetch())
   const config = configQuery.data
 
   if (idNum != null) {
     if (!isValidId) return <Navigate to="/activities" replace />
-    if (detailQuery.isPending) return spin
+    if (detailQuery.isPending) return skeleton
     // 載入失敗留在原頁顯示錯誤與重試,不導回列表(導走會被誤認為活動不存在)
     if (detailQuery.isError) return errorBox('活動資料載入失敗', detailQuery.error, () => void detailQuery.refetch())
     const detail = detailQuery.data

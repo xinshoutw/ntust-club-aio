@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { App, Button, Checkbox, Input, Modal, Skeleton, Spin } from 'antd'
+import { App, Button, Checkbox, Input, Modal, Skeleton } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
@@ -353,7 +354,7 @@ export default function CloseReviewPage() {
       />
 
       {/* 待審佇列:送件早的在前 */}
-      <Spin spinning={pendingQuery.isPending}>
+      <LoadingBlock pending={pendingQuery.isPending}>
         <div className="card" style={{ marginTop: 20 }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 6px' }}>待審結案</div>
           {pending.map((p) => (
@@ -402,10 +403,10 @@ export default function CloseReviewPage() {
           )}
           <Pager page={pendingPage} pageSize={PAGE_SIZE} total={pendingTotal} onChange={setPendingPage} />
         </div>
-      </Spin>
+      </LoadingBlock>
 
       {/* 逾期未結案:已鎖定與已解鎖皆列出(狀態欄區分),整列可點開活動詳情 */}
-      <Spin spinning={overdueQuery.isPending}>
+      <LoadingBlock pending={overdueQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>逾期未結案</div>
           <table className="tb dense fixed" style={{ minWidth: 640 }} aria-label="逾期未結案活動">
@@ -478,7 +479,7 @@ export default function CloseReviewPage() {
           </table>
           <Pager page={overduePage} pageSize={PAGE_SIZE} total={overdueTotal} onChange={setOverduePage} />
         </div>
-      </Spin>
+      </LoadingBlock>
 
       {/* Modal 常駐至關閉動畫結束(afterClose)才卸載 */}
       {selected && (

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { App, Button, Input, Modal, Spin } from 'antd'
+import { App, Button, Input, Modal } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
@@ -173,9 +174,7 @@ export default function AdminRoomsPage() {
     return (
       <div>
         <PageHeader title="固定場地借用" />
-        <div className="card" style={{ marginTop: 20, padding: '48px 24px', textAlign: 'center' }}>
-          <Spin />
-        </div>
+        <LoadingBlock pending rows={6} />
       </div>
     )
   }
@@ -241,7 +240,7 @@ export default function AdminRoomsPage() {
         </div>
       )}
 
-      <Spin spinning={listQuery.isPending || allPendingQuery.isPending || approvedQuery.isPending}>
+      <LoadingBlock pending={listQuery.isPending || allPendingQuery.isPending || approvedQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
           <table className="tb dense fixed" aria-label="待審固定場地借用" style={{ minWidth: 760 }}>
             {/* 社團/場地/用途截斷、每週時段吃剩餘寬且允許換行;狀態/開啟固定 px */}
@@ -315,7 +314,7 @@ export default function AdminRoomsPage() {
           </table>
           <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} />
         </div>
-      </Spin>
+      </LoadingBlock>
 
       {/* Modal 常駐至關閉動畫結束(afterClose)才卸載 */}
       {selected && (

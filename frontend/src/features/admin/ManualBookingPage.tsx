@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { App, Button, DatePicker, Form, Input, InputNumber, Select, Spin } from 'antd'
+import { App, Button, DatePicker, Form, Input, InputNumber, Select } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { type Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
 import PeriodPicker from '../bookings/PeriodPicker'
@@ -65,7 +66,7 @@ export default function ManualBookingPage() {
   return (
     <div>
       <PageHeader title="手動借用" sub="行政直接借用,免審核直接核准;佔用以「學務處」顯示" />
-      <Spin spinning={venuesQuery.isPending || equipmentQuery.isPending}>
+      <LoadingBlock pending={venuesQuery.isPending || equipmentQuery.isPending}>
         <div className="form-grid-2" style={{ marginTop: 20, alignItems: 'start' }}>
           <div className="card" style={{ padding: 24 }}>
             <div style={sectionTitle}>臨時場地</div>
@@ -131,7 +132,7 @@ export default function ManualBookingPage() {
             </Form>
           </div>
         </div>
-      </Spin>
+      </LoadingBlock>
     </div>
   )
 }

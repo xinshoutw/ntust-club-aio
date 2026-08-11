@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Spin } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { Cols, MultiSortButton, Pager, sortParam, useMultiSort, type SortEntry } from '../../components/ui/tableControls'
@@ -40,7 +40,7 @@ export default function ViewerDonePage() {
         }
       />
 
-      <Spin spinning={query.isPending}>
+      <LoadingBlock pending={query.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
           <table className="tb dense fixed" style={{ minWidth: 560 }}>
             <Cols widths={['34%', 'auto', 90, 150]} />
@@ -86,7 +86,7 @@ export default function ViewerDonePage() {
           </table>
           <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} />
         </div>
-      </Spin>
+      </LoadingBlock>
     </div>
   )
 }

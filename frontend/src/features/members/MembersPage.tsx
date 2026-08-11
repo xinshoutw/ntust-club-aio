@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { App, Button, Form, Input, Modal, Popconfirm, Select, Spin, Upload } from 'antd'
+import { App, Button, Form, Input, Modal, Popconfirm, Select, Upload } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { DownOutlined, DownloadOutlined, EditOutlined, UploadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
@@ -191,7 +192,7 @@ export default function MembersPage() {
         }
       />
 
-      <Spin spinning={listQuery.isPending}>
+      <LoadingBlock pending={listQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
           <table className="tb fixed" style={{ minWidth: 800 }}>
             <Cols widths={['auto', 100, 120, 'auto', 120, 80, 134, 90]} />
@@ -329,7 +330,7 @@ export default function MembersPage() {
             </tbody>
           </table>
         </div>
-      </Spin>
+      </LoadingBlock>
       <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
 
       <Modal

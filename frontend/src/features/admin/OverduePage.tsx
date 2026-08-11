@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { App, Button, DatePicker, Form, Input, Modal, Spin } from 'antd'
+import { App, Button, DatePicker, Form, Input, Modal } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import dayjs, { type Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
@@ -74,7 +75,7 @@ export default function OverduePage() {
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>逾期未還器材</div>
-        <Spin spinning={overdueQuery.isPending}>
+        <LoadingBlock pending={overdueQuery.isPending}>
           <table className="tb dense fixed" aria-label="逾期未還器材" style={{ minWidth: 720 }}>
             {/* 社團截斷、器材允許換行(數量須可見)、借用資訊吃剩餘寬;狀態/動作固定 px */}
             <Cols widths={['18%', '20%', 'auto', 96, 100]} />
@@ -133,12 +134,12 @@ export default function OverduePage() {
             total={overdueQuery.data?.total ?? 0}
             onChange={setOverduePage}
           />
-        </Spin>
+        </LoadingBlock>
       </div>
 
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
         <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>停權中社團</div>
-        <Spin spinning={suspendedQuery.isPending}>
+        <LoadingBlock pending={suspendedQuery.isPending}>
           <table className="tb fixed" aria-label="停權中社團" style={{ minWidth: 560 }}>
             {/* 社團截斷、停權資訊吃剩餘寬;狀態/動作固定 px */}
             <Cols widths={['26%', 100, 'auto', 110]} />
@@ -184,7 +185,7 @@ export default function OverduePage() {
               )}
             </tbody>
           </table>
-        </Spin>
+        </LoadingBlock>
       </div>
 
       <Modal

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router'
-import { Spin } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { PRESENTATION_MAX, useViewerAssignments, type ViewerAssignment } from '../../api/viewer'
@@ -22,7 +22,7 @@ export default function MyReviewsPage() {
           <QueryError title="評分指派載入失敗" error={query.error} onRetry={() => void query.refetch()} />
         </div>
       ) : (
-        <Spin spinning={query.isPending}>
+        <LoadingBlock pending={query.isPending}>
           {!query.isPending && assignments.length === 0 ? (
             <div className="card" style={{ marginTop: 20, padding: '40px 24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
               尚未被指派評分
@@ -66,7 +66,7 @@ export default function MyReviewsPage() {
               })}
             </div>
           )}
-        </Spin>
+        </LoadingBlock>
       )}
     </div>
   )

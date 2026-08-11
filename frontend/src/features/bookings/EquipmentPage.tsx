@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import dayjs from 'dayjs'
-import { App, Button, Form, Input, InputNumber, Select, Spin } from 'antd'
+import { App, Button, Form, Input, InputNumber, Select } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
 import { confirmDialog } from '../../lib/confirm'
@@ -102,7 +103,7 @@ export default function EquipmentPage() {
 
       <div className="overview-grid" style={{ marginTop: 20 }}>
         <div className="card" style={{ overflowX: 'auto' }}>
-          <Spin spinning={equipmentQuery.isPending}>
+          <LoadingBlock pending={equipmentQuery.isPending}>
             <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>器材一覽</div>
             <table className="tb fixed" aria-label="器材一覽" style={{ minWidth: 480 }}>
               <Cols widths={['auto', 100, 120]} />
@@ -173,7 +174,7 @@ export default function EquipmentPage() {
                 )}
               </tbody>
             </table>
-          </Spin>
+          </LoadingBlock>
         </div>
 
         <div className="card" style={{ padding: 24 }}>
@@ -265,7 +266,7 @@ export default function EquipmentPage() {
         </div>
       </div>
 
-      <Spin spinning={activeQuery.isPending}>
+      <LoadingBlock pending={activeQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在借用</div>
           <table className="tb fixed" aria-label="正在借用" style={{ minWidth: 760 }}>
@@ -318,9 +319,9 @@ export default function EquipmentPage() {
             </tbody>
           </table>
         </div>
-      </Spin>
+      </LoadingBlock>
 
-      <Spin spinning={recentQuery.isPending}>
+      <LoadingBlock pending={recentQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近借用</div>
           <table className="tb fixed" aria-label="最近借用" style={{ minWidth: 760 }}>
@@ -369,7 +370,7 @@ export default function EquipmentPage() {
             </tbody>
           </table>
         </div>
-      </Spin>
+      </LoadingBlock>
     </div>
   )
 }

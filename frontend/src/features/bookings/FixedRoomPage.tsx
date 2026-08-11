@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import dayjs from 'dayjs'
-import { App, Button, Form, Input, Select, Spin } from 'antd'
+import { App, Button, Form, Input, Select } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
 import { confirmDialog } from '../../lib/confirm'
@@ -133,9 +134,7 @@ export default function FixedRoomPage() {
     return (
       <div>
         <PageHeader title="固定場地借用" />
-        <div className="card" style={{ marginTop: 20, padding: '48px 24px', textAlign: 'center' }}>
-          <Spin />
-        </div>
+        <LoadingBlock pending rows={6} />
       </div>
     )
   }
@@ -259,7 +258,7 @@ export default function FixedRoomPage() {
             </div>
           )}
           {/* 場況未就緒(載入中或失敗)時不讓人選:空的佔用表看起來就是「整週都可借」 */}
-          <Spin spinning={venueId != null && occupancyQuery.isPending}>
+          <LoadingBlock pending={venueId != null && occupancyQuery.isPending} rows={7}>
           <fieldset disabled={occupancyUnknown} style={{ border: 0, padding: 0, margin: 0 }}>
           <div className={slotsError ? 'area-error' : undefined} style={{ overflowX: 'auto', border: '1px solid transparent', borderRadius: 6 }}>
             <table aria-label="每週時段選擇" {...containerProps} style={{ borderCollapse: 'separate', borderSpacing: 4, width: '100%', tableLayout: 'fixed', minWidth: 640, userSelect: 'none' }}>
@@ -314,7 +313,7 @@ export default function FixedRoomPage() {
             </table>
           </div>
           </fieldset>
-          </Spin>
+          </LoadingBlock>
           {venueId != null && occupied && occupied.size > 0 && (
             <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, fontSize: 12, color: 'var(--steel)' }}>
               {(['blocked', 'fixed', 'temp'] as const).map((r) => (
@@ -332,7 +331,7 @@ export default function FixedRoomPage() {
         </Form>
       </div>
 
-      <Spin spinning={activeQuery.isPending}>
+      <LoadingBlock pending={activeQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在申請</div>
           <table className="tb fixed" aria-label="正在申請" style={{ minWidth: 620 }}>
@@ -379,9 +378,9 @@ export default function FixedRoomPage() {
             </tbody>
           </table>
         </div>
-      </Spin>
+      </LoadingBlock>
 
-      <Spin spinning={recentQuery.isPending}>
+      <LoadingBlock pending={recentQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
           <table className="tb fixed" aria-label="最近申請" style={{ minWidth: 560 }}>
@@ -418,7 +417,7 @@ export default function FixedRoomPage() {
             </tbody>
           </table>
         </div>
-      </Spin>
+      </LoadingBlock>
     </div>
   )
 }

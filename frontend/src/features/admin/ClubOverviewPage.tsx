@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Modal, Spin } from 'antd'
+import { Modal } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import type { StatusKey } from '../../lib/status'
@@ -186,7 +187,7 @@ export default function ClubOverviewPage() {
   const loans = loansQuery.data ?? []
   const bookingCount = rooms.length + venues.length + loans.length
 
-  // 未啟用的查詢恆為 isPending:沒有該權限的管理員會看到永遠轉不完的 Spin,
+  // 未啟用的查詢恆為 isPending:沒有該權限的管理員會看到永遠鋪著的 Skeleton,
   // 所以每一支都要先看自己的啟用條件(與各 hook 的 enabled 同式)
   const loading = (query: { isPending: boolean }, enabled: boolean) => enabled && query.isPending
   const hasClub = clubId != null
@@ -215,7 +216,7 @@ export default function ClubOverviewPage() {
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>基本資料</div>
-        <Spin spinning={clubId != null && detailQuery.isPending}>
+        <LoadingBlock pending={clubId != null && detailQuery.isPending}>
           <div style={{ display: 'grid', gridTemplateColumns: '96px 1fr', gap: '9px 12px', fontSize: 13 }}>
             <div style={label}>性質</div><div>{info?.attribute ?? '—'}</div>
             <div style={label}>帳號</div>
@@ -238,7 +239,7 @@ export default function ClubOverviewPage() {
           {detailQuery.isError && (
             <div style={{ fontSize: 13, color: '#C13B34', marginTop: 12 }}>載入失敗:{detailQuery.error.message}</div>
           )}
-        </Spin>
+        </LoadingBlock>
       </div>
 
       <div className="overview-grid">
@@ -246,9 +247,8 @@ export default function ClubOverviewPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 20px 12px' }}>
             <div style={{ fontSize: 15, fontWeight: 600 }}>進行中申請</div>
             <span className="num" style={{ fontSize: 12, background: '#EEF0F3', color: 'var(--steel)', borderRadius: 999, padding: '1px 8px' }}>
-              {trackedCount}
+              {trackedLoading && clubId != null ? '—' : trackedCount}
             </span>
-            {trackedLoading && clubId != null && <Spin size="small" />}
           </div>
           {!canActivities && !canMaint && <NoPermission />}
           {activities.map((a) => (
@@ -277,7 +277,7 @@ export default function ClubOverviewPage() {
           )}
         </div>
 
-        <Spin spinning={bookingLoading}>
+        <LoadingBlock pending={bookingLoading}>
         <div className="card">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 20px 12px' }}>
             <div style={{ fontSize: 15, fontWeight: 600 }}>借用中</div>
@@ -335,7 +335,7 @@ export default function ClubOverviewPage() {
             </div>
           )}
         </div>
-        </Spin>
+        </LoadingBlock>
       </div>
 
       {/* 活動申請審核彈窗(與申請審核頁同版面);點列立即開啟、詳情補齊;

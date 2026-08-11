@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { App, Button, Checkbox, Input, Modal, Spin, Tabs, Tooltip } from 'antd'
+import { App, Button, Checkbox, Input, Modal, Tabs, Tooltip } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { confirmDialog } from '../../lib/confirm'
 import { suspendedNow } from '../../lib/status'
 import PageHeader from '../../components/ui/PageHeader'
@@ -552,7 +553,7 @@ export default function AccountsPage() {
         }
       />
 
-      <Spin spinning={tab === 'clubs' ? clubsQuery.isPending : accountsLoading}>
+      <LoadingBlock pending={tab === 'clubs' ? clubsQuery.isPending : accountsLoading}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto', paddingTop: 8 }}>
           <Tabs
             activeKey={tab}
@@ -569,7 +570,7 @@ export default function AccountsPage() {
             ]}
           />
         </div>
-      </Spin>
+      </LoadingBlock>
 
       {/* 新增帳號:建立後顯示帳號與一次性密碼;destroyOnHidden+取消清空,重開不殘留 */}
       <Modal

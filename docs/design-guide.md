@@ -119,7 +119,7 @@ theme: {
 
 ## 6. 元件與互動慣例
 
-以下為全站強制慣例,新頁面照做,不要自刻替代品。既有頁面仍有未收斂處(`<Spin>`、原生 `<Upload>`),清單在 `HANDOFF.md` 的 debt 段。
+以下為全站強制慣例,新頁面照做,不要自刻替代品。既有頁面仍有未收斂處(原生 `<Upload>`),清單在 `HANDOFF.md` 的 debt 段。
 
 **表格**
 
@@ -154,7 +154,8 @@ theme: {
 
 - 可點卡片/列 hover 一律變色(`.click-tint`)
 - 空狀態:一句話 + 主動作按鈕,不放插圖
-- 載入用 Skeleton,不用整頁 spinner
+- 載入一律 `components/ui/LoadingBlock`(`pending` 傳 `isPending`,即手上一筆資料都沒有時),鋪 Skeleton 取代內容,不用 spinner;
+  翻頁與背景重抓靠 `placeholderData` 留住舊資料並以 `isPlaceholderData` 淡化,不進 LoadingBlock
 - 錯誤說發生什麼 + 怎麼辦
 - 危險動作(退回、刪除、停權)要填原因
 

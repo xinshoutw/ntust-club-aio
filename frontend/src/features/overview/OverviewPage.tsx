@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { Button, Spin } from 'antd'
+import { Button } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import Markdown from '../../components/ui/Markdown'
@@ -159,7 +160,7 @@ export default function OverviewPage() {
     <div>
       <PageHeader title="總覽" />
 
-      <Spin spinning={loading}>
+      <LoadingBlock pending={loading}>
         <div className="card" style={{ marginTop: 20 }}>
           <CardTitle title="待辦" count={todos.length} />
           {todos.map((t) => (
@@ -276,7 +277,7 @@ export default function OverviewPage() {
             {!loading && trackedErrored.length === 0 && tracked.length === 0 && <EmptyRow text="目前沒有進行中的申請" />}
           </div>
         </div>
-      </Spin>
+      </LoadingBlock>
 
       <AnnouncementModal
         announcement={viewing}

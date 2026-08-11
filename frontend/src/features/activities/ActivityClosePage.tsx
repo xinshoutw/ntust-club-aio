@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { App, Button, DatePicker, Input, InputNumber, Select, Spin, TimePicker, Tooltip, Upload } from 'antd'
+import { App, Button, DatePicker, Input, InputNumber, Select, TimePicker, Tooltip, Upload } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import dayjs, { type Dayjs } from 'dayjs'
 import { InfoCircleOutlined, RightOutlined, UploadOutlined } from '@ant-design/icons'
 import { useUnsavedGuard } from '../../app/unsaved'
@@ -101,7 +102,7 @@ export default function ActivityClosePage() {
 
       {/* 未選活動:直接列出可結案的活動供點選 */}
       {!activity && !approvedQuery.isError && (
-        <Spin spinning={approvedQuery.isPending}>
+        <LoadingBlock pending={approvedQuery.isPending}>
           {closable.length > 0 && (
             <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
               {closable.map((a) => (
@@ -136,7 +137,7 @@ export default function ActivityClosePage() {
               目前沒有可結案的活動
             </div>
           )}
-        </Spin>
+        </LoadingBlock>
       )}
 
       {activity &&
@@ -157,9 +158,7 @@ export default function ActivityClosePage() {
             <QueryError title="系統組態載入失敗" error={configQuery.error} onRetry={() => void configQuery.refetch()} />
           </div>
         ) : (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
-            <Spin />
-          </div>
+          <LoadingBlock pending rows={6} />
         ))}
     </div>
   )

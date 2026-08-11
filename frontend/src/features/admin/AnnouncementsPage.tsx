@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import dayjs, { type Dayjs } from 'dayjs'
-import { App, Button, Checkbox, DatePicker, Form, Input, Select, Spin, Switch } from 'antd'
+import { App, Button, Checkbox, DatePicker, Form, Input, Select, Switch } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import AnnouncementModal from '../../components/ui/AnnouncementModal'
 import QueryError from '../../components/ui/QueryError'
@@ -174,7 +175,7 @@ export default function AnnouncementsPage() {
         </Form>
       </div>
 
-      <Spin spinning={listQuery.isPending}>
+      <LoadingBlock pending={listQuery.isPending}>
         <div className="card" style={{ marginTop: 16 }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>已發布公告</div>
           {items.map((a) => (
@@ -230,7 +231,7 @@ export default function AnnouncementsPage() {
             </div>
           )}
         </div>
-      </Spin>
+      </LoadingBlock>
       <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
 
       <AnnouncementModal

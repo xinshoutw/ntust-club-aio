@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { App, Button, Input, Select, Spin, Switch } from 'antd'
+import { App, Button, Input, Select, Switch } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { confirmDialog } from '../../lib/confirm'
 import PageHeader from '../../components/ui/PageHeader'
 import { suspendedNow } from '../../lib/status'
@@ -181,7 +182,7 @@ export default function AdminClubSettingsPage() {
       <div className="form-grid-2" style={{ marginTop: 20, alignItems: 'stretch' }}>
         <div className="card" style={{ padding: 24 }}>
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>社團資料</div>
-          <Spin spinning={clubId != null && detailQuery.isPending}>
+          <LoadingBlock pending={clubId != null && detailQuery.isPending}>
             <div style={{ display: 'grid', gridTemplateColumns: '104px 1fr', gap: '10px 12px', fontSize: 13 }}>
               <div style={label}>英文名稱</div><div>{detail?.enName || '—'}</div>
               <div style={label}>校內指導老師</div><div>{advisorText(detail)}</div>
@@ -203,7 +204,7 @@ export default function AdminClubSettingsPage() {
             {detailQuery.isError && (
               <div style={{ fontSize: 13, color: '#C13B34', marginTop: 12 }}>載入失敗:{detailQuery.error.message}</div>
             )}
-          </Spin>
+          </LoadingBlock>
         </div>
 
         <div className="card" style={{ padding: 24 }}>
@@ -275,9 +276,9 @@ export default function AdminClubSettingsPage() {
               </div>
             </div>
           ) : (
-            <Spin spinning={clubId != null && detailQuery.isPending}>
+            <LoadingBlock pending={clubId != null && detailQuery.isPending}>
               <div style={{ minHeight: 120 }} />
-            </Spin>
+            </LoadingBlock>
           )}
         </div>
       </div>

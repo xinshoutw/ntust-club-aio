@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { App, Button, Form, Input, Spin } from 'antd'
+import { App, Button, Form, Input } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import SuspensionNote from '../../components/ui/SuspensionNote'
 import { useAuth } from '../../app/auth'
@@ -86,7 +87,7 @@ export default function ClubSettingsPage() {
             載入失敗:{profileQuery.error.message}
           </div>
         ) : (
-          <Spin style={{ display: 'block', marginTop: 60 }} />
+          <LoadingBlock pending rows={6} />
         )}
       </div>
     )

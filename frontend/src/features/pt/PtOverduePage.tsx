@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { App, Button, Spin, Tooltip } from 'antd'
+import { App, Button, Tooltip } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
@@ -44,7 +45,7 @@ export default function PtOverduePage() {
       />
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-        <Spin spinning={listQuery.isPending}>
+        <LoadingBlock pending={listQuery.isPending}>
           <table className="tb dense fixed" style={{ minWidth: 760 }}>
             <Cols widths={['20%', 'auto', 144, 72, 90, 90, 100]} />
             <thead>
@@ -106,7 +107,7 @@ export default function PtOverduePage() {
             </tbody>
           </table>
           <Pager page={page} pageSize={STAFF_PAGE_SIZE} total={total} onChange={setPage} />
-        </Spin>
+        </LoadingBlock>
       </div>
     </div>
   )

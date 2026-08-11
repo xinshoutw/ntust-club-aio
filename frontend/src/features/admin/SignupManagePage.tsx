@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { App, Button, Checkbox, DatePicker, Input, Modal, Spin, Tooltip } from 'antd'
+import { App, Button, Checkbox, DatePicker, Input, Modal, Tooltip } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { DeleteOutlined, DownloadOutlined, RightOutlined } from '@ant-design/icons'
 import type { Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
@@ -176,7 +177,7 @@ function ManageModal({
         </Button>
       </div>
 
-      <Spin spinning={regsQuery.isPending || (item.sessionBased && sessionsQuery.isPending)}>
+      <LoadingBlock pending={regsQuery.isPending || (item.sessionBased && sessionsQuery.isPending)}>
         {/* 場次管理:名稱+日期新增、刪除(出席紀錄一併刪除);逐場簽到於下方名單列登錄 */}
         {item.sessionBased && (
           <div style={{ marginTop: 14 }}>
@@ -318,7 +319,7 @@ function ManageModal({
             <div style={{ padding: '16px 14px', fontSize: 13, color: 'var(--steel)' }}>尚無社團報名</div>
           )}
         </div>
-      </Spin>
+      </LoadingBlock>
     </Modal>
   )
 }
@@ -355,7 +356,7 @@ export default function SignupManagePage() {
         }
       />
 
-      <Spin spinning={listQuery.isPending}>
+      <LoadingBlock pending={listQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
           <table className="tb dense fixed" style={{ minWidth: 720 }} aria-label="報名活動列表">
             {/* 活動名吃剩餘寬且允許換行(含類別徽章);截止/人數/狀態/開啟固定 px */}
@@ -420,7 +421,7 @@ export default function SignupManagePage() {
           </table>
           <Pager page={page} pageSize={SIGNUP_PAGE_SIZE} total={total} onChange={setPage} />
         </div>
-      </Spin>
+      </LoadingBlock>
 
       {/* Modal 常駐至關閉動畫結束(afterClose)才卸載 */}
       {selected && (

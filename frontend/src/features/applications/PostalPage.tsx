@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { App, Button, Checkbox, Form, Input, Spin } from 'antd'
+import { App, Button, Checkbox, Form, Input } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
 import AttachmentArea, { type BagFile } from '../../components/ui/AttachmentArea'
@@ -143,7 +144,7 @@ export default function PostalPage() {
         </Form>
       </div>
 
-      <Spin spinning={listQuery.isPending}>
+      <LoadingBlock pending={listQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在申請</div>
           <table className="tb fixed" aria-label="郵局帳戶異動申請紀錄" style={{ minWidth: 520 }}>
@@ -182,9 +183,9 @@ export default function PostalPage() {
             </tbody>
           </table>
         </div>
-      </Spin>
+      </LoadingBlock>
 
-      <Spin spinning={recentQuery.isPending}>
+      <LoadingBlock pending={recentQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
           <table className="tb fixed" aria-label="郵局帳戶異動申請紀錄" style={{ minWidth: 520 }}>
@@ -223,7 +224,7 @@ export default function PostalPage() {
             </tbody>
           </table>
         </div>
-      </Spin>
+      </LoadingBlock>
     </div>
   )
 }

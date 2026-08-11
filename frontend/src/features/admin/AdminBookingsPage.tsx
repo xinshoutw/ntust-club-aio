@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import dayjs, { type Dayjs } from 'dayjs'
-import { App, Button, DatePicker, Dropdown, Spin, Tooltip } from 'antd'
+import { App, Button, DatePicker, Dropdown, Tooltip } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { LeftOutlined, RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
@@ -117,7 +118,7 @@ export default function AdminBookingsPage() {
             ))}
           </div>
         </div>
-        <Spin spinning={venuesQuery.isPending || gridQuery.isPending}>
+        <LoadingBlock pending={venuesQuery.isPending || gridQuery.isPending}>
           <div style={{ overflowX: 'auto', marginTop: 12 }}>
             <table aria-label="場地借用情形" style={{ borderCollapse: 'separate', borderSpacing: 3, width: '100%', tableLayout: 'fixed', minWidth: 720 }}>
               <thead>
@@ -212,10 +213,10 @@ export default function AdminBookingsPage() {
               載入失敗:{venuesQuery.error?.message ?? gridQuery.error?.message}
             </div>
           )}
-        </Spin>
+        </LoadingBlock>
       </div>
 
-      <Spin spinning={venueQuery.isPending}>
+      <LoadingBlock pending={venueQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>場地</div>
           <table className="tb dense fixed" aria-label="待審場地借用" style={{ minWidth: 720 }}>
@@ -270,9 +271,9 @@ export default function AdminBookingsPage() {
           </table>
           <Pager page={venuePage} pageSize={PAGE_SIZE} total={venueTotal} onChange={setVenuePage} />
         </div>
-      </Spin>
+      </LoadingBlock>
 
-      <Spin spinning={loanQuery.isPending}>
+      <LoadingBlock pending={loanQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>器材</div>
           <table className="tb dense fixed" aria-label="待審器材借用" style={{ minWidth: 720 }}>
@@ -340,7 +341,7 @@ export default function AdminBookingsPage() {
           </table>
           <Pager page={loanPage} pageSize={PAGE_SIZE} total={loanTotal} onChange={setLoanPage} />
         </div>
-      </Spin>
+      </LoadingBlock>
 
       {/* Modal 常駐至關閉動畫結束(afterClose)才卸載 */}
       {selected && (

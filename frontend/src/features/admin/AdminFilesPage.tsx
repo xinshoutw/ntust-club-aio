@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { App, Select, Spin, Tooltip } from 'antd'
+import { App, Select, Tooltip } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { DeleteOutlined, DownloadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
@@ -127,7 +128,7 @@ export default function AdminFilesPage() {
       />
 
       {/* 空間利用:數字 + 依模組分段的比例條(hover 顯示明細);查詢失敗顯示錯誤而非 0/— 彙總 */}
-      <Spin spinning={usageQuery.isPending}>
+      <LoadingBlock pending={usageQuery.isPending}>
         {usageQuery.isError ? (
           <div style={{ marginTop: 20 }}>
             <QueryError
@@ -228,7 +229,7 @@ export default function AdminFilesPage() {
           </div>
         </div>
         )}
-      </Spin>
+      </LoadingBlock>
 
       {/* 空間報修:檔案大且迭代最快,可直接刪除;歸零時整個 section 消失(查詢失敗時顯示錯誤,不可誤判為無報修檔案) */}
       {repairQuery.isError ? (
@@ -311,7 +312,7 @@ export default function AdminFilesPage() {
             ]}
           />
         </div>
-        <Spin spinning={largeQuery.isPending}>
+        <LoadingBlock pending={largeQuery.isPending}>
           <table className="tb fixed" style={{ minWidth: 760 }}>
             {/* 檔名吃剩餘寬並截斷;社團截斷;模組/大小/日期/狀態/動作固定 px */}
             <Cols widths={['auto', 110, '14%', 96, 120, 80, 96]} />
@@ -376,7 +377,7 @@ export default function AdminFilesPage() {
             </tbody>
           </table>
           <Pager page={largePage} pageSize={LARGE_PAGE_SIZE} total={largeTotal} onChange={setLargePage} />
-        </Spin>
+        </LoadingBlock>
       </div>
     </div>
   )

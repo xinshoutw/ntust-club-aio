@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import dayjs, { type Dayjs } from 'dayjs'
-import { App, Button, DatePicker, Select, Spin, Tooltip } from 'antd'
+import { App, Button, DatePicker, Select, Tooltip } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import {
   ArrowLeftOutlined,
   DoubleLeftOutlined,
@@ -250,7 +251,7 @@ export default function BookingOverviewPage() {
           <Legend />
         </div>
 
-        <Spin spinning={gridPending}>
+        <LoadingBlock pending={gridPending}>
           <div style={{ overflowX: 'auto', marginTop: 12 }}>
             {gridError ? (
               <QueryError compact title="場地借用情形載入失敗" error={gridError.error} onRetry={gridError.retry} />
@@ -340,11 +341,11 @@ export default function BookingOverviewPage() {
               </table>
             )}
           </div>
-        </Spin>
+        </LoadingBlock>
       </div>
 
       {/* 正在借用:單卡整併(固定/臨時/器材)、完整呈現不限長度 */}
-      <Spin spinning={listsPending}>
+      <LoadingBlock pending={listsPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在借用</div>
           <table className="tb fixed" aria-label="正在借用" style={{ minWidth: 680 }}>
@@ -506,7 +507,7 @@ export default function BookingOverviewPage() {
           </table>
           <Pager page={returnedPage} pageSize={RETURNED_PAGE} total={returnedTotal} onChange={setReturnedPage} style={{ padding: '10px 0 14px' }} />
         </div>
-      </Spin>
+      </LoadingBlock>
     </div>
   )
 }

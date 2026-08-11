@@ -1,5 +1,6 @@
 import { useRef } from 'react'
-import { App, Button, DatePicker, Form, Input, InputNumber, Select, Spin } from 'antd'
+import { App, Button, DatePicker, Form, Input, InputNumber, Select } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import dayjs, { type Dayjs } from 'dayjs'
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
@@ -264,9 +265,7 @@ export default function AdminSettingsPage() {
       <AdminVenueCard />
       <AdminEquipmentCard />
       {settingsQuery.isPending ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
-          <Spin />
-        </div>
+        <LoadingBlock pending rows={6} />
       ) : settingsQuery.data ? (
         <SettingsForm initial={settingsQuery.data} />
       ) : (

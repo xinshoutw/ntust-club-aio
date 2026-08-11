@@ -1,4 +1,5 @@
-import { App, Button, Checkbox, DatePicker, Form, Input, Select, Spin } from 'antd'
+import { App, Button, Checkbox, DatePicker, Form, Input, Select } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import dayjs, { type Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
@@ -62,7 +63,7 @@ export default function PtViolationFormPage() {
     <div>
       <PageHeader title="違規勸導填寫" />
 
-      <Spin spinning={clubsQuery.isPending || itemsQuery.isPending}>
+      <LoadingBlock pending={clubsQuery.isPending || itemsQuery.isPending}>
         <div className="card" style={{ marginTop: 20, padding: 24 }}>
           <Form form={form} layout="vertical" requiredMark onFinish={onFinish}>
             <Form.Item name="club" label="社團" rules={[{ required: true, message: '請選擇社團' }]}>
@@ -110,7 +111,7 @@ export default function PtViolationFormPage() {
             </div>
           </Form>
         </div>
-      </Spin>
+      </LoadingBlock>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import dayjs from 'dayjs'
-import { Spin } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
@@ -29,7 +29,7 @@ export default function ViolationsPage() {
         請於 <span className="num">1</span> 個月內至學務處活動辦理銷案，逾期將不受理
       </div>
 
-      <Spin spinning={listQuery.isPending}>
+      <LoadingBlock pending={listQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
           <table className="tb fixed" style={{ minWidth: 720 }}>
             <Cols widths={[110, '22%', 'auto', 180, 100]} />
@@ -88,7 +88,7 @@ export default function ViolationsPage() {
             </tbody>
           </table>
         </div>
-      </Spin>
+      </LoadingBlock>
       <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
     </div>
   )

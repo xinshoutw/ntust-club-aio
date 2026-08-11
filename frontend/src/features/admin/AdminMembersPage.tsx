@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { App, Button, Select, Spin } from 'antd'
+import { App, Button, Select } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { DownloadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import { Cols, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
@@ -91,7 +92,7 @@ export default function AdminMembersPage() {
         }
       />
 
-      <Spin spinning={clubId != null && listQuery.isPending}>
+      <LoadingBlock pending={clubId != null && listQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
           <table className="tb fixed" style={{ minWidth: 680 }}>
             {/* 姓名/職稱吃彈性寬並截斷;學號/身份/電話/學期/更新時間固定 px */}
@@ -136,7 +137,7 @@ export default function AdminMembersPage() {
             </tbody>
           </table>
         </div>
-      </Spin>
+      </LoadingBlock>
       <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
     </div>
   )

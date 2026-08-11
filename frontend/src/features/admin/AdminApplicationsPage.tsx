@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { App, Select, Spin } from 'antd'
+import { App, Select } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
@@ -82,7 +83,7 @@ export default function AdminApplicationsPage() {
         }
       />
 
-      <Spin spinning={certsQuery.isPending}>
+      <LoadingBlock pending={certsQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
           <div style={{ padding: '14px 16px 0', fontSize: 15, fontWeight: 600 }}>幹部證明</div>
           <table className="tb dense fixed" style={{ minWidth: 720 }}>
@@ -132,9 +133,9 @@ export default function AdminApplicationsPage() {
             onChange={setCertPage}
           />
         </div>
-      </Spin>
+      </LoadingBlock>
 
-      <Spin spinning={postalQuery.isPending}>
+      <LoadingBlock pending={postalQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
           <div style={{ padding: '14px 16px 0', fontSize: 15, fontWeight: 600 }}>郵局帳戶異動</div>
           <table className="tb dense fixed" style={{ minWidth: 860 }}>
@@ -208,7 +209,7 @@ export default function AdminApplicationsPage() {
             onChange={setPostalPage}
           />
         </div>
-      </Spin>
+      </LoadingBlock>
     </div>
   )
 }

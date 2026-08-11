@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { App, Button, Input, InputNumber, Modal, Select, Skeleton, Spin } from 'antd'
+import { App, Button, Input, InputNumber, Modal, Select, Skeleton } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { Cols, Pager, sortRows, type SortEntry } from '../../components/ui/tableControls'
@@ -114,7 +115,7 @@ export default function ViewerScorePage() {
           尚未被指派評分
         </div>
       ) : (
-        <Spin spinning={assignmentsQuery.isPending}>
+        <LoadingBlock pending={assignmentsQuery.isPending}>
           <div className="card" style={{ marginTop: 20, overflowX: 'auto', minHeight: assignmentsQuery.isPending ? 120 : undefined }}>
             <table className="tb dense fixed" style={{ minWidth: 560 }}>
               <Cols widths={['auto', 130, 90]} />
@@ -165,7 +166,7 @@ export default function ViewerScorePage() {
             </table>
             <Pager page={page} pageSize={PAGE_SIZE} total={clubs.length} onChange={setPage} />
           </div>
-        </Spin>
+        </LoadingBlock>
       )}
 
       <ScoreModal

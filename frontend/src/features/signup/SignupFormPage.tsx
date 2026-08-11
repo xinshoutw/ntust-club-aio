@@ -1,5 +1,6 @@
 import { Link, useNavigate, useParams } from 'react-router'
-import { App, Button, Checkbox, Form, Input, Radio, Select, Spin } from 'antd'
+import { App, Button, Checkbox, Form, Input, Radio, Select } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { LeftOutlined } from '@ant-design/icons'
 import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
@@ -52,9 +53,7 @@ export default function SignupFormPage() {
     return (
       <div>
         <BackLink />
-        <div className="card" style={{ marginTop: 12, padding: '48px 24px', textAlign: 'center' }}>
-          <Spin />
-        </div>
+        <LoadingBlock pending rows={6} />
       </div>
     )
   }

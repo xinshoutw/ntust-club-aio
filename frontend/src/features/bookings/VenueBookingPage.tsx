@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import dayjs, { type Dayjs } from 'dayjs'
-import { App, Button, DatePicker, Form, Input, Select, Spin } from 'antd'
+import { App, Button, DatePicker, Form, Input, Select } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
 import { confirmDialog } from '../../lib/confirm'
@@ -207,7 +208,7 @@ export default function VenueBookingPage() {
         </Form>
       </div>
 
-      <Spin spinning={activeQuery.isPending}>
+      <LoadingBlock pending={activeQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在申請</div>
           <table className="tb fixed" aria-label="正在申請" style={{ minWidth: 560 }}>
@@ -253,9 +254,9 @@ export default function VenueBookingPage() {
             </tbody>
           </table>
         </div>
-      </Spin>
+      </LoadingBlock>
 
-      <Spin spinning={recentQuery.isPending}>
+      <LoadingBlock pending={recentQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
           <table className="tb fixed" aria-label="最近申請" style={{ minWidth: 560 }}>
@@ -292,7 +293,7 @@ export default function VenueBookingPage() {
             </tbody>
           </table>
         </div>
-      </Spin>
+      </LoadingBlock>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { App, Button, Input, Modal, Spin } from 'antd'
+import { App, Button, Input, Modal } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
@@ -57,7 +58,7 @@ export default function PtCheckinPage() {
       />
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-        <Spin spinning={listQuery.isPending}>
+        <LoadingBlock pending={listQuery.isPending}>
           <table className="tb dense fixed" style={{ minWidth: 720 }}>
             <Cols widths={['30%', 'auto', 250, 110]} />
             <thead>
@@ -119,7 +120,7 @@ export default function PtCheckinPage() {
             </tbody>
           </table>
           <Pager page={page} pageSize={STAFF_PAGE_SIZE} total={total} onChange={setPage} />
-        </Spin>
+        </LoadingBlock>
       </div>
 
       <Modal

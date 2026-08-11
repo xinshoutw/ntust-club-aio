@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { App, Button, Dropdown, Modal, Popconfirm, Select, Spin, Tooltip } from 'antd'
+import { App, Button, Dropdown, Modal, Popconfirm, Select, Tooltip } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { DownloadOutlined, EllipsisOutlined, FileTextOutlined, LinkOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
@@ -162,7 +163,7 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
         ) : null
       }
     >
-      <Spin spinning={loading}>
+      <LoadingBlock pending={loading}>
       {/* 詳情載入失敗:整塊改為錯誤呈現,避免結案資料/附件被誤看成不存在 */}
       {error != null ? (
         <div style={{ marginTop: 10 }}>
@@ -329,7 +330,7 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
         )}
       </div>
       )}
-      </Spin>
+      </LoadingBlock>
     </Modal>
   )
 }
@@ -448,7 +449,7 @@ export default function ActivityListPage() {
         }
       />
 
-      <Spin spinning={draftsQuery.isPending || listQuery.isPending}>
+      <LoadingBlock pending={draftsQuery.isPending || listQuery.isPending}>
         {/* 沿用上一份時整表淡化,避免看起來像是新條件的結果 */}
         {draftsQuery.isError && (
           <div style={{ marginTop: 20 }}>
@@ -588,7 +589,7 @@ export default function ActivityListPage() {
             </tbody>
           </table>
         </div>
-      </Spin>
+      </LoadingBlock>
       <Pager page={page} pageSize={ACTIVITY_PAGE_SIZE} total={total} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
       <PreviewModal
         a={preview}

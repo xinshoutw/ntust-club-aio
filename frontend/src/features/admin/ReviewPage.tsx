@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Button, Spin } from 'antd'
+import { Button } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
@@ -120,7 +121,7 @@ export default function ReviewPage() {
         }
       />
 
-      <Spin spinning={queueQuery.isLoading || listQuery.isPending}>
+      <LoadingBlock pending={queueQuery.isLoading || listQuery.isPending}>
         {/* 待審佇列:本關可簽核的單據,送件早的在前 */}
         <div className="card" style={{ marginTop: 20 }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 6px' }}>待審佇列</div>
@@ -275,7 +276,7 @@ export default function ReviewPage() {
           </table>
           <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} />
         </div>
-      </Spin>
+      </LoadingBlock>
 
       {/* Modal 常駐待關閉動畫結束(afterClose)才卸載;key 依單據重掛,核定金額與退回原因不殘留;
           詳情載入完成後以完整資料(經費/附件/經費來源)替換列表列 */}

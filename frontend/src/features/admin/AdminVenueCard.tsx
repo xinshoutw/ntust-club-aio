@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { App, Button, Checkbox, Input, InputNumber, Select, Spin, Switch } from 'antd'
+import { App, Button, Checkbox, Input, InputNumber, Select, Switch } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { PlusOutlined } from '@ant-design/icons'
 import QueryError from '../../components/ui/QueryError'
 import {
@@ -155,14 +156,14 @@ export default function AdminVenueCard() {
       {query.isError ? (
         <QueryError title="場地主檔載入失敗" error={query.error} onRetry={() => void query.refetch()} />
       ) : (
-        <Spin spinning={query.isPending}>
+        <LoadingBlock pending={query.isPending}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {(query.data ?? []).map((item) => (
               <VenueRow key={item.id} item={item} />
             ))}
             <AddVenue />
           </div>
-        </Spin>
+        </LoadingBlock>
       )}
     </div>
   )

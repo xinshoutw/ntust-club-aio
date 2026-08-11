@@ -1,4 +1,5 @@
-import { App, Button, DatePicker, Form, Input, Select, Spin } from 'antd'
+import { App, Button, DatePicker, Form, Input, Select } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { useState } from 'react'
 import type { Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
@@ -110,7 +111,7 @@ export default function VenueRulesPage() {
         </Form>
       </div>
 
-      <Spin spinning={rulesQuery.isPending}>
+      <LoadingBlock pending={rulesQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <table className="tb fixed" style={{ minWidth: 720 }}>
             {/* 場地/原因截斷;期間固定 px;星期/節次允許換行 */}
@@ -157,7 +158,7 @@ export default function VenueRulesPage() {
             </tbody>
           </table>
         </div>
-      </Spin>
+      </LoadingBlock>
     </div>
   )
 }

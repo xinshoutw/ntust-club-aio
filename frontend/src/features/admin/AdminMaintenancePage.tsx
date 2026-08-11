@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { App, Select, Spin } from 'antd'
+import { App, Select } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
@@ -74,7 +75,7 @@ export default function AdminMaintenancePage() {
         }
       />
 
-      <Spin spinning={listQuery.isPending}>
+      <LoadingBlock pending={listQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
           <table className="tb dense fixed" style={{ minWidth: 760 }}>
             {/* 社團/地點截斷、項目吃剩餘寬且允許換行;申請日/狀態固定 px(狀態含單步推進下拉) */}
@@ -151,7 +152,7 @@ export default function AdminMaintenancePage() {
           </table>
           <Pager page={page} pageSize={MAINTENANCE_PAGE_SIZE} total={total} onChange={setPage} />
         </div>
-      </Spin>
+      </LoadingBlock>
     </div>
   )
 }

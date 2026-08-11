@@ -1,4 +1,5 @@
-import { App, Button, Form, Input, Select, Spin } from 'antd'
+import { App, Button, Form, Input, Select } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
@@ -123,7 +124,7 @@ export default function CertificatePage() {
         </Form>
       </div>
 
-      <Spin spinning={listQuery.isPending}>
+      <LoadingBlock pending={listQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在申請</div>
           <table className="tb fixed" aria-label="幹部證明申請紀錄" style={{ minWidth: 480 }}>
@@ -160,9 +161,9 @@ export default function CertificatePage() {
             </tbody>
           </table>
         </div>
-      </Spin>
+      </LoadingBlock>
 
-      <Spin spinning={recentQuery.isPending}>
+      <LoadingBlock pending={recentQuery.isPending}>
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
           <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
           <table className="tb fixed" aria-label="幹部證明申請紀錄" style={{ minWidth: 480 }}>
@@ -199,7 +200,7 @@ export default function CertificatePage() {
             </tbody>
           </table>
         </div>
-      </Spin>
+      </LoadingBlock>
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { App, Button, Input, InputNumber, Select, Spin, Switch } from 'antd'
+import { App, Button, Input, InputNumber, Select, Switch } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import { PlusOutlined } from '@ant-design/icons'
 import QueryError from '../../components/ui/QueryError'
 import {
@@ -154,14 +155,14 @@ export default function AdminEquipmentCard() {
       {query.isError ? (
         <QueryError title="器材主檔載入失敗" error={query.error} onRetry={() => void query.refetch()} />
       ) : (
-        <Spin spinning={query.isPending}>
+        <LoadingBlock pending={query.isPending}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {(query.data ?? []).map((item) => (
               <EquipmentRow key={item.id} item={item} />
             ))}
             <AddEquipment />
           </div>
-        </Spin>
+        </LoadingBlock>
       )}
     </div>
   )

@@ -121,10 +121,10 @@ export default function ReviewPage() {
         }
       />
 
-      <LoadingBlock pending={queueQuery.isLoading || listQuery.isPending}>
-        {/* 待審佇列:本關可簽核的單據,送件早的在前 */}
-        <div className="card" style={{ marginTop: 20 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 6px' }}>待審佇列</div>
+      {/* 待審佇列:本關可簽核的單據,送件早的在前 */}
+      <div className="card" style={{ marginTop: 20 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 6px' }}>待審佇列</div>
+        <LoadingBlock pending={queueQuery.isLoading} rows={3}>
           {queue.map((item) => (
             <div
               key={item.id}
@@ -176,11 +176,13 @@ export default function ReviewPage() {
               {queueQuery.isError ? `載入失敗:${queueQuery.error.message}` : '沒有待本關簽核的申請'}
             </div>
           )}
-        </div>
+        </LoadingBlock>
+      </div>
 
-        {/* 最近審核(他關審核中/已核准/已退回):供查閱與追蹤,預設審核時間新→舊 */}
-        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近審核</div>
+      {/* 最近審核(他關審核中/已核准/已退回):供查閱與追蹤,預設審核時間新→舊 */}
+      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近審核</div>
+        <LoadingBlock pending={listQuery.isPending} rows={6}>
           <table className="tb dense fixed" style={{ minWidth: 880 }} aria-label="最近審核的活動申請">
             {/* 社團/名稱吃剩餘寬並截斷;類型允許換行(含大型徽章);日期/金額/狀態/審核時間固定 px */}
             <Cols widths={['18%', 'auto', 130, 104, 90, 100, 140, 32]} />
@@ -274,9 +276,9 @@ export default function ReviewPage() {
               )}
             </tbody>
           </table>
-          <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} />
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+        <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} />
+      </div>
 
       {/* Modal 常駐待關閉動畫結束(afterClose)才卸載;key 依單據重掛,核定金額與退回原因不殘留;
           詳情載入完成後以完整資料(經費/附件/經費來源)替換列表列 */}

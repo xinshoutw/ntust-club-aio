@@ -449,9 +449,8 @@ export default function ActivityListPage() {
         }
       />
 
-      <LoadingBlock pending={draftsQuery.isPending || listQuery.isPending}>
-        {/* 沿用上一份時整表淡化,避免看起來像是新條件的結果 */}
-        {draftsQuery.isError && (
+      {/* 草稿卡本身就是條件渲染(有草稿才出現),沒有要撐住的版面,不需要 Skeleton */}
+      {draftsQuery.isError && (
           <div style={{ marginTop: 20 }}>
             <QueryError title="草稿載入失敗" error={draftsQuery.error} onRetry={() => void draftsQuery.refetch()} />
           </div>
@@ -514,6 +513,8 @@ export default function ActivityListPage() {
         )}
 
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+        {/* 沿用上一份時整表淡化(見下方 opacity),避免看起來像是新條件的結果 */}
+        <LoadingBlock pending={listQuery.isPending} rows={8}>
           <table
             className="tb fixed"
             aria-label="活動列表"
@@ -588,8 +589,8 @@ export default function ActivityListPage() {
               )}
             </tbody>
           </table>
+        </LoadingBlock>
         </div>
-      </LoadingBlock>
       <Pager page={page} pageSize={ACTIVITY_PAGE_SIZE} total={total} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
       <PreviewModal
         a={preview}

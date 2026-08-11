@@ -66,10 +66,10 @@ export default function ManualBookingPage() {
   return (
     <div>
       <PageHeader title="手動借用" sub="行政直接借用,免審核直接核准;佔用以「學務處」顯示" />
-      <LoadingBlock pending={venuesQuery.isPending || equipmentQuery.isPending}>
-        <div className="form-grid-2" style={{ marginTop: 20, alignItems: 'start' }}>
+      <div className="form-grid-2" style={{ marginTop: 20, alignItems: 'start' }}>
           <div className="card" style={{ padding: 24 }}>
             <div style={sectionTitle}>臨時場地</div>
+            <LoadingBlock pending={venuesQuery.isPending} rows={5}>
             <Form form={venueForm} layout="vertical" onFinish={submitVenue}>
               <Form.Item name="venue" label="場地" rules={[{ required: true, message: '請選擇場地' }]}>
                 <Select
@@ -100,10 +100,12 @@ export default function ManualBookingPage() {
                 </Button>
               </div>
             </Form>
+            </LoadingBlock>
           </div>
 
           <div className="card" style={{ padding: 24 }}>
             <div style={sectionTitle}>器材</div>
+            <LoadingBlock pending={equipmentQuery.isPending} rows={5}>
             <Form form={equipmentForm} layout="vertical" onFinish={submitEquipment}>
               <Form.Item name="equipment" label="器材" rules={[{ required: true, message: '請選擇器材' }]}>
                 <Select
@@ -130,9 +132,9 @@ export default function ManualBookingPage() {
                 </Button>
               </div>
             </Form>
+            </LoadingBlock>
           </div>
         </div>
-      </LoadingBlock>
     </div>
   )
 }

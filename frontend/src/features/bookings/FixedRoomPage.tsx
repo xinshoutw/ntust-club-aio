@@ -21,7 +21,6 @@ import {
   venueLabel,
 } from '../../api/bookings'
 
-const MAX_PERIODS = 10 // 每社團至多 10 節(1 節 = 1 小時;後端 max_periods 為權威)
 const LATE = new Set(['10', 'A', 'B', 'C', 'D']) // 晚間時段:需至少連續 3 節起借
 
 // 依 PERIODS 順序把已選節次切成連續區段
@@ -119,10 +118,6 @@ export default function FixedRoomPage() {
   }
 
   const window_ = windowQuery.data
-  const maxPeriods = window_?.maxPeriods ?? MAX_PERIODS
-  const usedPeriods = window_?.usedPeriods ?? 0
-  const remainingPeriods = Math.max(0, maxPeriods - usedPeriods)
-  const overQuota = slots.size > remainingPeriods
   if (!window_?.open) {
     return (
       <div>
@@ -138,6 +133,11 @@ export default function FixedRoomPage() {
       </div>
     )
   }
+
+  // 額度一律以後端回傳為準(唯一真相在 booking_service.MAX_FIXED_SLOTS)
+  const { usedPeriods, maxPeriods } = window_
+  const remainingPeriods = Math.max(0, maxPeriods - usedPeriods)
+  const overQuota = slots.size > remainingPeriods
 
   const apply = (key: string, to: boolean) => {
     const has = slotsRef.current.has(key)

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { App, Select, Spin, Tooltip } from 'antd'
 import { DeleteOutlined, DownloadOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
@@ -64,10 +64,12 @@ export default function AdminFilesPage() {
   const usageQuery = useFileUsage()
   const repairQuery = useRepairFiles()
   const [largePage, setLargePage] = useState(1)
-  const largeSort = sortParam(largeSortEntries)
-  // 換排序等於換一份清單,停在第 3 頁會看到不相干的一段
-  useEffect(() => setLargePage(1), [largeSort])
-  const largeQuery = useLargeFiles(moduleFilter, largeSort, largePage)
+  // 換排序等於換一份清單:與頁碼同一次更新,才不會先送出一次「新排序 + 舊頁碼」
+  const toggleLargeSortAndReset = (key: 'size' | 'created_at') => {
+    toggleLargeSort(key)
+    setLargePage(1)
+  }
+  const largeQuery = useLargeFiles(moduleFilter, sortParam(largeSortEntries), largePage)
   const deleteFile = useDeleteFile()
 
   const usage = usageQuery.data
@@ -311,10 +313,10 @@ export default function AdminFilesPage() {
                 <th>模組</th>
                 <th>社團</th>
                 <th className="r">
-                  <MultiSortButton label="大小" sortKey="size" entries={largeSortEntries} onToggle={toggleLargeSort} />
+                  <MultiSortButton label="大小" sortKey="size" entries={largeSortEntries} onToggle={toggleLargeSortAndReset} />
                 </th>
                 <th>
-                  <MultiSortButton label="上傳日期" sortKey="created_at" entries={largeSortEntries} onToggle={toggleLargeSort} />
+                  <MultiSortButton label="上傳日期" sortKey="created_at" entries={largeSortEntries} onToggle={toggleLargeSortAndReset} />
                 </th>
                 <th>狀態</th>
                 <th className="r">動作</th>

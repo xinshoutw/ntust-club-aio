@@ -29,6 +29,8 @@ export default function AdminMembersPage() {
   const { entries, toggle } = useMultiSort<SortKey>()
   const [exporting, setExporting] = useState(false)
   useEffect(() => setPage(1), [clubId, semester])
+  // 換社團要一併回到當前學期:上一社選的學期在新社可能根本不存在,列表與匯出都會是誤導性的空
+  useEffect(() => setSemester(currentSemester()), [clubId])
 
   // 學期下拉以該社名單實際有的學期為來源(只放當前學期的話查不到歷史名單)
   const semestersQuery = useAdminClubMemberSemesters(clubId)

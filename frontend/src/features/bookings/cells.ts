@@ -1,6 +1,6 @@
 export type CellState = 'free' | 'closed' | 'reviewing' | 'temp' | 'fixed' | 'mine'
 
-// 場地格配色:不開放不畫方框也不列圖例;固定借用深灰
+// 場地格配色:不開放不畫方框(圖例以空框呈現);固定借用深灰
 export const CELL: Record<CellState, { label: string; bg: string }> = {
   free: { label: '可借', bg: '#EEF0F3' },
   closed: { label: '不開放', bg: 'transparent' },

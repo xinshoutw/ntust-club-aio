@@ -44,6 +44,7 @@
 **A3 其餘 30 項**(可上線後補)
 
 - 併發與完整性:ISS-37、ISS-40、ISS-44、ISS-26
+- 停權與衝突顯示:ISS-93、ISS-94、ISS-95(第四輪交叉審查新發現)
 - 效能:ISS-47、ISS-48、ISS-49、ISS-50、ISS-52
 - 資料正確性:ISS-56(金額/數量非負約束,需 Alembic revision)
 - 畫面與資料落差:ISS-68~ISS-73、ISS-74、ISS-74d、ISS-74e、ISS-75、ISS-77

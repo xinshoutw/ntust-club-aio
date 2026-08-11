@@ -122,9 +122,11 @@ export default function AdminEvalPage() {
           />
         </div>
       ) : (
-        // 換社團時不沿用前一社的分數,載入期間以 Skeleton 蓋住,不讓空表與「—」看起來像真值
-        <LoadingBlock pending={clubId != null && detailQuery.isPending}>
+      <>
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+        {/* 換社團時不沿用前一社的分數,載入期間鋪 Skeleton,不讓空表與「—」看起來像真值。
+            下方的社團清單不在此範圍內:它由 clubsQuery 驅動,換社團時不該連同分頁器一起消失 */}
+        <LoadingBlock pending={clubId != null && detailQuery.isPending} rows={8}>
         <table className="tb fixed" style={{ minWidth: 780 }} aria-label="行政分評分項目">
           {/* 評分項目吃剩餘寬(兩行說明允許換行);分數/動作固定 px */}
           <Cols widths={['auto', 110, 130, 300]} />
@@ -198,6 +200,7 @@ export default function AdminEvalPage() {
             )}
           </tbody>
         </table>
+        </LoadingBlock>
       </div>
 
       {/* 各社團行政分總覽:點列切換上方審核對象 */}
@@ -246,7 +249,7 @@ export default function AdminEvalPage() {
           onChange={setClubPage}
         />
       </div>
-        </LoadingBlock>
+      </>
       )}
 
       <Modal

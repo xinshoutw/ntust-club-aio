@@ -26,7 +26,7 @@ const countBadge: React.CSSProperties = {
   padding: '1px 8px',
 }
 
-function CardTitle({ title, count }: { title: string; count: number }) {
+function CardTitle({ title, count }: { title: string; count: number | string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 20px 12px' }}>
       <div style={{ fontSize: 15, fontWeight: 600 }}>{title}</div>
@@ -160,9 +160,9 @@ export default function OverviewPage() {
     <div>
       <PageHeader title="總覽" />
 
-      <LoadingBlock pending={loading}>
         <div className="card" style={{ marginTop: 20 }}>
-          <CardTitle title="待辦" count={todos.length} />
+          <CardTitle title="待辦" count={loading ? '—' : todos.length} />
+          <LoadingBlock pending={loading} rows={2}>
           {todos.map((t) => (
             <div key={t.id} className="todo-row">
               <StatusPill status={t.kind} />
@@ -202,12 +202,14 @@ export default function OverviewPage() {
               <QueryError compact title="待辦事項載入失敗" error={activitiesQuery.error} onRetry={() => activitiesQuery.refetch()} />
             </div>
           )}
-          {!loading && !activitiesQuery.isError && todos.length === 0 && <EmptyRow text="目前沒有待辦事項" />}
+          {!activitiesQuery.isError && todos.length === 0 && <EmptyRow text="目前沒有待辦事項" />}
+          </LoadingBlock>
         </div>
 
         <div className="overview-grid">
           <div className="card">
-            <CardTitle title="公告" count={announcementTotal} />
+            <CardTitle title="公告" count={loading ? '—' : announcementTotal} />
+            <LoadingBlock pending={loading} rows={3}>
             {announcements.map((a) => (
               <div
                 key={a.id}
@@ -237,11 +239,13 @@ export default function OverviewPage() {
                 <QueryError compact title="公告載入失敗" error={announcementsQuery.error} onRetry={() => announcementsQuery.refetch()} />
               </div>
             )}
-            {!loading && !announcementsQuery.isError && announcements.length === 0 && <EmptyRow text="目前沒有公告" />}
+            {!announcementsQuery.isError && announcements.length === 0 && <EmptyRow text="目前沒有公告" />}
+            </LoadingBlock>
           </div>
 
           <div className="card">
-            <CardTitle title="進行中申請" count={tracked.length} />
+            <CardTitle title="進行中申請" count={loading ? '—' : tracked.length} />
+            <LoadingBlock pending={loading} rows={3}>
             {trackedErrored.length > 0 && (
               <div style={{ borderTop: '1px solid var(--line)' }}>
                 <QueryError compact title="申請進度載入失敗" error={trackedErrored[0].error} onRetry={retryTracked} />
@@ -274,10 +278,10 @@ export default function OverviewPage() {
                     ))}
                 </Fragment>
               ))}
-            {!loading && trackedErrored.length === 0 && tracked.length === 0 && <EmptyRow text="目前沒有進行中的申請" />}
+            {trackedErrored.length === 0 && tracked.length === 0 && <EmptyRow text="目前沒有進行中的申請" />}
+            </LoadingBlock>
           </div>
         </div>
-      </LoadingBlock>
 
       <AnnouncementModal
         announcement={viewing}

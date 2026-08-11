@@ -345,9 +345,9 @@ export default function BookingOverviewPage() {
       </div>
 
       {/* 正在借用:單卡整併(固定/臨時/器材)、完整呈現不限長度 */}
-      <LoadingBlock pending={listsPending}>
-        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在借用</div>
+      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在借用</div>
+        <LoadingBlock pending={listsPending}>
           <table className="tb fixed" aria-label="正在借用" style={{ minWidth: 680 }}>
             <Cols widths={[90, 'auto', 240, 110, 80]} />
             <thead>
@@ -465,11 +465,13 @@ export default function BookingOverviewPage() {
               )}
             </tbody>
           </table>
-        </div>
+        </LoadingBlock>
+      </div>
 
-        {/* 已歸還:伺服器端分頁(status=returned) */}
-        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近歸還</div>
+      {/* 已歸還:伺服器端分頁(status=returned) */}
+      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近歸還</div>
+        <LoadingBlock pending={returnedQuery.isPending}>
           <table className="tb fixed" aria-label="最近歸還" style={{ minWidth: 560 }}>
             <Cols widths={['auto', 190, 'auto', 100]} />
             <thead>
@@ -506,8 +508,8 @@ export default function BookingOverviewPage() {
             </tbody>
           </table>
           <Pager page={returnedPage} pageSize={RETURNED_PAGE} total={returnedTotal} onChange={setReturnedPage} style={{ padding: '10px 0 14px' }} />
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
     </div>
   )
 }

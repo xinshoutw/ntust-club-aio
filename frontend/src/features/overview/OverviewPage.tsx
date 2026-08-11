@@ -8,6 +8,11 @@ import AnnouncementModal from '../../components/ui/AnnouncementModal'
 import QueryError from '../../components/ui/QueryError'
 import { useAnnouncements, useMarkAnnouncementsRead, type Announcement } from '../../api/announcements'
 import { useOverviewActivities, type TrackedItem } from '../../api/overview'
+import {
+  useActiveEquipmentLoans,
+  useActiveRoomBookings,
+  useActiveVenueBookings,
+} from '../../api/bookings'
 import { useCertificates, useMaintenanceList, usePostalList } from '../../api/applications'
 import './overview.css'
 
@@ -92,7 +97,44 @@ export default function OverviewPage() {
         path: '/certificates',
       })),
   ]
-  const tracked = [...(activitiesQuery.data?.tracked ?? []), ...onlineTracked]
+  // 借用近況:三類審核中的申請(已核准的屬「正在借用」,在借用總覽頁看)
+  const roomQuery = useActiveRoomBookings()
+  const venueQuery = useActiveVenueBookings()
+  const loanQuery = useActiveEquipmentLoans()
+  const bookingTracked: TrackedItem[] = [
+    ...(roomQuery.data ?? [])
+      .filter((r) => r.status === 'pending')
+      .map((r) => ({
+        key: `room-${r.id}`,
+        name: `固定場地借用 ${r.venueName}`,
+        category: '借用' as const,
+        status: r.status,
+        path: '/bookings',
+      })),
+    ...(venueQuery.data ?? [])
+      .filter((r) => r.status === 'pending')
+      .map((r) => ({
+        key: `venue-${r.id}`,
+        name: `臨時場地借用 ${r.venueName}`,
+        category: '借用' as const,
+        status: r.status,
+        path: '/bookings',
+      })),
+    ...(loanQuery.data ?? [])
+      .filter((r) => r.status === 'pending')
+      .map((r) => ({
+        key: `loan-${r.id}`,
+        name: `器材借用 ${r.equipmentName}`,
+        category: '借用' as const,
+        status: r.status,
+        path: '/bookings',
+      })),
+  ]
+  const tracked = [
+    ...(activitiesQuery.data?.tracked ?? []),
+    ...bookingTracked,
+    ...onlineTracked,
+  ]
 
   const loading = announcementsQuery.isPending || activitiesQuery.isPending
 

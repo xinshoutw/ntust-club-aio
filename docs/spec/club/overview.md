@@ -33,10 +33,10 @@
 - 結案期限、鎖定與可結案一律讀後端的 `close_deadline` / `close_locked` / `can_close`(鎖定月數在系統設定可調)
 - 「進行中」的活動狀態集合:`pending_advisor`、`pending_chief`、`pending_dean`、`approved`、`closing_pending_advisor`;草稿、退回、已結案不列入
 - 線上申請只列 `pending`(報修另含 `in_progress`)
+- 借用三類只列 `pending`:已核准的是「正在借用」,在借用總覽頁看
 - 公告的 `scope` 由 `is_auto` 推導:系統自動通知標「通知」,行政發布標「公告」
 
 ## 未完成 / 問題
 
-- 「進行中申請」永遠不含借用 —— `tracked` 只組活動與線上申請。`categories` 列了「借用」但無資料來源,該分類會被 `filter` 濾掉,所以畫面連空標題都不會出現,更難察覺
 - 待辦與進行中都靠 `fetchAllPages` 把該社所有非結案活動抓回前端再篩,分頁形同虛設
 - 用 `<Spin>` 而非設計規範偏好的 Skeleton

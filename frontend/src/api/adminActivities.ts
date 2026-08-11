@@ -3,6 +3,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api, apiPaged, qs } from './client'
+import { fetchAllPages } from './fetchAll'
 import { fileUrl } from './activities'
 import type { SessionUser } from './auth'
 import type { StatusKey } from '../lib/status'
@@ -314,13 +315,14 @@ export const adminActivityKeys = keys
 // 僅限小結果集(待審佇列等);大清單一律走 useAdminActivitiesPaged
 async function fetchAllAdminActivities(p: AdminActivityListParams): Promise<AdminActivity[]> {
   const out: AdminActivity[] = []
-  for (let page = 1; ; page++) {
-    const { data, total } = await apiPaged<AdminActivityOut[]>(
-      `/admin/activities${qs({ status: p.statuses, club_id: p.clubId, page, page_size: 100 })}`,
-    )
-    out.push(...data.map(toAdminActivity))
-    if (data.length === 0 || out.length >= total) break
-  }
+  out.push(
+    ...(
+      await fetchAllPages<AdminActivityOut>('/admin/activities', {
+        status: p.statuses,
+        club_id: p.clubId,
+      })
+    ).map(toAdminActivity),
+  )
   return out
 }
 

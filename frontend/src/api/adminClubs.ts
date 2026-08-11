@@ -4,6 +4,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api, apiPaged, qs } from './client'
+import { fetchAllPages } from './fetchAll'
 import type { MemberKind } from '../lib/roles'
 
 export const slashDate = (iso: string): string => dayjs(iso).format('YYYY/MM/DD')
@@ -202,13 +203,14 @@ export function useAdminClubMembers(clubId: number | null, p: AdminMemberParams)
 /** 匯出用:抓齊指定學期(未帶=全部學期)全部成員(逐頁) */
 export async function fetchAllAdminMembers(clubId: number, semester?: string): Promise<AdminMember[]> {
   const out: AdminMember[] = []
-  for (let page = 1; ; page++) {
-    const { data, total } = await apiPaged<MemberOut[]>(
-      `/admin/clubs/${clubId}/members${qs({ semester, page, page_size: 100, sort: 'student_id' })}`,
-    )
-    out.push(...data.map(toMember))
-    if (data.length === 0 || out.length >= total) break
-  }
+  out.push(
+    ...(
+      await fetchAllPages<MemberOut>(`/admin/clubs/${clubId}/members`, {
+        semester,
+        sort: 'student_id',
+      })
+    ).map(toMember),
+  )
   return out
 }
 

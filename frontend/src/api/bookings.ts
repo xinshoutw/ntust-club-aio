@@ -3,6 +3,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs, { type Dayjs } from 'dayjs'
 import { api, apiPaged, apiWithMeta, qs } from './client'
+import { fetchAllPages } from './fetchAll'
 import type { StatusKey } from '../lib/status'
 
 // 節次:第 1–10 節與 A–D 節(與後端 booking_service.PERIODS 對齊)
@@ -397,22 +398,6 @@ export function useFixedWindow() {
 
 
 
-
-/** 逐頁抓齊(僅限 active=true 的小結果集;歷史清單一律走伺服器分頁) */
-async function fetchAllPages<T>(
-  path: string,
-  params: Record<string, string | number | boolean | undefined> = {},
-): Promise<T[]> {
-  const PAGE_SIZE = 100 // 後端 page_size 上限
-  const out: T[] = []
-  for (let page = 1; ; page++) {
-    const { data, total } = await apiPaged<T[]>(`${path}${qs({ ...params, page, page_size: PAGE_SIZE })}`)
-    out.push(...data)
-    // 不足一頁即為最後一頁;total 僅作輔助上限(防 meta 異常時提早/無限迴圈)
-    if (data.length < PAGE_SIZE || out.length >= total) break
-  }
-  return out
-}
 
 // 正在借用:伺服器端 active=true。三類的判定不同 —— 固定借用看學期結束日、
 // 臨時場地看最早節次的起始時刻、器材只看狀態(pending/approved/checked_out)。

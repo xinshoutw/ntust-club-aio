@@ -3,7 +3,8 @@
 // 查詢鍵集中管理,mutation 一律 invalidate 整域
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
-import { API_BASE, api, apiPaged, qs } from './client'
+import { API_BASE, api } from './client'
+import { fetchAllPages } from './fetchAll'
 import type { StatusKey } from '../lib/status'
 import { fileTypeOf, type EvalFile, type EvalFileType } from '../features/eval/types'
 import type { ActivityReport, BudgetItem, Reflection, WorkItem } from '../features/activities/types'
@@ -329,13 +330,14 @@ export const activityKeys = keys
 // 保留現有 UX(多選標籤篩選、經費排序皆非後端排序白名單可表達)
 async function fetchAllActivities(params: ActivityListParams): Promise<ClubActivity[]> {
   const out: ClubActivity[] = []
-  for (let page = 1; ; page++) {
-    const { data, total } = await apiPaged<ActivityOut[]>(
-      `/club/activities${qs({ semester: params.semester, status: params.status, page, page_size: 100 })}`,
-    )
-    out.push(...data.map(toActivity))
-    if (data.length === 0 || out.length >= total) break
-  }
+  out.push(
+    ...(
+      await fetchAllPages<ActivityOut>('/club/activities', {
+        semester: params.semester,
+        status: params.status,
+      })
+    ).map(toActivity),
+  )
   return out
 }
 

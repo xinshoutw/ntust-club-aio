@@ -71,11 +71,17 @@
 
 **A3 第十五批(2026-08-11)已修**:ISS-98(申請審核頁列表與社團漏斗兩種失敗都沒有出口)、
 ISS-99(審核彈窗詳情失敗永遠停在 Skeleton;新增 `detailError`/`onRetryDetail`,三個呼叫端全接)。
-一輪 opus 交叉審查抓到一個本批造成的回歸與一批同類漏網,全部已修:
-回歸 —— `detailError` 只看有沒有 error 不看「手上有沒有詳情」,背景重抓失敗會把讀得到的單變成不能簽;
-同類 —— 結案審核彈窗(同一支 detail 查詢,只有一行紅字且退回照樣可按)、
-`ClubCascader` 失敗讓四頁整頁空白零錯誤、幹部證明的學期選項失敗說成「名單尚無資料」、
-7 個場地/器材/活動 Select 的空選單、通知鈴鐺、`FilterButton` 選項失敗後無法取消已下的篩選。
+主題收斂成一條全站規則:**查詢失敗不得長得像「沒有資料」**(design-guide §6)。跑了兩輪 opus 交叉審查:
+第一輪 —— 本批造成的回歸(`detailError` 只看有沒有 error、不看「手上有沒有詳情」,
+背景重抓失敗會把讀得到的單變成不能簽,按重試還毫無變化)、以及一批同類漏網:
+結案審核彈窗(同一支 detail 查詢,只有一行紅字且退回照樣可按)、`ClubCascader` 失敗讓四頁整頁空白零錯誤、
+幹部證明的學期選項失敗說成「名單尚無資料」、7 個場地/器材/活動 Select 的空選單、通知鈴鐺、
+`FilterButton` 選項失敗後無法取消已下的篩選;
+第二輪 —— `notFoundText` 只看 `isError` 不看 `isPending`(給了 `notFoundContent`,AntD 的 loading 就不再換 spinner,
+載入中會斬釘截鐵說「目前沒有場地」)、器材查詢失敗時品項欄說「請先選擇關聯活動」而活動明明已選、
+彈窗 footer 用 `onApprove` 當唯讀判準(每一列都傳,等於對已核准單也叫人去審核)、
+稽核的操作者篩選 fail-open(對照表未就緒→參數整個消失→列出全部操作者,而漏斗還顯示著勾選)、
+稽核空狀態沒分「有無下篩選」、四處裸紅字沒有重試入口。全部已修。
 
 **A3 其餘 1 項**(可上線後補;作業流程見 `AGENTS.md`「修 issues.md 的條目時」)
 
@@ -149,6 +155,10 @@ ISS-99(審核彈窗詳情失敗永遠停在 Skeleton;新增 `detailError`/`onRet
 - 篩選漏斗的選項來自另一支查詢:它失敗時 `items` 是空的,**使用者連取消自己下的篩選都沒有入口**(而篩選是 fail-closed 的空結果)。`FilterButton` 一律把已選值併回選單
 - **共用選擇器失敗要在選擇器本身講**:`ClubCascader` 一支 `useClubOptions` 掛掉 → `clubId` 恆 null → 社團總覽/成員列表/管理項目/行政分審核四頁整頁空白、零錯誤訊息。與其把錯誤往四頁傳,不如讓那顆控制項自己換成失敗說明
 - 修完一項要回頭看 spec 有沒有**過期的「未完成」條目**:`certificate.md` 還寫著「學年期下拉硬編 `['114',…]`」,而那顆早在 ISS-03 就改成取名單實際學期了
+- **給了 `notFoundContent`,AntD Select 的 `loading` 就不再換成 spinner**:自訂空選單文案等於連載入中都會斬釘截鐵說「目前沒有場地」。`notFoundText` 與 `countText` 一樣要同時看 `isPending` 與 `isError`
+- 「失敗」與「還沒選前置欄位」共用同一個 null 值就會**給出錯的指示**:器材品項欄的 `loanWindow` 在查詢失敗時也是 null,畫面照樣說「請先選擇關聯活動」,而活動明明已經選了 —— 使用者只會一直重選活動
+- **判「唯讀」不能拿有沒有傳回呼當代理**:頁面對每一列都傳 `onApprove`(含已核准、非本關),真正的判準是 `canReview`
+- 篩選值→id 的對照表查不到時,`undefined` 會讓那個查詢參數**整個消失**(= 列出全部):稽核的操作者篩選就是這樣 fail-open,而漏斗圖示還是紅的、選單還顯示著勾選。一律補 sentinel(`?? -1`),與 `ReviewPage` 的 `clubIds=[-1]` 同一寫法
 
 ## B — 需決定
 
@@ -204,7 +214,7 @@ ISS-99(審核彈窗詳情失敗永遠停在 Skeleton;新增 `detailError`/`onRet
 ## 驗證現況(2026-08-11 實測)
 
 - 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → 333 passed(含 `test_migrations.py`:另開一個庫跑 `alembic upgrade head`,比對欄位、索引名與 CHECK 名 —— 後兩者是子集斷言,擋的是「模型有、revision 漏了」;`test_migration_helpers.py`:兩支匯入腳本的純函式);`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` → 0 錯;`pnpm test` → 79 passed(19 檔);`pnpm run lint` → **8** 個 fast-refresh warning(全為既有的 `only-export-components` 類)
+- 前端 `pnpm exec tsc -b --force` → 0 錯;`pnpm test` → 82 passed(20 檔);`pnpm run lint` → **8** 個 fast-refresh warning(全為既有的 `only-export-components` 類)
 - `git log --all` 確認 `.env` 與 `migration/out` 從未進版控
 
 ## 其他待處理

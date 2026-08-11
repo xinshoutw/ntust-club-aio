@@ -165,6 +165,15 @@ async def upload_passbook(
     row = await db.get(PostalAccountChange, change_id)
     if row is None or row.club_id != user.club_id:
         raise not_found("找不到申請")
+    # 一張申請一份存簿影本(前端 maxCount=1);沒有上限的話,任何一張舊單都能被
+    # 無限追加 50MB 的個資檔
+    existing = await db.scalar(
+        sa.select(sa.func.count())
+        .select_from(File)
+        .where(File.subject_type == "postal_change", File.subject_id == row.id)
+    )
+    if existing:
+        raise validation_error("此申請已有存簿影本")
     saved = await file_service.save_upload(
         db,
         file,

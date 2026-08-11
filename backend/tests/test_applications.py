@@ -327,39 +327,38 @@ async def test_club_config(client, db):
 
 
 async def test_passbook_upload_accepts_pdf_and_image(client, db):
-    """存簿佐證收 PDF+影像(2026-07-17 需求方拍板);其他型別仍 415。"""
+    """存簿佐證收 PDF+影像(2026-07-17 需求方拍板);其他型別仍 415,且一張申請只收一份。"""
     import io
 
     await setup_session(client, db)
-    resp = await client.post(
-        "/api/v1/club/postal-changes",
-        json={"reasons": ["印鑑變更"], "account_name": "熱舞社", "account_number": "0001234567890"},
-        headers=csrf_headers(client),
-    )
-    assert resp.status_code == 201, resp.text
-    change_id = resp.json()["data"]["id"]
 
-    files = {"file": ("存簿.pdf", io.BytesIO(b"%PDF-1.4 minimal"), "application/pdf")}
-    resp = await client.post(
-        f"/api/v1/club/postal-changes/{change_id}/passbook",
-        files=files,
-        headers=csrf_headers(client),
-    )
-    assert resp.status_code == 201, resp.text
+    async def new_change() -> int:
+        resp = await client.post(
+            "/api/v1/club/postal-changes",
+            json={
+                "reasons": ["印鑑變更"],
+                "account_name": "熱舞社",
+                "account_number": "0001234567890",
+            },
+            headers=csrf_headers(client),
+        )
+        assert resp.status_code == 201, resp.text
+        return resp.json()["data"]["id"]
+
+    async def upload(change_id: int, name: str, body: bytes, mime: str):
+        return await client.post(
+            f"/api/v1/club/postal-changes/{change_id}/passbook",
+            files={"file": (name, io.BytesIO(body), mime)},
+            headers=csrf_headers(client),
+        )
 
     jpg = b"\xff\xd8\xff\xe0" + b"\x00" * 64
-    files = {"file": ("存簿.jpg", io.BytesIO(jpg), "image/jpeg")}
-    resp = await client.post(
-        f"/api/v1/club/postal-changes/{change_id}/passbook",
-        files=files,
-        headers=csrf_headers(client),
-    )
-    assert resp.status_code == 201, resp.text
+    first = await new_change()
+    pdf = await upload(first, "存簿.pdf", b"%PDF-1.4 minimal", "application/pdf")
+    assert pdf.status_code == 201, pdf.text
+    assert (await upload(await new_change(), "存簿.jpg", jpg, "image/jpeg")).status_code == 201
+    zipped = await upload(await new_change(), "存簿.zip", b"PK\x03\x04zip", "application/zip")
+    assert zipped.status_code == 415
 
-    files = {"file": ("存簿.zip", io.BytesIO(b"PK\x03\x04zip"), "application/zip")}
-    resp = await client.post(
-        f"/api/v1/club/postal-changes/{change_id}/passbook",
-        files=files,
-        headers=csrf_headers(client),
-    )
-    assert resp.status_code == 415
+    # 一張申請一份:沒有上限的話,任何舊單都能被無限追加 50MB 個資檔
+    assert (await upload(first, "又一張.jpg", jpg, "image/jpeg")).status_code == 422

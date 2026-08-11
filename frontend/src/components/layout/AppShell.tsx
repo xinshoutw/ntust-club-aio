@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
 import { App, Badge, Drawer, Dropdown, Popover } from 'antd'
 import { confirmDialog } from '../../lib/confirm'
+import QueryError from '../ui/QueryError'
 import { BellOutlined, DownOutlined, HistoryOutlined, LogoutOutlined, MenuOutlined, SettingOutlined } from '@ant-design/icons'
 import { useAuth } from '../../app/auth'
 import { homeOf } from '../../lib/home'
@@ -134,7 +135,17 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
                   )}
                 </div>
               ))}
-              <div style={{ padding: '8px 4px 2px', fontSize: 12, color: 'var(--steel)', textAlign: 'center' }}>沒有更多通知</div>
+              {/* 失敗時別說「沒有更多通知」:未讀點也不會亮,使用者以為自己沒有任何通知 */}
+              {announcementsQuery.isError ? (
+                <QueryError
+                  compact
+                  title="通知載入失敗"
+                  error={announcementsQuery.error}
+                  onRetry={() => void announcementsQuery.refetch()}
+                />
+              ) : (
+                <div style={{ padding: '8px 4px 2px', fontSize: 12, color: 'var(--steel)', textAlign: 'center' }}>沒有更多通知</div>
+              )}
             </div>
           }
         >

@@ -17,7 +17,7 @@
 
 ## 通知鈴鐺
 
-只有社團端有內容:取公告查詢的前 5 筆,`unread` 者右側紅點。開啟面板即呼叫 `POST /club/announcements/read` 把水位線前移(`clubs.announcements_read_at`),紅點熄滅。底部固定寫「沒有更多通知」。
+只有社團端有內容:取公告查詢的前 5 筆,`unread` 者右側紅點。開啟面板即呼叫 `POST /club/announcements/read` 把水位線前移(`clubs.announcements_read_at`),紅點熄滅。底部固定寫「沒有更多通知」——惟公告查詢失敗時改為失敗說明與重試,否則紅點不亮、面板又寫「沒有更多通知」,看起來就是真的沒有通知。
 
 行政/工讀生/評審端鈴鐺一定是空的 —— 查詢帶 `enabled: user.role === 'club'`,這三端沒有任何通知來源。
 

@@ -87,12 +87,12 @@ export default function AdminApplicationsPage() {
             <Cols widths={['auto', 90, 110, 100, 96, 150]} />
             <thead>
               <tr>
-                <th>社團</th>
-                <th>學年期</th>
-                <th>職位</th>
-                <th>申請人</th>
-                <th>申請日</th>
-                <th>狀態</th>
+                <th scope="col">社團</th>
+                <th scope="col">學年期</th>
+                <th scope="col">職位</th>
+                <th scope="col">申請人</th>
+                <th scope="col">申請日</th>
+                <th scope="col">狀態</th>
               </tr>
             </thead>
             <tbody>
@@ -133,14 +133,14 @@ export default function AdminApplicationsPage() {
             <Cols widths={['14%', 'auto', 100, 130, 130, 110, 96, 150]} />
             <thead>
               <tr>
-                <th>社團</th>
-                <th>事由</th>
-                <th>戶名</th>
-                <th>局號帳號</th>
-                <th>新代理人</th>
-                <th>存簿影本</th>
-                <th>申請日</th>
-                <th>狀態</th>
+                <th scope="col">社團</th>
+                <th scope="col">事由</th>
+                <th scope="col">戶名</th>
+                <th scope="col">局號帳號</th>
+                <th scope="col">新代理人</th>
+                <th scope="col">存簿影本</th>
+                <th scope="col">申請日</th>
+                <th scope="col">狀態</th>
               </tr>
             </thead>
             <tbody>

@@ -257,9 +257,9 @@ export default function BookingOverviewPage() {
               <table aria-label="各場地單日借用情形" style={{ borderCollapse: 'separate', borderSpacing: 3, width: '100%', tableLayout: 'fixed', minWidth: 720 }}>
                 <thead>
                   <tr>
-                    <th style={{ ...thStyle, width: 176, textAlign: 'left', paddingRight: 8 }}>場地</th>
+                    <th scope="col" style={{ ...thStyle, width: 176, textAlign: 'left', paddingRight: 8 }}>場地</th>
                     {PERIODS.map((p) => (
-                      <th key={p} className="num" style={thStyle}>{p}</th>
+                      <th scope="col" key={p} className="num" style={thStyle}>{p}</th>
                     ))}
                   </tr>
                 </thead>
@@ -302,9 +302,9 @@ export default function BookingOverviewPage() {
               <table aria-label={`${venueDef.name} ${VENUE_DAYS} 天借用情形`} style={{ borderCollapse: 'separate', borderSpacing: 3, width: '100%', tableLayout: 'fixed', minWidth: 720 }}>
                 <thead>
                   <tr>
-                    <th style={{ ...thStyle, width: 110, textAlign: 'left', paddingRight: 8 }}>日期</th>
+                    <th scope="col" style={{ ...thStyle, width: 110, textAlign: 'left', paddingRight: 8 }}>日期</th>
                     {PERIODS.map((p) => (
-                      <th key={p} className="num" style={thStyle}>{p}</th>
+                      <th scope="col" key={p} className="num" style={thStyle}>{p}</th>
                     ))}
                   </tr>
                 </thead>
@@ -350,11 +350,11 @@ export default function BookingOverviewPage() {
             <Cols widths={[90, 'auto', 240, 110, 80]} />
             <thead>
               <tr>
-                <th>類別</th>
-                <th>內容</th>
-                <th>時間</th>
-                <th>狀態</th>
-                <th className="r">動作</th>
+                <th scope="col">類別</th>
+                <th scope="col">內容</th>
+                <th scope="col">時間</th>
+                <th scope="col">狀態</th>
+                <th scope="col" className="r">動作</th>
               </tr>
             </thead>
             <tbody>

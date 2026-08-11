@@ -40,23 +40,23 @@ export default function PtViolationsPage() {
             <Cols widths={[100, '20%', '14%', 'auto', 90, 104, 84]} />
             <thead>
               <tr>
-                <th>
+                <th scope="col">
                   <MultiSortButton label="發生日" sortKey="date" entries={entries} onToggle={toggleSort} />
                 </th>
-                <th>社團</th>
-                <th>
+                <th scope="col">社團</th>
+                <th scope="col">
                   <MultiSortButton label="地點" sortKey="location" entries={entries} onToggle={toggleSort} />
                 </th>
-                <th>
+                <th scope="col">
                   <MultiSortButton label="違規項目" sortKey="items" entries={entries} onToggle={toggleSort} />
                 </th>
-                <th>
+                <th scope="col">
                   <MultiSortButton label="填寫人" sortKey="filler" entries={entries} onToggle={toggleSort} />
                 </th>
-                <th>
+                <th scope="col">
                   <MultiSortButton label="銷案期限" sortKey="deadline" entries={entries} onToggle={toggleSort} />
                 </th>
-                <th>
+                <th scope="col">
                   <MultiSortButton label="狀態" sortKey="status" entries={entries} onToggle={toggleSort} />
                 </th>
               </tr>

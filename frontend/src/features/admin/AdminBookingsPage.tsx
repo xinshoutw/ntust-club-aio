@@ -122,9 +122,9 @@ export default function AdminBookingsPage() {
             <table aria-label="場地借用情形" style={{ borderCollapse: 'separate', borderSpacing: 3, width: '100%', tableLayout: 'fixed', minWidth: 720 }}>
               <thead>
                 <tr>
-                  <th style={{ fontSize: 11, fontWeight: 500, color: 'var(--steel)', width: 176, textAlign: 'left', paddingRight: 8 }}>場地(容納人數)</th>
+                  <th scope="col" style={{ fontSize: 11, fontWeight: 500, color: 'var(--steel)', width: 176, textAlign: 'left', paddingRight: 8 }}>場地(容納人數)</th>
                   {PERIODS.map((p) => (
-                    <th key={p} className="num" style={{ fontSize: 11, fontWeight: 500, color: 'var(--steel)' }}>{p}</th>
+                    <th scope="col" key={p} className="num" style={{ fontSize: 11, fontWeight: 500, color: 'var(--steel)' }}>{p}</th>
                   ))}
                 </tr>
               </thead>
@@ -213,12 +213,12 @@ export default function AdminBookingsPage() {
             <Cols widths={['18%', '18%', 96, 'auto', 90, 32]} />
             <thead>
               <tr>
-                <th>社團</th>
-                <th>場地</th>
-                <th>日期</th>
-                <th>時段與用途</th>
-                <th>狀態</th>
-                <th aria-label="開啟" />
+                <th scope="col">社團</th>
+                <th scope="col">場地</th>
+                <th scope="col">日期</th>
+                <th scope="col">時段與用途</th>
+                <th scope="col">狀態</th>
+                <th scope="col" aria-label="開啟" />
               </tr>
             </thead>
             <tbody>
@@ -270,12 +270,12 @@ export default function AdminBookingsPage() {
             <Cols widths={['16%', '20%', 184, 'auto', 90, 32]} />
             <thead>
               <tr>
-                <th>社團</th>
-                <th>器材與數量</th>
-                <th>借用期間</th>
-                <th>活動與用途</th>
-                <th>狀態</th>
-                <th aria-label="開啟" />
+                <th scope="col">社團</th>
+                <th scope="col">器材與數量</th>
+                <th scope="col">借用期間</th>
+                <th scope="col">活動與用途</th>
+                <th scope="col">狀態</th>
+                <th scope="col" aria-label="開啟" />
               </tr>
             </thead>
             <tbody>

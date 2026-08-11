@@ -248,12 +248,12 @@ export default function AdminRoomsPage() {
             <Cols widths={['16%', '15%', 'auto', '18%', 90, 32]} />
             <thead>
               <tr>
-                <th>社團</th>
-                <th>場地</th>
-                <th>每週時段</th>
-                <th>用途</th>
-                <th>狀態</th>
-                <th aria-label="開啟" />
+                <th scope="col">社團</th>
+                <th scope="col">場地</th>
+                <th scope="col">每週時段</th>
+                <th scope="col">用途</th>
+                <th scope="col">狀態</th>
+                <th scope="col" aria-label="開啟" />
               </tr>
             </thead>
             <tbody>

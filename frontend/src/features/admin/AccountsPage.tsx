@@ -328,7 +328,7 @@ export default function AccountsPage() {
       {/* 頁面權限吃剩餘寬且允許換行;姓名/帳號截斷;層級/狀態/動作固定 px */}
       <Cols widths={['13%', 110, 90, 'auto', 84, 216]} />
       <thead>
-        <tr><th>姓名</th><th>帳號</th><th>權限層級</th><th>頁面權限</th><th>狀態</th><th className="r">動作</th></tr>
+        <tr><th scope="col">姓名</th><th scope="col">帳號</th><th scope="col">權限層級</th><th scope="col">頁面權限</th><th scope="col">狀態</th><th scope="col" className="r">動作</th></tr>
       </thead>
       <tbody>
         {admins.map((a) => (
@@ -366,7 +366,7 @@ export default function AccountsPage() {
     <table className="tb fixed" style={{ minWidth: 560 }}>
       <Cols widths={['24%', 'auto', 84, 178]} />
       <thead>
-        <tr><th>姓名</th><th>帳號</th><th>狀態</th><th className="r">動作</th></tr>
+        <tr><th scope="col">姓名</th><th scope="col">帳號</th><th scope="col">狀態</th><th scope="col" className="r">動作</th></tr>
       </thead>
       <tbody>
         {staff.map((a) => (
@@ -388,7 +388,7 @@ export default function AccountsPage() {
     <table className="tb fixed" style={{ minWidth: 760 }}>
       <Cols widths={['14%', '16%', 'auto', 90, 84, 178]} />
       <thead>
-        <tr><th>評審</th><th>帳號</th><th>負責獎項</th><th>分組</th><th>狀態</th><th className="r">動作</th></tr>
+        <tr><th scope="col">評審</th><th scope="col">帳號</th><th scope="col">負責獎項</th><th scope="col">分組</th><th scope="col">狀態</th><th scope="col" className="r">動作</th></tr>
       </thead>
       <tbody>
         {viewers.map((a) => (
@@ -443,7 +443,7 @@ export default function AccountsPage() {
       <table className="tb fixed" style={{ minWidth: 760 }}>
         <Cols widths={['auto', 110, '20%', 140, 160]} />
         <thead>
-          <tr><th>社團名稱</th><th>性質</th><th>帳號</th><th>狀態</th><th className="r">動作</th></tr>
+          <tr><th scope="col">社團名稱</th><th scope="col">性質</th><th scope="col">帳號</th><th scope="col">狀態</th><th scope="col" className="r">動作</th></tr>
         </thead>
         <tbody>
           {pagedClubs.map((c) => (

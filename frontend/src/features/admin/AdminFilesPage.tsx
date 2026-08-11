@@ -250,12 +250,12 @@ export default function AdminFilesPage() {
             <Cols widths={['auto', '16%', 90, 110, 80, 96]} />
             <thead>
               <tr>
-                <th>檔名</th>
-                <th>社團</th>
-                <th className="r">大小</th>
-                <th>上傳日期</th>
-                <th>狀態</th>
-                <th className="r">動作</th>
+                <th scope="col">檔名</th>
+                <th scope="col">社團</th>
+                <th scope="col" className="r">大小</th>
+                <th scope="col">上傳日期</th>
+                <th scope="col">狀態</th>
+                <th scope="col" className="r">動作</th>
               </tr>
             </thead>
             <tbody>
@@ -309,17 +309,17 @@ export default function AdminFilesPage() {
             <Cols widths={['auto', 110, '14%', 96, 120, 80, 96]} />
             <thead>
               <tr>
-                <th>檔名</th>
-                <th>模組</th>
-                <th>社團</th>
-                <th className="r">
+                <th scope="col">檔名</th>
+                <th scope="col">模組</th>
+                <th scope="col">社團</th>
+                <th scope="col" className="r">
                   <MultiSortButton label="大小" sortKey="size" entries={largeSortEntries} onToggle={toggleLargeSortAndReset} />
                 </th>
-                <th>
+                <th scope="col">
                   <MultiSortButton label="上傳日期" sortKey="created_at" entries={largeSortEntries} onToggle={toggleLargeSortAndReset} />
                 </th>
-                <th>狀態</th>
-                <th className="r">動作</th>
+                <th scope="col">狀態</th>
+                <th scope="col" className="r">動作</th>
               </tr>
             </thead>
             <tbody>

@@ -101,8 +101,8 @@ export default function AuditPage() {
             <Cols widths={[140, '13%', 90, 130, 'auto']} />
             <thead>
               <tr>
-                <th>時間</th>
-                <th>
+                <th scope="col">時間</th>
+                <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     操作者
                     <FilterButton
@@ -113,7 +113,7 @@ export default function AuditPage() {
                     />
                   </span>
                 </th>
-                <th>
+                <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     角色
                     <FilterButton
@@ -124,7 +124,7 @@ export default function AuditPage() {
                     />
                   </span>
                 </th>
-                <th>
+                <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     動作
                     <FilterButton
@@ -135,7 +135,7 @@ export default function AuditPage() {
                     />
                   </span>
                 </th>
-                <th>內容</th>
+                <th scope="col">內容</th>
               </tr>
             </thead>
             <tbody>

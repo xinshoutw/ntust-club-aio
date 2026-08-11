@@ -3,6 +3,7 @@ import { Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { PRESENTATION_MAX, useViewerAssignments, type ViewerAssignment } from '../../api/viewer'
+import { clickableProps } from '../../lib/clickable'
 
 const itemsMax = (a: ViewerAssignment): number => a.items.reduce((s, i) => s + i.maxScore, 0)
 
@@ -44,7 +45,8 @@ export default function MyReviewsPage() {
                     key={a.groupId}
                     className="card click-tint"
                     style={{ padding: 20, cursor: 'pointer' }}
-                    onClick={() => navigate(`/viewer/score?group=${a.groupId}`)}
+                    aria-label={`${a.awardName} ${a.groupName},前往評分`}
+                    {...clickableProps(() => navigate(`/viewer/score?group=${a.groupId}`))}
                   >
                     <div style={{ fontSize: 16, fontWeight: 600 }}>{a.awardName}</div>
                     <div style={{ marginTop: 4, fontSize: 12, color: 'var(--steel)' }}>{a.groupName}</div>

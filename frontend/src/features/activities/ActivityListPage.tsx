@@ -509,8 +509,8 @@ export default function ActivityListPage() {
             <Cols widths={['auto', 120, 180, 160, 110, 120]} />
             <thead>
               <tr>
-                <th>{sortHeader('名稱', 'name')}</th>
-                <th>
+                <th scope="col">{sortHeader('名稱', 'name')}</th>
+                <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     {sortHeader('類型', 'type')}
                     <FilterButton
@@ -521,9 +521,9 @@ export default function ActivityListPage() {
                     />
                   </span>
                 </th>
-                <th>{sortHeader('日期', 'date')}</th>
-                <th className="r">{sortHeader('經費(自籌/擬請)', 'budget')}</th>
-                <th>
+                <th scope="col">{sortHeader('日期', 'date')}</th>
+                <th scope="col" className="r">{sortHeader('經費(自籌/擬請)', 'budget')}</th>
+                <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     {sortHeader('狀態', 'status')}
                     <FilterButton
@@ -534,7 +534,7 @@ export default function ActivityListPage() {
                     />
                   </span>
                 </th>
-                <th className="r">動作</th>
+                <th scope="col" className="r">動作</th>
               </tr>
             </thead>
             <tbody>

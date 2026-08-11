@@ -120,21 +120,32 @@ export default function ViewerScorePage() {
               <Cols widths={['auto', 130, 90]} />
               <thead>
                 <tr>
-                  <th>社團</th>
-                  <th>評分狀態</th>
-                  <th>合計</th>
+                  <th scope="col">社團</th>
+                  <th scope="col">評分狀態</th>
+                  <th scope="col">合計</th>
                 </tr>
               </thead>
               <tbody>
                 {clubs.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE).map((c) => (
                   <tr key={c.clubId} className="click-tint" style={{ cursor: 'pointer' }} onClick={() => openClub(c.clubId)}>
+                    {/* 列本身只給滑鼠;鍵盤走社團欄的按鈕(與行政端各表同一種入口) */}
                     <td
                       className="cell-clip"
                       title={c.attribute ? `${c.clubName}(${c.attribute})` : c.clubName}
                       style={{ fontWeight: 500 }}
                     >
-                      {c.clubName}
-                      {c.attribute && <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: 'var(--steel)' }}>{c.attribute}</span>}
+                      <button
+                        type="button"
+                        className="row-open-btn"
+                        aria-label={`開啟 ${c.clubName} 的評分`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openClub(c.clubId)
+                        }}
+                      >
+                        {c.clubName}
+                        {c.attribute && <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: 'var(--steel)' }}>{c.attribute}</span>}
+                      </button>
                     </td>
                     <td style={{ fontSize: 13, color: c.scored ? '#1F6B45' : 'var(--steel)' }}>
                       {c.scored ? '已評分(可修改)' : '未評分'}

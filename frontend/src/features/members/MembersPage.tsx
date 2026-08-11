@@ -197,9 +197,9 @@ export default function MembersPage() {
             <Cols widths={['auto', 100, 120, 'auto', 120, 80, 134, 90]} />
             <thead>
               <tr>
-                <th>{sortHeader('姓名', 'name')}</th>
-                <th>{sortHeader('學號', 'student_id')}</th>
-                <th>
+                <th scope="col">{sortHeader('姓名', 'name')}</th>
+                <th scope="col">{sortHeader('學號', 'student_id')}</th>
+                <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     {sortHeader('身份', 'kind')}
                     <FilterButton
@@ -213,11 +213,11 @@ export default function MembersPage() {
                     />
                   </span>
                 </th>
-                <th>{sortHeader('職稱', 'title')}</th>
-                <th>電話</th>
-                <th>{sortHeader('學期', 'semester')}</th>
-                <th>{sortHeader('更新時間', 'updated_at')}</th>
-                <th className="r">動作</th>
+                <th scope="col">{sortHeader('職稱', 'title')}</th>
+                <th scope="col">電話</th>
+                <th scope="col">{sortHeader('學期', 'semester')}</th>
+                <th scope="col">{sortHeader('更新時間', 'updated_at')}</th>
+                <th scope="col" className="r">動作</th>
               </tr>
             </thead>
             <tbody>

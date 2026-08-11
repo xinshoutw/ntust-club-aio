@@ -123,10 +123,10 @@ export default function AdminEvalPage() {
           <Cols widths={['auto', 110, 130, 300]} />
           <thead>
             <tr>
-              <th>評分項目</th>
-              <th className="r">自動計算</th>
-              <th className="r">採用分數</th>
-              <th>動作</th>
+              <th scope="col">評分項目</th>
+              <th scope="col" className="r">自動計算</th>
+              <th scope="col" className="r">採用分數</th>
+              <th scope="col">動作</th>
             </tr>
           </thead>
           <tbody>
@@ -201,9 +201,9 @@ export default function AdminEvalPage() {
           <Cols widths={['auto', 120, 120]} />
           <thead>
             <tr>
-              <th>社團</th>
-              <th>性質</th>
-              <th className="r">行政分總分</th>
+              <th scope="col">社團</th>
+              <th scope="col">性質</th>
+              <th scope="col" className="r">行政分總分</th>
             </tr>
           </thead>
           <tbody>

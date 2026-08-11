@@ -67,18 +67,29 @@ export default function PtCheckoutPage() {
             <Cols widths={['30%', 'auto', 190, 90]} />
             <thead>
               <tr>
-                <th>社團</th>
-                <th>器材</th>
-                <th>借用區間</th>
-                <th>點交方式</th>
+                <th scope="col">社團</th>
+                <th scope="col">器材</th>
+                <th scope="col">借用區間</th>
+                <th scope="col">點交方式</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((l) => (
                 <tr key={l.id} className="click-tint" style={{ cursor: 'pointer' }} onClick={() => openModal(l)}>
                   <td className="cell-clip" title={l.club}>{l.club}</td>
+                  {/* 列本身只給滑鼠;鍵盤走器材欄的按鈕(與行政端各表同一種入口) */}
                   <td className="cell-clip" title={`${l.equipment} ×${l.qty}`} style={{ fontWeight: 500 }}>
-                    {l.equipment} <span className="num">×{l.qty}</span>
+                    <button
+                      type="button"
+                      className="row-open-btn"
+                      aria-label={`開啟 ${l.club} 的「${l.equipment}」借出點交`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openModal(l)
+                      }}
+                    >
+                      {l.equipment} <span className="num">×{l.qty}</span>
+                    </button>
                   </td>
                   <td className="num" style={{ fontSize: 13 }}>{l.start} – {l.end}</td>
                   <td style={{ fontSize: 13, color: 'var(--steel)' }}>{l.needsSerial ? '依序點交' : '一般'}</td>

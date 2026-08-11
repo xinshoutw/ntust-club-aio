@@ -49,13 +49,13 @@ export default function PtOverduePage() {
             <Cols widths={['20%', 'auto', 144, 72, 90, 90, 100]} />
             <thead>
               <tr>
-                <th>社團</th>
-                <th>器材</th>
-                <th>應歸還時限</th>
-                <th>已逾</th>
-                <th>借用人</th>
-                <th>狀態</th>
-                <th>動作</th>
+                <th scope="col">社團</th>
+                <th scope="col">器材</th>
+                <th scope="col">應歸還時限</th>
+                <th scope="col">已逾</th>
+                <th scope="col">借用人</th>
+                <th scope="col">狀態</th>
+                <th scope="col">動作</th>
               </tr>
             </thead>
             <tbody>

@@ -359,12 +359,12 @@ export default function SignupManagePage() {
             <Cols widths={['auto', 100, 130, 96, 90, 32]} />
             <thead>
               <tr>
-                <th>活動</th>
-                <th>截止</th>
-                <th className="r">已報名</th>
-                <th className="r">每社上限</th>
-                <th>狀態</th>
-                <th aria-label="開啟" />
+                <th scope="col">活動</th>
+                <th scope="col">截止</th>
+                <th scope="col" className="r">已報名</th>
+                <th scope="col" className="r">每社上限</th>
+                <th scope="col">狀態</th>
+                <th scope="col" aria-label="開啟" />
               </tr>
             </thead>
             <tbody>

@@ -46,16 +46,16 @@ export default function ViewerDonePage() {
             <Cols widths={['34%', 'auto', 90, 150]} />
             <thead>
               <tr>
-                <th>
+                <th scope="col">
                   <MultiSortButton label="獎項" sortKey="award" entries={entries} onToggle={toggleSort} />
                 </th>
-                <th>
+                <th scope="col">
                   <MultiSortButton label="社團" sortKey="club" entries={entries} onToggle={toggleSort} />
                 </th>
-                <th>
+                <th scope="col">
                   <MultiSortButton label="總分" sortKey="total" entries={entries} onToggle={toggleSort} />
                 </th>
-                <th>
+                <th scope="col">
                   <MultiSortButton label="完成時間" sortKey="submitted_at" entries={entries} onToggle={toggleSort} />
                 </th>
               </tr>

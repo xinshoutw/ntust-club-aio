@@ -98,13 +98,13 @@ export default function AdminMembersPage() {
             <Cols widths={['15%', 100, 92, 'auto', 105, 80, 140]} />
             <thead>
               <tr>
-                <th><MultiSortButton label="姓名" sortKey="name" entries={entries} onToggle={toggleSort} /></th>
-                <th><MultiSortButton label="學號" sortKey="student_id" entries={entries} onToggle={toggleSort} /></th>
-                <th><MultiSortButton label="身份" sortKey="kind" entries={entries} onToggle={toggleSort} /></th>
-                <th><MultiSortButton label="職稱" sortKey="title" entries={entries} onToggle={toggleSort} /></th>
-                <th>電話</th>
-                <th><MultiSortButton label="學期" sortKey="semester" entries={entries} onToggle={toggleSort} /></th>
-                <th><MultiSortButton label="更新時間" sortKey="updated_at" entries={entries} onToggle={toggleSort} /></th>
+                <th scope="col"><MultiSortButton label="姓名" sortKey="name" entries={entries} onToggle={toggleSort} /></th>
+                <th scope="col"><MultiSortButton label="學號" sortKey="student_id" entries={entries} onToggle={toggleSort} /></th>
+                <th scope="col"><MultiSortButton label="身份" sortKey="kind" entries={entries} onToggle={toggleSort} /></th>
+                <th scope="col"><MultiSortButton label="職稱" sortKey="title" entries={entries} onToggle={toggleSort} /></th>
+                <th scope="col">電話</th>
+                <th scope="col"><MultiSortButton label="學期" sortKey="semester" entries={entries} onToggle={toggleSort} /></th>
+                <th scope="col"><MultiSortButton label="更新時間" sortKey="updated_at" entries={entries} onToggle={toggleSort} /></th>
               </tr>
             </thead>
             <tbody>

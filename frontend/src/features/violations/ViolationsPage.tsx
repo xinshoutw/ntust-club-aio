@@ -35,11 +35,11 @@ export default function ViolationsPage() {
             <Cols widths={[110, '22%', 'auto', 180, 100]} />
             <thead>
               <tr>
-                <th>日期</th>
-                <th>地點</th>
-                <th>違規項目</th>
-                <th>銷案期限</th>
-                <th>狀態</th>
+                <th scope="col">日期</th>
+                <th scope="col">地點</th>
+                <th scope="col">違規項目</th>
+                <th scope="col">銷案期限</th>
+                <th scope="col">狀態</th>
               </tr>
             </thead>
             <tbody>

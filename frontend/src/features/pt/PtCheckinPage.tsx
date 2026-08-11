@@ -19,6 +19,13 @@ export default function PtCheckinPage() {
   const rows = listQuery.data?.loans ?? []
   const total = listQuery.data?.total ?? 0
 
+  const openReturn = (loan: StaffLoan) => {
+    setSelected(loan)
+    setReturner('')
+    setNote('')
+    setOpen(true)
+  }
+
   const confirm = () => {
     if (!selected) return
     const name = returner.trim()
@@ -55,10 +62,10 @@ export default function PtCheckinPage() {
             <Cols widths={['30%', 'auto', 250, 110]} />
             <thead>
               <tr>
-                <th>社團</th>
-                <th>器材</th>
-                <th>借用區間</th>
-                <th>借用人</th>
+                <th scope="col">社團</th>
+                <th scope="col">器材</th>
+                <th scope="col">借用區間</th>
+                <th scope="col">借用人</th>
               </tr>
             </thead>
             <tbody>
@@ -67,16 +74,22 @@ export default function PtCheckinPage() {
                   key={l.id}
                   className="click-tint"
                   style={{ cursor: 'pointer' }}
-                  onClick={() => {
-                    setSelected(l)
-                    setReturner('')
-                    setNote('')
-                    setOpen(true)
-                  }}
+                  onClick={() => openReturn(l)}
                 >
                   <td className="cell-clip" title={l.club}>{l.club}</td>
+                  {/* 列本身只給滑鼠;鍵盤走器材欄的按鈕(與行政端各表同一種入口) */}
                   <td className="cell-clip" title={`${l.equipment} ×${l.qty}`} style={{ fontWeight: 500 }}>
-                    {l.equipment} <span className="num">×{l.qty}</span>
+                    <button
+                      type="button"
+                      className="row-open-btn"
+                      aria-label={`開啟 ${l.club} 的「${l.equipment}」歸還點交`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openReturn(l)
+                      }}
+                    >
+                      {l.equipment} <span className="num">×{l.qty}</span>
+                    </button>
                   </td>
                   {/* 逾期單要在點收當下就看得出來(逾期會影響停權與行政分) */}
                   <td className="num" style={{ fontSize: 13 }}>

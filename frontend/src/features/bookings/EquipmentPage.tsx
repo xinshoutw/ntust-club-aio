@@ -109,9 +109,9 @@ export default function EquipmentPage() {
               <Cols widths={['auto', 100, 120]} />
               <thead>
                 <tr>
-                  <th>品項</th>
-                  <th>點交方式</th>
-                  <th className="r">可借 / 總數</th>
+                  <th scope="col">品項</th>
+                  <th scope="col">點交方式</th>
+                  <th scope="col" className="r">可借 / 總數</th>
                 </tr>
               </thead>
               <tbody>

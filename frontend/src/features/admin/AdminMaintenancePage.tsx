@@ -79,12 +79,12 @@ export default function AdminMaintenancePage() {
             <Cols widths={['18%', '18%', 'auto', 150, 96, 150]} />
             <thead>
               <tr>
-                <th>社團</th>
-                <th><MultiSortButton label="地點" sortKey="location" entries={entries} onToggle={toggle} /></th>
-                <th>項目</th>
-                <th>佐證</th>
-                <th><MultiSortButton label="申請日" sortKey="date" entries={entries} onToggle={toggle} /></th>
-                <th>狀態</th>
+                <th scope="col">社團</th>
+                <th scope="col"><MultiSortButton label="地點" sortKey="location" entries={entries} onToggle={toggle} /></th>
+                <th scope="col">項目</th>
+                <th scope="col">佐證</th>
+                <th scope="col"><MultiSortButton label="申請日" sortKey="date" entries={entries} onToggle={toggle} /></th>
+                <th scope="col">狀態</th>
               </tr>
             </thead>
             <tbody>

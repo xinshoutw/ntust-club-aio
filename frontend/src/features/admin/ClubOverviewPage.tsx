@@ -29,6 +29,7 @@ import ClubSelect from './ClubSelect'
 import { useAdminClub } from './clubContext'
 import { useAuth } from '../../app/auth'
 import { canAccessAdminPath } from '../../lib/permissions'
+import { clickableProps } from '../../lib/clickable'
 
 const label: React.CSSProperties = { color: 'var(--steel)' }
 
@@ -46,20 +47,6 @@ interface Detail {
   title: string
   status: StatusKey
   rows: [string, React.ReactNode][]
-}
-
-function clickableRow(onClick: () => void): React.HTMLAttributes<HTMLDivElement> {
-  return {
-    role: 'button',
-    tabIndex: 0,
-    onClick,
-    onKeyDown: (e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault()
-        onClick()
-      }
-    },
-  }
 }
 
 function LoadError({ queries }: { queries: { isError: boolean; error: Error | null }[] }) {
@@ -257,7 +244,7 @@ export default function ClubOverviewPage() {
           </div>
           {!canActivities && !canMaint && <NoPermission />}
           {activities.map((a) => (
-            <div key={`act-${a.id}`} className="click-tint" style={rowStyle} {...clickableRow(() => openActivity(a.id, a.name))}>
+            <div key={`act-${a.id}`} className="click-tint" style={rowStyle} {...clickableProps(() => openActivity(a.id, a.name))}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14 }}>{a.name}</div>
                 <div style={{ fontSize: 12, color: 'var(--steel)' }}>活動申請</div>
@@ -266,7 +253,7 @@ export default function ClubOverviewPage() {
             </div>
           ))}
           {maintenance.map((m) => (
-            <div key={`mnt-${m.id}`} className="click-tint" style={rowStyle} {...clickableRow(() => openMaintenance(m))}>
+            <div key={`mnt-${m.id}`} className="click-tint" style={rowStyle} {...clickableProps(() => openMaintenance(m))}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14 }}>空間報修 {m.location}</div>
                 <div style={{ fontSize: 12, color: 'var(--steel)' }}>線上申請</div>
@@ -296,7 +283,7 @@ export default function ClubOverviewPage() {
               key={`room-${r.id}`}
               className="click-tint"
               style={rowStyle}
-              {...clickableRow(() => openBooking({ kind: 'room', data: r }, r.apiId))}
+              {...clickableProps(() => openBooking({ kind: 'room', data: r }, r.apiId))}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14 }}>{r.room}</div>
@@ -310,7 +297,7 @@ export default function ClubOverviewPage() {
               key={`ven-${v.id}`}
               className="click-tint"
               style={rowStyle}
-              {...clickableRow(() => openBooking({ kind: 'venue', data: v }, v.apiId))}
+              {...clickableProps(() => openBooking({ kind: 'venue', data: v }, v.apiId))}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14 }}>{v.venue}</div>
@@ -324,7 +311,7 @@ export default function ClubOverviewPage() {
               key={`loan-${l.id}`}
               className="click-tint"
               style={rowStyle}
-              {...clickableRow(() => openBooking({ kind: 'loan', data: l }, l.apiId))}
+              {...clickableProps(() => openBooking({ kind: 'loan', data: l }, l.apiId))}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14 }}>{l.equipment} <span className="num">×{l.qty}</span></div>

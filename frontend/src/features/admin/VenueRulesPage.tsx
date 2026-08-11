@@ -117,12 +117,12 @@ export default function VenueRulesPage() {
             <Cols widths={['16%', 200, 110, 110, 'auto', 90]} />
             <thead>
               <tr>
-                <th>場地</th>
-                <th>期間</th>
-                <th>星期</th>
-                <th>時段</th>
-                <th>原因</th>
-                <th className="r">動作</th>
+                <th scope="col">場地</th>
+                <th scope="col">期間</th>
+                <th scope="col">星期</th>
+                <th scope="col">時段</th>
+                <th scope="col">原因</th>
+                <th scope="col" className="r">動作</th>
               </tr>
             </thead>
             <tbody>

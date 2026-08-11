@@ -106,34 +106,34 @@ export default function AdminViolationsPage() {
             <Cols widths={['13%', 96, '11%', 'auto', 88, 132, 90, 84]} />
             <thead>
               <tr>
-                <th>社團</th>
-                <th><MultiSortButton label="日期" sortKey="date" entries={entries} onToggle={toggle} /></th>
-                <th><MultiSortButton label="地點" sortKey="location" entries={entries} onToggle={toggle} /></th>
-                <th>
+                <th scope="col">社團</th>
+                <th scope="col"><MultiSortButton label="日期" sortKey="date" entries={entries} onToggle={toggle} /></th>
+                <th scope="col"><MultiSortButton label="地點" sortKey="location" entries={entries} onToggle={toggle} /></th>
+                <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     <MultiSortButton label="項目" sortKey="items" entries={entries} onToggle={toggle} />
                     <FilterButton options={itemOptions} selected={itemFilter} onChange={setItemFilter} label="篩選項目" />
                   </span>
                 </th>
-                <th>
+                <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     <MultiSortButton label="填寫" sortKey="filler" entries={entries} onToggle={toggle} />
                     <FilterButton options={fillerOptions} selected={fillerFilter} onChange={setFillerFilter} label="篩選填寫人" />
                   </span>
                 </th>
-                <th>
+                <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     <MultiSortButton label="銷案期限" sortKey="deadline" entries={entries} onToggle={toggle} />
                     <FilterButton options={['未逾期', '已截止']} selected={deadlineFilter} onChange={setDeadlineFilter} label="篩選期限" />
                   </span>
                 </th>
-                <th>
+                <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     <MultiSortButton label="狀態" sortKey="status" entries={entries} onToggle={toggle} />
                     <FilterButton options={['未銷案', '已銷案']} selected={statusFilter} onChange={setStatusFilter} label="篩選狀態" />
                   </span>
                 </th>
-                <th className="r">動作</th>
+                <th scope="col" className="r">動作</th>
               </tr>
             </thead>
             <tbody>

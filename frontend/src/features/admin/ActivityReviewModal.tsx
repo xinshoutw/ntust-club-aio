@@ -333,10 +333,10 @@ export default function ActivityReviewModal({
               <Cols widths={['auto', 90, 90, 96]} />
               <thead>
                 <tr>
-                  <th style={{ paddingLeft: 0 }}>摘要</th>
-                  <th className="r">自籌</th>
-                  <th className="r">擬請</th>
-                  <th className="r" style={{ paddingRight: 0 }}>核定</th>
+                  <th scope="col" style={{ paddingLeft: 0 }}>摘要</th>
+                  <th scope="col" className="r">自籌</th>
+                  <th scope="col" className="r">擬請</th>
+                  <th scope="col" className="r" style={{ paddingRight: 0 }}>核定</th>
                 </tr>
               </thead>
               <tbody>

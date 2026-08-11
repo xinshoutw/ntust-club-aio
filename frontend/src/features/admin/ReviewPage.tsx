@@ -192,7 +192,7 @@ export default function ReviewPage() {
             <Cols widths={['18%', 'auto', 130, 104, 90, 100, 140, 32]} />
             <thead>
               <tr>
-                <th>
+                <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     <MultiSortButton label="社團" sortKey="club" entries={entries} onToggle={toggleSort} />
                     <FilterButton
@@ -206,8 +206,8 @@ export default function ReviewPage() {
                     />
                   </span>
                 </th>
-                <th><MultiSortButton label="活動名稱" sortKey="name" entries={entries} onToggle={toggleSort} /></th>
-                <th>
+                <th scope="col"><MultiSortButton label="活動名稱" sortKey="name" entries={entries} onToggle={toggleSort} /></th>
+                <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     <MultiSortButton label="類型" sortKey="type" entries={entries} onToggle={toggleSort} />
                     <FilterButton
@@ -221,9 +221,9 @@ export default function ReviewPage() {
                     />
                   </span>
                 </th>
-                <th><MultiSortButton label="活動日期" sortKey="date" entries={entries} onToggle={toggleSort} /></th>
-                <th className="r">擬請補助</th>
-                <th>
+                <th scope="col"><MultiSortButton label="活動日期" sortKey="date" entries={entries} onToggle={toggleSort} /></th>
+                <th scope="col" className="r">擬請補助</th>
+                <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     <MultiSortButton label="狀態" sortKey="status" entries={entries} onToggle={toggleSort} />
                     <FilterButton
@@ -237,8 +237,8 @@ export default function ReviewPage() {
                     />
                   </span>
                 </th>
-                <th><MultiSortButton label="審核時間" sortKey="reviewed_at" entries={entries} onToggle={toggleSort} /></th>
-                <th aria-label="開啟" />
+                <th scope="col"><MultiSortButton label="審核時間" sortKey="reviewed_at" entries={entries} onToggle={toggleSort} /></th>
+                <th scope="col" aria-label="開啟" />
               </tr>
             </thead>
             <tbody>

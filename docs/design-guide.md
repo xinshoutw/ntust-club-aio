@@ -119,11 +119,12 @@ theme: {
 
 ## 6. 元件與互動慣例
 
-以下為全站強制慣例,新頁面照做,不要自刻替代品。既有頁面仍有未收斂處(`<Spin>`、原生 `<Upload>`、`th` 缺 `scope`),清單在 `HANDOFF.md` 的 debt 段。
+以下為全站強制慣例,新頁面照做,不要自刻替代品。既有頁面仍有未收斂處(`<Spin>`、原生 `<Upload>`),清單在 `HANDOFF.md` 的 debt 段。
 
 **表格**
 
-- 資料表一律 `tb fixed` + `<Cols>` 固定欄寬;`th` 需給 `scope`
+- 資料表一律 `tb fixed` + `<Cols>` 固定欄寬;`th` 一律 `scope="col"`(全站無列首 `th`)
+- 整列可點時 `onClick` 掛在 `<tr>` 上只服務滑鼠,鍵盤入口是主要欄位裡的 `.row-open-btn`(記得 `stopPropagation`);卡片等非表格區塊用 `lib/clickable` 的 `clickableProps`
 - 排序一律 `useMultiSort` + `MultiSortButton`(伺服器端以 `sortParam` 帶查詢):至多 3 鍵、無移除態,指示器呈現實際生效的排序鏈。點主鍵=升降互換,點已啟用的次鍵=升為主鍵並保留方向,點新欄=插為主鍵。**僅 sort icon 變色**,不整欄變色
 - 篩選用 `FilterButton`,收進表頭,不做一排篩選器牆
 - 分頁一律 `Pager`(AntD Pagination `simple`):置中、只有一頁也顯示;禁用數字頁碼鈕

@@ -92,13 +92,15 @@ export interface ClubSuspension {
 
 /** 停權狀態:借用四頁與管理項目共用(見 components/ui/SuspensionNote)。 */
 export function useClubSuspension(): ClubSuspension {
-  const { data, isError } = useClubProfile()
+  // isLoadingError = 失敗且手上一筆資料都沒有。背景重抓失敗(error 態保留 data)不算 ——
+  // 那會把「停權至 2026/09/30」這個已知事實換成「無法確認」,比修之前更糟
+  const { data, isLoadingError } = useClubProfile()
   const until = data?.suspendedUntil ?? ''
   return {
     suspended: suspendedNow(until),
     until,
     reason: data?.suspendReason ?? '',
-    failed: isError,
+    failed: isLoadingError,
   }
 }
 

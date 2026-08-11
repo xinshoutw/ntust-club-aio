@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import sqlalchemy as sa
 
+from app.core.semesters import TAIPEI
 from app.models import AuditLog, MaintenanceRequest
 from tests.conftest import csrf_headers, login, make_club, make_user
 
@@ -174,6 +175,35 @@ async def test_audit_list_filters_and_super_only(client, db):
         await client.get("/api/v1/admin/audit", params={"action": "violation_filed"})
     ).json()["data"]
     assert [d["detail"] for d in data] == ["c"]
+
+
+async def test_audit_date_range_uses_taipei_day_bounds(client, db):
+    """畫面顯示台北時間,選某一天就該拿到那天整天(含頭含尾)。"""
+    await make_user(db, username="root", role="admin", is_super=True)
+    taipei_day = datetime(2026, 8, 11, tzinfo=TAIPEI)
+    db.add_all(
+        [
+            AuditLog(role="admin", action="settings_updated", detail="早", created_at=taipei_day),
+            AuditLog(
+                role="admin",
+                action="settings_updated",
+                detail="晚",
+                created_at=taipei_day + timedelta(hours=23, minutes=59),
+            ),
+            AuditLog(
+                role="admin",
+                action="settings_updated",
+                detail="隔天",
+                created_at=taipei_day + timedelta(days=1),
+            ),
+        ]
+    )
+    await db.commit()
+
+    await login(client, "root")
+    params = {"date_from": "2026-08-11", "date_to": "2026-08-11", "action": "settings_updated"}
+    data = (await client.get("/api/v1/admin/audit", params=params)).json()["data"]
+    assert sorted(d["detail"] for d in data) == ["早", "晚"]
 
 
 async def test_audit_options_cover_every_record(client, db):

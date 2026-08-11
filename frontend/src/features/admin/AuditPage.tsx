@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Spin } from 'antd'
+import { DatePicker, Spin } from 'antd'
+import type { Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { Cols, FilterButton, Pager } from '../../components/ui/tableControls'
@@ -17,6 +18,7 @@ export default function AuditPage() {
   const [whoFilter, setWhoFilter] = useState<string | null>(null)
   const [roleFilter, setRoleFilter] = useState<string | null>(null)
   const [actionFilter, setActionFilter] = useState<string | null>(null)
+  const [range, setRange] = useState<[Dayjs, Dayjs] | null>(null)
   const [page, setPage] = useState(1)
   const options = useAuditOptions()
   const operators = options.data?.operators ?? []
@@ -27,6 +29,8 @@ export default function AuditPage() {
     userId: operators.find((o) => o.name === whoFilter)?.id,
     role: roleFilter ? roleKeyOf(roleFilter) : undefined,
     action: actionFilter ? actionKeyOf(actionFilter) : undefined,
+    dateFrom: range?.[0].format('YYYY-MM-DD'),
+    dateTo: range?.[1].format('YYYY-MM-DD'),
   })
   const logs = listQuery.data?.logs ?? []
   const total = listQuery.data?.total ?? 0
@@ -40,7 +44,20 @@ export default function AuditPage() {
 
   return (
     <div>
-      <PageHeader title="稽核紀錄" />
+      <PageHeader
+        title="稽核紀錄"
+        extra={
+          <DatePicker.RangePicker
+            value={range}
+            onChange={(v) => {
+              setRange(v && v[0] && v[1] ? [v[0], v[1]] : null)
+              setPage(1)
+            }}
+            format="YYYY/MM/DD"
+            allowClear
+          />
+        }
+      />
 
       <Spin spinning={listQuery.isPending}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>

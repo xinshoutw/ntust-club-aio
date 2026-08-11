@@ -140,6 +140,9 @@ export interface AuditListParams {
   userId?: number
   role?: string
   action?: string
+  /** YYYY-MM-DD;含頭含尾,後端以台北日界切 */
+  dateFrom?: string
+  dateTo?: string
 }
 
 export function useAuditLogs(p: AuditListParams) {
@@ -147,7 +150,15 @@ export function useAuditLogs(p: AuditListParams) {
     queryKey: ['adminAudit', 'list', p] as const,
     queryFn: () =>
       apiPaged<AuditLogOut[]>(
-        `/admin/audit${qs({ page: p.page, page_size: p.pageSize, user_id: p.userId, role: p.role, action: p.action })}`,
+        `/admin/audit${qs({
+          page: p.page,
+          page_size: p.pageSize,
+          user_id: p.userId,
+          role: p.role,
+          action: p.action,
+          date_from: p.dateFrom,
+          date_to: p.dateTo,
+        })}`,
       ).then(({ data, total }) => ({ logs: data.map(toLog), total })),
     placeholderData: keepPreviousData,
   })

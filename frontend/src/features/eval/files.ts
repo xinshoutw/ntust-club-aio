@@ -1,5 +1,6 @@
 // 檔案工具(無其他 feature 依賴,避免循環匯入)
 import { isPdfFile } from '../../lib/uploads'
+import { fetchFile } from '../../api/client'
 import { fileTypeOf, type EvalFile } from './types'
 
 let fileSeq = 0
@@ -98,7 +99,7 @@ export function zipStore(entries: { name: string; data: Uint8Array }[]): Blob {
 export async function downloadPhotosZip(zipName: string, files: EvalFile[]): Promise<void> {
   const entries = await Promise.all(
     files.map(async (f, i) => {
-      const res = await fetch(f.url, { credentials: 'same-origin' })
+      const res = await fetchFile(f.url)
       // 不檢查就把錯誤信封的 JSON 當照片打進 zip:使用者拿到一包壞檔卻毫無提示
       if (!res.ok) throw new Error(`無法取得 ${f.name}(HTTP ${res.status})`)
       return {

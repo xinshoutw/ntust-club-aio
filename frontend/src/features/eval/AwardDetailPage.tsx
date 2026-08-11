@@ -8,6 +8,7 @@ import QueryError from '../../components/ui/QueryError'
 import { useAuth } from '../../app/auth'
 import { fmtMB, isImageFile, sha256 } from '../../lib/uploads'
 import { useAwardDetail, useEvalUploadMutations, type AwardRubricItem, type AwardUploadFile } from '../../api/eval'
+import { fetchFile } from '../../api/client'
 import { fileTypeOf, AWARD_BRIEFS, type EvalFile } from './types'
 import FilePreview from './FilePreview'
 
@@ -110,7 +111,7 @@ export default function AwardDetailPage() {
     // docx 預覽需要原始檔內容(mammoth);伺服器檔案先抓回 blob 再開
     if (f.type === 'doc' && !f.raw) {
       try {
-        const blob = await (await fetch(f.url, { credentials: 'same-origin' })).blob()
+        const blob = await (await fetchFile(f.url)).blob()
         f = { ...f, raw: new File([blob], f.name) }
       } catch {
         // 抓取失敗:仍開啟預覽視窗,由 DocView 顯示無法預覽說明

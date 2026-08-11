@@ -106,6 +106,14 @@ export class ApiError extends Error {
 /** 只有帶 401 的 ApiError 才算「確定已登出」:斷線與 500 都不算,訊息像也不算 */
 export const isUnauthorized = (e: unknown): boolean => e instanceof ApiError && e.status === 401
 
+/** 直接抓檔案(不走 JSON 信封)時也要讓 401 走同一條 session 過期路徑,
+ *  否則預覽/下載會顯示成「無法取得檔案」而不是導回登入 */
+export async function fetchFile(url: string): Promise<Response> {
+  const res = await fetch(url, { credentials: 'same-origin' })
+  if (res.status === 401) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT))
+  return res
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResponse<T>> {
   // 正確合併 headers(展開 init 不可蓋掉);FormData 交給瀏覽器帶 boundary
   const headers = new Headers(init.headers)

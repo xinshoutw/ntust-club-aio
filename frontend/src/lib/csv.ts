@@ -3,9 +3,11 @@
 // Excel 公式注入中和:= + - @ 開頭的欄位前置單引號,避免開檔即執行公式
 export const neutralizeFormula = (v: string): string => (/^[=+\-@\t\r]/.test(v) ? `'${v}` : v)
 
+// 單獨的 CR 也要引號:Excel 與多數解析器把它當換行,不引就能從一格值切出新的一列,
+// 而那一列的第一格繞過了 neutralizeFormula
 const escapeField = (raw: string): string => {
   const v = neutralizeFormula(raw)
-  return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
+  return /[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v
 }
 
 export function toCsv(rows: string[][]): string {

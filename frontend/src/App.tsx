@@ -8,6 +8,7 @@ import { useAdminFixedWindow } from './api/adminBookings'
 import { usePendingActivityTotal, usePendingCloseTotal } from './api/adminActivities'
 import { homeOf } from './lib/home'
 import AppShell from './components/layout/AppShell'
+import QueryError from './components/ui/QueryError'
 import LoginPage from './features/auth/LoginPage'
 import ChangePasswordPage from './features/auth/ChangePasswordPage'
 import ComingSoonPage from './features/auth/ComingSoonPage'
@@ -61,10 +62,20 @@ import VenueRulesPage from './features/admin/VenueRulesPage'
 import AdminViolationsPage from './features/admin/AdminViolationsPage'
 import AuditPage from './features/admin/AuditPage'
 
+// 開機無法確認登入狀態(非 401):不能導去登入頁 —— 那等於告訴使用者「你被登出了」
+function BootError({ error, onRetry }: { error: Error; onRetry: () => void }) {
+  return (
+    <div style={{ maxWidth: 520, margin: '18vh auto 0', padding: '0 24px' }}>
+      <QueryError title="無法確認登入狀態" error={error} onRetry={onRetry} />
+    </div>
+  )
+}
+
 function RequireRole({ roles, children }: { roles: Role[]; children: ReactNode }) {
-  const { user, booting } = useAuth()
+  const { user, booting, bootError, retryBoot } = useAuth()
   const location = useLocation()
   if (booting) return null // session 恢復中,避免閃現登入頁
+  if (bootError) return <BootError error={bootError} onRetry={retryBoot} />
   if (!user) return <Navigate to="/login" replace state={{ from: location }} />
   if (user.mustChangePassword) return <Navigate to="/change-password" replace />
   if (!roles.includes(user.role)) {
@@ -128,8 +139,9 @@ function AdminPermissionGate() {
 
 // 首登強制改密頁:需已登入,但不受 mustChangePassword 導轉限制
 function RequireAuth({ children }: { children: ReactNode }) {
-  const { user, booting } = useAuth()
+  const { user, booting, bootError, retryBoot } = useAuth()
   if (booting) return null
+  if (bootError) return <BootError error={bootError} onRetry={retryBoot} />
   if (!user) return <Navigate to="/login" replace />
   return children
 }

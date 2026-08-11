@@ -2,7 +2,7 @@
 // snake↔camel、日期(ISO↔YYYY/MM/DD)與 enum 值映射集中在此,頁面只碰 camelCase 型別
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
-import { api, apiPaged, qs } from './client'
+import { api } from './client'
 import { fetchAllPages } from './fetchAll'
 import type { MemberKind } from '../lib/roles'
 import type { StatusKey } from '../lib/status'
@@ -277,10 +277,9 @@ interface MemberNameOut {
 }
 
 async function officerNames(semester: string, kind: MemberKind): Promise<string[]> {
-  const { data } = await apiPaged<MemberNameOut[]>(
-    `/club/members${qs({ semester, kind: [kind], page: 1, page_size: 100 })}`,
-  )
-  return data.map((m) => m.name)
+  // 逐頁抓齊:負責人只會有一位,但幹部證明也走這裡,截在第一頁會靜默漏人
+  const rows = await fetchAllPages<MemberNameOut>('/club/members', { semester, kind: [kind] })
+  return rows.map((m) => m.name)
 }
 
 /** 姓名預覽:依學年期+職位查成員名單(整學年=兩學期聯集);送出時後端再驗證一次 */

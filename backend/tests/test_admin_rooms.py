@@ -118,6 +118,24 @@ async def test_list_with_weekly_slots(client, db):
     assert (await client.get(URL, params={"sort": "hack"})).status_code == 422
 
 
+async def test_list_active_filters_out_finished_terms(client, db):
+    """衝突標示只需要還佔著時段的已核准單:學期已結束的不必抓回前端。"""
+    first, _, done = await seed(client, db)
+    old = RoomBookingRequest(
+        club_id=first.club_id, venue_id=done.venue_id, purpose="去年的社課",
+        status="approved", start_date=date(2024, 2, 1), end_date=date(2024, 7, 31),
+    )
+    old.slots = [RoomBookingSlot(weekday=5, period="1")]
+    db.add(old)
+    await db.commit()
+    await db.refresh(old)
+
+    rows = (await client.get(URL, params={"status": "approved", "active": True})).json()["data"]
+    assert [d["id"] for d in rows] == [done.id]
+    rows = (await client.get(URL, params={"status": "approved", "active": False})).json()["data"]
+    assert [d["id"] for d in rows] == [old.id]
+
+
 async def test_approve_and_reject_whole_request(client, db):
     first, second, done = await seed(client, db)
 

@@ -3,10 +3,12 @@ import { App, Button, Input, Modal } from 'antd'
 import dayjs from 'dayjs'
 import StatusPill from '../../components/ui/StatusPill'
 import { DOW_TEXT } from '../../api/bookings'
+import { CONFLICT_TEXT, conflictNote } from '../../api/adminBookings'
 import type {
   AdminEquipmentLoan,
   AdminRoomRequest,
   AdminVenueBooking,
+  RoomConflictKind,
 } from '../../api/adminBookings'
 
 export type BookingReviewItem =
@@ -21,7 +23,7 @@ const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 // onApprove/onReject:接 API 的頁面傳入 mutateAsync 回呼(成功 message+關彈窗、失敗 message.error)
 export default function BookingReviewModal({
   item,
-  conflictKeys,
+  conflicts,
   open,
   onClose,
   afterClose,
@@ -30,9 +32,9 @@ export default function BookingReviewModal({
   onRevoke,
 }: {
   item: BookingReviewItem
-  /** 固定借用衝突的 `dow|period`;由呼叫端每次 render 算(見 roomConflictSlots)——
+  /** 固定借用衝突:`dow|period` → 種類;由呼叫端每次 render 算(見 roomConflictSlots)——
    *  存成快照的話,衝突清單晚一步回來就會永遠停在「沒有衝突」 */
-  conflictKeys?: string[]
+  conflicts?: Map<string, RoomConflictKind>
   open: boolean
   onClose: () => void
   afterClose: () => void
@@ -52,7 +54,13 @@ export default function BookingReviewModal({
   const canRevoke = item.data.status === 'approved' && !!onRevoke && notPast
   const title =
     item.kind === 'venue' ? item.data.venue : item.kind === 'room' ? item.data.room : `${item.data.equipment} ×${item.data.qty}`
-  const roomConflict = item.kind === 'room' && canReview && (conflictKeys?.length ?? 0) > 0
+  // 衝突僅對待審單有意義(已核准/已退回單不再顯示)
+  const conflictOf = (dow: number, period: string) =>
+    canReview ? conflicts?.get(`${dow}|${period}`) : undefined
+  const note =
+    item.kind === 'room'
+      ? conflictNote(item.data.entries.flatMap((e) => e.periods.map((p) => conflictOf(e.dow, p))))
+      : null
 
   const closeReason = () => {
     setReasonMode(null)
@@ -149,10 +157,10 @@ export default function BookingReviewModal({
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {item.data.entries.flatMap((e) =>
                 e.periods.map((p) => {
-                  const conflict = canReview && (conflictKeys?.includes(`${e.dow}|${p}`) ?? false)
+                  const conflict = conflictOf(e.dow, p)
                   return (
                     <span key={`${e.dow}-${p}`} className="num" style={{ color: conflict ? '#C13B34' : undefined, fontWeight: conflict ? 500 : undefined }}>
-                      週{DOW_TEXT[e.dow]} 第 {p} 節{conflict && '（衝突）'}
+                      週{DOW_TEXT[e.dow]} 第 {p} 節{conflict && CONFLICT_TEXT[conflict]}
                     </span>
                   )
                 }),
@@ -195,9 +203,9 @@ export default function BookingReviewModal({
           )
         })()}
 
-      {roomConflict && (
+      {note && (
         <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--paper)', borderRadius: 6, fontSize: 13, color: '#B03A2E' }}>
-          此申請與其他申請衝突，請擇一核准
+          {note}
         </div>
       )}
 

@@ -10,7 +10,9 @@ import {
   roomConflictSlots,
   useAdminBookingMutations,
   useAllPendingRoomBookings,
+  useApprovedRoomBookings,
   type AdminRoomRequest,
+  type RoomConflictKind,
 } from '../../api/adminBookings'
 import { useAdminActivityDetail, useAdminActivityMutations } from '../../api/adminActivities'
 import {
@@ -119,12 +121,13 @@ export default function ClubOverviewPage() {
     setBookingOpen(true)
   }
 
-  // 固定借用衝突以「全部社團的審核中申請」計算(judge 與 AdminRoomsPage 共用一份:
-  // 兩社搶同場地同星期同節次)
+  // 固定借用衝突與 AdminRoomsPage 共用一份判定:對上別社的審核中申請(擇一核准)或
+  // 已核准且學期未結束的申請(核准必被擋下),兩份名單都取全量
   const pendingRoomsQuery = useAllPendingRoomBookings(canRooms && clubId != null)
-  const conflicts = roomConflictSlots(pendingRoomsQuery.data ?? [])
-  const conflictSlotsOf = (r: AdminRoomRequest): string[] =>
-    r.status === 'pending' ? [...(conflicts.get(r.apiId) ?? [])] : []
+  const approvedRoomsQuery = useApprovedRoomBookings(canRooms && clubId != null)
+  const conflicts = roomConflictSlots(pendingRoomsQuery.data ?? [], approvedRoomsQuery.data ?? [])
+  const conflictsOf = (r: AdminRoomRequest): Map<string, RoomConflictKind> | undefined =>
+    r.status === 'pending' ? conflicts.get(r.apiId) : undefined
 
   const openMaintenance = (m: AdminMaintenanceRow) => {
     setDetail({
@@ -199,7 +202,8 @@ export default function ClubOverviewPage() {
     loading(roomsQuery, canRooms && hasClub) ||
     loading(venuesQuery, canBookings && hasClub) ||
     loading(loansQuery, canBookings && hasClub) ||
-    loading(pendingRoomsQuery, canRooms && hasClub)
+    loading(pendingRoomsQuery, canRooms && hasClub) ||
+    loading(approvedRoomsQuery, canRooms && hasClub)
 
   const rowStyle: React.CSSProperties = {
     display: 'flex',
@@ -329,7 +333,7 @@ export default function ClubOverviewPage() {
               <StatusPill status={l.status} />
             </div>
           ))}
-          <LoadError queries={[roomsQuery, venuesQuery, loansQuery, pendingRoomsQuery]} />
+          <LoadError queries={[roomsQuery, venuesQuery, loansQuery, pendingRoomsQuery, approvedRoomsQuery]} />
           {(canRooms || canBookings) && !bookingLoading && bookingCount === 0 && (
             <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
               尚無借用中的場地或器材
@@ -366,7 +370,7 @@ export default function ClubOverviewPage() {
         <BookingReviewModal
           key={booking.data.id}
           item={booking}
-          conflictKeys={booking.kind === 'room' ? conflictSlotsOf(booking.data) : undefined}
+          conflicts={booking.kind === 'room' ? conflictsOf(booking.data) : undefined}
           open={bookingOpen}
           onClose={() => setBookingOpen(false)}
           afterClose={() => setBooking(null)}

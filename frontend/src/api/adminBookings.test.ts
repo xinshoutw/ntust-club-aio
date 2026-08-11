@@ -26,6 +26,7 @@ const request = (
   venueId: number,
   entries: AdminRoomRequest['entries'],
   term: [string, string] = ['2026/08/01', '2027/01/31'],
+  status: AdminRoomRequest['status'] = 'pending',
 ): AdminRoomRequest => ({
   id: String(apiId),
   apiId,
@@ -34,10 +35,17 @@ const request = (
   room: `場地${venueId}`,
   entries,
   note: '',
-  status: 'pending',
+  status,
   startDate: term[0],
   endDate: term[1],
 })
+
+const approved = (
+  apiId: number,
+  venueId: number,
+  entries: AdminRoomRequest['entries'],
+  term: [string, string] = ['2026/08/01', '2027/01/31'],
+) => request(apiId, venueId, entries, term, 'approved')
 
 describe('roomConflictSlots', () => {
   it('兩社搶同場地同星期同節次才算衝突', () => {
@@ -46,8 +54,8 @@ describe('roomConflictSlots', () => {
       request(2, 7, [{ dow: 1, periods: ['4', '5'] }]), // 只有第 4 節重疊
       request(3, 9, [{ dow: 1, periods: ['4'] }]), // 別的場地不算
     ])
-    expect([...(conflicts.get(1) ?? [])]).toEqual(['1|4'])
-    expect([...(conflicts.get(2) ?? [])]).toEqual(['1|4'])
+    expect([...(conflicts.get(1) ?? [])]).toEqual([['1|4', 'pending']])
+    expect([...(conflicts.get(2) ?? [])]).toEqual([['1|4', 'pending']])
     expect(conflicts.get(3)).toBeUndefined()
   })
 
@@ -64,5 +72,30 @@ describe('roomConflictSlots', () => {
       request(1, 7, [{ dow: 1, periods: ['3'] }, { dow: 1, periods: ['3'] }]),
     ])
     expect(conflicts.size).toBe(0)
+  })
+
+  it('撞到已核准單標 taken(核准會吃 409,不是擇一核准)', () => {
+    const conflicts = roomConflictSlots(
+      [request(1, 7, [{ dow: 2, periods: ['5'] }])],
+      [approved(9, 7, [{ dow: 2, periods: ['5'] }])],
+    )
+    expect(conflicts.get(1)?.get('2|5')).toBe('taken')
+  })
+
+  it('同時撞到待審與已核准時以 taken 為準(能做的只剩退回)', () => {
+    const conflicts = roomConflictSlots(
+      [request(1, 7, [{ dow: 2, periods: ['5'] }]), request(2, 7, [{ dow: 2, periods: ['5'] }])],
+      [approved(9, 7, [{ dow: 2, periods: ['5'] }])],
+    )
+    expect(conflicts.get(1)?.get('2|5')).toBe('taken')
+    expect(conflicts.get(2)?.get('2|5')).toBe('taken')
+  })
+
+  it('已核准單本身不列衝突(只標待審單,已核准的不必再擇一)', () => {
+    const conflicts = roomConflictSlots(
+      [request(1, 7, [{ dow: 2, periods: ['5'] }])],
+      [approved(9, 7, [{ dow: 2, periods: ['5'] }])],
+    )
+    expect(conflicts.get(9)).toBeUndefined()
   })
 })

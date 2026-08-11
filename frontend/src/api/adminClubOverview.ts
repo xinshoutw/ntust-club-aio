@@ -95,6 +95,8 @@ interface AdminRoomBookingOut {
   venue_name: string
   purpose: string
   status: 'pending' | 'approved' | 'rejected'
+  start_date: string
+  end_date: string
   slots: { weekday: number; period: string }[]
 }
 
@@ -135,6 +137,8 @@ const toRoomRequest = (r: AdminRoomBookingOut): AdminRoomRequest => ({
   entries: slotsToEntries(r.slots),
   note: r.purpose,
   status: r.status,
+  startDate: slashDate(r.start_date),
+  endDate: slashDate(r.end_date),
 })
 
 const toEquipmentLoan = (l: AdminEquipmentLoanOut): AdminEquipmentLoan => ({

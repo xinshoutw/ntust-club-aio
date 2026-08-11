@@ -7,7 +7,7 @@ import StatusPill from '../../components/ui/StatusPill'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import { DOW_TEXT } from '../../api/bookings'
 import {
-  roomConflictKeys,
+  roomConflictSlots,
   useAdminBookingMutations,
   useAdminFixedWindow,
   useAllPendingRoomBookings,
@@ -158,9 +158,9 @@ export default function AdminRoomsPage() {
   // 標出互相衝突的時段(同場地每週同星期同節次);衝突時擇一社團核准,不做部分同意。
   // 比對對象是全部待審單而非當前這一頁,否則跨頁衝突會被判成無衝突
   const allPendingQuery = useAllPendingRoomBookings(windowOpen)
-  const conflictKeys = roomConflictKeys(allPendingQuery.data ?? [])
-  const isConflict = (venueId: number) => (dow: number, period: string) =>
-    conflictKeys.has(`${venueId}|${dow}|${period}`)
+  const conflictSlots = roomConflictSlots(allPendingQuery.data ?? [])
+  const isConflict = (apiId: number) => (dow: number, period: string) =>
+    conflictSlots.get(apiId)?.has(`${dow}|${period}`) ?? false
 
   if (windowQuery.isPending) {
     return (
@@ -269,7 +269,7 @@ export default function AdminRoomsPage() {
                   <td style={{ fontSize: 13 }}>
                     {r.entries.flatMap((e) =>
                       e.periods.map((p) => {
-                        const conflict = conflictKeys.has(`${r.venueId}|${e.dow}|${p}`)
+                        const conflict = isConflict(r.apiId)(e.dow, p)
                         return (
                           <span key={`${e.dow}-${p}`} className="num" style={{ color: conflict ? '#C13B34' : undefined, fontWeight: conflict ? 500 : undefined, marginRight: 8, display: 'inline-block' }}>
                             週{DOW_TEXT[e.dow]} 第{p}節
@@ -307,7 +307,7 @@ export default function AdminRoomsPage() {
         <RoomReviewModal
           key={selected.id}
           item={selected}
-          isConflict={isConflict(selected.venueId)}
+          isConflict={isConflict(selected.apiId)}
           open={open}
           onClose={() => setOpen(false)}
           afterClose={() => setSelected(null)}

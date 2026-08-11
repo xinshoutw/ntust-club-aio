@@ -171,7 +171,7 @@ const toEquipmentLoan = (l: AdminEquipmentLoanOut): AdminEquipmentLoan => ({
 
 // ---- 固定場地借用 ----
 
-/** venueId 供衝突偵測(同場地同星期同節次) */
+/** venueId 與目標學期起訖供衝突偵測(同場地、學期區間重疊、同星期同節次) */
 export interface AdminRoomRequest {
   id: string
   apiId: number
@@ -181,6 +181,9 @@ export interface AdminRoomRequest {
   entries: { dow: number; periods: string[] }[] // dow: 1=週一 … 7=週日
   note: string
   status: StatusKey
+  /** 目標學期起訖 YYYY/MM/DD(可比大小的格式) */
+  startDate: string
+  endDate: string
 }
 
 interface RoomSlotOut {
@@ -196,6 +199,8 @@ interface AdminRoomBookingOut {
   venue_name: string
   purpose: string
   status: 'pending' | 'approved' | 'rejected'
+  start_date: string
+  end_date: string
   created_at: string
   slots: RoomSlotOut[]
 }
@@ -218,21 +223,25 @@ export const slotsToEntries = (slots: RoomSlotOut[]): AdminRoomRequest['entries'
 }
 
 /**
- * 待審固定借用的衝突時段(同場地、同星期、同節次有兩社以上),鍵為 `venueId|dow|period`。
+ * 待審固定借用互相衝突的時段:同場地、**目標學期區間重疊**、同星期同節次(判定軸與後端
+ * 核准檢核一致)。回傳 apiId → `dow|period` 集合。
  *
  * 必須餵**全部**待審單:只比對當前這一頁的話,跨頁的兩社搶同一格會被判成無衝突而直接核准。
+ * ponytail: 逐對比對 O(n²),一輪開放窗的待審單頂多百餘筆;真的長到會卡時再改成先依場地分桶。
  */
-export function roomConflictKeys(requests: AdminRoomRequest[]): Set<string> {
-  const conflicts = new Set<string>()
-  const claimedBy = new Map<string, number>()
-  for (const r of requests) {
-    for (const e of r.entries) {
-      for (const p of e.periods) {
-        const key = `${r.venueId}|${e.dow}|${p}`
-        if (claimedBy.has(key) && claimedBy.get(key) !== r.apiId) {
-          conflicts.add(key)
-        } else {
-          claimedBy.set(key, r.apiId)
+export function roomConflictSlots(requests: AdminRoomRequest[]): Map<number, Set<string>> {
+  const conflicts = new Map<number, Set<string>>()
+  const overlaps = (a: AdminRoomRequest, b: AdminRoomRequest) =>
+    a.startDate <= b.endDate && a.endDate >= b.startDate // YYYY/MM/DD 可直接字串比大小
+  for (const a of requests) {
+    for (const b of requests) {
+      if (b.apiId === a.apiId || b.venueId !== a.venueId || !overlaps(a, b)) continue
+      for (const e of a.entries) {
+        for (const p of e.periods) {
+          if (!b.entries.some((oe) => oe.dow === e.dow && oe.periods.includes(p))) continue
+          const slots = conflicts.get(a.apiId) ?? new Set<string>()
+          slots.add(`${e.dow}|${p}`)
+          conflicts.set(a.apiId, slots)
         }
       }
     }
@@ -249,6 +258,8 @@ const toRoomRequest = (r: AdminRoomBookingOut): AdminRoomRequest => ({
   entries: slotsToEntries(r.slots),
   note: r.purpose,
   status: r.status,
+  startDate: toDisplayDate(r.start_date),
+  endDate: toDisplayDate(r.end_date),
 })
 
 // ---- queries ----

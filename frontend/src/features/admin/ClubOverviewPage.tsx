@@ -6,7 +6,7 @@ import type { StatusKey } from '../../lib/status'
 import { roomEntryText } from '../../api/bookings'
 import { useAdminClubDetail } from '../../api/adminClubs'
 import {
-  roomConflictKeys,
+  roomConflictSlots,
   useAdminBookingMutations,
   useAllPendingRoomBookings,
   type AdminRoomRequest,
@@ -121,13 +121,9 @@ export default function ClubOverviewPage() {
   // 固定借用衝突以「全部社團的審核中申請」計算(judge 與 AdminRoomsPage 共用一份:
   // 兩社搶同場地同星期同節次)
   const pendingRoomsQuery = useAllPendingRoomBookings(canRooms && clubId != null)
-  const conflicts = roomConflictKeys(pendingRoomsQuery.data ?? [])
+  const conflicts = roomConflictSlots(pendingRoomsQuery.data ?? [])
   const conflictSlotsOf = (r: AdminRoomRequest): string[] =>
-    r.status !== 'pending'
-      ? []
-      : r.entries.flatMap((e) =>
-          e.periods.filter((p) => conflicts.has(`${r.venueId}|${e.dow}|${p}`)).map((p) => `${e.dow}|${p}`),
-        )
+    r.status === 'pending' ? [...(conflicts.get(r.apiId) ?? [])] : []
 
   const openMaintenance = (m: AdminMaintenanceRow) => {
     setDetail({

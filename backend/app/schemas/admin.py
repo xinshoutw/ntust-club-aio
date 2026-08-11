@@ -380,6 +380,9 @@ class AdminRoomBookingOut(BaseModel):
     venue_name: str = ""
     purpose: str
     status: BookingStatus
+    # 目標學期起訖(送出時快照):衝突只發生在區間重疊的兩單之間
+    start_date: date
+    end_date: date
     created_at: datetime
     slots: list[RoomSlotOut] = []  # 每週 dow×節次
 

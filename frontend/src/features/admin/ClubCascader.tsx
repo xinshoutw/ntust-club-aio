@@ -1,4 +1,5 @@
-import { Button, Cascader } from 'antd'
+import { Cascader } from 'antd'
+import OptionsError from '../../components/ui/OptionsError'
 import { useClubOptions } from '../../api/adminClubs'
 
 interface CascaderOption {
@@ -32,18 +33,7 @@ export default function ClubCascader({
   const attrs = [...new Set(clubs.map(attrOf))]
   // 選項載不到就整個換成失敗說明:空的 cascader 只會顯示「暫無資料」,而選不到社團的頁面
   // (社團總覽/成員列表/管理項目/行政分審核)`clubId` 一律 null,整頁是空的、一句錯誤都沒有
-  if (isError) {
-    return (
-      <span
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#C13B34' }}
-        // 403 與網路中斷長得一樣,原因掛在 title 上;版面留在頁首那一格,不鋪整塊 QueryError
-        title={error?.message}
-      >
-        社團清單載入失敗
-        <Button size="small" onClick={() => void refetch()}>重試</Button>
-      </span>
-    )
-  }
+  if (isError) return <OptionsError what="社團清單" error={error} onRetry={() => void refetch()} />
   return (
     <Cascader<CascaderOption>
       allowClear={false}

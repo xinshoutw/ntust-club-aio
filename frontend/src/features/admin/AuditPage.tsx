@@ -95,8 +95,8 @@ export default function AuditPage() {
         }
       />
 
-      <LoadingBlock pending={listQuery.isPending}>
-        <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+      <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+        <LoadingBlock pending={listQuery.isPending}>
           <table className="tb dense fixed" style={{ minWidth: 760 }}>
             {/* 操作者截斷、內容吃剩餘寬且允許換行;時間/角色/動作固定 px */}
             <Cols widths={[140, '13%', 90, 130, 'auto']} />
@@ -177,8 +177,8 @@ export default function AuditPage() {
             </tbody>
           </table>
           <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} />
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
     </div>
   )
 }

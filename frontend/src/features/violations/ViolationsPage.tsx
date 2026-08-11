@@ -29,8 +29,8 @@ export default function ViolationsPage() {
         請於 <span className="num">1</span> 個月內至學務處活動辦理銷案，逾期將不受理
       </div>
 
-      <LoadingBlock pending={listQuery.isPending}>
-        <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+      <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+        <LoadingBlock pending={listQuery.isPending}>
           <table className="tb fixed" style={{ minWidth: 720 }}>
             <Cols widths={[110, '22%', 'auto', 180, 100]} />
             <thead>
@@ -87,8 +87,8 @@ export default function ViolationsPage() {
               )}
             </tbody>
           </table>
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
       <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
     </div>
   )

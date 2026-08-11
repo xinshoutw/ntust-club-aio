@@ -356,8 +356,8 @@ export default function SignupManagePage() {
         }
       />
 
-      <LoadingBlock pending={listQuery.isPending}>
-        <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+      <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+        <LoadingBlock pending={listQuery.isPending}>
           <table className="tb dense fixed" style={{ minWidth: 720 }} aria-label="報名活動列表">
             {/* 活動名吃剩餘寬且允許換行(含類別徽章);截止/人數/狀態/開啟固定 px */}
             <Cols widths={['auto', 100, 130, 96, 90, 32]} />
@@ -420,8 +420,8 @@ export default function SignupManagePage() {
             </tbody>
           </table>
           <Pager page={page} pageSize={SIGNUP_PAGE_SIZE} total={total} onChange={setPage} />
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
 
       {/* Modal 常駐至關閉動畫結束(afterClose)才卸載 */}
       {selected && (

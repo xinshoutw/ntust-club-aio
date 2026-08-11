@@ -192,8 +192,8 @@ export default function MembersPage() {
         }
       />
 
-      <LoadingBlock pending={listQuery.isPending}>
-        <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+      <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+        <LoadingBlock pending={listQuery.isPending}>
           <table className="tb fixed" style={{ minWidth: 800 }}>
             <Cols widths={['auto', 100, 120, 'auto', 120, 80, 134, 90]} />
             <thead>
@@ -329,8 +329,8 @@ export default function MembersPage() {
               )}
             </tbody>
           </table>
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
       <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
 
       <Modal

@@ -144,9 +144,9 @@ export default function PostalPage() {
         </Form>
       </div>
 
-      <LoadingBlock pending={listQuery.isPending}>
-        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在申請</div>
+      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在申請</div>
+        <LoadingBlock pending={listQuery.isPending}>
           <table className="tb fixed" aria-label="郵局帳戶異動申請紀錄" style={{ minWidth: 520 }}>
             <Cols widths={['30%', 'auto', 110, 100]} />
             <thead>
@@ -182,12 +182,12 @@ export default function PostalPage() {
               )}
             </tbody>
           </table>
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
 
-      <LoadingBlock pending={recentQuery.isPending}>
-        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
+      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
+        <LoadingBlock pending={recentQuery.isPending}>
           <table className="tb fixed" aria-label="郵局帳戶異動申請紀錄" style={{ minWidth: 520 }}>
             <Cols widths={['30%', 'auto', 110, 100]} />
             <thead>
@@ -223,8 +223,8 @@ export default function PostalPage() {
               )}
             </tbody>
           </table>
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
     </div>
   )
 }

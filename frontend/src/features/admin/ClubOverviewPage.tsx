@@ -277,8 +277,8 @@ export default function ClubOverviewPage() {
           )}
         </div>
 
-        <LoadingBlock pending={bookingLoading}>
         <div className="card">
+        <LoadingBlock pending={bookingLoading}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 20px 12px' }}>
             <div style={{ fontSize: 15, fontWeight: 600 }}>借用中</div>
             <span className="num" style={{ fontSize: 12, background: '#EEF0F3', color: 'var(--steel)', borderRadius: 999, padding: '1px 8px' }}>
@@ -334,8 +334,8 @@ export default function ClubOverviewPage() {
               尚無借用中的場地或器材
             </div>
           )}
-        </div>
         </LoadingBlock>
+        </div>
       </div>
 
       {/* 活動申請審核彈窗(與申請審核頁同版面);點列立即開啟、詳情補齊;

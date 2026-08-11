@@ -175,9 +175,9 @@ export default function AnnouncementsPage() {
         </Form>
       </div>
 
-      <LoadingBlock pending={listQuery.isPending}>
-        <div className="card" style={{ marginTop: 16 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>已發布公告</div>
+      <div className="card" style={{ marginTop: 16 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>已發布公告</div>
+        <LoadingBlock pending={listQuery.isPending}>
           {items.map((a) => (
             <div
               key={a.id}
@@ -230,8 +230,8 @@ export default function AnnouncementsPage() {
               尚未發布任何公告
             </div>
           )}
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
       <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
 
       <AnnouncementModal

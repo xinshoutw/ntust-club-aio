@@ -331,9 +331,9 @@ export default function FixedRoomPage() {
         </Form>
       </div>
 
-      <LoadingBlock pending={activeQuery.isPending}>
-        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在申請</div>
+      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在申請</div>
+        <LoadingBlock pending={activeQuery.isPending}>
           <table className="tb fixed" aria-label="正在申請" style={{ minWidth: 620 }}>
             <Cols widths={['auto', 110, 'auto', 110, 80]} />
             <thead>
@@ -377,12 +377,12 @@ export default function FixedRoomPage() {
               )}
             </tbody>
           </table>
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
 
-      <LoadingBlock pending={recentQuery.isPending}>
-        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
+      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
+        <LoadingBlock pending={recentQuery.isPending}>
           <table className="tb fixed" aria-label="最近申請" style={{ minWidth: 560 }}>
             <Cols widths={['30%', 'auto', 110]} />
             <thead>
@@ -416,8 +416,8 @@ export default function FixedRoomPage() {
               )}
             </tbody>
           </table>
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
     </div>
   )
 }

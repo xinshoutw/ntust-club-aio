@@ -124,9 +124,9 @@ export default function CertificatePage() {
         </Form>
       </div>
 
-      <LoadingBlock pending={listQuery.isPending}>
-        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在申請</div>
+      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在申請</div>
+        <LoadingBlock pending={listQuery.isPending}>
           <table className="tb fixed" aria-label="幹部證明申請紀錄" style={{ minWidth: 480 }}>
             <Cols widths={['auto', 130, 110, 100]} />
             <thead>
@@ -160,12 +160,12 @@ export default function CertificatePage() {
               )}
             </tbody>
           </table>
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
 
-      <LoadingBlock pending={recentQuery.isPending}>
-        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
+      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
+        <LoadingBlock pending={recentQuery.isPending}>
           <table className="tb fixed" aria-label="幹部證明申請紀錄" style={{ minWidth: 480 }}>
             <Cols widths={['auto', 130, 110, 100]} />
             <thead>
@@ -199,8 +199,8 @@ export default function CertificatePage() {
               )}
             </tbody>
           </table>
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
     </div>
   )
 }

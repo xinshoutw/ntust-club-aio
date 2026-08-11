@@ -111,8 +111,8 @@ export default function VenueRulesPage() {
         </Form>
       </div>
 
-      <LoadingBlock pending={rulesQuery.isPending}>
-        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+        <LoadingBlock pending={rulesQuery.isPending}>
           <table className="tb fixed" style={{ minWidth: 720 }}>
             {/* 場地/原因截斷;期間固定 px;星期/節次允許換行 */}
             <Cols widths={['16%', 200, 110, 110, 'auto', 90]} />
@@ -157,8 +157,8 @@ export default function VenueRulesPage() {
               )}
             </tbody>
           </table>
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
     </div>
   )
 }

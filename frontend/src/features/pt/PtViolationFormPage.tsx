@@ -63,8 +63,8 @@ export default function PtViolationFormPage() {
     <div>
       <PageHeader title="違規勸導填寫" />
 
-      <LoadingBlock pending={clubsQuery.isPending || itemsQuery.isPending}>
-        <div className="card" style={{ marginTop: 20, padding: 24 }}>
+      <div className="card" style={{ marginTop: 20, padding: 24 }}>
+        <LoadingBlock pending={clubsQuery.isPending || itemsQuery.isPending}>
           <Form form={form} layout="vertical" requiredMark onFinish={onFinish}>
             <Form.Item name="club" label="社團" rules={[{ required: true, message: '請選擇社團' }]}>
               <Select
@@ -110,8 +110,8 @@ export default function PtViolationFormPage() {
               </Button>
             </div>
           </Form>
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
     </div>
   )
 }

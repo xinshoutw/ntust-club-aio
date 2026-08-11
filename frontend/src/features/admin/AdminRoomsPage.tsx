@@ -240,8 +240,8 @@ export default function AdminRoomsPage() {
         </div>
       )}
 
-      <LoadingBlock pending={listQuery.isPending || allPendingQuery.isPending || approvedQuery.isPending}>
-        <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+      <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+        <LoadingBlock pending={listQuery.isPending || allPendingQuery.isPending || approvedQuery.isPending}>
           <table className="tb dense fixed" aria-label="待審固定場地借用" style={{ minWidth: 760 }}>
             {/* 社團/場地/用途截斷、每週時段吃剩餘寬且允許換行;狀態/開啟固定 px */}
             <Cols widths={['16%', '15%', 'auto', '18%', 90, 32]} />
@@ -313,8 +313,8 @@ export default function AdminRoomsPage() {
             </tbody>
           </table>
           <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} />
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
 
       {/* Modal 常駐至關閉動畫結束(afterClose)才卸載 */}
       {selected && (

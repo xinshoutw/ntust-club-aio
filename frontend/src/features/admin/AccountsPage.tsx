@@ -553,8 +553,8 @@ export default function AccountsPage() {
         }
       />
 
-      <LoadingBlock pending={tab === 'clubs' ? clubsQuery.isPending : accountsLoading}>
-        <div className="card" style={{ marginTop: 16, overflowX: 'auto', paddingTop: 8 }}>
+      <div className="card" style={{ marginTop: 16, overflowX: 'auto', paddingTop: 8 }}>
+        <LoadingBlock pending={tab === 'clubs' ? clubsQuery.isPending : accountsLoading}>
           <Tabs
             activeKey={tab}
             onChange={(next) => {
@@ -569,8 +569,8 @@ export default function AccountsPage() {
               { key: 'clubs', label: '社團', children: clubsTable },
             ]}
           />
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
 
       {/* 新增帳號:建立後顯示帳號與一次性密碼;destroyOnHidden+取消清空,重開不殘留 */}
       <Modal

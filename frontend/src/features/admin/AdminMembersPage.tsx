@@ -92,8 +92,8 @@ export default function AdminMembersPage() {
         }
       />
 
-      <LoadingBlock pending={clubId != null && listQuery.isPending}>
-        <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+      <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+        <LoadingBlock pending={clubId != null && listQuery.isPending}>
           <table className="tb fixed" style={{ minWidth: 680 }}>
             {/* 姓名/職稱吃彈性寬並截斷;學號/身份/電話/學期/更新時間固定 px */}
             <Cols widths={['15%', 100, 92, 'auto', 105, 80, 140]} />
@@ -136,8 +136,8 @@ export default function AdminMembersPage() {
               )}
             </tbody>
           </table>
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
       <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
     </div>
   )

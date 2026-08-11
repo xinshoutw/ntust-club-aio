@@ -266,9 +266,9 @@ export default function EquipmentPage() {
         </div>
       </div>
 
-      <LoadingBlock pending={activeQuery.isPending}>
-        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在借用</div>
+      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在借用</div>
+        <LoadingBlock pending={activeQuery.isPending}>
           <table className="tb fixed" aria-label="正在借用" style={{ minWidth: 760 }}>
             <Cols widths={['auto', 190, 'auto', 100, 110, 80]} />
             <thead>
@@ -318,12 +318,12 @@ export default function EquipmentPage() {
               )}
             </tbody>
           </table>
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
 
-      <LoadingBlock pending={recentQuery.isPending}>
-        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近借用</div>
+      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近借用</div>
+        <LoadingBlock pending={recentQuery.isPending}>
           <table className="tb fixed" aria-label="最近借用" style={{ minWidth: 760 }}>
             <Cols widths={['auto', 190, 'auto', 150, 110]} />
             <thead>
@@ -369,8 +369,8 @@ export default function EquipmentPage() {
               )}
             </tbody>
           </table>
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
     </div>
   )
 }

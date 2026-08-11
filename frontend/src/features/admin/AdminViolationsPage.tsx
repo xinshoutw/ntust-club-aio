@@ -130,8 +130,8 @@ export default function AdminViolationsPage() {
         }
       />
 
-      <LoadingBlock pending={loading}>
-        <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+      <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+        <LoadingBlock pending={loading}>
           <table className="tb dense fixed" aria-label="違規勸導紀錄" style={{ minWidth: 760 }}>
             {/* 社團/地點截斷、項目吃剩餘寬且允許換行;日期/填寫/期限/狀態/動作固定 px */}
             <Cols widths={['13%', 96, '11%', 'auto', 88, 132, 90, 84]} />
@@ -223,8 +223,8 @@ export default function AdminViolationsPage() {
             </tbody>
           </table>
           <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} />
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
 
       <Modal
         open={resolveOpen}

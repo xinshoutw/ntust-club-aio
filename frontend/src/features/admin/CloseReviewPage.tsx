@@ -354,9 +354,9 @@ export default function CloseReviewPage() {
       />
 
       {/* 待審佇列:送件早的在前 */}
-      <LoadingBlock pending={pendingQuery.isPending}>
-        <div className="card" style={{ marginTop: 20 }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 6px' }}>待審結案</div>
+      <div className="card" style={{ marginTop: 20 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 6px' }}>待審結案</div>
+        <LoadingBlock pending={pendingQuery.isPending}>
           {pending.map((p) => (
             <div
               key={p.id}
@@ -402,13 +402,13 @@ export default function CloseReviewPage() {
             </div>
           )}
           <Pager page={pendingPage} pageSize={PAGE_SIZE} total={pendingTotal} onChange={setPendingPage} />
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
 
       {/* 逾期未結案:已鎖定與已解鎖皆列出(狀態欄區分),整列可點開活動詳情 */}
-      <LoadingBlock pending={overdueQuery.isPending}>
-        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>逾期未結案</div>
+      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>逾期未結案</div>
+        <LoadingBlock pending={overdueQuery.isPending}>
           <table className="tb dense fixed" style={{ minWidth: 640 }} aria-label="逾期未結案活動">
             {/* 社團/名稱吃剩餘寬並截斷;期限/狀態/動作固定 px */}
             <Cols widths={['26%', 'auto', 110, 96, 90]} />
@@ -478,8 +478,8 @@ export default function CloseReviewPage() {
             </tbody>
           </table>
           <Pager page={overduePage} pageSize={PAGE_SIZE} total={overdueTotal} onChange={setOverduePage} />
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
 
       {/* Modal 常駐至關閉動畫結束(afterClose)才卸載 */}
       {selected && (

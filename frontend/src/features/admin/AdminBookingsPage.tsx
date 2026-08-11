@@ -216,9 +216,9 @@ export default function AdminBookingsPage() {
         </LoadingBlock>
       </div>
 
-      <LoadingBlock pending={venueQuery.isPending}>
-        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>場地</div>
+      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>場地</div>
+        <LoadingBlock pending={venueQuery.isPending}>
           <table className="tb dense fixed" aria-label="待審場地借用" style={{ minWidth: 720 }}>
             {/* 社團/場地截斷、時段與用途吃剩餘寬且允許換行;日期/狀態/開啟固定 px */}
             <Cols widths={['18%', '18%', 96, 'auto', 90, 32]} />
@@ -270,12 +270,12 @@ export default function AdminBookingsPage() {
             </tbody>
           </table>
           <Pager page={venuePage} pageSize={PAGE_SIZE} total={venueTotal} onChange={setVenuePage} />
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
 
-      <LoadingBlock pending={loanQuery.isPending}>
-        <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>器材</div>
+      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>器材</div>
+        <LoadingBlock pending={loanQuery.isPending}>
           <table className="tb dense fixed" aria-label="待審器材借用" style={{ minWidth: 720 }}>
             {/* 社團截斷、器材與數量允許換行(數量須可見)、活動與用途吃剩餘寬;期間/狀態/開啟固定 px */}
             <Cols widths={['16%', '20%', 184, 'auto', 90, 32]} />
@@ -340,8 +340,8 @@ export default function AdminBookingsPage() {
             </tbody>
           </table>
           <Pager page={loanPage} pageSize={PAGE_SIZE} total={loanTotal} onChange={setLoanPage} />
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
 
       {/* Modal 常駐至關閉動畫結束(afterClose)才卸載 */}
       {selected && (

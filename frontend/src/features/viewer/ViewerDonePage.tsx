@@ -40,8 +40,8 @@ export default function ViewerDonePage() {
         }
       />
 
-      <LoadingBlock pending={query.isPending}>
-        <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+      <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+        <LoadingBlock pending={query.isPending}>
           <table className="tb dense fixed" style={{ minWidth: 560 }}>
             <Cols widths={['34%', 'auto', 90, 150]} />
             <thead>
@@ -85,8 +85,8 @@ export default function ViewerDonePage() {
             </tbody>
           </table>
           <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} />
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
     </div>
   )
 }

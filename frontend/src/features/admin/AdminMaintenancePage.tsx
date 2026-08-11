@@ -75,8 +75,8 @@ export default function AdminMaintenancePage() {
         }
       />
 
-      <LoadingBlock pending={listQuery.isPending}>
-        <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+      <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+        <LoadingBlock pending={listQuery.isPending}>
           <table className="tb dense fixed" style={{ minWidth: 760 }}>
             {/* 社團/地點截斷、項目吃剩餘寬且允許換行;申請日/狀態固定 px(狀態含單步推進下拉) */}
             <Cols widths={['18%', '18%', 'auto', 150, 96, 150]} />
@@ -151,8 +151,8 @@ export default function AdminMaintenancePage() {
             </tbody>
           </table>
           <Pager page={page} pageSize={MAINTENANCE_PAGE_SIZE} total={total} onChange={setPage} />
-        </div>
-      </LoadingBlock>
+        </LoadingBlock>
+      </div>
     </div>
   )
 }

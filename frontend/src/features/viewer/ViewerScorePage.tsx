@@ -115,8 +115,8 @@ export default function ViewerScorePage() {
           尚未被指派評分
         </div>
       ) : (
-        <LoadingBlock pending={assignmentsQuery.isPending}>
-          <div className="card" style={{ marginTop: 20, overflowX: 'auto', minHeight: assignmentsQuery.isPending ? 120 : undefined }}>
+        <div className="card" style={{ marginTop: 20, overflowX: 'auto', minHeight: assignmentsQuery.isPending ? 120 : undefined }}>
+          <LoadingBlock pending={assignmentsQuery.isPending}>
             <table className="tb dense fixed" style={{ minWidth: 560 }}>
               <Cols widths={['auto', 130, 90]} />
               <thead>
@@ -165,8 +165,8 @@ export default function ViewerScorePage() {
               </tbody>
             </table>
             <Pager page={page} pageSize={PAGE_SIZE} total={clubs.length} onChange={setPage} />
-          </div>
-        </LoadingBlock>
+          </LoadingBlock>
+        </div>
       )}
 
       <ScoreModal

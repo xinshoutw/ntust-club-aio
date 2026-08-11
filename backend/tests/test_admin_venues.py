@@ -36,6 +36,39 @@ async def test_writes_are_super_only(client, db):
     assert (await client.get(URL)).status_code == 403
 
 
+async def test_update_is_super_only_and_rejects_explicit_nulls(client, db):
+    """PATCH 的門檻與 POST 一樣是 super;必填欄位帶顯式 null 是無效輸入,不是 500。"""
+    await seed(client, db)
+    vid = (await client.get(URL)).json()["data"][0]["id"]
+
+    await make_user(db, username="booking", role="admin", permissions=["abooking"])
+    await login(client, "booking")
+    resp = await client.patch(f"{URL}/{vid}", json={"capacity": 1}, headers=csrf_headers(client))
+    assert resp.status_code == 403
+    # 已停用的場地只有主檔維護視角需要,那頁限 super
+    assert (await client.get(URL, params={"include_inactive": "true"})).status_code == 403
+
+    await login(client, "root")
+    for field in ("name", "category", "allow_fixed", "is_active"):
+        resp = await client.patch(
+            f"{URL}/{vid}", json={field: None}, headers=csrf_headers(client)
+        )
+        assert resp.status_code == 422, f"{field}: {resp.status_code}"
+    # 容納人數是唯一可清空的欄位
+    resp = await client.patch(f"{URL}/{vid}", json={"capacity": None}, headers=csrf_headers(client))
+    assert resp.status_code == 200
+    assert resp.json()["data"]["capacity"] is None
+
+
+async def test_create_requires_a_booking_mode(client, db):
+    """兩種借用型態都不開放的場地兩邊下拉都不出現,只會在場況圖上多一列死列。"""
+    await seed(client, db)
+    resp = await client.post(
+        URL, json={"name": "無型態場地", "category": "教室"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 422
+
+
 async def test_list_and_update(client, db):
     await seed(client, db)
     rows = (await client.get(URL)).json()["data"]

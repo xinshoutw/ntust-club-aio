@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Request
 
 from app.core.deps import CurrentUser, DbDep, client_ip, require_super
-from app.core.errors import conflict, not_found
+from app.core.errors import conflict, not_found, validation_error
 from app.models import Equipment
 from app.schemas.common import ApiResponse
 from app.schemas.equipment import EquipmentIn, EquipmentMasterOut, EquipmentUpdateIn
@@ -54,7 +54,14 @@ async def update_equipment(
     row = await db.get(Equipment, equipment_id)
     if row is None:
         raise not_found("找不到器材")
-    changed = body.model_dump(exclude_unset=True)
+    # max_lease_count 是唯一可清空的欄位(null=不限);其餘顯式帶 null 會撞 NOT NULL(500)
+    changed = {
+        key: value
+        for key, value in body.model_dump(exclude_unset=True).items()
+        if value is not None or key == "max_lease_count"
+    }
+    if not changed:
+        raise validation_error("沒有可更新的欄位")
     if "name" in changed and changed["name"] != row.name:
         if await db.scalar(sa.select(Equipment.id).where(Equipment.name == changed["name"])):
             raise conflict("已有同名器材")

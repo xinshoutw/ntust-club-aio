@@ -53,6 +53,13 @@ class VenueIn(BaseModel):
 
     _clean = field_validator("name")(_clean_venue_name)
 
+    @model_validator(mode="after")
+    def _one_mode(self):
+        # 兩種都不開放的場地兩邊下拉都不出現,只會在場況圖上多一整列永遠「不開放」的死列
+        if not (self.allow_fixed or self.allow_temp):
+            raise ValueError("請至少開放一種借用型態")
+        return self
+
 
 class VenueUpdateIn(BaseModel):
     """部分更新:只改有帶的欄位(停用亦走此處,不硬刪)。"""

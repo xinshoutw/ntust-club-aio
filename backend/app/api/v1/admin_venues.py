@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Request
 
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission, require_super
-from app.core.errors import conflict, not_found
+from app.core.errors import conflict, forbidden, not_found, validation_error
 from app.models import Venue
 from app.schemas.bookings import VenueIn, VenueMasterOut, VenueUpdateIn
 from app.schemas.common import ApiResponse
@@ -29,7 +29,11 @@ async def list_venues(
 ) -> ApiResponse[list[VenueMasterOut]]:
     """場地主檔(不分頁);預設只回啟用中,主檔維護頁帶 include_inactive=true 才看得到停用的。"""
     query = sa.select(Venue).order_by(Venue.sort, Venue.id)
-    if not include_inactive:
+    if include_inactive:
+        # 已停用的場地只有主檔維護視角需要,而那頁本來就限 super
+        if not user.is_super:
+            raise forbidden()
+    else:
         query = query.where(Venue.is_active.is_(True))
     return ApiResponse(data=[VenueMasterOut.model_validate(r) for r in await db.scalars(query)])
 
@@ -38,8 +42,10 @@ async def list_venues(
 async def create_venue(
     body: VenueIn, user: SuperAdmin, db: DbDep, request: Request
 ) -> ApiResponse[VenueMasterOut]:
-    if await db.scalar(sa.select(Venue.id).where(Venue.name == body.name)):
-        raise conflict("已有同名場地")
+    existing = await db.scalar(sa.select(Venue).where(Venue.name == body.name))
+    if existing is not None:
+        # 停用的場地仍佔用名稱(預設清單看不到它):把原因講清楚,否則承辦會以為系統壞了
+        raise conflict("已有同名場地" if existing.is_active else "已有同名場地(目前為停用狀態)")
     max_sort = await db.scalar(sa.select(sa.func.coalesce(sa.func.max(Venue.sort), 0)))
     row = Venue(
         name=body.name,
@@ -62,7 +68,14 @@ async def update_venue(
     row = await db.get(Venue, venue_id)
     if row is None:
         raise not_found("找不到場地")
-    changed = body.model_dump(exclude_unset=True)
+    # capacity 是唯一可清空的欄位;其餘顯式帶 null 會撞 NOT NULL(500),當成無效輸入擋掉
+    changed = {
+        key: value
+        for key, value in body.model_dump(exclude_unset=True).items()
+        if value is not None or key == "capacity"
+    }
+    if not changed:
+        raise validation_error("沒有可更新的欄位")
     if "name" in changed and changed["name"] != row.name:
         if await db.scalar(sa.select(Venue.id).where(Venue.name == changed["name"])):
             raise conflict("已有同名場地")

@@ -19,6 +19,7 @@ import {
 } from '../../api/adminActivities'
 import { useClubOptions } from '../../api/adminClubs'
 import ActivityReviewModal from './ActivityReviewModal'
+import { clickableProps } from '../../lib/clickable'
 
 const PAGE_SIZE = 20
 const ALL_STATUSES: AdminActivityStatus[] = [
@@ -127,15 +128,7 @@ export default function ReviewPage() {
             <div
               key={item.id}
               className="click-tint"
-              role="button"
-              tabIndex={0}
-              onClick={() => openItem(item)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  openItem(item)
-                }
-              }}
+              {...clickableProps(() => openItem(item))}
               style={{
                 display: 'flex',
                 alignItems: 'center',

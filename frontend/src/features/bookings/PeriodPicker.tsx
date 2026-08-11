@@ -23,7 +23,7 @@ export default function PeriodPicker({ value, onChange, size = 'middle', nowrap 
     if (to && !has) onChange([...cur, p])
     if (!to && has) onChange(cur.filter((x) => x !== p))
   }
-  const { containerProps, start } = useDragSelect(apply)
+  const { containerProps, cellProps } = useDragSelect(apply)
 
   const h = size === 'small' ? 28 : 32
   return (
@@ -38,18 +38,7 @@ export default function PeriodPicker({ value, onChange, size = 'middle', nowrap 
             aria-pressed={on}
             disabled={off}
             title={off ? '該時段已開始' : undefined}
-            data-drag-key={p}
-            onPointerDown={(e) => {
-              e.preventDefault()
-              if (off) return
-              start(p, !on)
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                apply(p, !on)
-              }
-            }}
+            {...cellProps(p, on, off)}
             className="num"
             style={{
               minWidth: 40,

@@ -14,6 +14,7 @@ import {
   type AdminActivity,
 } from '../../api/adminActivities'
 import ActivityReviewModal from './ActivityReviewModal'
+import { clickableProps } from '../../lib/clickable'
 
 // 一頁最多 25 筆(50 筆太長,減半)、活動時間新在前
 const PAGE_SIZE = 25
@@ -359,15 +360,7 @@ export default function CloseReviewPage() {
             <div
               key={p.id}
               className="click-tint"
-              role="button"
-              tabIndex={0}
-              onClick={() => openItem(p)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  openItem(p)
-                }
-              }}
+              {...clickableProps(() => openItem(p))}
               style={{
                 display: 'flex',
                 alignItems: 'center',

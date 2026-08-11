@@ -9,6 +9,7 @@ import { useSignupItem, useSignupItems, type SignupItem } from '../../api/signup
 import SubmissionRecord from './SubmissionRecord'
 import KindBadge from './KindBadge'
 import './signup.css'
+import { clickableProps } from '../../lib/clickable'
 
 const PAGE_SIZE = 20
 
@@ -54,16 +55,9 @@ export default function SignupListPage() {
               <div
                 key={item.id}
                 className={clickable ? 'card signup-card click-tint' : 'card signup-card'}
-                role="button"
+                {...clickableProps(() => openCard(item))}
                 tabIndex={clickable ? 0 : -1}
                 aria-disabled={!clickable}
-                onClick={() => openCard(item)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    openCard(item)
-                  }
-                }}
                 style={{ opacity: item.accepting ? undefined : 0.72, cursor: clickable ? 'pointer' : 'default' }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>

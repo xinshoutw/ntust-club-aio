@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Input, Tag } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
+import { clickableProps } from '../../lib/clickable'
 
 // AntD 原生「可編輯標籤」模式(官方 Tag 範例):closable Tag + 虛線「新增」Tag,
 // 點擊變成小輸入框,Enter 或失焦即新增。
@@ -56,8 +57,9 @@ export default function TagListInput({
           onBlur={() => (draft.trim() ? commit(draft) : setAdding(false))}
         />
       ) : (
+        // AntD 的 Tag 本體是 span,只有 close icon 有鍵盤入口:自己補 role/tabIndex/Enter
         <Tag
-          onClick={() => setAdding(true)}
+          {...clickableProps(() => setAdding(true))}
           style={{ margin: 0, fontSize: 13, padding: '2px 8px', background: 'transparent', borderStyle: 'dashed', cursor: 'pointer' }}
         >
           <PlusOutlined style={{ fontSize: 11 }} /> 新增

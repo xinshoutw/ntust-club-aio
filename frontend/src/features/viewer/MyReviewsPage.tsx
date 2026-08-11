@@ -45,7 +45,6 @@ export default function MyReviewsPage() {
                     key={a.groupId}
                     className="card click-tint"
                     style={{ padding: 20, cursor: 'pointer' }}
-                    aria-label={`${a.awardName} ${a.groupName},前往評分`}
                     {...clickableProps(() => navigate(`/viewer/score?group=${a.groupId}`))}
                   >
                     <div style={{ fontSize: 16, fontWeight: 600 }}>{a.awardName}</div>

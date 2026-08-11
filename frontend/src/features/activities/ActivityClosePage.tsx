@@ -25,6 +25,7 @@ import type { EvalFile } from '../eval/types'
 import type { Reflection } from './types'
 import { TIME_RANGE_SEP, dateRangeText } from './utils'
 import './actform.css'
+import { clickableProps } from '../../lib/clickable'
 
 interface ReflectRow extends Reflection {
   key: number
@@ -107,15 +108,7 @@ export default function ActivityClosePage() {
                 <div
                   key={a.id}
                   className="card click-tint"
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => setParams({ id: String(a.id) }, { replace: true })}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault()
-                      setParams({ id: String(a.id) }, { replace: true })
-                    }
-                  }}
+                  {...clickableProps(() => setParams({ id: String(a.id) }, { replace: true }))}
                   style={{ padding: '16px 20px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}
                 >
                   <div style={{ flex: 1, minWidth: 220 }}>

@@ -77,7 +77,7 @@ export default function FixedRoomPage() {
     })
   }
   // 拖曳批量選取:與 PeriodPicker 共用同一份手感(hook 必須在下方 early return 之前呼叫)
-  const { containerProps, start } = useDragSelect(apply)
+  const { containerProps, cellProps } = useDragSelect(apply)
 
   // 開放窗由後端提供(與側欄共用同一查詢);未開放時直接輸入網址也只顯示說明
   const windowQuery = useFixedWindow()
@@ -242,17 +242,7 @@ export default function FixedRoomPage() {
                             type="button"
                             aria-pressed={on}
                             aria-label={`週${DOW_TEXT[dow]} 第${p}節`}
-                            data-drag-key={key}
-                            onPointerDown={(e) => {
-                              e.preventDefault()
-                              start(key, !on)
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault()
-                                apply(key, !on)
-                              }
-                            }}
+                            {...cellProps(key, on)}
                             className="num"
                             style={{
                               width: '100%',

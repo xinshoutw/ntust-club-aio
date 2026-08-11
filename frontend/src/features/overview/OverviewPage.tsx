@@ -15,6 +15,7 @@ import {
 } from '../../api/bookings'
 import { useCertificates, useMaintenanceList, usePostalList } from '../../api/applications'
 import './overview.css'
+import { clickableProps } from '../../lib/clickable'
 
 const countBadge: React.CSSProperties = {
   fontSize: 12,
@@ -210,19 +211,10 @@ export default function OverviewPage() {
               <div
                 key={a.id}
                 className="click-tint"
-                role="button"
-                tabIndex={0}
-                onClick={() => {
+                {...clickableProps(() => {
                   setViewing(a)
                   setViewOpen(true)
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault()
-                    setViewing(a)
-                    setViewOpen(true)
-                  }
-                }}
+                })}
                 style={{ padding: '16px 20px', borderTop: '1px solid var(--line)', cursor: 'pointer' }}
               >
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>

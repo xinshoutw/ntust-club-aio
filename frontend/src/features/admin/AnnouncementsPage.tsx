@@ -15,6 +15,7 @@ import {
 } from '../../api/announcementsAdmin'
 import { CLUB_ATTRIBUTES, useClubOptions } from '../../api/adminClubs'
 import ClubCascader from './ClubCascader'
+import { clickableProps } from '../../lib/clickable'
 
 const PAGE_SIZE = 20
 
@@ -180,15 +181,7 @@ export default function AnnouncementsPage() {
             <div
               key={a.id}
               className="click-tint"
-              role="button"
-              tabIndex={0}
-              onClick={() => view(a)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault()
-                  view(a)
-                }
-              }}
+              {...clickableProps(() => view(a))}
               style={{ padding: '14px 20px', borderTop: '1px solid var(--line)', cursor: 'pointer' }}
             >
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>

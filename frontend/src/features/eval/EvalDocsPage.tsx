@@ -5,6 +5,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import { useEvalOverview } from '../../api/eval'
 import type { AdKey, FinalScore } from './scoring'
 import { AD_LABELS } from './types'
+import { clickableProps } from '../../lib/clickable'
 
 // 各項分數的資料來源頁:點字卡跳轉(如網頁經營 → 管理項目)
 const AD_ROUTES: Record<AdKey, string> = {
@@ -72,15 +73,7 @@ export default function EvalDocsPage() {
           <div
             key={s.key}
             className="card click-tint"
-            role="button"
-            tabIndex={0}
-            onClick={() => go(AD_ROUTES[s.key])}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                go(AD_ROUTES[s.key])
-              }
-            }}
+            {...clickableProps(() => go(AD_ROUTES[s.key]))}
             style={{ padding: '14px 18px', cursor: 'pointer' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
@@ -105,15 +98,7 @@ export default function EvalDocsPage() {
           <div
             key={award.id}
             className="card click-tint"
-            role="button"
-            tabIndex={0}
-            onClick={() => navigate(`/eval/award/${award.id}`)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                navigate(`/eval/award/${award.id}`)
-              }
-            }}
+            {...clickableProps(() => navigate(`/eval/award/${award.id}`))}
             style={{ padding: '16px 18px', cursor: 'pointer' }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

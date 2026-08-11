@@ -9,6 +9,7 @@ from app.models import (
     EquipmentLoan,
     Holiday,
     RoomBookingRequest,
+    RoomBookingSlot,
     SystemSetting,
     Venue,
 )
@@ -286,6 +287,41 @@ async def test_room_booking_slot_limit(client, db):
 
 
 # ---- 臨時場地借用(綁定審核通過活動) ----
+
+
+async def test_concurrent_room_bookings_cannot_pierce_slot_quota(client, db):
+    """兩張並發送出的固定借用不得各自通過同一份合計而拿到 20 節。"""
+    import asyncio
+
+    import httpx
+
+    from app.main import app
+
+    await setup_session(client, db)
+    await open_fixed_window(db)
+    venue = await make_venue(db)
+    other = await make_venue(db, name="S305 韻律教室")
+
+    async def book(target, weekday):
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as c:
+            await login(c, "club01")
+            return await c.post(
+                "/api/v1/club/room-bookings",
+                json={
+                    "venue_id": target.id,
+                    "purpose": "社課",
+                    "slots": [{"weekday": weekday, "period": str(i)} for i in range(1, 7)],
+                },
+                headers=csrf_headers(c),
+            )
+
+    first, second = await asyncio.gather(book(venue, 1), book(other, 2))
+    assert sorted([first.status_code, second.status_code]) == [201, 409]  # 6+6 > 10
+    taken = await db.scalar(
+        sa.select(sa.func.count()).select_from(RoomBookingSlot)
+    )
+    assert taken == 6
 
 
 async def test_venue_booking_requires_approved_activity(client, db):

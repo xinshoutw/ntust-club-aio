@@ -241,7 +241,9 @@ async def create_room_booking(
     # 申請自動歸屬「下一學期」,起訖快照存入申請單
     sem_start, sem_end = next_semester_range(datetime.now(TAIPEI).date())
 
-    # 每社至多 10 節/學期:同目標學期的未退回申請(審核中+已核准)合計
+    # 每社至多 10 節/學期:同目標學期的未退回申請(審核中+已核准)合計。
+    # 先鎖住這個社團的額度,兩張並發送出的申請才不會各自通過同一份合計
+    await svc.lock_resource(db, "club_quota", user.club_id)
     used_count = (
         await db.scalar(
             sa.select(sa.func.count())

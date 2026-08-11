@@ -6,8 +6,9 @@ import type { StatusKey } from '../../lib/status'
 import { roomEntryText } from '../../api/bookings'
 import { useAdminClubDetail } from '../../api/adminClubs'
 import {
+  roomConflictKeys,
   useAdminBookingMutations,
-  usePendingRoomBookings,
+  useAllPendingRoomBookings,
   type AdminRoomRequest,
 } from '../../api/adminBookings'
 import { useAdminActivityDetail, useAdminActivityMutations } from '../../api/adminActivities'
@@ -117,26 +118,16 @@ export default function ClubOverviewPage() {
     setBookingOpen(true)
   }
 
-  // 固定借用衝突以「全部社團的審核中申請」現場資料計算(邏輯同 AdminRoomsPage:
-  // 兩社搶同場地同星期同節次;同樣僅取前 50 筆待審)
-  const pendingRoomsQuery = usePendingRoomBookings({ page: 1, pageSize: 50 }, canRooms && clubId != null)
-  const pendingRooms = pendingRoomsQuery.data?.requests ?? []
-  const roomConflictKeys = (r: AdminRoomRequest): string[] => {
-    if (r.status !== 'pending') return []
-    const keys: string[] = []
-    for (const e of r.entries)
-      for (const p of e.periods)
-        if (
-          pendingRooms.some(
-            (o) =>
-              o.apiId !== r.apiId &&
-              o.venueId === r.venueId &&
-              o.entries.some((oe) => oe.dow === e.dow && oe.periods.includes(p)),
-          )
+  // 固定借用衝突以「全部社團的審核中申請」計算(judge 與 AdminRoomsPage 共用一份:
+  // 兩社搶同場地同星期同節次)
+  const pendingRoomsQuery = useAllPendingRoomBookings(canRooms && clubId != null)
+  const conflicts = roomConflictKeys(pendingRoomsQuery.data ?? [])
+  const conflictSlotsOf = (r: AdminRoomRequest): string[] =>
+    r.status !== 'pending'
+      ? []
+      : r.entries.flatMap((e) =>
+          e.periods.filter((p) => conflicts.has(`${r.venueId}|${e.dow}|${p}`)).map((p) => `${e.dow}|${p}`),
         )
-          keys.push(`${e.dow}|${p}`)
-    return keys
-  }
 
   const openMaintenance = (m: AdminMaintenanceRow) => {
     setDetail({
@@ -276,7 +267,7 @@ export default function ClubOverviewPage() {
               key={`room-${r.id}`}
               className="click-tint"
               style={rowStyle}
-              {...clickableRow(() => openBooking({ kind: 'room', data: { ...r, conflictKeys: roomConflictKeys(r) } }, r.apiId))}
+              {...clickableRow(() => openBooking({ kind: 'room', data: { ...r, conflictKeys: conflictSlotsOf(r) } }, r.apiId))}
             >
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 14 }}>{r.room}</div>

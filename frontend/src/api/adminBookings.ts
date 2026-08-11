@@ -4,6 +4,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs, { type Dayjs } from 'dayjs'
 import { api, apiPaged, qs } from './client'
+import { fetchAllPages } from './fetchAll'
 import type { FixedWindow } from './bookings'
 import type { StatusKey } from '../lib/status'
 
@@ -210,6 +211,29 @@ export const slotsToEntries = (slots: RoomSlotOut[]): AdminRoomRequest['entries'
     }))
 }
 
+/**
+ * 待審固定借用的衝突時段(同場地、同星期、同節次有兩社以上),鍵為 `venueId|dow|period`。
+ *
+ * 必須餵**全部**待審單:只比對當前這一頁的話,跨頁的兩社搶同一格會被判成無衝突而直接核准。
+ */
+export function roomConflictKeys(requests: AdminRoomRequest[]): Set<string> {
+  const conflicts = new Set<string>()
+  const claimedBy = new Map<string, number>()
+  for (const r of requests) {
+    for (const e of r.entries) {
+      for (const p of e.periods) {
+        const key = `${r.venueId}|${e.dow}|${p}`
+        if (claimedBy.has(key) && claimedBy.get(key) !== r.apiId) {
+          conflicts.add(key)
+        } else {
+          claimedBy.set(key, r.apiId)
+        }
+      }
+    }
+  }
+  return conflicts
+}
+
 const toRoomRequest = (r: AdminRoomBookingOut): AdminRoomRequest => ({
   id: String(r.id),
   apiId: r.id,
@@ -230,6 +254,7 @@ export const keys = {
   venueBookings: (p: PendingListParams) => ['adminBookings', 'venueBookings', p] as const,
   equipmentLoans: (p: PendingListParams) => ['adminBookings', 'equipmentLoans', p] as const,
   roomBookings: (p: PendingListParams) => ['adminBookings', 'roomBookings', p] as const,
+  roomBookingsAll: ['adminBookings', 'roomBookings', 'all'] as const,
   fixedWindow: ['adminBookings', 'fixedWindow'] as const,
 }
 
@@ -309,6 +334,18 @@ export function usePendingRoomBookings(p: PendingListParams, enabled = true) {
         `/admin/room-bookings${qs({ status: 'pending', page: p.page, page_size: p.pageSize })}`,
       ).then(({ data, total }) => ({ requests: data.map(toRoomRequest), total })),
     placeholderData: keepPreviousData,
+  })
+}
+
+/** 衝突偵測專用:待審固定借用全量(一輪至多每社一單,量級小);顯示仍走分頁查詢 */
+export function useAllPendingRoomBookings(enabled = true) {
+  return useQuery({
+    queryKey: keys.roomBookingsAll,
+    enabled,
+    queryFn: () =>
+      fetchAllPages<AdminRoomBookingOut>('/admin/room-bookings', { status: 'pending' }).then(
+        (rows) => rows.map(toRoomRequest),
+      ),
   })
 }
 

@@ -7,8 +7,10 @@ import StatusPill from '../../components/ui/StatusPill'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import { DOW_TEXT } from '../../api/bookings'
 import {
+  roomConflictKeys,
   useAdminBookingMutations,
   useAdminFixedWindow,
+  useAllPendingRoomBookings,
   usePendingRoomBookings,
   type AdminRoomRequest,
 } from '../../api/adminBookings'
@@ -153,21 +155,10 @@ export default function AdminRoomsPage() {
   const pending = listQuery.data?.requests ?? []
   const total = listQuery.data?.total ?? 0
 
-  // 標出互相衝突的時段(同場地每週同星期同節次);衝突時擇一社團核准,不做部分同意
-  const conflictKeys = new Set<string>()
-  const seen = new Map<string, number>()
-  for (const r of pending) {
-    for (const e of r.entries) {
-      for (const p of e.periods) {
-        const key = `${r.venueId}|${e.dow}|${p}`
-        if (seen.has(key) && seen.get(key) !== r.apiId) {
-          conflictKeys.add(key)
-        } else {
-          seen.set(key, r.apiId)
-        }
-      }
-    }
-  }
+  // 標出互相衝突的時段(同場地每週同星期同節次);衝突時擇一社團核准,不做部分同意。
+  // 比對對象是全部待審單而非當前這一頁,否則跨頁衝突會被判成無衝突
+  const allPendingQuery = useAllPendingRoomBookings(windowOpen)
+  const conflictKeys = roomConflictKeys(allPendingQuery.data ?? [])
   const isConflict = (venueId: number) => (dow: number, period: string) =>
     conflictKeys.has(`${venueId}|${dow}|${period}`)
 

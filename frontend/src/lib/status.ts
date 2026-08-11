@@ -1,3 +1,5 @@
+import dayjs from 'dayjs'
+
 export type StatusKey =
   | 'draft'
   | 'pending_advisor'
@@ -65,3 +67,10 @@ export const STATUS: Record<StatusKey, StatusStyle> = {
   violation_open: { label: '未銷案', fg: '#B03A2E', bg: '#FBE9E7' },
   violation_resolved: { label: '已銷案', fg: '#1F6B45', bg: '#E3F2E9', border: 'rgba(31,107,69,.4)' },
 }
+
+/**
+ * 社團停權中(含到期當日)。解除停權是把 `suspended_until` 清成 null,
+ * 但過期未清的殘留值不該顯示成停權中 —— 與後端攔截同界(`suspended_until >= today`)。
+ */
+export const suspendedNow = (until: string | null | undefined): boolean =>
+  !!until && !dayjs(until, 'YYYY/MM/DD').isBefore(dayjs(), 'day')

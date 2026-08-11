@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { App, Button, Checkbox, Input, Modal, Spin, Tabs } from 'antd'
+import { App, Button, Checkbox, Input, Modal, Spin, Tabs, Tooltip } from 'antd'
 import { confirmDialog } from '../../lib/confirm'
+import { suspendedNow } from '../../lib/status'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { Cols, Pager } from '../../components/ui/tableControls'
@@ -55,7 +56,8 @@ const TAB_ROLE: Record<string, ManagedRole> = { admins: 'admin', staff: 'staff',
 // 社團 tab:159 社不分頁端點,前端過濾+分頁
 const CLUB_PAGE_SIZE = 20
 
-function ActiveTag({ active }: { active: boolean }) {
+// 社團分頁的啟停是「社團 + 帳號連動」的停用,與前三類的帳號停權不同詞
+function ActiveTag({ active, inactiveLabel = '停權' }: { active: boolean; inactiveLabel?: string }) {
   return (
     <span
       style={{
@@ -70,7 +72,7 @@ function ActiveTag({ active }: { active: boolean }) {
         color: active ? '#1F6B45' : '#3A3F4A',
       }}
     >
-      {active ? '啟用' : '停權'}
+      {active ? '啟用' : inactiveLabel}
     </span>
   )
 }
@@ -439,7 +441,7 @@ export default function AccountsPage() {
         />
       </div>
       <table className="tb fixed" style={{ minWidth: 760 }}>
-        <Cols widths={['auto', 110, '20%', 84, 160]} />
+        <Cols widths={['auto', 110, '20%', 140, 160]} />
         <thead>
           <tr><th>社團名稱</th><th>性質</th><th>帳號</th><th>狀態</th><th className="r">動作</th></tr>
         </thead>
@@ -455,7 +457,17 @@ export default function AccountsPage() {
                   <span style={{ fontSize: 13, color: 'var(--muted)' }}>尚未建立</span>
                 )}
               </td>
-              <td><ActiveTag active={c.isActive} /></td>
+              <td>
+                <ActiveTag active={c.isActive} inactiveLabel="停用" />
+                {/* 停權(器材逾期)與帳號啟停是兩回事:停權中但仍啟用的社團在這裡本來看起來完全正常 */}
+                {suspendedNow(c.suspendedUntil) && (
+                  <Tooltip title="器材逾期停權中,期間不得申請借用">
+                    <div className="num" style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>
+                      停權至 {c.suspendedUntil}
+                    </div>
+                  </Tooltip>
+                )}
+              </td>
               <td className="r" style={{ whiteSpace: 'nowrap' }}>
                 {c.username != null ? (
                   <button type="button" className="link-btn" onClick={() => askResetClubPassword(c)}>

@@ -2,6 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api } from './client'
+import { suspendedNow } from '../lib/status'
 
 const slashDate = (iso: string): string => dayjs(iso).format('YYYY/MM/DD')
 
@@ -86,13 +87,6 @@ export interface ClubSuspension {
   until: string
   reason: string
 }
-
-/**
- * 停權中(含到期當日)。解除停權是把日期清成 null,但過期未清的殘留值不該顯示成停權中,
- * 判定與後端 `suspended_until >= today` 一致。
- */
-export const suspendedNow = (until: string): boolean =>
-  until !== '' && !dayjs(until, 'YYYY/MM/DD').isBefore(dayjs(), 'day')
 
 /** 停權狀態:借用四頁與管理項目共用(見 features/club-settings/SuspensionNote)。 */
 export function useClubSuspension(): ClubSuspension {

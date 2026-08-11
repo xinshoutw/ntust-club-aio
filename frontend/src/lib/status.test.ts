@@ -1,7 +1,7 @@
 import dayjs from 'dayjs'
 import customParseFormat from 'dayjs/plugin/customParseFormat'
 import { describe, expect, it } from 'vitest'
-import { suspendedNow } from './clubProfile'
+import { suspendedNow } from './status'
 
 dayjs.extend(customParseFormat)
 

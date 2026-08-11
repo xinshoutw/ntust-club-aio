@@ -481,7 +481,8 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
             # 舊制即為 社員/非社員 人數,語彙已統一
             participants_in=a.ExpectedMemberNumber or 0,
             participants_out=a.ExpectedNotMemberNumber or 0,
-            staff_text=";".join(staffs.get(a.id, [])),
+            # 送審必填項在遷移件也要有值,否則退回件連暫存都會被 422 擋住
+            staff_text=";".join(staffs.get(a.id, [])) or "(未填)",
             status=status,
             created_by=user_id,
             **({"created_at": local_dt(a.SetupTime)} if a.SetupTime else {}),

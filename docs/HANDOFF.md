@@ -49,8 +49,13 @@
 
 **A3 第十三批(2026-08-11)已修**:效能組 ISS-48(行政端 9 頁)、ISS-49(社團端 4 頁),兩頁一 commit;
 畫面與資料落差組 ISS-40 前端半 + ISS-97(新端點 `GET /club/room-bookings/occupancy`,三條軸都由後端判定);
-補做 GAP-05(場地主檔 CRUD)。跑了兩輪 opus 交叉審查,第一輪抓到三件必修(報修卡片換頁整張消失、
-帳號管理刪除後停在空白頁、四個 header 統計數字載入中顯示 0)與違規 status 排序靠字面值巧合,全部已修。
+補做 GAP-05(場地主檔 CRUD)。跑了三輪 opus 交叉審查,抓到的必修全部已修:
+第一輪 —— 報修卡片換頁整張消失、帳號管理刪除後停在空白頁、四個 header 統計數字載入中顯示 0、
+違規 status 排序靠字面值巧合;
+第二輪 —— 活動列表的狀態漏斗弄丟「已逾期」而「已核准」悄悄變大(狀態篩選改吃顯示狀態,
+`locked` 成為後端也認得的推導狀態)、拿掉 `keepPreviousData` 讓每次換頁都閃一次「本學期尚無活動」;
+第三輪 —— 場地停用後待審單照樣核准得下去、`PATCH` 帶顯式 null 撞 NOT NULL 回 500、
+場況查詢失敗時整張時段表仍可自由選取(等於 ISS-40 的症狀重演)。
 
 **A3 其餘 2 項**(可上線後補;作業流程見 `AGENTS.md`「修 issues.md 的條目時」)
 
@@ -68,6 +73,10 @@
 - **判定搬到 SQL 就要留一條「兩邊同答案」的測試**:`window_open_sql`、`can_close_sql` 都是照 Python 版重寫的第二份,測試同時斷言篩選結果與逐列旗標,拿掉任一條件就會紅
 - 多值 query 參數改動不會破壞既有單值呼叫端(FastAPI 把 `?status=open` 解析成 `['open']`),但 `Literal` 型別的篩選要記得補齊列舉(`LoanStatusFilter` 原本漏了 `cancelled`,社團總覽的「未結束」集合就少一種)
 - **同一條路徑不能有兩個 router**:`/admin/venues` 原本在 `admin_bookings` 已有 GET,新增主檔 CRUD 時整條路徑要搬到同一個模組,否則先註冊的那支贏,新端點靜默失效(症狀是回應少了欄位)
+- **「送出關」與「核准關」擋的東西不一樣**:固定借用送出只擋不開放規則,撞到別社已核准的固定/臨時借用是**核准**關才擋(多社競爭同一時段本來就允許,由承辦整單擇一)。寫「兩關同一份判定」的註解與 spec 全是錯的,審查抓到才發現
+- 主檔多了停用開關,就要回頭問**「停用之後既有的單怎麼辦」**:待審單不會自己消失,核准端點原本完全不看 `is_active`,核出來的單在場況圖上還看不到(列首只取啟用中場地)
+- `PATCH` 的部分更新 schema 把 NOT NULL 欄位宣告成 `X | None`,顯式帶 `null` 就是 500(23502 不在錯誤轉譯表內)。器材主檔也有同一顆
+- **推導狀態要一路貫穿到篩選**:畫面把「已核准且逾期鎖定」顯示成「已逾期」,後端的 `status=approved` 卻含它們 —— 清單改伺服器端篩選後,漏斗少一個選項、「已核准」還悄悄變大
 - 停用的格子只擋 `pointerdown` 不夠:容器的 `elementFromPoint` 照樣掃得到 disabled 按鈕,從別處起拖再掃過去仍然選得到
 
 - ISS-78 第一版把行政端改成「場地固定借用」,而社團端/系統設定/spec 檔名一直是「**固定場地借用**」—— 同一個功能兩個名字,`admin_rooms.py` 一個檔就有三則 Discord 標題各用一種。定案詞彙只說「用場地不用教室」,沒說詞序,改名前要先數哪個是既有多數
@@ -161,7 +170,7 @@
 
 ## 驗證現況(2026-08-11 實測)
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → 327 passed(含 `test_migrations.py`:另開一個庫跑 `alembic upgrade head`,比對欄位、索引名與 CHECK 名 —— 後兩者是子集斷言,擋的是「模型有、revision 漏了」;`test_migration_helpers.py`:兩支匯入腳本的純函式);`ruff check .` 全綠
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → 333 passed(含 `test_migrations.py`:另開一個庫跑 `alembic upgrade head`,比對欄位、索引名與 CHECK 名 —— 後兩者是子集斷言,擋的是「模型有、revision 漏了」;`test_migration_helpers.py`:兩支匯入腳本的純函式);`ruff check .` 全綠
 - 前端 `pnpm exec tsc -b --force` → 0 錯;`pnpm test` → 76 passed(18 檔);`pnpm run lint` → **8** 個 fast-refresh warning(全為既有的 `only-export-components` 類)
 - `git log --all` 確認 `.env` 與 `migration/out` 從未進版控
 

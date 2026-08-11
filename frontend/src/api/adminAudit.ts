@@ -3,7 +3,7 @@
 // 動作/角色以標籤對照表轉中文顯示,未知鍵回退原始字串。
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
-import { apiPaged, qs } from './client'
+import { api, apiPaged, qs } from './client'
 
 export const ROLE_LABELS: Record<string, string> = {
   admin: '管理員',
@@ -69,11 +69,10 @@ export const ACTION_LABELS: Record<string, string> = {
   violation_resolved: '違規銷案',
 }
 
-const actionEntries = Object.entries(ACTION_LABELS)
-/** 動作篩選選項(顯示詞,固定清單) */
-export const ACTION_OPTIONS = actionEntries.map(([, label]) => label)
+/** 動作顯示詞;沒對照到就顯示原始鍵(後端新加的動作不會因此消失) */
+export const actionLabelOf = (key: string): string => ACTION_LABELS[key] ?? key
 export const actionKeyOf = (label: string): string | undefined =>
-  actionEntries.find(([, l]) => l === label)?.[0]
+  Object.entries(ACTION_LABELS).find(([, l]) => l === label)?.[0] ?? label
 
 const roleEntries = Object.entries(ROLE_LABELS)
 export const ROLE_OPTIONS = roleEntries.map(([, label]) => label)
@@ -107,7 +106,7 @@ const toLog = (l: AuditLogOut): AuditLog => ({
   userId: l.user_id,
   who: l.user_name ?? '(已刪除帳號)',
   roleLabel: l.role ? (ROLE_LABELS[l.role] ?? l.role) : '—',
-  actionLabel: ACTION_LABELS[l.action] ?? l.action,
+  actionLabel: actionLabelOf(l.action),
   detail: l.detail,
 })
 
@@ -127,5 +126,28 @@ export function useAuditLogs(p: AuditListParams) {
         `/admin/audit${qs({ page: p.page, page_size: p.pageSize, user_id: p.userId, role: p.role, action: p.action })}`,
       ).then(({ data, total }) => ({ logs: data.map(toLog), total })),
     placeholderData: keepPreviousData,
+  })
+}
+
+// ---- 篩選選項(取自實際留下的紀錄,不是已載入的那幾頁)----
+
+export interface AuditOptions {
+  operators: { id: number; name: string }[]
+  actionLabels: string[]
+}
+
+interface AuditOptionsOut {
+  operators: { id: number; name: string }[]
+  actions: string[]
+}
+
+export function useAuditOptions() {
+  return useQuery({
+    queryKey: ['adminAudit', 'options'] as const,
+    queryFn: () =>
+      api<AuditOptionsOut>('/admin/audit/options').then((o) => ({
+        operators: o.operators,
+        actionLabels: o.actions.map(actionLabelOf),
+      })),
   })
 }

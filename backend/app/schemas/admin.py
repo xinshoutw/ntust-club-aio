@@ -410,6 +410,18 @@ class AuditLogOut(BaseModel):
         return None if v is None else str(v)
 
 
+class AuditOperatorOut(BaseModel):
+    id: int
+    name: str
+
+
+class AuditOptionsOut(BaseModel):
+    """篩選選項:取自實際留下的紀錄,不是翻過的頁面。"""
+
+    operators: list[AuditOperatorOut]
+    actions: list[str]
+
+
 # ---- 檔案管理 ----
 
 

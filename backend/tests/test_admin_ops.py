@@ -174,3 +174,20 @@ async def test_audit_list_filters_and_super_only(client, db):
         await client.get("/api/v1/admin/audit", params={"action": "violation_filed"})
     ).json()["data"]
     assert [d["detail"] for d in data] == ["c"]
+
+
+async def test_audit_options_cover_every_record(client, db):
+    """選項來自整張表:操作者不必先翻到那一頁,動作也不會漏掉新加的。"""
+    super_admin = await make_user(db, username="root", role="admin", is_super=True)
+    staff = await make_user(db, username="staff01", role="staff", name="李工讀")
+    db.add_all(
+        [AuditLog(user_id=staff.id, role="staff", action="violation_filed", detail=str(i))
+         for i in range(25)]  # 超過一頁,確保不是靠翻頁累積
+    )
+    await db.commit()
+
+    await login(client, "root")
+    data = (await client.get("/api/v1/admin/audit/options")).json()["data"]
+    assert {o["id"] for o in data["operators"]} == {super_admin.id, staff.id}
+    assert "violation_filed" in data["actions"]
+    assert len(data["actions"]) == len(set(data["actions"]))

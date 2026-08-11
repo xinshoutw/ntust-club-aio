@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { Cols, FilterButton, Pager } from '../../components/ui/tableControls'
-import { ACTION_OPTIONS, ROLE_OPTIONS, actionKeyOf, roleKeyOf, useAuditLogs } from '../../api/adminAudit'
+import { ROLE_OPTIONS, actionKeyOf, roleKeyOf, useAuditLogs, useAuditOptions } from '../../api/adminAudit'
 
 const PAGE_SIZE = 20
 
@@ -18,32 +18,20 @@ export default function AuditPage() {
   const [roleFilter, setRoleFilter] = useState<string | null>(null)
   const [actionFilter, setActionFilter] = useState<string | null>(null)
   const [page, setPage] = useState(1)
-  // 操作者選項自已載入的列累積(id↔姓名對照;後端以 user_id 篩選)
-  const [operators, setOperators] = useState<Map<number, string>>(new Map())
+  const options = useAuditOptions()
+  const operators = options.data?.operators ?? []
 
   const listQuery = useAuditLogs({
     page,
     pageSize: PAGE_SIZE,
-    userId: whoFilter ? [...operators.entries()].find(([, name]) => name === whoFilter)?.[0] : undefined,
+    userId: operators.find((o) => o.name === whoFilter)?.id,
     role: roleFilter ? roleKeyOf(roleFilter) : undefined,
     action: actionFilter ? actionKeyOf(actionFilter) : undefined,
   })
   const logs = listQuery.data?.logs ?? []
   const total = listQuery.data?.total ?? 0
 
-  const data = listQuery.data
-  useEffect(() => {
-    if (!data) return
-    setOperators((prev) => {
-      const fresh = data.logs.filter((l) => l.userId != null && !prev.has(l.userId))
-      if (fresh.length === 0) return prev
-      const next = new Map(prev)
-      for (const l of fresh) if (l.userId != null) next.set(l.userId, l.who)
-      return next
-    })
-  }, [data])
-
-  const whoOptions = [...new Set(operators.values())]
+  const whoOptions = [...new Set(operators.map((o) => o.name))]
 
   const setFilter = (setter: (next: string | null) => void, current: string | null) => (next: string[]) => {
     setter(pickSingle(current, next))
@@ -88,7 +76,7 @@ export default function AuditPage() {
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     動作
                     <FilterButton
-                      options={ACTION_OPTIONS}
+                      options={options.data?.actionLabels ?? []}
                       selected={actionFilter ? [actionFilter] : []}
                       onChange={setFilter(setActionFilter, actionFilter)}
                       label="篩選動作"

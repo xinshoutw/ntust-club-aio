@@ -11,12 +11,30 @@ from fastapi import APIRouter, Depends, Query
 from app.api.pagination import Pagination
 from app.core.deps import CurrentUser, DbDep, require_super
 from app.models import AuditLog, User
-from app.schemas.admin import AuditLogOut
+from app.schemas.admin import AuditLogOut, AuditOperatorOut, AuditOptionsOut
 from app.schemas.common import ApiResponse
 
 router = APIRouter(prefix="/admin/audit", tags=["admin"])
 
 SuperAdmin = Annotated[CurrentUser, Depends(require_super)]
+
+
+@router.get("/options")
+async def audit_options(user: SuperAdmin, db: DbDep) -> ApiResponse[AuditOptionsOut]:
+    """篩選選項取自實際留下的紀錄:操作者不必先翻到那一頁才篩得到,動作也不會漏掉新加的。"""
+    operators = await db.execute(
+        sa.select(AuditLog.user_id, User.name)
+        .join(User, AuditLog.user_id == User.id)
+        .distinct()
+        .order_by(User.name)
+    )
+    actions = await db.scalars(sa.select(AuditLog.action).distinct().order_by(AuditLog.action))
+    return ApiResponse(
+        data=AuditOptionsOut(
+            operators=[AuditOperatorOut(id=i, name=n) for i, n in operators],
+            actions=list(actions),
+        )
+    )
 
 
 @router.get("")

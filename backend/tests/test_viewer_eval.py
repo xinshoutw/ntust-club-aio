@@ -223,6 +223,21 @@ async def test_score_submit_then_modify_overwrites(client, db):
     assert state["total"] == 42  # 10 + 20 + 簡報 12
 
 
+async def test_presentation_score_kept_unless_explicitly_cleared(client, db):
+    """簡報分是另一個時點補登的:省略該欄的請求不得把它清成 NULL。"""
+    viewer, items, club_a, _, _ = await viewer_setup(client, db)
+    url = f"/api/v1/viewer/clubs/{club_a.id}/awards/finance/score"
+
+    first = score_body(items, [18, 25], presentation=15)
+    await client.put(url, json=first, headers=csrf_headers(client))
+    resp = await client.put(url, json=score_body(items, [10, 20]), headers=csrf_headers(client))
+    assert resp.json()["data"]["presentation_score"] == 15
+
+    body = score_body(items, [10, 20]) | {"presentation_score": None}
+    resp = await client.put(url, json=body, headers=csrf_headers(client))
+    assert resp.json()["data"]["presentation_score"] is None
+
+
 async def test_score_validation_bounds_and_coverage(client, db):
     viewer, items, club_a, _, _ = await viewer_setup(client, db)
     admin_items = await make_rubric(db, "finance", [("ad1", 15)], is_admin_item=True)

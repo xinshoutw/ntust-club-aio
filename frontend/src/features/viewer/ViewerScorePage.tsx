@@ -320,7 +320,8 @@ function ScorePanel({
         score: scores[i.id] as number,
         comment: comments[i.id],
       })),
-      presentationScore: award.hasPresentation && presentation != null ? presentation : undefined,
+      // 有簡報的獎項一律明給(清空欄位=送 null 清除);沒有的獎項省略,後端不允許帶值
+      presentationScore: award.hasPresentation ? presentation : undefined,
     }
     save.mutate(
       { clubId, awardId: award.awardId, input },

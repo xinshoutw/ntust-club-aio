@@ -274,8 +274,8 @@ export function useViewerDone(p: DoneListParams) {
 export interface ScoreSaveInput {
   /** 必須整份涵蓋該獎項全部細項 */
   items: { rubricItemId: number; score: number; comment?: string }[]
-  /** 僅 has_presentation 獎項 */
-  presentationScore?: number
+  /** 僅 has_presentation 獎項;null=清除已登的分數,省略=不動 */
+  presentationScore?: number | null
 }
 
 export function useSaveScore() {

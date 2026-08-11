@@ -283,7 +283,9 @@ async def save_score(
             year=window.year, award_id=award.id, club_id=club.id, reviewer_id=user.id
         )
         db.add(score)
-    score.presentation_score = body.presentation_score
+    # 簡報分晚於線上審查補登:省略此欄=不動已登的分數,要清除得明給 null
+    if "presentation_score" in body.model_fields_set:
+        score.presentation_score = body.presentation_score
     score.submitted_at = datetime.now(UTC)
     await db.flush()  # 取得 score.id(新列)
     # items 全量替換:整份送出,舊細項分數一律覆蓋

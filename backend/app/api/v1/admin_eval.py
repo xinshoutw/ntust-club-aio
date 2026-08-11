@@ -169,6 +169,7 @@ async def revert_score(
 ) -> ApiResponse[dict]:
     club = await _club_or_404(db, club_id)
     window = await evaluation.get_eval_window(db)
+    await evaluation.lock_adjustments(db, club.id)
     await _revoke_key(db, club.id, window.year, body.key)
     audit.record(
         db,

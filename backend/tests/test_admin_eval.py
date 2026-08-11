@@ -73,8 +73,8 @@ async def test_override_revert_and_merit_flow(client, db):
     assert any(a["revoked"] for a in detail["adjustments"])
 
 
-async def test_override_waits_for_the_club_adjustment_lock(client, db):
-    """「註銷舊值 → 新增一筆」不是原子的:端點必須先取該社團的鎖,否則並發會留下兩筆生效中。"""
+async def test_adjustments_wait_for_the_club_lock(client, db):
+    """「註銷舊值 → 新增一筆」不是原子的:三支端點都得先取該社團的鎖,否則並發會互相蓋掉。"""
     import asyncio
 
     from app.core.db import async_session_factory
@@ -83,17 +83,23 @@ async def test_override_waits_for_the_club_adjustment_lock(client, db):
     club = await seed(client, db)
     await login(client, "evaladmin")
 
-    async with async_session_factory() as holder:
-        await evaluation.lock_adjustments(holder, club.id)  # 佔住鎖,交易不結束
+    async def blocked(path: str, body: dict):
         with pytest.raises(TimeoutError):
             await asyncio.wait_for(
                 client.post(
-                    f"/api/v1/admin/eval/clubs/{club.id}/override",
-                    json={"key": "ad6", "score": 2, "reason": "並發"},
+                    f"/api/v1/admin/eval/clubs/{club.id}/{path}",
+                    json=body,
                     headers=csrf_headers(client),
                 ),
                 timeout=1,
             )
+
+    async with async_session_factory() as holder:
+        await evaluation.lock_adjustments(holder, club.id)  # 佔住鎖,交易不結束
+        await blocked("override", {"key": "ad6", "score": 2, "reason": "並發"})
+        # 「回到自動」同樣是註銷後判定,漏鎖的話 override 會活過這次回復
+        await blocked("revert", {"key": "ad6", "reason": "並發"})
+        await blocked("merit", {"score": 3, "reason": "並發"})
 
 
 async def test_override_score_capped_per_item(client, db):

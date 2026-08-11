@@ -7,7 +7,6 @@
 - 退回必填原因;結案為承辦人單關
 """
 
-from datetime import datetime
 from typing import Annotated
 
 import sqlalchemy as sa
@@ -16,7 +15,6 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from app.api.pagination import NullsLast, Pagination, parse_sort
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, forbidden, not_found, validation_error
-from app.core.semesters import TAIPEI
 from app.models import Activity, ActivityReport, ApprovalRecord, Club
 from app.models.enums import (
     ActivityStatus,
@@ -249,14 +247,10 @@ async def list_activities(
         query = query.where(sa.or_(*conds))
     lock_months = await get_setting(db, "close_lock_months")
     if locked or overdue:
-        # 與 activity_service.is_close_locked 同規則:PG 月加法與 add_months 同為日夾底;
         # locked 僅未解鎖者,overdue 不分鎖定與否(是否鎖定由回應的 close_locked 區分)
-        threshold = datetime.now(TAIPEI).date()
         query = query.where(
             Activity.status == ActivityStatus.APPROVED,
-            sa.func.coalesce(Activity.end_date, Activity.date)
-            + sa.func.make_interval(0, int(lock_months))
-            < threshold,
+            svc.close_overdue_sql(lock_months),
         )
         if locked:
             query = query.where(Activity.close_unlocked.is_(False))

@@ -32,7 +32,7 @@
 - 繳交確認寫進 `activity_reports.{photos,report,reflections}_confirmed`,`services/scoring.py` 據此把未確認項目算 0 分
 - 解鎖只對「已核准 + 已逾期鎖定」的活動有效;**未逾期不得預先解鎖**,否則等於永久繞過鎖定
 - 逾期清單 `overdue=true` 含已鎖定與已解鎖兩種,由回應的 `close_locked` 區分
-- 逾期判定用 SQL 的 `make_interval` 與 Python 的 `add_months` 兩份實作,皆為月底夾底語意
+- 逾期清單在 DB 端篩(`activity_service.close_overdue_sql`),與 `is_close_locked` 共用同一條期限與 `close_lock_months`
 
 ## 未完成 / 問題
 

@@ -59,6 +59,15 @@ def is_close_locked(activity: Activity, lock_months: int, now: datetime | None =
     return now >= deadline
 
 
+def close_overdue_sql(lock_months: int) -> sa.ColumnElement[bool]:
+    """同一條期限的 SQL 版(逾期清單在 DB 端篩);PG 月加法與 add_months 同為日夾底。"""
+    return (
+        sa.func.coalesce(Activity.end_date, Activity.date)
+        + sa.func.make_interval(0, int(lock_months))
+        < datetime.now(TAIPEI).date()
+    )
+
+
 def can_close(activity: Activity, lock_months: int, now: datetime | None = None) -> bool:
     """結案資格:已核准且活動已結束且未被鎖定。"""
     now = now or datetime.now(UTC)

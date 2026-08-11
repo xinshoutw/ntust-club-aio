@@ -2,7 +2,7 @@ from datetime import UTC, date, datetime, timedelta
 
 import sqlalchemy as sa
 
-from app.models import Activity, ActivityBudgetItem, ApprovalRecord
+from app.models import Activity, ActivityBudgetItem, ApprovalRecord, SystemSetting
 from tests.conftest import csrf_headers, login, make_club, make_user
 from tests.test_activities import close_payload, create_activity, payload, upload_photo
 
@@ -543,6 +543,29 @@ async def test_overdue_filter_includes_unlocked(client, db):
 
     resp = await client.get("/api/v1/admin/activities", params={"locked": "true"})
     assert {r["name"] for r in resp.json()["data"]} == {"逾期鎖定"}
+
+
+async def test_overdue_filter_follows_close_lock_months(client, db):
+    """逾期清單(SQL)與每列的 close_locked(Python)必須同源:改鎖定月數,兩邊要一起動。"""
+    club = await seed(client, db)
+    creator = await make_user(db, username="creator6", club_id=club.id)
+    day = date.today() - timedelta(days=45)
+    db.add(Activity(
+        club_id=club.id, name="45 天前結束", location="x", type="社課或會議",
+        date=day, end_date=day, status="approved", created_by=creator.id,
+    ))
+    await db.commit()
+
+    await login(client, "advisor")
+    rows = (await client.get("/api/v1/admin/activities", params={"overdue": "true"})).json()["data"]
+    assert [r["close_locked"] for r in rows] == [True]
+
+    db.add(SystemSetting(key="close_lock_months", value=3))
+    await db.commit()
+    overdue = await client.get("/api/v1/admin/activities", params={"overdue": "true"})
+    assert overdue.json()["data"] == []
+    rows = (await client.get("/api/v1/admin/activities")).json()["data"]
+    assert [r["close_locked"] for r in rows] == [False]
 
 
 async def test_reviewed_at_field_and_sorting(client, db):

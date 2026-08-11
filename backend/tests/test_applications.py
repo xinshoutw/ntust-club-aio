@@ -362,3 +362,50 @@ async def test_passbook_upload_accepts_pdf_and_image(client, db):
 
     # 一張申請一份:沒有上限的話,任何舊單都能被無限追加 50MB 個資檔
     assert (await upload(first, "又一張.jpg", jpg, "image/jpeg")).status_code == 422
+
+
+async def test_takeover_announcements_are_not_limited_to_the_first_page(client, db):
+    """蓋板不能靠「最新 N 筆」撈:被後續公告擠出第一頁的蓋板照樣要回。"""
+    await setup_session(client, db)
+    admin = await make_user(db, username="admin01", role="admin")
+    db.add(
+        Announcement(
+            title="蓋板",
+            content="x",
+            target_type="all",
+            takeover_until=date(2026, 12, 31),
+            created_by=admin.id,
+        )
+    )
+    db.add_all(
+        Announcement(title=f"後續{i}", content="x", target_type="all", created_by=admin.id)
+        for i in range(25)
+    )
+    await db.commit()
+
+    first_page = (await client.get("/api/v1/club/announcements")).json()["data"]
+    assert "蓋板" not in [a["title"] for a in first_page]
+
+    rows = (await client.get("/api/v1/club/announcements?takeover=true")).json()["data"]
+    assert [a["title"] for a in rows] == ["蓋板"]
+
+
+async def test_expired_takeover_is_excluded(client, db):
+    await setup_session(client, db)
+    admin = await make_user(db, username="admin01", role="admin")
+    db.add_all(
+        [
+            Announcement(
+                title="已過期",
+                content="x",
+                target_type="all",
+                takeover_until=date(2020, 1, 1),
+                created_by=admin.id,
+            ),
+            Announcement(title="非蓋板", content="x", target_type="all", created_by=admin.id),
+        ]
+    )
+    await db.commit()
+
+    rows = (await client.get("/api/v1/club/announcements?takeover=true")).json()["data"]
+    assert rows == []

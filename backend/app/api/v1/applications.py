@@ -35,6 +35,7 @@ from app.schemas.applications import (
 from app.schemas.common import ApiResponse
 from app.services import audit, notify, violation_service
 from app.services import files as file_service
+from app.services.booking_service import today_taipei
 from app.services.settings_service import get_setting
 
 router = APIRouter(prefix="/club", tags=["applications"])
@@ -329,8 +330,13 @@ def _announcement_visible(club: Club) -> sa.ColumnElement[bool]:
 
 @router.get("/announcements")
 async def list_announcements(
-    user: ClubUser, db: DbDep, page: Pagination
+    user: ClubUser, db: DbDep, page: Pagination, takeover: bool = False
 ) -> ApiResponse[list[AnnouncementOut]]:
+    """本社可見公告(id 降冪)。
+
+    `takeover=true` 只回仍在期限內的蓋板公告:蓋板不能靠「最新 N 筆」撈,
+    期限內但被後續公告擠出第一頁的蓋板會靜默失效。
+    """
     club = await db.get(Club, user.club_id)
     query = (
         sa.select(Announcement, AnnouncementDismissal.club_id.is_not(None))
@@ -344,6 +350,8 @@ async def list_announcements(
         .where(_announcement_visible(club))
         .order_by(Announcement.id.desc())
     )
+    if takeover:
+        query = query.where(Announcement.takeover_until >= today_taipei())
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = (await db.execute(query.offset(page.offset).limit(page.page_size))).all()
     read_at = club.announcements_read_at

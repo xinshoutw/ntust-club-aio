@@ -3,7 +3,7 @@ import dayjs from 'dayjs'
 import { App, Button, Checkbox, Modal, Progress } from 'antd'
 import { CloseOutlined } from '@ant-design/icons'
 import Markdown from '../ui/Markdown'
-import { useAnnouncements, useDismissAnnouncement } from '../../api/announcements'
+import { useDismissAnnouncement, useTakeoverAnnouncements } from '../../api/announcements'
 
 // 每次登入清空(auth.login),讓蓋板於下次登入再次顯示
 export const TAKEOVER_DISMISSED_KEY = 'club-aio.takeover.dismissed'
@@ -30,11 +30,12 @@ export default function TakeoverOverlay() {
   const [percent, setPercent] = useState(0)
   const [neverShow, setNeverShow] = useState(false)
   const { message } = App.useApp()
-  // 僅社團端渲染(AppShell 已依角色守衛),與總覽/鈴鐺共用同一查詢
-  const { data } = useAnnouncements()
+  // 僅社團端渲染(AppShell 已依角色守衛);蓋板走自己的查詢,不從總覽的最新 20 筆裡挑
+  const { data } = useTakeoverAnnouncements()
   const dismissForever = useDismissAnnouncement()
 
-  const active = (data?.announcements ?? []).filter(
+  // 期限由後端篩過;這裡再擋一次,快取跨過午夜時不會蓋出已到期的公告
+  const active = (data ?? []).filter(
     (a) =>
       a.takeoverUntil &&
       !dayjs().isAfter(dayjs(a.takeoverUntil, 'YYYY/MM/DD'), 'day') &&

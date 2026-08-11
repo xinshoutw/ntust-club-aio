@@ -37,10 +37,14 @@ const toAnnouncement = (a: AnnouncementOut): Announcement => ({
   unread: a.unread,
 })
 
-// 三處共用近 20 筆:蓋板需涵蓋仍在期限內、但已非最新的公告
+// 總覽公告卡與鈴鐺共用近 20 筆
 const PAGE_SIZE = 20
 
-export const announcementKeys = { list: ['announcements', 'list'] as const }
+export const announcementKeys = {
+  all: ['announcements'] as const,
+  list: ['announcements', 'list'] as const,
+  takeover: ['announcements', 'takeover'] as const,
+}
 
 export function useAnnouncements(enabled = true) {
   return useQuery({
@@ -53,12 +57,27 @@ export function useAnnouncements(enabled = true) {
   })
 }
 
+/**
+ * 蓋板公告:後端只回仍在期限內者。不能從「最新 20 筆」裡挑 —— 期限內但被後續
+ * 公告擠出第一頁的蓋板會靜默失效(同時在線的蓋板不會多,一頁綽綽有餘)。
+ */
+export function useTakeoverAnnouncements(enabled = true) {
+  return useQuery({
+    queryKey: announcementKeys.takeover,
+    queryFn: () =>
+      apiPaged<AnnouncementOut[]>(
+        `/club/announcements${qs({ page: 1, page_size: PAGE_SIZE, takeover: true })}`,
+      ).then(({ data }) => data.map(toAnnouncement)),
+    enabled,
+  })
+}
+
 /** 蓋板「不再顯示」:跨裝置持久(DB);成功後刷新共用公告查詢 */
 export function useDismissAnnouncement() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => api<null>(`/club/announcements/${id}/dismiss`, { method: 'POST' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: announcementKeys.list }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: announcementKeys.all }),
   })
 }
 
@@ -67,6 +86,6 @@ export function useMarkAnnouncementsRead() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: () => api<null>('/club/announcements/read', { method: 'POST' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: announcementKeys.list }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: announcementKeys.all }),
   })
 }

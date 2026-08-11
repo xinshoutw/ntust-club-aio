@@ -99,8 +99,15 @@ async def validation_exception_handler(
     )
 
 
+# 唯一鍵 / 外鍵 / 排除約束:另一個交易搶先,重試才有意義
+_CONFLICT_SQLSTATES = {"23505", "23503", "23P01"}
+
+
 @app.exception_handler(IntegrityError)
 async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:
+    # NOT NULL、CHECK 等其餘約束是程式缺陷,包成「重複送出」只會讓使用者一直重試
+    if getattr(exc.orig, "sqlstate", None) not in _CONFLICT_SQLSTATES:
+        return await unhandled_exception_handler(request, exc)
     # UNIQUE/FK 競態(如雙擊送出):約束擋下的第二筆回 409,不是 500
     logger.warning("integrity conflict on %s %s", request.method, request.url.path)
     return _envelope(409, "資料狀態已變更或重複送出，請重新整理後再試", {"code": "CONFLICT"})

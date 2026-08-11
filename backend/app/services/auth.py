@@ -34,7 +34,10 @@ async def login(
 
     if user is None or not user.is_active:
         await verify_password_async(None, password)  # 時間等化,防帳號探測
-        audit.record(db, action="login_failed", role=None, detail=f"username={username}", ip=ip)
+        # 帳號欄的原文只在對得上真實帳號時才留:使用者常把密碼打進帳號欄,
+        # 查無此帳號還記原文等於把別人的密碼明文存進稽核
+        detail = f"username={username}" if user else "unknown_account"
+        audit.record(db, action="login_failed", role=None, detail=detail, ip=ip)
         await db.commit()
         raise unauthenticated(_GENERIC_LOGIN_ERROR)
 

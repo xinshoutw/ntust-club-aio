@@ -2,7 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 import sqlalchemy as sa
 
-from app.models import Session, User
+from app.models import AuditLog, Session, User
 from tests.conftest import PASSWORD, csrf_headers, login, make_club, make_user
 
 
@@ -58,6 +58,19 @@ async def test_inactive_user_cannot_login(client, db):
     await make_user(db, username="club01", is_active=False)
     resp = await login(client, "club01")
     assert resp.status_code == 401
+
+
+async def test_unknown_account_input_not_stored_in_audit(client, db):
+    """打錯欄位把密碼輸進帳號欄很常見:查無此帳號時不得把原文留在稽核裡。"""
+    await make_user(db, username="club01", is_active=False)
+    secret = "MyPassw0rd!"
+    await login(client, secret, secret)
+    await login(client, "club01")  # 停用帳號:帳號名對得上真實帳號,可以留
+
+    query = sa.select(AuditLog.detail).where(AuditLog.action == "login_failed")
+    details = list(await db.scalars(query))
+    assert secret not in " ".join(details)
+    assert "username=club01" in details
 
 
 async def test_login_rate_limited_per_ip(client, db):

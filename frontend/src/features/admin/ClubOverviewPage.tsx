@@ -208,7 +208,10 @@ export default function ClubOverviewPage() {
     loading(approvedRoomsQuery, needsConflicts)
   // 失敗與載入中對使用者是同一件事:計數顯示 —,空狀態讓位給錯誤說明(否則兩段同時出現)
   const trackedFailed = anyError(activitiesQuery, maintQuery)
-  const bookingFailed = anyError(roomsQuery, venuesQuery, loansQuery, pendingRoomsQuery, approvedRoomsQuery)
+  // 衝突查詢的 query key 不含社團,停用後 TanStack 仍留著上一次的 error ——
+  // 換到沒有待審固定借用的社團(needsConflicts=false)時那份錯誤與這張卡無關,要排除
+  const conflictQueries = needsConflicts ? [pendingRoomsQuery, approvedRoomsQuery] : []
+  const bookingFailed = anyError(roomsQuery, venuesQuery, loansQuery, ...conflictQueries)
 
   const rowStyle: React.CSSProperties = {
     display: 'flex',
@@ -226,6 +229,17 @@ export default function ClubOverviewPage() {
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>基本資料</div>
         <LoadingBlock pending={clubId != null && detailQuery.isPending}>
+          {/* 手上還沒有資料就只顯示錯誤:五個欄位全是 `—` 看起來像「這社什麼都沒填」,
+              而下面又跟著一句載入失敗。背景重抓失敗(info 還在)才保留資料 */}
+          {detailQuery.isError && !info ? (
+            <QueryError
+              compact
+              title="社團資料載入失敗"
+              error={detailQuery.error}
+              onRetry={() => void detailQuery.refetch()}
+            />
+          ) : (
+          <>
           <div style={{ display: 'grid', gridTemplateColumns: '96px 1fr', gap: '9px 12px', fontSize: 13 }}>
             <div style={label}>性質</div><div>{info?.attribute ?? '—'}</div>
             <div style={label}>帳號</div>
@@ -245,13 +259,16 @@ export default function ClubOverviewPage() {
             <div style={label}>聯絡 Email</div>
             <div className="num">{info?.contactEmails.filter(Boolean).join('、') || '—'}</div>
           </div>
-          {detailQuery.isError && (
+          {/* 背景重抓失敗:資料照舊,底下補一行說明 */}
+          {detailQuery.isError && info && (
             <QueryError
               compact
-              title="社團資料載入失敗"
+              title="社團資料重新載入失敗"
               error={detailQuery.error}
               onRetry={() => void detailQuery.refetch()}
             />
+          )}
+          </>
           )}
         </LoadingBlock>
       </div>
@@ -346,7 +363,7 @@ export default function ClubOverviewPage() {
               <StatusPill status={l.status} />
             </div>
           ))}
-          <LoadError queries={[roomsQuery, venuesQuery, loansQuery, pendingRoomsQuery, approvedRoomsQuery]} />
+          <LoadError queries={[roomsQuery, venuesQuery, loansQuery, ...conflictQueries]} />
           {(canRooms || canBookings) && !bookingFailed && bookingCount === 0 && (
             <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
               尚無借用中的場地或器材

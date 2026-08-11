@@ -19,6 +19,7 @@ import sqlalchemy as sa
 from fastapi import UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session, SessionTransaction
 
 from app.core.config import settings
 from app.core.errors import AppError, not_found, rate_limited
@@ -58,6 +59,26 @@ def unlink_quiet(path: Path) -> None:
         path.unlink(missing_ok=True)
     except OSError:
         logger.warning("cleanup unlink failed, orphan left on disk: %s", path, exc_info=True)
+
+
+# 已落盤但還沒 commit 的檔案。呼叫端的交易失敗(或整個沒送出)時,
+# File 那一列不存在,檔案就再也沒人管得到 —— 交易結束沒 commit 就一起刪掉
+_PENDING_PATHS = "pending_upload_paths"
+
+
+@sa.event.listens_for(Session, "after_commit")
+def _forget_committed_uploads(session: Session) -> None:
+    # commit 過的檔案 DB 有列可管,之後任何回滾都不得再刪它
+    session.info.pop(_PENDING_PATHS, None)
+
+
+@sa.event.listens_for(Session, "after_transaction_end")
+def _drop_uncommitted_uploads(session: Session, transaction: SessionTransaction) -> None:
+    # 只在最外層交易結束時清:內層(連線層)子交易先於 after_commit 結束,
+    # 在那裡刪會把剛 commit 成功的檔案一起刪掉
+    if transaction.parent is None:
+        for path in session.info.pop(_PENDING_PATHS, ()):
+            unlink_quiet(path)
 
 
 def _insufficient(message: str) -> AppError:
@@ -302,6 +323,7 @@ async def save_upload(
                 raise AppError(409, "DUPLICATE_FILE", "相同內容的檔案已上傳過(照片不得重複)")
 
         tmp.rename(dest)
+        db.info.setdefault(_PENDING_PATHS, []).append(dest)
         row = File(
             id=file_id,
             club_id=club_id,

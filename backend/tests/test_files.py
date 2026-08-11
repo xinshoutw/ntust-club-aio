@@ -267,6 +267,34 @@ async def test_duplicate_flush_conflict_leaves_no_orphan(db):
     assert await db.scalar(sa.select(sa.func.count()).select_from(File)) == 1
 
 
+async def test_uncommitted_upload_leaves_no_orphan(db):
+    """呼叫端沒 commit(交易失敗或請求中途拋錯)時,已落盤的檔案不得留在磁碟上。"""
+    from app.core.db import async_session_factory
+
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+
+    async def upload(session, name: str, content: bytes):
+        row = await file_service.save_upload(
+            session,
+            fake_upload(name, content),
+            policy=file_service.IMAGE,
+            module="reports",
+            uploaded_by=user.id,
+            club_id=club.id,
+        )
+        return settings.upload_dir / row.path
+
+    async with async_session_factory() as session:
+        kept = await upload(session, "keep.png", PNG_BYTES)
+        await session.commit()
+        dropped = await upload(session, "drop.jpg", JPG_BYTES)
+        assert dropped.is_file()
+
+    assert not dropped.exists()
+    assert kept.is_file()  # 已 commit 的檔案不得被後續回滾牽連
+
+
 async def test_download_scoped_to_own_club(client, db):
     club_a = await make_club(db, name="社A")
     club_b = await make_club(db, name="社B")

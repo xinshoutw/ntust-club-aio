@@ -95,12 +95,15 @@ async def test_list_default_order_sort_and_filters(client, db):
 async def test_expired_filter_follows_resolve_months(client, db, monkeypatch):
     """SQL 端的逾期篩選與 Python 端的推導必須同源:改期限月數,兩邊要一起動。"""
     await seed(client, db)
-    monkeypatch.setattr(violation_service, "RESOLVE_MONTHS", 12)
+    # 遠大於 seed 資料的年齡:這個測試不能因為時間流逝而變紅
+    monkeypatch.setattr(violation_service, "RESOLVE_MONTHS", 1200)
 
     resp = await client.get("/api/v1/admin/violations", params={"expired": "true"})
-    assert resp.json()["data"] == []
+    assert resp.json()["data"] == []  # SQL 端的篩選跟著改
     resp = await client.get("/api/v1/admin/violations", params={"expired": "false"})
-    assert len(resp.json()["data"]) == 2  # 兩筆未銷案都還在期限內
+    data = resp.json()["data"]
+    assert len(data) == 2  # 兩筆未銷案都還在期限內
+    assert data[0]["resolve_deadline"] == "2126-03-01"  # Python 端的期限也跟著改
 
 
 async def test_multi_key_sort(client, db):

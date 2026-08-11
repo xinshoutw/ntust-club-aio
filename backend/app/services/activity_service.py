@@ -68,18 +68,37 @@ def close_overdue_sql(lock_months: int) -> sa.ColumnElement[bool]:
     )
 
 
+def ended_sql() -> sa.ColumnElement[bool]:
+    """活動已結束(SQL 版):結束日 + 結束時間(未填以 23:59 計)已過台北當下。"""
+    return (
+        sa.func.coalesce(Activity.end_date, Activity.date)
+        + sa.func.coalesce(Activity.end_time, sa.literal(time(23, 59)))
+    ) <= datetime.now(TAIPEI).replace(tzinfo=None)
+
+
+def close_locked_sql(lock_months: int) -> sa.ColumnElement[bool]:
+    """`is_close_locked` 的 SQL 版:已核准、未解鎖、結案期限已過。
+
+    畫面把這種列顯示成「已逾期」而不是「已核准」,清單的狀態篩選要跟著同一條判定。
+    """
+    return sa.and_(
+        Activity.status == ActivityStatus.APPROVED,
+        Activity.close_unlocked.is_(False),
+        close_overdue_sql(lock_months),
+    )
+
+
 def can_close_sql(lock_months: int) -> sa.ColumnElement[bool]:
     """can_close 的 SQL 版(結案清單在 DB 端篩,不是抓回全部已核准再過濾)。
 
     「已結束」在 PG 以 date + time 相加成 timestamp 比對台北當下;
     「未鎖定」沿用 close_overdue_sql,兩邊的期限推導保持同源。
     """
-    ended = (
-        sa.func.coalesce(Activity.end_date, Activity.date)
-        + sa.func.coalesce(Activity.end_time, sa.literal(time(23, 59)))
-    ) <= datetime.now(TAIPEI).replace(tzinfo=None)
-    locked = sa.and_(Activity.close_unlocked.is_(False), close_overdue_sql(lock_months))
-    return sa.and_(Activity.status == ActivityStatus.APPROVED, ended, sa.not_(locked))
+    return sa.and_(
+        Activity.status == ActivityStatus.APPROVED,
+        ended_sql(),
+        sa.not_(close_locked_sql(lock_months)),
+    )
 
 
 def can_close(activity: Activity, lock_months: int, now: datetime | None = None) -> bool:

@@ -31,12 +31,15 @@ import { TIME_RANGE_SEP, dateRangeText } from './utils'
 // tiebreak 由後端固定,前端不必也不能送 id)
 type SortKey = 'name' | 'type' | 'date' | 'budget' | 'status'
 
-// 狀態漏斗以顯示標籤操作:三個申請關卡共用「申請待審核」,選一個標籤要送出對應的全部狀態
+// 狀態漏斗以顯示標籤操作:三個申請關卡共用「申請待審核」,選一個標籤要送出對應的全部狀態。
+// 'locked'(已逾期)是後端也認得的推導狀態 —— 已核准且逾期鎖定的列顯示成「已逾期」,
+// 兩者在後端就分得開,清單才不會把逾期件混進「已核准」
 const LISTED_STATUSES = [
   'pending_advisor',
   'pending_chief',
   'pending_dean',
   'approved',
+  'locked',
   'rejected',
   'closing_pending_advisor',
   'closed',
@@ -353,10 +356,10 @@ export default function ActivityListPage() {
   // 草稿不分學期,獨立區置頂(量少、排序特殊,整批抓回自排);
   // 主列表的學期/類型/狀態篩選、排序與分頁一律由後端處理
   const draftsQuery = useDraftActivities()
-  // 未選狀態時也要明列狀態:不帶 status 的話後端連草稿都會回,而草稿在上方獨立區
-  const statuses = statusFilter.length
-    ? LISTED_STATUSES.filter((s) => statusFilter.includes(STATUS[s].label))
-    : [...LISTED_STATUSES]
+  // 未選狀態時也要明列狀態:不帶 status 的話後端連草稿都會回,而草稿在上方獨立區。
+  // 標籤對不到任何狀態時同樣退回全部(空陣列會被 qs 略過,等於靜默不篩)
+  const picked = LISTED_STATUSES.filter((s) => statusFilter.includes(STATUS[s].label))
+  const statuses = picked.length ? picked : [...LISTED_STATUSES]
   const listQuery = useActivityList({
     semester,
     statuses,
@@ -446,6 +449,7 @@ export default function ActivityListPage() {
       />
 
       <Spin spinning={draftsQuery.isPending || listQuery.isPending}>
+        {/* 沿用上一份時整表淡化,避免看起來像是新條件的結果 */}
         {draftsQuery.isError && (
           <div style={{ marginTop: 20 }}>
             <QueryError title="草稿載入失敗" error={draftsQuery.error} onRetry={() => void draftsQuery.refetch()} />
@@ -509,7 +513,12 @@ export default function ActivityListPage() {
         )}
 
         <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
-          <table className="tb fixed" style={{ minWidth: 820 }} aria-label="活動列表">
+          <table
+            className="tb fixed"
+            aria-label="活動列表"
+            aria-busy={listQuery.isPlaceholderData}
+            style={{ minWidth: 820, opacity: listQuery.isPlaceholderData ? 0.55 : 1 }}
+          >
             <Cols widths={['auto', 120, 180, 160, 110, 120]} />
             <thead>
               <tr>
@@ -568,7 +577,8 @@ export default function ActivityListPage() {
                   </td>
                 </tr>
               )}
-              {paged.length === 0 && !listQuery.isError && (
+              {/* 抓取中不顯示空狀態:沿用上一份時 paged 不會是空的,但首次載入會 */}
+              {paged.length === 0 && !listQuery.isFetching && !listQuery.isError && (
                 <tr className="no-hover">
                   <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 28 }}>
                     本學期尚無活動

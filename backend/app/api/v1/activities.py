@@ -60,12 +60,31 @@ _BUDGET_TOTAL = (
     .scalar_subquery()
 )
 
+# 狀態排序照畫面的流程順序,不是列舉字面值(VARCHAR 排出來會是 approved→closed→…)
+_STATUS_ORDER = sa.case(
+    (Activity.status == ActivityStatus.DRAFT, 0),
+    (
+        Activity.status.in_(
+            [
+                ActivityStatus.PENDING_ADVISOR,
+                ActivityStatus.PENDING_CHIEF,
+                ActivityStatus.PENDING_DEAN,
+            ]
+        ),
+        1,
+    ),
+    (Activity.status == ActivityStatus.APPROVED, 2),
+    (Activity.status == ActivityStatus.CLOSING_PENDING_ADVISOR, 3),
+    (Activity.status == ActivityStatus.CLOSED, 4),
+    else_=5,  # rejected
+)
+
 _SORTABLE = {
     "name": Activity.name,
     "type": Activity.type,
     "date": Activity.date,
     "budget": _BUDGET_TOTAL,
-    "status": Activity.status,
+    "status": _STATUS_ORDER,
     "created_at": Activity.created_at,
 }
 
@@ -120,16 +139,31 @@ def _require_future_start(activity: Activity) -> None:
         raise validation_error("活動開始時間早於現在,請調整活動日期與時間")
 
 
+# 清單的 status 篩的是**畫面顯示的狀態**:已核准且逾期鎖定的列顯示成「已逾期」,
+# 所以 approved 不含它們,locked 是獨立的一種(推導,非 ActivityStatus 成員)
+_LOCKED = "locked"
+
+
+def _display_status_condition(key: str, lock_months: int) -> sa.ColumnElement[bool]:
+    locked = svc.close_locked_sql(lock_months)
+    if key == _LOCKED:
+        return locked
+    if key == ActivityStatus.APPROVED:
+        return sa.and_(Activity.status == ActivityStatus.APPROVED, sa.not_(locked))
+    return Activity.status == ActivityStatus(key)
+
+
 @router.get("")
 async def list_activities(
     user: ClubUser,
     db: DbDep,
     page: Pagination,
     semester: str | None = Query(None, pattern=r"^\d{3}-[12]$"),
-    # 可重複帶多值(總覽頁一次查非 closed 各狀態,避免整表撈取)
-    status: Annotated[list[ActivityStatus] | None, Query()] = None,
+    # 可重複帶多值(總覽頁一次查非 closed 各狀態,避免整表撈取);另收推導狀態 locked
+    status: Annotated[list[str] | None, Query()] = None,
     type: Annotated[list[ActivityType] | None, Query()] = None,  # 可重複帶多值
     closable: bool = Query(False),  # 僅可結案者(已核准、已結束、未鎖定)
+    ended: bool | None = Query(None),  # 借用綁定的活動下拉只要「還沒結束」的
     sort: str | None = None,
 ) -> ApiResponse[list[ActivityOut]]:
     query = (
@@ -140,19 +174,28 @@ async def list_activities(
     if semester:
         start, end = semester_range(semester)
         query = query.where(Activity.date >= start, Activity.date <= end)
+    lock_months = await get_setting(db, "close_lock_months")
     if status:
-        query = query.where(Activity.status.in_(status))
+        allowed = {s.value for s in ActivityStatus} | {_LOCKED}
+        unknown = [s for s in status if s not in allowed]
+        if unknown:
+            raise validation_error(f"未知的狀態:{','.join(unknown)}")
+        query = query.where(
+            sa.or_(*[_display_status_condition(s, lock_months) for s in status])
+        )
     if type:
         query = query.where(Activity.type.in_(type))
-    lock_months = await get_setting(db, "close_lock_months")
+    if ended is not None:
+        query = query.where(svc.ended_sql() if ended else sa.not_(svc.ended_sql()))
     if closable:
         query = query.where(svc.can_close_sql(lock_months))
+
+    # 計數不必排序:budget 排序是相關子查詢,套在 count 的子查詢上是白工
+    total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     # 固定 id 降冪 tiebreak:日期/類型/狀態都可能大量同值,無穩定全序時分頁會重複/漏列
     query = query.order_by(
         *parse_sort(sort, _SORTABLE, Activity.date.desc()), Activity.id.desc()
     )
-
-    total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = (await db.scalars(query.offset(page.offset).limit(page.page_size))).all()
     return ApiResponse(data=[_to_out(a, lock_months) for a in rows], meta=page.meta(total or 0))
 

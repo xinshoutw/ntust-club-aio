@@ -39,6 +39,8 @@ const IN_PROGRESS = [
   'pending_dean',
   'closing_pending_advisor',
   'approved',
+  // 後端的 approved 已排除逾期鎖定的列(那些顯示成「已逾期」),待辦要靠這個推導狀態拿回來
+  'locked',
 ] as const
 
 const trackedStatus = (a: ActivityOut): StatusKey => {

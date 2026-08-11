@@ -13,6 +13,7 @@
 | 學期選項 | `GET /club/activities/semesters` |
 | 草稿區 | `GET /club/activities?status=draft` |
 | 主列表 | `GET /club/activities?semester=&status=&type=&sort=&page=`(伺服器端分頁,每頁 20) |
+| 借用綁定用的已核准活動 | `GET /club/activities?status=approved&ended=false`(借用頁的下拉) |
 | 詳情 | `GET /club/activities/{id}` |
 | 送出 / 刪除草稿 | `POST /club/activities/{id}/submit`、`DELETE /club/activities/{id}` |
 | 文件下載 | `GET /club/activities/{id}/report-pdf`、`/reflections-pdf` |
@@ -30,7 +31,9 @@
 ## 規則
 
 - **排序、篩選、分頁全在後端**:排序白名單 `name`/`type`/`date`/`budget`/`status`(`budget` = 自籌+擬請補助逐項合計),類型與狀態漏斗以多值參數送出;同值以 id 降冪定序,換頁不會重複或漏列
-- 主列表明列七種狀態(不含草稿):不帶 `status` 時後端連草稿都會回,而草稿在上方獨立區
+- 主列表明列八種顯示狀態(不含草稿):不帶 `status` 時後端連草稿都會回,而草稿在上方獨立區
+- **`status` 篩的是畫面顯示的狀態**:已核准且逾期鎖定的列顯示成「已逾期」,後端的 `approved` 因此不含它們,`locked` 是獨立的一種(推導,非 `ActivityStatus` 成員);狀態排序也照流程順序(草稿→待審核→已核准→結案審核中→已結案→已退回),不是列舉字面值
+- 換頁/換條件時沿用上一份結果並淡化(`isPlaceholderData`),空狀態等抓取結束才顯示 —— 否則每次換頁都會閃一次「本學期尚無活動」
 
 - 狀態篩選以**顯示標籤**比對,三個審核關卡在社團端都顯示「待審核」,選單不出現重複項
 - `approved` 且 `close_locked` 在前端映射為顯示狀態 `locked`

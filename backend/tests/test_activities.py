@@ -537,6 +537,77 @@ async def test_closable_filter_matches_the_python_derivation(client, db):
     assert {a["name"] for a in rows if a["can_close"]} == {"可結案"}
 
 
+async def test_status_filter_uses_the_displayed_status(client, db):
+    """畫面把逾期鎖定的已核准列顯示成「已逾期」:狀態篩選要跟著同一條判定分開兩者。"""
+    await setup_session(client, db)
+    today = date.today()
+    fresh = await create_activity(
+        client, name="剛核准", date=(today - timedelta(days=3)).isoformat()
+    )
+    await approve(db, fresh["id"])
+    locked = await create_activity(
+        client, name="已逾期", date=(today - timedelta(days=63)).isoformat()
+    )
+    await approve(db, locked["id"])
+
+    resp = await client.get("/api/v1/club/activities", params={"status": "approved"})
+    assert [a["name"] for a in resp.json()["data"]] == ["剛核准"]
+    resp = await client.get("/api/v1/club/activities", params={"status": "locked"})
+    data = resp.json()["data"]
+    assert [a["name"] for a in data] == ["已逾期"]
+    assert data[0]["close_locked"] is True
+
+    # 多值取聯集:兩種一起選就是全部已核准的
+    resp = await client.get(
+        "/api/v1/club/activities", params=[("status", "approved"), ("status", "locked")]
+    )
+    assert {a["name"] for a in resp.json()["data"]} == {"剛核准", "已逾期"}
+    # 未知狀態 → 422(不是靜默不篩)
+    assert (
+        await client.get("/api/v1/club/activities", params={"status": "hack"})
+    ).status_code == 422
+
+
+async def test_ended_filter_for_the_booking_dropdown(client, db):
+    """借用綁定的活動下拉只要「還沒結束」的:條件與 can_close 的已結束那一半同源。"""
+    await setup_session(client, db)
+    today = date.today()
+    past = await create_activity(
+        client, name="已結束", date=(today - timedelta(days=1)).isoformat()
+    )
+    await approve(db, past["id"])
+    soon = await create_activity(
+        client, name="還沒結束", date=(today + timedelta(days=7)).isoformat()
+    )
+    await approve(db, soon["id"])
+
+    resp = await client.get(
+        "/api/v1/club/activities", params={"status": "approved", "ended": "false"}
+    )
+    assert [a["name"] for a in resp.json()["data"]] == ["還沒結束"]
+    resp = await client.get(
+        "/api/v1/club/activities", params={"status": "approved", "ended": "true"}
+    )
+    assert [a["name"] for a in resp.json()["data"]] == ["已結束"]
+
+
+async def test_status_sort_follows_the_workflow_order(client, db):
+    """狀態排序照流程順序;排列舉字面值的話 approved 會跑到待審核前面。"""
+    await setup_session(client, db)
+    draft = await create_activity(client, name="草稿")
+    approved = await create_activity(client, name="已核准")
+    await approve(db, approved["id"])
+    rejected = await create_activity(client, name="已退回")
+    await db.execute(
+        sa.update(Activity).where(Activity.id == rejected["id"]).values(status="rejected")
+    )
+    await db.commit()
+
+    resp = await client.get("/api/v1/club/activities", params={"sort": "status"})
+    assert [a["name"] for a in resp.json()["data"]] == ["草稿", "已核准", "已退回"]
+    assert draft["status"] == "draft"
+
+
 async def test_list_multi_value_type_and_budget_sort(client, db):
     """活動列表的篩選與排序全在後端:類型多選、經費欄=自籌+擬請補助合計。"""
     await setup_session(client, db)

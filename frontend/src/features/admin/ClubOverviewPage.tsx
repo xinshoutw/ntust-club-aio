@@ -274,9 +274,9 @@ export default function ClubOverviewPage() {
               <StatusPill status={m.status} />
             </div>
           ))}
-          {/* reviewQuery 是彈窗詳情:失敗在彈窗內沒有出口(見 issues.md),暫時仍在此處露出,
-              但不列入 trackedFailed —— 它不該讓這張卡的計數變 — 或吃掉空狀態 */}
-          <LoadError queries={[activitiesQuery, maintQuery, reviewQuery]} />
+          {/* reviewQuery 是彈窗詳情,失敗由彈窗自己說(見下方 detailError):
+              報在這張卡上等於把錯誤掛在與它無關的清單底下 */}
+          <LoadError queries={[activitiesQuery, maintQuery]} />
           {(canActivities || canMaint) && !trackedFailed && trackedCount === 0 && (
             <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
               尚無進行中的申請
@@ -353,6 +353,8 @@ export default function ClubOverviewPage() {
           key={reviewId}
           item={reviewItem ?? null}
           pendingName={reviewName}
+          detailError={reviewQuery.error}
+          onRetryDetail={() => void reviewQuery.refetch()}
           open={reviewOpen}
           onClose={() => setReviewOpen(false)}
           afterClose={() => setReviewId(null)}

@@ -498,6 +498,8 @@ export default function CloseReviewPage() {
         <ActivityReviewModal
           key={overdueItem.id}
           item={overdueDetailQuery.data ?? overdueItem}
+          detailError={overdueDetailQuery.error}
+          onRetryDetail={() => void overdueDetailQuery.refetch()}
           open={overdueOpen}
           onClose={() => setOverdueOpen(false)}
           afterClose={() => setOverdueItem(null)}

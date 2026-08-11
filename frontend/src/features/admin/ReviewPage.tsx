@@ -305,6 +305,8 @@ export default function ReviewPage() {
         <ActivityReviewModal
           key={current.id}
           item={detailQuery.data ?? current}
+          detailError={detailQuery.error}
+          onRetryDetail={() => void detailQuery.refetch()}
           open={open}
           onClose={() => setOpen(false)}
           afterClose={() => setCurrent(null)}

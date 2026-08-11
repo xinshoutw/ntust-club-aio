@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { App, Button, Checkbox, Input, InputNumber, Modal, Skeleton } from 'antd'
+import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import LargeBadge from '../../components/ui/LargeBadge'
 import { Cols } from '../../components/ui/tableControls'
@@ -67,6 +68,8 @@ export interface ActivityApprovePayload {
 export default function ActivityReviewModal({
   item,
   pendingName,
+  detailError,
+  onRetryDetail,
   open,
   onClose,
   afterClose,
@@ -76,6 +79,9 @@ export default function ActivityReviewModal({
   item: ReviewItem | null
   /** item 尚未載入時標題列顯示的名稱(通常=列表列的活動名) */
   pendingName?: string
+  /** 詳情查詢的錯誤:非 null 時內容改為錯誤呈現(Skeleton 沒有終點,不接就是永遠轉圈) */
+  detailError?: unknown
+  onRetryDetail?: () => void
   open: boolean
   onClose: () => void
   afterClose: () => void
@@ -207,7 +213,11 @@ export default function ActivityReviewModal({
         </div>
       }
       footer={
-        canReview ? (
+        // 看不到詳情就不給簽核鈕:核准要靠 detail 的 budget(否則整單核定 0 元),
+        // 退回也不該在讀不到申請內容的情況下按
+        detailError != null ? (
+          <div style={{ fontSize: 12, color: 'var(--steel)' }}>詳情載入失敗,請重試後再審核</div>
+        ) : canReview ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
             <Button danger style={{ height: 38 }} disabled={submitting} onClick={() => setRejectOpen(true)}>
               退回
@@ -237,10 +247,17 @@ export default function ActivityReviewModal({
         )
       }
     >
+      {/* 詳情載入失敗:整塊改為錯誤呈現。Skeleton 沒有終點,不接錯誤就是永遠轉圈;
+          而列表列那半份基本資料也不能留 —— 經費逐項與附件都不在,「地點 —」看起來就像沒填 */}
+      {detailError != null && (
+        <div style={{ marginTop: 8 }}>
+          <QueryError compact title="活動詳情載入失敗" error={detailError} onRetry={onRetryDetail} />
+        </div>
+      )}
       {/* 詳情未到位先鋪 Skeleton(彈窗立即開啟,內容漸進補齊) */}
-      {!item && <Skeleton active paragraph={{ rows: 6 }} style={{ marginTop: 8 }} />}
+      {!item && detailError == null && <Skeleton active paragraph={{ rows: 6 }} style={{ marginTop: 8 }} />}
       {/* 有經費才走雙欄:左=基本資料,右=經費逐項核定 */}
-      {item && (
+      {item && detailError == null && (
       <div
         style={{
           display: 'grid',

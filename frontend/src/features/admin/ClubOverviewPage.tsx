@@ -250,6 +250,7 @@ export default function ClubOverviewPage() {
               {trackedLoading && clubId != null ? '—' : trackedCount}
             </span>
           </div>
+          <LoadingBlock pending={trackedLoading && clubId != null} rows={3}>
           {!canActivities && !canMaint && <NoPermission />}
           {activities.map((a) => (
             <div key={`act-${a.id}`} className="click-tint" style={rowStyle} {...clickableProps(() => openActivity(a.id, a.name))}>
@@ -270,21 +271,22 @@ export default function ClubOverviewPage() {
             </div>
           ))}
           <LoadError queries={[activitiesQuery, maintQuery, reviewQuery]} />
-          {(canActivities || canMaint) && !trackedLoading && trackedCount === 0 && (
+          {(canActivities || canMaint) && trackedCount === 0 && (
             <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
               尚無進行中的申請
             </div>
           )}
+          </LoadingBlock>
         </div>
 
         <div className="card">
-        <LoadingBlock pending={bookingLoading}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 20px 12px' }}>
             <div style={{ fontSize: 15, fontWeight: 600 }}>借用中</div>
             <span className="num" style={{ fontSize: 12, background: '#EEF0F3', color: 'var(--steel)', borderRadius: 999, padding: '1px 8px' }}>
-              {bookingCount}
+              {bookingLoading ? '—' : bookingCount}
             </span>
           </div>
+          <LoadingBlock pending={bookingLoading} rows={3}>
           {!canRooms && !canBookings && <NoPermission />}
           {rooms.map((r) => (
             <div
@@ -329,12 +331,12 @@ export default function ClubOverviewPage() {
             </div>
           ))}
           <LoadError queries={[roomsQuery, venuesQuery, loansQuery, pendingRoomsQuery, approvedRoomsQuery]} />
-          {(canRooms || canBookings) && !bookingLoading && bookingCount === 0 && (
+          {(canRooms || canBookings) && bookingCount === 0 && (
             <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
               尚無借用中的場地或器材
             </div>
           )}
-        </LoadingBlock>
+          </LoadingBlock>
         </div>
       </div>
 

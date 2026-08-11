@@ -14,9 +14,11 @@ from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, not_found
 from app.models import Club, OfficerCertificate, PostalAccountChange
 from app.models.enums import ApplicationStatus
+from app.schemas.activities import FileOut
 from app.schemas.admin import AdminOfficerCertOut, AdminPostalChangeOut, ApplicationStatusIn
 from app.schemas.common import ApiResponse
 from app.services import audit, notify
+from app.services import files as file_service
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -95,11 +97,14 @@ async def list_postal_changes(
     )
 
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
-    rows = await db.execute(query.offset(page.offset).limit(page.page_size))
+    rows = (await db.execute(query.offset(page.offset).limit(page.page_size))).all()
+    # 存簿影本是核對局號帳號的依據,和單子一起回(整頁一次查,不逐列)
+    passbooks = await file_service.files_by_subject(db, "postal_change", [r.id for r, _ in rows])
     data = []
     for row, club_name in rows:
         out = AdminPostalChangeOut.model_validate(row)
         out.club_name = club_name
+        out.passbook = [FileOut.model_validate(f) for f in passbooks.get(row.id, [])]
         data.append(out)
     return ApiResponse(data=data, meta=page.meta(total or 0))
 

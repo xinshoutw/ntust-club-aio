@@ -4,6 +4,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols } from '../../components/ui/tableControls'
+import { fileDownloadUrl } from '../../api/adminFiles'
 import {
   NEXT_STATUS,
   useAdminOfficerCerts,
@@ -129,7 +130,7 @@ export default function AdminApplicationsPage() {
           <div style={{ padding: '14px 16px 0', fontSize: 15, fontWeight: 600 }}>郵局帳戶異動</div>
           <table className="tb dense fixed" style={{ minWidth: 860 }}>
             {/* 社團截斷、事由吃剩餘寬且允許換行;戶名/帳號/代理人/申請日/狀態固定 px */}
-            <Cols widths={['14%', 'auto', 100, 130, 130, 96, 150]} />
+            <Cols widths={['14%', 'auto', 100, 130, 130, 110, 96, 150]} />
             <thead>
               <tr>
                 <th>社團</th>
@@ -137,6 +138,7 @@ export default function AdminApplicationsPage() {
                 <th>戶名</th>
                 <th>局號帳號</th>
                 <th>新代理人</th>
+                <th>存簿影本</th>
                 <th>申請日</th>
                 <th>狀態</th>
               </tr>
@@ -157,6 +159,19 @@ export default function AdminApplicationsPage() {
                       '—'
                     )}
                   </td>
+                  {/* 承辦要核對局號帳號,存簿影本不該只在檔案管理找得到 */}
+                  <td className="cell-clip" style={{ fontSize: 13 }} title={p.passbook.map((f) => f.name).join('、')}>
+                    {p.passbook.length
+                      ? p.passbook.map((f, i) => (
+                          <span key={f.id}>
+                            {i > 0 && ' · '}
+                            <a href={fileDownloadUrl(f.id)} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--focus)' }}>
+                              {f.name}
+                            </a>
+                          </span>
+                        ))
+                      : <span style={{ color: 'var(--steel)' }}>—</span>}
+                  </td>
                   <td className="num" style={{ fontSize: 13 }}>{p.date}</td>
                   <td>
                     <StatusCell kind="postal" id={p.id} status={p.status} name={`${p.club} ${p.accountName}`} />
@@ -165,14 +180,14 @@ export default function AdminApplicationsPage() {
               ))}
               {postalQuery.isError && (
                 <tr className="no-hover">
-                  <td colSpan={7}>
+                  <td colSpan={8}>
                     <QueryError compact title="郵局帳戶異動載入失敗" error={postalQuery.error} onRetry={() => postalQuery.refetch()} />
                   </td>
                 </tr>
               )}
               {!postalQuery.isPending && !postalQuery.isError && postals.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有郵局帳戶異動申請</td>
+                  <td colSpan={8} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有郵局帳戶異動申請</td>
                 </tr>
               )}
             </tbody>

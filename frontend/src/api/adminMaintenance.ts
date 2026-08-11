@@ -14,6 +14,11 @@ export const NEXT_STATUS: Partial<Record<MaintenanceStatus, MaintenanceStatus>> 
   in_progress: 'done',
 }
 
+export interface EvidenceFile {
+  id: string
+  name: string
+}
+
 export interface MaintenanceItem {
   id: number
   club: string
@@ -22,6 +27,8 @@ export interface MaintenanceItem {
   date: string // 申請日 YYYY/MM/DD
   status: MaintenanceStatus
   handleNote?: string
+  /** 佐證照片/影片(未歸檔者;下載走 GET /files/{id}) */
+  evidence: EvidenceFile[]
 }
 
 interface AdminMaintenanceOut {
@@ -32,6 +39,7 @@ interface AdminMaintenanceOut {
   status: MaintenanceStatus
   handle_note: string | null
   created_at: string
+  evidence: { id: string; original_name: string }[]
 }
 
 const toItem = (m: AdminMaintenanceOut): MaintenanceItem => ({
@@ -42,6 +50,7 @@ const toItem = (m: AdminMaintenanceOut): MaintenanceItem => ({
   date: dayjs(m.created_at).format('YYYY/MM/DD'),
   status: m.status,
   handleNote: m.handle_note ?? undefined,
+  evidence: (m.evidence ?? []).map((f) => ({ id: f.id, name: f.original_name })),
 })
 
 const keys = {

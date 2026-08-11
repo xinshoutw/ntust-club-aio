@@ -11,6 +11,7 @@ import hashlib
 import logging
 import shutil
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -376,6 +377,28 @@ async def total_uploaded(
         )
         or 0
     )
+
+
+async def files_by_subject(
+    db: AsyncSession, subject_type: str, subject_ids: Sequence[int]
+) -> dict[int, list[File]]:
+    """一批單子的附件(未歸檔),依 subject_id 分組。逐列查會是清單頁的 N+1。"""
+    ids = list(subject_ids)
+    if not ids:
+        return {}
+    rows = await db.scalars(
+        sa.select(File)
+        .where(
+            File.subject_type == subject_type,
+            File.subject_id.in_(ids),
+            File.archived_at.is_(None),
+        )
+        .order_by(File.created_at)
+    )
+    grouped: dict[int, list[File]] = {sid: [] for sid in ids}
+    for file in rows:
+        grouped[file.subject_id].append(file)
+    return grouped
 
 
 async def can_access(db: AsyncSession, file: File, user: User) -> bool:

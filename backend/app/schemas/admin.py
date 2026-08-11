@@ -14,6 +14,7 @@ from app.models.enums import (
     ViolationStatus,
 )
 from app.schemas.accounts import _USERNAME_RE
+from app.schemas.activities import FileOut
 from app.schemas.bookings import RoomSlotOut
 from app.services.scoring import AD_KEYS, AD_MAX
 
@@ -172,6 +173,7 @@ class AdminMaintenanceOut(BaseModel):
     status: MaintenanceStatus
     handle_note: str | None
     created_at: datetime
+    evidence: list[FileOut] = []  # 佐證照片/影片:報修最主要的判斷依據
 
 
 # ---- 線上申請管理(/admin/applications,權限鍵 aapply) ----
@@ -203,6 +205,7 @@ class AdminPostalChangeOut(BaseModel):
     new_agent_phone: str | None  # 行政端顯示完整電話(承辦需聯絡代理人)
     status: ApplicationStatus
     created_at: datetime
+    passbook: list[FileOut] = []  # 存簿影本(承辦核對局號帳號的依據)
 
 
 class ApplicationStatusIn(BaseModel):

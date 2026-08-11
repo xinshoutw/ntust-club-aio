@@ -34,6 +34,8 @@ export interface PostalChangeRow {
   newAgentPhone?: string
   date: string
   status: ApplicationStatus
+  /** 存簿影本(未歸檔者;下載走 GET /files/{id}) */
+  passbook: { id: string; name: string }[]
 }
 
 interface AdminOfficerCertOut {
@@ -56,6 +58,7 @@ interface AdminPostalChangeOut {
   new_agent_phone: string | null
   status: ApplicationStatus
   created_at: string
+  passbook: { id: string; original_name: string }[]
 }
 
 const toCertRow = (c: AdminOfficerCertOut): OfficerCertRow => ({
@@ -78,6 +81,7 @@ const toPostalRow = (p: AdminPostalChangeOut): PostalChangeRow => ({
   newAgentPhone: p.new_agent_phone ?? undefined,
   date: dayjs(p.created_at).format('YYYY/MM/DD'),
   status: p.status,
+  passbook: (p.passbook ?? []).map((f) => ({ id: f.id, name: f.original_name })),
 })
 
 const keys = {

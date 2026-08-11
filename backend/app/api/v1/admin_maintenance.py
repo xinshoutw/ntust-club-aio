@@ -14,9 +14,11 @@ from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, not_found
 from app.models import Club, MaintenanceRequest
 from app.models.enums import MaintenanceStatus
+from app.schemas.activities import FileOut
 from app.schemas.admin import AdminMaintenanceOut, MaintenanceStatusIn
 from app.schemas.common import ApiResponse
 from app.services import audit, notify
+from app.services import files as file_service
 
 router = APIRouter(prefix="/admin/maintenance", tags=["admin"])
 
@@ -60,11 +62,14 @@ async def list_maintenance(
         )
 
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
-    rows = await db.execute(query.offset(page.offset).limit(page.page_size))
+    rows = (await db.execute(query.offset(page.offset).limit(page.page_size))).all()
+    # 佐證照片/影片是判斷依據,和單子一起回(整頁一次查,不逐列)
+    evidence = await file_service.files_by_subject(db, "maintenance", [r.id for r, _ in rows])
     data = []
     for req, club_name in rows:
         out = AdminMaintenanceOut.model_validate(req)
         out.club_name = club_name
+        out.evidence = [FileOut.model_validate(f) for f in evidence.get(req.id, [])]
         data.append(out)
     return ApiResponse(data=data, meta=page.meta(total or 0))
 

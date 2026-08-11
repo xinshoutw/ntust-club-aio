@@ -2,7 +2,7 @@
 
 import sqlalchemy as sa
 
-from app.models import AuditLog, OfficerCertificate, PostalAccountChange
+from app.models import AuditLog, File, OfficerCertificate, PostalAccountChange, User
 from app.models.enums import CertPosition
 from tests.conftest import csrf_headers, login, make_club, make_user
 
@@ -82,6 +82,30 @@ async def test_officer_cert_status_flow(client, db):
 
     actions = set(await db.scalars(sa.select(AuditLog.action)))
     assert "officer_cert_status_updated" in actions
+
+
+async def test_postal_change_carries_the_passbook(client, db):
+    """存簿影本是核對局號帳號的依據:單子上就要看得到。"""
+    club, _, postal = await seed(client, db)
+    admin = await db.scalar(sa.select(User).where(User.username == "applyadmin"))
+    db.add(
+        File(
+            club_id=club.id,
+            uploaded_by=admin.id,
+            original_name="存簿.jpg",
+            size=100,
+            mime="image/jpeg",
+            sha256="c" * 64,
+            path="postal/2026/08/c",
+            subject_type="postal_change",
+            subject_id=postal.id,
+            slot="passbook",
+        )
+    )
+    await db.commit()
+
+    data = (await client.get(POSTAL_URL)).json()["data"]
+    assert [f["original_name"] for f in data[0]["passbook"]] == ["存簿.jpg"]
 
 
 async def test_postal_change_status_flow(client, db):

@@ -17,6 +17,7 @@ import {
   type MaintenanceItem,
   type MaintenanceStatus,
 } from '../../api/adminMaintenance'
+import { fileDownloadUrl } from '../../api/adminFiles'
 
 const STATUS_ORDER: Record<MaintenanceStatus, number> = { pending: 0, in_progress: 1, done: 2 }
 const STATUS_LABELS: Record<MaintenanceStatus, string> = {
@@ -75,12 +76,13 @@ export default function AdminMaintenancePage() {
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
           <table className="tb dense fixed" style={{ minWidth: 760 }}>
             {/* 社團/地點截斷、項目吃剩餘寬且允許換行;申請日/狀態固定 px(狀態含單步推進下拉) */}
-            <Cols widths={['18%', '18%', 'auto', 96, 150]} />
+            <Cols widths={['18%', '18%', 'auto', 150, 96, 150]} />
             <thead>
               <tr>
                 <th>社團</th>
                 <th><MultiSortButton label="地點" sortKey="location" entries={entries} onToggle={toggle} /></th>
                 <th>項目</th>
+                <th>佐證</th>
                 <th><MultiSortButton label="申請日" sortKey="date" entries={entries} onToggle={toggle} /></th>
                 <th>狀態</th>
               </tr>
@@ -91,6 +93,19 @@ export default function AdminMaintenancePage() {
                   <td className="cell-clip" title={q.club}>{q.club}</td>
                   <td className="cell-clip" title={q.location} style={{ fontWeight: 500 }}>{q.location}</td>
                   <td style={{ fontSize: 13, color: 'var(--steel)' }}>{q.items}</td>
+                  {/* 照片/影片是最主要的判斷依據,不該只在檔案管理找得到 */}
+                  <td className="cell-clip" style={{ fontSize: 13 }} title={q.evidence.map((f) => f.name).join('、')}>
+                    {q.evidence.length
+                      ? q.evidence.map((f, i) => (
+                          <span key={f.id}>
+                            {i > 0 && ' · '}
+                            <a href={fileDownloadUrl(f.id)} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--focus)' }}>
+                              {f.name}
+                            </a>
+                          </span>
+                        ))
+                      : <span style={{ color: 'var(--steel)' }}>—</span>}
+                  </td>
                   <td className="num" style={{ fontSize: 13 }}>{q.date}</td>
                   <td>
                     {q.status === 'done' ? (
@@ -115,7 +130,7 @@ export default function AdminMaintenancePage() {
               ))}
               {listQuery.isError && (
                 <tr className="no-hover">
-                  <td colSpan={5}>
+                  <td colSpan={6}>
                     <QueryError
                       compact
                       title="維修申請載入失敗"
@@ -127,7 +142,7 @@ export default function AdminMaintenancePage() {
               )}
               {!listQuery.isPending && !listQuery.isError && rows.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有維修申請</td>
+                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有維修申請</td>
                 </tr>
               )}
             </tbody>

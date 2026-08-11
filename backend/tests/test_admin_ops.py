@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 import sqlalchemy as sa
 
 from app.core.semesters import TAIPEI
-from app.models import AuditLog, MaintenanceRequest
+from app.models import AuditLog, File, MaintenanceRequest, User
 from tests.conftest import csrf_headers, login, make_club, make_user
 
 # ---- 維修管理 ----
@@ -40,6 +40,48 @@ async def seed_maintenance(client, db):
     )
     await db.commit()
     return rows
+
+
+async def test_maintenance_carries_its_evidence(client, db):
+    """佐證照片/影片是判斷依據:列表就要帶,不必再到檔案管理翻。"""
+    rows = await seed_maintenance(client, db)
+    admin = await db.scalar(sa.select(User).where(User.username == "maintadmin"))
+    db.add_all(
+        [
+            File(
+                club_id=rows[1].club_id,
+                uploaded_by=admin.id,
+                original_name="漏水.jpg",
+                size=100,
+                mime="image/jpeg",
+                sha256="a" * 64,
+                path="repair/2026/08/a",
+                subject_type="maintenance",
+                subject_id=rows[1].id,
+                slot="evidence",
+            ),
+            # 已歸檔的檔案已離盤,不該再出現在單子上
+            File(
+                club_id=rows[1].club_id,
+                uploaded_by=admin.id,
+                original_name="舊檔.jpg",
+                size=100,
+                mime="image/jpeg",
+                sha256="b" * 64,
+                path="repair/2026/01/b",
+                subject_type="maintenance",
+                subject_id=rows[1].id,
+                slot="evidence",
+                archived_at=datetime.now(UTC),
+            ),
+        ]
+    )
+    await db.commit()
+
+    data = (await client.get("/api/v1/admin/maintenance")).json()["data"]
+    by_location = {d["location"]: d for d in data}
+    assert [f["original_name"] for f in by_location["社辦 S207"]["evidence"]] == ["漏水.jpg"]
+    assert by_location["練團室"]["evidence"] == []
 
 
 async def test_maintenance_default_order_and_sort(client, db):

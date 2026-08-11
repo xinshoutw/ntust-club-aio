@@ -156,8 +156,40 @@ async def test_invalid_key_and_permission_guard(client, db):
 
 
 async def test_list_clubs_scores(client, db):
+    """一次算一批社團,每社仍取自己的資料(批次彙整若錯把某社的值套給全部,這裡會紅)。"""
     club = await seed(client, db)
+    plain = await make_club(db, name="無網頁社")  # 沒有網頁 → ad6 0 分
     await login(client, "evaladmin")
     data = (await client.get("/api/v1/admin/eval/clubs")).json()["data"]
-    assert data[0]["club_name"] == club.name
-    assert data[0]["total"] == 5  # 只有 ad6 網頁 5 分
+    totals = {row["club_name"]: row["total"] for row in data}
+    assert totals == {club.name: 5, plain.name: 0}  # 只有前者有 ad6 網頁 5 分
+
+
+async def test_list_clubs_round_trips_do_not_grow_with_club_count(client, db):
+    """行政分總覽逐社重算會是「社團數 × 十幾次往返」;批次彙整後往返次數與社團數無關。"""
+    import sqlalchemy as sa
+
+    from app.core.db import engine
+
+    await seed(client, db)
+    await login(client, "evaladmin")
+
+    statements: list[str] = []
+
+    def record(conn, cursor, statement, *rest):
+        statements.append(statement)
+
+    sa.event.listen(engine.sync_engine, "before_cursor_execute", record)
+    try:
+        await client.get("/api/v1/admin/eval/clubs")
+        with_one_club = len(statements)
+
+        for i in range(4):
+            await make_club(db, name=f"社團{i}")
+        statements.clear()
+        await client.get("/api/v1/admin/eval/clubs")
+        with_five_clubs = len(statements)
+    finally:
+        sa.event.remove(engine.sync_engine, "before_cursor_execute", record)
+
+    assert with_five_clubs == with_one_club

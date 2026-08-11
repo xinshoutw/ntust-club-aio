@@ -1,5 +1,6 @@
 """評鑑資料彙整:從來源表即時推導 scoring 輸入(行政分不落表)。"""
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import Any
@@ -72,29 +73,72 @@ def _window_semesters(window: EvalWindow) -> list[str]:
 
 
 async def gather_scoring_input(db: AsyncSession, club_id: int, window: EvalWindow) -> ScoringInput:
-    club = await db.get(Club, club_id)
+    return (await gather_scoring_inputs(db, [club_id], window))[club_id]
+
+
+async def gather_scoring_inputs(
+    db: AsyncSession, club_ids: Sequence[int], window: EvalWindow
+) -> dict[int, ScoringInput]:
+    """一批社團一起彙整:每個來源各一次查詢。
+
+    逐社呼叫 gather_scoring_input 會是「社團數 × 十幾次往返」,全校規模等於上千次。
+    """
+    ids = list(dict.fromkeys(club_ids))
+    if not ids:
+        return {}
+
+    websites = dict(
+        (await db.execute(sa.select(Club.id, Club.website_url).where(Club.id.in_(ids)))).all()
+    )
 
     closed_rows = (
         await db.scalars(
             sa.select(Activity).where(
-                Activity.club_id == club_id,
+                Activity.club_id.in_(ids),
                 Activity.status == ActivityStatus.CLOSED,
                 Activity.date >= window.start,
                 Activity.date <= window.end,
             )
         )
     ).all()
-    closed = tuple(
-        ClosedActivity(
-            id=a.id,
-            name=a.name,
-            date=a.date.strftime("%Y/%m/%d"),
-            large=bool(a.is_large and a.is_large_approved),
+    closed: dict[int, list[ClosedActivity]] = {cid: [] for cid in ids}
+    activity_ids_of: dict[int, list[int]] = {cid: [] for cid in ids}
+    for a in closed_rows:
+        closed[a.club_id].append(
+            ClosedActivity(
+                id=a.id,
+                name=a.name,
+                date=a.date.strftime("%Y/%m/%d"),
+                large=bool(a.is_large and a.is_large_approved),
+            )
         )
-        for a in closed_rows
-    )
+        activity_ids_of[a.club_id].append(a.id)
 
-    activity_ids = [a.id for a in closed_rows]
+    results_of = await _activity_results(db, [a.id for a in closed_rows])
+    roster = await _roster_counts(db, ids, window)
+    leader_meetings = await _attended_by_club(db, ids, window, SignupKind.LEADER_MEETING)
+    cadre = await _attended_by_club(db, ids, window, SignupKind.CADRE_TRAINING)
+    violations = await _violation_counts(db, ids, window)
+    merits = await _merit_by_club(db, ids, window.year)
+
+    return {
+        cid: ScoringInput(
+            closed=tuple(closed[cid]),
+            results=tuple(results_of[aid] for aid in activity_ids_of[cid]),
+            roster_by_semester=roster[cid],
+            has_website=bool(websites.get(cid)),
+            leader_meeting_sessions=leader_meetings.get(cid, 0),
+            cadre_training_attended=cadre.get(cid, 0) > 0,
+            violation_count=violations.get(cid, 0),
+            merit=merits.get(cid, 0),
+        )
+        for cid in ids
+    }
+
+
+async def _activity_results(
+    db: AsyncSession, activity_ids: Sequence[int]
+) -> dict[int, ActivityResult]:
     photo_counts: dict[int, int] = {}
     reports: dict[int, ActivityReport] = {}
     reflection_counts: dict[int, int] = {}
@@ -127,8 +171,8 @@ async def gather_scoring_input(db: AsyncSession, club_id: int, window: EvalWindo
         report = reports.get(aid)
         return bool(getattr(report, field)) if report is not None else False
 
-    results = tuple(
-        ActivityResult(
+    return {
+        aid: ActivityResult(
             activity_id=aid,
             photo_count=photo_counts.get(aid, 0) if _confirmed(aid, "photos_confirmed") else 0,
             has_video_link=(
@@ -142,108 +186,102 @@ async def gather_scoring_input(db: AsyncSession, club_id: int, window: EvalWindo
             ),
         )
         for aid in activity_ids
+    }
+
+
+async def _roster_counts(
+    db: AsyncSession, club_ids: Sequence[int], window: EvalWindow
+) -> dict[int, dict[str, int]]:
+    """ad5 名單快照按學期保存(club_members.semester),存在即視為該學期有維護名單。"""
+    labels = _window_semesters(window)
+    roster = {cid: dict.fromkeys(labels, 0) for cid in club_ids}
+    rows = await db.execute(
+        sa.select(ClubMember.club_id, ClubMember.semester, sa.func.count())
+        .where(ClubMember.club_id.in_(club_ids), ClubMember.semester.in_(labels))
+        .group_by(ClubMember.club_id, ClubMember.semester)
     )
+    for club_id, semester, count in rows.all():
+        roster[club_id][semester] = count
+    return roster
 
-    # ad5 名單快照按學期保存(club_members.semester),存在即視為該學期有維護名單
-    roster: dict[str, int] = {}
-    for label in _window_semesters(window):
-        roster[label] = (
-            await db.scalar(
-                sa.select(sa.func.count()).where(
-                    ClubMember.club_id == club_id,
-                    ClubMember.semester == label,
-                )
-            )
-            or 0
+
+async def _attended_by_club(
+    db: AsyncSession, club_ids: Sequence[int], window: EvalWindow, kind: SignupKind
+) -> dict[int, int]:
+    """ad7/ad8 皆以管理員活動後登錄之「簽到」為準,僅報名不計分;
+    採計範圍=場次日期落在評鑑視窗(推導不儲存)。"""
+    rows = await db.execute(
+        sa.select(SessionAttendance.club_id, sa.func.count())
+        .select_from(SessionAttendance)
+        .join(SignupItemSession, SessionAttendance.session_id == SignupItemSession.id)
+        .join(SignupItem, SignupItemSession.item_id == SignupItem.id)
+        .where(
+            SignupItem.kind == kind,
+            SignupItemSession.date >= window.start,
+            SignupItemSession.date <= window.end,
+            SessionAttendance.club_id.in_(club_ids),
+            SessionAttendance.attended.is_(True),
         )
-
-    # ad7/ad8 皆以管理員活動後登錄之「簽到」為準,僅報名不計分;
-    # 採計範圍=場次日期落在評鑑視窗(推導不儲存)
-    async def _attended_sessions(kind: SignupKind) -> int:
-        return (
-            await db.scalar(
-                sa.select(sa.func.count())
-                .select_from(SessionAttendance)
-                .join(SignupItemSession, SessionAttendance.session_id == SignupItemSession.id)
-                .join(SignupItem, SignupItemSession.item_id == SignupItem.id)
-                .where(
-                    SignupItem.kind == kind,
-                    SignupItemSession.date >= window.start,
-                    SignupItemSession.date <= window.end,
-                    SessionAttendance.club_id == club_id,
-                    SessionAttendance.attended.is_(True),
-                )
-            )
-            or 0
-        )
-
-    # ad7 負責人會議:每場簽到 1.25 分(全學年 4 場滿分,由 scoring 封頂)
-    leader_meeting_sessions = await _attended_sessions(SignupKind.LEADER_MEETING)
-    # ad8 幹訓:任一場次簽到即滿分
-    cadre_attended = await _attended_sessions(SignupKind.CADRE_TRAINING) > 0
-
-    violation_count = (
-        await db.scalar(
-            sa.select(sa.func.count()).where(
-                Violation.club_id == club_id,
-                Violation.status == ViolationStatus.OPEN,
-                Violation.occurred_on >= window.start,
-                Violation.occurred_on <= window.end,
-            )
-        )
-        or 0
+        .group_by(SessionAttendance.club_id)
     )
+    return dict(rows.all())
 
-    merit = 0
-    merit_row = await _latest_adjustment(db, club_id, window.year, AdjustmentKind.MERIT_BONUS)
-    if merit_row is not None:
-        merit = int(merit_row.value.get("score", 0))
 
-    return ScoringInput(
-        closed=closed,
-        results=results,
-        roster_by_semester=roster,
-        has_website=bool(club.website_url),
-        leader_meeting_sessions=leader_meeting_sessions,
-        cadre_training_attended=cadre_attended,
-        violation_count=violation_count,
-        merit=merit,
+async def _violation_counts(
+    db: AsyncSession, club_ids: Sequence[int], window: EvalWindow
+) -> dict[int, int]:
+    rows = await db.execute(
+        sa.select(Violation.club_id, sa.func.count())
+        .where(
+            Violation.club_id.in_(club_ids),
+            Violation.status == ViolationStatus.OPEN,
+            Violation.occurred_on >= window.start,
+            Violation.occurred_on <= window.end,
+        )
+        .group_by(Violation.club_id)
     )
+    return dict(rows.all())
 
 
-async def _latest_adjustment(
-    db: AsyncSession, club_id: int, year: int, kind: AdjustmentKind, key: str | None = None
-) -> EvalAdjustment | None:
-    query = (
+async def _merit_by_club(db: AsyncSession, club_ids: Sequence[int], year: int) -> dict[int, int]:
+    """表現優良加分:每社取最新未註銷的一筆(id 升冪掃過,後者覆蓋前者)。"""
+    rows = await db.scalars(
         sa.select(EvalAdjustment)
         .where(
-            EvalAdjustment.club_id == club_id,
+            EvalAdjustment.club_id.in_(club_ids),
             EvalAdjustment.year == year,
-            EvalAdjustment.kind == kind,
+            EvalAdjustment.kind == AdjustmentKind.MERIT_BONUS,
             EvalAdjustment.revoked_at.is_(None),
         )
-        .order_by(EvalAdjustment.id.desc())
+        .order_by(EvalAdjustment.id)
     )
-    if key is not None:
-        query = query.where(EvalAdjustment.value["key"].as_string() == key)
-    return await db.scalar(query.limit(1))
+    return {row.club_id: int(row.value.get("score", 0)) for row in rows}
 
 
 async def get_overrides(db: AsyncSession, club_id: int, year: int) -> dict[str, float]:
     """行政分逐項調整(admin_score_override):每個 ad key 取最新未註銷值。"""
+    return (await get_overrides_by_club(db, [club_id], year))[club_id]
+
+
+async def get_overrides_by_club(
+    db: AsyncSession, club_ids: Sequence[int], year: int
+) -> dict[int, dict[str, float]]:
+    ids = list(dict.fromkeys(club_ids))
+    if not ids:
+        return {}
     rows = await db.scalars(
         sa.select(EvalAdjustment)
         .where(
-            EvalAdjustment.club_id == club_id,
+            EvalAdjustment.club_id.in_(ids),
             EvalAdjustment.year == year,
             EvalAdjustment.kind == AdjustmentKind.ADMIN_SCORE_OVERRIDE,
             EvalAdjustment.revoked_at.is_(None),
         )
         .order_by(EvalAdjustment.id)
     )
-    overrides: dict[str, Any] = {}
+    overrides: dict[int, dict[str, Any]] = {cid: {} for cid in ids}
     for row in rows:
         key = row.value.get("key")
         if key:
-            overrides[key] = row.value.get("score")
+            overrides[row.club_id][key] = row.value.get("score")
     return overrides

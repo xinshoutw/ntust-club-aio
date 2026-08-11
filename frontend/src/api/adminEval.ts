@@ -8,13 +8,13 @@ import type { AdKey, FinalScore } from '../features/eval/scoring'
 
 // ---- 後端 shape(backend/app/api/v1/admin_eval.py)----
 
+// 總覽只回總分:逐項明細各社 9 列 × 全校社團數,清單頁一列也用不到
 interface AdminEvalClubOut {
   club_id: number
   club_name: string
   attribute: string | null
   year: number
   total: number
-  scores: AdScoreOut[]
 }
 
 interface AdjustmentOut {

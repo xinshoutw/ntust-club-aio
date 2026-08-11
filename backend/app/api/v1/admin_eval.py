@@ -43,23 +43,31 @@ async def _club_scores(db, club_id: int) -> tuple[list[AdScoreOut], float, int]:
 
 @router.get("/clubs")
 async def list_clubs(user: EvalAdmin, db: DbDep) -> ApiResponse[list[dict]]:
+    """各社行政分總覽:只回總分,逐項明細由 /clubs/{id} 供應。
+
+    每個來源各查一次(見 evaluation.gather_scoring_inputs),往返次數不隨社團數成長。
+    """
     clubs = (
         await db.scalars(sa.select(Club).where(Club.is_active.is_(True)).order_by(Club.name))
     ).all()
-    data = []
-    for club in clubs:
-        scores, total, year = await _club_scores(db, club.id)
-        data.append(
+    window = await evaluation.get_eval_window(db)
+    club_ids = [c.id for c in clubs]
+    inputs = await evaluation.gather_scoring_inputs(db, club_ids, window)
+    overrides = await evaluation.get_overrides_by_club(db, club_ids, window.year)
+    return ApiResponse(
+        data=[
             {
                 "club_id": club.id,
                 "club_name": club.name,
                 "attribute": club.attribute.value if club.attribute else None,
-                "year": year,
-                "total": total,
-                "scores": [s.model_dump() for s in scores],
+                "year": window.year,
+                "total": total_of(
+                    apply_overrides(compute_ad_scores(inputs[club.id]), overrides[club.id])
+                ),
             }
-        )
-    return ApiResponse(data=data)
+            for club in clubs
+        ]
+    )
 
 
 @router.get("/clubs/{club_id}")

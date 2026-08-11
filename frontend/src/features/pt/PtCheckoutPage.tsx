@@ -127,6 +127,13 @@ export default function PtCheckoutPage() {
                 {selected.start} – {selected.end}
               </span>
             </div>
+            {/* 現場點交要看得到用途與聯絡人:器材對不上時得當場打電話 */}
+            <div style={{ fontSize: 13, color: 'var(--steel)' }}>
+              用途:{selected.purpose || '—'}
+              <span className="num" style={{ marginLeft: 12 }}>
+                聯絡電話:{selected.phone || '—'}
+              </span>
+            </div>
             <div>
               <div style={{ fontSize: 13, marginBottom: 4 }}>借用人姓名</div>
               <Input

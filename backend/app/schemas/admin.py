@@ -337,6 +337,7 @@ class AdminVenueBookingOut(BaseModel):
     date: date
     periods: list[str]
     purpose: str
+    phone: str | None = None  # 申請時填的聯絡人電話(審核與點交都要聯絡得到人)
     status: BookingStatus
     created_at: datetime
 
@@ -355,6 +356,7 @@ class AdminEquipmentLoanOut(BaseModel):
     start_date: date
     end_date: date
     purpose: str
+    phone: str | None = None  # 申請時填的聯絡人電話(審核與點交都要聯絡得到人)
     status: LoanStatus
     created_at: datetime
     overdue: bool = False  # 推導:結束日之隔天上班日 10:30 未歸還

@@ -170,6 +170,13 @@ export default function BookingReviewModal({
           </>
         )}
         <div style={detailLabel}>用途</div><div>{(item.kind === 'room' ? item.data.note : item.data.purpose) || '—'}</div>
+        {/* 固定借用的申請表沒有電話欄,只有臨時場地與器材填得到聯絡人 */}
+        {item.kind !== 'room' && (
+          <>
+            <div style={detailLabel}>聯絡電話</div>
+            <div className="num">{item.data.phone || '—'}</div>
+          </>
+        )}
       </div>
 
       {/* 器材可借數檢核:後端以本單借用區間推導可借數(排除本單自身),不足時提醒;僅審核中需要 */}

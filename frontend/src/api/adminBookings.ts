@@ -83,6 +83,7 @@ export interface AdminVenueBooking {
   date: string // YYYY/MM/DD
   periods: string[]
   purpose: string
+  phone: string
   activity?: string
   status: StatusKey
 }
@@ -98,6 +99,7 @@ interface AdminVenueBookingOut {
   date: string
   periods: string[]
   purpose: string
+  phone: string | null
   status: 'pending' | 'approved' | 'rejected'
   created_at: string
 }
@@ -110,6 +112,7 @@ const toVenueBooking = (b: AdminVenueBookingOut): AdminVenueBooking => ({
   date: toDisplayDate(b.date),
   periods: b.periods,
   purpose: b.purpose,
+  phone: b.phone ?? '',
   activity: b.activity_name ?? undefined,
   status: b.status,
 })
@@ -127,6 +130,7 @@ export interface AdminEquipmentLoan {
   startDate: string // YYYY/MM/DD
   endDate: string // YYYY/MM/DD
   purpose: string
+  phone: string
   status: StatusKey
   availableExcludingSelf?: number
 }
@@ -143,6 +147,7 @@ interface AdminEquipmentLoanOut {
   start_date: string
   end_date: string
   purpose: string
+  phone: string | null
   status: 'pending' | 'approved' | 'rejected' | 'checked_out' | 'returned'
   created_at: string
   overdue: boolean
@@ -159,6 +164,7 @@ const toEquipmentLoan = (l: AdminEquipmentLoanOut): AdminEquipmentLoan => ({
   startDate: toDisplayDate(l.start_date),
   endDate: toDisplayDate(l.end_date),
   purpose: l.purpose,
+  phone: l.phone ?? '',
   status: l.overdue ? 'overdue' : l.status, // 逾期為推導旗標,顯示上視為狀態
   availableExcludingSelf: l.available_excluding_self ?? undefined,
 })

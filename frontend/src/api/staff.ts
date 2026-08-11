@@ -78,7 +78,9 @@ export interface StaffLoan {
   start: string // YYYY/MM/DD
   end: string
   purpose: string
+  phone: string // 申請時填的聯絡人電話(手動借用可能為空)
   borrower?: string // 借出點交時登記
+  serials: string[] // 借出時逐件登記的序號(歸還點交照這份核對)
   overdue: boolean
   due: string // 應歸還時限 YYYY/MM/DD HH:mm(結束日之隔天上班日;後端推導)
   daysLate: number // 已逾天數(台北時區日差;未逾期為 0)
@@ -93,8 +95,10 @@ interface StaffLoanOut {
   start_date: string
   end_date: string
   purpose: string
+  phone: string | null
   status: string
   borrower_name: string | null
+  serials: string[] | null
   overdue: boolean
   overdue_deadline: string | null
 }
@@ -116,7 +120,9 @@ const toLoan = (l: StaffLoanOut): StaffLoan => ({
   start: dayjs(l.start_date).format('YYYY/MM/DD'),
   end: dayjs(l.end_date).format('YYYY/MM/DD'),
   purpose: l.purpose,
+  phone: l.phone ?? '',
   borrower: l.borrower_name ?? undefined,
+  serials: l.serials ?? [],
   overdue: l.overdue,
   due: l.overdue_deadline ? dayjs(l.overdue_deadline).format('YYYY/MM/DD HH:mm') : '',
   daysLate: l.overdue_deadline ? daysLate(l.overdue_deadline) : 0,

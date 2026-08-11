@@ -108,7 +108,8 @@ async def test_venue_list_and_review_flow(client, db):
                      date=date(2026, 3, 7), periods=["3", "4"], purpose="擺攤",
                      status="approved"),
         VenueBooking(club_id=club.id, venue_id=venue.id, activity_id=activity.id,
-                     date=date(2026, 3, 5), periods=["5"], purpose="彩排"),
+                     date=date(2026, 3, 5), periods=["5"], purpose="彩排",
+                     phone="0912-345678"),
         VenueBooking(club_id=other_club.id, venue_id=venue.id, activity_id=None,
                      date=date(2026, 3, 6), periods=["7"], purpose="社課"),
     ]
@@ -126,6 +127,9 @@ async def test_venue_list_and_review_flow(client, db):
     assert data[0]["venue_name"] == "精誠廣場"
     assert data[0]["activity_name"] == "迎新宿營"
     assert data[1]["activity_name"] is None
+    # 審核時要聯絡得到申請人(手動借用可不填,故為 None)
+    assert data[0]["phone"] == "0912-345678"
+    assert data[2]["phone"] is None
 
     # 過濾與排序白名單
     resp = await client.get("/api/v1/admin/venue-bookings", params={"status": "approved"})

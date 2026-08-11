@@ -47,6 +47,7 @@ async def make_loan(
         start_date=start or today,
         end_date=end or (today + timedelta(days=2)),
         purpose="營隊",
+        phone="0912-345678",
         status=status,
         borrower_name=borrower,
     )
@@ -339,6 +340,9 @@ async def test_checkout_serials_and_state(client, db, monkeypatch):
     assert data["status"] == "checked_out"
     assert data["borrower_name"] == "陳借用"
     assert data["club_name"] == club.name
+    # 歸還點交要照借出登記的序號核對,借出點交要聯絡得到申請人
+    assert data["serials"] == ["A1", "A2"]
+    assert data["phone"] == "0912-345678"
     await db.refresh(loan)
     assert loan.serials == ["A1", "A2"]  # 序號去空白後入庫
     assert loan.checkout_by == staff.id

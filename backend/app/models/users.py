@@ -13,6 +13,15 @@ class User(Base, TimestampMixin):
     """四角色單表(admin/staff/club/viewer);角色專屬欄位允許 NULL。"""
 
     __tablename__ = "users"
+    # 一社一帳號:應用層有檢查,但遷移腳本直接寫 DB,兜底約束得在這一層
+    __table_args__ = (
+        sa.Index(
+            "uq_users_club_id",
+            "club_id",
+            unique=True,
+            postgresql_where=sa.text("club_id IS NOT NULL"),
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     role: Mapped[UserRole] = mapped_column(db_enum(UserRole, "user_role"))

@@ -66,13 +66,28 @@ def _columns_of(sync_conn) -> dict[str, list[str]]:
     }
 
 
+def _indexes_of(sync_conn) -> set[str]:
+    inspector = sa.inspect(sync_conn)
+    return {
+        f"{table}.{ix['name']}"
+        for table in inspector.get_table_names(schema="public")
+        for ix in inspector.get_indexes(table, schema="public")
+    }
+
+
 async def test_upgrade_head_builds_the_same_tables_as_the_models(migration_db):
     _alembic("upgrade", "head")
 
     async with migration_db.connect() as conn:
         actual = await conn.run_sync(_columns_of)
+        indexes = await conn.run_sync(_indexes_of)
 
     expected = {
         name: sorted(c.name for c in table.columns) for name, table in Base.metadata.tables.items()
     }
     assert actual == expected
+    # 索引也要對得起來:少了 revision 的索引不會讓欄位比對分岔,但正式庫就是沒有它
+    expected_indexes = {
+        f"{table.name}.{ix.name}" for table in Base.metadata.tables.values() for ix in table.indexes
+    }
+    assert expected_indexes <= indexes

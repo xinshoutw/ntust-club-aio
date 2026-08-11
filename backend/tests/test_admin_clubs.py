@@ -241,6 +241,18 @@ async def test_create_club_account(client, db):
     assert resp.status_code == 409
 
 
+async def test_second_account_for_one_club_is_rejected_by_the_database(client, db):
+    """一社一帳號:繞過應用層(匯入腳本就是這樣寫)直接 INSERT 也要被 DB 擋下。"""
+    import pytest
+    from sqlalchemy.exc import IntegrityError
+
+    club, _, _ = await seed(client, db)
+    db.add(User(role=UserRole.CLUB, username="dance2", name="熱舞社", club_id=club.id))
+    with pytest.raises(IntegrityError):
+        await db.flush()
+    await db.rollback()
+
+
 async def test_create_club_account_username_rules(client, db):
     _, _, no_account = await seed(client, db)
 

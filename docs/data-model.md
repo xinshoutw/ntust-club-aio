@@ -84,7 +84,7 @@ erDiagram
 | auth_provider | enum(`local`,`sso`) | 預設 `local` |
 | name | text | 顯示名稱(社團帳號=社團名) |
 | email | text NULL | |
-| club_id | FK clubs NULL | 僅 role=club(一社一帳號) |
+| club_id | FK clubs NULL | 僅 role=club;部分唯一索引 `uq_users_club_id`(WHERE club_id IS NOT NULL)在 DB 層釘住一社一帳號 |
 | is_super | bool | 僅 admin:最高權限 |
 | permissions | text[] | 僅 admin。頁面鍵:`areview`(活動申請審核)、`aclose`、`asignup`、`aannounce`、`abooking`、`aroom`、`amember`、`aeval`、`amaint`、`aapply`、`aviol`、`afiles`;`aact`/`areg` 為尚未統一的舊鍵,暫時併收。簽核關卡鍵:`approve_advisor`/`approve_chief`/`approve_dean`,學務長為本人操作,開僅持 `approve_dean` 的帳號。白名單在 `schemas/accounts.PERMISSION_KEYS` |
 | can_view_eval | bool | 僅 viewer |

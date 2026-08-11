@@ -360,7 +360,7 @@ approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,�
 
 **violations**(id, club_id, occurred_on, location, items text[], other NULL, filler_id, status enum(open,resolved), resolve_note NULL)
 
-**銷案期限 = 開立日 +1 個月**,逾期即截止(不再受理銷案,−1 扣分成立)。期限與截止皆推導不儲存;管理端逾期後銷案鈕停用。判定同時存在 Python(`violation_service`)與 SQL(`make_interval`)兩處實作,邊界為期限當天仍可銷案(已以測試釘住),規則變動須同步兩處。
+**銷案期限 = 開立日 +1 個月**,逾期即截止(不再受理銷案,−1 扣分成立)。期限與截止皆推導不儲存;管理端逾期後銷案鈕停用。Python 與 SQL 兩端共用 `violation_service.RESOLVE_MONTHS`(`resolve_deadline` / `deadline_sql`),邊界為期限當天仍可銷案。
 
 **audit_logs**(id, user_id FK NULL ON DELETE SET NULL, role, action, detail, ip inet)— 高風險操作全記,不設上限。帳號刪除時稽核保留;有業務 FK 歷史的帳號刪除回 409(導向停權)。
 

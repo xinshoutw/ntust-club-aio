@@ -131,7 +131,9 @@ function CloseReviewModal({
         // 讀不到結案內容就不給簽核鈕:繳交確認三旗標本來就預設全勾,看不到照片與心得還能核准
         // 等於整份 fail-open;退回也不該在讀不到內容時按
         detailFailed ? (
-          <div style={{ fontSize: 12, color: 'var(--steel)' }}>詳情載入失敗,請重試後再審核</div>
+          <div style={{ fontSize: 12, color: 'var(--steel)' }}>
+            詳情載入失敗,請重試{canReview ? '後再審核' : ''}
+          </div>
         ) : canReview ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
             <Button danger style={{ height: 38 }} disabled={closeApprove.isPending} onClick={() => setRejectOpen(true)}>

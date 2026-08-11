@@ -92,6 +92,17 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body.data as T
 }
 
+/** 帶 HTTP 狀態碼的錯誤:呼叫端要能分辨 401(session 過期)與其他失敗,
+ *  不必依賴「UNAUTHORIZED_EVENT 是同步派發的」這種隱性時序前提 */
+export class ApiError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResponse<T>> {
   // 正確合併 headers(展開 init 不可蓋掉);FormData 交給瀏覽器帶 boundary
   const headers = new Headers(init.headers)
@@ -118,16 +129,16 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResp
   try {
     body = (await res.json()) as ApiResponse<T>
   } catch {
-    throw new Error(`HTTP ${res.status}`)
+    throw new ApiError(`HTTP ${res.status}`, res.status)
   }
 
   if (typeof body?.success !== 'boolean') {
-    throw new Error(`HTTP ${res.status}`)
+    throw new ApiError(`HTTP ${res.status}`, res.status)
   }
   if (!res.ok || !body.success) {
     const error = body.error ?? `HTTP ${res.status}`
     const detail = validationDetail((body.meta as { detail?: unknown } | null)?.detail)
-    throw new Error(detail ? `${error}:${detail}` : error)
+    throw new ApiError(detail ? `${error}:${detail}` : error, res.status)
   }
   return body
 }

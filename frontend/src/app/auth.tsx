@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { TAKEOVER_DISMISSED_KEY } from '../components/layout/TakeoverOverlay'
-import { UNAUTHORIZED_EVENT } from '../api/client'
+import { ApiError, UNAUTHORIZED_EVENT } from '../api/client'
 import { loginApi, logoutApi, meApi, type Role, type SessionUser } from '../api/auth'
 
 export type { Role, SessionUser }
@@ -20,6 +20,8 @@ interface AuthContextValue {
   refresh: () => Promise<void>
 }
 
+const toError = (e: unknown): Error => (e instanceof Error ? e : new Error('無法確認登入狀態'))
+
 const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -27,22 +29,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SessionUser | null>(null)
   const [booting, setBooting] = useState(true)
   const [bootError, setBootError] = useState<Error | null>(null)
-  // 401 走 UNAUTHORIZED_EVENT(client.ts 在 throw 之前同步廣播),所以 catch 執行時這面旗
-  // 已經是最新的:未過期而失敗 = 伺服器或網路問題,不能靜靜把人導去登入頁當成「已登出」
-  const expired = useRef(false)
+  // 開機驗證的世代序號:登入或重試會讓上一輪的結果作廢
+  // (慢後端下使用者可能在 /auth/me 還沒回來時就登入成功,晚到的 catch 不得把人清掉)
+  const gen = useRef(0)
 
-  // session 為 httpOnly cookie:重新整理後以 /auth/me 恢復登入狀態
+  // session 為 httpOnly cookie:重新整理後以 /auth/me 恢復登入狀態。
+  // 401 = 真的沒有 session(後端對無 cookie/過期/停用一律 401)→ 交給 RequireRole 導去登入頁;
+  // 其他失敗 = 伺服器或網路問題,不能靜靜把人導去登入頁當成「已登出」
   const verify = useCallback(() => {
+    const mine = ++gen.current
     setBooting(true)
-    setBootError(null)
-    expired.current = false
     meApi()
-      .then((u) => setUser(u))
-      .catch((e: unknown) => {
-        setUser(null)
-        if (!expired.current) setBootError(e instanceof Error ? e : new Error('無法確認登入狀態'))
+      .then((u) => {
+        if (mine !== gen.current) return
+        setUser(u)
+        setBootError(null)
       })
-      .finally(() => setBooting(false))
+      .catch((e: unknown) => {
+        if (mine !== gen.current) return
+        setUser(null)
+        // 錯誤自己帶狀態碼(ApiError),不依賴事件派發的時序
+        setBootError(e instanceof ApiError && e.status === 401 ? null : toError(e))
+      })
+      .finally(() => {
+        if (mine === gen.current) setBooting(false)
+      })
   }, [])
   useEffect(() => {
     verify()
@@ -51,7 +62,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 任一請求收到 401 即視為 session 過期:清掉登入狀態,RequireRole 會導回登入頁
   useEffect(() => {
     const expire = () => {
-      expired.current = true
       setUser(null)
       setBootError(null)
     }
@@ -66,6 +76,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       sessionStorage.removeItem(TAKEOVER_DISMISSED_KEY)
       // 同一台電腦換人登入時,前一位使用者的快取不得外流到新 session
       qc.clear()
+      // gate 的順序是 bootError 早於 user:不清掉的話登入成功還會被「無法確認登入狀態」擋住,
+      // 而開機失敗後停在 /login 重新登入正是最常見的路徑
+      gen.current += 1
+      setBootError(null)
       setUser(next)
       return next
     },
@@ -79,14 +93,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // session 已失效也視為登出成功
     }
     qc.clear()
+    gen.current += 1
+    setBootError(null)
     setUser(null)
   }, [qc])
 
   const refresh = useCallback(async () => {
     try {
       setUser(await meApi())
-    } catch {
-      setUser(null)
+    } catch (e) {
+      // 只有 401 才是「已登出」;其他失敗保留現有 user
+      // (改密成功後這支一失敗就登出,使用者會拿新密碼一直登入失敗)
+      if (e instanceof ApiError && e.status === 401) setUser(null)
     }
   }, [])
 

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { App, Button, Input, Select, Spin, Switch } from 'antd'
 import { confirmDialog } from '../../lib/confirm'
 import PageHeader from '../../components/ui/PageHeader'
+import { suspendedNow } from '../../lib/status'
 import { useUnsavedGuard } from '../../app/unsaved'
 import { useAdminClubDetail, useAdminClubMutations, type AdminClubDetail } from '../../api/adminClubs'
 import ClubSelect from './ClubSelect'
@@ -254,7 +255,8 @@ export default function AdminClubSettingsPage() {
                 </span>
                 {form.active !== saved.active && <span style={{ fontSize: 12, color: '#d48806' }}>未儲存</span>}
               </div>
-              {detail?.suspendedUntil && (
+              {/* 解除停權才會把日期清成 NULL,過期未清的殘留值不該一直顯示成停權中 */}
+              {detail && suspendedNow(detail.suspendedUntil) && (
                 <div style={{ fontSize: 12, color: '#B03A2E' }}>
                   停權中至 <span className="num">{detail.suspendedUntil}</span>
                   {detail.suspendReason ? ` · ${detail.suspendReason}` : ''}

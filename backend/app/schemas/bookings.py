@@ -1,5 +1,6 @@
 import re
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -152,11 +153,12 @@ class ClubFixedWindowOut(FixedWindowOut):
 
 
 class FixedOccupancyOut(BaseModel):
-    """固定借用申請畫面的格狀佔用:reason 為 blocked / fixed / temp。"""
+    """固定借用申請畫面的格狀佔用。"""
 
     weekday: int  # ISO 星期 1=一 … 7=日
     period: str
-    reason: str
+    # 列舉而非裸 str:前端依 reason 決定底色與文案,多一種而沒接住的話那格會變回沒底色
+    reason: Literal["blocked", "fixed", "temp"]
 
 
 # 聯絡電話僅允許 數字與 - ( ) * #

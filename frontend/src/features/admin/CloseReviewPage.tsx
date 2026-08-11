@@ -3,6 +3,7 @@ import { countText } from '../../lib/counts'
 import { App, Button, Checkbox, Input, Modal, Skeleton } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
 import { fmtMoney } from '../activities/types'
@@ -56,6 +57,9 @@ function CloseReviewModal({
   const detail = detailQuery.data
   const report = detail?.report
   const photos = detail?.photos ?? []
+  // 手上還沒有詳情才算失敗:背景重抓失敗時 TanStack 保留既有 data,
+  // 內容與按鈕都照舊(同 ActivityReviewModal)
+  const detailFailed = detailQuery.isError && !detail
   const canReview = item.status === 'closing_pending_advisor' && canActOnClose(user)
 
   const closeReject_ = () => {
@@ -124,7 +128,11 @@ function CloseReviewModal({
         </div>
       }
       footer={
-        canReview ? (
+        // 讀不到結案內容就不給簽核鈕:繳交確認三旗標本來就預設全勾,看不到照片與心得還能核准
+        // 等於整份 fail-open;退回也不該在讀不到內容時按
+        detailFailed ? (
+          <div style={{ fontSize: 12, color: 'var(--steel)' }}>詳情載入失敗,請重試後再審核</div>
+        ) : canReview ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
             <Button danger style={{ height: 38 }} disabled={closeApprove.isPending} onClick={() => setRejectOpen(true)}>
               退回
@@ -149,8 +157,10 @@ function CloseReviewModal({
     >
       {detailQuery.isPending ? (
         <Skeleton active paragraph={{ rows: 8 }} style={{ marginTop: 12 }} />
-      ) : detailQuery.isError ? (
-        <div style={{ marginTop: 16, fontSize: 13, color: '#C13B34' }}>載入失敗:{detailQuery.error.message}</div>
+      ) : detailFailed ? (
+        <div style={{ marginTop: 12 }}>
+          <QueryError compact title="結案詳情載入失敗" error={detailQuery.error} onRetry={() => void detailQuery.refetch()} />
+        </div>
       ) : !report ? (
         <div style={{ marginTop: 16, fontSize: 13, color: 'var(--steel)' }}>此活動尚無結案資料</div>
       ) : (

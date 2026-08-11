@@ -34,6 +34,7 @@
 - 「進行中」的活動狀態集合:`pending_advisor`、`pending_chief`、`pending_dean`、`approved`、`closing_pending_advisor`;草稿、退回、已結案不列入
 - 線上申請只列 `pending`(報修另含 `in_progress`)
 - 借用三類只列 `pending`:已核准的是「正在借用」,在借用總覽頁看
+- 組成這張卡的七支查詢一起看載入與錯誤:任一支失敗就顯示錯誤與重試,而不是安靜少掉一個分類
 - 公告的 `scope` 由 `is_auto` 推導:系統自動通知標「通知」,行政發布標「公告」
 
 ## 未完成 / 問題

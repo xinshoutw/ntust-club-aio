@@ -136,7 +136,23 @@ export default function OverviewPage() {
     ...onlineTracked,
   ]
 
-  const loading = announcementsQuery.isPending || activitiesQuery.isPending
+  // 空分類會被 filter 濾掉,查詢失敗時整個分類會安靜消失 —— 六支一起看載入與錯誤
+  const trackedQueries = [
+    activitiesQuery,
+    roomQuery,
+    venueQuery,
+    loanQuery,
+    maintenanceQuery,
+    postalQuery,
+    certificatesQuery,
+  ]
+  const trackedErrored = trackedQueries.filter((q) => q.isError)
+  const retryTracked = () => {
+    for (const q of trackedErrored) void q.refetch()
+  }
+
+  const loading =
+    announcementsQuery.isPending || trackedQueries.some((q) => q.isPending)
 
   return (
     <div>
@@ -233,12 +249,12 @@ export default function OverviewPage() {
 
           <div className="card">
             <CardTitle title="進行中申請" count={tracked.length} />
-            {activitiesQuery.isError && (
+            {trackedErrored.length > 0 && (
               <div style={{ borderTop: '1px solid var(--line)' }}>
-                <QueryError compact title="申請進度載入失敗" error={activitiesQuery.error} onRetry={() => activitiesQuery.refetch()} />
+                <QueryError compact title="申請進度載入失敗" error={trackedErrored[0].error} onRetry={retryTracked} />
               </div>
             )}
-            {!activitiesQuery.isError && categories
+            {categories
               .filter((cat) => tracked.some((t) => t.category === cat))
               .map((cat) => (
                 <Fragment key={cat}>
@@ -265,7 +281,7 @@ export default function OverviewPage() {
                     ))}
                 </Fragment>
               ))}
-            {!loading && !activitiesQuery.isError && tracked.length === 0 && <EmptyRow text="目前沒有進行中的申請" />}
+            {!loading && trackedErrored.length === 0 && tracked.length === 0 && <EmptyRow text="目前沒有進行中的申請" />}
           </div>
         </div>
       </Spin>

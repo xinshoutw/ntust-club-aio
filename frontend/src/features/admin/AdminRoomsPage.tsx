@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { countText } from '../../lib/counts'
 import { App, Button, Input, Modal } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { RightOutlined } from '@ant-design/icons'
@@ -217,7 +218,7 @@ export default function AdminRoomsPage() {
         title="固定場地借用"
         sub={
           <>
-            待審 <span className="num">{total}</span> 件
+            待審 <span className="num">{countText(total, listQuery)}</span> 件
           </>
         }
       />

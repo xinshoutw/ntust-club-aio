@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { countText } from '../../lib/counts'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
@@ -35,7 +36,7 @@ export default function ViewerDonePage() {
         title="已完成評分"
         sub={
           <>
-            共 <span className="num">{total}</span> 筆
+            共 <span className="num">{countText(total, query)}</span> 筆
           </>
         }
       />

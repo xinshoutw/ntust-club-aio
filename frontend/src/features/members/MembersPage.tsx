@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { countText } from '../../lib/counts'
 import { App, Button, Form, Input, Modal, Popconfirm, Select, Upload } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { DownOutlined, DownloadOutlined, EditOutlined, UploadOutlined } from '@ant-design/icons'
@@ -149,7 +150,7 @@ export default function MembersPage() {
     <div>
       <PageHeader
         title="成員列表"
-        sub={ <> 共 <span className="num">{total}</span> 人 </> }
+        sub={ <> 共 <span className="num">{countText(total, listQuery)}</span> 人 </> }
         extra={
           <div style={{ display: 'flex', gap: 8 }}>
             <Select

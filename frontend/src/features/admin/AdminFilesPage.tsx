@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { countText } from '../../lib/counts'
 import { App, Select, Tooltip } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { DeleteOutlined, DownloadOutlined } from '@ant-design/icons'
@@ -121,7 +122,7 @@ export default function AdminFilesPage() {
           // usage 查詢失敗時不顯示「共 0 個檔案」誤導字樣(主體已呈現錯誤與重試)
           !usageQuery.isError && (
             <>
-              共 <span className="num">{totalCount.toLocaleString()}</span> 個檔案
+              共 <span className="num">{countText(totalCount, usageQuery)}</span> 個檔案
             </>
           )
         }
@@ -248,7 +249,7 @@ export default function AdminFilesPage() {
             <div style={{ fontSize: 12, color: 'var(--steel)' }}>檔案大、迭代快,可直接刪除釋放空間</div>
             <div style={{ flex: 1 }} />
             <span style={{ fontSize: 12, color: 'var(--steel)' }}>
-              共 <span className="num">{repairTotal}</span> 個
+              共 <span className="num">{countText(repairTotal, repairQuery)}</span> 個
               {/* 佔用只認 usage 的權威值:分頁後這一頁的加總不是總量,已歸檔者也不佔空間 */}
               {repairUsage && <> · <span className="num">{fmtSize(repairUsage.sizeMb)}</span></>}
             </span>

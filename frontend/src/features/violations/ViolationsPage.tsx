@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { countText } from '../../lib/counts'
 import dayjs from 'dayjs'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
@@ -21,7 +22,7 @@ export default function ViolationsPage() {
         title="違規勸導紀錄"
         sub={
           <>
-            共 <span className="num">{total}</span> 筆
+            共 <span className="num">{countText(total, listQuery)}</span> 筆
           </>
         }
       />

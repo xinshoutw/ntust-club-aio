@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { countText } from '../../lib/counts'
 import { App, Button, Checkbox, Input, Modal, Skeleton } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
@@ -348,7 +349,7 @@ export default function CloseReviewPage() {
         title="結案審核"
         sub={
           <>
-            待審 <span className="num">{pendingTotal}</span> 件 · 逾期未結案 <span className="num">{overdueTotal}</span> 件
+            待審 <span className="num">{countText(pendingTotal, pendingQuery)}</span> 件 · 逾期未結案 <span className="num">{countText(overdueTotal, overdueQuery)}</span> 件
           </>
         }
       />

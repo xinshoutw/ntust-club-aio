@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { countText } from '../../lib/counts'
 import { Button } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { RightOutlined } from '@ant-design/icons'
@@ -116,7 +117,7 @@ export default function ReviewPage() {
         title="申請審核"
         sub={
           <>
-            待本關 <span className="num">{queue.length}</span> 件
+            待本關 <span className="num">{countText(queue.length, { isPending: queueQuery.isLoading, isError: queueQuery.isError })}</span> 件
           </>
         }
       />

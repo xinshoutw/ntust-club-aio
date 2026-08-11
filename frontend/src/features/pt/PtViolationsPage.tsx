@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { countText } from '../../lib/counts'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
@@ -29,7 +30,7 @@ export default function PtViolationsPage() {
         title="違規紀錄查詢"
         sub={
           <>
-            共 <span className="num">{total}</span> 筆
+            共 <span className="num">{countText(total, listQuery)}</span> 筆
           </>
         }
       />

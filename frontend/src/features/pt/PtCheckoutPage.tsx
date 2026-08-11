@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { countText } from '../../lib/counts'
 import { App, Button, Input, Modal } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
@@ -57,7 +58,7 @@ export default function PtCheckoutPage() {
         title="器材借出點交"
         sub={
           <>
-            待點交 <span className="num">{total}</span> 件
+            待點交 <span className="num">{countText(total, listQuery)}</span> 件
           </>
         }
       />

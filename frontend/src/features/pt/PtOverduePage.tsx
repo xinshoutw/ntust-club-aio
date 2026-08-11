@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { countText } from '../../lib/counts'
 import { App, Button, Tooltip } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
@@ -39,7 +40,7 @@ export default function PtOverduePage() {
         title="逾期追蹤"
         sub={
           <>
-            逾期未歸還 <span className="num">{total}</span> 件
+            逾期未歸還 <span className="num">{countText(total, listQuery)}</span> 件
           </>
         }
       />

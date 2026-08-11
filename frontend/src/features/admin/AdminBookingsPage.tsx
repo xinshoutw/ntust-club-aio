@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { countText } from '../../lib/counts'
 import dayjs, { type Dayjs } from 'dayjs'
 import { App, Button, DatePicker, Dropdown, Tooltip } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
@@ -83,7 +84,7 @@ export default function AdminBookingsPage() {
         title="臨時場地器材借用"
         sub={
           <>
-            待審 <span className="num">{venueTotal + loanTotal}</span> 件
+            待審 <span className="num">{countText(venueTotal + loanTotal, venueQuery, loanQuery)}</span> 件
           </>
         }
       />

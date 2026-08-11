@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { countText } from '../../lib/counts'
 import { useNavigate } from 'react-router'
 import { App, Button, Dropdown, Modal, Popconfirm, Select, Tooltip } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
@@ -433,7 +434,7 @@ export default function ActivityListPage() {
         title="活動列表"
         sub={
           <>
-            共 <span className="num">{total}</span> 件
+            共 <span className="num">{countText(total, listQuery)}</span> 件
           </>
         }
         extra={

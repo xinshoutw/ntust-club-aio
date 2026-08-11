@@ -37,7 +37,7 @@ import { CELL, type CellState } from './cells'
 const RETURNED_PAGE = 10
 const VENUE_DAYS = 15 // 單一場地檢視:選擇日 −7 ~ +7 共 15 天(不含過去,不足往未來補)
 
-const LEGEND: CellState[] = ['free', 'reviewing', 'temp', 'fixed', 'mine', 'closed']
+const LEGEND: CellState[] = ['free', 'reviewing', 'temp', 'fixed', 'mine', 'fixedOnly', 'closed']
 const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
 
 // 後端場況狀態 → 色格狀態;未佔用格依場地開放旗標補 可借/不開放
@@ -56,7 +56,9 @@ function cellOf(
 ): { state: CellState; club?: string } {
   const c: AvailabilityCell | undefined = grid?.[String(venue.id)]?.[period]
   if (c) return { state: STATE_OF[c.status], club: c.club }
-  return { state: venue.allowTemp ? 'free' : 'closed' }
+  // 未佔用格:能臨時借就是可借;只開放固定借用的場地借不到,但不是「不開放」
+  if (venue.allowTemp) return { state: 'free' }
+  return { state: venue.allowFixed ? 'fixedOnly' : 'closed' }
 }
 
 // 單一場地格:可借才可點(直接前往臨時場地借用);審核中不可點;不開放不畫方框。

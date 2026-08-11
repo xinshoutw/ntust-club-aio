@@ -78,6 +78,11 @@ def _audit(
     )
 
 
+def _unneutralize(cell: str) -> str:
+    """還原匯出端的公式中和(見 lib/csv.ts 的 neutralizeFormula)。"""
+    return cell[1:] if cell[:1] == "'" and cell[1:2] in "=+-@\t\r" else cell
+
+
 def _validate_member(kind: MemberKind, title: str | None) -> str | None:
     if kind == MemberKind.OFFICER and not title:
         raise validation_error("幹部必須填寫職稱")
@@ -226,9 +231,9 @@ async def import_members(
     # str.strip() 不會移除 U+FEFF,首列第一欄姓名會被污染成帶 BOM 前綴的值
     csv_text = body.csv_text.lstrip("﻿")
     for line_no, row in enumerate(csv.reader(io.StringIO(csv_text)), start=1):
-        # 匯出端為了中和 Excel 公式會在 = + - @ 開頭的值前面補一個單引號
-        # (電話 +886… 就會中);原樣貼回來時要脫掉,否則每往返一次多一個
-        cells = [c.strip().removeprefix("'") for c in row]
+        # 匯出端為了中和 Excel 公式,會在 = + - @ 開頭的值前面補一個單引號(電話 +886… 就會中);
+        # 原樣貼回來時要脫掉,否則每往返一次多一個。只脫真的被中和過的,不動以 ' 開頭的名字
+        cells = [_unneutralize(c.strip()) for c in row]
         if not any(cells):
             continue
         if len(cells) < 3:

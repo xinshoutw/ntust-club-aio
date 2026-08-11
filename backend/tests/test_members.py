@@ -340,6 +340,16 @@ async def test_csv_import_undoes_formula_neutralizing_quote(client, db):
     phone = await db.scalar(sa.select(ClubMember.phone))
     assert phone == "+886912345678"
 
+    # 本來就以 ' 開頭的值沒被中和過,不能跟著被吃掉一個字元
+    resp = await client.post(
+        "/api/v1/club/members/import",
+        json={"semester": "114-2", "csv_text": "'小明,B11109002,社員"},
+        headers=csrf_headers(client),
+    )
+    assert resp.json()["data"]["created"] == 1
+    names = list(await db.scalars(sa.select(ClubMember.name)))
+    assert "'小明" in names
+
 
 async def test_csv_import_strips_bom(client, db):
     """匯出檔前置 UTF-8 BOM(Excel 相容),原樣匯入時首列姓名不得被 BOM 污染。"""

@@ -14,7 +14,7 @@ import {
   submitClose,
   uploadActivityPhoto,
   useActivityDetail,
-  useActivityList,
+  useClosableActivities,
   useInvalidateActivities,
   type ClubActivity,
   type ClubActivityDetail,
@@ -66,9 +66,9 @@ export default function ActivityClosePage() {
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
 
-  // 已核准清單由伺服器 status 參數縮小,結案資格(已結束且未鎖定)採後端推導欄位 can_close
-  const approvedQuery = useActivityList({ status: 'approved' })
-  const closable = (approvedQuery.data ?? []).filter((a) => a.canClose)
+  // 結案資格(已核准、已結束、未鎖定)由後端判定並篩選,前端不再抓全部已核准再過濾
+  const approvedQuery = useClosableActivities()
+  const closable = approvedQuery.data ?? []
   const rawId = params.get('id')
   const selectedId = rawId ? Number(rawId) : undefined
   const activity = closable.find((a) => a.id === selectedId)

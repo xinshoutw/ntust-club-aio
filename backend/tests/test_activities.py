@@ -509,6 +509,73 @@ async def test_list_filters_and_sorting(client, db):
     assert resp.json()["data"] == ["114-2", "114-1"]
 
 
+async def test_closable_filter_matches_the_python_derivation(client, db):
+    """結案清單改由 DB 端篩:SQL 版 can_close 與 Python 版必須給同一個答案。"""
+    await setup_session(client, db)
+    today = date.today()
+
+    ended = await create_activity(
+        client, name="可結案", date=(today - timedelta(days=3)).isoformat()
+    )
+    await approve(db, ended["id"])
+    future = await create_activity(
+        client, name="還沒結束", date=(today + timedelta(days=7)).isoformat()
+    )
+    await approve(db, future["id"])
+    locked = await create_activity(
+        client, name="已鎖定", date=(today - timedelta(days=63)).isoformat()
+    )
+    await approve(db, locked["id"])
+    await create_activity(client, name="未核准", date=(today - timedelta(days=3)).isoformat())
+
+    resp = await client.get("/api/v1/club/activities", params={"closable": "true"})
+    assert [a["name"] for a in resp.json()["data"]] == ["可結案"]
+    assert resp.json()["meta"]["total"] == 1
+
+    # 每一列的 can_close 欄(Python 端)與篩選(SQL 端)不得分歧
+    rows = (await client.get("/api/v1/club/activities")).json()["data"]
+    assert {a["name"] for a in rows if a["can_close"]} == {"可結案"}
+
+
+async def test_list_multi_value_type_and_budget_sort(client, db):
+    """活動列表的篩選與排序全在後端:類型多選、經費欄=自籌+擬請補助合計。"""
+    await setup_session(client, db)
+    await create_activity(client, name="無經費", type="社課或會議", budget_items=[])
+    await create_activity(
+        client,
+        name="小額",
+        type="活動",
+        budget_items=[
+            {"category": "膳食費", "description": "便當", "self_fund": 100, "requested_subsidy": 0}
+        ],
+    )
+    await create_activity(client, name="大額", type="活動")  # 預設 1000+2000+0+500
+
+    resp = await client.get(
+        "/api/v1/club/activities", params=[("type", "社課或會議"), ("type", "活動")]
+    )
+    assert len(resp.json()["data"]) == 3
+
+    resp = await client.get("/api/v1/club/activities", params={"sort": "budget"})
+    assert [a["name"] for a in resp.json()["data"]] == ["無經費", "小額", "大額"]
+    resp = await client.get("/api/v1/club/activities", params={"sort": "-budget"})
+    assert [a["name"] for a in resp.json()["data"]] == ["大額", "小額", "無經費"]
+
+    # 同值也要有穩定全序,否則分頁會重複/漏列。
+    # 注意:這條只是契約標記不是護欄 —— 小表拿掉 id tiebreak 照樣綠(回傳序由 planner 決定)
+    page1 = (
+        await client.get(
+            "/api/v1/club/activities", params={"sort": "type", "page_size": 2, "page": 1}
+        )
+    ).json()["data"]
+    page2 = (
+        await client.get(
+            "/api/v1/club/activities", params={"sort": "type", "page_size": 2, "page": 2}
+        )
+    ).json()["data"]
+    assert len({a["id"] for a in page1 + page2}) == 3
+
+
 async def test_attachment_total_cap(client, db):
     """附件加總上限(2026-07-16 第八輪):讀 system_settings,超過回 413。"""
     from app.models import SystemSetting

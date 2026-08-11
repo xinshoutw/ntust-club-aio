@@ -68,6 +68,20 @@ def close_overdue_sql(lock_months: int) -> sa.ColumnElement[bool]:
     )
 
 
+def can_close_sql(lock_months: int) -> sa.ColumnElement[bool]:
+    """can_close 的 SQL 版(結案清單在 DB 端篩,不是抓回全部已核准再過濾)。
+
+    「已結束」在 PG 以 date + time 相加成 timestamp 比對台北當下;
+    「未鎖定」沿用 close_overdue_sql,兩邊的期限推導保持同源。
+    """
+    ended = (
+        sa.func.coalesce(Activity.end_date, Activity.date)
+        + sa.func.coalesce(Activity.end_time, sa.literal(time(23, 59)))
+    ) <= datetime.now(TAIPEI).replace(tzinfo=None)
+    locked = sa.and_(Activity.close_unlocked.is_(False), close_overdue_sql(lock_months))
+    return sa.and_(Activity.status == ActivityStatus.APPROVED, ended, sa.not_(locked))
+
+
 def can_close(activity: Activity, lock_months: int, now: datetime | None = None) -> bool:
     """結案資格:已核准且活動已結束且未被鎖定。"""
     now = now or datetime.now(UTC)

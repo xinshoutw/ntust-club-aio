@@ -4,7 +4,7 @@ import { App, Button, Dropdown, Modal, Popconfirm, Select, Spin, Tooltip } from 
 import { DownloadOutlined, EllipsisOutlined, FileTextOutlined, LinkOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
-import { Cols, FilterButton, MultiSortButton, Pager, sortRows, useMultiSort } from '../../components/ui/tableControls'
+import { Cols, FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
 import StatusPill from '../../components/ui/StatusPill'
 import LargeBadge from '../../components/ui/LargeBadge'
 import { STATUS } from '../../lib/status'
@@ -13,11 +13,13 @@ import { downloadEvalFile, downloadPhotosZip } from '../eval/files'
 import type { EvalFile } from '../eval/types'
 import FilePreview from '../eval/FilePreview'
 import {
+  ACTIVITY_PAGE_SIZE,
   activityReflectionsPdf,
   activityReportPdf,
   useActivityDetail,
   useActivityList,
   useActivityMutations,
+  useDraftActivities,
   useActivitySemesters,
   type ClubActivity,
   type ClubActivityDetail,
@@ -25,20 +27,21 @@ import {
 import { fmtMoney } from './types'
 import { TIME_RANGE_SEP, dateRangeText } from './utils'
 
-const PAGE_SIZE = 20
+// 排序鍵=後端 /club/activities 白名單(budget=自籌+擬請補助合計;同值的 id 降冪
+// tiebreak 由後端固定,前端不必也不能送 id)
 type SortKey = 'name' | 'type' | 'date' | 'budget' | 'status'
-// 'id' 僅作預設鏈的 tiebreak(不曝光排序鈕):預設 -date, -id(plan §B 準則 3 時間就近)
-type ClientSortKey = SortKey | 'id'
 
-// client 端比較器(一律升冪版;方向由 sortRows 依排序鏈翻轉)
-const CMP: Record<ClientSortKey, (a: ClubActivity, b: ClubActivity) => number> = {
-  name: (a, b) => a.name.localeCompare(b.name, 'zh-Hant'),
-  type: (a, b) => a.type.localeCompare(b.type, 'zh-Hant'),
-  date: (a, b) => (a.date ?? '').localeCompare(b.date ?? ''), // 部分填寫草稿可能無日期
-  budget: (a, b) => a.selfFundTotal + a.requestedTotal - (b.selfFundTotal + b.requestedTotal),
-  status: (a, b) => STATUS[a.status].label.localeCompare(STATUS[b.status].label, 'zh-Hant'),
-  id: (a, b) => a.id - b.id,
-}
+// 狀態漏斗以顯示標籤操作:三個申請關卡共用「申請待審核」,選一個標籤要送出對應的全部狀態
+const LISTED_STATUSES = [
+  'pending_advisor',
+  'pending_chief',
+  'pending_dean',
+  'approved',
+  'rejected',
+  'closing_pending_advisor',
+  'closed',
+] as const
+const STATUS_LABELS = [...new Set(LISTED_STATUSES.map((s) => STATUS[s].label))]
 
 function money(a: ClubActivity): string {
   if (a.selfFundTotal === 0 && a.requestedTotal === 0) return '–'
@@ -333,10 +336,7 @@ export default function ActivityListPage() {
   const { message } = App.useApp()
   const [semesterSel, setSemesterSel] = useState<string | null>(null)
   const [page, setPage] = useState(1)
-  const { entries, toggle } = useMultiSort<ClientSortKey>([
-    { key: 'date', dir: -1 },
-    { key: 'id', dir: -1 },
-  ])
+  const { entries, toggle } = useMultiSort<SortKey>([{ key: 'date', dir: -1 }])
   const [typeFilter, setTypeFilter] = useState<string[]>([])
   // 以顯示標籤篩選:三個申請關卡共用「申請待審核」,避免選單出現重複項
   const [statusFilter, setStatusFilter] = useState<string[]>([])
@@ -350,10 +350,21 @@ export default function ActivityListPage() {
   const semOptions = semesterOptions(semestersQuery.data ?? [])
   const semester = semesterSel ?? semOptions[0].value
 
-  // 草稿不分學期,獨立區置頂;主列表依學期(伺服器端 semester/status 參數縮小範圍,
-  // 排序/多選篩選/分頁因單社資料量小維持前端處理,保留既有 UX)
-  const draftsQuery = useActivityList({ status: 'draft' })
-  const listQuery = useActivityList({ semester })
+  // 草稿不分學期,獨立區置頂(量少、排序特殊,整批抓回自排);
+  // 主列表的學期/類型/狀態篩選、排序與分頁一律由後端處理
+  const draftsQuery = useDraftActivities()
+  // 未選狀態時也要明列狀態:不帶 status 的話後端連草稿都會回,而草稿在上方獨立區
+  const statuses = statusFilter.length
+    ? LISTED_STATUSES.filter((s) => statusFilter.includes(STATUS[s].label))
+    : [...LISTED_STATUSES]
+  const listQuery = useActivityList({
+    semester,
+    statuses,
+    types: typeFilter.length ? typeFilter : undefined,
+    sort: sortParam(entries),
+    page,
+    pageSize: ACTIVITY_PAGE_SIZE,
+  })
   // 草稿預設序:未填日期在前(最需要補的草稿),再日期新到舊(plan §B:準則 3+待補優先)
   const drafts = useMemo(
     () =>
@@ -367,24 +378,17 @@ export default function ActivityListPage() {
   const detailQuery = useActivityDetail(preview?.id)
   const { submit, remove } = useActivityMutations()
 
-  const rest = useMemo(() => {
-    let list = (listQuery.data ?? []).filter((a) => a.status !== 'draft')
-    if (typeFilter.length) list = list.filter((a) => typeFilter.includes(a.type))
-    if (statusFilter.length) list = list.filter((a) => statusFilter.includes(STATUS[a.status].label))
-    return sortRows(list, entries, CMP)
-  }, [listQuery.data, entries, typeFilter, statusFilter])
-
-  const paged = rest.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
-  const toggleSort = (key: ClientSortKey) => {
+  const paged = listQuery.data?.rows ?? []
+  const total = listQuery.data?.total ?? 0
+  const toggleSort = (key: SortKey) => {
     toggle(key)
-    setPage(1)
+    setPage(1) // 伺服器端分頁:換排序回到第 1 頁
   }
 
   const sortHeader = (label: string, key: SortKey) => (
     <MultiSortButton label={label} sortKey={key} entries={entries} onToggle={toggleSort} />
   )
 
-  const statusLabels = [...new Set((listQuery.data ?? []).filter((a) => a.status !== 'draft').map((a) => STATUS[a.status].label))]
 
   // 點列一律開活動詳情預覽;結案走列上的動作鈕(或預覽內「前往結案」)
   const onRowClick = (a: ClubActivity) => {
@@ -425,7 +429,7 @@ export default function ActivityListPage() {
         title="活動列表"
         sub={
           <>
-            共 <span className="num">{rest.length}</span> 件
+            共 <span className="num">{total}</span> 件
           </>
         }
         extra={
@@ -527,7 +531,7 @@ export default function ActivityListPage() {
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     {sortHeader('狀態', 'status')}
                     <FilterButton
-                      options={statusLabels}
+                      options={STATUS_LABELS}
                       selected={statusFilter}
                       onChange={(next) => { setStatusFilter(next); setPage(1) }}
                       label="篩選狀態"
@@ -575,7 +579,7 @@ export default function ActivityListPage() {
           </table>
         </div>
       </Spin>
-      <Pager page={page} pageSize={PAGE_SIZE} total={rest.length} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
+      <Pager page={page} pageSize={ACTIVITY_PAGE_SIZE} total={total} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
       <PreviewModal
         a={preview}
         detail={detailQuery.data}

@@ -31,14 +31,15 @@ interface ActivityOut {
   close_deadline: string | null
 }
 
-// 進行中=送審中/結案審核中/已核准(待辦理結案);草稿、退回、已結案不列入
-const IN_PROGRESS = new Set([
+// 進行中=送審中/結案審核中/已核准(待辦理結案);草稿、退回、已結案不列入。
+// 這份清單同時是向後端要的 status 篩選(待辦的鎖定/可結案都落在「已核准」裡)
+const IN_PROGRESS = [
   'pending_advisor',
   'pending_chief',
   'pending_dean',
   'closing_pending_advisor',
   'approved',
-])
+] as const
 
 const trackedStatus = (a: ActivityOut): StatusKey => {
   if (a.close_locked) return 'locked'
@@ -54,17 +55,10 @@ export function useOverviewActivities() {
   return useQuery({
     queryKey: overviewKeys.activities,
     queryFn: async () => {
-      // 排除已結案:歷史大宗,總覽的待辦與進行中皆用不到
+      // 只要這頁真的會顯示的狀態:草稿、退回與已結案都不進待辦也不進「進行中」,
+      // 抓回來只會是白工(已結案更是歷史大宗)
       const data = await fetchAllPages<ActivityOut>('/club/activities', {
-        status: [
-          'draft',
-          'pending_advisor',
-          'pending_chief',
-          'pending_dean',
-          'approved',
-          'rejected',
-          'closing_pending_advisor',
-        ],
+        status: [...IN_PROGRESS],
       })
       const today = dayjs().startOf('day')
       const todos: OverviewTodo[] = data
@@ -79,8 +73,8 @@ export function useOverviewActivities() {
         }))
         // 已鎖定在前,其餘依期限近到遠
         .sort((x, y) => (x.kind === y.kind ? x.daysLeft - y.daysLeft : x.kind === 'locked' ? -1 : 1))
+      // 回來的每一列都是進行中(狀態已由後端篩),不再於此二度過濾
       const tracked: TrackedItem[] = data
-        .filter((a) => IN_PROGRESS.has(a.status))
         .map((a) => ({
           key: `act-${a.id}`,
           name: a.name,

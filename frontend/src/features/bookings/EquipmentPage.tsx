@@ -15,7 +15,7 @@ import {
   useActiveEquipmentLoans,
   useRecentEquipmentLoans,
 } from '../../api/bookings'
-import { useActivityList } from '../../api/activities'
+import { useApprovedActivities } from '../../api/activities'
 import { activityEnded } from '../activities/utils'
 
 export default function EquipmentPage() {
@@ -27,7 +27,7 @@ export default function EquipmentPage() {
   // 器材借用綁定審核通過之活動,借用區間由活動推導;
   // 可借數與借用區間由後端依所選活動推導(GET /club/equipment?activity_id=);
   // 排除已結束活動(後端亦擋)
-  const activitiesQuery = useActivityList({ status: 'approved' })
+  const activitiesQuery = useApprovedActivities()
   const approved = (activitiesQuery.data ?? []).filter((a) => !activityEnded(a))
   const activityId = Form.useWatch('activity', form) as number | undefined
   const equipmentQuery = useEquipmentList(activityId)

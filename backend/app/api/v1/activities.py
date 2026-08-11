@@ -21,6 +21,7 @@ from app.core.errors import AppError, conflict, not_found, validation_error
 from app.core.semesters import TAIPEI, semester_of, semester_range
 from app.models import (
     Activity,
+    ActivityBudgetItem,
     ActivityReflection,
     ActivityReport,
     ApprovalRecord,
@@ -47,10 +48,23 @@ router = APIRouter(prefix="/club/activities", tags=["activities"])
 
 _EDITABLE = {ActivityStatus.DRAFT, ActivityStatus.REJECTED}
 
+# 經費欄顯示「自籌 / 擬請補助」,排序以兩者合計(逐項加總,無經費列為 0)
+_BUDGET_TOTAL = (
+    sa.select(
+        sa.func.coalesce(
+            sa.func.sum(ActivityBudgetItem.self_fund + ActivityBudgetItem.requested_subsidy), 0
+        )
+    )
+    .where(ActivityBudgetItem.activity_id == Activity.id)
+    .correlate(Activity)
+    .scalar_subquery()
+)
+
 _SORTABLE = {
     "name": Activity.name,
     "type": Activity.type,
     "date": Activity.date,
+    "budget": _BUDGET_TOTAL,
     "status": Activity.status,
     "created_at": Activity.created_at,
 }
@@ -114,7 +128,8 @@ async def list_activities(
     semester: str | None = Query(None, pattern=r"^\d{3}-[12]$"),
     # 可重複帶多值(總覽頁一次查非 closed 各狀態,避免整表撈取)
     status: Annotated[list[ActivityStatus] | None, Query()] = None,
-    type: ActivityType | None = None,
+    type: Annotated[list[ActivityType] | None, Query()] = None,  # 可重複帶多值
+    closable: bool = Query(False),  # 僅可結案者(已核准、已結束、未鎖定)
     sort: str | None = None,
 ) -> ApiResponse[list[ActivityOut]]:
     query = (
@@ -128,12 +143,17 @@ async def list_activities(
     if status:
         query = query.where(Activity.status.in_(status))
     if type:
-        query = query.where(Activity.type == type)
-    query = query.order_by(*parse_sort(sort, _SORTABLE, Activity.date.desc()))
+        query = query.where(Activity.type.in_(type))
+    lock_months = await get_setting(db, "close_lock_months")
+    if closable:
+        query = query.where(svc.can_close_sql(lock_months))
+    # 固定 id 降冪 tiebreak:日期/類型/狀態都可能大量同值,無穩定全序時分頁會重複/漏列
+    query = query.order_by(
+        *parse_sort(sort, _SORTABLE, Activity.date.desc()), Activity.id.desc()
+    )
 
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = (await db.scalars(query.offset(page.offset).limit(page.page_size))).all()
-    lock_months = await get_setting(db, "close_lock_months")
     return ApiResponse(data=[_to_out(a, lock_months) for a in rows], meta=page.meta(total or 0))
 
 

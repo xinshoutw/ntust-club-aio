@@ -1,9 +1,9 @@
 // 活動申請/結案 API 層:snake_case ↔ camelCase 轉換集中在此,頁面只碰 camelCase 型別;
 // 日期後端 ISO(YYYY-MM-DD / datetime)↔ 前端顯示 YYYY/MM/DD、時間 HH:mm;
 // 查詢鍵集中管理,mutation 一律 invalidate 整域
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
-import { API_BASE, api } from './client'
+import { API_BASE, api, apiPaged, qs } from './client'
 import { fetchAllPages } from './fetchAll'
 import type { StatusKey } from '../lib/status'
 import { fileTypeOf, type EvalFile, type EvalFileType } from '../features/eval/types'
@@ -314,38 +314,79 @@ export const activityReflectionsPdf = (a: Pick<ClubActivity, 'id' | 'name'>, sub
 
 export interface ActivityListParams {
   semester?: string
-  status?: string
+  /** 可多值(後端 status 收多值) */
+  statuses?: string[]
+  /** 類型多選(後端 type 收多值) */
+  types?: string[]
+  /** 排序白名單:name/type/date/budget/status/created_at;前綴 - 為降冪 */
+  sort?: string
+  page: number
+  pageSize: number
 }
 
 const keys = {
   all: ['activities'] as const,
   list: (p: ActivityListParams) => ['activities', 'list', p] as const,
+  drafts: ['activities', 'drafts'] as const,
+  approved: ['activities', 'approved'] as const,
+  closable: ['activities', 'closable'] as const,
   detail: (id: number) => ['activities', 'detail', id] as const,
   semesters: ['activities', 'semesters'] as const,
 }
 
 export const activityKeys = keys
 
-// 社團單學期活動量小(至多數十筆),逐頁抓齊後由前端排序/篩選/分頁,
-// 保留現有 UX(多選標籤篩選、經費排序皆非後端排序白名單可表達)
-async function fetchAllActivities(params: ActivityListParams): Promise<ClubActivity[]> {
-  const out: ClubActivity[] = []
-  out.push(
-    ...(
-      await fetchAllPages<ActivityOut>('/club/activities', {
-        semester: params.semester,
-        status: params.status,
-      })
-    ).map(toActivity),
-  )
-  return out
-}
+export const ACTIVITY_PAGE_SIZE = 20
 
+/** 活動列表:篩選、排序、分頁全在後端(經費排序=自籌+擬請補助合計) */
 export function useActivityList(params: ActivityListParams) {
   return useQuery({
     queryKey: keys.list(params),
-    queryFn: () => fetchAllActivities(params),
-    placeholderData: keepPreviousData,
+    queryFn: () =>
+      apiPaged<ActivityOut[]>(
+        `/club/activities${qs({
+          semester: params.semester,
+          status: params.statuses,
+          type: params.types,
+          sort: params.sort,
+          page: params.page,
+          page_size: params.pageSize,
+        })}`,
+      ).then(({ data, total }) => ({ rows: data.map(toActivity), total })),
+    // 不留上一份:query key 含學期與篩選,沿用舊資料等於把別的條件的結果當成這次的
+  })
+}
+
+/** 草稿:量少且排序特殊(未填日期的最需要補,排在最前),整批抓回前端自排 */
+export function useDraftActivities() {
+  return useQuery({
+    queryKey: keys.drafts,
+    queryFn: () =>
+      fetchAllPages<ActivityOut>('/club/activities', { status: 'draft' }).then((rows) =>
+        rows.map(toActivity),
+      ),
+  })
+}
+
+/** 已核准活動:借用綁定的下拉選項來源 */
+export function useApprovedActivities() {
+  return useQuery({
+    queryKey: keys.approved,
+    queryFn: () =>
+      fetchAllPages<ActivityOut>('/club/activities', { status: 'approved' }).then((rows) =>
+        rows.map(toActivity),
+      ),
+  })
+}
+
+/** 可結案活動:資格(已核准、已結束、未鎖定)由後端判定,前端不再抓全部已核准再篩 */
+export function useClosableActivities() {
+  return useQuery({
+    queryKey: keys.closable,
+    queryFn: () =>
+      fetchAllPages<ActivityOut>('/club/activities', { closable: true }).then((rows) =>
+        rows.map(toActivity),
+      ),
   })
 }
 

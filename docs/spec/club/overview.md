@@ -10,7 +10,7 @@
 
 | 區塊 | 端點 |
 |---|---|
-| 待辦、進行中申請(活動) | `GET /club/activities`(前端 `fetchAllPages` 抓完所有分頁後推導) |
+| 待辦、進行中申請(活動) | `GET /club/activities?status=`(僅送審中/結案審核中/已核准五種;待辦的鎖定與可結案都落在「已核准」裡) |
 | 公告 | `GET /club/announcements?page=1&page_size=20` |
 | 標為已讀 | `POST /club/announcements/read` |
 | 進行中申請(線上申請) | `GET /club/maintenance`、`/club/postal-changes`、`/club/officer-certificates` |
@@ -39,5 +39,4 @@
 
 ## 未完成 / 問題
 
-- 待辦與進行中都靠 `fetchAllPages` 把該社所有非結案活動抓回前端再篩,分頁形同虛設
 - 用 `<Spin>` 而非設計規範偏好的 Skeleton

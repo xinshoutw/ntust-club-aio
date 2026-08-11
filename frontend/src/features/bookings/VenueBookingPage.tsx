@@ -20,7 +20,7 @@ import {
   useVenues,
   venueLabel,
 } from '../../api/bookings'
-import { useActivityList } from '../../api/activities'
+import { useApprovedActivities } from '../../api/activities'
 import { activityEnded } from '../activities/utils'
 import PeriodPicker from './PeriodPicker'
 
@@ -50,7 +50,7 @@ export default function VenueBookingPage() {
   const venues = venuesQuery.data ?? []
   const tempVenues = venues.filter((v) => v.allowTemp)
   // 借用需綁定審核通過之活動(與器材借用一致;共用活動域查詢);排除已結束活動
-  const activitiesQuery = useActivityList({ status: 'approved' })
+  const activitiesQuery = useApprovedActivities()
   const approved = (activitiesQuery.data ?? []).filter((a) => !activityEnded(a))
   // 正在申請=進行中全部(不限長度、可取消);最近申請=已結束/退回/取消 近 5 筆
   const activeQuery = useActiveVenueBookings()

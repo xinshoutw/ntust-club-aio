@@ -12,7 +12,7 @@
 |---|---|
 | 學期選項 | `GET /club/activities/semesters` |
 | 草稿區 | `GET /club/activities?status=draft` |
-| 主列表 | `GET /club/activities?semester=…` |
+| 主列表 | `GET /club/activities?semester=&status=&type=&sort=&page=`(伺服器端分頁,每頁 20) |
 | 詳情 | `GET /club/activities/{id}` |
 | 送出 / 刪除草稿 | `POST /club/activities/{id}/submit`、`DELETE /club/activities/{id}` |
 | 文件下載 | `GET /club/activities/{id}/report-pdf`、`/reflections-pdf` |
@@ -29,6 +29,9 @@
 
 ## 規則
 
+- **排序、篩選、分頁全在後端**:排序白名單 `name`/`type`/`date`/`budget`/`status`(`budget` = 自籌+擬請補助逐項合計),類型與狀態漏斗以多值參數送出;同值以 id 降冪定序,換頁不會重複或漏列
+- 主列表明列七種狀態(不含草稿):不帶 `status` 時後端連草稿都會回,而草稿在上方獨立區
+
 - 狀態篩選以**顯示標籤**比對,三個審核關卡在社團端都顯示「待審核」,選單不出現重複項
 - `approved` 且 `close_locked` 在前端映射為顯示狀態 `locked`
 - 成果報告與學習心得 PDF 由後端依 `docs/模板_*.docx` 於下載時動態生成,不落檔
@@ -36,6 +39,5 @@
 
 ## 未完成 / 問題
 
-- 排序、篩選、分頁全在前端做:`fetchAllActivities` 逐頁抓完整學期資料再切,後端分頁與排序白名單形同虛設
 - 學習心得 PDF 生成為 O(n²),合法上限的輸入需約 4 分鐘 CPU
 - 詳情彈窗用 `<Spin>` 而非設計規範偏好的 Skeleton

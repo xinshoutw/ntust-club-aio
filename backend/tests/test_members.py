@@ -34,11 +34,17 @@ async def test_profile_get_and_update(client, db):
     assert data["advisor_name"] == "王老師"
 
 
-async def test_profile_rejects_bad_webhook_and_url(client, db):
+async def test_profile_rejects_invalid_or_cleared_fields(client, db):
     await setup_club_session(client, db)
     for payload in (
         {"discord_webhook_url": "https://evil.example.com/webhook"},
         {"website_url": "javascript:alert(1)"},
+        # 畫面上必填的欄位,直呼 API 不得清空
+        {"advisor_name": ""},
+        {"advisor_name": "  "},
+        # 承辦人拿這欄寄信,格式要驗
+        {"advisor_email": "not-an-email"},
+        {"advisor_out_email": "also bad"},
     ):
         resp = await client.patch(
             "/api/v1/club/profile", json=payload, headers=csrf_headers(client)

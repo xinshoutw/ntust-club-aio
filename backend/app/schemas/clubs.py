@@ -65,6 +65,23 @@ class ClubProfileUpdate(BaseModel):
             raise ValueError("Discord Webhook URL 格式不正確")
         return v or None
 
+    @field_validator("advisor_name")
+    @classmethod
+    def _require_advisor(cls, v: str | None) -> str | None:
+        # 校內指導老師姓名是必填(畫面與 spec 皆然);帶了空值等於清掉它
+        if v is not None and not v.strip():
+            raise ValueError("校內指導老師姓名為必填")
+        return v.strip() if v else v
+
+    @field_validator("advisor_email", "advisor_out_email")
+    @classmethod
+    def _valid_advisor_email(cls, v: str | None) -> str | None:
+        # 承辦人真的會拿這個欄位寄信,格式比照聯絡 Email
+        v = (v or "").strip()
+        if v and not _EMAIL_RE.match(v):
+            raise ValueError(f"指導老師 Email 格式不正確:{v}")
+        return v or None
+
     @field_validator("contact_emails")
     @classmethod
     def _valid_emails(cls, v: list[str] | None) -> list[str] | None:

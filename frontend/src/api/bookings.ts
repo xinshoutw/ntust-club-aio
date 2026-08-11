@@ -322,6 +322,7 @@ const keys = {
   availabilityRange: (startIso: string, endIso: string, venueId?: number) =>
     ['bookings', 'availability-range', startIso, endIso, venueId ?? null] as const,
   fixedWindow: ['bookings', 'fixed-window'] as const,
+  fixedOccupancy: (venueId: number | null) => ['bookings', 'fixed-occupancy', venueId] as const,
   rooms: (p: PageParams) => ['bookings', 'room-bookings', p] as const,
   venueBookings: (p: PageParams) => ['bookings', 'venue-bookings', p] as const,
   loans: (p: PageParams) => ['bookings', 'equipment-loans', p] as const,
@@ -390,6 +391,36 @@ export function useAvailabilityDays(dates: Dayjs[], venueId?: number) {
 }
 
 /** 固定借用開放窗(系統設定日期區間;side nav 與固定借用頁共用同一查詢) */
+/** 固定借用可用性:格子的佔用原因由後端判定(送出與核准兩關檢核的同一份) */
+export type OccupancyReason = 'blocked' | 'fixed' | 'temp'
+
+export const OCCUPANCY_TEXT: Record<OccupancyReason, string> = {
+  blocked: '此時段場地不開放',
+  fixed: '已有其他社團的固定借用',
+  temp: '學期內有已核准的臨時借用',
+}
+
+interface FixedOccupancyOut {
+  weekday: number
+  period: string
+  reason: OccupancyReason
+}
+
+/**
+ * 該場地下一學期每週時段的佔用:key 為 'dow|period'。
+ * 前端不自行推導 —— 臨時借用要逐日展開、不開放規則帶自己的日期區間,兩者都算不對。
+ */
+export function useFixedOccupancy(venueId: number | null) {
+  return useQuery({
+    queryKey: keys.fixedOccupancy(venueId),
+    enabled: venueId != null,
+    queryFn: () =>
+      api<FixedOccupancyOut[]>(`/club/room-bookings/occupancy${qs({ venue_id: venueId })}`).then(
+        (rows) => new Map(rows.map((r) => [`${r.weekday}|${r.period}`, r.reason])),
+      ),
+  })
+}
+
 export function useFixedWindow() {
   return useQuery({
     queryKey: keys.fixedWindow,

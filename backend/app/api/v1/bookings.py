@@ -31,6 +31,7 @@ from app.schemas.bookings import (
     EquipmentLoanIn,
     EquipmentLoanOut,
     EquipmentOut,
+    FixedOccupancyOut,
     RoomBookingIn,
     RoomBookingOut,
     VenueBookingIn,
@@ -195,6 +196,26 @@ async def fixed_window(user: ClubUser, db: DbDep) -> ApiResponse[ClubFixedWindow
             used_periods=await _used_fixed_periods(db, user.club_id, sem_start),
             max_periods=svc.MAX_FIXED_SLOTS,
         )
+    )
+
+
+@router.get("/room-bookings/occupancy")
+async def fixed_occupancy(
+    user: ClubUser, db: DbDep, venue_id: int = Query(...)
+) -> ApiResponse[list[FixedOccupancyOut]]:
+    """下一學期該場地每週時段的佔用情形(不開放規則 / 已核准固定借用 / 已核准臨時借用)。
+
+    衝突判定的權威在後端:送出與核准兩關檢核的就是這三條,這支只是把同一份判定
+    提前讓畫面標示,前端不自行推導(尤其臨時借用要逐日展開,前端做不對)。
+    """
+    sem_start, sem_end = next_semester_range(datetime.now(TAIPEI).date())
+    occupancy = await svc.fixed_occupancy(db, venue_id, sem_start, sem_end)
+    return ApiResponse(
+        data=[
+            FixedOccupancyOut(weekday=weekday, period=period, reason=reason)
+            for (weekday, period), reason in sorted(occupancy.items())
+        ],
+        meta={"start_date": sem_start.isoformat(), "end_date": sem_end.isoformat()},
     )
 
 

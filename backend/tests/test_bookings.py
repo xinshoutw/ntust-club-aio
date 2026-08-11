@@ -275,6 +275,50 @@ async def test_room_booking_rejects_blocked_slots(client, db):
     assert resp.status_code == 201, resp.text
 
 
+async def test_fixed_occupancy_lists_all_three_conflict_sources(client, db):
+    """申請畫面要看得到的佔用,與送出/核准兩關檢核同源:不開放規則、已核准固定、已核准臨時。"""
+    from app.core.semesters import next_semester_range
+    from app.models import RoomBookingRequest, RoomBookingSlot, User, VenueBlockRule, VenueBooking
+
+    club = await setup_session(client, db)
+    await open_fixed_window(db)
+    venue = await make_venue(db, allow_temp=True)
+    sem_start, sem_end = next_semester_range(date.today())
+    creator = await db.scalar(sa.select(User.id).order_by(User.id).limit(1))
+
+    wednesday = sem_start + timedelta(days=(2 - sem_start.weekday()) % 7)
+    db.add(VenueBlockRule(venue_id=venue.id, start_date=wednesday, end_date=wednesday,
+                          weekdays=[], periods=["3"], reason="整修", created_by=creator))
+    # 別社已核准的固定借用:週四第 5 節
+    other = await make_club(db, name="吉他社")
+    approved = RoomBookingRequest(club_id=other.id, venue_id=venue.id, purpose="社課",
+                                  start_date=sem_start, end_date=sem_end, status="approved")
+    approved.slots = [RoomBookingSlot(weekday=4, period="5")]
+    db.add(approved)
+    # 已核准的單日臨時借用:學期內某個週五第 7 節
+    friday = sem_start + timedelta(days=(4 - sem_start.weekday()) % 7)
+    db.add(VenueBooking(club_id=other.id, venue_id=venue.id, date=friday, periods=["7"],
+                        purpose="彩排", status="approved"))
+    await db.commit()
+
+    resp = await client.get("/api/v1/club/room-bookings/occupancy", params={"venue_id": venue.id})
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    cells = {(d["weekday"], d["period"]): d["reason"] for d in body["data"]}
+    assert cells[(3, "3")] == "blocked"
+    assert cells[(4, "5")] == "fixed"
+    assert cells[(5, "7")] == "temp"  # ISS-97:臨時借用那條軸畫面本來完全看不到
+    assert body["meta"]["start_date"] == sem_start.isoformat()
+
+    # 標出來的格子送出去一定會被擋 —— 畫面與檢核必須同一份判定
+    resp = await client.post(
+        "/api/v1/club/room-bookings",
+        json={"venue_id": venue.id, "purpose": "社課", "slots": [{"weekday": 3, "period": "3"}]},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+
+
 async def test_room_booking_slot_limit(client, db):
     """每社至多 10 節:單筆超過擋於 422;跨審核中申請合計超過 → 409。"""
     await setup_session(client, db)

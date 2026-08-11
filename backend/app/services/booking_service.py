@@ -233,6 +233,53 @@ async def temp_days_hitting_slots(
     )
 
 
+async def fixed_occupancy(
+    db: AsyncSession, venue_id: int, start: date, end: date
+) -> dict[tuple[int, str], str]:
+    """該場地在學期區間內每週 (星期, 節次) 的佔用原因,供申請畫面標示。
+
+    三條來源與送出/核准兩關檢核的完全同一份判定:
+    `blocked`=場地不開放規則、`fixed`=已核准的固定借用、`temp`=已核准的單日臨時借用。
+    同一格多重命中時取最硬的那條(不開放 > 已核准固定 > 已核准臨時)。
+    """
+    out: dict[tuple[int, str], str] = {}
+
+    # 已核准的臨時借用(逐日展開成星期):學期已開始的話,過去的日子不再擋
+    temp_start = max(start, today_taipei())
+    if temp_start <= end:
+        weekday = sa.cast(sa.extract("isodow", VenueBooking.date), sa.Integer)
+        rows = await db.execute(
+            sa.select(weekday, sa.func.unnest(VenueBooking.periods)).where(
+                VenueBooking.venue_id == venue_id,
+                VenueBooking.status == BookingStatus.APPROVED,
+                VenueBooking.date >= temp_start,
+                VenueBooking.date <= end,
+            )
+        )
+        for wd, period in rows:
+            out[(int(wd), period)] = "temp"
+
+    # 已核准的固定借用(同場地、學期區間重疊)
+    rows = await db.execute(
+        sa.select(RoomBookingSlot.weekday, RoomBookingSlot.period)
+        .join(RoomBookingRequest, RoomBookingRequest.id == RoomBookingSlot.request_id)
+        .where(
+            RoomBookingRequest.venue_id == venue_id,
+            RoomBookingRequest.status == BookingStatus.APPROVED,
+            RoomBookingRequest.start_date <= end,
+            RoomBookingRequest.end_date >= start,
+        )
+    )
+    for wd, period in rows:
+        out[(int(wd), period)] = "fixed"
+
+    # 場地不開放規則:區間內只要有一天的該星期該節次被封,整個每週時段就不受理
+    for (day, _venue), cells in (await blocked_map(db, start, end, venue_id)).items():
+        for period in cells:
+            out[(day.isoweekday(), period)] = "blocked"
+    return out
+
+
 async def equipment_available_in_window(
     db: AsyncSession,
     equipment_id: int,

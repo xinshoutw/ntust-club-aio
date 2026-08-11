@@ -36,7 +36,11 @@ export function useDragSelect(apply: (key: string, to: boolean) => void) {
         return
       }
       const el = document.elementFromPoint(e.clientX, e.clientY)
-      const key = el instanceof HTMLElement ? el.dataset.dragKey : undefined
+      if (!(el instanceof HTMLElement)) return
+      // 停用的格子拖曳掃過去也不能套用:elementFromPoint 照樣看得到 disabled 的按鈕,
+      // 只擋 pointerdown 的話,從別處起拖再掃過來仍然選得到
+      if (el instanceof HTMLButtonElement && el.disabled) return
+      const key = el.dataset.dragKey
       if (key) apply(key, dragTo)
     },
   }

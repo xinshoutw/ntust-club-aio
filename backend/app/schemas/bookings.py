@@ -106,6 +106,14 @@ class ClubFixedWindowOut(FixedWindowOut):
     max_periods: int
 
 
+class FixedOccupancyOut(BaseModel):
+    """固定借用申請畫面的格狀佔用:reason 為 blocked / fixed / temp。"""
+
+    weekday: int  # ISO 星期 1=一 … 7=日
+    period: str
+    reason: str
+
+
 # 聯絡電話僅允許 數字與 - ( ) * #
 _PHONE_RE = re.compile(r"^[0-9\-()*#]+$")
 

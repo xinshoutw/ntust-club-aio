@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import dayjs from 'dayjs'
 import { App, Button, Form, Input, Select, Spin } from 'antd'
 import { useFormUnsavedGuard } from '../../app/unsaved'
@@ -10,11 +10,14 @@ import { Cols } from '../../components/ui/tableControls'
 import SuspensionNote from '../../components/ui/SuspensionNote'
 import { useClubSuspension } from '../../api/clubProfile'
 import { useDragSelect } from './useDragSelect'
+import { CELL } from './cells'
 import {
   DOW_TEXT,
+  OCCUPANCY_TEXT,
   PERIODS,
   roomEntryText,
   useBookingMutations,
+  useFixedOccupancy,
   useFixedWindow,
   useActiveRoomBookings,
   useRecentRoomBookings,
@@ -78,6 +81,19 @@ export default function FixedRoomPage() {
   }
   // 拖曳批量選取:與 PeriodPicker 共用同一份手感(hook 必須在下方 early return 之前呼叫)
   const { containerProps, cellProps } = useDragSelect(apply)
+
+  // 場況:選了場地才查(佔用原因由後端判定,與送出/核准兩關同一份檢核)
+  const venueId = Form.useWatch<number | undefined>('room', form)
+  const occupancyQuery = useFixedOccupancy(venueId ?? null)
+  const occupied = occupancyQuery.data
+  // 換場地時,原本選好的格子可能在新場地已被佔用:直接拿掉,不要讓人送出去吃 422
+  useEffect(() => {
+    if (!occupied) return
+    setSlots((prev) => {
+      const next = new Set([...prev].filter((key) => !occupied.has(key)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [occupied])
 
   // 開放窗由後端提供(與側欄共用同一查詢);未開放時直接輸入網址也只顯示說明
   const windowQuery = useFixedWindow()
@@ -223,6 +239,18 @@ export default function FixedRoomPage() {
               已選 {slots.size} / 可用 {remainingPeriods} 節
             </span>
           </div>
+          {occupancyQuery.isError && (
+            <div style={{ marginBottom: 8 }}>
+              <QueryError
+                compact
+                title="場況載入失敗"
+                error={occupancyQuery.error}
+                onRetry={() => occupancyQuery.refetch()}
+              />
+            </div>
+          )}
+          {/* 場況未就緒時不讓人選:空的佔用表看起來就是「整週都可借」 */}
+          <Spin spinning={venueId != null && occupancyQuery.isPending}>
           <div className={slotsError ? 'area-error' : undefined} style={{ overflowX: 'auto', border: '1px solid transparent', borderRadius: 6 }}>
             <table aria-label="每週時段選擇" {...containerProps} style={{ borderCollapse: 'separate', borderSpacing: 4, width: '100%', tableLayout: 'fixed', minWidth: 640, userSelect: 'none' }}>
               {/* 不設表頭:每格按鈕本身已標節次,星期由列首標示 */}
@@ -236,24 +264,32 @@ export default function FixedRoomPage() {
                     {PERIODS.map((p) => {
                       const key = `${dow}|${p}`
                       const on = slots.has(key)
+                      const reason = occupied?.get(key)
+                      const label = `週${DOW_TEXT[dow]} 第${p}節`
                       return (
                         <td key={p}>
                           <button
                             type="button"
                             aria-pressed={on}
-                            aria-label={`週${DOW_TEXT[dow]} 第${p}節`}
-                            {...cellProps(key, on)}
+                            aria-label={reason ? `${label}(${OCCUPANCY_TEXT[reason]})` : label}
+                            title={reason ? OCCUPANCY_TEXT[reason] : undefined}
+                            disabled={reason != null}
+                            {...cellProps(key, on, reason != null)}
                             className="num"
                             style={{
                               width: '100%',
                               height: 28,
                               borderRadius: 6,
-                              cursor: 'pointer',
+                              cursor: reason ? 'not-allowed' : 'pointer',
                               fontSize: 12,
                               fontFamily: 'inherit',
                               border: on ? '1px solid var(--seal)' : '1px solid var(--line)',
-                              background: on ? 'var(--seal)' : '#fff',
-                              color: on ? '#fff' : 'var(--ink)',
+                              background: reason
+                                ? CELL[reason === 'blocked' ? 'closed' : reason].bg
+                                : on
+                                  ? 'var(--seal)'
+                                  : '#fff',
+                              color: reason ? 'var(--steel)' : on ? '#fff' : 'var(--ink)',
                             }}
                           >
                             {p}
@@ -266,6 +302,17 @@ export default function FixedRoomPage() {
               </tbody>
             </table>
           </div>
+          </Spin>
+          {venueId != null && occupied && occupied.size > 0 && (
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, fontSize: 12, color: 'var(--steel)' }}>
+              {(['blocked', 'fixed', 'temp'] as const).map((r) => (
+                <span key={r} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  <span style={{ width: 12, height: 12, borderRadius: 3, border: '1px solid var(--line)', background: CELL[r === 'blocked' ? 'closed' : r].bg }} />
+                  {OCCUPANCY_TEXT[r]}
+                </span>
+              ))}
+            </div>
+          )}
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
             <Button type="primary" htmlType="submit" loading={createRoomBooking.isPending} disabled={createRoomBooking.isPending || suspended}>送出申請</Button>

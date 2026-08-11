@@ -166,6 +166,28 @@ async def test_submit_flow_and_edit_guard(client, db):
     assert resp.status_code == 409
 
 
+async def test_deleting_a_draft_is_audited(client, db):
+    """整張單連同附件實體刪除,事後只剩稽核查得到刪了什麼。"""
+    await setup_session(client, db)
+    activity = await create_activity(client)
+    await client.post(
+        f"/api/v1/club/activities/{activity['id']}/attachments",
+        files={"file": ("企劃書.pdf", io.BytesIO(b"%PDF-1.7 " + b"\x00" * 32), "application/pdf")},
+        headers=csrf_headers(client),
+    )
+
+    resp = await client.delete(
+        f"/api/v1/club/activities/{activity['id']}", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200
+
+    detail = await db.scalar(
+        sa.select(AuditLog.detail).where(AuditLog.action == "activity_deleted")
+    )
+    assert activity["name"] in detail
+    assert "files=1" in detail
+
+
 async def test_submit_rejects_past_start(client, db):
     """過去時間全面禁止(2026-07-21):送審/退回重送擋過去開始時刻;草稿不擋。"""
     await setup_session(client, db)

@@ -217,7 +217,9 @@ async def update_activity(
 
 
 @router.delete("/{activity_id}")
-async def delete_activity(activity_id: int, user: ClubUser, db: DbDep) -> ApiResponse[None]:
+async def delete_activity(
+    activity_id: int, user: ClubUser, db: DbDep, request: Request
+) -> ApiResponse[None]:
     activity = await svc.get_own_activity(db, user, activity_id)
     await db.refresh(activity, attribute_names=["status"], with_for_update=True)
     if activity.status != ActivityStatus.DRAFT:
@@ -226,6 +228,14 @@ async def delete_activity(activity_id: int, user: ClubUser, db: DbDep) -> ApiRes
     for slot in (svc.PHOTO_SLOT, svc.ATTACHMENT_SLOT):
         for f in await svc.activity_files(db, activity, slot):
             disk_paths.append(await file_service.delete_file(db, f))
+    # 整張單連同附件一起實體刪除,比單刪一個檔更該留下紀錄
+    audit.record(
+        db,
+        action="activity_deleted",
+        user=user,
+        detail=f"activity={activity.id};name={activity.name};files={len(disk_paths)}",
+        ip=client_ip(request),
+    )
     await db.delete(activity)
     await db.commit()
     for path in disk_paths:  # commit 成功後才動磁碟

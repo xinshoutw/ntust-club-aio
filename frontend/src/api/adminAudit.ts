@@ -21,6 +21,7 @@ export const ACTION_LABELS: Record<string, string> = {
   password_changed: '變更密碼',
   account_created: '新增帳號',
   account_deleted: '刪除帳號',
+  account_restored: '恢復帳號',
   account_password_reset: '重設帳號密碼',
   account_permissions_updated: '調整頁面權限',
   account_suspended: '停權帳號',

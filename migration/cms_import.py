@@ -336,6 +336,17 @@ async def import_teachers(legacy, db: AsyncSession, clubs: dict[int, tuple[int, 
     print(f"teachers: 寫入 {count} 位(校內/校外各取最新)")
 
 
+def staff_line(item: str | None, owner: str | None) -> str:
+    """工作分配一行。
+
+    前端約定的格式是每列「項目:負責人」一行(api/activities.ts `staffTextToWorks`);
+    舊碼寫的是 `項目>負責人` + `;`,整份工作分配會顯示成一行亂碼。
+    兩欄都空的列不產生行。
+    """
+    item, owner = (item or "").strip(), (owner or "").strip()
+    return f"{item}:{owner}" if item or owner else ""
+
+
 def member_kind(identity: str | None, title: str | None) -> tuple[MemberKind, str | None]:
     """舊 Identity+Title → 新標準身份;職稱各身份皆保留(幹部缺職稱補「幹部」)。"""
     t = (title or "").strip()
@@ -448,10 +459,9 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
         funds.setdefault(r.aid, []).append(r)
     staffs: dict[int, list[str]] = {}
     for r in staff_rows:
-        if (r.Item or "").strip() or (r.Supervisor or "").strip():
-            # 前端約定的格式:每列「項目:負責人」一行(api/activities.ts staffTextToWorks)
-            item, owner = (r.Item or "").strip(), (r.Supervisor or "").strip()
-            staffs.setdefault(r.aid, []).append(f"{item}:{owner}")
+        line = staff_line(r.Item, r.Supervisor)
+        if line:
+            staffs.setdefault(r.aid, []).append(line)
     metas: dict[int, dict[str, bool]] = {}
     for r in meta_rows:
         metas.setdefault(r.aid, {})[r.key] = r.value == "True"

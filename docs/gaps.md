@@ -47,7 +47,6 @@
 | OPS-05 | Edge proxy 切換 | 六個項目仍是原狀(upstream 埠號、`client_max_body_size`、`proxy_request_buffering`、XFF 覆寫、`FORWARDED_ALLOW_IPS`、clubclass 導向) |
 | OPS-06 | SMTP relay | 未定,現用開發者個人信箱 |
 | OPS-07 | 容量告警 | 「已接受的磁碟 DoS 風險」的前提條件至今未建立 |
-| OPS-10 | 遷移腳本測試 | 兩套舊系統匯入腳本零測試 |
 
 ## 5. 資料遷移待決
 

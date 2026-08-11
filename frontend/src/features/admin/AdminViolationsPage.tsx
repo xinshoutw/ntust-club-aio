@@ -124,7 +124,7 @@ export default function AdminViolationsPage() {
         title="違規管理"
         sub={
           <>
-            未銷案 <span className="num">{openTotal.data ?? 0}</span> 筆
+            未銷案 <span className="num">{openTotal.data ?? '—'}</span> 筆
           </>
         }
       />

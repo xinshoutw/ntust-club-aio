@@ -77,7 +77,7 @@ export default function AdminApplicationsPage() {
         title="線上申請管理"
         sub={
           <>
-            待處理 <span className="num">{pendingTotal.data ?? 0}</span> 件
+            待處理 <span className="num">{pendingTotal.data ?? '—'}</span> 件
           </>
         }
       />

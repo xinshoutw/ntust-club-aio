@@ -345,7 +345,7 @@ export default function SignupManagePage() {
         title="活動管理"
         sub={
           <>
-            開放中 <span className="num">{openTotal.data ?? 0}</span> 項
+            開放中 <span className="num">{openTotal.data ?? '—'}</span> 項
           </>
         }
         extra={

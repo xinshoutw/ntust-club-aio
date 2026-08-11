@@ -222,7 +222,7 @@ export default function ActivityReviewModal({
         // 本來就沒有鈕,別叫人去審核 —— 頁面對每一列都傳 onApprove,判準只能是 canReview
         detailFailed ? (
           <div style={{ fontSize: 12, color: 'var(--steel)' }}>
-            詳情載入失敗,請重試{onApprove && (!item || canReview) ? '後再審核' : ''}
+            詳情載入失敗,請重試{canReview ? '後再審核' : ''}
           </div>
         ) : canReview ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>

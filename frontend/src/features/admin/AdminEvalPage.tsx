@@ -206,6 +206,7 @@ export default function AdminEvalPage() {
       {/* 各社團行政分總覽:點列切換上方審核對象 */}
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
         <div style={{ fontSize: 14, fontWeight: 600, padding: '14px 20px 6px' }}>各社團行政分</div>
+        <LoadingBlock pending={clubsQuery.isPending} rows={8}>
         <table className="tb fixed" aria-label="各社團行政分">
           {/* 社團名吃剩餘寬並截斷;性質/總分固定 px */}
           <Cols widths={['auto', 120, 120]} />
@@ -242,6 +243,7 @@ export default function AdminEvalPage() {
             ))}
           </tbody>
         </table>
+        </LoadingBlock>
         <Pager
           page={clubPage}
           pageSize={EVAL_CLUBS_PAGE_SIZE}

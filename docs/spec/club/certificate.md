@@ -10,7 +10,7 @@
 
 | 動作 | 端點 |
 |---|---|
-| 姓名預覽 | `GET /club/members?semester=&kind=` |
+| 姓名預覽 | `GET /club/members?semester=&kind=`(前端逐頁抓齊) |
 | 列表 | `GET /club/officer-certificates`(前端逐頁抓齊) |
 | 送出 | `POST /club/officer-certificates` |
 

@@ -61,6 +61,10 @@ Python 3.14 lazy annotation:欄位名與型別同名時型別須別名(`import d
 
 逾期、結案鎖定、器材可借數一律於查詢時推導,不排程改狀態,故不需要 Celery/Redis/scheduler。
 
+### 3.5 併發鎖
+
+「先查再寫」一律以 `pg_advisory_xact_lock` 序列化,命名空間登錄表見 [data-model.md](data-model.md) §3.10。需要列鎖時順序固定「列鎖 → advisory lock」;users 與 sessions 一律 users 先(登入、重設密碼、停權皆同),反序會死鎖。
+
 ## 4. API 契約
 
 REST JSON,前綴 `/api/v1`。回應信封:
@@ -101,7 +105,7 @@ REST JSON,前綴 `/api/v1`。回應信封:
 | 500 | `INTERNAL` | 未預期錯誤(訊息固定,不洩漏) |
 | 507 | `INSUFFICIENT_STORAGE` | 社團配額或實體磁碟空間不足 |
 
-- **分頁**:`?page=1&page_size=20`(1-based,page_size 上限 100),回應 `meta = { page, page_size, total }`。歷史型列表一律分頁;主檔與選項端點為全量回傳。行政分清單 `/admin/eval/clubs` 未分頁,是已知待修(BUG-41)
+- **分頁**:`?page=1&page_size=20`(1-based,page_size 上限 100),回應 `meta = { page, page_size, total }`。歷史型列表一律分頁;主檔與選項端點為全量回傳。行政分清單 `/admin/eval/clubs` 未分頁,是已知待修(ISS-47)
 - **排序**:`?sort=field` 升冪、`-field` 降冪,逗號分隔多鍵;欄位採各端點白名單,未知欄位 422;非唯一排序鍵一律補 id tiebreak
 - **CSRF**:登入時發 `csrf_token` cookie(非 HttpOnly,double-submit 綁 session 列);除 `/auth/login`(此時尚無 session)外,所有寫入請求須帶 `X-CSRF-Token`,前端 `client.ts` 自動附帶
 

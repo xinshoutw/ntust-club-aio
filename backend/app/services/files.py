@@ -1,4 +1,4 @@
-"""檔案上傳/下載服務(docs/architecture.md §3.5、data-model.md §3.4)。
+"""檔案上傳/下載服務(docs/architecture.md §3.2、data-model.md §3.4)。
 
 - 後端重驗:副檔名 × 魔術位元組必須一致,client 宣稱的 MIME 一律不信
 - 串流寫盤(1MB chunk,不整檔進記憶體),邊寫邊算 sha256、邊檢查大小上限

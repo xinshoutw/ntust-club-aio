@@ -368,6 +368,20 @@ approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,�
 
 **legacy_id_map**(id, legacy_system enum(cms,clubclass), legacy_table, legacy_id, new_table, new_id, migrated_at;UNIQUE(前三者))— migration scripts 先查 map 再寫入,重跑不重複。
 
+### 3.10 併發鎖
+
+「先查再寫」的檢核靠 `pg_advisory_xact_lock` 序列化(隨交易釋放)。命名空間分散在各服務,新增前先看這張表以免撞號:
+
+| ns | 鍵 | 用途 | 位置 |
+|---|---|---|---|
+| 411001 | equipment_id | 器材可借數 | `booking_service._LOCK_NS` |
+| 411002 | venue_id | 場地時段(臨時與固定共用同一把,否則兩邊可同時核准) | `booking_service._LOCK_NS` |
+| 411003 | club_id | 固定借用每社 10 節額度(鍵是社團不是場地) | `booking_service._LOCK_NS` |
+| 411004 | club_id | 行政分/加分調整的「註銷舊值後新增」 | `evaluation._ADJUSTMENT_LOCK_NS` |
+| 單參數 `0xC1ABA105EC3` | — | 上傳配額結算(全系統一把) | `files._STORAGE_LOCK_KEY` |
+
+雙參數與單參數是兩個獨立 key space,不會互相碰撞。全站沒有任何路徑同時持有兩把 advisory lock;需要列鎖時一律「列鎖 → advisory lock」的順序。另一組固定順序是 **users → sessions**(登入、重設密碼、停權皆同),反序會死鎖。
+
 ## 4. 學年、學期與設定分層
 
 - **上學期 = 8–1 月、下學期 = 2–7 月**

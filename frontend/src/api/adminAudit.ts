@@ -4,6 +4,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api, apiPaged, qs } from './client'
+import { fetchAllPages } from './fetchAll'
 
 export const ROLE_LABELS: Record<string, string> = {
   admin: '管理員',
@@ -174,13 +175,15 @@ export function useAuditLogs(p: AuditListParams) {
 
 /** 匯出用:依當前篩選逐頁抓完整結果(稽核只有 super 看得到,不另設上限) */
 export async function fetchAllAuditLogs(filters: AuditFilters): Promise<AuditLog[]> {
-  const out: AuditLog[] = []
-  for (let page = 1; ; page++) {
-    const { data, total } = await apiPaged<AuditLogOut[]>(listUrl({ ...filters, page, pageSize: 200 }))
-    out.push(...data.map(toLog))
-    if (data.length === 0 || out.length >= total) break
-  }
-  return out
+  const rows = await fetchAllPages<AuditLogOut>('/admin/audit', {
+    user_id: filters.userId,
+    role: filters.role,
+    action: filters.action,
+    date_from: filters.dateFrom,
+    date_to: filters.dateTo,
+  })
+  // 抓取期間有人登入就會往最前面插列,後面的頁會重覆回傳前一頁尾端 —— 以 id 去重
+  return [...new Map(rows.map((l) => [l.id, toLog(l)])).values()]
 }
 
 // ---- 篩選選項(取自實際留下的紀錄,不是已載入的那幾頁)----

@@ -134,7 +134,11 @@ export default function AccountsPage() {
       cancelText: '取消',
       onOk: () => {
         remove.mutate(a.id, {
-          onSuccess: () => message.success(`已刪除 ${a.name}(${a.username})`),
+          onSuccess: () => {
+            message.success(`已刪除 ${a.name}(${a.username})`)
+            // 刪掉的是本頁最後一列時退回前一頁,不要停在空白頁
+            if (accountRows.length === 1 && accountPage > 1) setAccountPage(accountPage - 1)
+          },
           onError: (e) => message.error(e.message),
         })
       },

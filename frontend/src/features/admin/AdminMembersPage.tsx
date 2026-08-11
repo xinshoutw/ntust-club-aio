@@ -4,6 +4,7 @@ import LoadingBlock from '../../components/ui/LoadingBlock'
 import { DownloadOutlined } from '@ant-design/icons'
 import OptionsError from '../../components/ui/OptionsError'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import { Cols, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
 import { downloadCsv } from '../../lib/csv'
 import { kindLabel } from '../../lib/roles'
@@ -131,8 +132,13 @@ export default function AdminMembersPage() {
               ))}
               {listQuery.isError && (
                 <tr className="no-hover">
-                  <td colSpan={7} style={{ textAlign: 'center', color: '#C13B34', padding: 24 }}>
-                    載入失敗:{listQuery.error.message}
+                  <td colSpan={7}>
+                    <QueryError
+                      compact
+                      title="成員名單載入失敗"
+                      error={listQuery.error}
+                      onRetry={() => void listQuery.refetch()}
+                    />
                   </td>
                 </tr>
               )}

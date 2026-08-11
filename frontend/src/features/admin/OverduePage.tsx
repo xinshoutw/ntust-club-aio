@@ -3,6 +3,7 @@ import { App, Button, DatePicker, Form, Input, Modal } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import dayjs, { type Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import { useAdminClubs } from '../../api/adminClubs'
@@ -116,8 +117,13 @@ export default function OverduePage() {
               ))}
               {overdueQuery.isError && (
                 <tr className="no-hover">
-                  <td colSpan={5} style={{ textAlign: 'center', color: '#C13B34', padding: 24 }}>
-                    載入失敗:{overdueQuery.error.message}
+                  <td colSpan={5}>
+                    <QueryError
+                      compact
+                      title="逾期未還器材載入失敗"
+                      error={overdueQuery.error}
+                      onRetry={() => void overdueQuery.refetch()}
+                    />
                   </td>
                 </tr>
               )}
@@ -173,8 +179,13 @@ export default function OverduePage() {
               ))}
               {suspendedQuery.isError && (
                 <tr className="no-hover">
-                  <td colSpan={4} style={{ textAlign: 'center', color: '#C13B34', padding: 24 }}>
-                    載入失敗:{suspendedQuery.error.message}
+                  <td colSpan={4}>
+                    <QueryError
+                      compact
+                      title="停權中社團載入失敗"
+                      error={suspendedQuery.error}
+                      onRetry={() => void suspendedQuery.refetch()}
+                    />
                   </td>
                 </tr>
               )}

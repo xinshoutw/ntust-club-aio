@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { App, Button, Form, Input } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import SuspensionNote from '../../components/ui/SuspensionNote'
 import { useAuth } from '../../app/auth'
 import { useUnsavedGuard } from '../../app/unsaved'
@@ -83,8 +84,12 @@ export default function ClubSettingsPage() {
       <div>
         <PageHeader title="管理項目" />
         {profileQuery.isError ? (
-          <div className="card" style={{ marginTop: 20, padding: 24, color: 'var(--steel)' }}>
-            載入失敗:{profileQuery.error.message}
+          <div style={{ marginTop: 20 }}>
+            <QueryError
+              title="社團資料載入失敗"
+              error={profileQuery.error}
+              onRetry={() => void profileQuery.refetch()}
+            />
           </div>
         ) : (
           <LoadingBlock pending rows={6} />

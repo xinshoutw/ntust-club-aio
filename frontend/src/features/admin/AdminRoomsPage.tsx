@@ -303,8 +303,13 @@ export default function AdminRoomsPage() {
               ))}
               {listQuery.isError && (
                 <tr className="no-hover">
-                  <td colSpan={6} style={{ textAlign: 'center', color: '#C13B34', padding: 24 }}>
-                    載入失敗:{listQuery.error.message}
+                  <td colSpan={6}>
+                    <QueryError
+                      compact
+                      title="固定借用申請載入失敗"
+                      error={listQuery.error}
+                      onRetry={() => void listQuery.refetch()}
+                    />
                   </td>
                 </tr>
               )}

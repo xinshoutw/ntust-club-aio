@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router'
 import { Tooltip } from 'antd'
 import { RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import { useEvalOverview } from '../../api/eval'
 import type { AdKey, FinalScore } from './scoring'
 import { AD_LABELS } from './types'
@@ -36,7 +37,8 @@ function ScoreValue({ s }: { s: FinalScore }) {
 // 資料總覽:行政資料各項分數(唯讀,後端自動計算+管理員調整)+ 五獎項資料入口
 export default function EvalDocsPage() {
   const navigate = useNavigate()
-  const { data, error } = useEvalOverview()
+  const overviewQuery = useEvalOverview()
+  const { data, error } = overviewQuery
 
   const go = (path: string) => navigate(path)
 
@@ -63,8 +65,12 @@ export default function EvalDocsPage() {
       />
 
       {error && (
-        <div className="card" style={{ marginTop: 20, padding: '24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
-          載入評鑑資料失敗:{error.message}
+        <div style={{ marginTop: 20 }}>
+          <QueryError
+            title="評鑑資料載入失敗"
+            error={error}
+            onRetry={() => void overviewQuery.refetch()}
+          />
         </div>
       )}
 

@@ -5,6 +5,7 @@ import { App, Button, DatePicker, Dropdown, Tooltip } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { LeftOutlined, RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import BookingReviewModal, { type BookingReviewItem } from './BookingReviewModal'
@@ -210,9 +211,15 @@ export default function AdminBookingsPage() {
             </table>
           </div>
           {(venuesQuery.isError || gridQuery.isError) && (
-            <div style={{ textAlign: 'center', color: '#C13B34', padding: '12px 0 2px', fontSize: 13 }}>
-              載入失敗:{venuesQuery.error?.message ?? gridQuery.error?.message}
-            </div>
+            <QueryError
+              compact
+              title={venuesQuery.isError ? '場地清單載入失敗' : '場況載入失敗'}
+              error={venuesQuery.error ?? gridQuery.error}
+              onRetry={() => {
+                if (venuesQuery.isError) void venuesQuery.refetch()
+                if (gridQuery.isError) void gridQuery.refetch()
+              }}
+            />
           )}
         </LoadingBlock>
       </div>
@@ -258,8 +265,13 @@ export default function AdminBookingsPage() {
               ))}
               {venueQuery.isError && (
                 <tr className="no-hover">
-                  <td colSpan={6} style={{ textAlign: 'center', color: '#C13B34', padding: 24 }}>
-                    載入失敗:{venueQuery.error.message}
+                  <td colSpan={6}>
+                    <QueryError
+                      compact
+                      title="臨時場地申請載入失敗"
+                      error={venueQuery.error}
+                      onRetry={() => void venueQuery.refetch()}
+                    />
                   </td>
                 </tr>
               )}
@@ -328,8 +340,13 @@ export default function AdminBookingsPage() {
               })}
               {loanQuery.isError && (
                 <tr className="no-hover">
-                  <td colSpan={6} style={{ textAlign: 'center', color: '#C13B34', padding: 24 }}>
-                    載入失敗:{loanQuery.error.message}
+                  <td colSpan={6}>
+                    <QueryError
+                      compact
+                      title="器材借用申請載入失敗"
+                      error={loanQuery.error}
+                      onRetry={() => void loanQuery.refetch()}
+                    />
                   </td>
                 </tr>
               )}

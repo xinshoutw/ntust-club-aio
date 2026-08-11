@@ -3,6 +3,7 @@ import { App, Button, Input, Select, Switch } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { confirmDialog } from '../../lib/confirm'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import { suspendedNow } from '../../lib/status'
 import { useUnsavedGuard } from '../../app/unsaved'
 import { useAdminClubDetail, useAdminClubMutations, type AdminClubDetail } from '../../api/adminClubs'
@@ -183,6 +184,16 @@ export default function AdminClubSettingsPage() {
         <div className="card" style={{ padding: 24 }}>
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>社團資料</div>
           <LoadingBlock pending={clubId != null && detailQuery.isPending}>
+            {/* 手上還沒有資料就只顯示錯誤:八個欄位全是 `—` 看起來像「這社什麼都沒填」(同社團總覽) */}
+            {detailQuery.isError && !detail ? (
+              <QueryError
+                compact
+                title="社團資料載入失敗"
+                error={detailQuery.error}
+                onRetry={() => void detailQuery.refetch()}
+              />
+            ) : (
+            <>
             <div style={{ display: 'grid', gridTemplateColumns: '104px 1fr', gap: '10px 12px', fontSize: 13 }}>
               <div style={label}>英文名稱</div><div>{detail?.enName || '—'}</div>
               <div style={label}>校內指導老師</div><div>{advisorText(detail)}</div>
@@ -201,8 +212,16 @@ export default function AdminClubSettingsPage() {
               <div style={label}>Discord Webhook</div>
               <div>{detail ? (detail.discordWebhookSet ? '已設定' : '未設定') : '—'}</div>
             </div>
-            {detailQuery.isError && (
-              <div style={{ fontSize: 13, color: '#C13B34', marginTop: 12 }}>載入失敗:{detailQuery.error.message}</div>
+            {/* 背景重抓失敗:資料照舊,底下補一行說明 */}
+            {detailQuery.isError && detail && (
+              <QueryError
+                compact
+                title="社團資料重新載入失敗"
+                error={detailQuery.error}
+                onRetry={() => void detailQuery.refetch()}
+              />
+            )}
+            </>
             )}
           </LoadingBlock>
         </div>

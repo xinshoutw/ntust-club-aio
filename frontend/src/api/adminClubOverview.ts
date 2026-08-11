@@ -205,6 +205,8 @@ export interface AdminMaintenanceRow {
   status: StatusKey // pending | in_progress | done
   handleNote?: string
   createdAt: string
+  /** 佐證照片/影片:報修最主要的判斷依據(下載走 GET /files/{id}) */
+  evidence: { id: string; name: string }[]
 }
 
 interface AdminMaintenanceOut {
@@ -214,6 +216,7 @@ interface AdminMaintenanceOut {
   status: 'pending' | 'in_progress' | 'done'
   handle_note: string | null
   created_at: string
+  evidence: { id: string; original_name: string }[]
 }
 
 export function useAdminClubMaintenance(clubId: number | null, canView = true) {
@@ -230,6 +233,7 @@ export function useAdminClubMaintenance(clubId: number | null, canView = true) {
             status: m.status,
             handleNote: m.handle_note ?? undefined,
             createdAt: slashDate(m.created_at),
+            evidence: (m.evidence ?? []).map((f) => ({ id: f.id, name: f.original_name })),
           }),
         ),
       ),

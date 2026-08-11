@@ -5,6 +5,7 @@ import StatusPill from '../../components/ui/StatusPill'
 import type { StatusKey } from '../../lib/status'
 import { roomEntryText } from '../../api/bookings'
 import { useAdminClubDetail } from '../../api/adminClubs'
+import { fileDownloadUrl } from '../../api/adminFiles'
 import {
   roomConflictSlots,
   useAdminBookingMutations,
@@ -134,6 +135,24 @@ export default function ClubOverviewPage() {
         ['地點', m.location],
         ['報修項目', m.items],
         ['申請日', <span className="num" key="d">{m.createdAt}</span>],
+        // 佐證是報修的判斷依據,唯讀詳情也要看得到
+        [
+          '佐證',
+          m.evidence.length ? (
+            <span key="ev">
+              {m.evidence.map((f, i) => (
+                <span key={f.id}>
+                  {i > 0 && ' · '}
+                  <a href={fileDownloadUrl(f.id)} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--focus)' }}>
+                    {f.name}
+                  </a>
+                </span>
+              ))}
+            </span>
+          ) : (
+            '—'
+          ),
+        ],
         ...(m.handleNote ? ([['處理備註', m.handleNote]] as [string, React.ReactNode][]) : []),
       ],
     })

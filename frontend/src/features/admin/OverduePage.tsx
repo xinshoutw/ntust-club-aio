@@ -96,6 +96,8 @@ export default function OverduePage() {
                   <td style={{ fontSize: 13, color: 'var(--steel)' }}>
                     借用區間 <span className="num">{l.startDate} – {l.endDate}</span>
                     {l.activity ? ` · ${l.activity}` : ''}
+                    {/* 這頁的動作就是催人,聯絡電話要在手邊 */}
+                    {l.phone && <> · 電話 <span className="num">{l.phone}</span></>}
                   </td>
                   <td><StatusPill status="overdue" /></td>
                   <td className="r">

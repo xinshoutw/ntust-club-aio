@@ -67,7 +67,11 @@ export default function PtOverduePage() {
                   </td>
                   <td className="num" style={{ fontSize: 13 }}>{r.due}</td>
                   <td className="num" style={{ fontSize: 13, color: '#A3341F' }}>{r.daysLate} 天</td>
-                  <td className="cell-clip" title={r.borrower} style={{ fontSize: 13 }}>{r.borrower}</td>
+                  <td className="cell-clip" title={r.phone ? `${r.borrower ?? ''}・${r.phone}` : r.borrower} style={{ fontSize: 13 }}>
+                    {r.borrower}
+                    {/* 逾期追蹤的動作就是聯絡社團,電話要看得到 */}
+                    {r.phone && <div className="num" style={{ fontSize: 12, color: 'var(--steel)' }}>{r.phone}</div>}
+                  </td>
                   <td><StatusPill status="overdue" /></td>
                   <td>
                     {r.manual ? (

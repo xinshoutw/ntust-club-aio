@@ -554,22 +554,21 @@ export default function AccountsPage() {
       />
 
       <div className="card" style={{ marginTop: 16, overflowX: 'auto', paddingTop: 8 }}>
-        <LoadingBlock pending={tab === 'clubs' ? clubsQuery.isPending : accountsLoading}>
-          <Tabs
-            activeKey={tab}
-            onChange={(next) => {
-              setTab(next)
-              setAccountPage(1) // 換分頁=換角色,頁碼不共用
-            }}
-            style={{ padding: '0 20px' }}
-            items={[
-              { key: 'admins', label: '管理員', children: adminsTable },
-              { key: 'staff', label: '工讀生', children: staffTable },
-              { key: 'viewers', label: '評審', children: viewersTable },
-              { key: 'clubs', label: '社團', children: clubsTable },
-            ]}
-          />
-        </LoadingBlock>
+        {/* Skeleton 收在各分頁內:分頁列本身不隨查詢消失,否則換角色/換頁時看不到自己在哪一頁 */}
+        <Tabs
+          activeKey={tab}
+          onChange={(next) => {
+            setTab(next)
+            setAccountPage(1) // 換分頁=換角色,頁碼不共用
+          }}
+          style={{ padding: '0 20px' }}
+          items={[
+            { key: 'admins', label: '管理員', children: <LoadingBlock pending={accountsLoading}>{adminsTable}</LoadingBlock> },
+            { key: 'staff', label: '工讀生', children: <LoadingBlock pending={accountsLoading}>{staffTable}</LoadingBlock> },
+            { key: 'viewers', label: '評審', children: <LoadingBlock pending={accountsLoading}>{viewersTable}</LoadingBlock> },
+            { key: 'clubs', label: '社團', children: <LoadingBlock pending={clubsQuery.isPending}>{clubsTable}</LoadingBlock> },
+          ]}
+        />
       </div>
 
       {/* 新增帳號:建立後顯示帳號與一次性密碼;destroyOnHidden+取消清空,重開不殘留 */}

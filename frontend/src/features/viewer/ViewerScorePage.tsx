@@ -280,7 +280,8 @@ function ScorePanel({
     for (const i of detail.items) init[i.id] = detail.score?.items[i.id]?.comment ?? ''
     return init
   })
-  const [presentation, setPresentation] = useState<number | null>(detail.score?.presentationScore ?? null)
+  const loadedPresentation = detail.score?.presentationScore ?? null
+  const [presentation, setPresentation] = useState<number | null>(loadedPresentation)
   const [errors, setErrors] = useState<ReadonlySet<string>>(new Set())
   const [pending, setPending] = useState<'save' | 'next' | null>(null)
 
@@ -320,8 +321,10 @@ function ScorePanel({
         score: scores[i.id] as number,
         comment: comments[i.id],
       })),
-      // 有簡報的獎項一律明給(清空欄位=送 null 清除);沒有的獎項省略,後端不允許帶值
-      presentationScore: award.hasPresentation ? presentation : undefined,
+      // 只在這次真的動過簡報分時才送:簡報分常是另一台裝置補登的,
+      // 本頁載入時是空的不代表現在還是空的(省略=後端不動,明給 null=清除)
+      presentationScore:
+        award.hasPresentation && presentation !== loadedPresentation ? presentation : undefined,
     }
     save.mutate(
       { clubId, awardId: award.awardId, input },

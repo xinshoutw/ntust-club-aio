@@ -703,6 +703,36 @@ async def test_equipment_loan_window_derived_from_activity(client, db):
     assert resp.status_code == 422
 
 
+async def test_equipment_list_round_trips_do_not_grow_with_equipment_count(client, db):
+    """可借數逐列查詢時往返次數等於器材數;批次彙整後與器材數無關。"""
+    from app.core.db import engine
+
+    club = await setup_session(client, db)
+    activity = await make_activity(db, club)
+    await make_equipment(db, total_qty=5)
+
+    statements: list[str] = []
+
+    def record(conn, cursor, statement, *rest):
+        statements.append(statement)
+
+    sa.event.listen(engine.sync_engine, "before_cursor_execute", record)
+    try:
+        url = f"/api/v1/club/equipment?activity_id={activity.id}"
+        await client.get(url)
+        with_one = len(statements)
+
+        for i in range(4):
+            await make_equipment(db, name=f"器材{i}", total_qty=3)
+        statements.clear()
+        await client.get(url)
+        with_five = len(statements)
+    finally:
+        sa.event.remove(engine.sync_engine, "before_cursor_execute", record)
+
+    assert with_five == with_one
+
+
 async def test_equipment_available_within_window(client, db):
     """可借數依指定活動推導區間動態計算:總數 − 區間重疊之未歸還未退回借用量。"""
     club = await setup_session(client, db)

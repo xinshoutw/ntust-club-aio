@@ -117,15 +117,12 @@ async def list_equipment(
             .order_by(Equipment.sort, Equipment.id)
         )
     ).all()
+    # 可借數一次算完:逐列查詢時往返次數等於器材數
+    available = await svc.equipment_available_map(db, {eq.id: eq.total_qty for eq in rows}, window)
     out = []
     for eq in rows:
         item = EquipmentOut.model_validate(eq)
-        if window is not None:
-            item.available = await svc.equipment_available_in_window(
-                db, eq.id, eq.total_qty, window[0], window[1]
-            )
-        else:
-            item.available = await svc.equipment_available(db, eq.id, eq.total_qty)
+        item.available = available[eq.id]
         out.append(item)
     meta = None
     if window is not None:

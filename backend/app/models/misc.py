@@ -25,7 +25,8 @@ class Announcement(Base, TimestampMixin):
         db_enum(AnnouncementTarget, "announcement_target"), default=AnnouncementTarget.ALL
     )
     attrs: Mapped[list[str] | None] = mapped_column(ARRAY(sa.Text))  # target=attr:性質可多選
-    club_id: Mapped[int | None] = mapped_column(sa.ForeignKey("clubs.id"))  # target=club
+    # target=club 時指定社團
+    club_id: Mapped[int | None] = mapped_column(sa.ForeignKey("clubs.id"), index=True)
     # 蓋板截止日;NULL=非蓋板。期限內社團每次登入全版顯示(顯示邏輯在前端)
     takeover_until: Mapped[date | None] = mapped_column(sa.Date)
     notify: Mapped[bool] = mapped_column(default=False)  # 發布時寄送通知(Email/Discord)
@@ -42,7 +43,7 @@ class AnnouncementDismissal(Base, TimestampMixin):
         sa.ForeignKey("announcements.id", ondelete="CASCADE"), primary_key=True
     )
     club_id: Mapped[int] = mapped_column(
-        sa.ForeignKey("clubs.id", ondelete="CASCADE"), primary_key=True
+        sa.ForeignKey("clubs.id", ondelete="CASCADE"), primary_key=True, index=True
     )
 
 
@@ -58,7 +59,7 @@ class Violation(Base, TimestampMixin):
     location: Mapped[str] = mapped_column(sa.Text)
     items: Mapped[list[str]] = mapped_column(ARRAY(sa.Text))  # 違規項目複選(目錄進 settings)
     other: Mapped[str | None] = mapped_column(sa.Text)
-    filler_id: Mapped[int] = mapped_column(sa.ForeignKey("users.id"))  # 填寫工讀生
+    filler_id: Mapped[int] = mapped_column(sa.ForeignKey("users.id"), index=True)  # 填寫工讀生
     status: Mapped[ViolationStatus] = mapped_column(
         db_enum(ViolationStatus, "violation_status"), default=ViolationStatus.OPEN
     )

@@ -19,7 +19,7 @@ class RoomBookingRequest(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     club_id: Mapped[int] = mapped_column(sa.ForeignKey("clubs.id"), index=True)
-    venue_id: Mapped[int] = mapped_column(sa.ForeignKey("venues.id"))  # allow_fixed
+    venue_id: Mapped[int] = mapped_column(sa.ForeignKey("venues.id"), index=True)  # allow_fixed
     purpose: Mapped[str] = mapped_column(sa.Text)  # 用途必填
     # 目標學期起訖快照(申請時自動歸屬「下一學期」;
     # 場況圖僅在此區間顯示,學期結束即不再佔格;比照器材借用的區間快照模式)
@@ -61,7 +61,7 @@ class VenueBooking(Base, TimestampMixin):
     club_id: Mapped[int | None] = mapped_column(sa.ForeignKey("clubs.id"), index=True)
     venue_id: Mapped[int] = mapped_column(sa.ForeignKey("venues.id"))  # allow_temp
     # 綁定審核通過活動;NULL 容舊資料,新申請於應用層必填
-    activity_id: Mapped[int | None] = mapped_column(sa.ForeignKey("activities.id"))
+    activity_id: Mapped[int | None] = mapped_column(sa.ForeignKey("activities.id"), index=True)
     date: Mapped[dt.date] = mapped_column(sa.Date)
     periods: Mapped[list[str]] = mapped_column(ARRAY(sa.String(2)))  # 複選節次
     purpose: Mapped[str] = mapped_column(sa.Text)  # 用途必填

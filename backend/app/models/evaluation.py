@@ -51,7 +51,7 @@ class EvalUpload(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     year: Mapped[int] = mapped_column()
-    club_id: Mapped[int] = mapped_column(sa.ForeignKey("clubs.id"))
+    club_id: Mapped[int] = mapped_column(sa.ForeignKey("clubs.id"), index=True)
     rubric_item_id: Mapped[int] = mapped_column(sa.ForeignKey("award_rubric_items.id"))
     file_id: Mapped[uuid.UUID] = mapped_column(sa.ForeignKey("files.id"))
 
@@ -77,7 +77,7 @@ class EvalGroupClub(Base, TimestampMixin):
     group_id: Mapped[int] = mapped_column(
         sa.ForeignKey("eval_groups.id", ondelete="CASCADE"), primary_key=True
     )
-    club_id: Mapped[int] = mapped_column(sa.ForeignKey("clubs.id"), primary_key=True)
+    club_id: Mapped[int] = mapped_column(sa.ForeignKey("clubs.id"), index=True, primary_key=True)
 
 
 class EvalGroupReviewer(Base, TimestampMixin):
@@ -86,7 +86,7 @@ class EvalGroupReviewer(Base, TimestampMixin):
     group_id: Mapped[int] = mapped_column(
         sa.ForeignKey("eval_groups.id", ondelete="CASCADE"), primary_key=True
     )
-    user_id: Mapped[int] = mapped_column(sa.ForeignKey("users.id"), primary_key=True)
+    user_id: Mapped[int] = mapped_column(sa.ForeignKey("users.id"), index=True, primary_key=True)
     sort: Mapped[int] = mapped_column(default=0)
 
 
@@ -99,8 +99,8 @@ class ReviewScore(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     year: Mapped[int] = mapped_column()
     award_id: Mapped[str] = mapped_column(sa.ForeignKey("awards.id"))
-    club_id: Mapped[int] = mapped_column(sa.ForeignKey("clubs.id"))
-    reviewer_id: Mapped[int] = mapped_column(sa.ForeignKey("users.id"))
+    club_id: Mapped[int] = mapped_column(sa.ForeignKey("clubs.id"), index=True)
+    reviewer_id: Mapped[int] = mapped_column(sa.ForeignKey("users.id"), index=True)
     presentation_score: Mapped[int | None] = mapped_column()  # 現場簡報 20 分
     bonus: Mapped[int] = mapped_column(default=0)
     penalty: Mapped[int] = mapped_column(default=0)
@@ -129,7 +129,7 @@ class EvalAdjustment(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     year: Mapped[int] = mapped_column()
     award_id: Mapped[str] = mapped_column(sa.ForeignKey("awards.id"))
-    club_id: Mapped[int] = mapped_column(sa.ForeignKey("clubs.id"))
+    club_id: Mapped[int] = mapped_column(sa.ForeignKey("clubs.id"), index=True)
     kind: Mapped[AdjustmentKind] = mapped_column(db_enum(AdjustmentKind, "adjustment_kind"))
     value: Mapped[Any] = mapped_column(JSONB)
     reason: Mapped[str] = mapped_column(sa.Text)  # 必填

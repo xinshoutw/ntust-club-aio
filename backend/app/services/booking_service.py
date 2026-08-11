@@ -213,17 +213,6 @@ async def temp_days_hitting_slots(
     )
 
 
-async def equipment_available(db: AsyncSession, equipment_id: int, total_qty: int) -> int:
-    """目前可借數 = total − 借出中數量(推導不儲存;未指定活動區間時的粗略值)。"""
-    out = await db.scalar(
-        sa.select(sa.func.coalesce(sa.func.sum(EquipmentLoan.qty), 0)).where(
-            EquipmentLoan.equipment_id == equipment_id,
-            EquipmentLoan.status == LoanStatus.CHECKED_OUT,
-        )
-    )
-    return max(total_qty - int(out or 0), 0)
-
-
 async def equipment_available_in_window(
     db: AsyncSession,
     equipment_id: int,
@@ -242,20 +231,49 @@ async def equipment_available_in_window(
 
     exclude_loan_id:行政端審核檢核時排除本單(避免把待審單自己算進佔用)。
     """
-    occupied = [sa.and_(EquipmentLoan.start_date <= end, EquipmentLoan.end_date >= start)]
-    if end >= today_taipei():
-        occupied.append(EquipmentLoan.status == LoanStatus.CHECKED_OUT)
     query = sa.select(sa.func.coalesce(sa.func.sum(EquipmentLoan.qty), 0)).where(
-        EquipmentLoan.equipment_id == equipment_id,
-        EquipmentLoan.status.notin_(
-            [LoanStatus.REJECTED, LoanStatus.RETURNED, LoanStatus.CANCELLED]
-        ),
-        sa.or_(*occupied),
+        EquipmentLoan.equipment_id == equipment_id, _occupies_window(start, end)
     )
     if exclude_loan_id is not None:
         query = query.where(EquipmentLoan.id != exclude_loan_id)
     out = await db.scalar(query)
     return max(total_qty - int(out or 0), 0)
+
+
+def _occupies_window(start: date, end: date) -> sa.ColumnElement[bool]:
+    """佔用該區間的借用單條件;逐筆版與批次版共用一份(判定分兩份就會各自漂移)。"""
+    occupied = [sa.and_(EquipmentLoan.start_date <= end, EquipmentLoan.end_date >= start)]
+    if end >= today_taipei():
+        occupied.append(EquipmentLoan.status == LoanStatus.CHECKED_OUT)
+    return sa.and_(
+        EquipmentLoan.status.notin_(
+            [LoanStatus.REJECTED, LoanStatus.RETURNED, LoanStatus.CANCELLED]
+        ),
+        sa.or_(*occupied),
+    )
+
+
+async def equipment_available_map(
+    db: AsyncSession, totals: dict[int, int], window: tuple[date, date] | None = None
+) -> dict[int, int]:
+    """一次算完整份器材主檔的可借數:逐列查詢時往返次數會隨器材數成長。
+
+    window=None 時與 equipment_available 同義(只扣借出中);給定時同 equipment_available_in_window。
+    """
+    if not totals:
+        return {}
+    occupied = (
+        EquipmentLoan.status == LoanStatus.CHECKED_OUT
+        if window is None
+        else _occupies_window(*window)
+    )
+    rows = await db.execute(
+        sa.select(EquipmentLoan.equipment_id, sa.func.coalesce(sa.func.sum(EquipmentLoan.qty), 0))
+        .where(EquipmentLoan.equipment_id.in_(totals), occupied)
+        .group_by(EquipmentLoan.equipment_id)
+    )
+    used = {equipment_id: int(qty) for equipment_id, qty in rows}
+    return {eid: max(total - used.get(eid, 0), 0) for eid, total in totals.items()}
 
 
 def next_workday_in(d: date, holidays: set[date]) -> date:

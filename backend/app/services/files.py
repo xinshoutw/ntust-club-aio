@@ -334,7 +334,9 @@ async def save_upload(
             subject_type=subject_type,
             subject_id=subject_id,
             slot=slot,
-            original_name=Path(upload.filename or f"upload{ext}").name,
+            # 反斜線在 POSIX 不是分隔符,Path().name 留得下來 —— 而這個名字會成為
+            # 打包下載的 zip entry 名,Windows 端解壓就會寫到目錄外
+            original_name=Path((upload.filename or f"upload{ext}").replace("\\", "/")).name,
             size=size,
             mime=mime,
             sha256=sha256,

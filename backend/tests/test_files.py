@@ -267,6 +267,21 @@ async def test_duplicate_flush_conflict_leaves_no_orphan(db):
     assert await db.scalar(sa.select(sa.func.count()).select_from(File)) == 1
 
 
+async def test_windows_path_stripped_from_stored_name(db):
+    """存下的檔名會成為打包下載的 zip entry 名,不能留下任何路徑成分。"""
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    row = await file_service.save_upload(
+        db,
+        fake_upload(r"a\..\..\Users\Public\evil.png", PNG_BYTES),
+        policy=file_service.IMAGE,
+        module="reports",
+        uploaded_by=user.id,
+        club_id=club.id,
+    )
+    assert row.original_name == "evil.png"
+
+
 async def test_uncommitted_upload_leaves_no_orphan(db):
     """呼叫端沒 commit(交易失敗或請求中途拋錯)時,已落盤的檔案不得留在磁碟上。"""
     from app.core.db import async_session_factory

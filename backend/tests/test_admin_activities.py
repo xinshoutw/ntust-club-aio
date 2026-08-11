@@ -2,9 +2,14 @@ from datetime import UTC, date, datetime, timedelta
 
 import sqlalchemy as sa
 
-from app.models import Activity, ActivityBudgetItem, ApprovalRecord, SystemSetting
+from app.models import Activity, ActivityBudgetItem, ApprovalRecord, SystemSetting, User
 from tests.conftest import csrf_headers, login, make_club, make_user
 from tests.test_activities import close_payload, create_activity, payload, upload_photo
+
+
+async def club_account(db) -> User:
+    """該社既有的社團帳號:一社一帳號是 DB 約束,測試不能為了拿 created_by 再開一個。"""
+    return await db.scalar(sa.select(User).where(User.username == "club01"))
 
 
 async def seed(client, db):
@@ -482,7 +487,7 @@ async def test_list_filters_locked_and_sort(client, db):
     from app.models import Activity
 
     club = await seed(client, db)
-    creator = await make_user(db, username="creator2", club_id=club.id)
+    creator = await club_account(db)
     await login(client, "advisor")
     old = Activity(
         club_id=club.id, name="逾期活動", location="x", type="活動",
@@ -516,7 +521,7 @@ async def test_list_filters_locked_and_sort(client, db):
 async def test_overdue_filter_includes_unlocked(client, db):
     """overdue=true 回全部逾期未結案(不分鎖定與否);locked=true 僅未解鎖者。"""
     club = await seed(client, db)
-    creator = await make_user(db, username="creator5", club_id=club.id)
+    creator = await club_account(db)
     old = date.today() - timedelta(days=200)
 
     def act(name, *, unlocked=False, day=old):
@@ -548,7 +553,7 @@ async def test_overdue_filter_includes_unlocked(client, db):
 async def test_overdue_filter_follows_close_lock_months(client, db):
     """逾期清單(SQL)與每列的 close_locked(Python)必須同源:改鎖定月數,兩邊要一起動。"""
     club = await seed(client, db)
-    creator = await make_user(db, username="creator6", club_id=club.id)
+    creator = await club_account(db)
     day = date.today() - timedelta(days=45)
     db.add(Activity(
         club_id=club.id, name="45 天前結束", location="x", type="社課或會議",
@@ -573,7 +578,7 @@ async def test_reviewed_at_field_and_sorting(client, db):
     from app.models.enums import ApprovalDecision, ApprovalSubject
 
     club = await seed(client, db)
-    creator = await make_user(db, username="creator4", club_id=club.id)
+    creator = await club_account(db)
     day = date.today() + timedelta(days=10)
 
     def act(name, status="approved"):
@@ -631,7 +636,7 @@ async def test_large_type_filter_and_locked_boundary(client, db):
     from app.services.settings_service import get_setting
 
     club = await seed(client, db)
-    creator = await make_user(db, username="creator3", club_id=club.id)
+    creator = await club_account(db)
     day = date.today() + timedelta(days=30)
 
     def act(name, *, type_="活動", is_large=False, approved=None):

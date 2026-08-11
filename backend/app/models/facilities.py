@@ -28,6 +28,12 @@ class Equipment(Base, TimestampMixin):
     """器材主檔;可借數 = total_qty − 未歸還中數量(推導不儲存)。"""
 
     __tablename__ = "equipment"
+    __table_args__ = (
+        sa.CheckConstraint(
+            "total_qty >= 0 AND (max_lease_count IS NULL OR max_lease_count >= 1)",
+            name="qty_non_negative",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(sa.Text, unique=True)

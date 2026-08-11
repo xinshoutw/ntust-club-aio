@@ -75,12 +75,22 @@ def _indexes_of(sync_conn) -> set[str]:
     }
 
 
+def _checks_of(sync_conn) -> set[str]:
+    inspector = sa.inspect(sync_conn)
+    return {
+        f"{table}.{ck['name']}"
+        for table in inspector.get_table_names(schema="public")
+        for ck in inspector.get_check_constraints(table, schema="public")
+    }
+
+
 async def test_upgrade_head_builds_the_same_tables_as_the_models(migration_db):
     _alembic("upgrade", "head")
 
     async with migration_db.connect() as conn:
         actual = await conn.run_sync(_columns_of)
         indexes = await conn.run_sync(_indexes_of)
+        checks = await conn.run_sync(_checks_of)
 
     expected = {
         name: sorted(c.name for c in table.columns) for name, table in Base.metadata.tables.items()
@@ -91,3 +101,10 @@ async def test_upgrade_head_builds_the_same_tables_as_the_models(migration_db):
         f"{table.name}.{ix.name}" for table in Base.metadata.tables.values() for ix in table.indexes
     }
     assert expected_indexes <= indexes
+    expected_checks = {
+        f"{table.name}.{ck.name}"
+        for table in Base.metadata.tables.values()
+        for ck in table.constraints
+        if isinstance(ck, sa.CheckConstraint) and ck.name
+    }
+    assert expected_checks <= checks

@@ -158,6 +158,8 @@ erDiagram
 | close_unlocked | bool | 逾期鎖定的管理員解鎖旗標 |
 | close_draft | jsonb NULL | 結案草稿(跨裝置續填),不含照片;送出結案時清除 |
 
+金額與人數欄位一律有非負 CHECK(`ck_activities_amounts_non_negative`、`ck_activity_budget_items_amounts_non_negative`、`ck_activity_reports_counts_non_negative`;器材為 `ck_equipment_qty_non_negative` 與 `ck_equipment_loans_qty_positive` ≥1)—— schema 擋 API,匯入腳本與 raw SQL 由這層收口。
+
 `date`/`end_date` 與 `name`/`location` 僅草稿可空,由 CHECK `ck_activities_draft_partial_only` 收口(`status='draft' OR (date, end_date 非空 AND name, location 非空字串)`);`start_time`/`end_time` 任何狀態皆可為 NULL,完整性由應用層在送出與非草稿更新時檢核。
 
 狀態機:

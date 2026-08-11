@@ -26,6 +26,12 @@ class Activity(Base, TimestampMixin):
             " AND name <> '' AND location <> '')",
             name="draft_partial_only",
         ),
+        # 人數與金額的下界:schema 已擋 API,匯入腳本與 raw SQL 沒人擋
+        sa.CheckConstraint(
+            "participants_in >= 0 AND participants_out >= 0"
+            " AND (school_approved IS NULL OR school_approved >= 0)",
+            name="amounts_non_negative",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -66,6 +72,13 @@ class ActivityBudgetItem(Base, TimestampMixin):
     """經費逐項編列;approved_subsidy 由承辦人關卡逐項核定。"""
 
     __tablename__ = "activity_budget_items"
+    __table_args__ = (
+        sa.CheckConstraint(
+            "self_fund >= 0 AND requested_subsidy >= 0"
+            " AND (approved_subsidy IS NULL OR approved_subsidy >= 0)",
+            name="amounts_non_negative",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     activity_id: Mapped[int] = mapped_column(
@@ -82,6 +95,13 @@ class ActivityReport(Base, TimestampMixin):
     """結案成果調查;除 video_url 外全必填。"""
 
     __tablename__ = "activity_reports"
+    __table_args__ = (
+        sa.CheckConstraint(
+            "member_count >= 0 AND non_member_count >= 0 AND expense >= 0"
+            " AND (review_attendees IS NULL OR review_attendees >= 0)",
+            name="counts_non_negative",
+        ),
+    )
 
     activity_id: Mapped[int] = mapped_column(
         sa.ForeignKey("activities.id", ondelete="CASCADE"), primary_key=True

@@ -79,7 +79,10 @@ class EquipmentLoan(Base, TimestampMixin):
     """
 
     __tablename__ = "equipment_loans"
-    __table_args__ = (sa.Index("ix_equipment_loans_club_status", "club_id", "status"),)
+    __table_args__ = (
+        sa.Index("ix_equipment_loans_club_status", "club_id", "status"),
+        sa.CheckConstraint("qty >= 1", name="qty_positive"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     # NULL=最高權限手動借用(行政)

@@ -97,6 +97,25 @@ async def test_create_draft_with_budget_and_derived_totals(client, db):
     assert data["semester"] == "114-2"
 
 
+async def test_negative_amounts_are_rejected_by_the_database(client, db):
+    """金額/件數的下界:schema 擋 API,匯入腳本與 raw SQL 由 CHECK 收口。"""
+    import pytest
+    from sqlalchemy.exc import IntegrityError
+
+    await setup_session(client, db)
+    activity_id = (await create_activity(client))["id"]
+    for sql, params in [
+        ("UPDATE activities SET school_approved = -1 WHERE id = :id", {"id": activity_id}),
+        ("UPDATE activity_budget_items SET requested_subsidy = -1 WHERE activity_id = :id",
+         {"id": activity_id}),
+        ("UPDATE activities SET participants_in = -1 WHERE id = :id", {"id": activity_id}),
+    ]:
+        with pytest.raises(IntegrityError):
+            await db.execute(sa.text(sql), params)
+            await db.flush()
+        await db.rollback()
+
+
 async def test_budget_category_check_tolerates_legacy_strings(client, db):
     """殘留舊 list[str] 經費科目設定時,建立申請與 /club/config 都不得 500。"""
     await setup_session(client, db)

@@ -334,9 +334,22 @@ async def upload_photo(
     return ApiResponse(data=FileOut.model_validate(row))
 
 
+def _audit_file_deleted(
+    db: DbDep, request: Request, user, action: str, activity_id: int, file: File
+) -> None:
+    """檔案刪了就查不到內容,至少留下誰在哪張單刪了哪個檔。"""
+    audit.record(
+        db,
+        action=action,
+        user=user,
+        detail=f"activity={activity_id};file={file.id};name={file.original_name}",
+        ip=client_ip(request),
+    )
+
+
 @router.delete("/{activity_id}/photos/{file_id}")
 async def delete_photo(
-    activity_id: int, file_id: str, user: ClubUser, db: DbDep
+    activity_id: int, file_id: str, user: ClubUser, db: DbDep, request: Request
 ) -> ApiResponse[None]:
     activity = await svc.get_own_activity(db, user, activity_id)
     # 鎖活動列並重讀狀態:submit_close 先 commit 時,這裡看到 closing → 409,
@@ -352,6 +365,7 @@ async def delete_photo(
         or file.slot != svc.PHOTO_SLOT
     ):
         raise not_found("找不到照片")
+    _audit_file_deleted(db, request, user, "activity_photo_deleted", activity.id, file)
     disk = await file_service.delete_file(db, file)
     await db.commit()
     file_service.unlink_quiet(disk)
@@ -401,7 +415,7 @@ async def upload_attachment(
 
 @router.delete("/{activity_id}/attachments/{file_id}")
 async def delete_attachment(
-    activity_id: int, file_id: str, user: ClubUser, db: DbDep
+    activity_id: int, file_id: str, user: ClubUser, db: DbDep, request: Request
 ) -> ApiResponse[None]:
     activity = await svc.get_own_activity(db, user, activity_id)
     await db.refresh(activity, attribute_names=["status"], with_for_update=True)
@@ -415,6 +429,7 @@ async def delete_attachment(
         or file.slot != svc.ATTACHMENT_SLOT
     ):
         raise not_found("找不到附件")
+    _audit_file_deleted(db, request, user, "activity_attachment_deleted", activity.id, file)
     disk = await file_service.delete_file(db, file)
     await db.commit()
     file_service.unlink_quiet(disk)

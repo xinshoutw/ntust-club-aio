@@ -8,6 +8,7 @@ from app.models import (
     Activity,
     ActivityReflection,
     ActivityReport,
+    AuditLog,
     Award,
     AwardRubricItem,
     EvalAdjustment,
@@ -277,6 +278,11 @@ async def test_award_upload_progress_and_delete(client, db):
     assert resp.status_code == 200
     detail = (await client.get("/api/v1/club/eval/awards/club")).json()["data"]
     assert detail["items"][0]["uploads"] == []
+    # 檔案刪了就查不到內容,稽核要留下誰刪了哪個檔
+    logged = await db.scalar(
+        sa.select(AuditLog.detail).where(AuditLog.action == "eval_file_deleted")
+    )
+    assert "doc.png" in logged
 
 
 async def test_eval_upload_dedup_survives_concurrent_sessions(db):

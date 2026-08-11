@@ -11,10 +11,10 @@ import io
 from typing import Annotated
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 
 from app.api.pagination import Pagination, parse_sort
-from app.core.deps import ClubUser, DbDep
+from app.core.deps import ClubUser, DbDep, client_ip
 from app.core.errors import conflict, not_found, validation_error
 from app.models import ClubMember
 from app.models.enums import MemberKind
@@ -26,6 +26,7 @@ from app.schemas.clubs import (
     MemberUpdate,
 )
 from app.schemas.common import ApiResponse
+from app.services import audit
 
 router = APIRouter(prefix="/club/members", tags=["club"])
 
@@ -61,6 +62,17 @@ _KIND_ALIASES = {
     "副社長": MemberKind.VICE_PRESIDENT,
     "副會長": MemberKind.VICE_PRESIDENT,
 }
+
+
+def _audit(
+    db: DbDep, request: Request, user, action: str, member: ClubMember, extra: str = ""
+) -> None:
+    """名單被清空時要查得出是誰、動到誰,所以連學號姓名一起記。"""
+    detail = f"member={member.id};{member.semester};{member.student_id};{member.name}"
+    audit.record(
+        db, action=action, user=user, detail=f"{detail};{extra}" if extra else detail,
+        ip=client_ip(request),
+    )
 
 
 def _validate_member(kind: MemberKind, title: str | None) -> str | None:
@@ -106,7 +118,9 @@ async def list_semesters(user: ClubUser, db: DbDep) -> ApiResponse[list[str]]:
 
 
 @router.post("", status_code=201)
-async def create_member(body: MemberIn, user: ClubUser, db: DbDep) -> ApiResponse[MemberOut]:
+async def create_member(
+    body: MemberIn, user: ClubUser, db: DbDep, request: Request
+) -> ApiResponse[MemberOut]:
     title = _validate_member(body.kind, body.title)
     exists = await db.scalar(
         sa.select(ClubMember.id).where(
@@ -127,6 +141,8 @@ async def create_member(body: MemberIn, user: ClubUser, db: DbDep) -> ApiRespons
         semester=body.semester,
     )
     db.add(member)
+    await db.flush()
+    _audit(db, request, user, "member_created", member)
     await db.commit()
     await db.refresh(member)
     return ApiResponse(data=MemberOut.model_validate(member))
@@ -141,7 +157,7 @@ async def _own_member(db: DbDep, user, member_id: int) -> ClubMember:
 
 @router.patch("/{member_id}")
 async def update_member(
-    member_id: int, body: MemberUpdate, user: ClubUser, db: DbDep
+    member_id: int, body: MemberUpdate, user: ClubUser, db: DbDep, request: Request
 ) -> ApiResponse[MemberOut]:
     member = await _own_member(db, user, member_id)
     # 行內編輯自動儲存會把整列原封送回;不濾掉未變值,下面的重複學號檢查會查到自己而 409
@@ -163,14 +179,19 @@ async def update_member(
     for field, value in changed.items():
         setattr(member, field, value)
     member.title = _validate_member(member.kind, member.title)
+    if changed:  # 行內編輯的 blur 會送出未變更的整列,那不是一次異動
+        _audit(db, request, user, "member_updated", member, f"fields={','.join(sorted(changed))}")
     await db.commit()
     await db.refresh(member)
     return ApiResponse(data=MemberOut.model_validate(member))
 
 
 @router.delete("/{member_id}")
-async def delete_member(member_id: int, user: ClubUser, db: DbDep) -> ApiResponse[None]:
+async def delete_member(
+    member_id: int, user: ClubUser, db: DbDep, request: Request
+) -> ApiResponse[None]:
     member = await _own_member(db, user, member_id)
+    _audit(db, request, user, "member_deleted", member)
     await db.delete(member)
     await db.commit()
     return ApiResponse()
@@ -178,7 +199,7 @@ async def delete_member(member_id: int, user: ClubUser, db: DbDep) -> ApiRespons
 
 @router.post("/import")
 async def import_members(
-    body: MemberImportRequest, user: ClubUser, db: DbDep
+    body: MemberImportRequest, user: ClubUser, db: DbDep, request: Request
 ) -> ApiResponse[MemberImportResult]:
     created = updated = 0
     errors: list[str] = []
@@ -250,5 +271,13 @@ async def import_members(
             member.name, member.kind, member.title, member.phone = name, kind, title, phone
             updated += 1
 
+    if created or updated:
+        audit.record(
+            db,
+            action="members_imported",
+            user=user,
+            detail=f"semester={body.semester};created={created};updated={updated}",
+            ip=client_ip(request),
+        )
     await db.commit()
     return ApiResponse(data=MemberImportResult(created=created, updated=updated, errors=errors))

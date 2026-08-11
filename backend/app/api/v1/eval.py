@@ -1,9 +1,9 @@
 """社團端:社團評鑑(資料總覽自動評分 + 五獎項資料上傳)。"""
 
 import sqlalchemy as sa
-from fastapi import APIRouter, UploadFile
+from fastapi import APIRouter, Request, UploadFile
 
-from app.core.deps import ClubUser, DbDep
+from app.core.deps import ClubUser, DbDep, client_ip
 from app.core.errors import conflict, not_found
 from app.models import Award, AwardRubricItem, EvalSetting, EvalUpload, File
 from app.schemas.common import ApiResponse
@@ -15,7 +15,7 @@ from app.schemas.eval import (
     EvalOverviewOut,
     RubricItemOut,
 )
-from app.services import evaluation
+from app.services import audit, evaluation
 from app.services import files as file_service
 from app.services.files import UploadPolicy
 from app.services.scoring import apply_overrides, compute_ad_scores, total_of
@@ -202,7 +202,7 @@ async def upload_eval_file(
 
 @router.delete("/awards/{award_id}/items/{item_id}/files/{upload_id}")
 async def delete_eval_file(
-    award_id: str, item_id: int, upload_id: int, user: ClubUser, db: DbDep
+    award_id: str, item_id: int, upload_id: int, user: ClubUser, db: DbDep, request: Request
 ) -> ApiResponse[None]:
     award = await _award_or_404(db, award_id)
     window = await evaluation.get_eval_window(db)
@@ -223,6 +223,14 @@ async def delete_eval_file(
     ):
         raise not_found("找不到上傳紀錄")
     file = await db.get(File, upload.file_id)
+    audit.record(
+        db,
+        action="eval_file_deleted",
+        user=user,
+        detail=f"year={window.year};award={award.id};item={item.item_key};"
+        f"name={file.original_name if file else '?'}",
+        ip=client_ip(request),
+    )
     await db.delete(upload)
     disk = await file_service.delete_file(db, file) if file is not None else None
     await db.commit()

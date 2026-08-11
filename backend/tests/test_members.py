@@ -1,6 +1,6 @@
 import sqlalchemy as sa
 
-from app.models import ClubMember
+from app.models import AuditLog, ClubMember
 from app.models.enums import MemberKind
 from tests.conftest import csrf_headers, login, make_club, make_user
 
@@ -113,6 +113,37 @@ async def test_member_crud_and_scoping(client, db):
     )
     assert resp.status_code == 404
     assert await db.scalar(sa.select(ClubMember.name).where(ClubMember.id == member_id)) == "陳大文"
+
+
+async def test_member_changes_are_audited(client, db):
+    """名單被清空要查得出是誰動的、動到誰。"""
+    await setup_club_session(client, db)
+    member = {
+        "name": "陳大文", "student_id": "B11109001", "kind": "社員", "semester": "114-2",
+    }
+    created = await client.post("/api/v1/club/members", json=member, headers=csrf_headers(client))
+    member_id = created.json()["data"]["id"]
+
+    # 行內編輯 blur 會把整列原封送回,那不是一次異動,不該留下稽核
+    await client.patch(
+        f"/api/v1/club/members/{member_id}", json=member, headers=csrf_headers(client)
+    )
+    await client.patch(
+        f"/api/v1/club/members/{member_id}", json={"name": "陳大明"}, headers=csrf_headers(client)
+    )
+    await client.post(
+        "/api/v1/club/members/import",
+        json={"semester": "114-2", "csv_text": "王小明,B11109002,社員"},
+        headers=csrf_headers(client),
+    )
+    await client.delete(f"/api/v1/club/members/{member_id}", headers=csrf_headers(client))
+
+    rows = list(await db.scalars(sa.select(AuditLog).order_by(AuditLog.id)))
+    assert [r.action for r in rows if r.action.startswith("member")] == [
+        "member_created", "member_updated", "members_imported", "member_deleted",
+    ]
+    deleted = next(r for r in rows if r.action == "member_deleted")
+    assert "B11109001" in deleted.detail and "陳大明" in deleted.detail
 
 
 async def test_member_list_pagination_filter_sort(client, db):

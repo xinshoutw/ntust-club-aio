@@ -4,7 +4,7 @@ from datetime import date, timedelta
 import sqlalchemy as sa
 
 from app.core.config import settings
-from app.models import Activity, SystemSetting
+from app.models import Activity, AuditLog, SystemSetting
 from tests.conftest import csrf_headers, login, make_club, make_user
 
 JPG = b"\xff\xd8\xff\xe0" + b"\x00" * 64
@@ -413,6 +413,11 @@ async def test_photo_upload_dedupe_and_delete(client, db):
         f"/api/v1/club/activities/{a1['id']}/photos/{file_id}", headers=csrf_headers(client)
     )
     assert resp.status_code == 200
+    # 照片刪了就無從還原,稽核要留下誰刪了哪張
+    logged = await db.scalar(
+        sa.select(AuditLog.detail).where(AuditLog.action == "activity_photo_deleted")
+    )
+    assert "photo.jpg" in logged
 
     # 刪掉後可重傳
     files = {"file": ("photo.jpg", io.BytesIO(JPG), "image/jpeg")}

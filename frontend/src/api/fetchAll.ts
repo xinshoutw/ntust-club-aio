@@ -11,7 +11,9 @@ export async function fetchAllPages<T>(
   for (let page = 1; ; page++) {
     const { data, total } = await apiPaged<T[]>(`${path}${qs({ ...params, page, page_size: PAGE_SIZE })}`)
     out.push(...data)
-    if (data.length === 0 || out.length >= total) break
+    // 不足一頁即為最後一頁;抓取期間有新資料插隊時 out 會含重複列,
+    // 只看 out.length >= total 會提早收工而漏掉尾端(total 僅作防無限迴圈的上限)
+    if (data.length < PAGE_SIZE || out.length >= total + PAGE_SIZE) break
   }
   return out
 }

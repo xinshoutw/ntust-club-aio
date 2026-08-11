@@ -46,11 +46,15 @@ describe('fetchAllAuditLogs', () => {
 
   it('抓取期間被推擠而重覆回傳的列只留一份', async () => {
     const seen: string[] = []
-    stubPages([[row(3), row(2)], [row(2), row(1)]], seen)
+    // 滿頁才會續抓;第二頁的頭一筆是第一頁的尾巴(匯出期間有人寫入就會這樣)
+    const first = Array.from({ length: 100 }, (_, i) => row(200 - i))
+    stubPages([first, [row(101), row(100)]], seen)
 
     const rows = await fetchAllAuditLogs({})
 
-    expect(rows.map((l) => l.id)).toEqual([3, 2, 1])
+    expect(seen).toHaveLength(2)
+    expect(rows).toHaveLength(101)
+    expect(new Set(rows.map((l) => l.id)).size).toBe(101)
   })
 })
 

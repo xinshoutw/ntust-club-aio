@@ -68,7 +68,7 @@ export function useMaintenanceList() {
     queryFn: () =>
       fetchAllPages<MaintenanceOut>('/club/maintenance', {
         status: ['pending', 'in_progress'],
-      }).then((rows) => ({ records: rows.map(toMaintenance), total: rows.length })),
+      }).then((rows) => ({ records: rows.map(toMaintenance) })),
   })
 }
 
@@ -165,10 +165,7 @@ export function usePostalList() {
     queryFn: () =>
       fetchAllPages<PostalChangeOut>('/club/postal-changes', {
         status: ['pending', 'processing'],
-      }).then((rows) => ({
-        records: rows.map(toPostal),
-        total: rows.length,
-      })),
+      }).then((rows) => ({ records: rows.map(toPostal) })),
   })
 }
 
@@ -282,10 +279,7 @@ export function useCertificates() {
     queryFn: () =>
       fetchAllPages<OfficerCertOut>('/club/officer-certificates', {
         status: ['pending', 'processing'],
-      }).then((rows) => ({
-        records: rows.map(toCertificate),
-        total: rows.length,
-      })),
+      }).then((rows) => ({ records: rows.map(toCertificate) })),
   })
 }
 

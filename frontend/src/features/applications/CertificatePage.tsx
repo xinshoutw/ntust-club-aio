@@ -83,14 +83,26 @@ export default function CertificatePage() {
           initialValues={{ club: user?.club }}
         >
           <div className="form-grid-2">
-            <Form.Item name="term" label="擔任學年度或學期" rules={[{ required: true, message: '請選擇學年期' }]} style={{ marginBottom: 0 }}>
-              <Select
-                placeholder={terms.length ? '請選擇' : '名單尚無資料'}
-                options={terms}
-                loading={semestersQuery.isPending}
-                disabled={!terms.length}
-              />
-            </Form.Item>
+            {/* 學年期選項來自成員名單(termOptions 不種當學期,名單是空的就真的是空的);
+                載不到時別說「名單尚無資料」—— 那是把責任推給社團自己的名單,而整張表單也永遠送不出去 */}
+            <div>
+              <Form.Item name="term" label="擔任學年度或學期" rules={[{ required: true, message: '請選擇學年期' }]} style={{ marginBottom: 0 }}>
+                <Select
+                  placeholder={semestersQuery.isError ? '學年期載入失敗' : terms.length ? '請選擇' : '名單尚無資料'}
+                  options={terms}
+                  loading={semestersQuery.isPending}
+                  disabled={!terms.length}
+                />
+              </Form.Item>
+              {semestersQuery.isError && (
+                <QueryError
+                  compact
+                  title="學年期載入失敗"
+                  error={semestersQuery.error}
+                  onRetry={() => void semestersQuery.refetch()}
+                />
+              )}
+            </div>
             <Form.Item name="club" label="社團名稱" style={{ marginBottom: 0 }}>
               <Input readOnly style={{ background: 'var(--paper)' }} />
             </Form.Item>

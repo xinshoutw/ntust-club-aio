@@ -44,14 +44,14 @@ async def list_maintenance(
     db: DbDep,
     page: Pagination,
     sort: str | None = None,
-    status: MaintenanceStatus | None = None,
+    status: Annotated[list[MaintenanceStatus] | None, Query()] = None,  # 可重複帶多值
     club_id: int | None = Query(None),
 ) -> ApiResponse[list[AdminMaintenanceOut]]:
     query = sa.select(MaintenanceRequest, Club.name).join(
         Club, MaintenanceRequest.club_id == Club.id
     )
     if status:
-        query = query.where(MaintenanceRequest.status == status)
+        query = query.where(MaintenanceRequest.status.in_(status))
     if club_id:
         query = query.where(MaintenanceRequest.club_id == club_id)
 

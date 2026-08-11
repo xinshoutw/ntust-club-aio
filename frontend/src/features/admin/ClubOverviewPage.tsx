@@ -76,7 +76,10 @@ export default function ClubOverviewPage() {
   const activitiesQuery = useAdminClubActivities(clubId, canActivities)
   const roomsQuery = useAdminClubRoomBookings(clubId, canRooms)
   const venuesQuery = useAdminClubVenueBookings(clubId, canBookings)
-  const loansQuery = useAdminEquipmentLoanList({ clubId }, canBookings)
+  const loansQuery = useAdminEquipmentLoanList(
+    { clubId, statuses: ['pending', 'approved', 'cancelled', 'checked_out'] },
+    canBookings,
+  )
   const maintQuery = useAdminClubMaintenance(clubId, canMaint)
   const actMutations = useAdminActivityMutations()
   const bookingMutations = useAdminBookingMutations()
@@ -174,12 +177,13 @@ export default function ClubOverviewPage() {
         ? bookingMutations.revokeLoan.mutateAsync({ id: apiId, reason })
         : bookingMutations.revokeRoom.mutateAsync({ id: apiId, reason })
 
+  // 各區塊要顯示的狀態都由後端篩(見 api/adminClubOverview),前端不再自行過濾
   const activities = activitiesQuery.data ?? []
-  const maintenance = (maintQuery.data ?? []).filter((m) => m.status !== 'done')
+  const maintenance = maintQuery.data ?? []
   const trackedCount = activities.length + maintenance.length
-  const rooms = (roomsQuery.data ?? []).filter((r) => r.status !== 'rejected')
-  const venues = (venuesQuery.data ?? []).filter((v) => v.status !== 'rejected')
-  const loans = (loansQuery.data ?? []).filter((l) => l.status !== 'returned' && l.status !== 'rejected')
+  const rooms = roomsQuery.data ?? []
+  const venues = venuesQuery.data ?? []
+  const loans = loansQuery.data ?? []
   const bookingCount = rooms.length + venues.length + loans.length
 
   // 未啟用的查詢恆為 isPending:沒有該權限的管理員會看到永遠轉不完的 Spin,

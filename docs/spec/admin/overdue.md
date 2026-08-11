@@ -10,7 +10,7 @@
 
 | 動作 | 端點 |
 |---|---|
-| 逾期清單 | `GET /admin/equipment-loans?status=overdue` |
+| 逾期清單 | `GET /admin/equipment-loans?status=overdue`(伺服器端分頁,每頁 20) |
 | 停權中社團 | `GET /admin/clubs`(前端篩 `suspended_until`)+ 逐社 `GET /admin/clubs/{id}` 補 `suspend_reason`(列表的 `AdminClubOut` 不含此欄) |
 | 停權表單的社團選單 | `GET /admin/clubs/options`(`require_role(ADMIN)`,與列表的 `amember` 是不同權限) |
 | 寄提醒 | `POST /admin/equipment-loans/{id}/remind` |
@@ -18,7 +18,7 @@
 
 ## 畫面
 
-**逾期未還器材** — 社團、器材與數量、借用資訊(區間 + 活動)、狀態、寄送提醒。
+**逾期未還器材** — 社團、器材與數量、借用資訊(區間 + 活動)、狀態、寄送提醒,底部分頁。
 
 **停權中社團** — 社團、狀態、停權資訊(至 YYYY/MM/DD · 原因)、解除停權。
 
@@ -35,7 +35,7 @@
 
 ## 未完成 / 問題
 
-- 兩張表都沒有分頁,逾期或停權筆數一多就整頁塞滿
+- 停權中社團表沒有分頁(停權中的社團極少,且資料取自不分頁的社團主檔端點)
 - 停權不會自動發生:逾期到什麼程度該停權完全靠人工判斷,沒有建議或門檻提示
 - 提醒無次數限制也不顯示上次提醒時間
 - 停權中社團的清單靠前端從全部社團篩出來,沒有專屬端點,而且要逐社再打一次詳情才拿得到停權原因

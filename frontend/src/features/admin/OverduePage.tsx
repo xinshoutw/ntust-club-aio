@@ -3,9 +3,9 @@ import { App, Button, DatePicker, Form, Input, Modal, Spin } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
-import { Cols } from '../../components/ui/tableControls'
+import { Cols, Pager } from '../../components/ui/tableControls'
 import { useAdminClubs } from '../../api/adminClubs'
-import { useAdminEquipmentLoanList } from '../../api/adminClubOverview'
+import { OVERDUE_PAGE_SIZE, useOverdueLoans } from '../../api/adminClubOverview'
 import { useOverdueMutations, useSuspendedClubs } from '../../api/adminOverdue'
 import ClubCascader from './ClubCascader'
 
@@ -19,12 +19,13 @@ export default function OverduePage() {
   const { message } = App.useApp()
   const [suspendOpen, setSuspendOpen] = useState(false)
   const [form] = Form.useForm<SuspendFormValues>()
-  // 逾期=推導狀態(結束日之隔天上班日 10:30 未歸還),由後端以 status=overdue 篩選
-  const overdueQuery = useAdminEquipmentLoanList({ status: 'overdue' })
+  // 逾期=推導狀態(結束日之隔天上班日 10:30 未歸還),由後端以 status=overdue 篩選並分頁
+  const [overduePage, setOverduePage] = useState(1)
+  const overdueQuery = useOverdueLoans(overduePage)
   const suspendedQuery = useSuspendedClubs()
   const clubsQuery = useAdminClubs() // 停權表單以名稱選社團 → 送出時對回主鍵
   const { remind, suspend, lift } = useOverdueMutations()
-  const overdue = overdueQuery.data ?? []
+  const overdue = overdueQuery.data?.rows ?? []
   const suspensions = suspendedQuery.data ?? []
 
   const sendReminder = (loanId: number, clubName: string) => {
@@ -126,6 +127,12 @@ export default function OverduePage() {
               )}
             </tbody>
           </table>
+          <Pager
+            page={overduePage}
+            pageSize={OVERDUE_PAGE_SIZE}
+            total={overdueQuery.data?.total ?? 0}
+            onChange={setOverduePage}
+          />
         </Spin>
       </div>
 

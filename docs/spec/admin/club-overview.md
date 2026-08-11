@@ -13,10 +13,10 @@
 | 區塊 | 端點 | 需要權限 |
 |---|---|---|
 | 基本資料 | `GET /admin/clubs/{id}` | `amember` |
-| 進行中活動 | `GET /admin/activities?club_id=` | `areview`/`aclose` |
-| 空間報修 | `GET /admin/maintenance?club_id=` | `amaint` |
-| 固定借用 | `GET /admin/room-bookings?club_id=` | `aroom` |
-| 臨時借用 / 器材 | `GET /admin/{venue-bookings,equipment-loans}?club_id=` | `abooking` |
+| 進行中活動 | `GET /admin/activities?club_id=&status=`(簽核中四種狀態) | `areview`/`aclose` |
+| 空間報修 | `GET /admin/maintenance?club_id=&status=`(待處理、處理中) | `amaint` |
+| 固定借用 | `GET /admin/room-bookings?club_id=&status=`(待審、已核准、已撤銷) | `aroom` |
+| 臨時借用 / 器材 | `GET /admin/{venue-bookings,equipment-loans}?club_id=&status=` | `abooking` |
 
 ## 畫面
 
@@ -29,7 +29,7 @@
 ## 規則
 
 - **受限管理員不發沒權限的查詢**,該區塊改顯示「您的權限無法檢視此區塊」而不是整排 403 錯誤
-- 已退回 / 已歸還的項目不列入
+- 已退回 / 已歸還的項目不列入:**狀態一律由後端篩**(各端點 `status` 收多值),前端不再抓回整份歷史再過濾
 - 固定借用的衝突標示與 `/admin/rooms` 共用 `roomConflictSlots`,比對對象是**全部待審單 + 全部進行中的已核准單**,分「衝突」與「已核准佔用」兩種;本社沒有待審固定借用時兩份都不抓(衝突只標在待審單上,開放窗外抓回來的全校清單一個字都用不到);衝突由彈窗每次 render 重算(不存快照),載入期間整張「借用中」卡以 Spin 遮住不可點
 
 **撤銷已核准的借用**:本頁是唯一同時看得到三類已核准借用的地方,借用彈窗對 `approved` 顯示「撤銷借用」(原因必填,狀態落 `cancelled`;固定借用的 10 節額度隨之回歸)。臨時場地日期已過、器材已借出者不得撤銷 —— 器材要走歸還。
@@ -37,5 +37,4 @@
 ## 未完成 / 問題
 
 - 「進行中申請」不含幹部證明與郵局帳戶異動,只有活動與報修
-- 各區塊都是全量抓回前端再篩,沒有分頁
 - 未選社團時整頁是空的,沒有引導文字

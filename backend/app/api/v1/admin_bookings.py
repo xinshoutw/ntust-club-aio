@@ -60,7 +60,10 @@ _LOAN_SORTABLE = {
     "created_at": EquipmentLoan.created_at,
 }
 
-LoanStatusFilter = Literal["pending", "approved", "rejected", "checked_out", "returned", "overdue"]
+# overdue 為推導狀態(非 LoanStatus 成員),其餘與 LoanStatus 同名
+LoanStatusFilter = Literal[
+    "pending", "approved", "rejected", "cancelled", "checked_out", "returned", "overdue"
+]
 
 
 async def _notify_club(
@@ -109,9 +112,10 @@ async def list_venue_bookings(
     db: DbDep,
     page: Pagination,
     sort: str | None = None,
-    status: BookingStatus | None = None,
+    status: Annotated[list[BookingStatus] | None, Query()] = None,
     club_id: int | None = Query(None),
 ) -> ApiResponse[list[AdminVenueBookingOut]]:
+    # status 可重複帶多值:社團總覽要的是「未被駁回的那幾種」,由後端篩才不會整份歷史抓回前端
     query = (
         sa.select(VenueBooking, Club.name, Venue.name, Activity.name)
         .outerjoin(Club, VenueBooking.club_id == Club.id)  # NULL club=行政手動借用
@@ -119,7 +123,7 @@ async def list_venue_bookings(
         .outerjoin(Activity, VenueBooking.activity_id == Activity.id)
     )
     if status:
-        query = query.where(VenueBooking.status == status)
+        query = query.where(VenueBooking.status.in_(status))
     if club_id:
         query = query.where(VenueBooking.club_id == club_id)
 
@@ -253,10 +257,11 @@ async def list_equipment_loans(
     db: DbDep,
     page: Pagination,
     sort: str | None = None,
-    status: LoanStatusFilter | None = None,
+    status: Annotated[list[LoanStatusFilter] | None, Query()] = None,
     club_id: int | None = Query(None),
 ) -> ApiResponse[list[AdminEquipmentLoanOut]]:
-    """status=overdue:逾期=checked_out 且過了結束日之隔天上班日 10:30(推導不儲存)。"""
+    """status 可重複帶多值(取聯集);
+    overdue=checked_out 且過了結束日之隔天上班日 10:30(推導不儲存)。"""
     return_time = await get_setting(db, "equipment_return_time")
     holidays = await svc.load_holidays(db)
 
@@ -266,20 +271,26 @@ async def list_equipment_loans(
         .join(Equipment, EquipmentLoan.equipment_id == Equipment.id)
         .outerjoin(Activity, EquipmentLoan.activity_id == Activity.id)
     )
-    if status == "overdue":
-        threshold = svc.overdue_threshold_in(datetime.now(UTC), return_time, holidays)
-        query = query.where(
-            EquipmentLoan.status == LoanStatus.CHECKED_OUT,
-            EquipmentLoan.end_date <= threshold,
-        )
-    elif status:
-        query = query.where(EquipmentLoan.status == LoanStatus(status))
+    if status:
+        conds = []
+        if "overdue" in status:
+            threshold = svc.overdue_threshold_in(datetime.now(UTC), return_time, holidays)
+            conds.append(
+                sa.and_(
+                    EquipmentLoan.status == LoanStatus.CHECKED_OUT,
+                    EquipmentLoan.end_date <= threshold,
+                )
+            )
+        plain = [LoanStatus(s) for s in status if s != "overdue"]
+        if plain:
+            conds.append(EquipmentLoan.status.in_(plain))
+        query = query.where(sa.or_(*conds))
     if club_id:
         query = query.where(EquipmentLoan.club_id == club_id)
 
     if sort:
         query = query.order_by(*parse_sort(sort, _LOAN_SORTABLE, None), EquipmentLoan.id)
-    elif status == "overdue":
+    elif status == ["overdue"]:
         # 逾期追蹤:逾越最久(結束日最早)在前
         query = query.order_by(EquipmentLoan.end_date.asc(), EquipmentLoan.id)
     else:

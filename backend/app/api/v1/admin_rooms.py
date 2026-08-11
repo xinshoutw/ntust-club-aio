@@ -54,7 +54,7 @@ async def list_room_bookings(
     db: DbDep,
     page: Pagination,
     sort: str | None = None,
-    status: BookingStatus | None = None,
+    status: Annotated[list[BookingStatus] | None, Query()] = None,  # 可重複帶多值
     club_id: int | None = Query(None),
     active: bool | None = None,
 ) -> ApiResponse[list[AdminRoomBookingOut]]:
@@ -65,7 +65,7 @@ async def list_room_bookings(
         .options(sa.orm.selectinload(RoomBookingRequest.slots))
     )
     if status:
-        query = query.where(RoomBookingRequest.status == status)
+        query = query.where(RoomBookingRequest.status.in_(status))
     if club_id:
         query = query.where(RoomBookingRequest.club_id == club_id)
     if active is not None:

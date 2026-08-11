@@ -325,6 +325,15 @@ async def test_equipment_overdue_filter(client, db):
         await client.get("/api/v1/admin/equipment-loans", params={"status": "hack"})
     ).status_code == 422
 
+    # 多值取聯集(社團總覽要「未結束的那幾種」);overdue 與一般狀態可混用且不重複列
+    data = (
+        await client.get(
+            "/api/v1/admin/equipment-loans",
+            params=[("status", "overdue"), ("status", "returned")],
+        )
+    ).json()["data"]
+    assert sorted(d["purpose"] for d in data) == ["已歸還", "更逾期", "逾期單"]
+
 
 # ---- 全校單日場況 ----
 

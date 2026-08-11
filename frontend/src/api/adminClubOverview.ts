@@ -11,6 +11,7 @@ import {
   type AdminRoomRequest,
   type AdminVenueBooking,
 } from './adminBookings'
+import { apiPaged, qs } from './client'
 import { slashDate } from './adminClubs'
 import { fetchAllPages } from './fetchAll'
 
@@ -52,6 +53,7 @@ const overviewKeys = {
   roomBookings: (clubId: number) => ['adminBookings', 'club', clubId, 'rooms'] as const,
   venueBookings: (clubId: number) => ['adminBookings', 'club', clubId, 'venues'] as const,
   equipmentLoans: (p: LoanListParams) => ['adminBookings', 'loans', p] as const,
+  overdueLoans: (page: number) => ['adminBookings', 'loans', 'overdue', page] as const,
   maintenance: (clubId: number) => ['adminMaintenance', 'club', clubId] as const,
 }
 
@@ -62,12 +64,13 @@ export function useAdminClubActivities(clubId: number | null, canView = true) {
   return useQuery({
     queryKey: overviewKeys.activities(clubId ?? 0),
     enabled: clubId != null && canView,
-    // 端點不支援多狀態篩選:抓齊該社全部申請後於前端留下進行中的
+    // 進行中的狀態交給後端篩(status 收多值):這頁只顯示進行中,不該把該社歷年申請都抓回來
     queryFn: () =>
-      fetchAllPages<ActivityListOut>('/admin/activities', { club_id: clubId }).then((rows) =>
-        rows
-          .filter((a) => IN_PROGRESS.includes(a.status))
-          .map((a): AdminActivityRow => ({ id: a.id, name: a.name, status: a.status })),
+      fetchAllPages<ActivityListOut>('/admin/activities', {
+        club_id: clubId,
+        status: [...IN_PROGRESS],
+      }).then((rows) =>
+        rows.map((a): AdminActivityRow => ({ id: a.id, name: a.name, status: a.status })),
       ),
   })
 }
@@ -156,14 +159,18 @@ const toEquipmentLoan = (l: AdminEquipmentLoanOut): AdminEquipmentLoan => ({
   availableExcludingSelf: l.available_excluding_self ?? undefined,
 })
 
+// 借用類三張表都只顯示「未被駁回/未結束」的單:狀態一律交給後端篩(status 收多值)
+const LIVE_BOOKING_STATUSES = ['pending', 'approved', 'cancelled'] as const
+
 export function useAdminClubRoomBookings(clubId: number | null, canView = true) {
   return useQuery({
     queryKey: overviewKeys.roomBookings(clubId ?? 0),
     enabled: clubId != null && canView,
     queryFn: () =>
-      fetchAllPages<AdminRoomBookingOut>('/admin/room-bookings', { club_id: clubId }).then((rows) =>
-        rows.map(toRoomRequest),
-      ),
+      fetchAllPages<AdminRoomBookingOut>('/admin/room-bookings', {
+        club_id: clubId,
+        status: [...LIVE_BOOKING_STATUSES],
+      }).then((rows) => rows.map(toRoomRequest)),
   })
 }
 
@@ -172,18 +179,29 @@ export function useAdminClubVenueBookings(clubId: number | null, canView = true)
     queryKey: overviewKeys.venueBookings(clubId ?? 0),
     enabled: clubId != null && canView,
     queryFn: () =>
-      fetchAllPages<AdminVenueBookingOut>('/admin/venue-bookings', { club_id: clubId }).then((rows) =>
-        rows.map(toVenueBooking),
-      ),
+      fetchAllPages<AdminVenueBookingOut>('/admin/venue-bookings', {
+        club_id: clubId,
+        status: [...LIVE_BOOKING_STATUSES],
+      }).then((rows) => rows.map(toVenueBooking)),
   })
 }
 
+export type LoanStatusFilter =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'cancelled'
+  | 'checked_out'
+  | 'returned'
+  | 'overdue' // 後端推導(checked_out 且已過歸還門檻)
+
 export interface LoanListParams {
   clubId?: number | null
-  status?: 'pending' | 'approved' | 'rejected' | 'checked_out' | 'returned' | 'overdue'
+  /** 可多值(後端取聯集);overdue 為後端推導 */
+  statuses?: LoanStatusFilter[]
 }
 
-/** 器材借用列表:社團總覽帶 clubId;逾期追蹤頁帶 status=overdue */
+/** 器材借用列表:社團總覽帶 clubId + 未結束的狀態 */
 export function useAdminEquipmentLoanList(p: LoanListParams, canView = true) {
   return useQuery({
     queryKey: overviewKeys.equipmentLoans(p),
@@ -191,8 +209,21 @@ export function useAdminEquipmentLoanList(p: LoanListParams, canView = true) {
     queryFn: () =>
       fetchAllPages<AdminEquipmentLoanOut>('/admin/equipment-loans', {
         club_id: p.clubId,
-        status: p.status,
+        status: p.statuses,
       }).then((rows) => rows.map(toEquipmentLoan)),
+  })
+}
+
+export const OVERDUE_PAGE_SIZE = 20
+
+/** 逾期追蹤頁:逾期未還器材(伺服器端分頁;逾期為後端推導,排序=逾越最久在前) */
+export function useOverdueLoans(page: number) {
+  return useQuery({
+    queryKey: overviewKeys.overdueLoans(page),
+    queryFn: () =>
+      apiPaged<AdminEquipmentLoanOut[]>(
+        `/admin/equipment-loans${qs({ status: 'overdue', page, page_size: OVERDUE_PAGE_SIZE })}`,
+      ).then(({ data, total }) => ({ rows: data.map(toEquipmentLoan), total })),
   })
 }
 
@@ -223,8 +254,12 @@ export function useAdminClubMaintenance(clubId: number | null, canView = true) {
   return useQuery({
     queryKey: overviewKeys.maintenance(clubId ?? 0),
     enabled: clubId != null && canView,
+    // 只顯示未完成的報修:狀態交給後端篩
     queryFn: () =>
-      fetchAllPages<AdminMaintenanceOut>('/admin/maintenance', { club_id: clubId }).then((rows) =>
+      fetchAllPages<AdminMaintenanceOut>('/admin/maintenance', {
+        club_id: clubId,
+        status: ['pending', 'in_progress'],
+      }).then((rows) =>
         rows.map(
           (m): AdminMaintenanceRow => ({
             id: m.id,

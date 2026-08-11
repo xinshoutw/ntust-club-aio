@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 import sqlalchemy as sa
 
 from app.core.db import async_session_factory
+from app.core.errors import AppError
 from app.models import AuditLog, Session, User
 from app.services import auth as auth_service
 from tests.conftest import PASSWORD, csrf_headers, login, make_club, make_user
@@ -123,8 +124,10 @@ async def test_password_reset_beats_a_login_already_in_flight(db, monkeypatch):
             await session.execute(sa.delete(Session).where(Session.user_id == user.id))
             await session.commit()
 
-    await asyncio.gather(sign_in(), reset_password())
+    outcomes = await asyncio.gather(sign_in(), reset_password(), return_exceptions=True)
 
+    # 驗證期間密碼被換掉:這次登入不算數,也不得留下 session
+    assert isinstance(outcomes[0], AppError)
     assert await db.scalar(sa.select(sa.func.count()).select_from(Session)) == 0
 
 

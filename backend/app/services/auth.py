@@ -26,14 +26,8 @@ _GENERIC_LOGIN_ERROR = "帳號或密碼錯誤"
 async def login(
     db: AsyncSession, *, username: str, password: str, ip: str | None, user_agent: str | None
 ) -> tuple[User, Session]:
-    # 鎖住這一列再驗密碼:同時進行的重設密碼會等到本次登入結束才改 hash 並撤銷 session,
-    # 否則「用舊密碼建立的 session」會在重設之後才寫進去,重設等於沒撤銷
-    user = await db.scalar(sa.select(User).where(User.username == username).with_for_update())
+    user = await db.scalar(sa.select(User).where(User.username == username))
     now = datetime.now(UTC)
-
-    # 過期 session 順手清掉(單機低流量,不排程)。**必須在鎖住 users 之後**:
-    # 重設密碼與停權都是先改 users 再刪 sessions,反過來取鎖就會與它們死鎖
-    await db.execute(sa.delete(Session).where(Session.expires_at <= sa.func.now()))
 
     if user is None or not user.is_active:
         await verify_password_async(None, password)  # 時間等化,防帳號探測
@@ -69,6 +63,19 @@ async def login(
         audit.record(db, action="login_failed", user=user, detail=detail, ip=ip)
         await db.commit()
         raise unauthenticated(_GENERIC_LOGIN_ERROR)
+
+    # 驗過密碼才鎖住這一列:argon2 要 30ms 以上,鎖在它外面會讓同一組社團帳號的
+    # 多人登入完全排隊。鎖到手後重讀 hash —— 驗證期間被重設密碼的話,這把舊密碼
+    # 已經不算數,否則新建的 session 會活過那次撤銷
+    verified_hash = user.password_hash
+    await db.refresh(user, attribute_names=["password_hash", "is_active"], with_for_update=True)
+    if user.password_hash != verified_hash or not user.is_active:
+        await db.rollback()
+        raise unauthenticated(_GENERIC_LOGIN_ERROR)
+
+    # 過期 session 順手清掉(單機低流量,不排程)。**必須在鎖住 users 之後**:
+    # 重設密碼與停權都是先改 users 再刪 sessions,反過來取鎖就會與它們死鎖
+    await db.execute(sa.delete(Session).where(Session.expires_at <= sa.func.now()))
 
     if needs_rehash(user.password_hash):
         user.password_hash = await hash_password_async(password)

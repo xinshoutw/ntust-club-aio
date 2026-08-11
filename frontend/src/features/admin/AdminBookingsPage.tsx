@@ -121,6 +121,19 @@ export default function AdminBookingsPage() {
           </div>
         </div>
         <LoadingBlock pending={venuesQuery.isPending || gridQuery.isPending}>
+          {/* 場況載不到就不畫格圖:空的場況表會把每一格畫成「可借」,承辦拿它回答電話或
+              決定核不核准時看到的是假事實(社團端 BookingOverviewPage 同一條規則) */}
+          {venuesQuery.isError || gridQuery.isError ? (
+            <QueryError
+              compact
+              title={venuesQuery.isError ? '場地清單載入失敗' : '場況載入失敗'}
+              error={venuesQuery.error ?? gridQuery.error}
+              onRetry={() => {
+                if (venuesQuery.isError) void venuesQuery.refetch()
+                if (gridQuery.isError) void gridQuery.refetch()
+              }}
+            />
+          ) : (
           <div style={{ overflowX: 'auto', marginTop: 12 }}>
             <table aria-label="場地借用情形" style={{ borderCollapse: 'separate', borderSpacing: 3, width: '100%', tableLayout: 'fixed', minWidth: 720 }}>
               <thead>
@@ -210,16 +223,6 @@ export default function AdminBookingsPage() {
               </tbody>
             </table>
           </div>
-          {(venuesQuery.isError || gridQuery.isError) && (
-            <QueryError
-              compact
-              title={venuesQuery.isError ? '場地清單載入失敗' : '場況載入失敗'}
-              error={venuesQuery.error ?? gridQuery.error}
-              onRetry={() => {
-                if (venuesQuery.isError) void venuesQuery.refetch()
-                if (gridQuery.isError) void gridQuery.refetch()
-              }}
-            />
           )}
         </LoadingBlock>
       </div>

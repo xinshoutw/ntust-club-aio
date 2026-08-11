@@ -1,6 +1,7 @@
 import { useRef } from 'react'
 import { App, Button, DatePicker, Form, Input, InputNumber, Select } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
+import QueryError from '../../components/ui/QueryError'
 import dayjs, { type Dayjs } from 'dayjs'
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
@@ -269,8 +270,12 @@ export default function AdminSettingsPage() {
       ) : settingsQuery.data ? (
         <SettingsForm initial={settingsQuery.data} />
       ) : (
-        <div className="card" style={{ marginTop: 20, padding: 24, color: 'var(--steel)', fontSize: 13 }}>
-          無法載入系統設定{settingsQuery.error ? `:${settingsQuery.error.message}` : ''}
+        <div style={{ marginTop: 20 }}>
+          <QueryError
+            title="系統設定載入失敗"
+            error={settingsQuery.error}
+            onRetry={() => void settingsQuery.refetch()}
+          />
         </div>
       )}
     </div>

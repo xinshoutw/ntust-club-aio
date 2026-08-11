@@ -6,7 +6,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols, Pager } from '../../components/ui/tableControls'
-import { useAdminClubs } from '../../api/adminClubs'
+import { useClubOptions } from '../../api/adminClubs'
 import { OVERDUE_PAGE_SIZE, useOverdueLoans } from '../../api/adminClubOverview'
 import { useOverdueMutations, useSuspendedClubs } from '../../api/adminOverdue'
 import ClubCascader from './ClubCascader'
@@ -25,7 +25,9 @@ export default function OverduePage() {
   const [overduePage, setOverduePage] = useState(1)
   const overdueQuery = useOverdueLoans(overduePage)
   const suspendedQuery = useSuspendedClubs()
-  const clubsQuery = useAdminClubs() // 停權表單以名稱選社團 → 送出時對回主鍵
+  // 名稱→主鍵的對照與 ClubCascader 走同一支選項查詢:分成兩支的話選單看起來健康、
+  // 對照卻是空的,使用者填完整張表才收到「找不到所選社團」
+  const clubsQuery = useClubOptions()
   const { remind, suspend, lift } = useOverdueMutations()
   const overdue = overdueQuery.data?.rows ?? []
   const suspensions = suspendedQuery.data ?? []

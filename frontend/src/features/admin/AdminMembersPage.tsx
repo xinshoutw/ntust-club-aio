@@ -142,10 +142,11 @@ export default function AdminMembersPage() {
                   </td>
                 </tr>
               )}
-              {!listQuery.isPending && !listQuery.isError && members.length === 0 && (
+              {/* 未選社團時查詢未啟用、isPending 恆真:那時 tbody 會整個空白,所以與 :91 一樣要帶 clubId */}
+              {(clubId == null || (!listQuery.isPending && !listQuery.isError)) && members.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
-                    {club} 尚未建立成員名單
+                    {clubId == null ? '請先選擇社團' : `${club} 尚未建立成員名單`}
                   </td>
                 </tr>
               )}

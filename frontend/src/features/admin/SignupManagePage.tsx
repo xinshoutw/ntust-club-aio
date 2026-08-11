@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { countText } from '../../lib/counts'
 import { useNavigate } from 'react-router'
 import { App, Button, Checkbox, DatePicker, Input, Modal, Tooltip } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
@@ -59,6 +60,10 @@ function ManageModal({
 
   // 逐人匯出:固定欄位+該活動全部自訂欄位(依欄位順序)
   const exportCsv = () => {
+    if (regsQuery.isError) {
+      message.error('報名名單載入失敗,無法匯出;請重試後再匯出')
+      return
+    }
     if (!regs.length) {
       message.error('尚無報名名單可匯出')
       return
@@ -166,7 +171,8 @@ function ManageModal({
           截止 <span className="num">{item.deadline}</span>
         </span>
         <span>
-          已報名 <span className="num">{regs.length}</span> 社團 · <span className="num">{totalPeople}</span> 人
+          已報名 <span className="num">{countText(regs.length, regsQuery)}</span> 社團 ·{' '}
+          <span className="num">{countText(totalPeople, regsQuery)}</span> 人
         </span>
         <span>
           每社上限 <span className="num">{item.maxParticipants}</span> 人

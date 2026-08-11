@@ -296,7 +296,17 @@ export default function AdminClubSettingsPage() {
             </div>
           ) : (
             <LoadingBlock pending={clubId != null && detailQuery.isPending}>
-              <div style={{ minHeight: 120 }} />
+              {/* form 恆為 null 的另一種原因是詳情載入失敗:空白 120px 就是「查詢失敗長得像沒有資料」 */}
+              {detailQuery.isError ? (
+                <QueryError
+                  compact
+                  title="社團資料載入失敗"
+                  error={detailQuery.error}
+                  onRetry={() => void detailQuery.refetch()}
+                />
+              ) : (
+                <div style={{ minHeight: 120 }} />
+              )}
             </LoadingBlock>
           )}
         </div>

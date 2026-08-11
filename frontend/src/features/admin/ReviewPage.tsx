@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { countText } from '../../lib/counts'
 import { Button } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
+import QueryError from '../../components/ui/QueryError'
 import { RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
@@ -270,7 +271,24 @@ export default function ReviewPage() {
                   <td className="r"><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>
                 </tr>
               ))}
-              {!listQuery.isPending && pagedRows.length === 0 && (
+              {/* 兩種失敗都要有出口:列表失敗時 isPending 已為 false、pagedRows 是空陣列,
+                  不說出來就會顯示成「無符合篩選條件的申請」;社團選項失敗則讓漏斗靜靜地空著 */}
+              {(listQuery.isError || clubsQuery.isError) && (
+                <tr className="no-hover">
+                  <td colSpan={8}>
+                    <QueryError
+                      compact
+                      title={listQuery.isError ? '最近審核載入失敗' : '篩選選項載入失敗'}
+                      error={listQuery.error ?? clubsQuery.error}
+                      onRetry={() => {
+                        if (listQuery.isError) void listQuery.refetch()
+                        if (clubsQuery.isError) void clubsQuery.refetch()
+                      }}
+                    />
+                  </td>
+                </tr>
+              )}
+              {!listQuery.isPending && !listQuery.isError && !clubsQuery.isError && pagedRows.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={8} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>無符合篩選條件的申請</td>
                 </tr>

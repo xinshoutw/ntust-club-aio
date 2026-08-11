@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { App, Button, Select } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { DownloadOutlined } from '@ant-design/icons'
+import OptionsError from '../../components/ui/OptionsError'
 import PageHeader from '../../components/ui/PageHeader'
 import { Cols, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
 import { downloadCsv } from '../../lib/csv'
@@ -76,7 +77,15 @@ export default function AdminMembersPage() {
       <PageHeader
         title="成員列表"
         extra={
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {/* semesterOptions 一定補上當學期,查詢掛掉時只是歷史學期全不見(見 MembersPage 同型) */}
+            {semestersQuery.isError && (
+              <OptionsError
+                what="學期清單"
+                error={semestersQuery.error}
+                onRetry={() => void semestersQuery.refetch()}
+              />
+            )}
             <Select
               value={semester}
               onChange={setSemester}

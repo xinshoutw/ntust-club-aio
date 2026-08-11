@@ -3,6 +3,7 @@ import { countText } from '../../lib/counts'
 import { App, Button, Form, Input, Modal, Popconfirm, Select, Upload } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { DownOutlined, DownloadOutlined, EditOutlined, UploadOutlined } from '@ant-design/icons'
+import OptionsError from '../../components/ui/OptionsError'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { Cols, FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
@@ -152,7 +153,15 @@ export default function MembersPage() {
         title="成員列表"
         sub={ <> 共 <span className="num">{countText(total, listQuery)}</span> 人 </> }
         extra={
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {/* 選單一定有當學期,所以查詢掛掉時看起來完全正常 —— 只是歷史學期全不見了 */}
+            {semestersQuery.isError && (
+              <OptionsError
+                what="學期清單"
+                error={semestersQuery.error}
+                onRetry={() => void semestersQuery.refetch()}
+              />
+            )}
             <Select
               value={semester}
               onChange={(v) => {

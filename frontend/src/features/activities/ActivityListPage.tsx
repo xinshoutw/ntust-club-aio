@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 import { App, Button, Dropdown, Modal, Popconfirm, Select, Tooltip } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { DownloadOutlined, EllipsisOutlined, FileTextOutlined, LinkOutlined } from '@ant-design/icons'
+import OptionsError from '../../components/ui/OptionsError'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { Cols, FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
@@ -438,15 +439,25 @@ export default function ActivityListPage() {
           </>
         }
         extra={
-          <Select
-            value={semester}
-            onChange={(v) => {
-              setSemesterSel(v)
-              setPage(1)
-            }}
-            style={{ width: 110 }}
-            options={semOptions}
-          />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {/* semesterOptions 一定補上當學期,查詢掛掉時只是歷史學期全不見(見 MembersPage 同型) */}
+            {semestersQuery.isError && (
+              <OptionsError
+                what="學期清單"
+                error={semestersQuery.error}
+                onRetry={() => void semestersQuery.refetch()}
+              />
+            )}
+            <Select
+              value={semester}
+              onChange={(v) => {
+                setSemesterSel(v)
+                setPage(1)
+              }}
+              style={{ width: 110 }}
+              options={semOptions}
+            />
+          </div>
         }
       />
 

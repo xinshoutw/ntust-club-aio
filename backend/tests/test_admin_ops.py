@@ -105,6 +105,23 @@ async def test_maintenance_default_order_and_sort(client, db):
     resp = await client.get("/api/v1/admin/maintenance", params={"status": "done"})
     assert [d["location"] for d in resp.json()["data"]] == ["社辦 S312"]
 
+    # 畫面的預設排序是顯式的 status,created_at:必須等同不帶 sort 的預設
+    resp = await client.get("/api/v1/admin/maintenance", params={"sort": "status,created_at"})
+    assert [d["id"] for d in resp.json()["data"]] == [d["id"] for d in data]
+    # 狀態排序依處理進度,不是列舉字面值(done < in_progress < pending 那樣就錯了)
+    resp = await client.get("/api/v1/admin/maintenance", params={"sort": "-status"})
+    assert [d["status"] for d in resp.json()["data"]] == [
+        "done",
+        "in_progress",
+        "pending",
+        "pending",
+    ]
+
+    # 分頁:每頁 2 筆、總數仍為 4
+    resp = await client.get("/api/v1/admin/maintenance", params={"page_size": 2})
+    assert len(resp.json()["data"]) == 2
+    assert resp.json()["meta"]["total"] == 4
+
 
 async def test_maintenance_status_transitions(client, db):
     """狀態機:待處理 → 處理中 → 已完成(僅單步前進);audit + notify。"""

@@ -10,12 +10,13 @@
 
 | 動作 | 端點 |
 |---|---|
-| 列表 | `GET /admin/maintenance`(前端逐頁抓齊) |
+| 列表 | `GET /admin/maintenance`(伺服器端分頁,每頁 50) |
+| 待處理件數 | `GET /admin/maintenance?status=pending&page_size=1` 的 `meta.total` |
 | 推進狀態 | `POST /admin/maintenance/{id}/status` |
 
 ## 畫面
 
-表格:社團、地點、項目、佐證、申請日、狀態。佐證欄逐檔連到 `GET /files/{id}`。地點與申請日可排序(伺服器端白名單)。
+表格:社團、地點、項目、佐證、申請日、狀態。佐證欄逐檔連到 `GET /files/{id}`。地點、申請日、狀態可排序(伺服器端白名單;狀態依處理進度而非列舉字面值)。
 
 ## 規則
 
@@ -27,5 +28,5 @@
 
 ## 未完成 / 問題
 
-- 全量抓回前端,沒有分頁與社團篩選(後端有 `club_id` 參數)
+- 畫面無社團篩選入口(後端有 `club_id` 參數)
 - 狀態不可回退

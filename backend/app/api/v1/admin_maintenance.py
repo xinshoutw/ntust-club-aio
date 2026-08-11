@@ -24,16 +24,18 @@ router = APIRouter(prefix="/admin/maintenance", tags=["admin"])
 
 MaintAdmin = Annotated[CurrentUser, Depends(require_permission("amaint"))]
 
-_SORTABLE = {
-    "location": MaintenanceRequest.location,
-    "created_at": MaintenanceRequest.created_at,  # 申請日
-}
-
 _STATUS_ORDER = sa.case(
     (MaintenanceRequest.status == MaintenanceStatus.PENDING, 0),
     (MaintenanceRequest.status == MaintenanceStatus.IN_PROGRESS, 1),
     else_=2,
 )
+
+_SORTABLE = {
+    "location": MaintenanceRequest.location,
+    "created_at": MaintenanceRequest.created_at,  # 申請日
+    # 狀態依處理進度排,不是列舉字面值(待處理要在最上面)
+    "status": _STATUS_ORDER,
+}
 
 
 @router.get("")

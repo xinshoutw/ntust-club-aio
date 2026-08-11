@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useState } from 'react'
 import { App, Select, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
@@ -6,49 +6,51 @@ import StatusPill from '../../components/ui/StatusPill'
 import {
   Cols,
   MultiSortButton,
-  sortRows,
+  Pager,
+  sortParam,
   useMultiSort,
   type SortEntry,
 } from '../../components/ui/tableControls'
 import {
+  MAINTENANCE_PAGE_SIZE,
   NEXT_STATUS,
   useAdminMaintenance,
   useMaintenanceStatusMutation,
+  usePendingMaintenanceTotal,
   type MaintenanceItem,
   type MaintenanceStatus,
 } from '../../api/adminMaintenance'
 import { fileDownloadUrl } from '../../api/adminFiles'
 
-const STATUS_ORDER: Record<MaintenanceStatus, number> = { pending: 0, in_progress: 1, done: 2 }
 const STATUS_LABELS: Record<MaintenanceStatus, string> = {
   pending: '待處理',
   in_progress: '處理中',
   done: '已完成',
 }
 
-// status 僅作預設鏈用(狀態欄無排序鈕);比較器一律升冪,方向由 sortRows 翻轉
-type SortKey = 'location' | 'date' | 'status'
-
-const CMPS: Record<SortKey, (a: MaintenanceItem, b: MaintenanceItem) => number> = {
-  location: (a, b) => a.location.localeCompare(b.location, 'zh-Hant'),
-  date: (a, b) => a.date.localeCompare(b.date),
-  status: (a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status],
-}
+// 排序鍵=後端 /admin/maintenance 白名單(status 依處理進度排,不是列舉字面值)
+type SortKey = 'location' | 'created_at' | 'status'
 
 // 預設排序:待處理 → 處理中 → 已完成,各組內照申請日順序(與後端預設一致)
 const DEFAULT_SORT: SortEntry<SortKey>[] = [
   { key: 'status', dir: 1 },
-  { key: 'date', dir: 1 },
+  { key: 'created_at', dir: 1 },
 ]
 
 export default function AdminMaintenancePage() {
   const { message } = App.useApp()
   const { entries, toggle } = useMultiSort<SortKey>(DEFAULT_SORT)
-  const listQuery = useAdminMaintenance()
-  const queue = useMemo(() => listQuery.data ?? [], [listQuery.data])
+  const [page, setPage] = useState(1)
+  const listQuery = useAdminMaintenance(sortParam(entries), page)
+  const rows = listQuery.data?.rows ?? []
+  const total = listQuery.data?.total ?? 0
+  const pendingTotal = usePendingMaintenanceTotal()
   const updateStatus = useMaintenanceStatusMutation()
 
-  const rows = useMemo(() => sortRows(queue, entries, CMPS), [queue, entries])
+  const toggleSort = (key: SortKey) => {
+    toggle(key)
+    setPage(1) // 伺服器端分頁:換排序回到第 1 頁
+  }
 
   // 狀態機僅允許單步前進(待處理→處理中→已完成):下拉只開放下一步選項
   const onChangeStatus = (q: MaintenanceItem, status: MaintenanceStatus) => {
@@ -67,7 +69,7 @@ export default function AdminMaintenancePage() {
         title="維修管理"
         sub={
           <>
-            待處理 <span className="num">{queue.filter((q) => q.status === 'pending').length}</span> 件
+            待處理 <span className="num">{pendingTotal.data ?? 0}</span> 件
           </>
         }
       />
@@ -80,11 +82,11 @@ export default function AdminMaintenancePage() {
             <thead>
               <tr>
                 <th scope="col">社團</th>
-                <th scope="col"><MultiSortButton label="地點" sortKey="location" entries={entries} onToggle={toggle} /></th>
+                <th scope="col"><MultiSortButton label="地點" sortKey="location" entries={entries} onToggle={toggleSort} /></th>
                 <th scope="col">項目</th>
                 <th scope="col">佐證</th>
-                <th scope="col"><MultiSortButton label="申請日" sortKey="date" entries={entries} onToggle={toggle} /></th>
-                <th scope="col">狀態</th>
+                <th scope="col"><MultiSortButton label="申請日" sortKey="created_at" entries={entries} onToggle={toggleSort} /></th>
+                <th scope="col"><MultiSortButton label="狀態" sortKey="status" entries={entries} onToggle={toggleSort} /></th>
               </tr>
             </thead>
             <tbody>
@@ -147,6 +149,7 @@ export default function AdminMaintenancePage() {
               )}
             </tbody>
           </table>
+          <Pager page={page} pageSize={MAINTENANCE_PAGE_SIZE} total={total} onChange={setPage} />
         </div>
       </Spin>
     </div>

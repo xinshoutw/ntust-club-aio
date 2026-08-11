@@ -1,10 +1,9 @@
 // 行政端維修管理 API 層(權限鍵 amaint)。
-// 列表一次抓全量(報修量級小)沿用前端排序;預設排序=後端預設(待處理→處理中→已完成,組內申請日升冪)。
+// 伺服器端分頁與排序(白名單 location/created_at/status,status 依處理進度而非字面值)。
 // 狀態流轉走後端狀態機:僅允許單步前進(待處理→處理中→已完成),UI 也只開放下一步選項。
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
-import { api } from './client'
-import { fetchAllPages } from './fetchAll'
+import { api, apiPaged, qs } from './client'
 
 export type MaintenanceStatus = 'pending' | 'in_progress' | 'done'
 
@@ -55,14 +54,30 @@ const toItem = (m: AdminMaintenanceOut): MaintenanceItem => ({
 
 const keys = {
   all: ['adminMaintenance'] as const,
-  list: ['adminMaintenance', 'list'] as const,
+  list: (sort: string, page: number) => ['adminMaintenance', 'list', sort, page] as const,
+  pendingTotal: ['adminMaintenance', 'pendingTotal'] as const,
 }
 
-export function useAdminMaintenance() {
+export const MAINTENANCE_PAGE_SIZE = 50
+
+/** sort:逗號多鍵(白名單 location/created_at/status);未帶=後端預設 待處理在前+申請日升冪 */
+export function useAdminMaintenance(sort: string | undefined, page: number) {
   return useQuery({
-    queryKey: keys.list,
+    queryKey: keys.list(sort ?? '', page),
     queryFn: () =>
-      fetchAllPages<AdminMaintenanceOut>('/admin/maintenance').then((rows) => rows.map(toItem)),
+      apiPaged<AdminMaintenanceOut[]>(
+        `/admin/maintenance${qs({ sort, page, page_size: MAINTENANCE_PAGE_SIZE })}`,
+      ).then(({ data, total }) => ({ rows: data.map(toItem), total })),
+  })
+}
+
+/** 待處理件數(page_size=1 只取 meta.total;分頁後算不出全域數字) */
+export function usePendingMaintenanceTotal() {
+  return useQuery({
+    queryKey: keys.pendingTotal,
+    queryFn: async () =>
+      (await apiPaged<unknown[]>(`/admin/maintenance${qs({ status: 'pending', page_size: 1 })}`))
+        .total,
   })
 }
 

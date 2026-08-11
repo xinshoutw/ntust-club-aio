@@ -8,6 +8,8 @@ fields 定義(signup_items.fields):
 from datetime import UTC, datetime
 from typing import Any
 
+import sqlalchemy as sa
+
 from app.models import SignupItem
 
 _TEXT_MAX = 1000
@@ -21,6 +23,16 @@ def window_open(item: SignupItem, now: datetime | None = None) -> bool:
     if item.signup_start is not None and now < item.signup_start:
         return False
     return not (item.signup_end is not None and now > item.signup_end)
+
+
+def window_open_sql() -> sa.ColumnElement[bool]:
+    """同一個報名窗判定的 SQL 版(開放中件數要在 DB 端算,不能靠撈全部再數)。"""
+    now = sa.func.now()
+    return sa.and_(
+        SignupItem.is_open.is_(True),
+        sa.or_(SignupItem.signup_start.is_(None), SignupItem.signup_start <= now),
+        sa.or_(SignupItem.signup_end.is_(None), SignupItem.signup_end >= now),
+    )
 
 
 def normalize_fields(fields: list[dict[str, Any]]) -> list[dict[str, Any]]:

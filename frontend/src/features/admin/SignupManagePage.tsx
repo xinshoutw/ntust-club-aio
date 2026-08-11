@@ -6,12 +6,14 @@ import type { Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
-import { Cols } from '../../components/ui/tableControls'
+import { Cols, Pager } from '../../components/ui/tableControls'
 import { confirmDialog } from '../../lib/confirm'
 import { downloadCsv } from '../../lib/csv'
 import KindBadge from '../signup/KindBadge'
 import {
+  SIGNUP_PAGE_SIZE,
   useAdminSignupItems,
+  useOpenSignupTotal,
   useRegistrations,
   useSessions,
   useSignupItemMutations,
@@ -326,15 +328,16 @@ export default function SignupManagePage() {
   const [selected, setSelected] = useState<AdminSignupItem | null>(null)
   const [open, setOpen] = useState(false)
 
-  const listQuery = useAdminSignupItems()
-  const items = listQuery.data ?? []
+  const [page, setPage] = useState(1)
+  const listQuery = useAdminSignupItems(page)
+  const items = listQuery.data?.rows ?? []
+  const total = listQuery.data?.total ?? 0
+  const openTotal = useOpenSignupTotal()
 
   const openItem = (item: AdminSignupItem) => {
     setSelected(item)
     setOpen(true)
   }
-
-  const openCount = items.filter((i) => i.status === 'open').length
 
   return (
     <div>
@@ -342,7 +345,7 @@ export default function SignupManagePage() {
         title="活動管理"
         sub={
           <>
-            開放中 <span className="num">{openCount}</span> 項
+            開放中 <span className="num">{openTotal.data ?? 0}</span> 項
           </>
         }
         extra={
@@ -415,6 +418,7 @@ export default function SignupManagePage() {
               )}
             </tbody>
           </table>
+          <Pager page={page} pageSize={SIGNUP_PAGE_SIZE} total={total} onChange={setPage} />
         </div>
       </Spin>
 

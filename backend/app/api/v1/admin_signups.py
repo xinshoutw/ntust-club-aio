@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from typing import Annotated
 
 import sqlalchemy as sa
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 
 from app.api.pagination import Pagination
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
@@ -123,10 +123,19 @@ async def create_item(
 
 @router.get("")
 async def list_items(
-    user: RegAdmin, db: DbDep, page: Pagination
+    user: RegAdmin,
+    db: DbDep,
+    page: Pagination,
+    accepting: bool | None = Query(None),
 ) -> ApiResponse[list[AdminSignupItemOut]]:
-    """報名管理總表:各活動已報名社團數/人數、待確認數。"""
+    """報名管理總表:各活動已報名社團數/人數、待確認數。
+
+    accepting 篩「報名窗開著的活動」(判定與 `svc.window_open` 同源)。
+    """
     query = sa.select(SignupItem).order_by(SignupItem.id.desc())
+    if accepting is not None:
+        window = svc.window_open_sql()
+        query = query.where(window if accepting else sa.not_(window))
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     items = (await db.scalars(query.offset(page.offset).limit(page.page_size))).all()
     ids = [i.id for i in items]

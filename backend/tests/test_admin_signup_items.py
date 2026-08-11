@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 import sqlalchemy as sa
 
-from app.models import AuditLog, Award, Signup, SignupEntry
+from app.models import AuditLog, Award, Signup, SignupEntry, SignupItem, User
 from app.models.enums import AwardKind
 from tests.conftest import csrf_headers, login, make_club, make_user
 
@@ -174,6 +174,42 @@ async def test_list_with_registration_stats(client, db):
     assert by_club[club.name]["confirmed"] is False
     assert by_club["吉他社"]["confirmed"] is True
     assert by_club[club.name]["entries"][0]["answers"] == {"f1": "0912"}
+
+
+async def test_accepting_filter_matches_the_python_window(client, db):
+    """開放中件數改由 DB 端算:SQL 版報名窗與 window_open 必須給同一個答案。"""
+    now = datetime.now(UTC)
+    await seed(client, db)
+    admin_id = await db.scalar(sa.select(User.id).where(User.username == "regadmin"))
+    await client.post(URL, json=body(name="報名中"), headers=csrf_headers(client))
+    # 已截止的活動建不出來(API 禁過去時刻),直接落一列
+    db.add(
+        SignupItem(
+            name="已截止",
+            event_at=now + timedelta(days=30),
+            signup_start=now - timedelta(days=30),
+            signup_end=now - timedelta(days=1),
+            max_participants=5,
+            created_by=admin_id,
+        )
+    )
+    await db.commit()
+    await client.post(
+        URL,
+        json=body(name="未開始", signup_start=(now + timedelta(days=3)).isoformat()),
+        headers=csrf_headers(client),
+    )
+    await client.post(URL, json=body(name="未開放", is_open=False), headers=csrf_headers(client))
+
+    resp = await client.get(URL, params={"accepting": "true"})
+    assert [r["name"] for r in resp.json()["data"]] == ["報名中"]
+    assert resp.json()["meta"]["total"] == 1
+    resp = await client.get(URL, params={"accepting": "false"})
+    assert {r["name"] for r in resp.json()["data"]} == {"已截止", "未開始", "未開放"}
+
+    # 每一列的 accepting 欄(Python 端)與篩選(SQL 端)不得分歧
+    rows = (await client.get(URL)).json()["data"]
+    assert {r["name"] for r in rows if r["accepting"]} == {"報名中"}
 
 
 async def test_confirm_waits_for_the_signup_row_lock(client, db):

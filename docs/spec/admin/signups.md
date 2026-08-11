@@ -10,7 +10,8 @@
 
 | 動作 | 端點 |
 |---|---|
-| 活動列表 | `GET /admin/signup-items`(前端逐頁抓齊) |
+| 活動列表 | `GET /admin/signup-items`(伺服器端分頁,每頁 20,新→舊) |
+| 開放中件數 | `GET /admin/signup-items?accepting=true&page_size=1` 的 `meta.total` |
 | 報名名單 | `GET /admin/signup-items/{id}/registrations` |
 | 確認報名 | `PUT /admin/signup-items/{id}/registrations/{club_id}/confirm` |
 | 場次 CRUD | `GET\|POST\|DELETE /admin/signup-items/{id}/sessions[/{sid}]` |
@@ -40,5 +41,5 @@
 ## 未完成 / 問題
 
 - **報名活動建立後無法修改也無法關閉**:沒有 PUT/PATCH/DELETE,打錯字或要提前截止只能直接動 DB
-- 列表靠 `fetchAllPages` 全量抓回,沒有分頁、排序或篩選
+- 列表只有分頁,沒有排序或篩選入口(後端亦僅提供 `accepting` 一個篩選)
 - 實際到場但未線上報名的社團無法補登簽到 —— 後端硬性要求先有 `signups` 列

@@ -7,8 +7,7 @@
 //   場次由 GET/POST/DELETE /{id}/sessions 管理(建立僅場次制可用,非場次制 409)。
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
-import { api } from './client'
-import { fetchAllPages } from './fetchAll'
+import { api, apiPaged, qs } from './client'
 import { FIELD_TYPE_LABEL, type FieldType, type SignupField, type SignupKind } from '../features/signup/types'
 
 const DATETIME_FMT = 'YYYY/MM/DD HH:mm'
@@ -153,16 +152,32 @@ const toSession = (s: SessionOut): SignupSession => ({
 
 const keys = {
   all: ['adminSignups'] as const,
-  list: ['adminSignups', 'list'] as const,
+  list: (page: number) => ['adminSignups', 'list', page] as const,
+  openTotal: ['adminSignups', 'openTotal'] as const,
   registrations: (itemId: number) => ['adminSignups', 'registrations', itemId] as const,
   sessions: (itemId: number) => ['adminSignups', 'sessions', itemId] as const,
 }
 
-export function useAdminSignupItems() {
+export const SIGNUP_PAGE_SIZE = 20
+
+/** 伺服器端分頁(排序由後端固定為新→舊) */
+export function useAdminSignupItems(page: number) {
   return useQuery({
-    queryKey: keys.list,
+    queryKey: keys.list(page),
     queryFn: () =>
-      fetchAllPages<AdminSignupItemOut>('/admin/signup-items').then((rows) => rows.map(toItem)),
+      apiPaged<AdminSignupItemOut[]>(
+        `/admin/signup-items${qs({ page, page_size: SIGNUP_PAGE_SIZE })}`,
+      ).then(({ data, total }) => ({ rows: data.map(toItem), total })),
+  })
+}
+
+/** 開放中件數(報名窗判定在後端;page_size=1 只取 meta.total) */
+export function useOpenSignupTotal() {
+  return useQuery({
+    queryKey: keys.openTotal,
+    queryFn: async () =>
+      (await apiPaged<unknown[]>(`/admin/signup-items${qs({ accepting: true, page_size: 1 })}`))
+        .total,
   })
 }
 

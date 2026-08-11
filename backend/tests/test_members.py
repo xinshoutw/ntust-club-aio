@@ -138,6 +138,11 @@ async def test_member_changes_are_audited(client, db):
     )
     await client.delete(f"/api/v1/club/members/{member_id}", headers=csrf_headers(client))
 
+    imported = await db.scalar(
+        sa.select(AuditLog.detail).where(AuditLog.action == "members_imported")
+    )
+    assert "B11109002" in imported  # 匯入是 upsert,只記數量查不出改了誰
+
     rows = list(await db.scalars(sa.select(AuditLog).order_by(AuditLog.id)))
     assert [r.action for r in rows if r.action.startswith("member")] == [
         "member_created", "member_updated", "members_imported", "member_deleted",

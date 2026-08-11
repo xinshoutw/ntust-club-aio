@@ -52,6 +52,9 @@ _SORTABLE = {
 _DEFAULT_ORDER = (_KIND_WEIGHT.asc(), ClubMember.student_id.asc())
 
 # 匯入「身份」欄:顯示詞映射為標準身份(社長/會長→負責人;副社長/副會長→副負責人)
+# 匯入稽核最多列幾個學號(名單動輒上百人,全列進去會把稽核表格撐爆)
+_AUDIT_ID_LIMIT = 10
+
 _KIND_ALIASES = {
     "社員": MemberKind.MEMBER,
     "幹部": MemberKind.OFFICER,
@@ -178,7 +181,10 @@ async def update_member(
             raise conflict("該學號已在該學期名單中")
     for field, value in changed.items():
         setattr(member, field, value)
-    member.title = _validate_member(member.kind, member.title)
+    normalized = _validate_member(member.kind, member.title)
+    if normalized != member.title:  # 空職稱正規化成 NULL 也是一次真實寫入
+        member.title = normalized
+        changed["title"] = normalized
     if changed:  # 行內編輯的 blur 會送出未變更的整列,那不是一次異動
         _audit(db, request, user, "member_updated", member, f"fields={','.join(sorted(changed))}")
     await db.commit()
@@ -202,6 +208,7 @@ async def import_members(
     body: MemberImportRequest, user: ClubUser, db: DbDep, request: Request
 ) -> ApiResponse[MemberImportResult]:
     created = updated = 0
+    touched: set[str] = set()
     errors: list[str] = []
 
     # 匯入至指定學期:同學期同學號 upsert,不影響其他學期名單
@@ -268,17 +275,22 @@ async def import_members(
                 )
             )
             created += 1
+            touched.add(student_id)
         elif (member.name, member.kind, member.title, member.phone) != (name, kind, title, phone):
             # 值沒變不計入 updated:重匯同一份名單要回報 0 筆更新,不能謊報整份都動過
             member.name, member.kind, member.title, member.phone = name, kind, title, phone
             updated += 1
+            touched.add(student_id)
 
-    if created or updated:
+    if touched:
+        # 匯入是 upsert,會覆寫既有成員的姓名/身份/職稱/電話 —— 只記數量查不出改了誰
+        shown = ",".join(sorted(touched)[:_AUDIT_ID_LIMIT])
+        more = f"…等 {len(touched)} 人" if len(touched) > _AUDIT_ID_LIMIT else ""
         audit.record(
             db,
             action="members_imported",
             user=user,
-            detail=f"semester={body.semester};created={created};updated={updated}",
+            detail=f"semester={body.semester};created={created};updated={updated};{shown}{more}",
             ip=client_ip(request),
         )
     await db.commit()

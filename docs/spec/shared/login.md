@@ -31,7 +31,7 @@
 - session 存 DB,cookie `session_id` 為 HttpOnly;7 天滑動效期,剩餘 < 6 天 23 小時才續期,續期時一併重送 cookie
 - CSRF double-submit:`csrf_token` cookie 非 HttpOnly,前端 `client.ts` 對 POST/PUT/PATCH/DELETE 自動附 `X-CSRF-Token`
 - 登入限流在應用層(`login_limiter`,只計失敗)與 nginx `limit_req` 各一道;帳號本身連錯 5 次鎖 15 分
-- 驗密碼期間鎖住該帳號列:同時進行的重設密碼會等本次登入結束,撤銷 session 才不會漏掉剛建立的那一個
+- 驗密碼期間鎖住該帳號列:同時進行的重設密碼會等本次登入結束,撤銷 session 才不會漏掉剛建立的那一個。**取鎖順序固定 users → sessions**(重設密碼與停權也是),反序會死鎖
 - 登入成功會清 `sessionStorage` 的蓋板已關閉紀錄,使蓋板公告每次登入重新顯示
 
 ## 未完成 / 問題

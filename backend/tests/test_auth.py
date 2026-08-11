@@ -2,7 +2,9 @@ from datetime import UTC, datetime, timedelta
 
 import sqlalchemy as sa
 
+from app.core.db import async_session_factory
 from app.models import AuditLog, Session, User
+from app.services import auth as auth_service
 from tests.conftest import PASSWORD, csrf_headers, login, make_club, make_user
 
 
@@ -124,6 +126,30 @@ async def test_password_reset_beats_a_login_already_in_flight(db, monkeypatch):
     await asyncio.gather(sign_in(), reset_password())
 
     assert await db.scalar(sa.select(sa.func.count()).select_from(Session)) == 0
+
+
+async def test_login_locks_users_before_touching_sessions(db):
+    """重設密碼與停權都是先改 users 再刪 sessions;登入反序取鎖就會與它們死鎖(登入方噴 500)。"""
+    from app.core.db import engine
+
+    await make_user(db, username="club01")
+    statements: list[str] = []
+
+    def record(conn, cursor, statement, *args):
+        statements.append(" ".join(statement.split()))
+
+    sa.event.listen(engine.sync_engine, "before_cursor_execute", record)
+    try:
+        async with async_session_factory() as session:
+            await auth_service.login(
+                session, username="club01", password=PASSWORD, ip=None, user_agent=None
+            )
+    finally:
+        sa.event.remove(engine.sync_engine, "before_cursor_execute", record)
+
+    locked_users = next(i for i, s in enumerate(statements) if "FOR UPDATE" in s)
+    cleared = next(i for i, s in enumerate(statements) if s.startswith("DELETE FROM sessions"))
+    assert locked_users < cleared
 
 
 async def test_csrf_required_on_state_changing_requests(client, db):

@@ -159,6 +159,18 @@ class AdminViolationOut(BaseModel):
     resolve_expired: bool = False
 
 
+class ViolationFillerOut(BaseModel):
+    id: int
+    name: str
+
+
+class ViolationOptionsOut(BaseModel):
+    """篩選選項取自實際開立過的紀錄:目錄(system_settings)改過之後,舊項目仍篩得到。"""
+
+    items: list[str]
+    fillers: list[ViolationFillerOut]
+
+
 # ---- 維修管理 ----
 
 

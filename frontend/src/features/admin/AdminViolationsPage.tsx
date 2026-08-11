@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import { App, Form, Input, Modal, Spin, Tooltip } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
@@ -7,34 +7,31 @@ import {
   Cols,
   FilterButton,
   MultiSortButton,
-  sortRows,
+  Pager,
+  sortParam,
   useMultiSort,
   type SortEntry,
 } from '../../components/ui/tableControls'
-import { useAdminViolations, useResolveViolation, type AdminViolation } from '../../api/adminViolations'
+import { useOpenViolationTotal } from '../../api/adminActivities'
+import {
+  ALL_VIOLATION_STATUSES,
+  DEADLINE_LABELS,
+  VIOLATION_STATUS_LABEL,
+  useAdminViolations,
+  useResolveViolation,
+  useViolationOptions,
+  violationFilterParams,
+  type AdminViolation,
+} from '../../api/adminViolations'
 
+const PAGE_SIZE = 50
+
+// 排序鍵=後端 /admin/violations 白名單(社團欄不在白名單,不開排序)
 type SortKey = 'date' | 'location' | 'items' | 'filler' | 'deadline' | 'status'
 
-const statusLabel = (v: AdminViolation): string => (v.status === 'violation_open' ? '未銷案' : '已銷案')
-const deadlineLabel = (v: AdminViolation): string =>
-  v.status === 'violation_resolved' ? '—' : v.expired ? '已截止' : '未逾期'
+const STATUS_LABELS = ALL_VIOLATION_STATUSES.map((s) => VIOLATION_STATUS_LABEL[s])
 
-// 各鍵一律寫升冪比較器,方向由 sortRows 依排序鏈翻轉;
-// status 升冪=未銷案在前(業務語意,非標籤字典序);deadline 已銷案(無期限)視為最小值
-const CMPS: Record<SortKey, (a: AdminViolation, b: AdminViolation) => number> = {
-  date: (a, b) => a.date.localeCompare(b.date),
-  location: (a, b) => a.location.localeCompare(b.location, 'zh-Hant'),
-  items: (a, b) => a.items.join('、').localeCompare(b.items.join('、'), 'zh-Hant'),
-  filler: (a, b) => a.filler.localeCompare(b.filler, 'zh-Hant'),
-  deadline: (a, b) =>
-    (a.status === 'violation_resolved' ? '' : a.deadline).localeCompare(
-      b.status === 'violation_resolved' ? '' : b.deadline,
-    ),
-  status: (a, b) =>
-    (a.status === 'violation_open' ? 0 : 1) - (b.status === 'violation_open' ? 0 : 1),
-}
-
-// 預設排序:未銷案在最上,各組內照發生日順序(銷案期限最近的先;與後端預設一致)
+// 預設排序:未銷案在最上,各組內照發生日順序(銷案期限最近的先;= 後端 status,date 升冪)
 const DEFAULT_SORT: SortEntry<SortKey>[] = [
   { key: 'status', dir: 1 },
   { key: 'date', dir: 1 },
@@ -50,23 +47,52 @@ export default function AdminViolationsPage() {
   const [fillerFilter, setFillerFilter] = useState<string[]>([])
   const [deadlineFilter, setDeadlineFilter] = useState<string[]>([])
   const [statusFilter, setStatusFilter] = useState<string[]>([])
+  const [page, setPage] = useState(1)
 
-  // 後端排序/篩選為單值參數,與多選漏斗不合:抓全量後沿用前端排序/篩選(見 api/adminViolations)
-  const listQuery = useAdminViolations()
-  const violations = useMemo(() => listQuery.data ?? [], [listQuery.data])
+  // 篩選選項取自實際紀錄(不是這一頁的列):承辦不必先翻到某頁才篩得到
+  const optionsQuery = useViolationOptions()
+  const fillerOptions = optionsQuery.data?.fillers ?? []
+  const itemOptions = optionsQuery.data?.items ?? []
+
+  const { statuses, expired, fillerIds } = violationFilterParams({
+    statusLabels: statusFilter,
+    deadlineLabels: deadlineFilter,
+    fillerNames: fillerFilter,
+    fillers: fillerOptions,
+  })
+
+  // 狀態交集為空=使用者選了不可能同時成立的條件,沒有列可回,也就不必打 API
+  const enabled = statuses.length > 0
+  const listQuery = useAdminViolations(
+    {
+      items: itemFilter.length ? itemFilter : undefined,
+      fillerIds,
+      statuses,
+      expired,
+      sort: sortParam(entries),
+      page,
+      pageSize: PAGE_SIZE,
+    },
+    { enabled },
+  )
+  // 未啟用的查詢恆為 isPending,不能直接當 loading 旗標
+  const loading = enabled && listQuery.isPending
+  const rows = enabled ? (listQuery.data?.rows ?? []) : []
+  const total = enabled ? (listQuery.data?.total ?? 0) : 0
+  const openTotal = useOpenViolationTotal()
+
   const resolve = useResolveViolation()
 
-  const fillerOptions = [...new Set(violations.map((v) => v.filler))]
-  const itemOptions = [...new Set(violations.flatMap((v) => v.items))]
-
-  const rows = useMemo(() => {
-    let list = violations
-    if (itemFilter.length) list = list.filter((v) => v.items.some((i) => itemFilter.includes(i)))
-    if (fillerFilter.length) list = list.filter((v) => fillerFilter.includes(v.filler))
-    if (deadlineFilter.length) list = list.filter((v) => deadlineFilter.includes(deadlineLabel(v)))
-    if (statusFilter.length) list = list.filter((v) => statusFilter.includes(statusLabel(v)))
-    return sortRows(list, entries, CMPS)
-  }, [violations, entries, itemFilter, fillerFilter, deadlineFilter, statusFilter])
+  const withPageReset =
+    <T,>(set: (next: T) => void) =>
+    (next: T) => {
+      set(next)
+      setPage(1)
+    }
+  const toggleSort = (key: SortKey) => {
+    toggle(key)
+    setPage(1) // 伺服器端分頁:換排序回到第 1 頁
+  }
 
   const askResolve = (v: AdminViolation) => {
     setResolving(v)
@@ -88,18 +114,22 @@ export default function AdminViolationsPage() {
     )
   }
 
+  const filtered = Boolean(
+    itemFilter.length || fillerFilter.length || deadlineFilter.length || statusFilter.length,
+  )
+
   return (
     <div>
       <PageHeader
         title="違規管理"
         sub={
           <>
-            未銷案 <span className="num">{violations.filter((v) => v.status === 'violation_open').length}</span> 筆
+            未銷案 <span className="num">{openTotal.data ?? 0}</span> 筆
           </>
         }
       />
 
-      <Spin spinning={listQuery.isPending}>
+      <Spin spinning={loading}>
         <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
           <table className="tb dense fixed" aria-label="違規勸導紀錄" style={{ minWidth: 760 }}>
             {/* 社團/地點截斷、項目吃剩餘寬且允許換行;日期/填寫/期限/狀態/動作固定 px */}
@@ -107,30 +137,30 @@ export default function AdminViolationsPage() {
             <thead>
               <tr>
                 <th scope="col">社團</th>
-                <th scope="col"><MultiSortButton label="日期" sortKey="date" entries={entries} onToggle={toggle} /></th>
-                <th scope="col"><MultiSortButton label="地點" sortKey="location" entries={entries} onToggle={toggle} /></th>
+                <th scope="col"><MultiSortButton label="日期" sortKey="date" entries={entries} onToggle={toggleSort} /></th>
+                <th scope="col"><MultiSortButton label="地點" sortKey="location" entries={entries} onToggle={toggleSort} /></th>
                 <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <MultiSortButton label="項目" sortKey="items" entries={entries} onToggle={toggle} />
-                    <FilterButton options={itemOptions} selected={itemFilter} onChange={setItemFilter} label="篩選項目" />
+                    <MultiSortButton label="項目" sortKey="items" entries={entries} onToggle={toggleSort} />
+                    <FilterButton options={itemOptions} selected={itemFilter} onChange={withPageReset(setItemFilter)} label="篩選項目" />
                   </span>
                 </th>
                 <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <MultiSortButton label="填寫" sortKey="filler" entries={entries} onToggle={toggle} />
-                    <FilterButton options={fillerOptions} selected={fillerFilter} onChange={setFillerFilter} label="篩選填寫人" />
+                    <MultiSortButton label="填寫" sortKey="filler" entries={entries} onToggle={toggleSort} />
+                    <FilterButton options={fillerOptions.map((f) => f.name)} selected={fillerFilter} onChange={withPageReset(setFillerFilter)} label="篩選填寫人" />
                   </span>
                 </th>
                 <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <MultiSortButton label="銷案期限" sortKey="deadline" entries={entries} onToggle={toggle} />
-                    <FilterButton options={['未逾期', '已截止']} selected={deadlineFilter} onChange={setDeadlineFilter} label="篩選期限" />
+                    <MultiSortButton label="銷案期限" sortKey="deadline" entries={entries} onToggle={toggleSort} />
+                    <FilterButton options={DEADLINE_LABELS} selected={deadlineFilter} onChange={withPageReset(setDeadlineFilter)} label="篩選期限" />
                   </span>
                 </th>
                 <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <MultiSortButton label="狀態" sortKey="status" entries={entries} onToggle={toggle} />
-                    <FilterButton options={['未銷案', '已銷案']} selected={statusFilter} onChange={setStatusFilter} label="篩選狀態" />
+                    <MultiSortButton label="狀態" sortKey="status" entries={entries} onToggle={toggleSort} />
+                    <FilterButton options={STATUS_LABELS} selected={statusFilter} onChange={withPageReset(setStatusFilter)} label="篩選狀態" />
                   </span>
                 </th>
                 <th scope="col" className="r">動作</th>
@@ -178,13 +208,16 @@ export default function AdminViolationsPage() {
                   </td>
                 </tr>
               )}
-              {!listQuery.isPending && !listQuery.isError && rows.length === 0 && (
+              {!loading && !listQuery.isError && rows.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={8} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有違規勸導紀錄</td>
+                  <td colSpan={8} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
+                    {filtered ? '沒有符合篩選條件的紀錄' : '目前沒有違規勸導紀錄'}
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
+          <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} />
         </div>
       </Spin>
 

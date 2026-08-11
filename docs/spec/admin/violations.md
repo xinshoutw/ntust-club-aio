@@ -10,7 +10,9 @@
 
 | 動作 | 端點 |
 |---|---|
-| 列表 | `GET /admin/violations`(前端逐頁抓齊) |
+| 列表 | `GET /admin/violations`(伺服器端分頁,每頁 50) |
+| 篩選選項 | `GET /admin/violations/options`(違規項目、填寫人;取自實際紀錄) |
+| 未銷案筆數 | `GET /admin/violations?status=open&page_size=1` 的 `meta.total` |
 | 銷案 | `POST /admin/violations/{id}/resolve` |
 
 ## 畫面
@@ -21,6 +23,9 @@
 
 ## 規則
 
+- **排序與篩選一律伺服器端**:多欄排序走白名單(`date`/`location`/`items`/`filler`/`deadline`/`status`),漏斗的多選值直接送後端(`status`/`item`/`filler_id` 皆收多值,`item` 多值=命中任一項)
+- 篩選選項來自 `/options`(實際開立過的項目與填寫人),不是當前這一頁的列;違規項目目錄改過之後舊項目仍篩得到
+- 期限漏斗只對未銷案有意義(已銷案該欄顯示「—」):只選一邊 → `expired` 布林;兩邊都選 = 僅未銷案;與狀態漏斗取交集,交集為空時不發查詢、直接顯示無資料
 - **銷案期限 = 開立日 + 1 個月**,逾期即截止,後端回 409 `RESOLVE_EXPIRED`;期限當天仍可銷案
 - 逾期篩選在 DB 端算(`violation_service.deadline_sql`),與 Python 端的推導共用 `RESOLVE_MONTHS`
 - 預設排序:未銷案在前,各組內發生日升冪(與工讀生端、社團端一致)
@@ -29,6 +34,5 @@
 
 ## 未完成 / 問題
 
-- 後端支援社團 / 填寫人 / 項目 / 地點 / 日期區間 / 逾期六種篩選,**前端全量抓回自己篩**,沒有用到
-- 沒有分頁
+- 後端另支援社團 / 地點 / 日期區間篩選,畫面尚無對應入口
 - 開立違規只能由工讀生端做,行政端無法補開單

@@ -92,6 +92,54 @@ async def test_list_default_order_sort_and_filters(client, db):
     assert resp.json()["data"][0]["resolve_expired"] is False
 
 
+async def test_multi_value_filters_and_options(client, db):
+    """漏斗是多選:status/item/filler_id 都要收多值,選項來源取自實際紀錄。"""
+    club, other, staff, rows = await seed(client, db)
+
+    options = (await client.get("/api/v1/admin/violations/options")).json()["data"]
+    assert set(options["items"]) == {"未經申請使用場地", "噪音影響他人", "張貼未核可文宣"}
+    # 李工讀開了兩張:選項要去重(否則漏斗會出現兩個同名的人)
+    assert len(options["fillers"]) == 2
+    filler_ids = {f["name"]: f["id"] for f in options["fillers"]}
+    assert filler_ids["李工讀"] == staff.id
+
+    # item 多值 = 命中任一項
+    resp = await client.get(
+        "/api/v1/admin/violations",
+        params=[("item", "噪音影響他人"), ("item", "張貼未核可文宣")],
+    )
+    assert {d["location"] for d in resp.json()["data"]} == {"社辦 S312", "活動中心"}
+
+    # status 多值
+    resp = await client.get(
+        "/api/v1/admin/violations", params=[("status", "open"), ("status", "resolved")]
+    )
+    assert len(resp.json()["data"]) == 3
+
+    # filler_id 多值
+    resp = await client.get(
+        "/api/v1/admin/violations",
+        params=[("filler_id", filler_ids["李工讀"]), ("filler_id", filler_ids["陳工讀"])],
+    )
+    assert len(resp.json()["data"]) == 3
+    resp = await client.get(
+        "/api/v1/admin/violations", params=[("filler_id", filler_ids["陳工讀"])]
+    )
+    assert [d["filler_name"] for d in resp.json()["data"]] == ["陳工讀"]
+
+    # 分頁:每頁 2 筆、總數仍為 3(前端據此顯示頁碼)
+    resp = await client.get("/api/v1/admin/violations", params={"page_size": 2})
+    assert len(resp.json()["data"]) == 2
+    assert resp.json()["meta"]["total"] == 3
+
+
+async def test_options_requires_permission(client, db):
+    await seed(client, db)
+    await make_user(db, username="nope-admin", role="admin", permissions=["aact"])
+    await login(client, "nope-admin")
+    assert (await client.get("/api/v1/admin/violations/options")).status_code == 403
+
+
 async def test_expired_filter_follows_resolve_months(client, db, monkeypatch):
     """SQL 端的逾期篩選與 Python 端的推導必須同源:改期限月數,兩邊要一起動。"""
     await seed(client, db)

@@ -15,7 +15,12 @@ from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, not_found
 from app.models import Club, User, Violation
 from app.models.enums import ViolationStatus
-from app.schemas.admin import AdminViolationOut, ResolveViolationIn
+from app.schemas.admin import (
+    AdminViolationOut,
+    ResolveViolationIn,
+    ViolationFillerOut,
+    ViolationOptionsOut,
+)
 from app.schemas.common import ApiResponse
 from app.services import audit, notify, violation_service
 
@@ -46,34 +51,54 @@ def _to_out(v: Violation, club_name: str, filler_name: str, today: date) -> Admi
     return out
 
 
+@router.get("/options")
+async def violation_options(user: ViolationAdmin, db: DbDep) -> ApiResponse[ViolationOptionsOut]:
+    """篩選選項取自實際開立過的紀錄:承辦不必先翻到那一頁才篩得到,目錄改過也不漏舊項目。"""
+    items_sub = sa.select(sa.func.unnest(Violation.items).label("item")).subquery()
+    items = await db.scalars(sa.select(items_sub.c.item).distinct().order_by(items_sub.c.item))
+    fillers = await db.execute(
+        sa.select(_FILLER.id, _FILLER.name)
+        .join(Violation, Violation.filler_id == _FILLER.id)
+        .distinct()
+        .order_by(_FILLER.name)
+    )
+    return ApiResponse(
+        data=ViolationOptionsOut(
+            items=list(items),
+            fillers=[ViolationFillerOut(id=i, name=n) for i, n in fillers],
+        )
+    )
+
+
 @router.get("")
 async def list_violations(
     user: ViolationAdmin,
     db: DbDep,
     page: Pagination,
     sort: str | None = None,
-    status: ViolationStatus | None = None,
-    club_id: int | None = Query(None),
-    filler_id: int | None = Query(None),
-    item: str | None = Query(None),
+    status: Annotated[list[ViolationStatus] | None, Query()] = None,
+    club_id: Annotated[list[int] | None, Query()] = None,
+    filler_id: Annotated[list[int] | None, Query()] = None,
+    item: Annotated[list[str] | None, Query()] = None,
     location: str | None = Query(None),
     date_from: date | None = None,
     date_to: date | None = None,
     expired: bool | None = Query(None),
 ) -> ApiResponse[list[AdminViolationOut]]:
+    # status/club_id/filler_id/item 可重複帶多值(畫面的漏斗是多選);item 多值=命中任一項
     query = (
         sa.select(Violation, Club.name, _FILLER.name)
         .join(Club, Violation.club_id == Club.id)
         .join(_FILLER, Violation.filler_id == _FILLER.id)
     )
     if status:
-        query = query.where(Violation.status == status)
+        query = query.where(Violation.status.in_(status))
     if club_id:
-        query = query.where(Violation.club_id == club_id)
+        query = query.where(Violation.club_id.in_(club_id))
     if filler_id:
-        query = query.where(Violation.filler_id == filler_id)
+        query = query.where(Violation.filler_id.in_(filler_id))
     if item:
-        query = query.where(Violation.items.any(item))
+        query = query.where(Violation.items.overlap(item))
     if location:
         query = query.where(Violation.location.ilike(f"%{location}%"))
     if date_from:

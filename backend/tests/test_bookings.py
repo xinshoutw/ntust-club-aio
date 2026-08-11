@@ -385,9 +385,23 @@ async def test_venue_booking_requires_approved_activity(client, db):
     assert resp.status_code == 201, resp.text
     assert resp.json()["data"]["activity_name"] == "迎新宿營"
 
-    # 同場地同日重複申請 → 409
+    # 同場地同日、節次重疊 → 409
     resp = await client.post("/api/v1/club/venue-bookings", json=body, headers=csrf_headers(client))
     assert resp.status_code == 409
+    resp = await client.post(
+        "/api/v1/club/venue-bookings",
+        json={**body, "periods": ["4", "5"]},  # 第 4 節重疊
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 409
+
+    # 同場地同日但節次完全不重疊 → 各自成立(上午擺攤、晚上彩排是兩件事)
+    resp = await client.post(
+        "/api/v1/club/venue-bookings",
+        json={**body, "periods": ["6", "7"]},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201, resp.text
 
     # 未核准活動 → 422
     resp = await client.post(

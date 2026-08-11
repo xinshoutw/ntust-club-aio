@@ -362,7 +362,8 @@ async def create_venue_booking(
     if hit:
         raise validation_error(f"所選時段不開放借用(時段 {','.join(hit)})")
 
-    # 同社同場地同日重複申請直接擋(不同社的衝突由審核關把關)。
+    # 同社同場地同日「節次重疊」才算重複(不同社的衝突由審核關把關)。
+    # 節次不重疊的兩張單是兩件事:上午擺攤、晚上彩排本來就該各送一張。
     # 先鎖住這個社團:守門是先查再寫,雙擊送出的第二筆會查不到第一筆
     await svc.lock_resource(db, "club", user.club_id)
     dup = await db.scalar(
@@ -370,11 +371,12 @@ async def create_venue_booking(
             VenueBooking.club_id == user.club_id,
             VenueBooking.venue_id == venue.id,
             VenueBooking.date == body.date,
+            VenueBooking.periods.overlap(body.periods),
             VenueBooking.status.notin_([BookingStatus.REJECTED, BookingStatus.CANCELLED]),
         )
     )
     if dup:
-        raise conflict("同一場地同一天已有申請")
+        raise conflict("同一場地同一天的相同節次已有申請")
 
     row = VenueBooking(
         club_id=user.club_id,

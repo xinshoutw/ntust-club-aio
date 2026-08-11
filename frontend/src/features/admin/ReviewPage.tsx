@@ -174,8 +174,19 @@ export default function ReviewPage() {
             </div>
           ))}
           {queue.length === 0 && (
-            <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
-              {queueQuery.isError ? `載入失敗:${queueQuery.error.message}` : '沒有待本關簽核的申請'}
+            <div style={{ borderTop: '1px solid var(--line)' }}>
+              {queueQuery.isError ? (
+                <QueryError
+                  compact
+                  title="待審佇列載入失敗"
+                  error={queueQuery.error}
+                  onRetry={() => void queueQuery.refetch()}
+                />
+              ) : (
+                <div style={{ padding: '20px 20px 24px', fontSize: 13, color: 'var(--steel)' }}>
+                  沒有待本關簽核的申請
+                </div>
+              )}
             </div>
           )}
         </LoadingBlock>

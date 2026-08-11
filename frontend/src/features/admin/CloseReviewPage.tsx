@@ -410,8 +410,17 @@ export default function CloseReviewPage() {
             </div>
           ))}
           {pending.length === 0 && (
-            <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
-              {pendingQuery.isError ? `載入失敗:${pendingQuery.error.message}` : '目前沒有待審結案'}
+            <div style={{ borderTop: '1px solid var(--line)' }}>
+              {pendingQuery.isError ? (
+                <QueryError
+                  compact
+                  title="待審結案載入失敗"
+                  error={pendingQuery.error}
+                  onRetry={() => void pendingQuery.refetch()}
+                />
+              ) : (
+                <div style={{ padding: '20px 20px 24px', fontSize: 13, color: 'var(--steel)' }}>目前沒有待審結案</div>
+              )}
             </div>
           )}
         </LoadingBlock>
@@ -481,10 +490,22 @@ export default function CloseReviewPage() {
                   </td>
                 </tr>
               ))}
-              {!overdueQuery.isPending && overdue.length === 0 && (
+              {overdueQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={5}>
+                    <QueryError
+                      compact
+                      title="逾期未結案載入失敗"
+                      error={overdueQuery.error}
+                      onRetry={() => void overdueQuery.refetch()}
+                    />
+                  </td>
+                </tr>
+              )}
+              {!overdueQuery.isPending && !overdueQuery.isError && overdue.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
-                    {overdueQuery.isError ? `載入失敗:${overdueQuery.error.message}` : '沒有逾期的活動'}
+                    沒有逾期的活動
                   </td>
                 </tr>
               )}

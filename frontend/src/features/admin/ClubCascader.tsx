@@ -21,7 +21,7 @@ export default function ClubCascader({
   width?: number | string
   placeholder?: string
 }) {
-  const { data: clubs = [], isError, refetch } = useClubOptions()
+  const { data: clubs = [], isError, error, refetch } = useClubOptions()
   // 停社舊社團 attribute 為 null → 歸「未分類」資料夾
   const attrOf = (c: { attribute: string | null }) => c.attribute ?? '未分類'
   const attr = (() => {
@@ -34,7 +34,11 @@ export default function ClubCascader({
   // (社團總覽/成員列表/管理項目/行政分審核)`clubId` 一律 null,整頁是空的、一句錯誤都沒有
   if (isError) {
     return (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#C13B34' }}>
+      <span
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#C13B34' }}
+        // 403 與網路中斷長得一樣,原因掛在 title 上;版面留在頁首那一格,不鋪整塊 QueryError
+        title={error?.message}
+      >
         社團清單載入失敗
         <Button size="small" onClick={() => void refetch()}>重試</Button>
       </span>

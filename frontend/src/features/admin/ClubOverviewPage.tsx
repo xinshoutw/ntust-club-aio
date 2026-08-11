@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Modal } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import type { StatusKey } from '../../lib/status'
 import { roomEntryText } from '../../api/bookings'
@@ -50,12 +51,16 @@ interface Detail {
   rows: [string, React.ReactNode][]
 }
 
-function LoadError({ queries }: { queries: { isError: boolean; error: Error | null }[] }) {
+function LoadError({
+  queries,
+}: {
+  queries: { isError: boolean; error: Error | null; refetch: () => unknown }[]
+}) {
   const failed = queries.find((q) => q.isError)
   if (!failed) return null
   return (
-    <div style={{ padding: '12px 20px', borderTop: '1px solid var(--line)', fontSize: 13, color: '#C13B34' }}>
-      載入失敗:{failed.error?.message ?? '請稍後再試'}
+    <div style={{ borderTop: '1px solid var(--line)' }}>
+      <QueryError compact error={failed.error} onRetry={() => void failed.refetch()} />
     </div>
   )
 }
@@ -241,7 +246,12 @@ export default function ClubOverviewPage() {
             <div className="num">{info?.contactEmails.filter(Boolean).join('、') || '—'}</div>
           </div>
           {detailQuery.isError && (
-            <div style={{ fontSize: 13, color: '#C13B34', marginTop: 12 }}>載入失敗:{detailQuery.error.message}</div>
+            <QueryError
+              compact
+              title="社團資料載入失敗"
+              error={detailQuery.error}
+              onRetry={() => void detailQuery.refetch()}
+            />
           )}
         </LoadingBlock>
       </div>

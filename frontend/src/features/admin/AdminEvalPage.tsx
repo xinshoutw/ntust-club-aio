@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { App, Button, Input, InputNumber, Modal, Spin, Tooltip } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
-import { Cols } from '../../components/ui/tableControls'
+import { Cols, Pager } from '../../components/ui/tableControls'
 import type { AdKey } from '../eval/scoring'
 import { AD_LABELS } from '../eval/types'
 import {
+  EVAL_CLUBS_PAGE_SIZE,
   useAdminEvalClubs,
   useAdminEvalDetail,
   useAdminEvalMutations,
@@ -29,8 +30,9 @@ const MODE_TITLE: Record<AdjustMode['kind'], string> = {
 export default function AdminEvalPage() {
   const { message } = App.useApp()
   const { club, clubId, setClub } = useAdminClub()
-  const clubsQuery = useAdminEvalClubs()
-  const clubs = clubsQuery.data
+  const [clubPage, setClubPage] = useState(1)
+  const clubsQuery = useAdminEvalClubs(clubPage)
+  const clubs = clubsQuery.data?.rows
   const detailQuery = useAdminEvalDetail(clubId)
   const detail = detailQuery.data
   const { override, revert, merit } = useAdminEvalMutations(clubId)
@@ -236,6 +238,12 @@ export default function AdminEvalPage() {
             ))}
           </tbody>
         </table>
+        <Pager
+          page={clubPage}
+          pageSize={EVAL_CLUBS_PAGE_SIZE}
+          total={clubsQuery.data?.total ?? 0}
+          onChange={setClubPage}
+        />
       </div>
         </Spin>
       )}

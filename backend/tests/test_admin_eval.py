@@ -165,6 +165,28 @@ async def test_list_clubs_scores(client, db):
     assert totals == {club.name: 5, plain.name: 0}  # 只有前者有 ad6 網頁 5 分
 
 
+async def test_list_clubs_paginates_by_name(client, db):
+    """各社行政分改伺服器端分頁:名稱升冪、meta.total 為全部啟用中社團數。"""
+    await seed(client, db)
+    for i in range(4):
+        await make_club(db, name=f"社團{i}")
+    await login(client, "evaladmin")
+
+    body = (await client.get("/api/v1/admin/eval/clubs", params={"page_size": 2})).json()
+    assert len(body["data"]) == 2
+    assert body["meta"]["total"] == 5  # seed 一社 + 四社
+    page1 = [row["club_name"] for row in body["data"]]
+    page2 = [
+        row["club_name"]
+        for row in (
+            await client.get("/api/v1/admin/eval/clubs", params={"page_size": 2, "page": 2})
+        ).json()["data"]
+    ]
+    assert page1 == sorted(page1)
+    assert set(page1) & set(page2) == set()  # 兩頁不重疊
+    assert page1 + page2 == sorted(page1 + page2)
+
+
 async def test_list_clubs_round_trips_do_not_grow_with_club_count(client, db):
     """行政分總覽逐社重算會是「社團數 × 十幾次往返」;批次彙整後往返次數與社團數無關。"""
     import sqlalchemy as sa

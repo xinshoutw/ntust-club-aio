@@ -9,6 +9,7 @@ from typing import Annotated
 import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
 
+from app.api.pagination import Pagination
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import not_found
 from app.models import Club, EvalAdjustment
@@ -42,14 +43,15 @@ async def _club_scores(db, club_id: int) -> tuple[list[AdScoreOut], float, int]:
 
 
 @router.get("/clubs")
-async def list_clubs(user: EvalAdmin, db: DbDep) -> ApiResponse[list[dict]]:
+async def list_clubs(user: EvalAdmin, db: DbDep, page: Pagination) -> ApiResponse[list[dict]]:
     """各社行政分總覽:只回總分,逐項明細由 /clubs/{id} 供應。
 
-    每個來源各查一次(見 evaluation.gather_scoring_inputs),往返次數不隨社團數成長。
+    每個來源各查一次(見 evaluation.gather_scoring_inputs),往返次數不隨社團數成長;
+    分數只算這一頁的社團 —— 一頁用不到的 159 社行政分不必每次重算。
     """
-    clubs = (
-        await db.scalars(sa.select(Club).where(Club.is_active.is_(True)).order_by(Club.name))
-    ).all()
+    query = sa.select(Club).where(Club.is_active.is_(True)).order_by(Club.name, Club.id)
+    total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
+    clubs = (await db.scalars(query.offset(page.offset).limit(page.page_size))).all()
     window = await evaluation.get_eval_window(db)
     club_ids = [c.id for c in clubs]
     inputs = await evaluation.gather_scoring_inputs(db, club_ids, window)
@@ -66,7 +68,8 @@ async def list_clubs(user: EvalAdmin, db: DbDep) -> ApiResponse[list[dict]]:
                 ),
             }
             for club in clubs
-        ]
+        ],
+        meta=page.meta(total or 0),
     )
 
 

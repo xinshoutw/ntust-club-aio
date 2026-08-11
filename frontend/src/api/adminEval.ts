@@ -2,7 +2,7 @@
 // 分數計算/調整套用皆在後端,前端只讀 FinalScore;調整留痕於 eval_adjustments(revert=註銷不硬刪)
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
-import { api } from './client'
+import { api, apiPaged, qs } from './client'
 import { toFinalScores, type AdScoreOut } from './eval'
 import type { AdKey, FinalScore } from '../features/eval/scoring'
 
@@ -114,16 +114,22 @@ const toDetail = (d: AdminEvalDetailOut): AdminEvalDetail => {
 
 const keys = {
   all: ['adminEval'] as const,
-  clubs: ['adminEval', 'clubs'] as const,
+  clubs: (page: number) => ['adminEval', 'clubs', page] as const,
   detail: (clubId: number) => ['adminEval', 'detail', clubId] as const,
 }
 
 export const adminEvalKeys = keys
 
-export function useAdminEvalClubs() {
+export const EVAL_CLUBS_PAGE_SIZE = 20
+
+/** 各社行政分:伺服器端分頁(分數只算這一頁,社團名升冪由後端排) */
+export function useAdminEvalClubs(page: number) {
   return useQuery({
-    queryKey: keys.clubs,
-    queryFn: () => api<AdminEvalClubOut[]>('/admin/eval/clubs').then((rows) => rows.map(toClub)),
+    queryKey: keys.clubs(page),
+    queryFn: () =>
+      apiPaged<AdminEvalClubOut[]>(
+        `/admin/eval/clubs${qs({ page, page_size: EVAL_CLUBS_PAGE_SIZE })}`,
+      ).then(({ data, total }) => ({ rows: data.map(toClub), total })),
   })
 }
 

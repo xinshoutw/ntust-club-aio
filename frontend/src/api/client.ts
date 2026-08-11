@@ -103,6 +103,9 @@ export class ApiError extends Error {
   }
 }
 
+/** 只有帶 401 的 ApiError 才算「確定已登出」:斷線與 500 都不算,訊息像也不算 */
+export const isUnauthorized = (e: unknown): boolean => e instanceof ApiError && e.status === 401
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResponse<T>> {
   // 正確合併 headers(展開 init 不可蓋掉);FormData 交給瀏覽器帶 boundary
   const headers = new Headers(init.headers)
@@ -122,8 +125,11 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResp
     headers,
   })
 
-  // 先廣播再解析:edge proxy 之類回的 401 不是 JSON 信封,解析失敗會先丟出去
-  if (res.status === 401) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT))
+  // 先廣播再解析:edge proxy 之類回的 401 不是 JSON 信封,解析失敗會先丟出去。
+  // 登入端點例外 —— 那裡的 401 是「帳號密碼錯」,已登入者開著 /login 打錯一次不該被登出
+  if (res.status === 401 && !path.startsWith('/auth/login')) {
+    window.dispatchEvent(new Event(UNAUTHORIZED_EVENT))
+  }
 
   let body: ApiResponse<T>
   try {

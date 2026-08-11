@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validationDetail } from './client'
+import { ApiError, isUnauthorized, validationDetail } from './client'
 
 describe('validationDetail', () => {
   it('自訂驗證器的中文訊息連欄位一起帶出', () => {
@@ -37,5 +37,20 @@ describe('validationDetail', () => {
     expect(validationDetail(undefined)).toBeNull()
     expect(validationDetail([])).toBeNull()
     expect(validationDetail([{ loc: ['body', 'x'] }])).toBeNull()
+  })
+})
+
+describe('isUnauthorized', () => {
+  it('只有帶 401 的 ApiError 算「確定已登出」', () => {
+    expect(isUnauthorized(new ApiError('請先登入', 401))).toBe(true)
+  })
+
+  it('伺服器錯誤與斷線都不算 —— 那是「無法確認」,不是「已登出」', () => {
+    expect(isUnauthorized(new ApiError('伺服器內部錯誤', 500))).toBe(false)
+    expect(isUnauthorized(new TypeError('Failed to fetch'))).toBe(false)
+  })
+
+  it('訊息像也不算(沒有狀態碼就不能下結論)', () => {
+    expect(isUnauthorized(new Error('請先登入'))).toBe(false)
   })
 })

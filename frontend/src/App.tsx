@@ -63,10 +63,10 @@ import AdminViolationsPage from './features/admin/AdminViolationsPage'
 import AuditPage from './features/admin/AuditPage'
 
 // 開機無法確認登入狀態(非 401):不能導去登入頁 —— 那等於告訴使用者「你被登出了」
-function BootError({ error, onRetry }: { error: Error; onRetry: () => void }) {
+function BootError({ error, onRetry, retrying }: { error: Error; onRetry: () => void; retrying: boolean }) {
   return (
     <div style={{ maxWidth: 520, margin: '18vh auto 0', padding: '0 24px', textAlign: 'center' }}>
-      <QueryError title="無法確認登入狀態" error={error} onRetry={onRetry} />
+      <QueryError title="無法確認登入狀態" error={error} onRetry={onRetry} retrying={retrying} />
       {/* 只有重試就是死路:這個帳號持續失敗時,能到登入頁就能換帳號重登(用 a 讓整頁重載) */}
       <a href="/login" style={{ display: 'inline-block', marginTop: 14, fontSize: 13 }}>
         改用其他帳號登入
@@ -79,7 +79,7 @@ function RequireRole({ roles, children }: { roles: Role[]; children: ReactNode }
   const { user, booting, bootError, retryBoot } = useAuth()
   const location = useLocation()
   // bootError 先判:重試期間 booting 又是 true,先判 booting 會讓整頁變白直到請求回來
-  if (bootError) return <BootError error={bootError} onRetry={retryBoot} />
+  if (bootError) return <BootError error={bootError} onRetry={retryBoot} retrying={booting} />
   if (booting) return null // session 恢復中,避免閃現登入頁
   if (!user) return <Navigate to="/login" replace state={{ from: location }} />
   if (user.mustChangePassword) return <Navigate to="/change-password" replace />
@@ -145,7 +145,7 @@ function AdminPermissionGate() {
 // 首登強制改密頁:需已登入,但不受 mustChangePassword 導轉限制
 function RequireAuth({ children }: { children: ReactNode }) {
   const { user, booting, bootError, retryBoot } = useAuth()
-  if (bootError) return <BootError error={bootError} onRetry={retryBoot} />
+  if (bootError) return <BootError error={bootError} onRetry={retryBoot} retrying={booting} />
   if (booting) return null
   if (!user) return <Navigate to="/login" replace />
   return children

@@ -29,8 +29,11 @@ export default function ChangePasswordPage() {
     try {
       await changePasswordApi(oldPassword, newPassword)
       message.success('密碼已更新')
-      await refresh()
-      navigate(homeOf(user?.role), { replace: true })
+      const home = homeOf(user?.role)
+      // refresh 失敗時 mustChangePassword 還是舊的 true,導首頁會被 gate 彈回這一頁 ——
+      // 密碼其實已經改了,整頁重載重跑開機驗證才走得出去(仍失敗會顯示「無法確認登入狀態」)
+      if (await refresh()) navigate(home, { replace: true })
+      else window.location.replace(home)
     } catch (e) {
       setError(e instanceof Error ? e.message : '更新失敗')
     } finally {

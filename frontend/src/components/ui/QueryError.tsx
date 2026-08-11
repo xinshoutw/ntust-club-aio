@@ -7,11 +7,14 @@ export default function QueryError({
   onRetry,
   title = '資料載入失敗',
   compact = false,
+  retrying = false,
 }: {
   error?: unknown
   onRetry?: () => void
   title?: string
   compact?: boolean
+  /** 重試進行中:鈕轉圈並擋重複點擊(沒有回饋的話使用者會連按十幾次,每次都真的發請求) */
+  retrying?: boolean
 }) {
   const detail = error instanceof Error && error.message ? error.message : '請稍後再試'
   const body = (
@@ -19,7 +22,7 @@ export default function QueryError({
       <div style={{ fontSize: 14, fontWeight: 600 }}>{title}</div>
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>{detail}</div>
       {onRetry && (
-        <Button size="small" style={{ marginTop: 12 }} onClick={onRetry}>
+        <Button size="small" style={{ marginTop: 12 }} loading={retrying} disabled={retrying} onClick={onRetry}>
           重試
         </Button>
       )}

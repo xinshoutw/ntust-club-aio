@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { TAKEOVER_DISMISSED_KEY } from '../components/layout/TakeoverOverlay'
-import { ApiError, UNAUTHORIZED_EVENT } from '../api/client'
+import { UNAUTHORIZED_EVENT, isUnauthorized } from '../api/client'
 import { loginApi, logoutApi, meApi, type Role, type SessionUser } from '../api/auth'
 
 export type { Role, SessionUser }
@@ -17,7 +17,8 @@ interface AuthContextValue {
   login: (username: string, password: string) => Promise<SessionUser>
   logout: () => Promise<void>
   /** 改密完成等使用者資料變動後,原地更新 context */
-  refresh: () => Promise<void>
+  /** 回傳是否真的更新到最新的使用者資料(失敗時呼叫端要自己決定怎麼收) */
+  refresh: () => Promise<boolean>
 }
 
 const toError = (e: unknown): Error => (e instanceof Error ? e : new Error('無法確認登入狀態'))
@@ -49,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (mine !== gen.current) return
         setUser(null)
         // 錯誤自己帶狀態碼(ApiError),不依賴事件派發的時序
-        setBootError(e instanceof ApiError && e.status === 401 ? null : toError(e))
+        setBootError(isUnauthorized(e) ? null : toError(e))
       })
       .finally(() => {
         if (mine === gen.current) setBooting(false)
@@ -78,7 +79,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       qc.clear()
       // gate 的順序是 bootError 早於 user:不清掉的話登入成功還會被「無法確認登入狀態」擋住,
       // 而開機失敗後停在 /login 重新登入正是最常見的路徑
+      // gen 遞增會讓在途 verify 的 then/catch/finally 全部作廢,而 setBooting(false)
+      // 只在那個 finally 裡 —— 不自己關掉的話,登入成功會停在永久白畫面(gate 的 booting 分支)
       gen.current += 1
+      setBooting(false)
       setBootError(null)
       setUser(next)
       return next
@@ -94,17 +98,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     qc.clear()
     gen.current += 1
+    setBooting(false)
     setBootError(null)
     setUser(null)
   }, [qc])
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (): Promise<boolean> => {
     try {
       setUser(await meApi())
+      return true
     } catch (e) {
       // 只有 401 才是「已登出」;其他失敗保留現有 user
       // (改密成功後這支一失敗就登出,使用者會拿新密碼一直登入失敗)
-      if (e instanceof ApiError && e.status === 401) setUser(null)
+      if (isUnauthorized(e)) setUser(null)
+      return false
     }
   }, [])
 

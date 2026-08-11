@@ -198,7 +198,7 @@ export default function AdminBookingsPage() {
             </table>
           </div>
           {(venuesQuery.isError || gridQuery.isError) && (
-            <div style={{ textAlign: 'center', color: '#B03A2E', padding: '12px 0 2px', fontSize: 13 }}>
+            <div style={{ textAlign: 'center', color: '#C13B34', padding: '12px 0 2px', fontSize: 13 }}>
               載入失敗:{venuesQuery.error?.message ?? gridQuery.error?.message}
             </div>
           )}
@@ -246,7 +246,7 @@ export default function AdminBookingsPage() {
               ))}
               {venueQuery.isError && (
                 <tr className="no-hover">
-                  <td colSpan={6} style={{ textAlign: 'center', color: '#B03A2E', padding: 24 }}>
+                  <td colSpan={6} style={{ textAlign: 'center', color: '#C13B34', padding: 24 }}>
                     載入失敗:{venueQuery.error.message}
                   </td>
                 </tr>
@@ -299,7 +299,7 @@ export default function AdminBookingsPage() {
                       </button>{' '}
                       {short ? (
                         <Tooltip title={`該區間可借 ${l.availableExcludingSelf}`}>
-                          <span className="num" style={{ color: '#B03A2E', fontWeight: 600 }}>×{l.qty}</span>
+                          <span className="num" style={{ color: '#C13B34', fontWeight: 600 }}>×{l.qty}</span>
                         </Tooltip>
                       ) : (
                         <span className="num">×{l.qty}</span>
@@ -316,7 +316,7 @@ export default function AdminBookingsPage() {
               })}
               {loanQuery.isError && (
                 <tr className="no-hover">
-                  <td colSpan={6} style={{ textAlign: 'center', color: '#B03A2E', padding: 24 }}>
+                  <td colSpan={6} style={{ textAlign: 'center', color: '#C13B34', padding: 24 }}>
                     載入失敗:{loanQuery.error.message}
                   </td>
                 </tr>

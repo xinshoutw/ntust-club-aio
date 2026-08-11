@@ -114,7 +114,7 @@ export default function OverduePage() {
               ))}
               {overdueQuery.isError && (
                 <tr className="no-hover">
-                  <td colSpan={5} style={{ textAlign: 'center', color: '#B03A2E', padding: 24 }}>
+                  <td colSpan={5} style={{ textAlign: 'center', color: '#C13B34', padding: 24 }}>
                     載入失敗:{overdueQuery.error.message}
                   </td>
                 </tr>
@@ -165,7 +165,7 @@ export default function OverduePage() {
               ))}
               {suspendedQuery.isError && (
                 <tr className="no-hover">
-                  <td colSpan={4} style={{ textAlign: 'center', color: '#B03A2E', padding: 24 }}>
+                  <td colSpan={4} style={{ textAlign: 'center', color: '#C13B34', padding: 24 }}>
                     載入失敗:{suspendedQuery.error.message}
                   </td>
                 </tr>

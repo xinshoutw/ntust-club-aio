@@ -148,7 +148,7 @@ export default function AdminViolationsPage() {
                     {v.resolveNote && <div style={{ fontSize: 12, color: 'var(--steel)' }}>銷案:{v.resolveNote}</div>}
                   </td>
                   <td className="cell-clip" title={v.filler} style={{ fontSize: 13, color: 'var(--steel)' }}>{v.filler}</td>
-                  <td className="num" style={{ fontSize: 13, color: v.expired ? '#B03A2E' : undefined }}>
+                  <td className="num" style={{ fontSize: 13, color: v.expired ? '#C13B34' : undefined }}>
                     {v.status === 'violation_resolved' ? '—' : v.expired ? `${v.deadline} 已截止` : v.deadline}
                   </td>
                   <td><StatusPill status={v.status} /></td>

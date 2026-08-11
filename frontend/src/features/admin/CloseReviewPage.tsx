@@ -147,7 +147,7 @@ function CloseReviewModal({
       {detailQuery.isPending ? (
         <Skeleton active paragraph={{ rows: 8 }} style={{ marginTop: 12 }} />
       ) : detailQuery.isError ? (
-        <div style={{ marginTop: 16, fontSize: 13, color: '#B03A2E' }}>載入失敗:{detailQuery.error.message}</div>
+        <div style={{ marginTop: 16, fontSize: 13, color: '#C13B34' }}>載入失敗:{detailQuery.error.message}</div>
       ) : !report ? (
         <div style={{ marginTop: 16, fontSize: 13, color: 'var(--steel)' }}>此活動尚無結案資料</div>
       ) : (
@@ -168,14 +168,14 @@ function CloseReviewModal({
             <div>
               核定補助 <span className="num">{fmtMoney(approvedBudget)}</span> · 自籌{' '}
               <span className="num">{fmtMoney(item.selfFundTotal)}</span> · 實支{' '}
-              <span className="num" style={overBudget ? { color: '#B03A2E', fontWeight: 500 } : undefined}>
+              <span className="num" style={overBudget ? { color: '#C13B34', fontWeight: 500 } : undefined}>
                 {fmtMoney(report.expense)}
               </span>
-              {overBudget && <span style={{ color: '#B03A2E', fontSize: 12 }}>(超出核定總經費)</span>}
+              {overBudget && <span style={{ color: '#C13B34', fontSize: 12 }}>(超出核定總經費)</span>}
             </div>
             <div style={detailLabel}>成果</div>
             <div>
-              照片 <span className="num" style={photoShort ? { color: '#B03A2E' } : undefined}>{photos.length}</span> 張
+              照片 <span className="num" style={photoShort ? { color: '#C13B34' } : undefined}>{photos.length}</span> 張
               {report.videoUrl ? (
                 <>
                   {' '}·{' '}
@@ -185,7 +185,7 @@ function CloseReviewModal({
                 ' · 無影片連結'
               )}
               {' '}· 心得 <span className="num">{report.reflections.length}</span> 人
-              {photoShort && <div style={{ color: '#B03A2E', fontSize: 12 }}>照片未達 5 張且無影片連結,成果照片項不計分</div>}
+              {photoShort && <div style={{ color: '#C13B34', fontSize: 12 }}>照片未達 5 張且無影片連結,成果照片項不計分</div>}
             </div>
             <div style={detailLabel}>活動重點</div><div style={{ lineHeight: 1.7 }}>{report.highlights}</div>
             <div style={detailLabel}>達成目標</div><div style={{ lineHeight: 1.7 }}>{report.goals}</div>

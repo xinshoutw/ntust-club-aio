@@ -20,7 +20,7 @@ const AD_ROUTES: Record<AdKey, string> = {
 }
 
 function ScoreValue({ s }: { s: FinalScore }) {
-  const color = s.final > 0 ? '#1F6B45' : s.final < 0 ? '#B03A2E' : 'var(--steel)'
+  const color = s.final > 0 ? '#1F6B45' : s.final < 0 ? '#C13B34' : 'var(--steel)'
   return (
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
       <span className="num" style={{ fontSize: 26, fontWeight: 600, color, lineHeight: 1 }}>

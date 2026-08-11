@@ -201,7 +201,7 @@ export default function AdminClubSettingsPage() {
               <div>{detail ? (detail.discordWebhookSet ? '已設定' : '未設定') : '—'}</div>
             </div>
             {detailQuery.isError && (
-              <div style={{ fontSize: 13, color: '#B03A2E', marginTop: 12 }}>載入失敗:{detailQuery.error.message}</div>
+              <div style={{ fontSize: 13, color: '#C13B34', marginTop: 12 }}>載入失敗:{detailQuery.error.message}</div>
             )}
           </Spin>
         </div>
@@ -250,14 +250,14 @@ export default function AdminClubSettingsPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ fontSize: 13, fontWeight: 500 }}>帳號狀態</span>
                 <Switch checked={form.active} onChange={(v) => setForm({ ...form, active: v })} />
-                <span style={{ fontSize: 13, color: form.active ? '#1F6B45' : '#B03A2E' }}>
+                <span style={{ fontSize: 13, color: form.active ? '#1F6B45' : '#C13B34' }}>
                   {form.active ? '啟用中' : '已停用'}
                 </span>
                 {form.active !== saved.active && <span style={{ fontSize: 12, color: '#d48806' }}>未儲存</span>}
               </div>
               {/* 解除停權才會把日期清成 NULL,過期未清的殘留值不該一直顯示成停權中 */}
               {detail && suspendedNow(detail.suspendedUntil) && (
-                <div style={{ fontSize: 12, color: '#B03A2E' }}>
+                <div style={{ fontSize: 12, color: '#C13B34' }}>
                   停權中至 <span className="num">{detail.suspendedUntil}</span>
                   {detail.suspendReason ? ` · ${detail.suspendReason}` : ''}
                 </div>

@@ -196,7 +196,7 @@ export default function BookingReviewModal({
           const free = item.data.availableExcludingSelf
           if (free == null || item.data.qty <= free) return null
           return (
-            <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--paper)', borderRadius: 6, fontSize: 13, color: '#B03A2E' }}>
+            <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--paper)', borderRadius: 6, fontSize: 13, color: '#C13B34' }}>
               可借數不足：該區間「{item.data.equipment}」可借 <span className="num">{free}</span>，本單申請{' '}
               <span className="num">{item.data.qty}</span>；核准前請確認歸還排程
             </div>
@@ -204,7 +204,7 @@ export default function BookingReviewModal({
         })()}
 
       {note && (
-        <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--paper)', borderRadius: 6, fontSize: 13, color: '#B03A2E' }}>
+        <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--paper)', borderRadius: 6, fontSize: 13, color: '#C13B34' }}>
           {note}
         </div>
       )}

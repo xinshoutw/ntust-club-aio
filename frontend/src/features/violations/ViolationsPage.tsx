@@ -59,7 +59,7 @@ export default function ViolationsPage() {
                       {v.status === 'violation_resolved' || !v.deadline ? (
                         <span style={{ color: 'var(--steel)' }}>—</span>
                       ) : v.expired ? (
-                        <span style={{ color: '#B03A2E', fontWeight: 500 }}>{v.deadline} 已截止</span>
+                        <span style={{ color: '#C13B34', fontWeight: 500 }}>{v.deadline} 已截止</span>
                       ) : (
                         <>
                           {v.deadline}

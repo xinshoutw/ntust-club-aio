@@ -120,7 +120,7 @@ function RoomReviewModal({
         </div>
       </div>
       {note && (
-        <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--paper)', borderRadius: 6, fontSize: 13, color: '#B03A2E' }}>
+        <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--paper)', borderRadius: 6, fontSize: 13, color: '#C13B34' }}>
           {note}
         </div>
       )}
@@ -301,7 +301,7 @@ export default function AdminRoomsPage() {
               ))}
               {listQuery.isError && (
                 <tr className="no-hover">
-                  <td colSpan={6} style={{ textAlign: 'center', color: '#B03A2E', padding: 24 }}>
+                  <td colSpan={6} style={{ textAlign: 'center', color: '#C13B34', padding: 24 }}>
                     載入失敗:{listQuery.error.message}
                   </td>
                 </tr>

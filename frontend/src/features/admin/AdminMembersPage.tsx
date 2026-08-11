@@ -121,7 +121,7 @@ export default function AdminMembersPage() {
               ))}
               {listQuery.isError && (
                 <tr className="no-hover">
-                  <td colSpan={7} style={{ textAlign: 'center', color: '#B03A2E', padding: 24 }}>
+                  <td colSpan={7} style={{ textAlign: 'center', color: '#C13B34', padding: 24 }}>
                     載入失敗:{listQuery.error.message}
                   </td>
                 </tr>

@@ -66,7 +66,7 @@ function LoadError({ queries }: { queries: { isError: boolean; error: Error | nu
   const failed = queries.find((q) => q.isError)
   if (!failed) return null
   return (
-    <div style={{ padding: '12px 20px', borderTop: '1px solid var(--line)', fontSize: 13, color: '#B03A2E' }}>
+    <div style={{ padding: '12px 20px', borderTop: '1px solid var(--line)', fontSize: 13, color: '#C13B34' }}>
       載入失敗:{failed.error?.message ?? '請稍後再試'}
     </div>
   )
@@ -226,7 +226,7 @@ export default function ClubOverviewPage() {
             <div style={label}>帳號</div>
             <div className="num">
               {info?.username ?? '—'}
-              {info && !info.isActive && <span style={{ color: '#B03A2E', marginLeft: 8 }}>(已停用)</span>}
+              {info && !info.isActive && <span style={{ color: '#C13B34', marginLeft: 8 }}>(已停用)</span>}
             </div>
             <div style={label}>網頁連結</div>
             <div>
@@ -241,7 +241,7 @@ export default function ClubOverviewPage() {
             <div className="num">{info?.contactEmails.filter(Boolean).join('、') || '—'}</div>
           </div>
           {detailQuery.isError && (
-            <div style={{ fontSize: 13, color: '#B03A2E', marginTop: 12 }}>載入失敗:{detailQuery.error.message}</div>
+            <div style={{ fontSize: 13, color: '#C13B34', marginTop: 12 }}>載入失敗:{detailQuery.error.message}</div>
           )}
         </Spin>
       </div>

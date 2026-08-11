@@ -33,6 +33,6 @@
 - 聯絡信箱是公告 Email 通知的收件人
 - 社團名稱與屬性(自治性/學藝性…)不可自行修改,只能由行政端改
 - profile 變更寫 `audit_logs`
-- 停權中時頁首顯示停權 pill 與到期日,停權原因收在 Tooltip(與借用四頁共用 `SuspensionNote`;到期日已過的殘留值不顯示)
+- 停權中時頁首顯示停權 pill 與到期日,停權原因收在 Tooltip(共用 `components/ui/SuspensionNote`,借用四頁同一則;到期日已過的殘留值不顯示)
 - 校內指導老師姓名的必填與兩個 Email 的格式由 schema 收口,直呼 API 也清不掉、塞不進壞格式
 

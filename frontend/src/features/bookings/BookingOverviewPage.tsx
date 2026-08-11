@@ -10,7 +10,7 @@ import {
   RightOutlined,
 } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
-import SuspensionNote from '../club-settings/SuspensionNote'
+import SuspensionNote from '../../components/ui/SuspensionNote'
 import QueryError from '../../components/ui/QueryError'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import StatusPill from '../../components/ui/StatusPill'

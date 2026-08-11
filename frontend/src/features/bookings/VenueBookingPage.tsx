@@ -8,7 +8,7 @@ import { confirmDialog } from '../../lib/confirm'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols } from '../../components/ui/tableControls'
-import SuspensionNote from '../club-settings/SuspensionNote'
+import SuspensionNote from '../../components/ui/SuspensionNote'
 import { useClubSuspension } from '../../api/clubProfile'
 import {
   PERIODS,

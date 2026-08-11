@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { App, Button, Form, Input, Spin } from 'antd'
 import PageHeader from '../../components/ui/PageHeader'
-import SuspensionNote from './SuspensionNote'
+import SuspensionNote from '../../components/ui/SuspensionNote'
 import { useAuth } from '../../app/auth'
 import { useUnsavedGuard } from '../../app/unsaved'
 import { changePasswordApi } from '../../api/auth'

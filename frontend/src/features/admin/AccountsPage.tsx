@@ -461,7 +461,7 @@ export default function AccountsPage() {
                 <ActiveTag active={c.isActive} inactiveLabel="停用" />
                 {/* 停權(器材逾期)與帳號啟停是兩回事:停權中但仍啟用的社團在這裡本來看起來完全正常 */}
                 {suspendedNow(c.suspendedUntil) && (
-                  <Tooltip title="器材逾期停權中,期間不得申請借用">
+                  <Tooltip title="停權中,期間不得申請借用(原因見逾期追蹤與停權管理)">
                     <div className="num" style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>
                       停權至 {c.suspendedUntil}
                     </div>

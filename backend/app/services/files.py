@@ -68,6 +68,9 @@ _PENDING_PATHS = "pending_upload_paths"
 
 @sa.event.listens_for(Session, "after_commit")
 def _forget_committed_uploads(session: Session) -> None:
+    # SAVEPOINT 的 commit 也會進到這裡,但外層還可能整個回滾,那時檔案仍該清掉
+    if session.in_nested_transaction():
+        return
     # commit 過的檔案 DB 有列可管,之後任何回滾都不得再刪它
     session.info.pop(_PENDING_PATHS, None)
 

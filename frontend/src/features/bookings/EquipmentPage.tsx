@@ -214,9 +214,14 @@ export default function EquipmentPage() {
               />
             </Form.Item>
             <Form.Item name="equipment" label="品項" rules={[{ required: true, message: '請選擇品項' }]}>
+              {/* 器材查詢失敗時 loanWindow 也是 null,不能照樣說「請先選擇關聯活動」——
+                  活動明明已經選了,那句話會讓人一直重選活動 */}
               <Select
-                placeholder={loanWindow ? '請選擇' : '請先選擇關聯活動'}
+                placeholder={
+                  equipmentQuery.isError ? '器材清單載入失敗' : loanWindow ? '請選擇' : '請先選擇關聯活動'
+                }
                 disabled={!loanWindow}
+                notFoundContent={notFoundText(equipmentQuery, '此活動區間沒有可借器材', '器材清單')}
                 options={items.map((e) => {
                   const a = loanWindow ? e.available : null
                   return {

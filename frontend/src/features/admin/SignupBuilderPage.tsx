@@ -4,6 +4,7 @@ import { App, Button, Checkbox, DatePicker, Input, InputNumber, Select, Tag } fr
 import dayjs, { type Dayjs } from 'dayjs'
 import { HolderOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
+import TagListInput from '../../components/ui/TagListInput'
 import { FIELD_TYPE_LABEL, type FieldType, type SignupKind } from '../signup/types'
 import KindBadge from '../signup/KindBadge'
 import { useSignupItemMutations } from '../../api/adminSignups'
@@ -99,21 +100,6 @@ export default function SignupBuilderPage() {
   const addField = () => {
     setFields((fs) => [...fs, { key: nextKey, label: '', type: 'text', required: false, options: [] }])
     setNextKey((k) => k + 1)
-  }
-
-  const addOption = (key: number) => {
-    const value = window.prompt('選項內容')?.trim()
-    if (!value) return
-    setFields((fs) =>
-      fs.map((f) => {
-        if (f.key !== key) return f
-        if (f.options.includes(value)) {
-          message.error(`選項「${value}」已存在`)
-          return f
-        }
-        return { ...f, options: [...f.options, value] }
-      }),
-    )
   }
 
   // 發布驗證未過的欄位集合:對應欄位標紅框,修改該欄即解除
@@ -374,24 +360,14 @@ export default function SignupBuilderPage() {
                       刪除
                     </button>
                   </div>
+                  {/* 選項用行內輸入(與系統設定同一顆元件):window.prompt 在行動裝置可能整個叫不出來 */}
                   {OPTION_TYPES.includes(f.type) && (
                     <div className="builder-field-options">
                       <span style={{ fontSize: 12, color: 'var(--steel)' }}>選項</span>
-                      {f.options.map((o) => (
-                        <Tag
-                          key={o}
-                          closable
-                          onClose={() =>
-                            update(f.key, { options: f.options.filter((x) => x !== o) })
-                          }
-                          style={{ marginInlineEnd: 0 }}
-                        >
-                          {o}
-                        </Tag>
-                      ))}
-                      <button type="button" className="link-btn" style={{ color: 'var(--focus)', fontSize: 12 }} onClick={() => addOption(f.key)}>
-                        + 選項
-                      </button>
+                      <TagListInput
+                        value={f.options}
+                        onChange={(options) => update(f.key, { options })}
+                      />
                     </div>
                   )}
                 </div>

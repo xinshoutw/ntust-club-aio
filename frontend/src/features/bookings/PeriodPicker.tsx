@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef } from 'react'
 import { PERIODS } from '../../api/bookings'
+import { useDragSelect } from './useDragSelect'
 
 interface PeriodPickerProps {
   value: string[]
@@ -12,15 +13,8 @@ interface PeriodPickerProps {
 
 // 節次複選按鈕(第 1–10、A–D);支援按住拖曳批量選取/取消
 export default function PeriodPicker({ value, onChange, size = 'middle', nowrap = false, disabledPeriods = [] }: PeriodPickerProps) {
-  const [dragTo, setDragTo] = useState<boolean | null>(null)
   const valueRef = useRef(value)
   valueRef.current = value
-
-  useEffect(() => {
-    const up = () => setDragTo(null)
-    window.addEventListener('mouseup', up)
-    return () => window.removeEventListener('mouseup', up)
-  }, [])
 
   const apply = (p: string, to: boolean) => {
     if (disabledPeriods.includes(p)) return
@@ -29,10 +23,11 @@ export default function PeriodPicker({ value, onChange, size = 'middle', nowrap 
     if (to && !has) onChange([...cur, p])
     if (!to && has) onChange(cur.filter((x) => x !== p))
   }
+  const { containerProps, start } = useDragSelect(apply)
 
   const h = size === 'small' ? 28 : 32
   return (
-    <div role="group" aria-label="時段" style={{ display: 'flex', flexWrap: nowrap ? 'nowrap' : 'wrap', overflowX: nowrap ? 'auto' : undefined, gap: 6, userSelect: 'none', paddingBottom: nowrap ? 2 : 0 }}>
+    <div role="group" aria-label="時段" {...containerProps} style={{ display: 'flex', flexWrap: nowrap ? 'nowrap' : 'wrap', overflowX: nowrap ? 'auto' : undefined, gap: 6, userSelect: 'none', paddingBottom: nowrap ? 2 : 0 }}>
       {PERIODS.map((p) => {
         const on = value.includes(p)
         const off = disabledPeriods.includes(p)
@@ -43,21 +38,11 @@ export default function PeriodPicker({ value, onChange, size = 'middle', nowrap 
             aria-pressed={on}
             disabled={off}
             title={off ? '該時段已開始' : undefined}
-            onMouseDown={(e) => {
+            data-drag-key={p}
+            onPointerDown={(e) => {
               e.preventDefault()
               if (off) return
-              const to = !on
-              setDragTo(to)
-              apply(p, to)
-            }}
-            onMouseEnter={(e) => {
-              if (dragTo === null) return
-              // 在視窗外放開滑鼠收不到 mouseup;按鍵已放開就結束拖曳
-              if (e.buttons === 0) {
-                setDragTo(null)
-                return
-              }
-              apply(p, dragTo)
+              start(p, !on)
             }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {

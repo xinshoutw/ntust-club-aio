@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import dayjs from 'dayjs'
 import { App, Button, Form, Input, Select, Spin } from 'antd'
 import { useFormUnsavedGuard } from '../../app/unsaved'
@@ -9,6 +9,7 @@ import StatusPill from '../../components/ui/StatusPill'
 import { Cols } from '../../components/ui/tableControls'
 import SuspensionNote from '../../components/ui/SuspensionNote'
 import { useClubSuspension } from '../../api/clubProfile'
+import { useDragSelect } from './useDragSelect'
 import {
   DOW_TEXT,
   PERIODS,
@@ -57,11 +58,26 @@ export default function FixedRoomPage() {
   // 已選時段:'dow|period'(dow 1=週一 … 7=週日)
   const [slots, setSlots] = useState<ReadonlySet<string>>(new Set())
   const guard = useFormUnsavedGuard(slots.size > 0)
-  // 拖曳批量選取(與 PeriodPicker 同手感):按下起點決定「選取/取消」,掃過即套用
-  const [dragTo, setDragTo] = useState<boolean | null>(null)
   const [slotsError, setSlotsError] = useState(false)
   const slotsRef = useRef(slots)
   slotsRef.current = slots
+
+  const apply = (key: string, to: boolean) => {
+    const has = slotsRef.current.has(key)
+    if (to === has) return
+    setSlotsError(false)
+    setSlots((s) => {
+      const next = new Set(s)
+      if (to) {
+        next.add(key)
+      } else {
+        next.delete(key)
+      }
+      return next
+    })
+  }
+  // 拖曳批量選取:與 PeriodPicker 共用同一份手感(hook 必須在下方 early return 之前呼叫)
+  const { containerProps, start } = useDragSelect(apply)
 
   // 開放窗由後端提供(與側欄共用同一查詢);未開放時直接輸入網址也只顯示說明
   const windowQuery = useFixedWindow()
@@ -87,12 +103,6 @@ export default function FixedRoomPage() {
           onError: (e) => message.error(e.message),
         }),
     })
-
-  useEffect(() => {
-    const up = () => setDragTo(null)
-    window.addEventListener('mouseup', up)
-    return () => window.removeEventListener('mouseup', up)
-  }, [])
 
   if (windowQuery.isPending) {
     return (
@@ -138,21 +148,6 @@ export default function FixedRoomPage() {
   const { usedPeriods, maxPeriods } = window_
   const remainingPeriods = Math.max(0, maxPeriods - usedPeriods)
   const overQuota = slots.size > remainingPeriods
-
-  const apply = (key: string, to: boolean) => {
-    const has = slotsRef.current.has(key)
-    if (to === has) return
-    setSlotsError(false)
-    setSlots((s) => {
-      const next = new Set(s)
-      if (to) {
-        next.add(key)
-      } else {
-        next.delete(key)
-      }
-      return next
-    })
-  }
 
   const submit = (values: { room: number; note: string }) => {
     if (slots.size === 0) {
@@ -229,7 +224,7 @@ export default function FixedRoomPage() {
             </span>
           </div>
           <div className={slotsError ? 'area-error' : undefined} style={{ overflowX: 'auto', border: '1px solid transparent', borderRadius: 6 }}>
-            <table aria-label="每週時段選擇" style={{ borderCollapse: 'separate', borderSpacing: 4, width: '100%', tableLayout: 'fixed', minWidth: 640, userSelect: 'none' }}>
+            <table aria-label="每週時段選擇" {...containerProps} style={{ borderCollapse: 'separate', borderSpacing: 4, width: '100%', tableLayout: 'fixed', minWidth: 640, userSelect: 'none' }}>
               {/* 不設表頭:每格按鈕本身已標節次,星期由列首標示 */}
               <colgroup>
                 <col style={{ width: 52 }} />
@@ -247,20 +242,10 @@ export default function FixedRoomPage() {
                             type="button"
                             aria-pressed={on}
                             aria-label={`週${DOW_TEXT[dow]} 第${p}節`}
-                            onMouseDown={(e) => {
+                            data-drag-key={key}
+                            onPointerDown={(e) => {
                               e.preventDefault()
-                              const to = !on
-                              setDragTo(to)
-                              apply(key, to)
-                            }}
-                            onMouseEnter={(e) => {
-                              if (dragTo === null) return
-                              // 視窗外放開滑鼠收不到 mouseup;按鍵已放開就結束拖曳
-                              if (e.buttons === 0) {
-                                setDragTo(null)
-                                return
-                              }
-                              apply(key, dragTo)
+                              start(key, !on)
                             }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') {

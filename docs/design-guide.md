@@ -135,7 +135,7 @@ theme: {
 
 - 確認彈窗一律 `lib/confirm.ts` 的 `confirmDialog`。AntD `Modal.confirm` 預設 `maskClosable:false`,與全站「點遮罩=取消」慣例相反
 - Modal 一律 `open` + `afterClose` 常駐;`{selected && <Modal open>}` 會吃掉退場動畫,是反模式
-- 確認型彈窗開啟即聚焦確認鈕、必填輸入型聚焦輸入框;高彈窗一律用 `useModalAutoFocus`(`preventScroll`,讓標題保持可見),禁用原生 `autoFocus`
+- 確認型彈窗開啟即聚焦確認鈕、必填輸入型聚焦輸入框(有必填欄就聚焦欄位,不聚焦確認鈕 —— 否則 Enter 只是送出空值換來錯誤)。**輸入欄用原生 `autoFocus`**;**聚焦確認鈕用 `useModalAutoFocus`**(`preventScroll`:原生 `autoFocus` 會把 footer 捲進視野,彈窗高過視窗時標題就被捲走)。AntD 內建 footer 沒有 ref 可掛,只能 `okButtonProps.autoFocus`,僅限內容必定短的彈窗
 - 點擊即開、內容以 Skeleton 補齊
 - 審核用 popup Modal,不用 Drawer
 

@@ -99,7 +99,6 @@
 | ISS-81 | 中 | 時段拖曳批量選取只綁 mouse 事件,手機無法使用;報名表單建構器的選項輸入用 `window.prompt`,行動裝置可能完全無法新增選項 |
 | ISS-82 | 中 | 設計規範偏好 Skeleton,但接線頁廣泛使用 `<Spin>`;非狀態錯誤大量誤用 `#B03A2E`(規範保留給「已退回」),一般 error 應為 `#C13B34` |
 | ISS-83 | 中 | `design-guide` 指定的明體(Noto Serif TC)完全未實作,全站沒有自架任何字體 |
-| ISS-84 | 低 | 原生 `autoFocus` 15 處,`useModalAutoFocus` 只有 2 處(共用元件本身也用原生) |
 
 ## 13. 程式碼一致性
 

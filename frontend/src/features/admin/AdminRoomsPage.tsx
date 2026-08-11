@@ -131,12 +131,14 @@ function RoomReviewModal({
         okText="確認退回"
         destroyOnHidden
         confirmLoading={rejectRoom.isPending}
-        okButtonProps={{ danger: true, autoFocus: true }}
+        okButtonProps={{ danger: true }}
         cancelText="取消"
         onOk={submitReject}
         onCancel={closeReject}
       >
+        {/* 必填輸入型彈窗聚焦輸入框(不是確認鈕):否則 Enter 只會送出空原因換來錯誤 */}
         <Input.TextArea
+          autoFocus
           rows={3}
           value={reason}
           onChange={(e) => setReason(e.target.value)}

@@ -1,5 +1,6 @@
 import { App, Button, Input, Modal } from 'antd'
 import { CopyOutlined } from '@ant-design/icons'
+import { useModalAutoFocus } from '../../components/ui/useModalAutoFocus'
 
 // 一次性密碼彈窗:預設隱藏、可複製;帳號之後仍可查看,密碼關閉後不再顯示。
 // password 必傳且一律是 API 回來的明碼 —— 前端不得自行產生,產出來的東西登不進去
@@ -24,6 +25,7 @@ export default function OneTimePasswordModal({
   onOk?: () => void
 }) {
   const { message } = App.useApp()
+  const okRef = useModalAutoFocus(open)
 
   const copy = async () => {
     try {
@@ -40,7 +42,7 @@ export default function OneTimePasswordModal({
       onCancel={onClose}
       afterClose={afterClose}
       title={title}
-      footer={<Button type="primary" autoFocus onClick={onOk ?? onClose}>{okLabel}</Button>}
+      footer={<Button type="primary" ref={okRef} onClick={onOk ?? onClose}>{okLabel}</Button>}
     >
       {account && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, fontSize: 13 }}>

@@ -12,6 +12,14 @@ export const CELL: Record<CellState, { label: string; bg: string }> = {
   mine: { label: '我的借用', bg: '#2E7D57' },
 }
 
+// 固定借用申請表的「不可選」底色:那張表沒有圖例式的空框,不開放格用 transparent
+// 會與可選格長得一模一樣(白卡片上看不出差別),必須給一個看得見的灰
+export const UNAVAILABLE_BG: Record<'blocked' | 'fixed' | 'temp', string> = {
+  blocked: '#E8EAEE',
+  fixed: CELL.fixed.bg,
+  temp: CELL.temp.bg,
+}
+
 /** 未佔用格的狀態:能臨時借就是可借;只開放固定借用的借不到,但那不是「不開放」。
  * 社團端與行政端的場況圖共用這條判定,兩邊的空格才不會講不同的話。 */
 export const emptyCellState = (venue: { allowFixed: boolean; allowTemp: boolean }): CellState =>

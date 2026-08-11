@@ -10,7 +10,7 @@ import { Cols } from '../../components/ui/tableControls'
 import SuspensionNote from '../../components/ui/SuspensionNote'
 import { useClubSuspension } from '../../api/clubProfile'
 import { useDragSelect } from './useDragSelect'
-import { CELL } from './cells'
+import { UNAVAILABLE_BG } from './cells'
 import {
   DOW_TEXT,
   OCCUPANCY_TEXT,
@@ -285,11 +285,12 @@ export default function FixedRoomPage() {
                               fontFamily: 'inherit',
                               border: on ? '1px solid var(--seal)' : '1px solid var(--line)',
                               background: reason
-                                ? CELL[reason === 'blocked' ? 'closed' : reason].bg
+                                ? UNAVAILABLE_BG[reason]
                                 : on
                                   ? 'var(--seal)'
                                   : '#fff',
-                              color: reason ? 'var(--steel)' : on ? '#fff' : 'var(--ink)',
+                              // 佔用格一律深字:三種底色都是中明度,白字在上面讀不到
+                              color: reason ? 'var(--ink)' : on ? '#fff' : 'var(--ink)',
                             }}
                           >
                             {p}
@@ -307,7 +308,7 @@ export default function FixedRoomPage() {
             <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 8, fontSize: 12, color: 'var(--steel)' }}>
               {(['blocked', 'fixed', 'temp'] as const).map((r) => (
                 <span key={r} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-                  <span style={{ width: 12, height: 12, borderRadius: 3, border: '1px solid var(--line)', background: CELL[r === 'blocked' ? 'closed' : r].bg }} />
+                  <span style={{ width: 12, height: 12, borderRadius: 3, border: '1px solid var(--line)', background: UNAVAILABLE_BG[r] }} />
                   {OCCUPANCY_TEXT[r]}
                 </span>
               ))}

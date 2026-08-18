@@ -18,6 +18,7 @@ const superUser: SessionUser = {
   permissions: [],
   canViewEval: true,
   mustChangePassword: false,
+  periods: [],
 }
 
 describe('固定場地借用的側欄項目', () => {

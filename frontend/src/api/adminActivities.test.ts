@@ -11,6 +11,7 @@ const admin = (over: Partial<SessionUser> = {}): SessionUser => ({
   permissions: [],
   canViewEval: false,
   mustChangePassword: false,
+  periods: [],
   ...over,
 })
 

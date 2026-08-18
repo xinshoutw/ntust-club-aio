@@ -10,7 +10,7 @@ import StatusPill from '../../components/ui/StatusPill'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import BookingReviewModal, { type BookingReviewItem } from './BookingReviewModal'
 import { CELL, emptyCellState, type CellState } from '../bookings/cells'
-import { PERIODS } from '../../api/bookings'
+import { periodKeys, usePeriods } from '../../lib/periods'
 import {
   useAdminAvailability,
   useAdminBookingMutations,
@@ -45,6 +45,7 @@ function cellText(state: CellState, cell: GridCell | undefined): string {
 
 export default function AdminBookingsPage() {
   const { message } = App.useApp()
+  const periodAxis = periodKeys(usePeriods())
   const [selected, setSelected] = useState<BookingReviewItem | null>(null)
   const [open, setOpen] = useState(false)
   const [gridDate, setGridDate] = useState<Dayjs>(() => dayjs())
@@ -139,7 +140,7 @@ export default function AdminBookingsPage() {
               <thead>
                 <tr>
                   <th scope="col" style={{ fontSize: 11, fontWeight: 500, color: 'var(--steel)', width: 176, textAlign: 'left', paddingRight: 8 }}>場地(容納人數)</th>
-                  {PERIODS.map((p) => (
+                  {periodAxis.map((p) => (
                     <th scope="col" key={p} className="num" style={{ fontSize: 11, fontWeight: 500, color: 'var(--steel)' }}>{p}</th>
                   ))}
                 </tr>
@@ -153,7 +154,7 @@ export default function AdminBookingsPage() {
                         <span className="num" style={{ fontSize: 11, color: 'var(--steel)', marginLeft: 5 }}>{v.capacity}</span>
                       )}
                     </td>
-                    {PERIODS.map((p) => {
+                    {periodAxis.map((p) => {
                       const cell = grid[String(v.id)]?.[p]
                       // 未列出的格不是一律可借:場地可能只開放固定借用,或整個不開放
                       const state: CellState = cell ? CELL_STATE[cell.status] : emptyCellState(v)

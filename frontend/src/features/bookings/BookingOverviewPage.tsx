@@ -16,9 +16,8 @@ import QueryError from '../../components/ui/QueryError'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import StatusPill from '../../components/ui/StatusPill'
 import { confirmDialog } from '../../lib/confirm'
+import { bookingStarted, periodKeys, usePeriods } from '../../lib/periods'
 import {
-  PERIODS,
-  bookingStarted,
   roomEntryText,
   useActiveEquipmentLoans,
   useActiveRoomBookings,
@@ -95,6 +94,8 @@ function Legend() {
 }
 
 export default function BookingOverviewPage() {
+  const periodCatalogue = usePeriods()
+  const periodAxis = periodKeys(periodCatalogue)
   const navigate = useNavigate()
   const { message, modal } = App.useApp()
   const { cancelRoomBooking, cancelVenueBooking, cancelEquipmentLoan } = useBookingMutations()
@@ -260,7 +261,7 @@ export default function BookingOverviewPage() {
                 <thead>
                   <tr>
                     <th scope="col" style={{ ...thStyle, width: 176, textAlign: 'left', paddingRight: 8 }}>場地</th>
-                    {PERIODS.map((p) => (
+                    {periodAxis.map((p) => (
                       <th scope="col" key={p} className="num" style={thStyle}>{p}</th>
                     ))}
                   </tr>
@@ -281,7 +282,7 @@ export default function BookingOverviewPage() {
                           <span className="num" style={{ fontSize: 11, color: 'var(--steel)', marginLeft: 5 }}>{v.capacity}</span>
                         )}
                       </td>
-                      {PERIODS.map((p) => {
+                      {periodAxis.map((p) => {
                         const { state, club } = cellOf(v, dayQuery.data, p)
                         const label = `${v.name} 第${p}節:${CELL[state].label}`
                         return (
@@ -305,7 +306,7 @@ export default function BookingOverviewPage() {
                 <thead>
                   <tr>
                     <th scope="col" style={{ ...thStyle, width: 110, textAlign: 'left', paddingRight: 8 }}>日期</th>
-                    {PERIODS.map((p) => (
+                    {periodAxis.map((p) => (
                       <th scope="col" key={p} className="num" style={thStyle}>{p}</th>
                     ))}
                   </tr>
@@ -319,7 +320,7 @@ export default function BookingOverviewPage() {
                         <td className="num" style={{ whiteSpace: 'nowrap', paddingRight: 8, fontSize: 12, fontWeight: isToday ? 600 : 400, color: isToday ? 'var(--seal)' : 'var(--ink)' }}>
                           {d.format('MM/DD')}（{WEEKDAY[d.day()]}）
                         </td>
-                        {PERIODS.map((p) => {
+                        {periodAxis.map((p) => {
                           const { state, club } = cellOf(venueDef, grid, p)
                           const label = `${d.format('MM/DD')} 第${p}節:${CELL[state].label}`
                           return (
@@ -399,7 +400,7 @@ export default function BookingOverviewPage() {
                   <td><StatusPill status={v.status} /></td>
                   <td className="r">
                     {/* 臨時場地:申請起始時刻(最早節次起點)前皆可取消,pending 與 approved 一致(與後端同界) */}
-                    {(v.status === 'pending' || v.status === 'approved') && !bookingStarted(v.date, v.periods) ? (
+                    {(v.status === 'pending' || v.status === 'approved') && !bookingStarted(periodCatalogue, v.date, v.periods) ? (
                       <Button
                         size="small"
                         danger

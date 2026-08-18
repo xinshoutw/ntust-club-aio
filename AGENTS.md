@@ -69,7 +69,7 @@
 - **結案**:承辦人單關;活動結束日 +1 個月未結案即鎖定(推導,管理員可解鎖);結案通過才計入競賽行政分
 - **競賽五獎項**:最佳社團(行政 40% + 營運 60% 加權)/財務/活動/成果發表/負責人;財務、活動、負責人含現場簡報 20 分;行政資料 ad1–ad8 系統自動評分 + 人工調整
 - **器材逾期**:結束日之隔天**上班日**(排除政府行事曆假日)10:30 前未歸還即逾期;可觸發停權
-- **節次制**:場地借用用 14 節次(第 1–10 節、A–D 節);`PERIOD_TIMES` 權威來源是舊 clubclass
+- **節次制**:場地借用用 14 節次(第 1–10 節、A–D 節);`PERIOD_TIMES` 權威來源是舊 clubclass,單一實作在 `services/booking_service.py`,隨 `/auth/me` 下發給前端
 - **申請時間禁過去**(前後端皆驗);行政手動借用不受限,供補登使用
 
 ## 技術
@@ -111,8 +111,8 @@ pnpm run lint
 - 元件與互動慣例一律照 `docs/design-guide.md` §6,不要自刻替代品
 - 測試環境是全域 jsdom(`vite.config.ts` + `src/test/setup.ts` 補 `matchMedia`/`ResizeObserver`);
   元件測試用 `@testing-library/react` 的 `render`/`screen`/`fireEvent`,`cleanup` 已在 setup 掛好
-- `PERIOD_TIMES` 前後端各一份(`booking_service.py` / `api/bookings.ts`),改動須同步;
-  `VenueCategory` 同樣兩份(`models/enums.py` / `api/adminVenues.ts`,後端是 PG enum,新增值另需 revision)
+- 節次目錄(節次軸與起訖時刻)只有後端一份,前端經 `lib/periods.ts` 的 `usePeriods()` 取用;
+  `VenueCategory` 則是兩份(`models/enums.py` / `api/adminVenues.ts`,後端是 PG enum,新增值另需 revision)
 
 **修 issues.md 的條目時**(A/B/C 三堆的作業流程,見 `docs/HANDOFF.md`)
 

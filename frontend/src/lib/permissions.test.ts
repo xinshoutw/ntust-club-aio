@@ -18,6 +18,7 @@ const admin = (permissions: string[], extra: Partial<SessionUser> = {}): Session
   permissions,
   canViewEval: false,
   mustChangePassword: false,
+  periods: [],
   adminPages: PAGES,
   ...extra,
 })

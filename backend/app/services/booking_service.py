@@ -21,8 +21,8 @@ from app.models.enums import BookingStatus, LoanStatus
 # 14 節次(原型 PERIODS/BK_SLOTS)
 PERIODS: tuple[str, ...] = ("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "A", "B", "C", "D")
 
-# 節次起訖時刻(權威來源為舊系統 clubclass;
-# 前端鏡射於 frontend/src/api/bookings.ts 的 PERIOD_TIMES,改動須同步)
+# 節次起訖時刻(權威來源為舊系統 clubclass)。
+# 前端沒有第二份:period_catalogue() 隨 /auth/me 下發,改這裡前端就跟著變
 PERIOD_TIMES: dict[str, tuple[time, time]] = {
     "1": (time(8, 10), time(9, 0)),
     "2": (time(9, 10), time(10, 0)),
@@ -39,6 +39,18 @@ PERIOD_TIMES: dict[str, tuple[time, time]] = {
     "C": (time(20, 15), time(21, 5)),
     "D": (time(21, 10), time(22, 0)),
 }
+
+
+def period_catalogue() -> list[dict[str, str]]:
+    """節次目錄(依上課順序);前端的節次軸與起訖時刻全部讀這一份。"""
+    return [
+        {
+            "key": p,
+            "start": PERIOD_TIMES[p][0].strftime("%H:%M"),
+            "end": PERIOD_TIMES[p][1].strftime("%H:%M"),
+        }
+        for p in PERIODS
+    ]
 
 
 def now_utc() -> datetime:

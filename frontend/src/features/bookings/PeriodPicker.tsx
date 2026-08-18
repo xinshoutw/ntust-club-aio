@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { PERIODS } from '../../api/bookings'
+import { periodKeys, usePeriods } from '../../lib/periods'
 import { useDragSelect } from './useDragSelect'
 
 interface PeriodPickerProps {
@@ -13,6 +13,7 @@ interface PeriodPickerProps {
 
 // 節次複選按鈕(第 1–10、A–D);支援按住拖曳批量選取/取消
 export default function PeriodPicker({ value, onChange, size = 'middle', nowrap = false, disabledPeriods = [] }: PeriodPickerProps) {
+  const periodAxis = periodKeys(usePeriods())
   const valueRef = useRef(value)
   valueRef.current = value
 
@@ -28,7 +29,7 @@ export default function PeriodPicker({ value, onChange, size = 'middle', nowrap 
   const h = size === 'small' ? 28 : 32
   return (
     <div role="group" aria-label="時段" {...containerProps} style={{ display: 'flex', flexWrap: nowrap ? 'nowrap' : 'wrap', overflowX: nowrap ? 'auto' : undefined, gap: 6, userSelect: 'none', paddingBottom: nowrap ? 2 : 0 }}>
-      {PERIODS.map((p) => {
+      {periodAxis.map((p) => {
         const on = value.includes(p)
         const off = disabledPeriods.includes(p)
         return (

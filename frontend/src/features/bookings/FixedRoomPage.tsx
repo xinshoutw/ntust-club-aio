@@ -12,11 +12,11 @@ import { Cols } from '../../components/ui/tableControls'
 import SuspensionNote from '../../components/ui/SuspensionNote'
 import { useClubSuspension } from '../../api/clubProfile'
 import { useDragSelect } from './useDragSelect'
+import { periodKeys, usePeriods } from '../../lib/periods'
 import { UNAVAILABLE_BG } from './cells'
 import {
   DOW_TEXT,
   OCCUPANCY_TEXT,
-  PERIODS,
   roomEntryText,
   useBookingMutations,
   useFixedOccupancy,
@@ -29,26 +29,26 @@ import {
 
 const LATE = new Set(['10', 'A', 'B', 'C', 'D']) // 晚間時段:需至少連續 3 節起借
 
-// 依 PERIODS 順序把已選節次切成連續區段
-function runsOf(periods: string[]): string[][] {
-  const idx = periods.map((p) => PERIODS.indexOf(p)).sort((a, b) => a - b)
+// 依節次軸順序把已選節次切成連續區段
+function runsOf(axis: string[], periods: string[]): string[][] {
+  const idx = periods.map((p) => axis.indexOf(p)).sort((a, b) => a - b)
   const runs: string[][] = []
   let cur: number[] = []
   for (const i of idx) {
     if (cur.length && i === cur[cur.length - 1] + 1) {
       cur.push(i)
     } else {
-      if (cur.length) runs.push(cur.map((x) => PERIODS[x]))
+      if (cur.length) runs.push(cur.map((x) => axis[x]))
       cur = [i]
     }
   }
-  if (cur.length) runs.push(cur.map((x) => PERIODS[x]))
+  if (cur.length) runs.push(cur.map((x) => axis[x]))
   return runs
 }
 
 // 晚間時段規則:含第 10 節或 A–D 節的連續區段需 ≥3 節(合法如 9–A、8–10、A–C、B–D)
-function lateRuleError(dow: number, periods: string[]): string | null {
-  for (const run of runsOf(periods)) {
+function lateRuleError(axis: string[], dow: number, periods: string[]): string | null {
+  for (const run of runsOf(axis, periods)) {
     if (run.some((p) => LATE.has(p)) && run.length < 3) {
       return `週${DOW_TEXT[dow]}的第 10 節及 A–D 節至少需連續 3 節，目前為 ${run.length} 節`
     }
@@ -58,6 +58,7 @@ function lateRuleError(dow: number, periods: string[]): string | null {
 
 export default function FixedRoomPage() {
   const { message, modal } = App.useApp()
+  const periodAxis = periodKeys(usePeriods())
   const [form] = Form.useForm()
   const { suspended } = useClubSuspension()
   // 已選時段:'dow|period'(dow 1=週一 … 7=週日)
@@ -190,7 +191,7 @@ export default function FixedRoomPage() {
       return
     }
     for (let dow = 1; dow <= 7; dow++) {
-      const err = lateRuleError(dow, PERIODS.filter((p) => slots.has(`${dow}|${p}`)))
+      const err = lateRuleError(periodAxis, dow, periodAxis.filter((p) => slots.has(`${dow}|${p}`)))
       if (err) {
         setSlotsError(true)
         message.error(err)
@@ -274,7 +275,7 @@ export default function FixedRoomPage() {
                 {[1, 2, 3, 4, 5, 6, 7].map((dow) => (
                   <tr key={dow}>
                     <td style={{ fontSize: 13, color: 'var(--steel)', whiteSpace: 'nowrap' }}>週{DOW_TEXT[dow]}</td>
-                    {PERIODS.map((p) => {
+                    {periodAxis.map((p) => {
                       const key = `${dow}|${p}`
                       const on = slots.has(key)
                       const reason = occupied?.get(key)

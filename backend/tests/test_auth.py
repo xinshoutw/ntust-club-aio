@@ -321,3 +321,17 @@ async def test_expired_session_rejected(client, db):
     )
     await db.commit()
     assert (await client.get("/api/v1/auth/me")).status_code == 401
+
+
+async def test_me_carries_the_period_catalogue(client, db):
+    """節次目錄隨 /auth/me 下發:前端的節次軸與起訖時刻沒有第二份(ISS-86)。"""
+    from app.services import booking_service
+
+    club = await make_club(db)
+    await make_user(db, username="club01", club_id=club.id)
+    await login(client, "club01")
+
+    periods = (await client.get("/api/v1/auth/me")).json()["data"]["periods"]
+    assert [p["key"] for p in periods] == list(booking_service.PERIODS)
+    assert periods[0] == {"key": "1", "start": "08:10", "end": "09:00"}
+    assert periods[-1] == {"key": "D", "start": "21:10", "end": "22:00"}

@@ -22,6 +22,14 @@ class AdminPageOut(BaseModel):
     also: list[str]
 
 
+class PeriodOut(BaseModel):
+    """節次目錄(services/booking_service.PERIOD_TIMES);起訖為 HH:MM。"""
+
+    key: str
+    start: str
+    end: str
+
+
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -39,3 +47,5 @@ class UserOut(BaseModel):
     must_change_password: bool
     # 行政端頁面權限目錄:側欄過濾、路由守衛與權限彈窗的唯一來源。非 admin 為 None
     admin_pages: list[AdminPageOut] | None = None
+    # 節次目錄:借用相關畫面的節次軸與「已開始節次」判定都讀這一份,前端不維護第二份
+    periods: list[PeriodOut] = []

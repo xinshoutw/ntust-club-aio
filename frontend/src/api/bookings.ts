@@ -6,43 +6,11 @@ import { api, apiPaged, apiWithMeta, qs } from './client'
 import { fetchAllPages } from './fetchAll'
 import type { StatusKey } from '../lib/status'
 
-// 節次:第 1–10 節與 A–D 節(與後端 booking_service.PERIODS 對齊)
-export const PERIODS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'A', 'B', 'C', 'D']
 export const DOW_TEXT = ['', '一', '二', '三', '四', '五', '六', '日']
 
-// 節次起訖時刻(退役舊系統 clubclass 的權威對照;後端 booking_service.PERIOD_TIMES 鏡射,改動須同步)
-export const PERIOD_TIMES: Record<string, [start: string, end: string]> = {
-  '1': ['08:10', '09:00'],
-  '2': ['09:10', '10:00'],
-  '3': ['10:20', '11:10'],
-  '4': ['11:20', '12:10'],
-  '5': ['12:20', '13:10'],
-  '6': ['13:20', '14:10'],
-  '7': ['14:20', '15:10'],
-  '8': ['15:30', '16:20'],
-  '9': ['16:30', '17:20'],
-  '10': ['17:30', '18:20'],
-  A: ['18:25', '19:15'],
-  B: ['19:20', '20:10'],
-  C: ['20:15', '21:05'],
-  D: ['21:10', '22:00'],
-}
-
-/** 借用起始時刻=最早節次的起點(periods 不保證有序);date 為顯示格式 YYYY/MM/DD */
-export const bookingStartAt = (date: string, periods: string[]): Dayjs => {
-  const first = [...periods].sort((a, b) => PERIODS.indexOf(a) - PERIODS.indexOf(b))[0]
-  return dayjs(`${date} ${PERIOD_TIMES[first]?.[0] ?? '00:00'}`, 'YYYY/MM/DD HH:mm')
-}
-
-/** 是否已過申請起始時刻(含相等=已開始;與後端 booking_started 同規則) */
-export const bookingStarted = (date: string, periods: string[]): boolean =>
-  periods.length > 0 && !bookingStartAt(date, periods).isAfter(dayjs())
-
-/** 現在時刻已開始的節次(起點 ≤ now):選「今天」時禁選用 */
-export const startedPeriods = (): string[] => {
-  const now = dayjs().format('HH:mm')
-  return PERIODS.filter((p) => PERIOD_TIMES[p][0] <= now)
-}
+// 節次排序:數字節在前、字母節在後。節次目錄本身在 lib/periods(隨 /auth/me 下發),
+// 這裡是純轉換函式拿不到 hook —— 只用得到順序規則,不需要目錄
+const periodRank = (p: string): number => (/^\d+$/.test(p) ? Number(p) : 100 + p.charCodeAt(0))
 
 const DATE_FMT = 'YYYY/MM/DD'
 const toIso = (d: Dayjs): string => d.format('YYYY-MM-DD')
@@ -208,7 +176,7 @@ export const toRoomBooking = (r: RoomBookingOut): RoomBooking => {
     .sort(([a], [b]) => a - b)
     .map(([dow, periods]) => ({
       dow,
-      periods: [...periods].sort((a, b) => PERIODS.indexOf(a) - PERIODS.indexOf(b)),
+      periods: [...periods].sort((a, b) => periodRank(a) - periodRank(b)),
     }))
   return {
     id: r.id,

@@ -6,6 +6,7 @@ import LoadingBlock from '../../components/ui/LoadingBlock'
 import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
 import { confirmDialog } from '../../lib/confirm'
+import { bookingStarted, periodKeys, startedPeriods, usePeriods } from '../../lib/periods'
 import { notFoundText } from '../../lib/selectOptions'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
@@ -13,9 +14,6 @@ import { Cols } from '../../components/ui/tableControls'
 import SuspensionNote from '../../components/ui/SuspensionNote'
 import { useClubSuspension } from '../../api/clubProfile'
 import {
-  PERIODS,
-  bookingStarted,
-  startedPeriods,
   useBookingMutations,
   useActiveVenueBookings,
   useRecentVenueBookings,
@@ -27,6 +25,8 @@ import PeriodPicker from './PeriodPicker'
 
 export default function VenueBookingPage() {
   const { message, modal } = App.useApp()
+  const periodCatalogue = usePeriods()
+  const periodAxis = periodKeys(periodCatalogue)
   const [form] = Form.useForm()
   const { suspended } = useClubSuspension()
   // 借用總覽格子點入時自動帶入場地、日期、時段
@@ -41,7 +41,7 @@ export default function VenueBookingPage() {
       ? rawDate
       : undefined
   const qPeriod = params.get('period')
-  const [periods, setPeriods] = useState<string[]>(() => (qPeriod && PERIODS.includes(qPeriod) ? [qPeriod] : []))
+  const [periods, setPeriods] = useState<string[]>(() => (qPeriod && periodAxis.includes(qPeriod) ? [qPeriod] : []))
   // 從場況圖點格進來時 periods 已有初值,與初值相同不算 dirty(否則一進頁就被攔)
   const initialPeriods = useRef(periods.join())
   const guard = useFormUnsavedGuard(periods.join() !== initialPeriods.current)
@@ -63,7 +63,7 @@ export default function VenueBookingPage() {
 
   // 過去時間全面禁止:過去日期不可選;選「今天」時已開始節次禁選(後端亦擋)
   const dateValue = Form.useWatch('date', form) as Dayjs | undefined
-  const disabledPeriods = dateValue?.isSame(todayStart, 'day') ? startedPeriods() : []
+  const disabledPeriods = dateValue?.isSame(todayStart, 'day') ? startedPeriods(periodCatalogue) : []
   const disabledKey = disabledPeriods.join(',')
   useEffect(() => {
     // 日期切到今天、或表單開著跨過節次起點時,已選到的已開始節次自動剔除
@@ -233,7 +233,7 @@ export default function VenueBookingPage() {
                   <td><StatusPill status={v.status} /></td>
                   <td className="r">
                     {/* 申請起始時刻(最早節次起點)前皆可取消,pending 與 approved 一致(與後端同界) */}
-                    {(v.status === 'pending' || v.status === 'approved') && !bookingStarted(v.date, v.periods) ? (
+                    {(v.status === 'pending' || v.status === 'approved') && !bookingStarted(periodCatalogue, v.date, v.periods) ? (
                       <Button size="small" danger onClick={() => cancelRow(v)}>取消</Button>
                     ) : (
                       <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>

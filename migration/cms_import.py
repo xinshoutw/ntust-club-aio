@@ -578,6 +578,41 @@ async def import_news(legacy, db: AsyncSession, ids: IdMap) -> None:
 
 
 # ---------------------------------------------------------------------------
+# id-map 的舊表名 → 要清掉的新表(reset 用;順序即刪除順序,子表在前)
+_RESET_ORDER = (
+    ("Club_news", Announcement),
+    ("Club_activity", Activity),
+    ("Club_student", ClubMember),
+    ("Club_staff", User),
+    ("Club_club:user", User),
+    ("Club_club", Club),
+)
+
+
+async def reset(db: AsyncSession) -> None:
+    """清掉本腳本匯入過的資料,讓換一份新 dump 之後可以從乾淨狀態重跑
+    (decisions.md MIG-04)。
+
+    只刪自己 id-map 記過的列 —— 新系統上線後自己產生的社團、活動與公告不受影響。
+    先跑 `cc_import.py --reset`(借用單掛在活動與社團上),再跑這支。
+    """
+    ids = IdMap()
+    await ids.load(db)
+    for table, model in _RESET_ORDER:
+        target = [
+            int(new_id)
+            for (t, _lid), new_id in ids._map.items()  # noqa: SLF001 - 同一套腳本的內部結構
+            if t == table
+        ]
+        if not target:
+            continue
+        await db.execute(sa.delete(model).where(model.id.in_(target)))
+        print(f"  清除 {table}: {len(target)} 列")
+    await db.execute(sa.delete(LegacyIdMap).where(LegacyIdMap.legacy_system == LegacySystem.CMS))
+    await db.commit()
+    print("已清除 CMS 匯入結果;指導老師欄位不還原(非 id-map 型,重跑會覆寫)")
+
+
 async def main() -> None:
     legacy_db = os.environ.get("LEGACY_DB", "legacy_clubs")
     legacy_url = settings.sqlalchemy_url.set(database=legacy_db)
@@ -585,6 +620,8 @@ async def main() -> None:
 
     passwords: list[tuple[str, str, str]] = []
     async with async_session_factory() as db, legacy_engine.connect() as legacy:
+        if "--reset" in sys.argv:
+            await reset(db)
         ids = IdMap()
         await ids.load(db)
 

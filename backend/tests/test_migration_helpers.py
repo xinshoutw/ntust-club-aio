@@ -78,3 +78,19 @@ def test_unresolvable_booking_units_are_kept_as_office_bookings():
     # 空字串 / None / admin / 8 開頭偽帳號 / 認不出來的:一律留下來,掛「學務處」
     for raw in ("", None, "admin", "80001", "who-is-this"):
         assert cc_import.resolve_club(lookup, raw) is None
+
+
+def test_cc_import_offers_reset_and_unknown_club_report():
+    """換一份新 dump 之前要清得乾淨(MIG-04);認不出來的帳號要導得出清單(MIG-06)。"""
+    assert callable(cc_import.reset)
+    assert callable(cc_import.report_unknown_clubs)
+
+
+def test_cms_import_reset_covers_every_id_mapped_table():
+    """重置漏掉一張表就會在重跑時撞唯一鍵,或留下一批孤兒列(decisions.md MIG-04)。"""
+    import re
+
+    mapped = set(re.findall(r'ids\.record\(db, "([^"]+)"', cms_import.__file__ and
+                            Path(cms_import.__file__).read_text()))
+    assert mapped, "找不到任何 ids.record 呼叫,這支測試自己壞了"
+    assert {t for t, _ in cms_import._RESET_ORDER} == mapped

@@ -40,9 +40,7 @@
 
 | 編號 | 項目 | 現況 |
 |---|---|---|
-| OPS-01 | 備份機制 | **完全沒有**,且每次部署自動跑 migration 沒有前置備份 |
 | OPS-05 | Edge proxy 切換 | 六個項目仍是原狀(upstream 埠號、`client_max_body_size`、`proxy_request_buffering`、XFF 覆寫、`FORWARDED_ALLOW_IPS`、clubclass 導向) |
-| OPS-07 | 容量告警 | 「已接受的磁碟 DoS 風險」的前提條件至今未建立 |
 
 ## 5. 資料遷移待決
 
@@ -50,10 +48,8 @@
 |---|---|
 | MIG-01 | 舊機 media 目錄(約 8.7 萬檔)何時交付 |
 | MIG-02 | 舊評鑑檔案庫(12,752 檔 / 14 分類)與行政歷史文件要不要遷 |
-| MIG-03 | clubclass 有 960 筆器材借用(11.7%)因 `club_id` 為空字串被靜默丟棄,其實可還原 |
-| MIG-04 | 換新 dump 重跑遷移會撞唯一約束,前面幾萬筆全白做 |
 | MIG-05 | 遷入後 159 社的聯絡 Email 全為空,公告 Email 通知寄給 0 個收件人 |
-| MIG-06 | 約 560 筆借用以「`club_id` 開頭為 8」被歸為學務處,這 5 組帳號身分未經確認 |
+| MIG-06 | 約 560 筆借用的單位認不出來,歸「學務處」。清單由 `cc_import.py --unknown-clubs` 導出交承辦辨識;認不出就永久維持現況(不擋上線) |
 | MIG-07 | clubclass 與 CMS 的退役順序 —— 若 clubclass 較晚退役,登入會直接斷 |
 
 ## 6. 需要承辦決定才能排程

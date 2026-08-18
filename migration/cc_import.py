@@ -5,6 +5,8 @@
         -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=cc mysql:8.0
     docker exec -i cc-legacy mysql -uroot -proot cc < cc_YYYY-MM-DD.sql
     uv run python ../migration/cc_import.py
+    uv run python ../migration/cc_import.py --reset          # 清掉上次匯入,換新 dump 前先跑
+    uv run python ../migration/cc_import.py --unknown-clubs  # 只導出認不出單位的借用清單
 
 前置:cms_import.py 已跑完(club/activity 對照仰賴 legacy_id_map system=cms)。
 對映規則見 migration/README.md。
@@ -12,8 +14,10 @@
 
 # ruff: noqa: E402 - sys.path 調整必須先於 app 匯入(同 cms_import.py)
 import asyncio
+import csv
 import os
 import sys
+from collections import Counter
 from datetime import UTC, date, datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -129,6 +133,7 @@ def resolve_club(club_lookup: dict[str, int], raw: str | None) -> int | None:
     舊系統的 `club_id` 有 960 筆是空字串。欄位沒填不代表那張單不存在 ——
     丟掉等於整段借用歷史憑空少一塊,而歸「學務處」至少留得住場地與時間
     (decisions.md MIG-03)。同理適用 `admin` 與已移除的 8 開頭偽社團帳號;
+    認不出來的帳號另由 `--unknown-clubs` 導出清單交承辦辨識(MIG-06)。
     
     """
     return club_lookup.get(raw) if raw else None
@@ -286,6 +291,83 @@ async def import_device_loans(
     print(f"device loans: 新增 {created} 筆器材借用、跳過 {skipped}(孤兒/髒資料)")
 
 
+async def report_unknown_clubs(legacy, club_lookup: dict[str, int]) -> Path:
+    """導出「認不出借用單位」的借用清單,交承辦辨識(decisions.md MIG-06)。
+
+    這些單會以「學務處」的身分留在系統裡。認得出來就人工改掛社團,
+    認不出來就永久維持現況 —— 不擋上線。
+    """
+    with legacy.cursor() as cur:
+        cur.execute("SELECT * FROM Apply ORDER BY id")
+        applies = cur.fetchall()
+        cur.execute("SELECT * FROM DeviceApply ORDER BY id")
+        device_applies = cur.fetchall()
+        cur.execute("SELECT id, name FROM Classroom")
+        rooms = {r["id"]: r["name"] for r in cur.fetchall()}
+
+    rows = []
+    for r in applies:
+        if resolve_club(club_lookup, r["club_id"]) is None:
+            rows.append({
+                "類型": "場地",
+                "舊帳號": r["club_id"] or "(空白)",
+                "舊單號": r["id"],
+                "日期": r["date"],
+                "標的": rooms.get(r["classroom_id"], r["classroom_id"]),
+                "節次": ",".join(periods_of(r)),
+                "用途": (r["purpose"] or "").strip() or (r["activity"] or "").strip(),
+                "電話": (r["phone"] or "").strip(),
+            })
+    for r in device_applies:
+        if resolve_club(club_lookup, r["club_id"]) is None:
+            rows.append({
+                "類型": "器材",
+                "舊帳號": r["club_id"] or "(空白)",
+                "舊單號": r["id"],
+                "日期": r["date"],
+                "標的": "(見器材明細)",
+                "節次": "",
+                "用途": (r["purpose"] or "").strip() or (r["activity"] or "").strip(),
+                "電話": (r["phone"] or "").strip(),
+            })
+
+    out_dir = MIGRATION_DIR / "out"
+    out_dir.mkdir(exist_ok=True)
+    path = out_dir / "unknown_club_bookings.csv"
+    with path.open("w", newline="", encoding="utf-8-sig") as fh:
+        writer = csv.DictWriter(fh, fieldnames=list(rows[0]) if rows else ["舊帳號"])
+        writer.writeheader()
+        writer.writerows(rows)
+    accounts = Counter(r["舊帳號"] for r in rows)
+    print(f"認不出借用單位的借用共 {len(rows)} 筆,來自 {len(accounts)} 個帳號:")
+    for account, count in accounts.most_common():
+        print(f"  {account}: {count} 筆")
+    print(f"清單 → {path}")
+    return path
+
+
+async def reset(db: AsyncSession) -> None:
+    """清掉本腳本匯入過的資料,讓換一份新 dump 之後可以從乾淨狀態重跑
+    (decisions.md MIG-04)。只刪自己 id-map 記過的列,不碰新系統自己產生的資料。"""
+    ids = IdMap(LegacySystem.CLUBCLASS)
+    await ids.load(db)
+    deleted = {}
+    for table, model in (("venue_bookings", VenueBooking), ("equipment_loans", EquipmentLoan)):
+        target = [
+            int(new_id)
+            for (_t, _lid), new_id in ids._map.items()  # noqa: SLF001 - 同一套腳本的內部結構
+            if _t.startswith("Apply" if table == "venue_bookings" else "DeviceLog")
+        ]
+        if target:
+            await db.execute(sa.delete(model).where(model.id.in_(target)))
+        deleted[table] = len(target)
+    await db.execute(
+        sa.delete(LegacyIdMap).where(LegacyIdMap.legacy_system == LegacySystem.CLUBCLASS)
+    )
+    await db.commit()
+    print(f"已清除 clubclass 匯入結果:{deleted};器材與場地主檔保留(reset_db 會重建)")
+
+
 async def main() -> None:
     legacy = pymysql.connect(
         host=os.environ.get("CC_MYSQL_HOST", "127.0.0.1"),
@@ -298,6 +380,11 @@ async def main() -> None:
     )
     try:
         async with async_session_factory() as db:
+            if "--reset" in sys.argv:
+                await reset(db)
+            if "--unknown-clubs" in sys.argv:
+                await report_unknown_clubs(legacy, await build_club_lookup(db))
+                return
             ids = IdMap(LegacySystem.CLUBCLASS)
             await ids.load(db)
             club_lookup = await build_club_lookup(db)

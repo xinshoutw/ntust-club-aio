@@ -21,7 +21,13 @@ idempotent:以 `legacy_id_map`(system=cms)記錄舊 id → 新 id,重跑跳過�
 cd backend
 uv run python ../migration/cms_import.py           # 全部匯入
 LEGACY_DB=legacy_clubs uv run python ../migration/cms_import.py  # 指定舊庫名
+uv run python ../migration/cms_import.py --reset   # 清掉上次匯入的結果(換新 dump 前)
 ```
+
+**換一份新 dump 重跑前先清乾淨**(decisions.md MIG-04):`--reset` 只刪自己
+`legacy_id_map` 記過的列,新系統上線後自己產生的資料不受影響。
+順序是**先 `cc_import.py --reset` 再 `cms_import.py --reset`** —— 借用單掛在活動與社團上。
+指導老師欄位不還原(非 id-map 型,重跑本來就會覆寫)。
 
 - 一次性密碼輸出到 `migration/out/one_time_passwords_*.csv`(**含明碼,不入版控**,
   交承辦發放後銷毀);所有帳號 `must_change_password=True`
@@ -53,7 +59,7 @@ LEGACY_DB=legacy_clubs uv run python ../migration/cms_import.py  # 指定舊庫�
 | Device(25) | equipment(含 max_lease_count) | 名稱正規化 `DEVICE_RENAME`;停用 8 項建 inactive |
 | Apply(15,021) | venue_bookings | status 0/1/4/2→pending/approved/rejected/cancelled;phone 保留、其餘申請人明細丟棄 |
 | DeviceApply+DeviceLog | equipment_loans(一品項一筆) | 已核准且區間已過→returned;活動已刪→activity_id NULL |
-| 認不出借用單位的單(空字串 / admin / 8 開頭偽帳號 / 未知) | club_id NULL(顯示「學務處」) | 舊系統有 960 筆 `club_id` 是空字串,**不丟掉**(decisions.md MIG-03);認不出來的帳號身分待承辦辨識(MIG-06) |
+| 認不出借用單位的單(空字串 / admin / 8 開頭偽帳號 / 未知) | club_id NULL(顯示「學務處」) | 舊系統有 960 筆 `club_id` 是空字串,**不丟掉**(decisions.md MIG-03);認不出來的帳號另以 `--unknown-clubs` 導出清單交承辦辨識(MIG-06),認不出就永久維持現況 |
 | ClassroomRule(2,848)、Admin、Notice | 不遷 | 場地封鎖=新 Rule Page 功能;未過期封鎖上線時人工重建 |
 
 ## 注意

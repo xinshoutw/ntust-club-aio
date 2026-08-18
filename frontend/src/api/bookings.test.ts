@@ -47,7 +47,6 @@ describe('toEquipmentLoan', () => {
     end_date: '2026-06-15',
     purpose: '迎新擺攤',
     status: 'checked_out',
-    serials: null,
     borrower_name: '陳予恩',
     returner_name: null,
     overdue: false,

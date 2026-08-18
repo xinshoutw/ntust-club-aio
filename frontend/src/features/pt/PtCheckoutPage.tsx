@@ -1,21 +1,20 @@
 import { useState } from 'react'
 import { countText } from '../../lib/counts'
-import { App, Button, Input, Modal } from 'antd'
+import { Alert, App, Button, Input, Modal } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import { STAFF_PAGE_SIZE, useStaffLoans, useStaffMutations, type StaffLoan } from '../../api/staff'
 
-// 器材借出點交:已核准借用逐單點交,登記借用人;
-// 「依序點交」器材逐件登記序號(任一空白擋下,與後端檢核一致)
+// 器材借出點交:已核准借用逐單點交,登記借用人。
+// 「依序點交」器材只在此提醒工讀生現場核對序號 —— 序號本身不入系統(decisions.md ISS-55b)
 export default function PtCheckoutPage() {
   const { message } = App.useApp()
   const [page, setPage] = useState(1)
   const [selected, setSelected] = useState<StaffLoan | null>(null)
   const [open, setOpen] = useState(false)
   const [borrower, setBorrower] = useState('')
-  const [serials, setSerials] = useState<string[]>([])
   const listQuery = useStaffLoans('approved', page)
   const { checkout } = useStaffMutations()
   const rows = listQuery.data?.loans ?? []
@@ -24,7 +23,6 @@ export default function PtCheckoutPage() {
   const openModal = (loan: StaffLoan) => {
     setSelected(loan)
     setBorrower('')
-    setSerials(Array.from({ length: loan.needsSerial ? loan.qty : 0 }, () => ''))
     setOpen(true)
   }
 
@@ -35,13 +33,8 @@ export default function PtCheckoutPage() {
       message.error('請填寫借用人姓名')
       return
     }
-    const cleaned = serials.map((s) => s.trim())
-    if (selected.needsSerial && cleaned.some((s) => !s)) {
-      message.error('依序點交器材需逐件登記序號')
-      return
-    }
     checkout.mutate(
-      { id: selected.id, borrower: name, serials: selected.needsSerial ? cleaned : undefined },
+      { id: selected.id, borrower: name },
       {
         onSuccess: () => {
           setOpen(false)
@@ -157,21 +150,14 @@ export default function PtCheckoutPage() {
                 maxLength={50}
               />
             </div>
-            {selected.needsSerial &&
-              serials.map((s, i) => (
-                <div key={i}>
-                  <div style={{ fontSize: 13, marginBottom: 4 }}>
-                    第 <span className="num">{i + 1}</span> 件序號
-                  </div>
-                  <Input
-                    value={s}
-                    onChange={(e) =>
-                      setSerials((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))
-                    }
-                    maxLength={50}
-                  />
-                </div>
-              ))}
+            {selected.needsSerial && (
+              <Alert
+                type="info"
+                showIcon
+                message="此品項為依序點交"
+                description={`請於現場逐件核對 ${selected.qty} 件的機身序號後再確認點交;序號不需登入系統。`}
+              />
+            )}
           </div>
         )}
       </Modal>

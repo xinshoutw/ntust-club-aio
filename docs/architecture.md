@@ -100,7 +100,6 @@ REST JSON,前綴 `/api/v1`。回應信封:
 | 422 | `VALIDATION` | Pydantic 驗證失敗(`meta.detail` 附明細) |
 | 422 | `PASSWORD_POLICY` / `PASSWORD_REUSED` / `PASSWORD_MISMATCH` | 密碼政策 |
 | 422 | `INVALID_SORT` | 排序欄位不在白名單 |
-| 422 | `SERIALS_REQUIRED` / `SERIALS_NOT_ALLOWED` / `SERIALS_DUPLICATED` | 器材點交序號 |
 | 429 | `RATE_LIMITED` | 超過速率限制 |
 | 500 | `INTERNAL` | 未預期錯誤(訊息固定,不洩漏) |
 | 507 | `INSUFFICIENT_STORAGE` | 社團配額或實體磁碟空間不足 |

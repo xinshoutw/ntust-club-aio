@@ -226,7 +226,7 @@ async def checkout_equipment_loan(
     request: Request,
     background: BackgroundTasks,
 ) -> ApiResponse[StaffEquipmentLoanOut]:
-    """借出點交:approved → checked_out;依序點交器材逐件登記序號。
+    """借出點交:approved → checked_out。
 
     不需 advisory lock:approved → checked_out 不改變區間佔用量(核准時已佔)。
     """
@@ -234,18 +234,6 @@ async def checkout_equipment_loan(
     if loan.status != LoanStatus.APPROVED:
         raise conflict("此借用單不在已核准狀態")
     equipment = await db.get(Equipment, loan.equipment_id)
-    if equipment.needs_serial:
-        serials = [s.strip() for s in body.serials]
-        if len(serials) != loan.qty or any(not s for s in serials):
-            raise validation_error(
-                f"依序點交器材需逐件登記序號(共 {loan.qty} 件)", code="SERIALS_REQUIRED"
-            )
-        if len(set(serials)) != len(serials):
-            raise validation_error("序號不可重複", code="SERIALS_DUPLICATED")
-        loan.serials = serials
-    elif body.serials:
-        raise validation_error("此器材為一般點交,毋須登記序號", code="SERIALS_NOT_ALLOWED")
-
     loan.status = LoanStatus.CHECKED_OUT
     loan.checkout_by = user.id
     loan.checkout_at = datetime.now(UTC)

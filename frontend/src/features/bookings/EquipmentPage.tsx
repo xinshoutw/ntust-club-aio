@@ -292,9 +292,6 @@ export default function EquipmentPage() {
                 <tr key={l.id}>
                   <td style={{ fontWeight: 500 }}>
                     {l.equipmentName} <span className="num">×{l.qty}</span>
-                    {l.serials?.length ? (
-                      <span className="num" style={{ color: 'var(--steel)', fontSize: 12 }}> ({l.serials.join('、')})</span>
-                    ) : null}
                   </td>
                   <td className="num" style={{ fontSize: 13 }}>{l.startDate} – {l.endDate}</td>
                   <td style={{ color: 'var(--steel)', fontSize: 13 }}>{l.activityName ?? l.purpose}</td>
@@ -346,9 +343,6 @@ export default function EquipmentPage() {
                 <tr key={l.id}>
                   <td style={{ fontWeight: 500 }}>
                     {l.equipmentName} <span className="num">×{l.qty}</span>
-                    {l.serials?.length ? (
-                      <span className="num" style={{ color: 'var(--steel)', fontSize: 12 }}> ({l.serials.join('、')})</span>
-                    ) : null}
                   </td>
                   <td className="num" style={{ fontSize: 13 }}>{l.startDate} – {l.endDate}</td>
                   <td style={{ color: 'var(--steel)', fontSize: 13 }}>{l.activityName ?? l.purpose}</td>

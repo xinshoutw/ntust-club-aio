@@ -101,7 +101,6 @@ class EquipmentLoan(Base, TimestampMixin):
     # 借出點交(工讀生;需序號類登記序號)
     checkout_by: Mapped[int | None] = mapped_column(sa.ForeignKey("users.id"))
     checkout_at: Mapped[dt.datetime | None] = mapped_column(sa.DateTime(timezone=True))
-    serials: Mapped[list[str] | None] = mapped_column(ARRAY(sa.Text))
     borrower_name: Mapped[str | None] = mapped_column(sa.Text)  # 借用人(借出點交時登記)
     # 歸還點交
     checkin_by: Mapped[int | None] = mapped_column(sa.ForeignKey("users.id"))

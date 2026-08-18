@@ -128,7 +128,7 @@ erDiagram
 
 **equipment**(id, name UNIQUE, total_qty, max_lease_count int NULL, needs_serial bool, sort, is_active)
 
-`needs_serial` 是唯一分類欄:false=一般點交、true=依序點交(登記序號)。`max_lease_count` 為單次可借上限,NULL=不限。可借數推導不儲存。
+`needs_serial` 是唯一分類欄:false=一般點交、true=依序點交(點交畫面提醒核對序號,序號值不入系統)。`max_lease_count` 為單次可借上限,NULL=不限。可借數推導不儲存。
 
 **venue_block_rules**(id, venue_id, start_date, end_date, weekdays smallint[] NULL, periods varchar(2)[], reason, created_by)
 
@@ -261,14 +261,14 @@ approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,�
 | start_date / end_date | 借用區間 = 活動起訖 ∓ 工作天緩衝的**推導快照**;之後調整緩衝設定不回溯既有借用 |
 | purpose | |
 | status | enum(pending, approved, rejected, cancelled, checked_out, returned) |
-| checkout_by / at / serials / borrower_name | 借出點交(工讀生;需序號類登記序號) |
+| checkout_by / at / borrower_name | 借出點交(工讀生) |
 | checkin_by / checkin_at / checkin_note / returner_name | 歸還點交 |
 
 **逾期為推導**:status=checked_out 且 now ≥ (end_date 之隔天上班日的 `equipment_return_time`,預設 10:30)。逾期追蹤、停權管理、社團逾期數全查這裡;逾期未還的借用視為持續佔用,不論原區間是否已過。
 
 社團可取消審核中或已核准未開始的借用(狀態 `cancelled`);臨時場地的可取消邊界是申請起始時刻(最早節次起點)。
 
-固定借用(週期時段)、臨時場地(單日節次)、器材(區間+點交+序號+逾期)的欄位與生命週期完全不同,故拆三表而非單表 + type。
+固定借用(週期時段)、臨時場地(單日節次)、器材(區間+點交+逾期)的欄位與生命週期完全不同,故拆三表而非單表 + type。
 
 ### 3.6 其他申請
 
@@ -415,5 +415,5 @@ approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,�
 | 經費科目、違規項目目錄放 settings 不開表 | 需要逐科目統計報表時 |
 | 指導老師固定兩槽存於 clubs 欄位 | 出現多位指導老師需求時抽表 |
 | 評分草稿只做前端暫存 | 評審反映跨裝置需求時加 draft 表 |
-| 器材不做逐台資產管理(序號僅登記於借用單) | 需要維修/報廢生命週期時開 equipment_units |
+| 器材不做逐台資產管理(系統不記錄序號) | 需要逐台追蹤或維修/報廢生命週期時開 equipment_units |
 | 幹部證明 PDF 不入模型 | 由資料即時產生,不存檔 |

@@ -145,13 +145,7 @@ export default function PtCheckinPage() {
               </span>
               {selected.overdue && <span style={{ marginLeft: 12 }}><StatusPill status="overdue" /></span>}
             </div>
-            {/* 依序點交的器材要照借出時登記的序號核對,否則追蹤到哪一台就斷了 */}
-            {selected.serials.length > 0 && (
-              <div style={{ fontSize: 13 }}>
-                <div style={{ color: 'var(--steel)', marginBottom: 4 }}>借出登記序號</div>
-                <div className="num">{selected.serials.join('、')}</div>
-              </div>
-            )}
+
             <div>
               <div style={{ fontSize: 13, marginBottom: 4 }}>歸還人姓名</div>
               <Input

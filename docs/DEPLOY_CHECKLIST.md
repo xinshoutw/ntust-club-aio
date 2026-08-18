@@ -7,7 +7,7 @@
 ## A. 阻擋項
 
 - [ ] **備份機制**:目前 repo 內沒有任何備份 script 或排程。單機部署 = 單點故障。需建立每日 `pg_dump | gzip → GCS`(lifecycle 30 天)、每日 `uploads/` 同步、每週 GCE 磁碟快照、部署前手動 dump 一次
-- [ ] **器材主檔進正式 seed**:`scripts/seed.py` 只建 5 獎項 + 19 場地 + superadmin,器材主檔只存在於 `seed_mock.py`(假資料)。無器材主檔則器材借用無品項可選。需承辦提供真實清單(品名/數量/是否需序號/單次上限)
+- [ ] **器材主檔的建立順序**:`scripts/seed.py` 只建 5 獎項 + 19 場地 + superadmin,**器材主檔由 `migration/cc_import.py` 從舊 `Device` 表帶入**(品名、數量、單次上限、啟用與否)。正式流程必須 seed 之後跑過遷移,否則器材借用無品項可選
 - [ ] **政府行事曆假日**:`holidays` 表未 seed。未匯入的年度,`booking_service.add_workdays` 會退化成只排除週六日,逢國定假日的逾期判定偏一天
 
 ## B. `.env`(prod)

@@ -42,7 +42,6 @@
 | 編號 | 項目 | 現況 |
 |---|---|---|
 | OPS-01 | 備份機制 | **完全沒有**,且每次部署自動跑 migration 沒有前置備份 |
-| OPS-04 | 正式 seed 缺器材主檔 | 遷移的 `DEVICE_RENAME` 會落空,序號點交功能全失效 |
 | OPS-05 | Edge proxy 切換 | 六個項目仍是原狀(upstream 埠號、`client_max_body_size`、`proxy_request_buffering`、XFF 覆寫、`FORWARDED_ALLOW_IPS`、clubclass 導向) |
 | OPS-06 | SMTP relay | 未定,現用開發者個人信箱 |
 | OPS-07 | 容量告警 | 「已接受的磁碟 DoS 風險」的前提條件至今未建立 |

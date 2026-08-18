@@ -311,28 +311,22 @@ async def test_loan_lists_and_overdue_filter(client, db):
 # ---- 借出點交 ----
 
 
-async def test_checkout_serials_and_state(client, db, monkeypatch):
+async def test_checkout_state(client, db, monkeypatch):
     staff, club = await seed(client, db)
     _mute_club_event(monkeypatch)
     loan, _ = await make_loan(db, club.id, eq_name="無線麥克風", needs_serial=True, qty=2)
     url = f"/api/v1/staff/equipment-loans/{loan.id}/checkout"
 
-    # 序號驗證:缺件 / 空白 / 多給 / 少給 / 重複 → 422
-    for serials in (None, ["A1", "   "], ["A1", "A2", "A3"], ["A1"], ["A1", " A1"]):
-        payload = {"borrower_name": "陳借用"}
-        if serials is not None:
-            payload["serials"] = serials
-        resp = await client.post(url, json=payload, headers=csrf_headers(client))
-        assert resp.status_code == 422, serials
     # 借用人空白 → 422
     resp = await client.post(
-        url, json={"borrower_name": "  ", "serials": ["A1", "A2"]}, headers=csrf_headers(client)
+        url, json={"borrower_name": "  "}, headers=csrf_headers(client)
     )
     assert resp.status_code == 422
 
+    # 序號不再由系統記錄:依序點交的器材照樣點交得掉,多送的欄位一律忽略
     resp = await client.post(
         url,
-        json={"borrower_name": "陳借用", "serials": [" A1 ", "A2"]},
+        json={"borrower_name": "陳借用"},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 200, resp.text
@@ -340,11 +334,10 @@ async def test_checkout_serials_and_state(client, db, monkeypatch):
     assert data["status"] == "checked_out"
     assert data["borrower_name"] == "陳借用"
     assert data["club_name"] == club.name
-    # 歸還點交要照借出登記的序號核對,借出點交要聯絡得到申請人
-    assert data["serials"] == ["A1", "A2"]
+    assert "serials" not in data
+    # 借出點交要聯絡得到申請人
     assert data["phone"] == "0912-345678"
     await db.refresh(loan)
-    assert loan.serials == ["A1", "A2"]  # 序號去空白後入庫
     assert loan.checkout_by == staff.id
     assert loan.checkout_at is not None
     audit_row = await db.scalar(
@@ -355,25 +348,18 @@ async def test_checkout_serials_and_state(client, db, monkeypatch):
     # 已借出再點交 → 409
     resp = await client.post(
         url,
-        json={"borrower_name": "陳借用", "serials": ["A1", "A2"]},
+        json={"borrower_name": "陳借用"},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 409
 
-    # 一般點交:不收序號;成功後 serials 保持空
+    # 一般點交
     plain, _ = await make_loan(db, club.id, eq_name="延長線")
     plain_url = f"/api/v1/staff/equipment-loans/{plain.id}/checkout"
-    resp = await client.post(
-        plain_url, json={"borrower_name": "林領用", "serials": ["S1"]},
-        headers=csrf_headers(client),
-    )
-    assert resp.status_code == 422
     resp = await client.post(
         plain_url, json={"borrower_name": "林領用"}, headers=csrf_headers(client)
     )
     assert resp.status_code == 200
-    await db.refresh(plain)
-    assert plain.serials is None
 
     # 待審單不可點交 → 409;不存在 → 404
     pending, _ = await make_loan(db, club.id, status="pending", eq_name="椅子")

@@ -80,7 +80,6 @@ export interface StaffLoan {
   purpose: string
   phone: string // 申請時填的聯絡人電話(手動借用可能為空)
   borrower?: string // 借出點交時登記
-  serials: string[] // 借出時逐件登記的序號(歸還點交照這份核對)
   overdue: boolean
   due: string // 應歸還時限 YYYY/MM/DD HH:mm(結束日之隔天上班日;後端推導)
   daysLate: number // 已逾天數(台北時區日差;未逾期為 0)
@@ -98,7 +97,6 @@ interface StaffLoanOut {
   phone: string | null
   status: string
   borrower_name: string | null
-  serials: string[] | null
   overdue: boolean
   overdue_deadline: string | null
 }
@@ -122,7 +120,6 @@ const toLoan = (l: StaffLoanOut): StaffLoan => ({
   purpose: l.purpose,
   phone: l.phone ?? '',
   borrower: l.borrower_name ?? undefined,
-  serials: l.serials ?? [],
   overdue: l.overdue,
   due: l.overdue_deadline ? dayjs(l.overdue_deadline).format('YYYY/MM/DD HH:mm') : '',
   daysLate: l.overdue_deadline ? daysLate(l.overdue_deadline) : 0,
@@ -206,10 +203,10 @@ export function useStaffMutations() {
     onSuccess: invalidate,
   })
   const checkout = useMutation({
-    mutationFn: ({ id, borrower, serials }: { id: number; borrower: string; serials?: string[] }) =>
+    mutationFn: ({ id, borrower }: { id: number; borrower: string }) =>
       api<StaffLoanOut>(`/staff/equipment-loans/${id}/checkout`, {
         method: 'POST',
-        body: JSON.stringify({ borrower_name: borrower, serials }),
+        body: JSON.stringify({ borrower_name: borrower }),
       }),
     onSuccess: invalidate,
   })

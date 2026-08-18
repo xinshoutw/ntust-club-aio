@@ -270,7 +270,6 @@ export interface EquipmentLoanRecord {
   endDate: string
   purpose: string
   status: StatusKey
-  serials?: string[]
   borrower?: string
   returnedBy?: string
 }
@@ -288,7 +287,6 @@ interface EquipmentLoanOut {
   end_date: string
   purpose: string
   status: LoanStatusOut
-  serials: string[] | null
   borrower_name: string | null
   returner_name: string | null
   overdue: boolean
@@ -305,7 +303,6 @@ export const toEquipmentLoan = (l: EquipmentLoanOut): EquipmentLoanRecord => ({
   endDate: fromIso(l.end_date),
   purpose: l.purpose,
   status: l.overdue ? 'overdue' : l.status,
-  serials: l.serials ?? undefined,
   borrower: l.borrower_name ?? undefined,
   returnedBy: l.returner_name ?? undefined,
 })

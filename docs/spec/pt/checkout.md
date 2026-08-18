@@ -17,13 +17,13 @@
 
 表格:社團、器材(含數量)、借用區間、點交方式(一般 / 依序點交)。點列開 Modal。
 
-Modal:器材與數量、借用區間、申請時填的用途與聯絡電話、借用人姓名輸入;`needs_serial` 的器材另逐件列出序號輸入框(件數 = `qty`)。底部只有「確認借出」一顆鈕。
+Modal:器材與數量、借用區間、申請時填的用途與聯絡電話、借用人姓名輸入;`needs_serial` 的器材另顯示一則提醒,請工讀生現場逐件核對機身序號。底部只有「確認借出」一顆鈕。
 
 ## 規則
 
 - 排序依起借日升冪(即將領用在前)
 - 狀態轉移 `approved` → `checked_out`;不需 advisory lock —— 核准時已佔用區間額度,點交不改變佔用量
-- 序號規則:`needs_serial=true` 時件數必須等於 `qty` 且不得空白或重複(`SERIALS_REQUIRED` / `SERIALS_DUPLICATED`);`false` 時傳序號會被拒(`SERIALS_NOT_ALLOWED`)
+- **序號不入系統**:`needs_serial` 只驅動點交畫面的核對提醒,系統不記錄任何序號值(decisions.md ISS-55b)
 - 完成後推 Discord 給該社;行政手動借用(`club_id` 為 NULL)顯示「學務處」且不推通知
 
 ## 未完成 / 問題

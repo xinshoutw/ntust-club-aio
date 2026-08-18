@@ -68,26 +68,16 @@ class StaffEquipmentLoanOut(BaseModel):
     phone: str | None = None  # 申請時填的聯絡人電話
     status: LoanStatus
     borrower_name: str | None = None  # 借出點交時登記
-    # 借出時逐件登記的序號(歸還點交照這份核對);非依序點交的器材為 NULL
-    serials: list[str] | None = None
     overdue: bool = False  # 推導:結束日之隔天上班日 10:30 未歸還
     overdue_deadline: dt.datetime | None = None  # 應歸還時限(台北時區;推導不儲存)
 
 
 class CheckoutIn(BaseModel):
-    """借出點交:依序點交器材須帶 serials(len==qty、逐件非空;端點檢核)。"""
+    """借出點交。器材序號不由系統記錄,見 docs/decisions.md ISS-55b。"""
 
     borrower_name: str = Field(min_length=1, max_length=50)
-    serials: list[str] = Field(default_factory=list, max_length=200)
 
     _borrower = field_validator("borrower_name")(_strip_required)
-
-    @field_validator("serials")
-    @classmethod
-    def _serials(cls, v: list[str]) -> list[str]:
-        if any(len(s) > 50 for s in v):
-            raise ValueError("序號長度不得超過 50 字")
-        return v
 
 
 class CheckinIn(BaseModel):

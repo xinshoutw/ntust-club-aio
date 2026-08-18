@@ -68,3 +68,13 @@ def test_staff_text_uses_the_format_the_form_reads():
 def test_cc_import_exposes_a_main_entry():
     """教室借用系統匯入腳本要能被 import(sys.path 與 app 匯入順序容易寫壞)。"""
     assert callable(cc_import.main)
+
+
+def test_unresolvable_booking_units_are_kept_as_office_bookings():
+    """舊系統 960 筆 `club_id` 是空字串。欄位沒填不代表那張單不存在 ——
+    丟掉等於整段借用歷史憑空少一塊(decisions.md MIG-03)。"""
+    lookup = {"dance": 7}
+    assert cc_import.resolve_club(lookup, "dance") == 7
+    # 空字串 / None / admin / 8 開頭偽帳號 / 認不出來的:一律留下來,掛「學務處」
+    for raw in ("", None, "admin", "80001", "who-is-this"):
+        assert cc_import.resolve_club(lookup, raw) is None

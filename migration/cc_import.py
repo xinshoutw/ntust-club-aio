@@ -25,6 +25,7 @@ sys.path.insert(0, str(MIGRATION_DIR))
 
 import pymysql
 import sqlalchemy as sa
+from cms_import import IdMap
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import async_session_factory
@@ -36,7 +37,6 @@ from app.models.enums import (
     UserRole,
     VenueCategory,
 )
-from cms_import import IdMap
 
 TAIPEI = ZoneInfo("Asia/Taipei")
 PERIOD_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "A", "B", "C", "D"]
@@ -123,17 +123,15 @@ async def build_activity_lookup(db: AsyncSession) -> dict[str, int]:
     return {legacy: int(new) for legacy, new in rows.all()}
 
 
-def resolve_club(
-    club_lookup: dict[str, int], raw: str | None
-) -> tuple[bool, int | None]:
-    """回 (可遷, club_id);行政借用=(True, None)、無法識別=(False, None)。"""
-    if not raw:
-        return False, None
-    if raw in club_lookup:
-        return True, club_lookup[raw]
-    if raw == "admin" or raw.startswith("8"):
-        return True, None  # 行政借用(含已移除的偽社團帳號):club NULL
-    return False, None
+def resolve_club(club_lookup: dict[str, int], raw: str | None) -> int | None:
+    """借用單位 → 新 club id;認不出來就回 None(顯示為「學務處」)。
+
+    舊系統的 `club_id` 有 960 筆是空字串。欄位沒填不代表那張單不存在 ——
+    丟掉等於整段借用歷史憑空少一塊,而歸「學務處」至少留得住場地與時間
+    (decisions.md MIG-03)。同理適用 `admin` 與已移除的 8 開頭偽社團帳號;
+    
+    """
+    return club_lookup.get(raw) if raw else None
 
 
 async def ensure_masters(
@@ -202,11 +200,11 @@ async def import_applies(
     for r in rows:
         status = BOOKING_STATUS_MAP.get(r["status"])
         targets = venue_ids.get(r["classroom_id"])
-        ok, club_id = resolve_club(club_lookup, r["club_id"])
+        club_id = resolve_club(club_lookup, r["club_id"])
         day = valid_date(r["date"])
         periods = periods_of(r)
-        if status is None or targets is None or day is None or not ok or not periods:
-            skipped += 1  # 壞日期/未知狀態/未知場地/無法識別的申請單位/無節次
+        if status is None or targets is None or day is None or not periods:
+            skipped += 1  # 壞日期/未知狀態/未知場地/無節次
             continue
         activity_id = act_lookup.get(r["activity_id"])
         purpose = (r["purpose"] or "").strip() or (r["activity"] or "").strip() or "(未填)"
@@ -232,7 +230,7 @@ async def import_applies(
             created += 1
         if created and created % 2000 == 0:
             print(f"  applies … {created}")
-    print(f"applies: 新增 {created} 筆場地借用、跳過 {skipped} 單(髒資料/無法識別)")
+    print(f"applies: 新增 {created} 筆場地借用、跳過 {skipped} 單(髒資料)")
 
 
 async def import_device_loans(
@@ -255,10 +253,10 @@ async def import_device_loans(
             skipped += 1
             continue
         status = LOAN_STATUS_MAP.get(head["status"])
-        ok, club_id = resolve_club(club_lookup, head["club_id"])
+        club_id = resolve_club(club_lookup, head["club_id"])
         start = valid_date(head["date"])
         end = valid_date(head["end_date"]) or start
-        if status is None or start is None or not ok:
+        if status is None or start is None:
             skipped += 1
             continue
         if end < start:
@@ -285,7 +283,7 @@ async def import_device_loans(
         await db.flush()
         ids.record(db, "DeviceLog", log["id"], "equipment_loans", loan.id)
         created += 1
-    print(f"device loans: 新增 {created} 筆器材借用、跳過 {skipped}(孤兒/髒資料/無法識別)")
+    print(f"device loans: 新增 {created} 筆器材借用、跳過 {skipped}(孤兒/髒資料)")
 
 
 async def main() -> None:

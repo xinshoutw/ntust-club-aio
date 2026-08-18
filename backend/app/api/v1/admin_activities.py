@@ -539,6 +539,10 @@ async def close_reject(
     _require_close_key(user)
 
     activity.status = ActivityStatus.APPROVED  # 退回 → 可修正後重送結案
+    # 退回即解鎖:結案已在期限內送到,補件的往返不該再被期限擋下 —— 否則社團為了
+    # 補一張照片還得先請行政解鎖(decisions.md D-05)。仍列在「逾期未結案」中,
+    # 只是不再屬於「鎖定」那一類
+    activity.close_unlocked = True
     _record(
         db,
         activity,

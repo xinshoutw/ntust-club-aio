@@ -401,6 +401,16 @@ async def test_close_review_flow(client, db):
         await db.scalar(sa.select(Activity.status).where(Activity.id == aid))
     ).value == "approved"
 
+    # 退回件不受結案期限限制:補件期間跨過期限也重送得了,不必請行政解鎖
+    from app.services.settings_service import get_setting
+
+    lock_months = int(await get_setting(db, "close_lock_months"))
+    long_past = date.today() - timedelta(days=31 * (lock_months + 1))
+    await db.execute(
+        sa.update(Activity).where(Activity.id == aid).values(date=long_past, end_date=long_past)
+    )
+    await db.commit()
+
     await login(client, "club01")
     resp = await client.post(
         f"/api/v1/club/activities/{aid}/close",

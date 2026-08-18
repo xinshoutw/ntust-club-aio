@@ -193,3 +193,32 @@ async def test_cannot_take_over_an_account_that_outranks_you(client, db):
     )
     assert resp.status_code == 200, resp.text
     assert plain.role is UserRole.ADMIN
+
+
+# ---- 檔案下載:看得到那一頁 = 下載得了那一頁的檔案(decisions.md D-02)----
+
+
+@pytest.mark.parametrize(
+    ("subject", "allowed", "denied"),
+    [
+        ("postal_change", "apostal", "acert"),
+        ("eval_upload", "aeval", "afiles"),
+        ("maintenance", "amaint", "apostal"),
+        ("activity", "aclose", "amaint"),
+    ],
+)
+def test_file_download_follows_the_page_that_shows_it(subject, allowed, denied):
+    assert permissions.can_download(subject, [allowed]) is True
+    assert permissions.can_download(subject, [denied]) is False
+
+
+def test_file_management_alone_downloads_nothing():
+    """檔案管理頁是「看磁碟怎麼被吃掉」,不是取得內容 —— 正是 ISS-23 的原始抱怨。"""
+    for subject in permissions.FILE_SUBJECT_KEYS:
+        assert permissions.can_download(subject, ["afiles"]) is False
+
+
+def test_unclassified_files_are_fail_closed():
+    """`subject_type` 認不得的檔案只有 super 下載得到,不落到「開放給所有管理員」。"""
+    assert permissions.can_download(None, ["afiles", "aeval", "apostal"]) is False
+    assert permissions.can_download("something_new", ["aeval"]) is False

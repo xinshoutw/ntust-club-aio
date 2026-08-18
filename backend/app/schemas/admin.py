@@ -474,3 +474,6 @@ class AdminFileOut(BaseModel):
     mime: str
     created_at: datetime
     archived: bool = False
+    # 本人能否下載此檔:檔案管理頁本身不含下載權,要看該類檔案的頁面權限(D-02)。
+    # 少了這欄,畫面只能一律給連結,按下去才吃 404
+    can_download: bool = False

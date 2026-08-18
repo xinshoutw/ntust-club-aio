@@ -315,7 +315,8 @@ async def test_download_scoped_to_own_club(client, db):
     club_b = await make_club(db, name="社B")
     owner = await make_user(db, username="club-a", club_id=club_a.id)
     await make_user(db, username="club-b", club_id=club_b.id)
-    await make_user(db, username="admin01", role="admin")
+    await make_user(db, username="admin01", role="admin", permissions=["aclose"])
+    await make_user(db, username="admin-files", role="admin", permissions=["afiles"])
 
     row = await file_service.save_upload(
         db,
@@ -324,6 +325,8 @@ async def test_download_scoped_to_own_club(client, db):
         module="reports",
         uploaded_by=owner.id,
         club_id=club_a.id,
+        subject_type="activity",
+        subject_id=1,
         slot="report_photo",
     )
     await db.commit()
@@ -338,8 +341,13 @@ async def test_download_scoped_to_own_club(client, db):
     await login(client, "club-b")
     assert (await client.get(url)).status_code == 404  # 他社檔案視同不存在
 
+    # 結案審核看得到活動照片
     await login(client, "admin01")
     assert (await client.get(url)).status_code == 200
+
+    # 檔案管理是「看磁碟怎麼被吃掉」,不是取得內容:下載仍需該類檔案的頁面權限
+    await login(client, "admin-files")
+    assert (await client.get(url)).status_code == 404
 
     assert (await client.get(f"/api/v1/files/{uuid.uuid4()}")).status_code == 404
 

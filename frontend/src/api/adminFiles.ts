@@ -43,6 +43,8 @@ export interface StoredFile {
   sizeMb: number
   date: string // 上傳日 YYYY/MM/DD
   archived: boolean // 已歸檔=行政備份後已離盤
+  /** 本人能否下載:檔案管理頁本身不含下載權,要看該類檔案的頁面權限(decisions.md D-02) */
+  canDownload: boolean
 }
 
 interface AdminFileOut {
@@ -54,6 +56,7 @@ interface AdminFileOut {
   mime: string
   created_at: string
   archived: boolean
+  can_download: boolean
 }
 
 const toFile = (f: AdminFileOut): StoredFile => ({
@@ -64,9 +67,10 @@ const toFile = (f: AdminFileOut): StoredFile => ({
   sizeMb: toMb(f.size),
   date: dayjs(f.created_at).format('YYYY/MM/DD'),
   archived: f.archived,
+  canDownload: f.can_download,
 })
 
-/** 通用下載端點(admin 對全部檔案可讀) */
+/** 通用下載端點;可讀與否由後端依檔案類型判定(decisions.md D-02) */
 export const fileDownloadUrl = (id: string): string => `${API_BASE}/files/${id}`
 
 const keys = {

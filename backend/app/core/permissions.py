@@ -83,6 +83,26 @@ VENUE_READ_KEYS = ("abooking", "asetting", "amanual", "arule")
 # GET /admin/equipment-loans 器材借用清單:借用審核、逾期追蹤
 LOAN_READ_KEYS = ("abooking", "aoverdue")
 
+# ---- 檔案下載:看得到那一頁 = 下載得了那一頁的檔案(decisions.md D-02)----
+#
+# 改這張表之前先想清楚:`afiles`(檔案管理)**刻意不在任何一列**。那頁的用途是
+# 看磁碟怎麼被吃掉、清理報修的大型影片,不是取得檔案內容 —— 讓它下載得到全部,
+# 就回到 ISS-23 原本的問題(只持檔案管理權限的人拿得到郵局存簿影本這類個資)。
+# `subject_type` 不在表內的檔案一律只有 super 下載得到(fail-closed)。
+FILE_SUBJECT_KEYS: dict[str, tuple[str, ...]] = {
+    # 活動申請附件與結案照片:三個會實際審閱活動的頁面
+    "activity": ("areview", "aclose", "aeval", "aclub"),
+    "maintenance": ("amaint", "aclub"),
+    "postal_change": ("apostal",),
+    "eval_upload": ("aeval",),
+    "violation": ("aviol",),
+}
+
+
+def can_download(subject_type: str | None, user_permissions: list[str]) -> bool:
+    """非 super 管理員能否下載此類檔案。"""
+    return any(k in user_permissions for k in FILE_SUBJECT_KEYS.get(subject_type or "", ()))
+
 
 def catalogue() -> list[dict[str, object]]:
     """供 `/auth/me` 送給前端;順序即權限彈窗的排列順序。"""

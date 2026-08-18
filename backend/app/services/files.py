@@ -22,6 +22,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session, SessionTransaction
 
+from app.core import permissions
 from app.core.config import settings
 from app.core.errors import AppError, not_found, rate_limited
 from app.core.rate_limit import upload_limiter
@@ -402,11 +403,17 @@ async def files_by_subject(
 
 
 async def can_access(db: AsyncSession, file: File, user: User) -> bool:
-    """權限邊界:admin 全通;staff 僅職務相關;club 只能取自己社團;
-    viewer 僅「被指派分組內社團」的評鑑上傳檔(2026-07-21 收緊)。"""
+    """權限邊界:admin 依檔案類型對應的頁面權限;staff 僅職務相關;club 只能取自己社團;
+    viewer 僅「被指派分組內社團」的評鑑上傳檔(2026-07-21 收緊)。
+
+    admin 原本一律放行,只持「檔案管理」權限的人因此拿得到郵局存簿影本這類個資。
+    現在對照 `core/permissions.FILE_SUBJECT_KEYS`,看得到那一頁才下載得了那一頁的檔案。
+    """
     match user.role:
         case UserRole.ADMIN:
-            return True
+            if user.is_super:
+                return True
+            return permissions.can_download(file.subject_type, user.permissions)
         case UserRole.STAFF:
             # 最小權限(資安審查結論,擴權須重審):工讀生職務=報修/違規/器材點交,
             # 郵局存簿、活動附件、評鑑上傳等敏感檔不開放

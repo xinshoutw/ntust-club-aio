@@ -14,7 +14,7 @@
 | 報修檔案 | `GET /admin/files?module=repair&page=&page_size=`(伺服器分頁,每頁 50,同為大小降冪) |
 | 大型檔案 | `GET /admin/files?module=&sort=&page=&page_size=`(伺服器分頁,每頁 50,預設依大小降冪;`module` 可重複帶多值) |
 | 刪除 | `DELETE /admin/files/{id}` |
-| 下載 | `GET /files/{id}` |
+| 下載 | `GET /files/{id}`(**本頁的權限不含下載**,見下方規則) |
 
 ## 畫面
 
@@ -26,6 +26,7 @@
 
 ## 規則
 
+- **看得到清單不等於看得到內容**(decisions.md D-02):下載要該類檔案所屬頁面的權限(`core/permissions.FILE_SUBJECT_KEYS`),`afiles` 本身不在任何一列 —— 這頁的用途是看磁碟怎麼被吃掉、清理報修影片,不是取得檔案。列表逐列回 `can_download`,不可下載者的圖示反灰並附說明,不給按了才 404 的連結
 - 模組由磁碟路徑前綴推導(`reports`/`eval`/`activities`/`postal`/`maintenance`)
 - 大型檔案的「全部模組」= 明列報修以外的四個模組交給後端篩(報修有專屬區);篩選與總數都由後端決定,換模組或換排序都回到第 1 頁,且不沿用上一份查詢結果
 - **只有報修檔案可直接刪除**,其餘依歸檔政策由系統管理(回 403)

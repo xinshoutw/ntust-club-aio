@@ -14,6 +14,7 @@ import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Query, Request
 
 from app.api.pagination import Pagination, parse_sort
+from app.core import permissions
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import forbidden, not_found, validation_error
 from app.models import Club, File
@@ -121,6 +122,7 @@ async def list_files(
 
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = await db.execute(query.offset(page.offset).limit(page.page_size))
+    may_download = user.is_super
     data = [
         AdminFileOut(
             id=f.id,
@@ -131,6 +133,8 @@ async def list_files(
             mime=f.mime,
             created_at=f.created_at,
             archived=f.archived_at is not None,
+            can_download=may_download
+            or permissions.can_download(f.subject_type, user.permissions),
         )
         for f, club_name in rows
     ]

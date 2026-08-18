@@ -9,7 +9,54 @@ import pytest
 from app.core import permissions
 from tests.conftest import csrf_headers, login, make_user
 
-# 原本僅 super 可達的頁面:各自的讀取端點 → 現在的權限鍵
+# 每頁「持該頁的鍵就必須讀得到」的端點,取自各頁 spec 的「資料來源」表。
+#
+# 只驗頁面本身的入口是不夠的:第一版就只列了五支剛好有 GET 的端點,結果
+# amanual / arule / aoverdue / asetting 四頁「門開得了、門後一片空白」全部測不到 ——
+# 那幾頁真正的資料來源(/admin/venues、/admin/equipment-loans、/admin/clubs)
+# 還綁在 abooking 或 is_super 上。新增行政頁時請把該頁 spec 列的每一支 GET 都加進來。
+PAGE_READS: list[tuple[str, str]] = [
+    ("areview", "/api/v1/admin/activities?status=pending_advisor"),
+    ("aclose", "/api/v1/admin/activities?status=closing_pending_advisor"),
+    ("asignup", "/api/v1/admin/signup-items"),
+    ("aannounce", "/api/v1/admin/announcements"),
+    ("aannounce", "/api/v1/admin/clubs/options"),
+    ("abooking", "/api/v1/admin/venue-bookings"),
+    ("abooking", "/api/v1/admin/equipment-loans"),
+    ("abooking", "/api/v1/admin/venues"),
+    ("aroom", "/api/v1/admin/room-bookings"),
+    ("amanual", "/api/v1/admin/venues"),
+    ("amanual", "/api/v1/admin/equipment"),
+    ("arule", "/api/v1/admin/venues"),
+    ("arule", "/api/v1/admin/venue-rules"),
+    ("aclub", "/api/v1/admin/clubs/options"),
+    ("amember", "/api/v1/admin/clubs/options"),
+    ("aoverdue", "/api/v1/admin/equipment-loans?status=overdue"),
+    ("aoverdue", "/api/v1/admin/clubs"),
+    ("aeval", "/api/v1/admin/eval/clubs"),
+    ("aaccount", "/api/v1/admin/accounts"),
+    ("aaccount", "/api/v1/admin/clubs"),
+    ("aapply", "/api/v1/admin/officer-certificates"),
+    ("aapply", "/api/v1/admin/postal-changes"),
+    ("amaint", "/api/v1/admin/maintenance"),
+    ("aviol", "/api/v1/admin/violations"),
+    ("afiles", "/api/v1/admin/files"),
+    ("asetting", "/api/v1/admin/settings"),
+    ("asetting", "/api/v1/admin/venues?include_inactive=true"),
+    ("asetting", "/api/v1/admin/equipment"),
+    ("aaudit", "/api/v1/admin/audit"),
+]
+
+
+@pytest.mark.parametrize(("key", "url"), PAGE_READS)
+async def test_page_key_reads_everything_that_page_needs(client, db, key, url):
+    """持一把鍵就要讀得到該頁的全部資料;開得了門卻拿不到資料等於那把鍵沒用。"""
+    await make_user(db, username="holder", role="admin", permissions=[key])
+    await login(client, "holder")
+    assert (await client.get(url)).status_code == 200, f"{key} → {url}"
+
+
+# 原本僅 super 可達的頁面:換成鍵控之後,別頁的鍵一律進不來
 FORMERLY_SUPER = [
     ("/api/v1/admin/accounts", "aaccount"),
     ("/api/v1/admin/audit", "aaudit"),

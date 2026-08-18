@@ -14,6 +14,7 @@ import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 
 from app.api.pagination import Pagination, parse_sort
+from app.core import permissions
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, not_found
 from app.models import (
@@ -41,6 +42,8 @@ from app.services.settings_service import get_setting
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 BookingAdmin = Annotated[CurrentUser, Depends(require_permission("abooking"))]
+# 器材借用清單:借用審核頁與逾期追蹤頁共讀(core/permissions.LOAN_READ_KEYS)
+LoanReader = Annotated[CurrentUser, Depends(require_permission(*permissions.LOAN_READ_KEYS))]
 ManualAdmin = Annotated[CurrentUser, Depends(require_permission("amanual"))]
 
 _VENUE_SORTABLE = {
@@ -245,7 +248,7 @@ async def reject_venue_booking(
 
 @router.get("/equipment-loans")
 async def list_equipment_loans(
-    user: BookingAdmin,
+    user: LoanReader,
     db: DbDep,
     page: Pagination,
     sort: str | None = None,

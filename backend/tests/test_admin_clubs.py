@@ -18,7 +18,8 @@ async def seed(client, db):
         db,
         username="clubadmin",
         role="admin",
-        permissions=["aclub", "amember", "aclubset"],
+        # 這支測試檔涵蓋整個 /admin/clubs router,含只有帳號管理頁會呼叫的清單端點
+        permissions=["aclub", "amember", "aclubset", "aaccount"],
     )
     # 只讀得到名單、改不了設定的帳號(社團三頁各自一把鍵)
     await make_user(db, username="memberonly", role="admin", permissions=["amember"])
@@ -32,10 +33,13 @@ async def test_club_pages_have_separate_keys(client, db):
     club, _, _ = await seed(client, db)
     await login(client, "memberonly")
 
-    assert (await client.get(f"{URL}/{club.id}")).status_code == 200
+    # 成員列表頁要的就是名單本身
     assert (await client.get(f"{URL}/{club.id}/members")).status_code == 200
-    # 清單掛在「社團總覽/帳號管理/公告」那組讀者,成員列表也在其中
-    assert (await client.get(URL)).status_code == 200
+    assert (await client.get(f"{URL}/{club.id}/members/semesters")).status_code == 200
+    # 社團詳情(指導老師、聯絡信箱、停權原因)是總覽與管理項目的資料,名單頁讀不到;
+    # 全校社團清單(含帳號名與停權日)也只有帳號管理與逾期追蹤需要
+    assert (await client.get(f"{URL}/{club.id}")).status_code == 403
+    assert (await client.get(URL)).status_code == 403
 
     for resp in (
         await client.patch(

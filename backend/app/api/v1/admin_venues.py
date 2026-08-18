@@ -9,6 +9,7 @@ from typing import Annotated
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Request
 
+from app.core import permissions
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, forbidden, not_found, validation_error
 from app.models import Venue
@@ -20,18 +21,18 @@ router = APIRouter(prefix="/admin/venues", tags=["admin"])
 
 SettingAdmin = Annotated[CurrentUser, Depends(require_permission("asetting"))]
 # 列表另供場況圖與手動借用取列首名稱,權限維持 abooking(super 全通)
-BookingAdmin = Annotated[CurrentUser, Depends(require_permission("abooking"))]
+VenueReader = Annotated[CurrentUser, Depends(require_permission(*permissions.VENUE_READ_KEYS))]
 
 
 @router.get("")
 async def list_venues(
-    user: BookingAdmin, db: DbDep, include_inactive: bool = False
+    user: VenueReader, db: DbDep, include_inactive: bool = False
 ) -> ApiResponse[list[VenueMasterOut]]:
     """場地主檔(不分頁);預設只回啟用中,主檔維護頁帶 include_inactive=true 才看得到停用的。"""
     query = sa.select(Venue).order_by(Venue.sort, Venue.id)
     if include_inactive:
-        # 已停用的場地只有主檔維護視角需要,而那頁本來就限 super
-        if not user.is_super:
+        # 已停用的場地只有主檔維護視角需要 —— 那是系統設定頁的場地卡片
+        if not (user.is_super or "asetting" in user.permissions):
             raise forbidden()
     else:
         query = query.where(Venue.is_active.is_(True))

@@ -39,10 +39,11 @@ from app.services import audit
 router = APIRouter(prefix="/admin/clubs", tags=["admin"])
 
 # 社團三頁(總覽/成員列表/管理項目)各自一把鍵,唯讀資料共享
-ClubReader = Annotated[CurrentUser, Depends(require_permission(*permissions.CLUB_READ_KEYS))]
+ClubReader = Annotated[CurrentUser, Depends(require_permission(*permissions.CLUB_DETAIL_KEYS))]
 ClubLister = Annotated[CurrentUser, Depends(require_permission(*permissions.CLUB_LIST_KEYS))]
 # 寫入一律歸「管理項目」;重設社團密碼同此關(decisions.md ISS-25)
 ClubSettingAdmin = Annotated[CurrentUser, Depends(require_permission("aclubset"))]
+MemberReader = Annotated[CurrentUser, Depends(require_permission(*permissions.CLUB_MEMBER_KEYS))]
 # 最小社團選項對「任何管理員」開放(公告/行政分審核等獨立權限頁也要選社團)
 AnyAdmin = Annotated[CurrentUser, Depends(require_role(UserRole.ADMIN))]
 
@@ -296,7 +297,7 @@ async def reset_club_password(
 
 @router.get("/{club_id}/members/semesters")
 async def list_club_member_semesters(
-    club_id: int, user: ClubReader, db: DbDep
+    club_id: int, user: MemberReader, db: DbDep
 ) -> ApiResponse[list[str]]:
     """該社名單有資料的學期(新到舊),供學期下拉(比照社團端 /club/members/semesters)。"""
     await _club_or_404(db, club_id)
@@ -311,7 +312,7 @@ async def list_club_member_semesters(
 @router.get("/{club_id}/members")
 async def list_club_members(
     club_id: int,
-    user: ClubReader,
+    user: MemberReader,
     db: DbDep,
     page: Pagination,
     semester: str | None = Query(None, pattern=r"^\d{3}-[12]$"),

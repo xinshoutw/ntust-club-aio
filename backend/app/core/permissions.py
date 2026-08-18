@@ -59,11 +59,28 @@ STAGE_KEYS = frozenset(_STAGES)
 
 PERMISSION_KEYS = PAGE_KEYS | STAGE_KEYS
 
-# 社團三頁共用的唯讀資料(單一社團、成員名單):任一頁的權限都讀得到
-CLUB_READ_KEYS = ("aclub", "amember", "aclubset")
+# ---- 跨頁共用的讀取端點:誰真的需要,就只給誰 ----
+#
+# 一把鍵開得了頁面卻讀不到那頁的資料,等於那把鍵沒用;反過來給太寬,
+# 就是拿別頁的鍵讀得到不該看的資料。每一組都以「哪些頁面實際會呼叫」為準,
+# 對應的測試在 tests/test_admin_permissions.PAGE_READS。
 
-# 社團清單再多兩個讀者:帳號管理的社團分頁、公告的分眾選擇
-CLUB_LIST_KEYS = (*CLUB_READ_KEYS, "aaccount", "aannounce")
+# GET /admin/clubs 全校社團清單(含帳號名、啟用狀態、停權日):
+# 帳號管理的社團分頁、逾期追蹤的停權中清單。公告的分眾走 /clubs/options,不在此列
+CLUB_LIST_KEYS = ("aaccount", "aoverdue")
+
+# GET /admin/clubs/{id} 單一社團詳情(指導老師、聯絡信箱、停權原因)
+CLUB_DETAIL_KEYS = ("aclub", "aclubset", "aoverdue")
+
+# GET /admin/clubs/{id}/members 成員名單:成員列表頁專用,不含上面那些社團資料
+CLUB_MEMBER_KEYS = ("amember",)
+
+# GET /admin/venues 場地主檔:借用審核的篩選、系統設定的場地卡、
+# 手動借用與不開放規則的場地下拉。`include_inactive` 另限主檔維護頁
+VENUE_READ_KEYS = ("abooking", "asetting", "amanual", "arule")
+
+# GET /admin/equipment-loans 器材借用清單:借用審核、逾期追蹤
+LOAN_READ_KEYS = ("abooking", "aoverdue")
 
 
 def catalogue() -> list[dict[str, object]]:

@@ -66,6 +66,14 @@ DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— �
 
 ### 這一批踩到的坑
 
+**三輪跨模型審查共 61 條 findings**,絕大多數落在「漏掉的同類呼叫點」與「這批自己製造的問題」兩類 —— 與前幾批同一個分佈。以下是其中會真的出事的:
+
+- **加了旗標就要走完它的整條流程**:`--reset` 沒有 `return`,語意變成「清完立刻重匯」,於是下一支腳本的刪除被剛建好的借用單擋住(外鍵是 NO ACTION)—— **沒有任何順序能讓它跑完一次重置**,而重置正是那個旗標的全部目的
+- **錯誤碼要能穿過中間層**:`auth_request` 只認 2xx/401/403,其餘一律轉成 500。上傳前置閘回 507,使用者實際看到的是「HTTP 500」;改成 403 + `X-Upload-Gate` 標頭讓 nginx 換文案
+- **可調的設定值要對得上部署層的硬上限**:`upload_limits` 收到 1024MB 而 nginx 擋在 64m,承辦一調高就變成「畫面說 100MB、送出回超過上限」
+- **`assert callable(f)` 不是測試**:MIG-04/MIG-06 那兩條就是這樣寫的,所以上面那個 `--reset` 的死結一路過關
+- **通知補一半比不補更奇怪**:建立手動借用會推、撤銷不推;補登會通知社團、撤除不通知 —— 每一條「因為 X 所以要推」的理由,反向動作幾乎都同樣成立
+- **備份腳本的失敗路徑要自己收尾**:`> "$tmp"` 在指令跑之前就建檔,失敗留下的 `.part` 不會被 `*.dump` 的輪替比對到,一台正在失敗的機器會被自己的殘骸寫滿
 - **刪掉「唯一一份」常數之前先 grep 整個前端**:ISS-86 第一版只清了 `api/bookings.ts`,`api/adminBookings.ts` 還有一份完整的節次軸複製(名字叫 `PERIOD_ORDER`),而 AGENTS.md 已經改寫成「只有後端一份」。跨模型審查抓到
 - **拿不到值就不要用預設值頂替**:`bookingStartAt` 查不到節次時回 `'00:00'`,等於把每張單都算成「凌晨就開始了」→ 取消鈕全部消失。改回 invalid,讓「算不出來」走到「還沒開始」那一側(後端會再擋一次)
 - **斷點量的是 viewport,表格拿到的是 viewport − 304px**:側欄 240 + shell padding 64。照 xl/lg 收欄的話,1200px 筆電上姓名與職稱各剩不到 60px —— 隱藏欄位機制本來就是為了避免這件事。門檻要各升一級(xxl / xl)
@@ -202,7 +210,7 @@ DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— �
 
 ## 驗證現況(2026-08-20 實測)
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **433 passed**(含 `test_migrations.py`:另開一個庫跑 `alembic upgrade head`,比對欄位、索引名與 CHECK 名 —— 後兩者是子集斷言,擋的是「模型有、revision 漏了」);`ruff check .` 全綠
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **445 passed**(含 `test_migrations.py`:另開一個庫跑 `alembic upgrade head`,比對欄位、索引名與 CHECK 名 —— 後兩者是子集斷言,擋的是「模型有、revision 漏了」);`ruff check . ../migration` 全綠(CI 現在也 lint `migration/`)
 - 前端 `pnpm exec tsc -b --force` → 0 錯;`pnpm test` → **117 passed**(27 檔);`pnpm run lint` → **8** 個 fast-refresh warning(全為既有的 `only-export-components` 類)
 - `git log --all` 確認 `.env` 與 `migration/out` 從未進版控
 - 本批每一個 commit 都做過 mutation 驗證:把修法改回舊寫法,確認新測試真的會紅

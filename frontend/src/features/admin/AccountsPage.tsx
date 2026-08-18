@@ -18,6 +18,7 @@ import {
 } from '../../api/adminAccounts'
 import { useAdminClubMutations, useAdminClubs, type AdminClub } from '../../api/adminClubs'
 import { useAuth } from '../../app/auth'
+import { canAccessAdminPath } from '../../lib/permissions'
 import type { AdminPage } from '../../api/auth'
 
 // 權限彈窗以外的既有鍵(簽核關卡)僅供顯示;儲存時原樣保留
@@ -99,6 +100,8 @@ export default function AccountsPage() {
   // 非最高權限只授得出自己也持有的鍵(後端 _check_grantable 同一條規則),
   // 勾不到的直接反灰,不要讓人按了儲存才吃 403
   const grantable = (key: string) => me?.isSuper === true || me?.permissions.includes(key) === true
+  // 社團分頁的三個動作打的是 /admin/clubs 的寫入端點,歸「社團管理項目」
+  const canClubSettings = canAccessAdminPath(me, '/admin/club-settings')
 
   // 權限設定彈窗:草稿受控,按「儲存」才生效;未存關閉須確認
   const [permTarget, setPermTarget] = useState<Account | null>(null)
@@ -492,18 +495,39 @@ export default function AccountsPage() {
                 )}
               </td>
               <td className="r" style={{ whiteSpace: 'nowrap' }}>
-                {c.username != null ? (
-                  <button type="button" className="link-btn" onClick={() => askResetClubPassword(c)}>
-                    重設密碼
-                  </button>
-                ) : (
-                  <button type="button" className="link-btn" onClick={() => openClubAccountModal(c)}>
-                    建立帳號
-                  </button>
-                )}
-                <button type="button" className="link-btn" onClick={() => toggleClubActive(c)}>
-                  {c.isActive ? '停用' : '啟用'}
-                </button>
+                {/* 這三個動作歸「社團管理項目」那把鍵(decisions.md ISS-25);
+                    沒有就反灰,不要讓人按了才吃 403 —— 與本頁權限勾選框同一條規則 */}
+                <Tooltip title={canClubSettings ? undefined : '需要「社團管理項目」權限'}>
+                  <span>
+                    {c.username != null ? (
+                      <button
+                        type="button"
+                        className="link-btn"
+                        disabled={!canClubSettings}
+                        onClick={() => askResetClubPassword(c)}
+                      >
+                        重設密碼
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="link-btn"
+                        disabled={!canClubSettings}
+                        onClick={() => openClubAccountModal(c)}
+                      >
+                        建立帳號
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="link-btn"
+                      disabled={!canClubSettings}
+                      onClick={() => toggleClubActive(c)}
+                    >
+                      {c.isActive ? '停用' : '啟用'}
+                    </button>
+                  </span>
+                </Tooltip>
               </td>
             </tr>
           ))}

@@ -1,5 +1,7 @@
 from datetime import date
 
+import sqlalchemy as sa
+
 from app.models import Announcement, MaintenanceRequest, OfficerCertificate, Violation
 from app.models.enums import CertPosition
 from tests.conftest import csrf_headers, login, make_club, make_user
@@ -445,3 +447,99 @@ async def test_expired_takeover_is_excluded(client, db):
 
     rows = (await client.get("/api/v1/club/announcements?takeover=true")).json()["data"]
     assert rows == []
+
+
+async def test_evidenceless_rows_are_visible_and_can_still_be_completed(client, db):
+    """兩段式送出的第二步失敗時,單子已建立而附件沒上去。
+
+    列表逐列回 attachment_count,社團才有補傳入口 —— 沒有的話只能再送一張新單,
+    系統累積無佐證的重複單(decisions.md D-06)。已完成的單不再收附件。
+    """
+    import io
+
+    from app.models.enums import MaintenanceStatus
+
+    await setup_session(client, db)
+    resp = await client.post(
+        "/api/v1/club/maintenance",
+        json={"location": "社辦 B1", "items": "冷氣不冷"},
+        headers=csrf_headers(client),
+    )
+    request_id = resp.json()["data"]["id"]
+
+    rows = (await client.get("/api/v1/club/maintenance")).json()["data"]
+    assert [r["attachment_count"] for r in rows] == [0]
+
+    png = b"\x89PNG\r\n\x1a\n" + b"0" * 64
+    up = await client.post(
+        f"/api/v1/club/maintenance/{request_id}/evidence",
+        files={"file": ("a.png", io.BytesIO(png), "image/png")},
+        headers=csrf_headers(client),
+    )
+    assert up.status_code == 201, up.text
+    rows = (await client.get("/api/v1/club/maintenance")).json()["data"]
+    assert [r["attachment_count"] for r in rows] == [1]
+
+    # 已完成的單不收補傳:補傳入口是給第二步失敗的單用的
+    await db.execute(
+        sa.update(MaintenanceRequest)
+        .where(MaintenanceRequest.id == request_id)
+        .values(status=MaintenanceStatus.DONE)
+    )
+    await db.commit()
+    late = await client.post(
+        f"/api/v1/club/maintenance/{request_id}/evidence",
+        files={"file": ("b.png", io.BytesIO(png), "image/png")},
+        headers=csrf_headers(client),
+    )
+    assert late.status_code == 422
+
+
+async def test_postal_rows_report_whether_the_passbook_arrived(client, db):
+    """郵局異動同理:存簿影本沒上去的單要看得出來、補得回去(decisions.md D-06)。"""
+    import io
+
+    from app.models import PostalAccountChange
+    from app.models.enums import ApplicationStatus
+
+    await setup_session(client, db)
+    resp = await client.post(
+        "/api/v1/club/postal-changes",
+        json={"reasons": ["印鑑變更"], "account_name": "熱舞社"},
+        headers=csrf_headers(client),
+    )
+    change_id = resp.json()["data"]["id"]
+    rows = (await client.get("/api/v1/club/postal-changes")).json()["data"]
+    assert [r["attachment_count"] for r in rows] == [0]
+
+    jpg = b"\xff\xd8\xff\xe0" + b"\x00" * 64
+    up = await client.post(
+        f"/api/v1/club/postal-changes/{change_id}/passbook",
+        files={"file": ("存簿.jpg", io.BytesIO(jpg), "image/jpeg")},
+        headers=csrf_headers(client),
+    )
+    assert up.status_code == 201, up.text
+    rows = (await client.get("/api/v1/club/postal-changes")).json()["data"]
+    assert [r["attachment_count"] for r in rows] == [1]
+
+    # 已完成的單不收補傳(另開一張沒附件的單,才不會被「已有存簿影本」那條先擋掉)
+    other = (
+        await client.post(
+            "/api/v1/club/postal-changes",
+            json={"reasons": ["結清銷戶"]},
+            headers=csrf_headers(client),
+        )
+    ).json()["data"]["id"]
+    await db.execute(
+        sa.update(PostalAccountChange)
+        .where(PostalAccountChange.id == other)
+        .values(status=ApplicationStatus.COMPLETED)
+    )
+    await db.commit()
+    late = await client.post(
+        f"/api/v1/club/postal-changes/{other}/passbook",
+        files={"file": ("又一張.jpg", io.BytesIO(jpg), "image/jpeg")},
+        headers=csrf_headers(client),
+    )
+    assert late.status_code == 422
+    assert "已完成" in late.json()["error"]

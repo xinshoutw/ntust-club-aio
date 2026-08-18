@@ -4,6 +4,7 @@ import LoadingBlock from '../../components/ui/LoadingBlock'
 import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
 import AttachmentArea, { type BagFile } from '../../components/ui/AttachmentArea'
+import AttachmentRetryModal from './AttachmentRetryModal'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols } from '../../components/ui/tableControls'
@@ -42,7 +43,9 @@ export default function MaintenancePage() {
   // 正在申請=未完成全部、最近申請=已完成近 5 筆,兩份都由後端篩好
   const activeRows = listQuery.data?.records ?? []
   const recentRows = recentQuery.data ?? []
-  const { submit } = useMaintenanceMutations()
+  const { submit, addEvidence } = useMaintenanceMutations()
+  // 佐證沒上去的單:給補傳入口,不要讓社團再送一張新的(decisions.md D-06)
+  const [retryId, setRetryId] = useState<number | null>(null)
 
   // 上限以後端組態為權威:載入完成前不開放操作(比照 ActivityFormPage),
   // 不做前端 fallback 常數,避免組態調整後兩邊說法不一
@@ -126,12 +129,13 @@ export default function MaintenancePage() {
         <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>正在報修</div>
         <LoadingBlock pending={listQuery.isPending}>
           <table className="tb fixed" aria-label="空間報修紀錄" style={{ minWidth: 620 }}>
-            <Cols widths={['auto', 110, 100]} />
+            <Cols widths={['auto', 110, 100, 96]} />
             <thead>
               <tr>
                 <th scope="col">報修內容</th>
                 <th scope="col">申請日期</th>
                 <th scope="col">狀態</th>
+                <th scope="col">佐證</th>
               </tr>
             </thead>
             <tbody>
@@ -146,18 +150,27 @@ export default function MaintenancePage() {
                   </td>
                   <td className="num" style={{ fontSize: 13 }}>{r.date}</td>
                   <td><StatusPill status={r.status} /></td>
+                  <td>
+                    {r.attachmentCount > 0 ? (
+                      <span className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>{r.attachmentCount} 個</span>
+                    ) : (
+                      <button type="button" className="link-btn" style={{ padding: 0, color: '#C13B34' }} onClick={() => setRetryId(r.id)}>
+                        補傳佐證
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
               {listQuery.isError && (
                 <tr className="no-hover">
-                  <td colSpan={3}>
+                  <td colSpan={4}>
                     <QueryError compact title="報修紀錄載入失敗" error={listQuery.error} onRetry={() => listQuery.refetch()} />
                   </td>
                 </tr>
               )}
               {!listQuery.isPending && !listQuery.isError && activeRows.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={3} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有進行中的申請</td>
+                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有進行中的申請</td>
                 </tr>
               )}
             </tbody>
@@ -207,6 +220,27 @@ export default function MaintenancePage() {
           </table>
         </LoadingBlock>
       </div>
+
+      <AttachmentRetryModal
+        open={retryId != null}
+        title="補傳佐證照片 / 影片"
+        accept={`${IMAGE_ACCEPT},video/*`}
+        hint="拖放圖片或影片檔案"
+        validate={makeValidateEvidence(config.imgBytes, config.videoBytes)}
+        maxTotalBytes={config.maintenanceBytes}
+        maxCount={5}
+        uploading={addEvidence.isPending}
+        onUpload={async (files) => {
+          try {
+            await addEvidence.mutateAsync({ id: retryId as number, files })
+            message.success('佐證已補傳')
+          } catch (e) {
+            message.error(e instanceof Error ? e.message : '上傳失敗')
+            throw e
+          }
+        }}
+        onClose={() => setRetryId(null)}
+      />
     </div>
   )
 }

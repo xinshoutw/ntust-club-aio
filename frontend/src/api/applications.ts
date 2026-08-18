@@ -41,6 +41,8 @@ export interface MaintenanceRecord {
   date: string
   status: StatusKey
   handleNote?: string
+  /** 0 = 佐證還沒上去,列表給補傳入口(decisions.md D-06) */
+  attachmentCount: number
 }
 
 interface MaintenanceOut {
@@ -50,6 +52,7 @@ interface MaintenanceOut {
   status: 'pending' | 'in_progress' | 'done'
   handle_note: string | null
   created_at: string
+  attachment_count: number
 }
 
 const toMaintenance = (m: MaintenanceOut): MaintenanceRecord => ({
@@ -59,6 +62,7 @@ const toMaintenance = (m: MaintenanceOut): MaintenanceRecord => ({
   date: dayjs(m.created_at).format('YYYY/MM/DD'),
   status: m.status,
   handleNote: m.handle_note ?? undefined,
+  attachmentCount: m.attachment_count,
 })
 
 /** 未完成的報修(不限長度,全部列出);狀態由後端篩 */
@@ -91,6 +95,13 @@ export interface MaintenanceInput {
 
 export function useMaintenanceMutations() {
   const qc = useQueryClient()
+  /** 補傳佐證:第二步失敗留下的無佐證單,不必再送一張新的 */
+  const addEvidence = useMutation({
+    mutationFn: async ({ id, files }: { id: number; files: File[] }) => {
+      for (const f of files) await uploadFile(`/club/maintenance/${id}/evidence`, f)
+    },
+    onSettled: () => void qc.invalidateQueries({ queryKey: keys.maintenance }),
+  })
   const submit = useMutation({
     mutationFn: async ({ location, items, files }: MaintenanceInput) => {
       const row = await api<MaintenanceOut>('/club/maintenance', {
@@ -111,7 +122,7 @@ export function useMaintenanceMutations() {
     // 主體建立後不論佐證成敗,列表都已變動
     onSettled: () => void qc.invalidateQueries({ queryKey: keys.maintenance }),
   })
-  return { submit }
+  return { submit, addEvidence }
 }
 
 // ---- 郵局帳戶異動 ----
@@ -131,6 +142,8 @@ const REASON_TO_LABEL: Record<string, string> = Object.fromEntries(
 
 export interface PostalRecord {
   id: number
+  /** 0 = 存簿影本還沒上去,列表給補傳入口(decisions.md D-06) */
+  attachmentCount: number
   reasons: string[]
   accountName?: string
   accountNumber?: string
@@ -147,10 +160,12 @@ interface PostalChangeOut {
   new_agent_phone: string | null
   status: 'pending' | 'processing' | 'completed'
   created_at: string
+  attachment_count: number
 }
 
 const toPostal = (p: PostalChangeOut): PostalRecord => ({
   id: p.id,
+  attachmentCount: p.attachment_count,
   reasons: p.reasons.map((r) => REASON_TO_LABEL[r] ?? r),
   accountName: p.account_name ?? undefined,
   accountNumber: p.account_number ?? undefined,
@@ -193,6 +208,12 @@ export interface PostalInput {
 
 export function usePostalMutations() {
   const qc = useQueryClient()
+  /** 補傳存簿影本:第二步失敗留下的無附件單,不必再送一張新的 */
+  const addPassbook = useMutation({
+    mutationFn: ({ id, file }: { id: number; file: File }) =>
+      uploadFile(`/club/postal-changes/${id}/passbook`, file),
+    onSettled: () => void qc.invalidateQueries({ queryKey: keys.postal }),
+  })
   const submit = useMutation({
     mutationFn: async (b: PostalInput) => {
       const row = await api<PostalChangeOut>('/club/postal-changes', {
@@ -215,7 +236,7 @@ export function usePostalMutations() {
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: keys.postal }),
   })
-  return { submit }
+  return { submit, addPassbook }
 }
 
 // ---- 幹部證明 ----
@@ -262,6 +283,7 @@ interface OfficerCertOut {
   applicant_name: string
   status: 'pending' | 'processing' | 'completed'
   created_at: string
+  attachment_count: number
 }
 
 const toCertificate = (c: OfficerCertOut): CertificateRecord => ({

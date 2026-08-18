@@ -124,6 +124,23 @@ async def create_cert(
 # ---- 郵局帳戶異動 ----
 
 
+async def _attachment_counts(db, subject_type: str, ids: list[int]) -> dict[int, int]:
+    """逐單附件數(一次查完,不逐列查)。
+
+    判準與各自的上傳端點一致(都不看 archived_at):列表顯示的「還沒附」
+    要跟按下去之後上傳端點的答案是同一件事。
+    """
+    if not ids:
+        return {}
+    rows = await db.execute(
+        sa.select(File.subject_id, sa.func.count())
+        .where(File.subject_type == subject_type, File.subject_id.in_(ids))
+        .group_by(File.subject_id)
+    )
+    return dict(rows.all())
+
+
+
 def _postal_out(row: PostalAccountChange) -> PostalChangeOut:
     # 社團端申請紀錄顯示完整局號帳號(不遮罩);電話仍遮罩
     out = PostalChangeOut.model_validate(row)
@@ -146,8 +163,14 @@ async def list_postal(
     if status:
         query = query.where(PostalAccountChange.status.in_(status))
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
-    rows = await db.scalars(query.offset(page.offset).limit(page.page_size))
-    return ApiResponse(data=[_postal_out(r) for r in rows], meta=page.meta(total or 0))
+    rows = list(await db.scalars(query.offset(page.offset).limit(page.page_size)))
+    counts = await _attachment_counts(db, "postal_change", [r.id for r in rows])
+    data = []
+    for row in rows:
+        out = _postal_out(row)
+        out.attachment_count = counts.get(row.id, 0)
+        data.append(out)
+    return ApiResponse(data=data, meta=page.meta(total or 0))
 
 
 @router.post("/postal-changes", status_code=201)
@@ -184,6 +207,8 @@ async def upload_passbook(
     row = await db.get(PostalAccountChange, change_id)
     if row is None or row.club_id != user.club_id:
         raise not_found("找不到申請")
+    if row.status == ApplicationStatus.COMPLETED:
+        raise validation_error("此申請已完成,不可再上傳存簿影本")
     # 一張申請一份存簿影本(前端 maxCount=1);沒有上限的話,任何一張舊單都能被
     # 無限追加 50MB 的個資檔
     existing = await db.scalar(
@@ -226,10 +251,14 @@ async def list_maintenance(
     if status:
         query = query.where(MaintenanceRequest.status.in_(status))
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
-    rows = await db.scalars(query.offset(page.offset).limit(page.page_size))
-    return ApiResponse(
-        data=[MaintenanceOut.model_validate(r) for r in rows], meta=page.meta(total or 0)
-    )
+    rows = list(await db.scalars(query.offset(page.offset).limit(page.page_size)))
+    counts = await _attachment_counts(db, "maintenance", [r.id for r in rows])
+    data = []
+    for row in rows:
+        out = MaintenanceOut.model_validate(row)
+        out.attachment_count = counts.get(row.id, 0)
+        data.append(out)
+    return ApiResponse(data=data, meta=page.meta(total or 0))
 
 
 @router.post("/maintenance", status_code=201)
@@ -258,6 +287,8 @@ async def upload_evidence(
     row = await db.get(MaintenanceRequest, request_id)
     if row is None or row.club_id != user.club_id:
         raise not_found("找不到報修單")
+    if row.status == MaintenanceStatus.DONE:
+        raise validation_error("此報修單已完成,不可再上傳佐證")
     # 鎖報修列:同單並發上傳序列化,加總上限不被雙寫繞過
     await db.execute(
         sa.select(MaintenanceRequest.id)

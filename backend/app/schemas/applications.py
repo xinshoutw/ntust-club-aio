@@ -82,6 +82,9 @@ class PostalChangeOut(BaseModel):
     new_agent_phone: str | None  # 電話仍依決議 §6-11 遮罩(末 3 碼)
     status: ApplicationStatus
     created_at: datetime
+    # 0 = 存簿影本還沒上去(兩段式流程的第二步失敗):列表要給補傳入口,
+    # 否則社團只能再送一張新單(decisions.md D-06)
+    attachment_count: int = 0
 
 
 class MaintenanceIn(BaseModel):
@@ -98,6 +101,8 @@ class MaintenanceOut(BaseModel):
     status: MaintenanceStatus
     handle_note: str | None
     created_at: datetime
+    # 0 = 佐證還沒上去;同 PostalChangeOut.attachment_count
+    attachment_count: int = 0
 
 
 class ViolationOut(BaseModel):

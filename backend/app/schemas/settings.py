@@ -1,4 +1,4 @@
-"""系統設定(/admin/settings,僅 super)。
+"""系統設定(/admin/settings,權限鍵 asetting)。
 
 管理的鍵與 services/settings_service.DEFAULTS 對齊;PUT 為部分更新
 (僅寫入有帶的鍵),值以 JSON 存 system_settings(日期一律 ISO 字串)。

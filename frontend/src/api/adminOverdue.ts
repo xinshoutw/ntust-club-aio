@@ -1,4 +1,4 @@
-// 行政端逾期追蹤與停權(僅最高權限):歸還提醒、停權/解除;
+// 行政端逾期追蹤與停權(權限鍵 aoverdue):歸還提醒、停權/解除;
 // 逾期列表沿用 adminClubOverview 的 useAdminEquipmentLoanList({ status: 'overdue' })
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { type Dayjs } from 'dayjs'

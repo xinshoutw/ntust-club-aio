@@ -12,7 +12,7 @@
 
 帳號選單:
 - `club` — 設定(→ `/club-settings`)、登出
-- `admin` 且 super — 稽核紀錄(→ `/admin/audit`)、設定(→ `/admin/settings`)、登出。**這兩頁沒有側欄入口,只能從這裡進**
+- `admin` — 稽核紀錄(→ `/admin/audit`,鍵 `aaudit`)、設定(→ `/admin/settings`,鍵 `asetting`)、登出。**這兩頁沒有側欄入口,只能從這裡進**;兩個項目各自依 `canAccessAdminPath` 顯示
 - 其他 — 只有登出
 
 ## 通知鈴鐺

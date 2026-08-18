@@ -239,7 +239,7 @@ async def test_stage_only_account_visibility_is_scoped(client, db):
     assert listing["meta"]["total"] == 0
     assert (await client.get(f"/api/v1/admin/activities/{aid}")).status_code == 404
 
-    # 持 aact 的帳號可全覽
+    # 持 areview 的帳號可全覽
     await login(client, "advisor")
     assert (await client.get(f"/api/v1/admin/activities/{aid}")).status_code == 200
 
@@ -421,8 +421,8 @@ async def test_large_application_denied_by_default(client, db):
     assert data["is_large_approved"] is False
 
 
-async def test_review_permission_key_alias(client, db):
-    """前端權限彈窗鍵 areview 與既有 aact 皆可看審核列表(鍵名尚未統一)。"""
+async def test_review_page_key_lists_every_status(client, db):
+    """申請審核頁的鍵看得到全部狀態;只持簽核關卡鍵的帳號視野受限。"""
     await seed(client, db)
     aid = await submit_activity(client, db)
     await make_user(db, username="fe_reviewer", role="admin", permissions=["areview"])

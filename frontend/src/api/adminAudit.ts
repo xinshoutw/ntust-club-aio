@@ -1,4 +1,4 @@
-// 行政端稽核軌跡 API 層(僅 super,唯讀)。
+// 行政端稽核軌跡 API 層(權限鍵 aaudit,唯讀)。
 // 後端篩選為單值參數(user_id / role / action),UI 漏斗因此為單選(再點取消);
 // 動作/角色以標籤對照表轉中文顯示,未知鍵回退原始字串。
 import { keepPreviousData, useQuery } from '@tanstack/react-query'

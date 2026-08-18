@@ -1,4 +1,4 @@
-"""行政端:帳號管理(/admin/accounts,僅 super)。
+"""行政端:帳號管理(/admin/accounts,權限鍵 aaccount)。
 
 - 三類角色:管理員/工讀生/評審(社團帳號走 /admin/clubs:帳號管理「社團」分頁與管理項目皆可維護)
 - 建立與重設密碼:後端以密碼政策產生器產一次性密碼,僅該次 response 回傳明文,

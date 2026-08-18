@@ -16,7 +16,7 @@
 | 待審結案 | `/admin/close-review` | `aclose`/`approve_advisor` |
 | 待審固定借用 | `/admin/rooms` | `aroom` |
 | 待審臨時借用 | `/admin/bookings` | `abooking` |
-| 逾期未還器材 | `/admin/overdue` | super |
+| 逾期未還器材 | `/admin/overdue` | `aoverdue` |
 | 未銷案違規 | `/admin/violations` | `aviol` |
 
 ## 規則

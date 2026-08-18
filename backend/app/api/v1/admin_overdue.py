@@ -1,4 +1,4 @@
-"""行政端:逾期追蹤與停權管理(僅最高權限 require_permission)。
+"""行政端:逾期追蹤與停權管理(權限鍵 aoverdue)。
 
 - 逾期列表由 /admin/equipment-loans?status=overdue 支援(admin_bookings.py)
 - 提醒:Discord(全域+社團自設 webhook)+ Email(社團聯絡人);audit

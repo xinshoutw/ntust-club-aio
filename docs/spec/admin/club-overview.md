@@ -1,6 +1,6 @@
 # 社團總覽(行政端)
 
-`/admin/club-overview` · `admin` · 權限鍵 `amember` · `features/admin/ClubOverviewPage.tsx`
+`/admin/club-overview` · `admin` · 權限鍵 `aclub` · `features/admin/ClubOverviewPage.tsx`
 
 ## 用途
 
@@ -14,7 +14,7 @@
 
 | 區塊 | 端點 | 需要權限 |
 |---|---|---|
-| 基本資料 | `GET /admin/clubs/{id}` | `amember` |
+| 基本資料 | `GET /admin/clubs/{id}` | `aclub` |
 | 進行中活動 | `GET /admin/activities?club_id=&status=`(簽核中四種狀態) | `areview`/`aclose` |
 | 空間報修 | `GET /admin/maintenance?club_id=&status=`(待處理、處理中) | `amaint` |
 | 固定借用 | `GET /admin/room-bookings?club_id=&status=`(待審、已核准、已撤銷) | `aroom` |

@@ -20,7 +20,7 @@ interface AdminClubValue {
 const AdminClubContext = createContext<AdminClubValue | null>(null)
 
 export function AdminClubProvider({ children }: { children: ReactNode }) {
-  // 最小選項端點:所有管理員可讀,不綁 amember 權限
+  // 最小選項端點:所有管理員可讀,不綁任何頁面權限鍵
   const { data: clubs, isFetching } = useClubOptions()
   const [club, setClubState] = useState<string>(() => sessionStorage.getItem(STORAGE_KEY) ?? '')
 

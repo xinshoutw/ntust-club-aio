@@ -35,7 +35,7 @@
 
 - 受管鍵共 11 個(見 `admin_settings.MANAGED_KEYS`),`.env` 只放恆不變的連線與密鑰
 - 兩份主檔的「刪除」都是停用(`is_active=false`),避免既有借用單(場地另含不開放規則)的外鍵斷裂;每列 blur 有差異才 PATCH,離散控制(類別/借用型態/點交方式/啟用)變更即送
-- `GET /admin/venues` 一支兩用:預設只回啟用中(場況圖與手動借用的列首),主檔維護頁帶 `include_inactive=true`;讀取權限 `abooking`,新增與修改限 super
+- `GET /admin/venues` 一支兩用:預設只回啟用中(場況圖與手動借用的列首),主檔維護頁帶 `include_inactive=true`;讀取開給 `VENUE_READ_KEYS`(`abooking`/`asetting`/`amanual`/`arule`),`include_inactive` 與新增修改限 `asetting`
 - 違規項目與經費科目都不可存成空清單
 - 設定變更寫 `audit_logs`:逐鍵記改前改後值(清單型只記增減,值太長會截斷),值沒變的鍵不留紀錄
 

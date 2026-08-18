@@ -1,4 +1,4 @@
-// 系統設定 API 層(僅 super):GET/PUT /admin/settings,欄位對照 backend schemas/settings.py。
+// 系統設定 API 層(權限鍵 asetting):GET/PUT /admin/settings,欄位對照 backend schemas/settings.py。
 // 日期一律 ISO 字串存 system_settings;評鑑視窗以民國年推導採計區間
 // (year 116 → 2026/02/01–2027/01/31,即 start=(year+1910)-02-01、end=(year+1911)-01-31)。
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'

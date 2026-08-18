@@ -254,7 +254,7 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
   )
 }
 
-// 系統設定(system_settings):散落各流程的可調參數集中於此;僅 super 可調
+// 系統設定(system_settings):散落各流程的可調參數集中於此;權限鍵 asetting
 export default function AdminSettingsPage() {
   const settingsQuery = useSystemSettings()
 

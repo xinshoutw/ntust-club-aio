@@ -1,4 +1,4 @@
-// 行政端社團主檔 API 層(/admin/clubs,權限鍵 amember):
+// 行政端社團主檔 API 層(/admin/clubs;總覽 aclub、成員列表 amember、管理項目 aclubset):
 // snake_case ↔ camelCase 與日期(ISO → YYYY/MM/DD)轉換集中在此,頁面只碰 camelCase 型別;
 // 主檔列表不分頁(全校 <200 筆),供 ClubCascader/AdminClubContext/管理項目共用
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -124,7 +124,7 @@ export function useAdminClubs() {
   })
 }
 
-// ---- 最小社團選項(任何管理員可讀;跨頁選擇器共用,完整主檔仍限 amember) ----
+// ---- 最小社團選項(任何管理員可讀;跨頁選擇器共用,完整主檔另有權限)----
 
 /** 社團性質:對應後端 Club.attribute enum(GAP-11 未定案前無主檔表可查) */
 export const CLUB_ATTRIBUTES = ['自治性', '學藝性', '服務性', '聯誼性', '藝術性', '體育性'] as const

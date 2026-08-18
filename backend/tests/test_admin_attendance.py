@@ -101,7 +101,7 @@ async def test_mark_requires_signup_and_permission(client, db):
     )
     assert resp.status_code == 409
 
-    # 無 areg 權限的管理員 → 403
+    # 無 asignup 權限的管理員 → 403
     db.add(Signup(item_id=item.id, club_id=club.id))
     await db.commit()
     await login(client, "other")

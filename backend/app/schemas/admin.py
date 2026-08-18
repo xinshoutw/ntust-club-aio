@@ -226,7 +226,7 @@ class ApplicationStatusIn(BaseModel):
     status: ApplicationStatus
 
 
-# ---- 社團主檔管理(/admin/clubs,權限鍵 amember) ----
+# ---- 社團主檔管理(/admin/clubs;三頁三把鍵,見 core/permissions 的 CLUB_* 群組) ----
 
 
 class AdminClubOut(BaseModel):
@@ -328,7 +328,7 @@ class ClubAccountCreatedOut(BaseModel):
 
 
 class SuspendIn(BaseModel):
-    """停權管理(僅 super):寫 clubs.suspended_until / suspend_reason。"""
+    """停權管理(權限鍵 aoverdue):寫 clubs.suspended_until / suspend_reason。"""
 
     until: date
     reason: str = Field(min_length=1, max_length=500)

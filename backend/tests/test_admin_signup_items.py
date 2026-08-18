@@ -142,7 +142,7 @@ async def test_create_item_validations(client, db):
     )
     assert resp.status_code == 422
 
-    # 權限:無 areg 的管理員 → 403
+    # 權限:無 asignup 的管理員 → 403
     await make_user(db, username="other", role="admin", permissions=["areview"])
     await login(client, "other")
     resp = await client.post(URL, json=body(), headers=csrf_headers(client))
@@ -325,8 +325,8 @@ async def test_confirm_flow_for_review_based_item(client, db):
     assert detail["my_signup"]["confirmed"] is True
 
 
-async def test_frontend_permission_key_alias(client, db):
-    """前端權限彈窗鍵 asignup 與既有 areg 皆可用(鍵名尚未統一)。"""
+async def test_signup_page_key_opens_the_page(client, db):
+    """報名管理與報名活動建立共用 asignup 一把鍵。"""
     await seed(client, db)
     await make_user(db, username="fe_admin", role="admin", permissions=["asignup"])
     await login(client, "fe_admin")

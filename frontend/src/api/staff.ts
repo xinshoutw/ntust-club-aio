@@ -73,7 +73,7 @@ export interface StaffLoan {
   club: string // club_name null → 學務處(行政手動借用)
   manual: boolean // 行政手動借用:無社團可通知(逾期頁提醒鈕停用)
   equipment: string
-  needsSerial: boolean // 依序點交:逐件登記序號
+  needsSerial: boolean // 依序點交:點交畫面提醒現場核對序號(序號不入系統)
   qty: number
   start: string // YYYY/MM/DD
   end: string

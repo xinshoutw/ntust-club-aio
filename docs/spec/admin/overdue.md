@@ -12,7 +12,7 @@
 |---|---|
 | 逾期清單 | `GET /admin/equipment-loans?status=overdue`(伺服器端分頁,每頁 20) |
 | 停權中社團 | `GET /admin/clubs`(前端篩 `suspended_until`)+ 逐社 `GET /admin/clubs/{id}` 補 `suspend_reason`(列表的 `AdminClubOut` 不含此欄) |
-| 停權表單的社團選單 | `GET /admin/clubs/options`(`require_role(ADMIN)`,與列表的 `amember` 是不同權限) |
+| 停權表單的社團選單 | `GET /admin/clubs/options`(`require_role(ADMIN)`,不綁頁面鍵) |
 | 寄提醒 | `POST /admin/equipment-loans/{id}/remind` |
 | 停權 / 解除 | `POST\|DELETE /admin/clubs/{id}/suspend` |
 

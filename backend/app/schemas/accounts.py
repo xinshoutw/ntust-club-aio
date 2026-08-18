@@ -1,4 +1,4 @@
-"""帳號管理(/admin/accounts,僅 super)。
+"""帳號管理(/admin/accounts,權限鍵 aaccount)。
 
 管理員/工讀生/評審三類帳號;社團帳號走 /admin/clubs(帳號管理「社團」分頁與管理項目),不在此管理。
 """

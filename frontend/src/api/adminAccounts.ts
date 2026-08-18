@@ -1,4 +1,4 @@
-// 行政端帳號管理 API 層(僅 super):管理員/工讀生/評審三類。
+// 行政端帳號管理 API 層(權限鍵 aaccount):管理員/工讀生/評審三類。
 // 建立與重設密碼由後端產生一次性密碼(僅該次 response 回傳明文),前端交 OneTimePasswordModal 顯示。
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, apiPaged, qs } from './client'

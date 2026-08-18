@@ -1,4 +1,7 @@
-"""行政端:社團主檔管理(/admin/clubs,權限鍵 amember)。
+"""行政端:社團主檔管理(/admin/clubs)。
+
+社團總覽 `aclub`、成員列表 `amember`、管理項目 `aclubset` 三頁各一把鍵;
+共用的唯讀端點見 `core/permissions` 的 CLUB_LIST/DETAIL/MEMBER_KEYS。寫入一律歸 `aclubset`。
 
 - 列表不分頁(全校社團 <200 筆,供 ClubCascader/管理項目)
 - 詳情=社團自管資料唯讀呈現;webhook 只回是否已設定,不回實值
@@ -131,7 +134,7 @@ async def list_clubs(user: ClubLister, db: DbDep) -> ApiResponse[list[AdminClubO
 async def club_options(user: AnyAdmin, db: DbDep) -> ApiResponse[list[ClubOptionOut]]:
     """最小社團選項(僅 id/name/attribute):任何管理員可讀,供跨頁社團選擇器。
 
-    不得為此放寬含帳號、停權等敏感欄位的完整主檔(list_clubs 仍限 amember)。
+    不得為此放寬含帳號、停權等敏感欄位的完整主檔(list_clubs 仍限 CLUB_LIST_KEYS)。
     """
     rows = await db.scalars(sa.select(Club).order_by(Club.attribute, Club.name, Club.id))
     return ApiResponse(

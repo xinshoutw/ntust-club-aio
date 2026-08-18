@@ -1,6 +1,6 @@
 # 管理項目(行政端)
 
-`/admin/club-settings` · `admin` · 權限鍵 `amember` · `features/admin/AdminClubSettingsPage.tsx`
+`/admin/club-settings` · `admin` · 權限鍵 `aclubset` · `features/admin/AdminClubSettingsPage.tsx`
 
 ## 用途
 
@@ -35,6 +35,5 @@
 
 ## 未完成 / 問題
 
-- 社團帳號重設密碼只要 `amember`,但帳號管理頁的同類操作要 super,兩處門檻不一致
 - 社團「性質」(自治性/學藝性…)在本頁與 API 都改不了,只能動 DB
 - 停權與解除停權在逾期追蹤頁(權限鍵 `aoverdue`),本頁只顯示停權狀態不能操作

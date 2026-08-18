@@ -1,4 +1,4 @@
-// 器材主檔維護 API 層(僅 super):GET/POST/PATCH /admin/equipment。
+// 器材主檔維護 API 層(權限鍵 asetting;手動借用頁可讀):GET/POST/PATCH /admin/equipment。
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from './client'
 import { keys as bookingKeys } from './adminBookings'

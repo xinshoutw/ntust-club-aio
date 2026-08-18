@@ -139,8 +139,9 @@ export function applyOverrides(
 }
 
 // 行政資料總分上限 100(各項滿分合計 100,加分後仍以 100 計)、下限 0(decisions.md DEC-08)。
-// 後端 services/scoring.total_of 是同一條夾擠 —— 少了下限,勸導扣分夠多時畫面會顯示負分,
-// 而實際採計的是 0(最佳社團獎的 40%/60% 加權吃的是後端那份)
+// 本檔是 spec 指定的**可執行規格**,後端 services/scoring.total_of 照它實作 —— 兩份夾擠必須一致。
+// 畫面顯示的總分一律取後端回傳值(EvalDocsPage 讀 `data.total`),所以少了下限不會讓社團看到負分,
+// 壞掉的是「規格與實作等價」這件事本身
 export const ADMIN_TOTAL_MAX = 100
 export const totalOf = (scores: FinalScore[]): number =>
   Math.min(ADMIN_TOTAL_MAX, Math.max(0, scores.reduce((sum, s) => sum + s.final, 0)))

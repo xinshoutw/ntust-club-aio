@@ -33,7 +33,7 @@
 - 解除停權即清空兩個欄位
 - 停權與解除都寫 `audit_logs` 並推 Discord
 - **提醒不設次數上限**(decisions.md DEC-11):排程每上班日 10:35 掃一次,逾期當天寄第一封,仍未歸還者每 3 個上班日重寄到歸還為止(`scripts/send_overdue_reminders.py`,host cron)。人工提醒隨時可加寄,兩條路徑都會更新 `last_reminded_at`,列上看得到
-- **停權中的判定要比日期**:前端一律走 `lib/status.suspendedNow`(與後端攔截條件 `suspended_until >= today` 同一條)—— `suspended_until` 過期不會自動清空,裸 truthiness 會讓早就不再被擋的社團永遠掛在表上
+- **停權中的判定要比日期**:前端一律走 `lib/status.suspendedNow`,判準與後端攔截條件 `suspended_until >= today` 相同 —— `suspended_until` 過期不會自動清空,裸 truthiness 會讓早就不再被擋的社團永遠掛在表上。但前端比的是**瀏覽器本地日期**、後端比台北日期,不在 +08:00 的使用者在跨日那幾小時會看到兩邊不一致
 
 ## 未完成 / 問題
 

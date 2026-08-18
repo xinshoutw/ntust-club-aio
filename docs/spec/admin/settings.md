@@ -34,6 +34,7 @@
 ## 規則
 
 - 受管鍵共 11 個(見 `admin_settings.MANAGED_KEYS`),`.env` 只放恆不變的連線與密鑰
+- **受理期間一經收到申請就不能換學期**(`INTAKE_SEMESTER_LOCKED`):固定借用的目標學期由受理期間結束日推導,把 `open_until` 從 7/31 延到 8/1 這種「再開三天」會讓它跳到下一個學期 —— 已收到的申請存的是舊學期的起訖快照,每社 10 節額度會歸零、場況圖清空,連核准關的重疊檢核都因為兩段區間不重疊而擋不住雙重核准。同一個學期內調整不受限
 - 兩份主檔的「刪除」都是停用(`is_active=false`),避免既有借用單(場地另含不開放規則)的外鍵斷裂;每列 blur 有差異才 PATCH,離散控制(類別/借用型態/點交方式/啟用)變更即送
 - `GET /admin/venues` 一支兩用:預設只回啟用中(場況圖與手動借用的列首),主檔維護頁帶 `include_inactive=true`;讀取開給 `VENUE_READ_KEYS`(`abooking`/`asetting`/`amanual`/`arule`),`include_inactive` 與新增修改限 `asetting`
 - 違規項目與經費科目都不可存成空清單

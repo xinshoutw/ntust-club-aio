@@ -3,7 +3,7 @@
 import sqlalchemy as sa
 
 from app.models import AuditLog, SystemSetting
-from tests.conftest import csrf_headers, login, make_user
+from tests.conftest import csrf_headers, login, make_club, make_user
 
 URL = "/api/v1/admin/settings"
 
@@ -190,8 +190,6 @@ async def test_fixed_window_setting_drives_club_endpoint(client, db):
 
     await seed(client, db)
     club_user = await make_user(db, username="club01")
-    from tests.conftest import make_club
-
     club = await make_club(db)
     club_user.club_id = club.id
     await db.commit()
@@ -224,3 +222,53 @@ async def test_budget_categories_legacy_string_rows_normalized(client, db):
         {"name": "膳食費", "hint": ""},
         {"name": "交通費", "hint": ""},
     ]
+
+
+async def test_intake_window_cannot_switch_semester_mid_round(client, db):
+    """受理期間一改就換學期的話,已收到的申請會整批對不上(ISS-33 的第二種觸發)。
+
+    目標學期由受理期間結束日推導。把 open_until 從 7/31 延到 8/1 這種「再開三天」
+    會讓它從 115-1 跳到 115-2:每社 10 節額度歸零、場況圖清空,而核准關的重疊檢核
+    因為兩個學期區間不重疊,同一間教室同一時段會被雙重核准。
+    """
+    from app.models import RoomBookingRequest, RoomBookingSlot, Venue
+    from app.models.enums import VenueCategory
+    from app.services import booking_service as svc
+
+    await seed(client, db)
+    first = {"open_from": "2026-07-25", "open_until": "2026-07-31"}
+    resp = await client.put(
+        URL, json={"fixed_booking_window": first}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+
+    # 這一輪收到一張申請(起訖=當時推導的目標學期快照)
+    club = await make_club(db, name="吉他社")
+    venue = Venue(name="S304", capacity=40, category=VenueCategory.CLASSROOM, allow_fixed=True)
+    db.add(venue)
+    await db.commit()
+    await db.refresh(venue)
+    sem_start, sem_end = svc.fixed_target_semester(first)
+    booking = RoomBookingRequest(
+        club_id=club.id, venue_id=venue.id, purpose="社課", start_date=sem_start, end_date=sem_end
+    )
+    booking.slots = [RoomBookingSlot(weekday=2, period="3")]
+    db.add(booking)
+    await db.commit()
+
+    # 延三天就跨過學期邊界 → 擋下
+    blocked = await client.put(
+        URL,
+        json={"fixed_booking_window": {"open_from": "2026-07-25", "open_until": "2026-08-03"}},
+        headers=csrf_headers(client),
+    )
+    assert blocked.status_code == 409
+    assert blocked.json()["meta"]["code"] == "INTAKE_SEMESTER_LOCKED"
+
+    # 同一個學期內延長沒問題
+    ok = await client.put(
+        URL,
+        json={"fixed_booking_window": {"open_from": "2026-07-25", "open_until": "2026-07-30"}},
+        headers=csrf_headers(client),
+    )
+    assert ok.status_code == 200, ok.text

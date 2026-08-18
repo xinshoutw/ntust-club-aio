@@ -3,7 +3,7 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 import sqlalchemy as sa
 
-from app.core.semesters import next_semester_range
+from app.core.semesters import next_semester_range, semester_of, semester_range
 from app.models import (
     Activity,
     Equipment,
@@ -85,14 +85,20 @@ async def make_activity(
 
 
 async def open_fixed_window(db):
-    """固定借用預設不開放;測試以日期區間加開(2026-07-16 第八輪)。"""
+    """固定借用預設不開放;測試以日期區間加開(2026-07-16 第八輪)。
+
+    `open_until` 夾在本學期內:目標學期由受理期間結束日推導(ISS-33),
+    今天 +7 天在 7/25–7/31 與 1/25–1/31 會跨過學期邊界,
+    測試裡以 `next_semester_range(today)` 寫死的期望值一年會有 14 天對不上。
+    """
     today = date.today()
+    sem_end = semester_range(semester_of(today))[1]
     db.add(
         SystemSetting(
             key="fixed_booking_window",
             value={
                 "open_from": (today - timedelta(days=1)).isoformat(),
-                "open_until": (today + timedelta(days=7)).isoformat(),
+                "open_until": min(today + timedelta(days=7), sem_end).isoformat(),
             },
         )
     )

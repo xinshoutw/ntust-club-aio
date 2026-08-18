@@ -9,12 +9,17 @@
 import json
 from typing import Annotated, Any
 
+import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Request
 
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
+from app.core.errors import conflict
+from app.models import RoomBookingRequest
+from app.models.enums import BookingStatus
 from app.schemas.common import ApiResponse
 from app.schemas.settings import SettingsUpdateIn
 from app.services import audit
+from app.services import booking_service as svc
 from app.services.settings_service import get_budget_categories, get_setting, set_setting
 
 router = APIRouter(prefix="/admin/settings", tags=["admin"])
@@ -77,12 +82,46 @@ async def get_settings(user: PageAdmin, db: DbDep) -> ApiResponse[dict[str, Any]
     return ApiResponse(data=data)
 
 
+async def _guard_intake_semester(db, new_window: Any) -> None:
+    """改受理期間不得把「這一輪的目標學期」換掉,只要已經收到申請。
+
+    目標學期由受理期間結束日推導(`fixed_target_semester`,ISS-33)。把 open_until
+    從 7/31 延到 8/1 這種「再開三天」就會讓它從 115-1 跳到 115-2,而已收到的申請
+    存的是舊學期的起訖快照 —— 每社 10 節額度歸零、場況圖清空,連核准關的重疊檢核
+    都因為兩個學期區間不重疊而擋不住同一間教室被雙重核准。
+    """
+    old = await get_setting(db, "fixed_booking_window")
+    if not isinstance(new_window, dict):
+        return
+    old_target = svc.fixed_target_semester(old)
+    if svc.fixed_target_semester(new_window) == old_target:
+        return
+    filed = await db.scalar(
+        sa.select(sa.func.count())
+        .select_from(RoomBookingRequest)
+        .where(
+            RoomBookingRequest.start_date == old_target[0],
+            RoomBookingRequest.status != BookingStatus.CANCELLED,
+        )
+    )
+    if filed:
+        raise conflict(
+            f"這一輪已收到 {filed} 張申請,改受理期間會把目標學期換掉("
+            f"{old_target[0]}~{old_target[1]} → 另一個學期),額度與場況圖都會對不上。"
+            "請先處理完這一輪的申請",
+            code="INTAKE_SEMESTER_LOCKED",
+        )
+
+
 @router.put("")
 async def update_settings(
     body: SettingsUpdateIn, user: PageAdmin, db: DbDep, request: Request
 ) -> ApiResponse[dict[str, Any]]:
+    changes = body.model_dump(exclude_unset=True, exclude_none=True)
+    if "fixed_booking_window" in changes:
+        await _guard_intake_semester(db, _to_json(body.fixed_booking_window))
     diffs = []
-    for key in sorted(body.model_dump(exclude_unset=True, exclude_none=True)):
+    for key in sorted(changes):
         value = _to_json(getattr(body, key))
         before = await get_setting(db, key)  # 必須在寫入前讀:set_setting 就地改同一列
         if before != value:

@@ -176,13 +176,16 @@ def fixed_target_semester(window: dict, now: date | None = None) -> tuple[date, 
     按今天推導會讓同一輪申請落到兩個不同學期,每社 10 節的額度跟著重置。
     一律取較後面的那個學期(decisions.md ISS-33)。
 
-    期間已過或未設定時退回以今天推導 —— 送件本來就會被 `fixed_window_open` 擋下,
-    剩下的顯示用途不該倒退回一個已經結束的學期。
+    推出來的學期**已經結束**時(或根本沒設過受理期間)才退回以今天推導:
+    夾成 `max(open_until, today)` 的話,目標學期一開學就會往前跳一格 ——
+    社團的已用節數會在學期中途歸零、場況圖清空。
     """
     today = now or today_taipei()
     open_until = window.get("open_until")
-    basis = max(date.fromisoformat(open_until), today) if open_until else today
-    return next_semester_range(basis)
+    if not open_until:
+        return next_semester_range(today)
+    start, end = next_semester_range(date.fromisoformat(open_until))
+    return (start, end) if end >= today else next_semester_range(today)
 
 
 # 資源層 advisory lock:序列化「可用量/衝突檢核 → 寫入」的關鍵區段(隨交易釋放)。

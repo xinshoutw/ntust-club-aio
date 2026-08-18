@@ -545,12 +545,16 @@ def test_fixed_target_semester_follows_the_intake_window():
     assert booking_service.fixed_target_semester(window, date(2026, 8, 2)) == later
 
 
-def test_fixed_target_semester_never_falls_back_to_a_finished_semester():
-    """期間已過或未設定就以今天推導 —— 顯示用途不該倒退回一個已結束的學期。"""
-    today = date(2027, 3, 1)
-    stale = {"open_from": "2026-07-25", "open_until": "2026-08-05"}
-    assert booking_service.fixed_target_semester(stale, today) == next_semester_range(today)
-    assert booking_service.fixed_target_semester({}, today) == next_semester_range(today)
+def test_fixed_target_semester_holds_until_that_semester_actually_ends():
+    """目標學期在它自己結束之前都不變:一開學就往前跳的話,已用節數會中途歸零。"""
+    window = {"open_from": "2026-07-25", "open_until": "2026-08-05"}
+    target = (date(2027, 2, 1), date(2027, 7, 31))  # 115-2
+    assert booking_service.fixed_target_semester(window, date(2026, 8, 2)) == target
+    assert booking_service.fixed_target_semester(window, date(2027, 3, 1)) == target  # 學期中
+    # 那個學期真的結束了才退回以今天推導;沒設過受理期間同理
+    later = date(2027, 8, 15)
+    assert booking_service.fixed_target_semester(window, later) == next_semester_range(later)
+    assert booking_service.fixed_target_semester({}, later) == next_semester_range(later)
 
 
 def test_period_axis_matches_the_frontend_sort_rule():

@@ -40,7 +40,7 @@
 - `GET /admin/venues` 一支兩用:預設只回啟用中(場況圖與手動借用的列首),主檔維護頁帶 `include_inactive=true`;讀取開給 `VENUE_READ_KEYS`(`abooking`/`asetting`/`amanual`/`arule`),`include_inactive` 與新增修改限 `asetting`
 - 違規項目與經費科目都不可存成空清單
 - 設定變更寫 `audit_logs`:逐鍵記改前改後值(清單型只記增減,值太長會截斷),值沒變的鍵不留紀錄
-- **政府行事曆假日不做後台介面**(decisions.md GAP-06):資料源是人事行政總處辦公日曆表,每年匯入一次,由行政執行 `scripts/import_holidays.py --year <民國年> --yes`(上線檢查表 A 段列為每年必辦)
+- **政府行事曆假日不做後台介面**(decisions.md GAP-06):資料源是人事行政總處辦公日曆表,每年匯入一次:`scripts/import_holidays.py --year <民國年> --yes`(上線檢查表 A 段列為每年必辦;由誰執行見該表 F 段待決 #8)
 
 ## 未完成 / 問題
 

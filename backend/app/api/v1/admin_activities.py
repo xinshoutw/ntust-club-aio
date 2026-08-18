@@ -42,10 +42,9 @@ _STAGE_BY_STATUS = {
 # 通知文案的關卡顯示詞(Discord 對外顯示,不得漏出英文鍵)
 _STAGE_LABEL = {"advisor": "承辦人", "chief": "組長", "dean": "學務長"}
 
-# aact=既有後端鍵、areview=前端權限彈窗鍵(尚未統一,任一即通過);
 # aclose=結案審核頁:僅持該鍵的帳號也需要讀列表/詳情(動作端點另有各自關卡檢查),
 # 但視野僅限結案範圍(_visible_statuses),不得看到申請中/已退回等非結案狀態
-_FULL_VIEW_KEYS = ("aact", "areview")
+_FULL_VIEW_KEYS = ("areview",)
 _REVIEW_PAGE_KEYS = (*_FULL_VIEW_KEYS, "aclose")
 _REVIEW_KEYS = (*_REVIEW_PAGE_KEYS, "approve_advisor", "approve_chief", "approve_dean")
 

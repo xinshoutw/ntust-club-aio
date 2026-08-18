@@ -12,7 +12,7 @@
 
 | 卡片 | 導向 | 需要權限 |
 |---|---|---|
-| 待審活動申請 | `/admin/review` | `areview`/`aact`/簽核鍵 |
+| 待審活動申請 | `/admin/review` | `areview`/簽核鍵 |
 | 待審結案 | `/admin/close-review` | `aclose`/`approve_advisor` |
 | 待審固定借用 | `/admin/rooms` | `aroom` |
 | 待審臨時借用 | `/admin/bookings` | `abooking` |

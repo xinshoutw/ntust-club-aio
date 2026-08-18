@@ -154,7 +154,7 @@ async def test_status_sort_follows_resolution_progress(client, db):
 
 async def test_options_requires_permission(client, db):
     await seed(client, db)
-    await make_user(db, username="nope-admin", role="admin", permissions=["aact"])
+    await make_user(db, username="nope-admin", role="admin", permissions=["areview"])
     await login(client, "nope-admin")
     assert (await client.get("/api/v1/admin/violations/options")).status_code == 403
 
@@ -237,6 +237,6 @@ async def test_resolve_within_deadline_and_reject_expired(client, db):
     assert resp.status_code == 409
 
     # 權限:無 aviol 的管理員 → 403
-    await make_user(db, username="other-admin", role="admin", permissions=["aact"])
+    await make_user(db, username="other-admin", role="admin", permissions=["areview"])
     await login(client, "other-admin")
     assert (await client.get("/api/v1/admin/violations")).status_code == 403

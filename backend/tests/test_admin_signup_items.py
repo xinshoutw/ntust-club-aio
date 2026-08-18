@@ -14,7 +14,7 @@ URL = "/api/v1/admin/signup-items"
 async def seed(client, db):
     club = await make_club(db)
     await make_user(db, username="club01", club_id=club.id)
-    await make_user(db, username="regadmin", role="admin", permissions=["areg"])
+    await make_user(db, username="regadmin", role="admin", permissions=["asignup"])
     await login(client, "regadmin")
     return club
 
@@ -143,7 +143,7 @@ async def test_create_item_validations(client, db):
     assert resp.status_code == 422
 
     # 權限:無 areg 的管理員 → 403
-    await make_user(db, username="other", role="admin", permissions=["aact"])
+    await make_user(db, username="other", role="admin", permissions=["areview"])
     await login(client, "other")
     resp = await client.post(URL, json=body(), headers=csrf_headers(client))
     assert resp.status_code == 403

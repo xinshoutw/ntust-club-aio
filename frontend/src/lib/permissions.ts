@@ -5,10 +5,10 @@ import type { SessionUser } from '../api/auth'
 // 申請審核頁對簽核關卡鍵開放(學務長受限帳號僅持 approve_dean 也要能進待審頁);
 // 結案審核=aclose 或結案單關的 approve_advisor
 const ROUTE_KEYS: [string, string[]][] = [
-  ['/admin/review', ['areview', 'aact', 'approve_advisor', 'approve_chief', 'approve_dean']],
+  ['/admin/review', ['areview', 'approve_advisor', 'approve_chief', 'approve_dean']],
   ['/admin/close-review', ['aclose', 'approve_advisor']],
-  ['/admin/signup-items', ['areg', 'asignup']],
-  ['/admin/signups', ['areg', 'asignup']],
+  ['/admin/signup-items', ['asignup']],
+  ['/admin/signups', ['asignup']],
   ['/admin/announcements', ['aannounce']],
   ['/admin/bookings', ['abooking']],
   ['/admin/rooms', ['aroom']],

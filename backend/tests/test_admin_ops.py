@@ -197,7 +197,7 @@ async def test_maintenance_status_rejects_illegal_transitions(client, db):
 
 async def test_audit_list_filters_and_super_only(client, db):
     super_admin = await make_user(db, username="root", role="admin", is_super=True)
-    await make_user(db, username="normal", role="admin", permissions=["aact"])
+    await make_user(db, username="normal", role="admin", permissions=["areview"])
     staff = await make_user(db, username="staff01", role="staff", name="李工讀")
 
     db.add_all(

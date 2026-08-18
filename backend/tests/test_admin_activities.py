@@ -16,7 +16,7 @@ async def seed(client, db):
     club = await make_club(db)
     await make_user(db, username="club01", club_id=club.id)
     await make_user(
-        db, username="advisor", role="admin", permissions=["approve_advisor", "aact", "aclose"]
+        db, username="advisor", role="admin", permissions=["approve_advisor", "areview", "aclose"]
     )
     await make_user(db, username="chief", role="admin", permissions=["approve_chief"])
     await make_user(db, username="dean", role="admin", permissions=["approve_dean"])
@@ -755,7 +755,10 @@ async def test_adjacent_stages_cannot_share_a_signer(client, db):
     """
     await seed(client, db)
     await make_user(
-        db, username="both", role="admin", permissions=["approve_advisor", "approve_chief", "aact"]
+        db,
+        username="both",
+        role="admin",
+        permissions=["approve_advisor", "approve_chief", "areview"],
     )
     await make_user(db, username="root", role="admin", is_super=True)
 

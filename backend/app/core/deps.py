@@ -122,9 +122,9 @@ ClubUser = Annotated[User, Depends(require_club)]
 
 
 def require_permission(*keys: str):
-    """管理員頁面權限鍵(aact/aclose/…)或簽核關卡鍵(approve_advisor/…);super 全通。
+    """管理員頁面權限鍵(areview/aclose/…)或簽核關卡鍵(approve_advisor/…);super 全通。
 
-    可傳多鍵=任一即通過(前後端權限鍵名尚未統一時的別名,如 areg/asignup)。
+    可傳多鍵=任一即通過(一支端點同時服務多頁時使用)。
     """
 
     async def dep(user: CurrentUser) -> User:

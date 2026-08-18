@@ -141,6 +141,6 @@ async def test_delete_repair_file_only(client, db):
     assert (by_key["repair"]["size"], by_key["repair"]["count"]) == (2000, 1)
 
     # 權限:無 afiles → 403
-    await make_user(db, username="other", role="admin", permissions=["aact"])
+    await make_user(db, username="other", role="admin", permissions=["areview"])
     await login(client, "other")
     assert (await client.get("/api/v1/admin/files/usage")).status_code == 403

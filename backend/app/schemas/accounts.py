@@ -27,9 +27,6 @@ PERMISSION_KEYS = frozenset(
         "aapply",  # 線上申請管理(幹部證明/郵局帳戶異動)
         "aviol",  # 違規管理
         "afiles",  # 檔案管理
-        # 既有後端鍵(前後端鍵名待統一,先兩者皆收)
-        "aact",
-        "areg",
         # 簽核關卡鍵
         "approve_advisor",
         "approve_chief",

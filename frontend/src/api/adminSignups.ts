@@ -1,4 +1,4 @@
-// 行政端報名管理 API 層(權限鍵 asignup/areg)。
+// 行政端報名管理 API 層(權限鍵 asignup)。
 // - 基本欄位(姓名/學號/系級)必須包含在 signup_items.fields:後端 validate_answers 會拒絕
 //   answers 內的未知欄位鍵,而社團端送出的參加人資料含 name/studentId/dept,
 //   故建立活動時一律把 BASE_FIELDS 前置到自訂欄位前;管理端顯示/匯出時再把它們與自訂欄位分開。

@@ -1,6 +1,6 @@
 # 報名活動管理
 
-`/admin/signups` · `admin` · 權限鍵 `areg` / `asignup` · `features/admin/SignupManagePage.tsx`
+`/admin/signups` · `admin` · 權限鍵 `asignup` · `features/admin/SignupManagePage.tsx`
 
 ## 用途
 

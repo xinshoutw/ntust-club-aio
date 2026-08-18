@@ -43,8 +43,7 @@ from app.services import signup_service as svc
 
 router = APIRouter(prefix="/admin/signup-items", tags=["admin"])
 
-# areg=既有後端鍵、asignup=前端權限彈窗鍵(尚未統一,任一即通過)
-RegAdmin = Annotated[CurrentUser, Depends(require_permission("areg", "asignup"))]
+RegAdmin = Annotated[CurrentUser, Depends(require_permission("asignup"))]
 
 
 async def _default_session(db, item: SignupItem) -> SignupItemSession:

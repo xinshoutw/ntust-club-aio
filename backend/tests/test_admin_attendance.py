@@ -12,8 +12,8 @@ from tests.conftest import csrf_headers, login, make_club, make_user
 async def seed(client, db):
     club = await make_club(db)
     await make_user(db, username="club01", club_id=club.id)
-    admin = await make_user(db, username="regadmin", role="admin", permissions=["areg"])
-    await make_user(db, username="other", role="admin", permissions=["aact"])
+    admin = await make_user(db, username="regadmin", role="admin", permissions=["asignup"])
+    await make_user(db, username="other", role="admin", permissions=["areview"])
     await login(client, "regadmin")
     return club, admin
 

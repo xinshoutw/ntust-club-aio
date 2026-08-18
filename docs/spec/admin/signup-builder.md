@@ -1,6 +1,6 @@
 # 報名活動建立
 
-`/admin/signup-items/new` · `admin` · 權限鍵 `areg` / `asignup` · `features/admin/SignupBuilderPage.tsx`
+`/admin/signup-items/new` · `admin` · 權限鍵 `asignup` · `features/admin/SignupBuilderPage.tsx`
 
 ## 用途
 

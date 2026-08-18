@@ -22,7 +22,7 @@ import { useAdminClubMutations, useAdminClubs, type AdminClub } from '../../api/
 const PERMISSION_KEYS = [
   ['areview', '申請審核'],
   ['aclose', '結案審核'],
-  ['asignup', '活動管理'],
+  ['asignup', '報名管理'],
   ['aannounce', '發布公告'],
   ['abooking', '臨時場地器材借用審核'],
   ['aroom', '固定場地借用審核'],
@@ -41,8 +41,6 @@ const EXTRA_KEY_LABELS: Record<string, string> = {
   approve_advisor: '承辦人簽核',
   approve_chief: '組長簽核',
   approve_dean: '學務長簽核',
-  aact: '活動管理(舊鍵)',
-  areg: '報名管理(舊鍵)',
 }
 
 const permsText = (a: Account): string => {

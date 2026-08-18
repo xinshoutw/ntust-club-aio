@@ -10,7 +10,7 @@ async def seed(client, db):
     club.website_url = "https://club.example.com"
     await make_user(db, username="club01", club_id=club.id)
     await make_user(db, username="evaladmin", role="admin", permissions=["aeval"])
-    await make_user(db, username="other", role="admin", permissions=["aact"])
+    await make_user(db, username="other", role="admin", permissions=["areview"])
     db.add(Award(id="club", name="最佳社團獎", kind=AwardKind.GROUP, is_weighted=True))
     await db.commit()
     return club

@@ -1,6 +1,6 @@
 # 活動申請審核
 
-`/admin/review` · `admin` · 權限鍵 `areview` / `aact` / `approve_advisor` / `approve_chief` / `approve_dean` · `features/admin/ReviewPage.tsx` + `ActivityReviewModal.tsx`
+`/admin/review` · `admin` · 權限鍵 `areview` / `approve_advisor` / `approve_chief` / `approve_dean` · `features/admin/ReviewPage.tsx` + `ActivityReviewModal.tsx`
 
 ## 用途
 

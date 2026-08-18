@@ -53,10 +53,10 @@
 | 頁 | 路由 | 權限鍵 |
 |---|---|---|
 | [admin/home.md](admin/home.md) | `/admin` | 全體管理員 |
-| [admin/review.md](admin/review.md) | `/admin/review` | `areview`/`aact`/簽核鍵 |
+| [admin/review.md](admin/review.md) | `/admin/review` | `areview`/簽核鍵 |
 | [admin/close-review.md](admin/close-review.md) | `/admin/close-review` | `aclose`/`approve_advisor` |
-| [admin/signups.md](admin/signups.md) | `/admin/signups` | `areg`/`asignup` |
-| [admin/signup-builder.md](admin/signup-builder.md) | `/admin/signup-items/new` | `areg`/`asignup` |
+| [admin/signups.md](admin/signups.md) | `/admin/signups` | `asignup` |
+| [admin/signup-builder.md](admin/signup-builder.md) | `/admin/signup-items/new` | `asignup` |
 | [admin/announcements.md](admin/announcements.md) | `/admin/announcements` | `aannounce` |
 | [admin/bookings.md](admin/bookings.md) | `/admin/bookings` | `abooking` |
 | [admin/rooms.md](admin/rooms.md) | `/admin/rooms` | `aroom` |

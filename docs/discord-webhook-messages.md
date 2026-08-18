@@ -29,11 +29,11 @@
 | `reject` | `0xEF4444` 紅 | 退回/拒絕 |
 | `alert` | `0x8B5CF6` 紫 | 系統事件(解鎖、逾期提醒、停權、評鑑調整) |
 
-**長度**:程式自截 title 256、description 2000(Discord 上限 4096)、公告 Text Display 3800(上限 4000)。活動名、社團名、退回原因(≤500 字)、公告內文皆為使用者輸入,模板要容忍被截斷。Discord 速率限制約每 2 秒 5 則,公告逐社團推送(60+ 社)可能觸頂,現行無退避。
+**長度**:程式自截 title 256、description 2000(Discord 上限 4096)、公告 Text Display 3800(上限 4000)。活動名、社團名、退回原因(≤500 字)、公告內文皆為使用者輸入,模板要容忍被截斷。Discord 速率限制約每 2 秒 5 則,公告逐社團推送(60+ 社)可能觸頂;429 會照 `Retry-After` 退避重試(上限 30 秒 × 3 次)。
 
 ## 2. 事件與現行文案
 
-45 個事件(6 個依狀態有兩種文案)。目的地未註明者=全域必推 + 該社團有設 webhook 才推。
+48 個事件(7 個依狀態有兩種文案)。目的地未註明者=全域必推 + 該社團有設 webhook 才推。
 
 **公告**
 
@@ -158,6 +158,7 @@ D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政�
   `行政手動借用建立` / `{user.name}:{venue 或 equipment 名}(時間)`
 - **K5 報名簽到登錄** `PUT /admin/signup-items/{id}/attendance` · 登錄 approve、取消 alert
   `報名簽到已登錄` 或 `報名簽到已取消` / `{club.name}:{item.name}({session.name})`
+  —— **只在真的翻面時推**(同值再送一次不是事件);非場次制的預設場次名就是活動名,那時不重複印
 - **K6 公告蓋板開啟** `PATCH /admin/announcements/{id}`(`takeover_until` 由 null 轉為日期)· announce · 僅推全域
   `公告已設為蓋板` / `{title}`
 - **K7 公告蓋板關閉** 同上(轉回 null)· announce · 僅推全域
@@ -169,6 +170,13 @@ D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政�
 - **K10 行政補登報名** `POST /admin/signup-items/{id}/registrations` · announce
   `學務處已為貴社補登報名` / `{club.name}:{item.name}(現場到場,參加人名單從缺)`
   —— 社團會在「我的報名」看到一筆自己沒送過的紀錄,不說一聲會像是名單不見了
+- **K11 撤除補登報名** `DELETE /admin/signup-items/{id}/registrations/{club_id}` · alert
+  `學務處已撤除貴社的補登報名` / `{club.name}:{item.name}` —— K10 的反面,名單這次真的不見了
+- **K12 報名場次刪除** `DELETE /admin/signup-items/{id}/sessions/{sid}` · alert · 僅推全域
+  `報名場次已刪除` / `{item.name}:{session.name}(連帶清掉 N 筆簽到)`
+  —— 該場次所有社團的簽到隨 FK CASCADE 一起消失,而簽到是行政分 ad7 的唯一資料源
+- **K4b 行政手動借用撤銷** `POST /admin/{venue-bookings,equipment-loans}/{id}/revoke` · reject · 無社團時僅推全域
+  文案同一般撤銷 —— 手動借用沒有社團可推,但場況圖少一格的理由與 K4 一樣成立
 
 蓋板只在**切換**時推:同值再送一次不算事件,否則承辦每次存檔都會多推一則。
 逐事件的呼叫點由 `tests/test_gap18_notifications.py` 釘住。

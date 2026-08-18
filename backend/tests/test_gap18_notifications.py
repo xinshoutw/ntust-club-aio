@@ -127,7 +127,7 @@ async def test_k3_equipment_loan_self_cancel(client, db, monkeypatch):
 async def test_k4_manual_booking_notifies_the_office_only(client, db, monkeypatch):
     """手動借用沒有社團可推,只推全域;而它直接就是已核准,場況圖會憑空多一格。"""
     spy = Spy(monkeypatch)
-    await make_user(db, username="manual", role="admin", permissions=["amanual"])
+    await make_user(db, username="manual", role="admin", permissions=["amanual", "abooking"])
     await login(client, "manual")
     venue = await make_venue(db, name="精誠廣場", allow_fixed=False, allow_temp=True)
     day = date.today() + timedelta(days=5)
@@ -145,6 +145,38 @@ async def test_k4_manual_booking_notifies_the_office_only(client, db, monkeypatc
     )
     assert resp.status_code == 201, resp.text
     assert spy.global_titles() == ["行政手動借用建立"]
+    assert "精誠廣場" in spy.global_only[0][2]
+    assert spy.club == []
+
+    # 器材那一半走另一支端點,一樣要推
+    spy.global_only.clear()
+    eq = await make_equipment(db, total_qty=5)
+    loan = await client.post(
+        "/api/v1/admin/bookings/manual-equipment",
+        json={
+            "equipment_id": eq.id,
+            "qty": 2,
+            "start_date": day.isoformat(),
+            "end_date": (day + timedelta(days=1)).isoformat(),
+            "purpose": "校慶佈置",
+            "phone": "0227333141",
+        },
+        headers=csrf_headers(client),
+    )
+    assert loan.status_code == 201, loan.text
+    assert spy.global_titles() == ["行政手動借用建立"]
+    assert "帳篷 ×2" in spy.global_only[0][2]
+
+    # 撤銷手動借用同樣要推:場況圖少一格而頻道一片安靜的話,K4 的理由反向就不成立
+    spy.global_only.clear()
+    booking_id = resp.json()["data"]["id"]
+    revoked = await client.post(
+        f"/api/v1/admin/venue-bookings/{booking_id}/revoke",
+        json={"reason": "活動取消"},
+        headers=csrf_headers(client),
+    )
+    assert revoked.status_code == 200, revoked.text
+    assert spy.global_titles(), "撤銷手動借用完全沒有通知"
     assert spy.club == []
 
 
@@ -282,3 +314,112 @@ async def test_k9_activity_draft_deleted(client, db, monkeypatch):
     )
     assert resp.status_code == 200, resp.text
     assert spy.club == [("alert", "活動草稿已刪除", f"{club.name}:尚未送出的草稿")]
+
+
+async def test_attendance_only_announces_on_a_real_flip(client, db, monkeypatch):
+    """同值再送一次不是事件(與公告蓋板同一條規則),否則承辦每點一次就多推一則。"""
+    spy = Spy(monkeypatch)
+    club = await make_club(db)
+    await make_user(db, username="regadmin", role="admin", permissions=["asignup"])
+    await login(client, "regadmin")
+    now = datetime.now(UTC)
+    item = SignupItem(
+        name="社團幹訓",
+        kind=SignupKind.CADRE_TRAINING,
+        event_at=now - timedelta(days=1),
+        signup_start=now - timedelta(days=30),
+        signup_end=now - timedelta(days=2),
+        max_participants=5,
+        fields=[],
+        created_by=1,
+    )
+    db.add(item)
+    await db.commit()
+    await db.refresh(item)
+    db.add(Signup(item_id=item.id, club_id=club.id, confirmed=True))
+    await db.commit()
+
+    mark = {"club_id": club.id, "attended": True}
+    url = f"/api/v1/admin/signup-items/{item.id}/attendance"
+    assert (await client.put(url, json=mark, headers=csrf_headers(client))).status_code == 200
+    assert spy.titles() == ["報名簽到已登錄"]
+    # 非場次制的預設場次名就是活動名,別把同一個名字印兩次
+    assert spy.club[0][2].count(item.name) == 1
+
+    spy.club.clear()
+    assert (await client.put(url, json=mark, headers=csrf_headers(client))).status_code == 200
+    assert spy.titles() == []
+
+
+async def test_removing_a_backfill_tells_the_club_too(client, db, monkeypatch):
+    """補登通知過一次,撤除是同一件事的反面 —— 名單這次是真的不見了。"""
+    spy = Spy(monkeypatch)
+    club = await make_club(db, name="吉他社")
+    await make_user(db, username="regadmin", role="admin", permissions=["asignup"])
+    await login(client, "regadmin")
+    now = datetime.now(UTC)
+    item = SignupItem(
+        name="社團負責人會議",
+        kind=SignupKind.LEADER_MEETING,
+        event_at=now - timedelta(days=1),
+        signup_start=now - timedelta(days=30),
+        signup_end=now - timedelta(days=2),
+        max_participants=5,
+        fields=[],
+        created_by=1,
+    )
+    db.add(item)
+    await db.commit()
+    await db.refresh(item)
+    base = f"/api/v1/admin/signup-items/{item.id}/registrations"
+    await client.post(base, json={"club_id": club.id}, headers=csrf_headers(client))
+    spy.club.clear()
+
+    gone = await client.delete(f"{base}/{club.id}", headers=csrf_headers(client))
+    assert gone.status_code == 200, gone.text
+    assert spy.titles() == ["學務處已撤除貴社的補登報名"]
+
+
+async def test_deleting_a_session_says_how_much_attendance_went_with_it(client, db, monkeypatch):
+    """刪一個場次會 CASCADE 掉該場次所有社團的簽到,而簽到是行政分 ad7 的唯一資料源。"""
+    spy = Spy(monkeypatch)
+    club = await make_club(db)
+    await make_user(db, username="regadmin", role="admin", permissions=["asignup"])
+    await login(client, "regadmin")
+    now = datetime.now(UTC)
+    item = SignupItem(
+        name="社團負責人會議",
+        kind=SignupKind.LEADER_MEETING,
+        session_based=True,
+        event_at=now - timedelta(days=10),
+        signup_start=now - timedelta(days=30),
+        signup_end=now - timedelta(days=20),
+        max_participants=5,
+        fields=[],
+        created_by=1,
+    )
+    db.add(item)
+    await db.commit()
+    await db.refresh(item)
+    db.add(Signup(item_id=item.id, club_id=club.id, confirmed=True))
+    await db.commit()
+
+    base = f"/api/v1/admin/signup-items/{item.id}/sessions"
+    made = await client.post(
+        base,
+        json={"name": "第一場", "date": (date.today() - timedelta(days=3)).isoformat()},
+        headers=csrf_headers(client),
+    )
+    assert made.status_code == 201, made.text
+    session_id = made.json()["data"]["id"]
+    await client.put(
+        f"/api/v1/admin/signup-items/{item.id}/attendance",
+        json={"club_id": club.id, "attended": True, "session_id": session_id},
+        headers=csrf_headers(client),
+    )
+    spy.global_only.clear()
+
+    gone = await client.delete(f"{base}/{session_id}", headers=csrf_headers(client))
+    assert gone.status_code == 200, gone.text
+    assert spy.global_titles() == ["報名場次已刪除"]
+    assert "1 筆簽到" in spy.global_only[0][2]

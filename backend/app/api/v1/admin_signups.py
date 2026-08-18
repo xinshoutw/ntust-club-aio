@@ -371,6 +371,7 @@ async def remove_registration(
     user: RegAdmin,
     db: DbDep,
     request: Request,
+    background: BackgroundTasks,
 ) -> ApiResponse[None]:
     """撤掉一筆補登(decisions.md DEC-07)。
 
@@ -412,6 +413,15 @@ async def remove_registration(
         ip=client_ip(request),
     )
     await db.commit()
+    # 補登通知過一次(K10),撤除是同一件事的反面 —— 名單這次是真的不見了
+    club = await db.get(Club, club_id)
+    background.add_task(
+        notify.club_event,
+        "alert",
+        "學務處已撤除貴社的補登報名",
+        f"{club.name}:{item.name}",
+        club.discord_webhook_url,
+    )
     return ApiResponse()
 
 
@@ -525,11 +535,24 @@ async def create_session(
 
 @router.delete("/{item_id}/sessions/{session_id}")
 async def delete_session(
-    item_id: int, session_id: int, user: RegAdmin, db: DbDep, request: Request
+    item_id: int,
+    session_id: int,
+    user: RegAdmin,
+    db: DbDep,
+    request: Request,
+    background: BackgroundTasks,
 ) -> ApiResponse[None]:
     session = await db.get(SignupItemSession, session_id)
     if session is None or session.item_id != item_id:
         raise not_found("找不到場次")
+    # 這一場所有社團的簽到會一起消失(FK CASCADE),而簽到是行政分 ad7 的唯一資料源
+    wiped = await db.scalar(
+        sa.select(sa.func.count())
+        .select_from(SessionAttendance)
+        .where(SessionAttendance.session_id == session.id, SessionAttendance.attended.is_(True))
+    )
+    item = await db.get(SignupItem, item_id)
+    session_name = session.name
     await db.delete(session)  # session_attendance 隨 FK CASCADE 一併刪除
     audit.record(
         db,
@@ -539,6 +562,12 @@ async def delete_session(
         ip=client_ip(request),
     )
     await db.commit()
+    background.add_task(
+        notify.discord,
+        "alert",
+        "報名場次已刪除",
+        f"{item.name}:{session_name}(連帶清掉 {wiped or 0} 筆簽到)",
+    )
     return ApiResponse()
 
 
@@ -585,6 +614,7 @@ async def mark_attendance(
             SessionAttendance.club_id == body.club_id,
         )
     )
+    was_attended = bool(row and row.attended)
     now = datetime.now(UTC)
     if row is None:
         db.add(
@@ -622,13 +652,17 @@ async def mark_attendance(
             )
         )
     ) or 0
-    # 簽到是行政分 ad7/ad8 的唯一資料源:社團要知道自己這一場被登錄了(GAP-18 K5)
-    club = await db.get(Club, body.club_id)
-    background.add_task(
-        notify.club_event,
-        "approve" if body.attended else "alert",
-        "報名簽到已登錄" if body.attended else "報名簽到已取消",
-        f"{club.name}:{item.name}({session.name})",
-        club.discord_webhook_url,
-    )
+    # 簽到是行政分 ad7/ad8 的唯一資料源:社團要知道自己這一場被登錄了(GAP-18 K5)。
+    # 只在真的翻面時推:同值再送一次不是事件(與公告蓋板同一條規則)
+    if body.attended != was_attended:
+        club = await db.get(Club, body.club_id)
+        # 非場次制的預設場次名就是活動名,別把同一個名字印兩次
+        where = "" if session.name == item.name else f"({session.name})"
+        background.add_task(
+            notify.club_event,
+            "approve" if body.attended else "alert",
+            "報名簽到已登錄" if body.attended else "報名簽到已取消",
+            f"{club.name}:{item.name}{where}",
+            club.discord_webhook_url,
+        )
     return ApiResponse(data={"session_id": session.id, "attended_sessions": attended_total})

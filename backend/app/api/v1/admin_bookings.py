@@ -72,11 +72,14 @@ LoanStatusFilter = Literal[
 async def _notify_club(
     background: BackgroundTasks, db, club_id: int | None, kind: str, title: str, desc: str
 ) -> None:
-    # NULL club=行政手動借用(遷移的歷史行政借用可為 pending):無社團可通知
-    if club_id is None:
-        return
-    club = await db.get(Club, club_id)
+    """推給該社團 + 全域;沒有社團(行政手動借用)時只推全域。
+
+    早期版本在 `club_id is None` 直接 return —— 於是承辦撤掉一筆手動借用,
+    場況圖少一格而頻道上一片安靜,與「手動借用建立」會推的理由正好相反。
+    """
+    club = await db.get(Club, club_id) if club_id is not None else None
     if club is None:
+        background.add_task(notify.discord, kind, title, desc)
         return
     background.add_task(notify.club_event, kind, title, desc, club.discord_webhook_url)
 

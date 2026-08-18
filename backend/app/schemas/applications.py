@@ -12,14 +12,6 @@ from app.models.enums import (
 
 _TERM_RE = re.compile(r"^\d{3}(-[12])?$")  # 114 / 114-1 / 114-2
 
-# 郵局事由互斥組合(前後端同規則)
-_POSTAL_EXCLUSIVE: tuple[tuple[PostalReason, PostalReason], ...] = (
-    (PostalReason.CHANGE_AGENT, PostalReason.NEW_ACCOUNT),
-    (PostalReason.NEW_ACCOUNT, PostalReason.CLOSE_ACCOUNT),
-    (PostalReason.CHANGE_AGENT, PostalReason.CLOSE_ACCOUNT),
-)
-
-
 class OfficerCertIn(BaseModel):
     term: str = Field(max_length=10)
     position: CertPosition
@@ -44,29 +36,29 @@ class OfficerCertOut(BaseModel):
 
 
 class PostalChangeIn(BaseModel):
+    """事由複選、不設互斥組合,其餘欄位全部選填(decisions.md D-07)。
+
+    互斥組合原本是工程端自訂的,承辦看過之後決定拿掉:一次辦好幾件本來就常見。
+    欄位改選填同理 —— 結清銷戶不必填新代理人,新開戶當下也還沒有帳號。
+    """
+
     reasons: list[PostalReason] = Field(min_length=1, max_length=6)
-    account_name: str = Field(min_length=1, max_length=50)
-    account_number: str = Field(min_length=6, max_length=20, pattern=r"^[\d-]+$")
+    account_name: str | None = Field(None, max_length=50)
+    account_number: str | None = Field(None, min_length=6, max_length=20, pattern=r"^[\d-]+$")
     new_agent_name: str | None = Field(None, max_length=50)
     new_agent_phone: str | None = Field(None, max_length=20)
 
     @model_validator(mode="after")
     def _check(self):
-        chosen = set(self.reasons)
-        if len(chosen) != len(self.reasons):
+        if len(set(self.reasons)) != len(self.reasons):
             raise ValueError("事由重複")
-        for a, b in _POSTAL_EXCLUSIVE:
-            if a in chosen and b in chosen:
-                raise ValueError(f"「{a.value}」與「{b.value}」不可同時勾選")
-        if PostalReason.CHANGE_AGENT in chosen and not (
-            self.new_agent_name and self.new_agent_phone
-        ):
-            raise ValueError("更換代理人需填寫新代理人姓名與電話")
         return self
 
 
-def mask_account(number: str) -> str:
+def mask_account(number: str | None) -> str | None:
     """個資遮罩:前 3 碼 + 末 2 碼(決議 §6-11)。"""
+    if not number:
+        return number
     if len(number) <= 5:
         return number[0] + "*" * (len(number) - 1) if number else ""
     return f"{number[:3]}{'*' * (len(number) - 5)}{number[-2:]}"
@@ -84,8 +76,8 @@ class PostalChangeOut(BaseModel):
 
     id: int
     reasons: list[PostalReason]
-    account_name: str
-    account_number: str  # 社團端申請紀錄顯示完整局號帳號(不遮罩)
+    account_name: str | None
+    account_number: str | None  # 社團端申請紀錄顯示完整局號帳號(不遮罩)
     new_agent_name: str | None
     new_agent_phone: str | None  # 電話仍依決議 §6-11 遮罩(末 3 碼)
     status: ApplicationStatus

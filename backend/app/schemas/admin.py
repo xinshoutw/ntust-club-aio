@@ -211,8 +211,8 @@ class AdminPostalChangeOut(BaseModel):
     club_id: int
     club_name: str = ""
     reasons: list[PostalReason]
-    account_name: str
-    account_number: str
+    account_name: str | None
+    account_number: str | None
     new_agent_name: str | None
     new_agent_phone: str | None  # 行政端顯示完整電話(承辦需聯絡代理人)
     status: ApplicationStatus

@@ -132,8 +132,8 @@ const REASON_TO_LABEL: Record<string, string> = Object.fromEntries(
 export interface PostalRecord {
   id: number
   reasons: string[]
-  accountName: string
-  accountNumber: string
+  accountName?: string
+  accountNumber?: string
   date: string
   status: StatusKey
 }
@@ -141,8 +141,8 @@ export interface PostalRecord {
 interface PostalChangeOut {
   id: number
   reasons: string[]
-  account_name: string
-  account_number: string
+  account_name: string | null
+  account_number: string | null
   new_agent_name: string | null
   new_agent_phone: string | null
   status: 'pending' | 'processing' | 'completed'
@@ -152,8 +152,8 @@ interface PostalChangeOut {
 const toPostal = (p: PostalChangeOut): PostalRecord => ({
   id: p.id,
   reasons: p.reasons.map((r) => REASON_TO_LABEL[r] ?? r),
-  accountName: p.account_name,
-  accountNumber: p.account_number,
+  accountName: p.account_name ?? undefined,
+  accountNumber: p.account_number ?? undefined,
   date: dayjs(p.created_at).format('YYYY/MM/DD'),
   status: p.status,
 })
@@ -182,8 +182,9 @@ export function useRecentPostal() {
 
 export interface PostalInput {
   reasons: string[]
-  accountName: string
-  accountNumber: string
+  /** 事由以外全部選填(decisions.md D-07) */
+  accountName?: string
+  accountNumber?: string
   agentName?: string
   agentPhone?: string
   /** 原存簿影本/新開戶申請表(單檔) */
@@ -198,10 +199,10 @@ export function usePostalMutations() {
         method: 'POST',
         body: JSON.stringify({
           reasons: b.reasons.map((r) => REASON_TO_API[r] ?? r),
-          account_name: b.accountName,
-          account_number: b.accountNumber,
-          new_agent_name: b.agentName,
-          new_agent_phone: b.agentPhone,
+          account_name: b.accountName || undefined,
+          account_number: b.accountNumber || undefined,
+          new_agent_name: b.agentName || undefined,
+          new_agent_phone: b.agentPhone || undefined,
         }),
       })
       try {

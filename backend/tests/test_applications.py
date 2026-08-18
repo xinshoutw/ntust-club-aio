@@ -67,10 +67,10 @@ async def test_officer_cert_autofills_from_roster(client, db):
     assert resp.status_code == 422
 
 
-async def test_postal_change_exclusive_reasons_and_masking(client, db):
+async def test_postal_change_reasons_and_masking(client, db):
     await setup_session(client, db)
 
-    # 互斥組合 → 422
+    # 不設互斥組合:一次辦好幾件是常態(decisions.md D-07)
     resp = await client.post(
         "/api/v1/club/postal-changes",
         json={
@@ -80,19 +80,23 @@ async def test_postal_change_exclusive_reasons_and_masking(client, db):
         },
         headers=csrf_headers(client),
     )
-    assert resp.status_code == 422
+    assert resp.status_code == 201, resp.text
 
-    # 更換代理人缺新代理人資料 → 422
+    # 事由以外全部選填:新開戶當下還沒有帳號可填
     resp = await client.post(
         "/api/v1/club/postal-changes",
-        json={
-            "reasons": ["更換代理人"],
-            "account_name": "熱舞社",
-            "account_number": "0001234567890",
-        },
+        json={"reasons": ["新開戶"]},
         headers=csrf_headers(client),
     )
-    assert resp.status_code == 422
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["data"]["account_number"] is None
+
+    # 事由本身仍必填,且不得重複
+    for bad in ({"reasons": []}, {"reasons": ["新開戶", "新開戶"]}):
+        resp = await client.post(
+            "/api/v1/club/postal-changes", json=bad, headers=csrf_headers(client)
+        )
+        assert resp.status_code == 422, bad
 
     resp = await client.post(
         "/api/v1/club/postal-changes",

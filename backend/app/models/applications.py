@@ -22,15 +22,19 @@ class OfficerCertificate(Base, TimestampMixin):
 
 
 class PostalAccountChange(Base, TimestampMixin):
-    """郵局帳戶異動;事由複選,互斥組合由應用層驗證。"""
+    """郵局帳戶異動;事由複選,不設互斥組合(decisions.md D-07)。
+
+    除事由外所有欄位皆可空 —— 各種異動需要的欄位不同(結清銷戶不必填新代理人、
+    新開戶還沒有帳號),一律必填只會逼社團填假資料。
+    """
 
     __tablename__ = "postal_account_changes"
 
     id: Mapped[int] = mapped_column(primary_key=True)
     club_id: Mapped[int] = mapped_column(sa.ForeignKey("clubs.id"), index=True)
     reasons: Mapped[list[str]] = mapped_column(ARRAY(sa.Text))  # PostalReason 值(複選)
-    account_name: Mapped[str] = mapped_column(sa.Text)
-    account_number: Mapped[str] = mapped_column(sa.Text)  # 列表遮罩:前 3 碼+末 2 碼
+    account_name: Mapped[str | None] = mapped_column(sa.Text)
+    account_number: Mapped[str | None] = mapped_column(sa.Text)  # 列表遮罩:前 3 碼+末 2 碼
     new_agent_name: Mapped[str | None] = mapped_column(sa.Text)
     new_agent_phone: Mapped[str | None] = mapped_column(sa.Text)
     status: Mapped[ApplicationStatus] = mapped_column(

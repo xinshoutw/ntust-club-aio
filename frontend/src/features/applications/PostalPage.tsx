@@ -11,17 +11,15 @@ import { IMAGE_ACCEPT, isImageFile, isPdfFile } from '../../lib/uploads'
 import { usePostalList, usePostalMutations, useRecentPostal } from '../../api/applications'
 
 const REASONS = ['更換郵局存簿代理人', '新開戶', '帳戶印鑑章變更', '帳簿遺失', '存簿密碼異動', '結清銷戶']
-// 互斥組合(依承辦邏輯先行判斷,與後端同規則)
-const CONFLICTS: [string, string][] = [
-  ['更換郵局存簿代理人', '新開戶'],
-  ['新開戶', '結清銷戶'],
-  ['更換郵局存簿代理人', '結清銷戶'],
-]
+// 「新開戶申請表」空白表由站內留存(異動走 infra,前端不提供替換)
+const NEW_ACCOUNT_FORM = '/postal-new-account-form.pdf'
+// 事由不設互斥組合,欄位除事由外全部選填(decisions.md D-07):
+// 一次辦好幾件本來就常見,而結清銷戶不必填新代理人、新開戶當下也還沒有帳號
 
 interface PostalFormValues {
   reasons: string[]
-  accountName: string
-  accountNo: string
+  accountName?: string
+  accountNo?: string
   agent?: string
   phone?: string
 }
@@ -41,10 +39,7 @@ export default function PostalPage() {
   const recentRows = recentQuery.data ?? []
   const { submit } = usePostalMutations()
 
-  const disabled = (r: string) =>
-    CONFLICTS.some(([a, b]) => (r === a && reasons.includes(b)) || (r === b && reasons.includes(a)))
-
-  const needAgent = reasons.includes('更換郵局存簿代理人') || reasons.includes('新開戶')
+  const isNewAccount = reasons.includes('新開戶')
 
   return (
     <div>
@@ -93,37 +88,41 @@ export default function PostalPage() {
             rules={[{ required: true, message: '請勾選至少一項事由' }]}
           >
             <Checkbox.Group
-              options={REASONS.map((r) => ({ value: r, label: r, disabled: disabled(r) }))}
+              options={REASONS.map((r) => ({ value: r, label: r }))}
               style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 6 }}
             />
           </Form.Item>
           <div className="form-grid-2">
-            <Form.Item name="accountName" label="存簿戶名" rules={[{ required: true, message: '請輸入戶名' }]} style={{ marginBottom: 0 }}>
+            <Form.Item name="accountName" label="存簿戶名" style={{ marginBottom: 0 }}>
               <Input placeholder="資工系學會" />
             </Form.Item>
             <Form.Item
               name="accountNo"
               label="存簿局號、帳號"
-              rules={[
-                { required: true, message: '請輸入局號帳號' },
-                { pattern: /^[\d-]{6,20}$/, message: '局號帳號為 6–20 碼數字(可含 -)' },
-              ]}
+              rules={[{ pattern: /^[\d-]{6,20}$/, message: '局號帳號為 6–20 碼數字(可含 -)' }]}
               style={{ marginBottom: 0 }}
             >
               <Input className="num" />
             </Form.Item>
-            {needAgent && (
-              <>
-                <Form.Item name="agent" label="新代理人姓名" preserve={false} rules={[{ required: true, message: '請輸入新代理人' }]} style={{ marginBottom: 0 }}>
-                  <Input />
-                </Form.Item>
-                <Form.Item name="phone" label="新代理人電話" preserve={false} rules={[{ required: true, message: '請輸入聯絡電話' }]} style={{ marginBottom: 0 }}>
-                  <Input className="num" />
-                </Form.Item>
-              </>
-            )}
+            <Form.Item name="agent" label="新代理人姓名" style={{ marginBottom: 0 }}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="phone" label="新代理人電話" style={{ marginBottom: 0 }}>
+              <Input className="num" />
+            </Form.Item>
           </div>
-          <Form.Item label="原存簿影本/新開戶申請表" required style={{ margin: '16px 0 0' }}>
+          <Form.Item
+            label="原存簿影本/新開戶申請表"
+            required
+            style={{ margin: '16px 0 0' }}
+            extra={
+              isNewAccount ? (
+                <a href={NEW_ACCOUNT_FORM} target="_blank" rel="noreferrer">
+                  下載「社團於本校郵局新開戶申請表」空白表
+                </a>
+              ) : undefined
+            }
+          >
             <AttachmentArea
               value={files}
               onChange={(next) => {
@@ -162,7 +161,7 @@ export default function PostalPage() {
                 <tr key={r.id}>
                   <td style={{ fontWeight: 500 }}>{r.reasons.join('、')}</td>
                   <td style={{ color: 'var(--steel)', fontSize: 13 }}>
-                    戶名:{r.accountName} · 帳號:<span className="num">{r.accountNumber}</span>
+                    戶名:{r.accountName || '—'} · 帳號:<span className="num">{r.accountNumber || '—'}</span>
                   </td>
                   <td className="num" style={{ fontSize: 13 }}>{r.date}</td>
                   <td><StatusPill status={r.status} /></td>
@@ -203,7 +202,7 @@ export default function PostalPage() {
                 <tr key={r.id}>
                   <td style={{ fontWeight: 500 }}>{r.reasons.join('、')}</td>
                   <td style={{ color: 'var(--steel)', fontSize: 13 }}>
-                    戶名:{r.accountName} · 帳號:<span className="num">{r.accountNumber}</span>
+                    戶名:{r.accountName || '—'} · 帳號:<span className="num">{r.accountNumber || '—'}</span>
                   </td>
                   <td className="num" style={{ fontSize: 13 }}>{r.date}</td>
                   <td><StatusPill status={r.status} /></td>

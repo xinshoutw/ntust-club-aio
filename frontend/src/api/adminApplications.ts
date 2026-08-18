@@ -27,8 +27,9 @@ export interface PostalChangeRow {
   id: number
   club: string
   reasons: string[]
-  accountName: string
-  accountNumber: string
+  /** 事由以外全部選填(decisions.md D-07) */
+  accountName?: string
+  accountNumber?: string
   newAgentName?: string
   newAgentPhone?: string
   date: string
@@ -51,8 +52,8 @@ interface AdminPostalChangeOut {
   id: number
   club_name: string
   reasons: string[]
-  account_name: string
-  account_number: string
+  account_name: string | null
+  account_number: string | null
   new_agent_name: string | null
   new_agent_phone: string | null
   status: ApplicationStatus
@@ -74,8 +75,8 @@ const toPostalRow = (p: AdminPostalChangeOut): PostalChangeRow => ({
   id: p.id,
   club: p.club_name,
   reasons: p.reasons,
-  accountName: p.account_name,
-  accountNumber: p.account_number,
+  accountName: p.account_name ?? undefined,
+  accountNumber: p.account_number ?? undefined,
   newAgentName: p.new_agent_name ?? undefined,
   newAgentPhone: p.new_agent_phone ?? undefined,
   date: dayjs(p.created_at).format('YYYY/MM/DD'),

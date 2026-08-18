@@ -158,8 +158,8 @@ export default function AdminApplicationsPage() {
                 <tr key={p.id}>
                   <td className="cell-clip" title={p.club}>{p.club}</td>
                   <td style={{ fontSize: 13 }}>{p.reasons.join('、')}</td>
-                  <td>{p.accountName}</td>
-                  <td className="num" style={{ fontSize: 13 }}>{p.accountNumber}</td>
+                  <td>{p.accountName || '—'}</td>
+                  <td className="num" style={{ fontSize: 13 }}>{p.accountNumber || '—'}</td>
                   <td style={{ fontSize: 13 }}>
                     {p.newAgentName ? (
                       <>
@@ -184,7 +184,7 @@ export default function AdminApplicationsPage() {
                   </td>
                   <td className="num" style={{ fontSize: 13 }}>{p.date}</td>
                   <td>
-                    <StatusCell kind="postal" id={p.id} status={p.status} name={`${p.club} ${p.accountName}`} />
+                    <StatusCell kind="postal" id={p.id} status={p.status} name={`${p.club} ${p.accountName || ''}`.trim()} />
                   </td>
                 </tr>
               ))}

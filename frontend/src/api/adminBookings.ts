@@ -7,6 +7,7 @@ import { api, apiPaged, qs } from './client'
 import { fetchAllPages } from './fetchAll'
 import type { FixedWindow } from './bookings'
 import type { StatusKey } from '../lib/status'
+import { periodRank } from '../lib/periods'
 
 const toDisplayDate = (iso: string): string => dayjs(iso).format('YYYY/MM/DD')
 
@@ -199,9 +200,6 @@ interface AdminRoomBookingOut {
   slots: RoomSlotOut[]
 }
 
-// 節次顯示順序(第 1–10 節與 A–D 節);slots → 每週時段 entries 的排序依據
-const PERIOD_ORDER = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'A', 'B', 'C', 'D']
-
 /** slots(weekday×period 平面列)→ 依星期分組、節次照課表順序排序 */
 export const slotsToEntries = (slots: RoomSlotOut[]): AdminRoomRequest['entries'] => {
   const byDow = new Map<number, string[]>()
@@ -212,7 +210,7 @@ export const slotsToEntries = (slots: RoomSlotOut[]): AdminRoomRequest['entries'
     .sort(([a], [b]) => a - b)
     .map(([dow, periods]) => ({
       dow,
-      periods: [...periods].sort((a, b) => PERIOD_ORDER.indexOf(a) - PERIOD_ORDER.indexOf(b)),
+      periods: [...periods].sort((a, b) => periodRank(a) - periodRank(b)),
     }))
 }
 

@@ -112,7 +112,9 @@ pnpm run lint
 - 測試環境是全域 jsdom(`vite.config.ts` + `src/test/setup.ts` 補 `matchMedia`/`ResizeObserver`);
   元件測試用 `@testing-library/react` 的 `render`/`screen`/`fireEvent`,`cleanup` 已在 setup 掛好
 - 節次目錄(節次軸與起訖時刻)只有後端一份,前端經 `lib/periods.ts` 的 `usePeriods()` 取用;
-  `VenueCategory` 則是兩份(`models/enums.py` / `api/adminVenues.ts`,後端是 PG enum,新增值另需 revision)
+  節次「順序規則」在 `lib/periods.periodRank`(純轉換函式拿不到 hook,只需要順序);
+  **晚間節次集合與最少連續節數仍是前後端各一份**(`booking_service.LATE_PERIODS` / `FixedRoomPage.LATE`);
+  `VenueCategory` 同樣兩份(`models/enums.py` / `api/adminVenues.ts`,後端是 PG enum,新增值另需 revision)
 
 **修 issues.md 的條目時**(A/B/C 三堆的作業流程,見 `docs/HANDOFF.md`)
 

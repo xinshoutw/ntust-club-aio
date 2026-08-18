@@ -551,3 +551,13 @@ def test_fixed_target_semester_never_falls_back_to_a_finished_semester():
     stale = {"open_from": "2026-07-25", "open_until": "2026-08-05"}
     assert booking_service.fixed_target_semester(stale, today) == next_semester_range(today)
     assert booking_service.fixed_target_semester({}, today) == next_semester_range(today)
+
+
+def test_period_axis_matches_the_frontend_sort_rule():
+    """節次軸的順序必須與前端 `lib/periods.periodRank`(數字節在前、字母節在後)一致。
+
+    前端的純轉換函式(把 slots 排成每週時段)拿不到 hook,只能用這條規則排序。
+    新增節次時若打破,固定借用的時段顯示會靜默倒過來,而畫面上看不出來。
+    """
+    rank = lambda k: int(k) if k.isdigit() else 100 + ord(k)  # noqa: E731
+    assert list(booking_service.PERIODS) == sorted(booking_service.PERIODS, key=rank)

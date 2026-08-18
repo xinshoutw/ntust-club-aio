@@ -5,12 +5,9 @@ import dayjs, { type Dayjs } from 'dayjs'
 import { api, apiPaged, apiWithMeta, qs } from './client'
 import { fetchAllPages } from './fetchAll'
 import type { StatusKey } from '../lib/status'
+import { periodRank } from '../lib/periods'
 
 export const DOW_TEXT = ['', '一', '二', '三', '四', '五', '六', '日']
-
-// 節次排序:數字節在前、字母節在後。節次目錄本身在 lib/periods(隨 /auth/me 下發),
-// 這裡是純轉換函式拿不到 hook —— 只用得到順序規則,不需要目錄
-const periodRank = (p: string): number => (/^\d+$/.test(p) ? Number(p) : 100 + p.charCodeAt(0))
 
 const DATE_FMT = 'YYYY/MM/DD'
 const toIso = (d: Dayjs): string => d.format('YYYY-MM-DD')

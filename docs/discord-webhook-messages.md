@@ -146,7 +146,31 @@ D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政�
 - **I2 停權解除** `DELETE /admin/clubs/{id}/suspend` · alert
   `社團停權解除` / `{club.name}:即日起恢復借用申請`
 
-**目前不發通知的相近動作**(設計時可問需求方是否要補):三種借用的社團自行取消、行政手動借用建立、報名簽到登錄、公告蓋板切換與刪除、活動草稿儲存與刪除。
+**待實作**(GAP-18,需求方 2026-08-18 決定「都發」)
+
+以下九項目前完全不發通知,文案為初擬,需求方可逐條調整或增刪:
+
+- **K1 固定借用社團自行取消** `DELETE /club/room-bookings/{id}` · reject
+  `固定場地借用已取消` / `{club.name}:{venue.name}({n} 個每週時段)`
+- **K2 臨時借用社團自行取消** `DELETE /club/venue-bookings/{id}` · reject
+  `臨時場地借用已取消` / `{club.name}:{venue.name}({date} 時段 {periods})`
+- **K3 器材借用社團自行取消** `DELETE /club/equipment-loans/{id}` · reject
+  `器材借用已取消` / `{club.name}:{equipment.name} ×{qty}({start}~{end})`
+- **K4 行政手動借用建立** `POST /admin/manual-booking` · alert · **僅推全域**(無社團)
+  `行政手動借用建立` / `{user.name}:{venue 或 equipment 名}({date} 時段 {periods})`
+- **K5 報名簽到登錄** `PUT /admin/signup-items/{id}/registrations/{club_id}/attend` · approve
+  `報名簽到已登錄` / `{club.name}:{item.name}({n} 人到場)`
+- **K6 公告蓋板開啟** `PATCH /admin/announcements/{id}`(`is_pinned` 轉為真時)· announce · 僅推全域
+  `公告已設為蓋板` / `{title}`
+- **K7 公告蓋板關閉** 同上(轉為假時)· announce · 僅推全域
+  `公告已取消蓋板` / `{title}`
+- **K8 公告刪除** `DELETE /admin/announcements/{id}` · alert · 僅推全域
+  `公告已刪除` / `{title}`
+- **K9 活動草稿刪除** `DELETE /club/activities/{id}`(草稿狀態)· alert
+  `活動草稿已刪除` / `{club.name}:{activity.name}`
+
+**「活動草稿儲存」刻意不列**:草稿每存一次就推一則訊息,同一份活動在填寫過程中會產生數十則,
+會把承辦頻道的其他事件淹掉。若需求方仍要,建議改為「首次建立草稿時推一則」而非每次儲存。
 
 ## 3. 模板可取用的資料
 

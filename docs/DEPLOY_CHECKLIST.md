@@ -8,7 +8,7 @@
 
 - [ ] **備份排程**:`backend/scripts/backup_db.sh` 已就緒(每日 `pg_dump` 自訂格式 + 保留 14 天輪替,**存在同一台機器**,decisions.md OPS-01 明定不做異地),**cron 尚未掛上**(cron 行見該檔頂部)。上傳檔案目錄不在腳本範圍內,要靠 GCE 磁碟快照;部署前另手動 dump 一次
 - [ ] **器材主檔的建立順序**:`scripts/seed.py` 只建 5 獎項 + 19 場地 + superadmin,**器材主檔由 `migration/cc_import.py` 從舊 `Device` 表帶入**(品名、數量、單次上限、啟用與否)。正式流程必須 seed 之後跑過遷移,否則器材借用無品項可選
-- [ ] **政府行事曆假日**:`holidays` 表未 seed。未匯入的年度,`booking_service.add_workdays` 會退化成只排除週六日,逢國定假日的逾期判定偏一天
+- [ ] **政府行事曆假日**:`holidays` 表未 seed。匯入腳本已就緒(`scripts/import_holidays.py --year <民國年> --yes`,資料源見 decisions.md GAP-06),**每年上線年度都要跑一次**;未匯入的年度 `booking_service.add_workdays` 會退化成只排除週六日,逢國定假日的逾期判定偏一天
 
 ## B. `.env`(prod)
 
@@ -63,7 +63,7 @@
 5. GCE 實體磁碟大小(`df` 驗證)與 VM 規格(e2-medium + 2GB swap 是否夠)
 6. `.env` 的保管與輪替方式
 7. 監控方案(容量告警已有腳本;後端存活與 log 輪替仍未定)
-8. 政府行事曆假日由誰於上線年度匯入
+8. 政府行事曆假日由誰於每年年初執行匯入(腳本已有)
 9. HTTPS:確認 edge 上 `clubs.ntust.edu.tw` 的憑證來源與自動續期(現行憑證路徑不是 certbot 慣例的 `/etc/letsencrypt/live/`,不能假設);內層走 HTTP(僅 compose 內網)
 
 ## G. 已知限制

@@ -6,7 +6,7 @@
 """
 
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 MIGRATION_DIR = Path(__file__).resolve().parents[2] / "migration"
@@ -94,3 +94,30 @@ def test_cms_import_reset_covers_every_id_mapped_table():
                             Path(cms_import.__file__).read_text()))
     assert mapped, "找不到任何 ids.record 呼叫,這支測試自己壞了"
     assert {t for t, _ in cms_import._RESET_ORDER} == mapped
+
+
+def test_holiday_calendar_parsing():
+    """人事行政總處的辦公日曆表:`是否放假` 2=放假,週六日不入表
+    (`add_workdays` 本來就排除週末)。"""
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(
+        "import_holidays", Path(__file__).resolve().parents[1] / "scripts" / "import_holidays.py"
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    csv_text = (
+        "﻿西元日期,星期,是否放假,備註\n"
+        "20270101,五,2,開國紀念日\n"   # 平日假期 → 入表
+        "20270102,六,2,\n"             # 週六 → 不入表
+        "20270103,日,2,\n"             # 週日 → 不入表
+        "20270104,一,0,\n"             # 上班日 → 不入表
+        "20270209,二,2,\n"             # 平日放假但沒寫名稱 → 補預設名
+        "2027,三,2,壞資料\n"            # 日期長度不對 → 跳過
+        "20271332,三,2,壞日期\n"        # 月份 13 → 跳過
+    )
+    assert module.parse_calendar(csv_text) == [
+        (date(2027, 1, 1), "開國紀念日"),
+        (date(2027, 2, 9), "例假日"),
+    ]

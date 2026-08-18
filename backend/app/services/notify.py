@@ -11,7 +11,6 @@ import html as html_escape
 import logging
 import ssl
 from email.message import EmailMessage
-from functools import cache
 from typing import Any
 
 import aiosmtplib
@@ -19,6 +18,7 @@ import httpx
 
 from app.core.config import settings
 from app.core.db import async_session_factory
+from app.core.tls import lenient_extension_context
 from app.models import EmailLog
 from app.models.enums import EmailStatus
 
@@ -221,20 +221,10 @@ async def announcement_broadcast(
         await send_email(addr, subject, plain, template="announcement", html=html)
 
 
-@cache
 def _smtp_tls_context() -> ssl.SSLContext:
-    """SMTP 用的 TLS context:憑證鏈與主機名照驗,只關掉 RFC 5280 的嚴格擴充欄位檢查。
-
-    校方 relay(mail.ntust.edu.tw)的憑證鏈可信、主機名相符,但鏈上有一張 CA 憑證
-    缺 Subject Key Identifier。Python 3.13 起 `create_default_context()` 預設開
-    `VERIFY_X509_STRICT`,那張 CA 就會讓整條鏈驗不過(Missing Subject Key Identifier)。
-
-    **只清掉 VERIFY_X509_STRICT**:`CERT_REQUIRED` 與 `check_hostname` 都保留,
-    偽造憑證或換一台主機一樣連不上。不要在這裡改成 `CERT_NONE`。
-    """
-    ctx = ssl.create_default_context()
-    ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
-    return ctx
+    """校方 relay(mail.ntust.edu.tw)的憑證鏈可信、主機名相符,但鏈上有一張 CA
+    缺 Subject Key Identifier —— 與人事行政總處那台同一種毛病,共用 `core.tls`。"""
+    return lenient_extension_context()
 
 
 async def send_email(

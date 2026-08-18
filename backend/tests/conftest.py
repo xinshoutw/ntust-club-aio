@@ -1,10 +1,17 @@
 # ruff: noqa: E402
 import os
+import time
 
 # 必須在 import app 之前設定:測試一律打獨立資料庫(絕不碰開發庫)。
 # CLUB_AIO_TEST_DB 允許平行 worktree 各用一個測試庫,互不搶鎖
 TEST_DB = os.environ.get("CLUB_AIO_TEST_DB", "club_aio_test")
 os.environ["POSTGRES_DB"] = TEST_DB
+
+# 行程時區固定台北:業務推導全走 core.semesters.TAIPEI(結案期限、逾期、學期起訖),
+# 而測試裡的 date.today() 讀的是行程時區 —— CI 跑 UTC 就會與後端差一天,日界測試必翻。
+# 必須早於測試模組 import(有模組層級的 date.today() 常數)。
+os.environ["TZ"] = "Asia/Taipei"
+time.tzset()
 
 import httpx
 import pytest

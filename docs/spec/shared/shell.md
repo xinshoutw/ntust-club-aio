@@ -32,7 +32,7 @@
 
 ## 權限閘
 
-`lib/permissions.ts` 的 `ROUTE_KEYS` 定義每條 admin 路由需要的權限鍵(any-of;`super` 全通;空陣列 = 僅 super)。`/admin` 總覽對所有管理員開放。無權限時 `AdminPermissionGate` **就地顯示說明**而非導走。後端各 router 另有 `require_permission` / `require_super`,前端過濾只是體驗層。
+`lib/permissions.ts` 的 `canAccessAdminPath` 逐條比對**後端目錄表**(`core/permissions.ADMIN_PAGES`,隨 `/auth/me` 送達):一頁一把鍵,`super` 全通,**沒有僅 super 可達的頁面**。目錄表未涵蓋的路徑一律當作無權限(fail-closed);`/admin` 總覽對所有管理員開放。無權限時 `AdminPermissionGate` **就地顯示說明**而非導走。後端各 router 另有 `require_permission`,前端過濾只是體驗層。
 
 ## 蓋板公告
 

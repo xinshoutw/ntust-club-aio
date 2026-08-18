@@ -15,8 +15,8 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.exc import IntegrityError
 
 from app.api.pagination import Pagination
-from app.core.deps import CurrentUser, DbDep, client_ip, require_super
-from app.core.errors import conflict, not_found, validation_error
+from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
+from app.core.errors import conflict, forbidden, not_found, validation_error
 from app.core.security import generate_password, hash_password_async
 from app.models import PasswordHistory, Session, User
 from app.models.enums import UserRole
@@ -34,9 +34,24 @@ from app.services import audit
 
 router = APIRouter(prefix="/admin/accounts", tags=["admin"])
 
-SuperAdmin = Annotated[CurrentUser, Depends(require_super)]
+PageAdmin = Annotated[CurrentUser, Depends(require_permission("aaccount"))]
 
 _MANAGED_ROLES = {UserRole.ADMIN, UserRole.STAFF, UserRole.VIEWER}
+
+
+def _check_grantable(actor: User, keys: list[str]) -> None:
+    """非 super 只能授出自己也持有的權限。
+
+    帳號管理自己也是一把可授權的鍵(D-01),少了這條就等於「拿到 aaccount 的人
+    可以把自己升成全權」—— aaccount 會直接等同最高權限。
+    """
+    if actor.is_super:
+        return
+    excess = [k for k in keys if k not in actor.permissions]
+    if excess:
+        raise forbidden(
+            f"不可授予自己未持有的權限:{','.join(excess)}", code="PERMISSION_NOT_GRANTABLE"
+        )
 
 
 async def _managed_account(db, account_id: int) -> User:
@@ -55,7 +70,7 @@ def _guard_target(user: User, target: User, action: str) -> None:
 
 @router.get("")
 async def list_accounts(
-    user: SuperAdmin,
+    user: PageAdmin,
     db: DbDep,
     page: Pagination,
     role: Annotated[ManagedRole | None, Query()] = None,
@@ -75,13 +90,14 @@ async def list_accounts(
 
 @router.post("", status_code=201)
 async def create_account(
-    body: AccountCreateIn, user: SuperAdmin, db: DbDep, request: Request
+    body: AccountCreateIn, user: PageAdmin, db: DbDep, request: Request
 ) -> ApiResponse[AccountCreatedOut]:
     exists = await db.scalar(sa.select(User.id).where(User.username == body.username))
     if exists:
         raise conflict("此帳號已存在")
     if body.permissions and body.role != "admin":
         raise validation_error("僅管理員帳號可設定頁面權限")
+    _check_grantable(user, body.permissions)
 
     password = generate_password()
     target = User(
@@ -113,7 +129,7 @@ async def create_account(
 
 @router.delete("/{account_id}")
 async def delete_account(
-    account_id: int, user: SuperAdmin, db: DbDep, request: Request
+    account_id: int, user: PageAdmin, db: DbDep, request: Request
 ) -> ApiResponse[None]:
     target = await _managed_account(db, account_id)
     _guard_target(user, target, "刪除")
@@ -138,7 +154,7 @@ async def delete_account(
 
 @router.put("/{account_id}/active")
 async def set_active(
-    account_id: int, body: ActiveIn, user: SuperAdmin, db: DbDep, request: Request
+    account_id: int, body: ActiveIn, user: PageAdmin, db: DbDep, request: Request
 ) -> ApiResponse[AccountOut]:
     target = await _managed_account(db, account_id)
     _guard_target(user, target, "停權" if not body.is_active else "變更")
@@ -160,7 +176,7 @@ async def set_active(
 
 @router.post("/{account_id}/reset-password")
 async def reset_password(
-    account_id: int, user: SuperAdmin, db: DbDep, request: Request
+    account_id: int, user: PageAdmin, db: DbDep, request: Request
 ) -> ApiResponse[PasswordResetOut]:
     target = await _managed_account(db, account_id)
     if target.id == user.id:
@@ -188,13 +204,15 @@ async def reset_password(
 
 @router.put("/{account_id}/permissions")
 async def set_permissions(
-    account_id: int, body: PermissionsIn, user: SuperAdmin, db: DbDep, request: Request
+    account_id: int, body: PermissionsIn, user: PageAdmin, db: DbDep, request: Request
 ) -> ApiResponse[AccountOut]:
     target = await _managed_account(db, account_id)
     if target.role != UserRole.ADMIN:
         raise validation_error("僅管理員帳號可設定頁面權限")
     if target.is_super:
         raise conflict("最高權限帳號不受頁面權限限制")
+    # 收回別人的權限不必自己持有,但授出的每一把都必須自己也有
+    _check_grantable(user, [k for k in body.permissions if k not in target.permissions])
 
     target.permissions = body.permissions
     audit.record(

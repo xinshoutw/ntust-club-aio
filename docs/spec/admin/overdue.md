@@ -1,6 +1,6 @@
 # 逾期追蹤與停權
 
-`/admin/overdue` · `admin`(**僅 super**) · `features/admin/OverduePage.tsx`
+`/admin/overdue` · `admin` · 權限鍵 `aoverdue` · `features/admin/OverduePage.tsx`
 
 ## 用途
 

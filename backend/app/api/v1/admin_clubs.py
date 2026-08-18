@@ -17,6 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from app.api.pagination import Pagination, parse_sort
 from app.api.v1.members import _DEFAULT_ORDER as _MEMBER_DEFAULT_ORDER
 from app.api.v1.members import _SORTABLE as _MEMBER_SORTABLE
+from app.core import permissions
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission, require_role
 from app.core.errors import conflict, not_found
 from app.core.security import generate_password, hash_password_async
@@ -37,7 +38,11 @@ from app.services import audit
 
 router = APIRouter(prefix="/admin/clubs", tags=["admin"])
 
-ClubAdmin = Annotated[CurrentUser, Depends(require_permission("amember"))]
+# 社團三頁(總覽/成員列表/管理項目)各自一把鍵,唯讀資料共享
+ClubReader = Annotated[CurrentUser, Depends(require_permission(*permissions.CLUB_READ_KEYS))]
+ClubLister = Annotated[CurrentUser, Depends(require_permission(*permissions.CLUB_LIST_KEYS))]
+# 寫入一律歸「管理項目」;重設社團密碼同此關(decisions.md ISS-25)
+ClubSettingAdmin = Annotated[CurrentUser, Depends(require_permission("aclubset"))]
 # 最小社團選項對「任何管理員」開放(公告/行政分審核等獨立權限頁也要選社團)
 AnyAdmin = Annotated[CurrentUser, Depends(require_role(UserRole.ADMIN))]
 
@@ -98,7 +103,7 @@ def _detail_out(club: Club, account: User | None) -> AdminClubDetailOut:
 
 
 @router.get("")
-async def list_clubs(user: ClubAdmin, db: DbDep) -> ApiResponse[list[AdminClubOut]]:
+async def list_clubs(user: ClubLister, db: DbDep) -> ApiResponse[list[AdminClubOut]]:
     """全部社團(不分頁;全校 <200 筆)。"""
     account = sa.orm.aliased(User)
     rows = await db.execute(
@@ -142,14 +147,14 @@ async def club_options(user: AnyAdmin, db: DbDep) -> ApiResponse[list[ClubOption
 
 
 @router.get("/{club_id}")
-async def get_club(club_id: int, user: ClubAdmin, db: DbDep) -> ApiResponse[AdminClubDetailOut]:
+async def get_club(club_id: int, user: ClubReader, db: DbDep) -> ApiResponse[AdminClubDetailOut]:
     club = await _club_or_404(db, club_id)
     return ApiResponse(data=_detail_out(club, await _club_account(db, club_id)))
 
 
 @router.patch("/{club_id}")
 async def update_club(
-    club_id: int, body: AdminClubUpdate, user: ClubAdmin, db: DbDep, request: Request
+    club_id: int, body: AdminClubUpdate, user: ClubSettingAdmin, db: DbDep, request: Request
 ) -> ApiResponse[AdminClubDetailOut]:
     club = await _club_or_404(db, club_id)
     account = await _club_account(db, club_id)
@@ -214,7 +219,7 @@ async def update_club(
 
 @router.post("/{club_id}/account", status_code=201)
 async def create_club_account(
-    club_id: int, body: ClubAccountCreateIn, user: ClubAdmin, db: DbDep, request: Request
+    club_id: int, body: ClubAccountCreateIn, user: ClubSettingAdmin, db: DbDep, request: Request
 ) -> ApiResponse[ClubAccountCreatedOut]:
     """建立社團帳號(一社一帳號):產生一次性密碼,首登強制改密。
 
@@ -261,7 +266,7 @@ async def create_club_account(
 
 @router.post("/{club_id}/reset-password")
 async def reset_club_password(
-    club_id: int, user: ClubAdmin, db: DbDep, request: Request
+    club_id: int, user: ClubSettingAdmin, db: DbDep, request: Request
 ) -> ApiResponse[PasswordResetOut]:
     await _club_or_404(db, club_id)
     account = await _club_account(db, club_id)
@@ -291,7 +296,7 @@ async def reset_club_password(
 
 @router.get("/{club_id}/members/semesters")
 async def list_club_member_semesters(
-    club_id: int, user: ClubAdmin, db: DbDep
+    club_id: int, user: ClubReader, db: DbDep
 ) -> ApiResponse[list[str]]:
     """該社名單有資料的學期(新到舊),供學期下拉(比照社團端 /club/members/semesters)。"""
     await _club_or_404(db, club_id)
@@ -306,7 +311,7 @@ async def list_club_member_semesters(
 @router.get("/{club_id}/members")
 async def list_club_members(
     club_id: int,
-    user: ClubAdmin,
+    user: ClubReader,
     db: DbDep,
     page: Pagination,
     semester: str | None = Query(None, pattern=r"^\d{3}-[12]$"),

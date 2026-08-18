@@ -16,6 +16,18 @@ export interface SessionUser {
   permissions: string[]
   canViewEval: boolean
   mustChangePassword: boolean
+  /** 行政端頁面權限目錄(後端 core/permissions.ADMIN_PAGES);非 admin 為 undefined。
+   *  側欄過濾、路由守衛與權限彈窗全部讀這一份,前端不得自行維護第二份鍵表 */
+  adminPages?: AdminPage[]
+}
+
+export interface AdminPage {
+  key: string
+  label: string
+  /** 路由前綴;第一個為主要入口(報名管理有兩頁共用一把鍵) */
+  paths: string[]
+  /** 本頁另外開給哪些非頁面鍵(簽核關卡帳號要進得了審核頁) */
+  also: string[]
 }
 
 interface UserOut {
@@ -31,6 +43,7 @@ interface UserOut {
   permissions: string[]
   can_view_eval: boolean
   must_change_password: boolean
+  admin_pages: AdminPage[] | null
 }
 
 const toUser = (u: UserOut): SessionUser => ({
@@ -45,6 +58,7 @@ const toUser = (u: UserOut): SessionUser => ({
   permissions: u.permissions,
   canViewEval: u.can_view_eval,
   mustChangePassword: u.must_change_password,
+  adminPages: u.admin_pages ?? undefined,
 })
 
 export const loginApi = (username: string, password: string): Promise<SessionUser> =>

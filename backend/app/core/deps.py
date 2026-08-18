@@ -137,12 +137,6 @@ def require_permission(*keys: str):
     return dep
 
 
-async def require_super(user: CurrentUser) -> User:
-    if user.role != UserRole.ADMIN or not user.is_super:
-        raise forbidden()
-    return user
-
-
 async def require_staff(user: CurrentUser) -> User:
     if user.role != UserRole.STAFF:
         raise forbidden()

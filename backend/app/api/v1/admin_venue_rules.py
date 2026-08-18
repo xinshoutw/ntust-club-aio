@@ -10,7 +10,7 @@ from typing import Annotated
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Query, Request
 
-from app.core.deps import CurrentUser, DbDep, client_ip, require_super
+from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import not_found, validation_error
 from app.models import Venue, VenueBlockRule
 from app.schemas.bookings import VenueBlockRuleIn, VenueBlockRuleOut
@@ -19,12 +19,12 @@ from app.services import audit
 
 router = APIRouter(prefix="/admin/venue-rules", tags=["admin"])
 
-SuperAdmin = Annotated[CurrentUser, Depends(require_super)]
+PageAdmin = Annotated[CurrentUser, Depends(require_permission("arule"))]
 
 
 @router.get("")
 async def list_rules(
-    user: SuperAdmin, db: DbDep, venue_id: int | None = Query(None)
+    user: PageAdmin, db: DbDep, venue_id: int | None = Query(None)
 ) -> ApiResponse[list[VenueBlockRuleOut]]:
     query = (
         sa.select(VenueBlockRule, Venue.name)
@@ -43,7 +43,7 @@ async def list_rules(
 
 @router.post("", status_code=201)
 async def create_rule(
-    body: VenueBlockRuleIn, user: SuperAdmin, db: DbDep, request: Request
+    body: VenueBlockRuleIn, user: PageAdmin, db: DbDep, request: Request
 ) -> ApiResponse[VenueBlockRuleOut]:
     venue = await db.get(Venue, body.venue_id)
     if venue is None or not venue.is_active:
@@ -73,7 +73,7 @@ async def create_rule(
 
 @router.delete("/{rule_id}")
 async def delete_rule(
-    rule_id: int, user: SuperAdmin, db: DbDep, request: Request
+    rule_id: int, user: PageAdmin, db: DbDep, request: Request
 ) -> ApiResponse[None]:
     rule = await db.get(VenueBlockRule, rule_id)
     if rule is None:

@@ -1,6 +1,6 @@
 # 手動借用
 
-`/admin/manual-booking` · `admin`(**僅 super**) · `features/admin/ManualBookingPage.tsx`
+`/admin/manual-booking` · `admin` · 權限鍵 `amanual` · `features/admin/ManualBookingPage.tsx`
 
 ## 用途
 

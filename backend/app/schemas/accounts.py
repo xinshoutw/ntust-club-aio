@@ -9,30 +9,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.core.permissions import PERMISSION_KEYS  # noqa: F401 - 對外沿用此匯入點
 from app.models.enums import UserRole
-
-# 頁面權限鍵(前端 AccountsPage.PERMISSION_KEYS)+ 既有後端鍵 + 簽核關卡鍵
-PERMISSION_KEYS = frozenset(
-    {
-        # 前端權限彈窗清單
-        "areview",  # 活動申請審核
-        "aclose",  # 結案審核
-        "asignup",  # 報名管理
-        "aannounce",  # 發布公告
-        "abooking",  # 臨時場地器材借用審核
-        "aroom",  # 固定場地借用審核
-        "amember",  # 社團管理
-        "aeval",  # 行政分審核
-        "amaint",  # 維修管理
-        "aapply",  # 線上申請管理(幹部證明/郵局帳戶異動)
-        "aviol",  # 違規管理
-        "afiles",  # 檔案管理
-        # 簽核關卡鍵
-        "approve_advisor",
-        "approve_chief",
-        "approve_dean",
-    }
-)
 
 _USERNAME_RE = re.compile(r"^[a-zA-Z0-9._-]{3,50}$")
 

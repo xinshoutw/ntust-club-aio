@@ -9,6 +9,7 @@ import { homeOf } from '../../lib/home'
 import { useAnnouncements, useMarkAnnouncementsRead } from '../../api/announcements'
 import { UnsavedProvider, useHasUnsaved } from '../../app/unsaved'
 import type { NavGroup } from '../../lib/nav'
+import { canAccessAdminPath } from '../../lib/permissions'
 import Sidebar from './Sidebar'
 import TakeoverOverlay from './TakeoverOverlay'
 import './shell.css'
@@ -69,13 +70,14 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
 
   const userMenu = {
     items: [
-      // 登出上方的角色捷徑:社團=設定(管理項目);系統設定與稽核軌跡僅 super
+      // 登出上方的角色捷徑:社團=設定(管理項目);系統設定與稽核軌跡各自一把權限鍵,
+      // 不在側欄,入口只有這裡 —— 判定仍走 canAccessAdminPath,與側欄同一份規則
       ...(user?.role === 'club' ? [{ key: 'settings', icon: <SettingOutlined />, label: '設定' }] : []),
-      ...(user?.role === 'admin' && user.isSuper
-        ? [
-            { key: 'admin-audit', icon: <HistoryOutlined />, label: '稽核紀錄' },
-            { key: 'admin-settings', icon: <SettingOutlined />, label: '設定' },
-          ]
+      ...(canAccessAdminPath(user, '/admin/audit')
+        ? [{ key: 'admin-audit', icon: <HistoryOutlined />, label: '稽核紀錄' }]
+        : []),
+      ...(canAccessAdminPath(user, '/admin/settings')
+        ? [{ key: 'admin-settings', icon: <SettingOutlined />, label: '設定' }]
         : []),
       { key: 'logout', icon: <LogoutOutlined />, label: '登出' },
     ],

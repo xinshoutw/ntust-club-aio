@@ -1,4 +1,4 @@
-"""行政端:場地主檔維護(僅 super)。
+"""行政端:場地主檔維護(系統設定頁的場地卡片)。
 
 形狀比照器材主檔(admin_equipment):名稱/容納人數/類別/借用型態/啟用為 CRUD。
 刪除採停用(is_active=False),避免既有借用單與不開放規則的外鍵斷裂。
@@ -9,7 +9,7 @@ from typing import Annotated
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Request
 
-from app.core.deps import CurrentUser, DbDep, client_ip, require_permission, require_super
+from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, forbidden, not_found, validation_error
 from app.models import Venue
 from app.schemas.bookings import VenueIn, VenueMasterOut, VenueUpdateIn
@@ -18,7 +18,7 @@ from app.services import audit
 
 router = APIRouter(prefix="/admin/venues", tags=["admin"])
 
-SuperAdmin = Annotated[CurrentUser, Depends(require_super)]
+SettingAdmin = Annotated[CurrentUser, Depends(require_permission("asetting"))]
 # 列表另供場況圖與手動借用取列首名稱,權限維持 abooking(super 全通)
 BookingAdmin = Annotated[CurrentUser, Depends(require_permission("abooking"))]
 
@@ -40,7 +40,7 @@ async def list_venues(
 
 @router.post("", status_code=201)
 async def create_venue(
-    body: VenueIn, user: SuperAdmin, db: DbDep, request: Request
+    body: VenueIn, user: SettingAdmin, db: DbDep, request: Request
 ) -> ApiResponse[VenueMasterOut]:
     existing = await db.scalar(sa.select(Venue).where(Venue.name == body.name))
     if existing is not None:
@@ -63,7 +63,7 @@ async def create_venue(
 
 @router.patch("/{venue_id}")
 async def update_venue(
-    venue_id: int, body: VenueUpdateIn, user: SuperAdmin, db: DbDep, request: Request
+    venue_id: int, body: VenueUpdateIn, user: SettingAdmin, db: DbDep, request: Request
 ) -> ApiResponse[VenueMasterOut]:
     row = await db.get(Venue, venue_id)
     if row is None:

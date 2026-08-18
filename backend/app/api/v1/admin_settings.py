@@ -11,7 +11,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Request
 
-from app.core.deps import CurrentUser, DbDep, client_ip, require_super
+from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.schemas.common import ApiResponse
 from app.schemas.settings import SettingsUpdateIn
 from app.services import audit
@@ -19,7 +19,7 @@ from app.services.settings_service import get_budget_categories, get_setting, se
 
 router = APIRouter(prefix="/admin/settings", tags=["admin"])
 
-SuperAdmin = Annotated[CurrentUser, Depends(require_super)]
+PageAdmin = Annotated[CurrentUser, Depends(require_permission("asetting"))]
 
 # 受管鍵(與 SettingsUpdateIn 欄位一致;GET 依此彙整)
 MANAGED_KEYS = (
@@ -70,7 +70,7 @@ def _diff(before: Any, after: Any) -> str:
 
 
 @router.get("")
-async def get_settings(user: SuperAdmin, db: DbDep) -> ApiResponse[dict[str, Any]]:
+async def get_settings(user: PageAdmin, db: DbDep) -> ApiResponse[dict[str, Any]]:
     data = {key: await get_setting(db, key) for key in MANAGED_KEYS}
     # 舊 list[str] 殘留一律正規化為 [{name, hint}],編輯器才不會拿到空列
     data["budget_categories"] = await get_budget_categories(db)
@@ -79,7 +79,7 @@ async def get_settings(user: SuperAdmin, db: DbDep) -> ApiResponse[dict[str, Any
 
 @router.put("")
 async def update_settings(
-    body: SettingsUpdateIn, user: SuperAdmin, db: DbDep, request: Request
+    body: SettingsUpdateIn, user: PageAdmin, db: DbDep, request: Request
 ) -> ApiResponse[dict[str, Any]]:
     diffs = []
     for key in sorted(body.model_dump(exclude_unset=True, exclude_none=True)):

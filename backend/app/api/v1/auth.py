@@ -2,6 +2,7 @@ import secrets
 
 from fastapi import APIRouter, Request, Response
 
+from app.core import permissions
 from app.core.deps import (
     CSRF_COOKIE,
     CSRF_HEADER,
@@ -14,7 +15,8 @@ from app.core.deps import (
 from app.core.errors import AppError, forbidden, rate_limited
 from app.core.rate_limit import login_limiter
 from app.models import Club, User
-from app.schemas.auth import ChangePasswordRequest, LoginRequest, UserOut
+from app.models.enums import UserRole
+from app.schemas.auth import AdminPageOut, ChangePasswordRequest, LoginRequest, UserOut
 from app.schemas.common import ApiResponse
 from app.services import auth as auth_service
 
@@ -23,6 +25,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 async def _user_out(db: DbDep, user: User) -> UserOut:
     out = UserOut.model_validate(user)
+    if user.role == UserRole.ADMIN:
+        out.admin_pages = [AdminPageOut(**p) for p in permissions.catalogue()]
     if user.club_id is not None:
         club = await db.get(Club, user.club_id)
         out.club_name = club.name if club else None

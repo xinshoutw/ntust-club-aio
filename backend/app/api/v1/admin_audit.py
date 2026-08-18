@@ -10,7 +10,7 @@ import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Query
 
 from app.api.pagination import Pagination
-from app.core.deps import CurrentUser, DbDep, require_super
+from app.core.deps import CurrentUser, DbDep, require_permission
 from app.core.semesters import TAIPEI
 from app.models import AuditLog, User
 from app.schemas.admin import AuditLogOut, AuditOperatorOut, AuditOptionsOut
@@ -18,11 +18,11 @@ from app.schemas.common import ApiResponse
 
 router = APIRouter(prefix="/admin/audit", tags=["admin"])
 
-SuperAdmin = Annotated[CurrentUser, Depends(require_super)]
+PageAdmin = Annotated[CurrentUser, Depends(require_permission("aaudit"))]
 
 
 @router.get("/options")
-async def audit_options(user: SuperAdmin, db: DbDep) -> ApiResponse[AuditOptionsOut]:
+async def audit_options(user: PageAdmin, db: DbDep) -> ApiResponse[AuditOptionsOut]:
     """篩選選項取自實際留下的紀錄:操作者不必先翻到那一頁才篩得到,動作也不會漏掉新加的。"""
     operators = await db.execute(
         sa.select(AuditLog.user_id, User.name, User.username)
@@ -43,7 +43,7 @@ async def audit_options(user: SuperAdmin, db: DbDep) -> ApiResponse[AuditOptions
 
 @router.get("")
 async def list_audit_logs(
-    user: SuperAdmin,
+    user: PageAdmin,
     db: DbDep,
     page: Pagination,
     user_id: int | None = Query(None),  # operator 篩選

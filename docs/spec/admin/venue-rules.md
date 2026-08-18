@@ -1,6 +1,6 @@
 # 場地不開放規則
 
-`/admin/venue-rules` · `admin`(**僅 super**) · `features/admin/VenueRulesPage.tsx`
+`/admin/venue-rules` · `admin` · 權限鍵 `arule` · `features/admin/VenueRulesPage.tsx`
 
 ## 用途
 

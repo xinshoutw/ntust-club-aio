@@ -1,4 +1,4 @@
-"""行政端:逾期追蹤與停權管理(僅最高權限 require_super)。
+"""行政端:逾期追蹤與停權管理(僅最高權限 require_permission)。
 
 - 逾期列表由 /admin/equipment-loans?status=overdue 支援(admin_bookings.py)
 - 提醒:Discord(全域+社團自設 webhook)+ Email(社團聯絡人);audit
@@ -10,7 +10,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Request
 
-from app.core.deps import CurrentUser, DbDep, client_ip, require_super
+from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, not_found, validation_error
 from app.models import Club
 from app.schemas.admin import AdminClubOut, SuspendIn
@@ -20,7 +20,7 @@ from app.services.violation_service import today_taipei
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
-SuperAdmin = Annotated[CurrentUser, Depends(require_super)]
+PageAdmin = Annotated[CurrentUser, Depends(require_permission("aoverdue"))]
 
 
 def _club_out(club: Club) -> AdminClubOut:
@@ -37,7 +37,7 @@ def _club_out(club: Club) -> AdminClubOut:
 @router.post("/equipment-loans/{loan_id}/remind")
 async def remind_equipment_loan(
     loan_id: int,
-    user: SuperAdmin,
+    user: PageAdmin,
     db: DbDep,
     request: Request,
     background: BackgroundTasks,
@@ -56,7 +56,7 @@ async def remind_equipment_loan(
 async def suspend_club(
     club_id: int,
     body: SuspendIn,
-    user: SuperAdmin,
+    user: PageAdmin,
     db: DbDep,
     request: Request,
     background: BackgroundTasks,
@@ -91,7 +91,7 @@ async def suspend_club(
 @router.delete("/clubs/{club_id}/suspend")
 async def lift_club_suspension(
     club_id: int,
-    user: SuperAdmin,
+    user: PageAdmin,
     db: DbDep,
     request: Request,
     background: BackgroundTasks,

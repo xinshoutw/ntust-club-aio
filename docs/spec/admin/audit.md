@@ -1,6 +1,6 @@
 # 稽核紀錄
 
-`/admin/audit` · `admin`(**僅 super**) · `features/admin/AuditPage.tsx`
+`/admin/audit` · `admin` · 權限鍵 `aaudit` · `features/admin/AuditPage.tsx`
 
 > 側欄沒有這一項,入口只有頂欄帳號選單的「稽核紀錄」。
 

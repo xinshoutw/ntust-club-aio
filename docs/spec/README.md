@@ -60,20 +60,20 @@
 | [admin/announcements.md](admin/announcements.md) | `/admin/announcements` | `aannounce` |
 | [admin/bookings.md](admin/bookings.md) | `/admin/bookings` | `abooking` |
 | [admin/rooms.md](admin/rooms.md) | `/admin/rooms` | `aroom` |
-| [admin/manual-booking.md](admin/manual-booking.md) | `/admin/manual-booking` | super |
-| [admin/venue-rules.md](admin/venue-rules.md) | `/admin/venue-rules` | super |
-| [admin/club-overview.md](admin/club-overview.md) | `/admin/club-overview` | `amember` |
+| [admin/manual-booking.md](admin/manual-booking.md) | `/admin/manual-booking` | `amanual` |
+| [admin/venue-rules.md](admin/venue-rules.md) | `/admin/venue-rules` | `arule` |
+| [admin/club-overview.md](admin/club-overview.md) | `/admin/club-overview` | `aclub` |
 | [admin/members.md](admin/members.md) | `/admin/members` | `amember` |
-| [admin/club-settings.md](admin/club-settings.md) | `/admin/club-settings` | `amember` |
-| [admin/overdue.md](admin/overdue.md) | `/admin/overdue` | super |
+| [admin/club-settings.md](admin/club-settings.md) | `/admin/club-settings` | `aclubset` |
+| [admin/overdue.md](admin/overdue.md) | `/admin/overdue` | `aoverdue` |
 | [admin/eval.md](admin/eval.md) | `/admin/eval` | `aeval` |
-| [admin/accounts.md](admin/accounts.md) | `/admin/accounts` | super |
+| [admin/accounts.md](admin/accounts.md) | `/admin/accounts` | `aaccount` |
 | [admin/applications.md](admin/applications.md) | `/admin/applications` | `aapply` |
 | [admin/maintenance.md](admin/maintenance.md) | `/admin/maintenance` | `amaint` |
 | [admin/violations.md](admin/violations.md) | `/admin/violations` | `aviol` |
 | [admin/files.md](admin/files.md) | `/admin/files` | `afiles` |
-| [admin/settings.md](admin/settings.md) | `/admin/settings` | super |
-| [admin/audit.md](admin/audit.md) | `/admin/audit` | super |
+| [admin/settings.md](admin/settings.md) | `/admin/settings` | `asetting` |
+| [admin/audit.md](admin/audit.md) | `/admin/audit` | `aaudit` |
 
 ## 工讀生端(`staff`,URL 前綴 `/pt`)
 

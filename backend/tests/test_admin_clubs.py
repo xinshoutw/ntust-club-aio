@@ -14,10 +14,41 @@ async def seed(client, db):
     club = await make_club(db)  # 熱舞社(藝術性)
     account = await make_user(db, username="club01", club_id=club.id)
     no_account = await make_club(db, name="吉他社")
-    await make_user(db, username="clubadmin", role="admin", permissions=["amember"])
+    await make_user(
+        db,
+        username="clubadmin",
+        role="admin",
+        permissions=["aclub", "amember", "aclubset"],
+    )
+    # 只讀得到名單、改不了設定的帳號(社團三頁各自一把鍵)
+    await make_user(db, username="memberonly", role="admin", permissions=["amember"])
     await make_user(db, username="other", role="admin", permissions=["aviol"])
     await login(client, "clubadmin")
     return club, account, no_account
+
+
+async def test_club_pages_have_separate_keys(client, db):
+    """成員列表的權限讀得到社團資料,但改不動管理項目 —— 三頁各自一把鍵。"""
+    club, _, _ = await seed(client, db)
+    await login(client, "memberonly")
+
+    assert (await client.get(f"{URL}/{club.id}")).status_code == 200
+    assert (await client.get(f"{URL}/{club.id}/members")).status_code == 200
+    # 清單掛在「社團總覽/帳號管理/公告」那組讀者,成員列表也在其中
+    assert (await client.get(URL)).status_code == 200
+
+    for resp in (
+        await client.patch(
+            f"{URL}/{club.id}", json={"name": "改名"}, headers=csrf_headers(client)
+        ),
+        await client.post(
+            f"{URL}/{club.id}/reset-password", headers=csrf_headers(client)
+        ),
+        await client.post(
+            f"{URL}/{club.id}/account", json={"username": "x1"}, headers=csrf_headers(client)
+        ),
+    ):
+        assert resp.status_code == 403, resp.text
 
 
 async def test_permission_gate(client, db):

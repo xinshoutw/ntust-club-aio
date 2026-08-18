@@ -17,36 +17,21 @@ import {
   type ManagedRole,
 } from '../../api/adminAccounts'
 import { useAdminClubMutations, useAdminClubs, type AdminClub } from '../../api/adminClubs'
+import { useAuth } from '../../app/auth'
+import type { AdminPage } from '../../api/auth'
 
-// 頁面權限鍵(與後端 permissions 對齊;super 不受限)
-const PERMISSION_KEYS = [
-  ['areview', '申請審核'],
-  ['aclose', '結案審核'],
-  ['asignup', '報名管理'],
-  ['aannounce', '發布公告'],
-  ['abooking', '臨時場地器材借用審核'],
-  ['aroom', '固定場地借用審核'],
-  ['amember', '社團管理'],
-  ['aeval', '行政分審核'],
-  ['amaint', '維修管理'],
-  ['aapply', '線上申請管理'],
-  ['aviol', '違規管理'],
-  ['afiles', '檔案管理'],
-] as const
-
-const PAGE_KEY_SET = new Set<string>(PERMISSION_KEYS.map(([k]) => k))
-
-// 權限彈窗以外的既有鍵(簽核關卡等)僅供顯示;儲存時原樣保留
+// 權限彈窗以外的既有鍵(簽核關卡)僅供顯示;儲存時原樣保留
 const EXTRA_KEY_LABELS: Record<string, string> = {
   approve_advisor: '承辦人簽核',
   approve_chief: '組長簽核',
   approve_dean: '學務長簽核',
 }
 
-const permsText = (a: Account): string => {
+// 頁面權限鍵一律取自 session 的目錄表(後端 core/permissions),前端不留第二份
+const permsText = (a: Account, pages: AdminPage[]): string => {
   if (a.isSuper) return '全部'
   const labels = a.permissions.map(
-    (k) => PERMISSION_KEYS.find(([key]) => key === k)?.[1] ?? EXTRA_KEY_LABELS[k] ?? k,
+    (k) => pages.find((p) => p.key === k)?.label ?? EXTRA_KEY_LABELS[k] ?? k,
   )
   return labels.length ? labels.join('、') : '—'
 }
@@ -107,6 +92,14 @@ export default function AccountsPage() {
   // 一次性密碼彈窗:密碼由後端於建立/重設當次回傳,關閉後不再顯示
   const [pwTarget, setPwTarget] = useState<{ title: string; account: string; password: string } | null>(null)
   const [pwOpen, setPwOpen] = useState(false)
+  // 頁面權限目錄由 session 帶來(後端 core/permissions);前端不維護第二份
+  const { user: me } = useAuth()
+  const adminPages = me?.adminPages ?? []
+  const pageKeySet = new Set(adminPages.map((p) => p.key))
+  // 非最高權限只授得出自己也持有的鍵(後端 _check_grantable 同一條規則),
+  // 勾不到的直接反灰,不要讓人按了儲存才吃 403
+  const grantable = (key: string) => me?.isSuper === true || me?.permissions.includes(key) === true
+
   // 權限設定彈窗:草稿受控,按「儲存」才生效;未存關閉須確認
   const [permTarget, setPermTarget] = useState<Account | null>(null)
   const [permOpen, setPermOpen] = useState(false)
@@ -352,7 +345,7 @@ export default function AccountsPage() {
             <td className="cell-clip" title={a.name} style={{ fontWeight: 500 }}>{a.name}</td>
             <td className="num cell-clip" title={a.username} style={{ color: 'var(--steel)' }}>{a.username}</td>
             <td>{a.isSuper ? '最高權限' : '一般'}</td>
-            <td style={{ fontSize: 13, color: 'var(--steel)' }}>{permsText(a)}</td>
+            <td style={{ fontSize: 13, color: 'var(--steel)' }}>{permsText(a, adminPages)}</td>
             <td><ActiveTag active={a.active} /></td>
             {actions(
               a,
@@ -362,7 +355,7 @@ export default function AccountsPage() {
                   className="link-btn"
                   onClick={() => {
                     setPermTarget(a)
-                    setPermDraft(a.permissions.filter((k) => PAGE_KEY_SET.has(k)))
+                    setPermDraft(a.permissions.filter((k) => pageKeySet.has(k)))
                     setPermOpen(true)
                   }}
                 >
@@ -610,9 +603,9 @@ export default function AccountsPage() {
 
       {/* 權限設定(一般管理員):變更的項目以橘框標示,按「儲存」才生效 */}
       {(() => {
-        const original = permTarget ? permTarget.permissions.filter((k) => PAGE_KEY_SET.has(k)) : []
+        const original = permTarget ? permTarget.permissions.filter((k) => pageKeySet.has(k)) : []
         // 頁面清單以外的既有鍵(簽核關卡等)不受此彈窗管理,儲存時原樣保留
-        const extraKeys = permTarget ? permTarget.permissions.filter((k) => !PAGE_KEY_SET.has(k)) : []
+        const extraKeys = permTarget ? permTarget.permissions.filter((k) => !pageKeySet.has(k)) : []
         const permDirty =
           permDraft.length !== original.length || permDraft.some((k) => !original.includes(k))
         const closePerm = () => {
@@ -660,8 +653,9 @@ export default function AccountsPage() {
             )}
           >
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-              {PERMISSION_KEYS.map(([value, label]) => {
+              {adminPages.map(({ key: value, label }) => {
                 const changed = permDraft.includes(value) !== original.includes(value)
+                const locked = !grantable(value) && !original.includes(value)
                 return (
                   <label
                     key={value}
@@ -671,18 +665,22 @@ export default function AccountsPage() {
                       gap: 8,
                       padding: '4px 8px',
                       borderRadius: 6,
-                      cursor: 'pointer',
+                      cursor: locked ? 'not-allowed' : 'pointer',
                       border: changed ? '1px solid #d48806' : '1px solid transparent',
                       boxShadow: changed ? '0 0 0 1px rgba(212, 136, 6, 0.45)' : undefined,
                     }}
+                    title={locked ? '你本身沒有這項權限,無法授予他人' : undefined}
                   >
                     <Checkbox
                       checked={permDraft.includes(value)}
+                      disabled={locked}
                       onChange={(e) =>
                         setPermDraft((d) => (e.target.checked ? [...d, value] : d.filter((k) => k !== value)))
                       }
                     />
-                    <span style={{ fontSize: 13 }}>{label}</span>
+                    <span style={{ fontSize: 13, color: locked ? 'var(--steel)' : undefined }}>
+                      {label}
+                    </span>
                   </label>
                 )
               })}

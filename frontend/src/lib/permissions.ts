@@ -1,38 +1,17 @@
 import type { SessionUser } from '../api/auth'
 
-// 各 admin 路由所需權限鍵(any-of;super 全通;空陣列=僅 super)。
-// 對齊 backend 各 router 的 require_permission/require_super:
-// 申請審核頁對簽核關卡鍵開放(學務長受限帳號僅持 approve_dean 也要能進待審頁);
-// 結案審核=aclose 或結案單關的 approve_advisor
-const ROUTE_KEYS: [string, string[]][] = [
-  ['/admin/review', ['areview', 'approve_advisor', 'approve_chief', 'approve_dean']],
-  ['/admin/close-review', ['aclose', 'approve_advisor']],
-  ['/admin/signup-items', ['asignup']],
-  ['/admin/signups', ['asignup']],
-  ['/admin/announcements', ['aannounce']],
-  ['/admin/bookings', ['abooking']],
-  ['/admin/rooms', ['aroom']],
-  ['/admin/manual-booking', []],
-  ['/admin/venue-rules', []],
-  ['/admin/club-overview', ['amember']],
-  ['/admin/members', ['amember']],
-  ['/admin/club-settings', ['amember']],
-  ['/admin/overdue', []],
-  ['/admin/eval', ['aeval']],
-  ['/admin/accounts', []],
-  ['/admin/maintenance', ['amaint']],
-  ['/admin/applications', ['aapply']],
-  ['/admin/violations', ['aviol']],
-  ['/admin/files', ['afiles']],
-  ['/admin/settings', []],
-  ['/admin/audit', []],
-]
+// 行政端路由守衛。權限鍵、路徑與例外規則全部來自後端目錄表(core/permissions.ADMIN_PAGES,
+// 隨 /auth/me 送達),前端不再自行維護一份對照 —— 舊版那份與後端對不上,
+// 報名管理的鍵一度被標成「活動管理」。
 
 /** 該管理員可否進入此 admin 路徑;/admin 總覽對所有管理員開放 */
 export function canAccessAdminPath(user: SessionUser | null | undefined, path: string): boolean {
   if (!user || user.role !== 'admin') return false
   if (user.isSuper) return true
-  const entry = ROUTE_KEYS.find(([prefix]) => path === prefix || path.startsWith(`${prefix}/`))
-  if (!entry) return path === '/admin' || path === '/admin/'
-  return entry[1].some((k) => user.permissions.includes(k))
+  const page = (user.adminPages ?? []).find((p) =>
+    p.paths.some((prefix) => path === prefix || path.startsWith(`${prefix}/`)),
+  )
+  // 目錄表沒有的路徑只剩總覽;其餘一律當成未授權(fail-closed)
+  if (!page) return path === '/admin' || path === '/admin/'
+  return [page.key, ...page.also].some((k) => user.permissions.includes(k))
 }

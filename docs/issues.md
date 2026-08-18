@@ -38,7 +38,6 @@
 | 編號 | 嚴重度 | 問題 |
 |---|---|---|
 | ISS-23 | 阻擋 | **檔案下載對 admin 一律放行**:`can_access` 對 `UserRole.ADMIN` 直接 `return True`。只持「檔案管理」權限的管理員可下載全系統檔案,包含郵局存簿影本這類個資 |
-| ISS-25 | 中 | 社團帳號重設密碼在兩個頁面的**頁面門檻**不一致(帳號管理頁需 super、管理項目頁只需 `amember`),但兩處打的是同一支 `/admin/clubs/{id}/reset-password`(`AccountsPage.tsx:221` 與 `AdminClubSettingsPage.tsx:165` 同用 `useAdminClubMutations`)。`_MANAGED_ROLES` 不含 `CLUB`,super 那支 `/admin/accounts/{id}/reset-password` 重設不了社團帳號 —— 待決的是這個動作該歸 super 還是 `amember` |
 
 ## 6. 時間與日期的判定
 

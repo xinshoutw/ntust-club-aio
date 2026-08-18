@@ -1,6 +1,6 @@
 # 帳號管理
 
-`/admin/accounts` · `admin`(**僅 super**) · `features/admin/AccountsPage.tsx`
+`/admin/accounts` · `admin` · 權限鍵 `aaccount` · `features/admin/AccountsPage.tsx`
 
 ## 用途
 
@@ -18,7 +18,7 @@
 
 四個分頁:管理員 / 工讀生 / 評審 / 社團。前三類各自向後端要該角色的那一頁(姓名升冪由後端排,換分頁時頁碼歸 1)。社團分頁走不分頁的主檔端點,搜尋與分頁在前端(每頁 20)。
 
-**權限設定彈窗**(僅管理員)— 12 個頁面權限鍵的勾選框:申請審核 `areview`、結案審核 `aclose`、報名管理 `asignup`、發布公告 `aannounce`、臨時場地器材借用審核 `abooking`、固定場地借用審核 `aroom`、社團管理 `amember`、行政分審核 `aeval`、維修管理 `amaint`、線上申請管理 `aapply`、違規管理 `aviol`、檔案管理 `afiles`。彈窗外的既有鍵(簽核關卡 `approve_*`)**只顯示不可勾,儲存時原樣保留**。
+**權限設定彈窗**(僅管理員)— 勾選框逐頁列出,**清單由後端目錄表 `core/permissions.ADMIN_PAGES` 隨 `/auth/me` 送達**,前端不維護第二份;順序即目錄表順序。彈窗外的既有鍵(簽核關卡 `approve_*`)**只顯示不可勾,儲存時原樣保留**。非最高權限的操作者只勾得到自己也持有的項目,其餘反灰並附說明(後端 `_check_grantable` 同一條規則,回 `PERMISSION_NOT_GRANTABLE`)。
 
 **一次性密碼彈窗** — 帳號 + 密碼(預設遮蔽,可複製),說明「密碼僅顯示這一次」。
 

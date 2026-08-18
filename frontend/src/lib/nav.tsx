@@ -181,7 +181,7 @@ export function buildAdminNav(
     items: [
       { key: 'a-booking', label: '臨時場地器材借用', path: '/admin/bookings', icon: <EnvironmentOutlined /> },
       ...(fixedBookingOpen ? [ADMIN_ROOM_ITEM] : []),
-      // 最高權限專屬(canAccessAdminPath 過濾:僅 super 可見)
+      // 以下各頁都有自己的權限鍵,由 canAccessAdminPath 逐項過濾(decisions.md D-01)
       { key: 'a-manual', label: '手動借用', path: '/admin/manual-booking', icon: <PlusSquareOutlined /> },
       { key: 'a-venue-rules', label: '場地不開放規則', path: '/admin/venue-rules', icon: <StopOutlined /> },
     ],

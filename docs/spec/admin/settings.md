@@ -1,6 +1,6 @@
 # 系統設定
 
-`/admin/settings` · `admin`(**僅 super**) · `features/admin/AdminSettingsPage.tsx`
+`/admin/settings` · `admin` · 權限鍵 `asetting`(場地與器材主檔亦在此頁) · `features/admin/AdminSettingsPage.tsx`
 
 > 側欄沒有這一項,入口只有頂欄帳號選單的「設定」。
 

@@ -14,7 +14,7 @@ import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 
 from app.api.pagination import Pagination, parse_sort
-from app.core.deps import CurrentUser, DbDep, client_ip, require_permission, require_super
+from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, not_found
 from app.models import (
     Activity,
@@ -41,7 +41,7 @@ from app.services.settings_service import get_setting
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 BookingAdmin = Annotated[CurrentUser, Depends(require_permission("abooking"))]
-SuperAdmin = Annotated[CurrentUser, Depends(require_super)]
+ManualAdmin = Annotated[CurrentUser, Depends(require_permission("amanual"))]
 
 _VENUE_SORTABLE = {
     "date": VenueBooking.date,
@@ -503,7 +503,7 @@ async def availability(user: BookingAdmin, db: DbDep, date: date) -> ApiResponse
 
 @router.post("/bookings/manual-venue", status_code=201)
 async def manual_venue_booking(
-    body: ManualVenueBookingIn, user: SuperAdmin, db: DbDep, request: Request
+    body: ManualVenueBookingIn, user: ManualAdmin, db: DbDep, request: Request
 ) -> ApiResponse[AdminVenueBookingOut]:
     venue = await db.get(Venue, body.venue_id)
     if venue is None or not venue.is_active:
@@ -550,7 +550,7 @@ async def manual_venue_booking(
 
 @router.post("/bookings/manual-equipment", status_code=201)
 async def manual_equipment_loan(
-    body: ManualEquipmentLoanIn, user: SuperAdmin, db: DbDep, request: Request
+    body: ManualEquipmentLoanIn, user: ManualAdmin, db: DbDep, request: Request
 ) -> ApiResponse[AdminEquipmentLoanOut]:
     equipment = await db.get(Equipment, body.equipment_id)
     if equipment is None or not equipment.is_active:

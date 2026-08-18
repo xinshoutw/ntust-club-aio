@@ -13,6 +13,15 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(min_length=1, max_length=200)
 
 
+class AdminPageOut(BaseModel):
+    """行政端頁面權限目錄(core/permissions.ADMIN_PAGES);僅 admin 取得。"""
+
+    key: str
+    label: str
+    paths: list[str]
+    also: list[str]
+
+
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -28,3 +37,5 @@ class UserOut(BaseModel):
     permissions: list[str]
     can_view_eval: bool
     must_change_password: bool
+    # 行政端頁面權限目錄:側欄過濾、路由守衛與權限彈窗的唯一來源。非 admin 為 None
+    admin_pages: list[AdminPageOut] | None = None

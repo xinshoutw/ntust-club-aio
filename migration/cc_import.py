@@ -314,6 +314,10 @@ async def import_device_loans(
     print(f"device loans: 新增 {created} 筆器材借用、跳過 {skipped}(孤兒/髒資料)")
 
 
+# 沒有任何未知單位時檔頭也要長一樣,否則承辦拿到的兩份 CSV 欄位對不起來
+UNKNOWN_CSV_FIELDS = ("類型", "舊帳號", "舊單號", "日期", "標的", "節次", "用途", "電話")
+
+
 async def report_unknown_clubs(legacy, club_lookup: dict[str, int]) -> Path:
     """導出「認不出借用單位」的借用清單,交承辦辨識(decisions.md MIG-06)。
 
@@ -328,7 +332,7 @@ async def report_unknown_clubs(legacy, club_lookup: dict[str, int]) -> Path:
         cur.execute("SELECT id, name FROM Classroom")
         rooms = {r["id"]: r["name"] for r in cur.fetchall()}
 
-    rows = []
+    rows: list[dict] = []
     for r in applies:
         if resolve_club(club_lookup, r["club_id"]) is None and unidentified_kind(
             r["club_id"]
@@ -362,7 +366,7 @@ async def report_unknown_clubs(legacy, club_lookup: dict[str, int]) -> Path:
     out_dir.mkdir(exist_ok=True)
     path = out_dir / "unknown_club_bookings.csv"
     with path.open("w", newline="", encoding="utf-8-sig") as fh:
-        writer = csv.DictWriter(fh, fieldnames=list(rows[0]) if rows else ["舊帳號"])
+        writer = csv.DictWriter(fh, fieldnames=UNKNOWN_CSV_FIELDS)
         writer.writeheader()
         writer.writerows(rows)
     blanks = sum(

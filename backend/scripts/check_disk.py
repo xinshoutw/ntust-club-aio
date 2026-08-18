@@ -4,7 +4,7 @@
 到 90% 時系統已經不收新檔了 —— 那時才有人發現的話,社團已經傳不上東西一整天。
 
     20 8 * * *  cd /srv/club-aio && docker compose exec -T backend \\
-        uv run python scripts/check_disk.py >> /var/log/club-aio/disk.log 2>&1
+        uv run --no-dev python scripts/check_disk.py >> /var/log/club-aio/disk.log 2>&1
 
 水位正常時不推播(每天一則「一切正常」等於沒有告警)。
 """

@@ -3,7 +3,8 @@
 逾期判定是「結束日之隔天上班日 10:30」,所以排在判定成立之後幾分鐘跑:
 
     35 10 * * 1-5  cd /srv/club-aio && docker compose exec -T backend \\
-        uv run python scripts/send_overdue_reminders.py >> /var/log/club-aio/remind.log 2>&1
+        uv run --no-dev python scripts/send_overdue_reminders.py \
+        >> /var/log/club-aio/remind.log 2>&1
 
 假日不必在 cron 排除 —— 逾期判定本身就吃 `holidays` 表,國定假日當天不會有單成立。
 重寄間隔見 `services/loan_remind.REMIND_EVERY_WORKDAYS`;寄到歸還為止,不設次數上限。

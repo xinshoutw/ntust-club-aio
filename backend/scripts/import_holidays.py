@@ -8,6 +8,11 @@ CSV 欄位 `西元日期,星期,是否放假,備註`,`是否放假` 2=放假、0
     uv run python scripts/import_holidays.py --year 116 --yes    # 實際寫入
     uv run python scripts/import_holidays.py --file 116.csv --yes  # 沒有對外連線時先自行下載
 
+正式機在容器內跑,加 `--no-dev`(映像是 `uv sync --no-dev` 建的,少了它 uv 會試著補裝):
+
+    docker compose exec -T backend \
+        uv run --no-dev python scripts/import_holidays.py --year 116 --yes
+
 `holidays` 只影響器材逾期的「隔天上班日 10:30」判定(`booking_service.add_workdays`)。
 **週六日不入表**:那條推導本來就排除週末,把 100 多天例假日灌進來只是把表撐大。
 同理,政府偶爾指定的「補上班的週六」目前也不會被當成上班日 —— 那條推導不看本表的

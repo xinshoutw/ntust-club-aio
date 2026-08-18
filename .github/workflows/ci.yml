@@ -29,7 +29,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --frozen
-      - run: uv run ruff check .
+      # migration/ 也一起 lint:遷移腳本寫錯的欄位會一路帶進正式資料
+      - run: uv run ruff check . ../migration
       - run: uv run pytest
 
   frontend:

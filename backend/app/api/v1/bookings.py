@@ -50,6 +50,12 @@ async def _notify_submit(background: BackgroundTasks, db, user, title: str, desc
     background.add_task(notify.club_event, "submit", title, desc, club.discord_webhook_url)
 
 
+async def _notify_cancel(background: BackgroundTasks, db, user, title: str, desc: str) -> None:
+    """社團自行取消(GAP-18 K1–K3):承辦手上的待審單少一張,得知道是誰收回去的。"""
+    club = await db.get(Club, user.club_id)
+    background.add_task(notify.club_event, "reject", title, desc, club.discord_webhook_url)
+
+
 async def _ensure_not_suspended(db, user) -> None:
     """停權中的社團不得申請借用(器材逾期停權管理的執行點)。"""
     club = await db.get(Club, user.club_id)
@@ -560,7 +566,11 @@ def _ensure_venue_cancellable(row: VenueBooking) -> None:
 
 @router.post("/venue-bookings/{booking_id}/cancel")
 async def cancel_venue_booking(
-    booking_id: int, user: ClubUser, db: DbDep, request: Request
+    booking_id: int,
+    user: ClubUser,
+    db: DbDep,
+    request: Request,
+    background: BackgroundTasks,
 ) -> ApiResponse[None]:
     row = await db.scalar(
         sa.select(VenueBooking)
@@ -579,17 +589,30 @@ async def cancel_venue_booking(
         ip=client_ip(request),
     )
     await db.commit()
+    venue = await db.get(Venue, row.venue_id)
+    await _notify_cancel(
+        background,
+        db,
+        user,
+        "臨時場地借用已取消",
+        f"{user.name}:{venue.name}({row.date} 時段 {','.join(row.periods)})",
+    )
     return ApiResponse()
 
 
 @router.post("/room-bookings/{booking_id}/cancel")
 async def cancel_room_booking(
-    booking_id: int, user: ClubUser, db: DbDep, request: Request
+    booking_id: int,
+    user: ClubUser,
+    db: DbDep,
+    request: Request,
+    background: BackgroundTasks,
 ) -> ApiResponse[None]:
     row = await db.scalar(
         sa.select(RoomBookingRequest)
         .where(RoomBookingRequest.id == booking_id, RoomBookingRequest.club_id == user.club_id)
-        .with_for_update()
+        .options(sa.orm.selectinload(RoomBookingRequest.slots))
+        .with_for_update(of=RoomBookingRequest)
     )
     if row is None:
         raise not_found("找不到借用申請")
@@ -604,13 +627,26 @@ async def cancel_room_booking(
         detail=f"room_booking={row.id}",
         ip=client_ip(request),
     )
+    slot_count = len(row.slots)
     await db.commit()
+    venue = await db.get(Venue, row.venue_id)
+    await _notify_cancel(
+        background,
+        db,
+        user,
+        "固定場地借用已取消",
+        f"{user.name}:{venue.name}({slot_count} 個每週時段)",
+    )
     return ApiResponse()
 
 
 @router.post("/equipment-loans/{loan_id}/cancel")
 async def cancel_equipment_loan(
-    loan_id: int, user: ClubUser, db: DbDep, request: Request
+    loan_id: int,
+    user: ClubUser,
+    db: DbDep,
+    request: Request,
+    background: BackgroundTasks,
 ) -> ApiResponse[None]:
     row = await db.scalar(
         sa.select(EquipmentLoan)
@@ -629,4 +665,12 @@ async def cancel_equipment_loan(
         ip=client_ip(request),
     )
     await db.commit()
+    equipment = await db.get(Equipment, row.equipment_id)
+    await _notify_cancel(
+        background,
+        db,
+        user,
+        "器材借用已取消",
+        f"{user.name}:{equipment.name} ×{row.qty}({row.start_date}~{row.end_date})",
+    )
     return ApiResponse()

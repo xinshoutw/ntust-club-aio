@@ -286,7 +286,11 @@ async def update_activity(
 
 @router.delete("/{activity_id}")
 async def delete_activity(
-    activity_id: int, user: ClubUser, db: DbDep, request: Request
+    activity_id: int,
+    user: ClubUser,
+    db: DbDep,
+    request: Request,
+    background: BackgroundTasks,
 ) -> ApiResponse[None]:
     activity = await svc.get_own_activity(db, user, activity_id)
     await db.refresh(activity, attribute_names=["status"], with_for_update=True)
@@ -304,10 +308,21 @@ async def delete_activity(
         detail=f"activity={activity.id};name={activity.name};files={len(disk_paths)}",
         ip=client_ip(request),
     )
+    name = activity.name
     await db.delete(activity)
     await db.commit()
     for path in disk_paths:  # commit 成功後才動磁碟
         file_service.unlink_quiet(path)
+    # 草稿刪掉就整份不見(附件一起實體刪除),留一則痕跡(GAP-18 K9)。
+    # 「草稿儲存」刻意不發:同一份活動在填寫過程會產生數十則,會淹掉頻道
+    club = await _club_of(db, user)
+    background.add_task(
+        notify.club_event,
+        "alert",
+        "活動草稿已刪除",
+        f"{club.name}:{name}",
+        club.discord_webhook_url,
+    )
     return ApiResponse()
 
 

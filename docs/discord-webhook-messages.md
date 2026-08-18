@@ -33,7 +33,7 @@
 
 ## 2. 事件與現行文案
 
-35 個事件(4 個依狀態有兩種文案)。目的地未註明者=全域必推 + 該社團有設 webhook 才推。
+44 個事件(6 個依狀態有兩種文案)。目的地未註明者=全域必推 + 該社團有設 webhook 才推。
 
 **公告**
 
@@ -137,7 +137,7 @@ D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政�
 - **J2 器材已歸還** `POST /staff/equipment-loans/{id}/checkin` · approve
   `器材已歸還` / `{equipment.name} ×{qty}(歸還人 {returner_name})`
 
-行政手動借用(`club_id` NULL)不通知。
+行政手動借用只推全域(`club_id` NULL,沒有社團可推):見 K4。
 
 **帳號與停權**
 
@@ -146,31 +146,32 @@ D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政�
 - **I2 停權解除** `DELETE /admin/clubs/{id}/suspend` · alert
   `社團停權解除` / `{club.name}:即日起恢復借用申請`
 
-**待實作**(GAP-18,需求方 2026-08-18 決定「都發」)
+**取消與刪除(GAP-18,2026-08-20 實作)**
 
-以下九項目前完全不發通知,文案為初擬,需求方可逐條調整或增刪:
-
-- **K1 固定借用社團自行取消** `DELETE /club/room-bookings/{id}` · reject
-  `固定場地借用已取消` / `{club.name}:{venue.name}({n} 個每週時段)`
-- **K2 臨時借用社團自行取消** `DELETE /club/venue-bookings/{id}` · reject
-  `臨時場地借用已取消` / `{club.name}:{venue.name}({date} 時段 {periods})`
-- **K3 器材借用社團自行取消** `DELETE /club/equipment-loans/{id}` · reject
-  `器材借用已取消` / `{club.name}:{equipment.name} ×{qty}({start}~{end})`
-- **K4 行政手動借用建立** `POST /admin/manual-booking` · alert · **僅推全域**(無社團)
-  `行政手動借用建立` / `{user.name}:{venue 或 equipment 名}({date} 時段 {periods})`
-- **K5 報名簽到登錄** `PUT /admin/signup-items/{id}/registrations/{club_id}/attend` · approve
-  `報名簽到已登錄` / `{club.name}:{item.name}({n} 人到場)`
-- **K6 公告蓋板開啟** `PATCH /admin/announcements/{id}`(`is_pinned` 轉為真時)· announce · 僅推全域
+- **K1 固定借用社團自行取消** `POST /club/room-bookings/{id}/cancel` · reject
+  `固定場地借用已取消` / `{user.name}:{venue.name}({n} 個每週時段)`
+- **K2 臨時借用社團自行取消** `POST /club/venue-bookings/{id}/cancel` · reject
+  `臨時場地借用已取消` / `{user.name}:{venue.name}({date} 時段 {periods})`
+- **K3 器材借用社團自行取消** `POST /club/equipment-loans/{id}/cancel` · reject
+  `器材借用已取消` / `{user.name}:{equipment.name} ×{qty}({start}~{end})`
+- **K4 行政手動借用建立** `POST /admin/bookings/manual-{venue,equipment}` · alert · **僅推全域**(無社團)
+  `行政手動借用建立` / `{user.name}:{venue 或 equipment 名}(時間)`
+- **K5 報名簽到登錄** `PUT /admin/signup-items/{id}/attendance` · 登錄 approve、取消 alert
+  `報名簽到已登錄` 或 `報名簽到已取消` / `{club.name}:{item.name}({session.name})`
+- **K6 公告蓋板開啟** `PATCH /admin/announcements/{id}`(`takeover_until` 由 null 轉為日期)· announce · 僅推全域
   `公告已設為蓋板` / `{title}`
-- **K7 公告蓋板關閉** 同上(轉為假時)· announce · 僅推全域
+- **K7 公告蓋板關閉** 同上(轉回 null)· announce · 僅推全域
   `公告已取消蓋板` / `{title}`
 - **K8 公告刪除** `DELETE /admin/announcements/{id}` · alert · 僅推全域
   `公告已刪除` / `{title}`
 - **K9 活動草稿刪除** `DELETE /club/activities/{id}`(草稿狀態)· alert
   `活動草稿已刪除` / `{club.name}:{activity.name}`
 
-**「活動草稿儲存」刻意不列**:草稿每存一次就推一則訊息,同一份活動在填寫過程中會產生數十則,
-會把承辦頻道的其他事件淹掉。若需求方仍要,建議改為「首次建立草稿時推一則」而非每次儲存。
+蓋板只在**切換**時推:同值再送一次不算事件,否則承辦每次存檔都會多推一則。
+逐事件的呼叫點由 `tests/test_gap18_notifications.py` 釘住。
+
+**「活動草稿儲存」刻意不發**:草稿每存一次就推一則,同一份活動在填寫過程中會產生數十則,
+會把承辦頻道的其他事件淹掉。若之後要發,建議改為「首次建立草稿時推一則」而非每次儲存。
 
 ## 3. 模板可取用的資料
 

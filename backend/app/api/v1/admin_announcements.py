@@ -115,12 +115,14 @@ async def update_takeover(
     user: AnnounceAdmin,
     db: DbDep,
     request: Request,
+    background: BackgroundTasks,
 ) -> ApiResponse[AdminAnnouncementOut]:
     """蓋板切換:給日期=期限內社團每次登入全版顯示;null=關閉蓋板。"""
     row = await db.get(Announcement, announcement_id)
     if row is None:
         raise not_found("找不到公告")
 
+    was_on = row.takeover_until is not None
     row.takeover_until = body.takeover_until
     audit.record(
         db,
@@ -130,12 +132,25 @@ async def update_takeover(
         ip=client_ip(request),
     )
     await db.commit()
+    # 蓋板會擋住每個社團的畫面,開關都要留下痕跡(GAP-18 K6/K7);只推全域
+    now_on = row.takeover_until is not None
+    if now_on != was_on:
+        background.add_task(
+            notify.discord,
+            "announce",
+            "公告已設為蓋板" if now_on else "公告已取消蓋板",
+            row.title,
+        )
     return ApiResponse(data=AdminAnnouncementOut.model_validate(row))
 
 
 @router.delete("/{announcement_id}")
 async def delete_announcement(
-    announcement_id: int, user: AnnounceAdmin, db: DbDep, request: Request
+    announcement_id: int,
+    user: AnnounceAdmin,
+    db: DbDep,
+    request: Request,
+    background: BackgroundTasks,
 ) -> ApiResponse[None]:
     row = await db.get(Announcement, announcement_id)
     if row is None:
@@ -147,6 +162,9 @@ async def delete_announcement(
         detail=f"announcement={row.id};title={row.title[:50]}",
         ip=client_ip(request),
     )
+    title = row.title
     await db.delete(row)
     await db.commit()
+    # 公告刪掉之後就查不到內容了,標題至少留在頻道裡(GAP-18 K8);只推全域
+    background.add_task(notify.discord, "alert", "公告已刪除", title)
     return ApiResponse()

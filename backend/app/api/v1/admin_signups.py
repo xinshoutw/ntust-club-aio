@@ -466,6 +466,7 @@ async def mark_attendance(
     user: RegAdmin,
     db: DbDep,
     request: Request,
+    background: BackgroundTasks,
 ) -> ApiResponse[dict]:
     item = await db.get(SignupItem, item_id)
     if item is None:
@@ -538,4 +539,13 @@ async def mark_attendance(
             )
         )
     ) or 0
+    # 簽到是行政分 ad7/ad8 的唯一資料源:社團要知道自己這一場被登錄了(GAP-18 K5)
+    club = await db.get(Club, body.club_id)
+    background.add_task(
+        notify.club_event,
+        "approve" if body.attended else "alert",
+        "報名簽到已登錄" if body.attended else "報名簽到已取消",
+        f"{club.name}:{item.name}({session.name})",
+        club.discord_webhook_url,
+    )
     return ApiResponse(data={"session_id": session.id, "attended_sessions": attended_total})

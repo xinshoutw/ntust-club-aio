@@ -506,7 +506,11 @@ async def availability(user: BookingAdmin, db: DbDep, date: date) -> ApiResponse
 
 @router.post("/bookings/manual-venue", status_code=201)
 async def manual_venue_booking(
-    body: ManualVenueBookingIn, user: ManualAdmin, db: DbDep, request: Request
+    body: ManualVenueBookingIn,
+    user: ManualAdmin,
+    db: DbDep,
+    request: Request,
+    background: BackgroundTasks,
 ) -> ApiResponse[AdminVenueBookingOut]:
     venue = await db.get(Venue, body.venue_id)
     if venue is None or not venue.is_active:
@@ -545,6 +549,13 @@ async def manual_venue_booking(
         ip=client_ip(request),
     )
     await db.commit()
+    # 手動借用直接就是已核准,場況圖上會憑空多一格 —— 只推全域(沒有社團可推)
+    background.add_task(
+        notify.discord,
+        "alert",
+        "行政手動借用建立",
+        f"{user.name}:{venue.name}({body.date} 時段 {','.join(body.periods)})",
+    )
     out = AdminVenueBookingOut.model_validate(row)
     out.club_name = "學務處"
     out.venue_name = venue.name
@@ -553,7 +564,11 @@ async def manual_venue_booking(
 
 @router.post("/bookings/manual-equipment", status_code=201)
 async def manual_equipment_loan(
-    body: ManualEquipmentLoanIn, user: ManualAdmin, db: DbDep, request: Request
+    body: ManualEquipmentLoanIn,
+    user: ManualAdmin,
+    db: DbDep,
+    request: Request,
+    background: BackgroundTasks,
 ) -> ApiResponse[AdminEquipmentLoanOut]:
     equipment = await db.get(Equipment, body.equipment_id)
     if equipment is None or not equipment.is_active:
@@ -584,6 +599,12 @@ async def manual_equipment_loan(
         ip=client_ip(request),
     )
     await db.commit()
+    background.add_task(
+        notify.discord,
+        "alert",
+        "行政手動借用建立",
+        f"{user.name}:{equipment.name} ×{body.qty}({body.start_date}~{body.end_date})",
+    )
     out = AdminEquipmentLoanOut.model_validate(loan)
     out.club_name = "學務處"
     out.equipment_name = equipment.name

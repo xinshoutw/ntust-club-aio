@@ -19,7 +19,9 @@
 - [ ] 阻擋 `POSTGRES_PASSWORD` = 強密碼(compose 以同一個變數插值到 db 與 backend)
 - [ ] 阻擋 `FORWARDED_ALLOW_IPS` = `172.28.0.0/24` + edge VM 內網 IP。**絕不可用 `*`**,否則登入限流可被繞過、稽核 IP 可被投毒。值需與內層 web nginx 的 `set_real_ip_from` 一起核對
 - [ ] 待決 `DISCORD_WEBHOOK_URL`:現值為測試群組,prod 換正式頻道;**絕不入版控**
-- [ ] 待決 `SMTP_*`:host / username / password 任一為空即降級 log-only(不報錯,但信不會寄出)
+- [ ] 阻擋 `SMTP_*`:校方 relay 已實測可寄(`mail.ntust.edu.tw:465`、`SMTP_SECURITY=ssl`)。
+  host / username / password 任一為空即降級 log-only(不報錯,但信不會寄出)。
+  **`MAIL_FROM_ADDRESS` 需與認證帳號同網域**,否則 relay 會拒收
 - [ ] 應辦 `BACKEND_IMAGE` / `WEB_IMAGE` = GHCR 映像路徑。CI 對 main 的每次 push 同時打 `latest` 與 commit sha 兩個 tag:**正式環境釘 sha**,要回滾就換成上一版的 sha,不必等重新建置
 - [ ] 應辦 `WEB_PORT`(預設 8080)—— edge upstream 要帶埠號
 
@@ -53,7 +55,7 @@
 
 ## F. 待決清單
 
-1. SMTP relay 最終方案(校方 relay / Google Workspace / 第三方 / 開發者 iCloud+);決定前通知信只 log-only
+1. ~~SMTP relay 最終方案~~ —— 已定案為校方 relay,實測可寄
 2. Discord 正式頻道 webhook
 3. 上傳檔案儲存位置:`compose.yml` 現用具名 volume `uploads`,`architecture.md §3.2` 規劃 bind mount `/srv/club-aio/uploads` 以便備份工具直接同步。二者影響備份做法,擇一並對齊
 4. 備份 owner 與 GCS bucket

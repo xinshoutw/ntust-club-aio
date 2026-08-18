@@ -8,7 +8,9 @@
 
 import html as html_escape
 import logging
+import ssl
 from email.message import EmailMessage
+from functools import cache
 from typing import Any
 
 import aiosmtplib
@@ -180,6 +182,22 @@ async def announcement_broadcast(
         await send_email(addr, subject, plain, template="announcement", html=html)
 
 
+@cache
+def _smtp_tls_context() -> ssl.SSLContext:
+    """SMTP 用的 TLS context:憑證鏈與主機名照驗,只關掉 RFC 5280 的嚴格擴充欄位檢查。
+
+    校方 relay(mail.ntust.edu.tw)的憑證鏈可信、主機名相符,但鏈上有一張 CA 憑證
+    缺 Subject Key Identifier。Python 3.13 起 `create_default_context()` 預設開
+    `VERIFY_X509_STRICT`,那張 CA 就會讓整條鏈驗不過(Missing Subject Key Identifier)。
+
+    **只清掉 VERIFY_X509_STRICT**:`CERT_REQUIRED` 與 `check_hostname` 都保留,
+    偽造憑證或換一台主機一樣連不上。不要在這裡改成 `CERT_NONE`。
+    """
+    ctx = ssl.create_default_context()
+    ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
+    return ctx
+
+
 async def send_email(
     to_addr: str, subject: str, body: str, template: str = "generic", html: str | None = None
 ) -> None:
@@ -206,6 +224,9 @@ async def send_email(
                 password=settings.smtp_password,
                 use_tls=settings.smtp_security == "ssl",
                 start_tls=settings.smtp_security == "starttls",
+                tls_context=(
+                    _smtp_tls_context() if settings.smtp_security != "none" else None
+                ),
                 timeout=15,
             )
         except Exception as exc:  # noqa: BLE001 - 失敗留底,不往外拋

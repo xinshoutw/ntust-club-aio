@@ -802,7 +802,12 @@ async def test_reviewed_at_field_and_sorting(client, db):
 
 async def test_large_type_filter_and_locked_boundary(client, db):
     """「大型活動」推導過濾(三值 is_large_approved)與逾期鎖定的日界。"""
-    from datetime import date, timedelta
+    from datetime import date, datetime, timedelta
+
+    # 後端一律以台北日期判定鎖定,本測試卻拿行程時區的 date.today() 當基準 ——
+    # conftest 固定 TZ=Asia/Taipei 才對得上。少了它,下面的日界斷言只在
+    # 「行程時區與台北同一天」的時段才成立(CI 跑 UTC,每天有 8 小時會翻)
+    assert datetime.now().astimezone().utcoffset() == timedelta(hours=8)
 
     from app.models import Activity
     from app.services.activity_service import add_months

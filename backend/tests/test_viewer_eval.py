@@ -457,7 +457,7 @@ async def test_rubric_seed_idempotent_and_totals(db):
     verify_rubrics()
     await seed(None, None)
     count = await db.scalar(sa.select(sa.func.count()).select_from(AwardRubricItem))
-    assert count == sum(len(items) for items in RUBRICS.values()) == 48
+    assert count == sum(len(items) for items in RUBRICS.values()) == 51
     await seed(None, None)  # idempotent:重跑不重複
     assert await db.scalar(sa.select(sa.func.count()).select_from(AwardRubricItem)) == count
 

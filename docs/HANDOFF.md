@@ -5,7 +5,7 @@
 
 ## 現在在哪
 
-**`decisions.md` 裡「已定案且做得完」的項目全部做完了。** `docs/issues.md` 剩 5 項、
+**`decisions.md` 裡「已定案且做得完」的項目全部做完了。** `docs/issues.md` 剩 6 項、
 `docs/gaps.md` 的未完成功能剩評鑑鏈與幾項延伸,**全部落在「上線後單獨排程」那一堆**。
 
 也就是說:接下來不是照清單逐項修,而是挑一整條線來做(評鑑鏈是最大的一條),
@@ -40,6 +40,23 @@ DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— �
 | GAP-15 | 待審申請彙整頁(報修/借用/活動的待審件併看) |
 
 可改進但不排期的方向見 [`improvements.md`](improvements.md)。
+
+## 最新一批已完成(文件對齊)
+
+| 項目 | 內容 |
+|---|---|
+| **CI 紅燈** | `tests/conftest.py` 固定行程時區 `Asia/Taipei`。測試裡 84 處 `date.today()` 讀的是行程時區,而後端一律以 `TAIPEI` 推導 —— CI 跑 UTC,台北 08:00 前兩者差一天,`test_large_type_filter_and_locked_boundary` 的日界斷言必翻 |
+| **DEC-08 只做了一半** | 前端 `features/eval/scoring.ts` 的 `totalOf` 只有上限 100,後端 `total_of` 兩端都夾。勸導扣分夠多時社團看到負分、實際採計 0 |
+| **`gaps.md` 過期條目** | 已拍板的 DEC-02/03/04/08/10/12、GAP-06/08/11/12/13、MIG-01/05/06/07、OPS-05 全數移除(decisions.md 自己的規則就是「落地即移除」);`decisions.md` 補上原本只寫在本檔的 DEC-01 |
+| **`spec/` 對齊** | 15 頁共 19 條「未完成 / 問題」描述的是已修或已定案的行為,逐條改寫成正面規則 |
+| **ISS-91** | 對齊過程驗出:固定借用審核的衝突標示不含臨時借用,畫面標「無衝突」而核准端會擋 |
+| **頁級缺口** | spec 各頁的零散缺口(建立後不可修改的幾張單、缺索引的查詢、缺篩選入口)收進 `improvements.md`,不再只存在於單頁 spec |
+
+### 這一批的教訓
+
+- **時區相依的測試不是「寫法不好」,是整套測試站錯了牆鐘**:業務推導只有台北一個時區,行程時區卻由 CI 決定。逐處改 `date.today()` 要動 84 個地方,固定 `TZ` 只要兩行 —— 但必須早於測試模組 import(有模組層級的 `date.today()` 常數)
+- **「同一份判定有幾份」對前後端一樣適用**:DEC-08 的下限只寫進後端;`scoring.ts` 明明就是那份可執行規格,兩邊各自封頂卻只有一邊有底
+- **彙總檔會比 spec 先被清乾淨**:`issues.md` 的條目修完就刪,但 spec 該頁的「未完成 / 問題」段是另一份手抄 —— 這批 19 條全是這樣留下來的。修完一項要順手改 spec,這條慣例已在 AGENTS.md,實際上做漏了很多次
 
 ## 本批已完成(2026-08-20)
 
@@ -211,7 +228,7 @@ DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— �
 ## 驗證現況(2026-08-20 實測)
 
 - 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **445 passed**(含 `test_migrations.py`:另開一個庫跑 `alembic upgrade head`,比對欄位、索引名與 CHECK 名 —— 後兩者是子集斷言,擋的是「模型有、revision 漏了」);`ruff check . ../migration` 全綠(CI 現在也 lint `migration/`)
-- 前端 `pnpm exec tsc -b --force` → 0 錯;`pnpm test` → **117 passed**(27 檔);`pnpm run lint` → **8** 個 fast-refresh warning(全為既有的 `only-export-components` 類)
+- 前端 `pnpm exec tsc -b --force` → 0 錯;`pnpm test` → **118 passed**(27 檔);`pnpm run lint` → **8** 個 fast-refresh warning(全為既有的 `only-export-components` 類)
 - `git log --all` 確認 `.env` 與 `migration/out` 從未進版控
 - 本批每一個 commit 都做過 mutation 驗證:把修法改回舊寫法,確認新測試真的會紅
 

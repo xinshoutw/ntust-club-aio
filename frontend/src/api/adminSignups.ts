@@ -246,7 +246,8 @@ export interface SignupItemInput {
 /** 編輯活動:只帶要改的欄位(decisions.md D-09) */
 export interface SignupItemPatch {
   name?: string
-  place?: string
+  /** null = 清空地點(唯一可以清空的欄位);undefined = 不動 */
+  place?: string | null
   description?: string
   eventAt?: string // YYYY/MM/DD HH:mm
   signupEnd?: string // YYYY/MM/DD HH:mm

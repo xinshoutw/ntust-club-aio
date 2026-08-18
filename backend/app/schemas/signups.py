@@ -167,14 +167,18 @@ class SignupItemUpdateIn(BaseModel):
 
     `kind` 不在裡面:它同時決定行政分採計(ad7/ad8)與是否場次制,
     改掉會讓既有的場次與簽到失去意義。真要換種類就重建一個活動。
-    起訖與名額的交叉檢核在端點做(要跟資料庫裡的現值合併後才判得準)。
+    `signup_start` 也不在:往未來推就能把一個開放中的報名靜靜關掉,
+    而畫面上完全看不出來 —— 要收單請關「開放報名」。
+    報名截止的交叉檢核在端點做(要跟資料庫裡的現值合併後才判得準)。
+
+    **`None` 一律代表「沒帶這個欄位」**,只有 `place` 允許顯式送 null 清空。
+    其餘欄位在 DB 都是 NOT NULL,顯式 null 會變成 500 或靜靜清掉整份表單定義。
     """
 
     name: str | None = Field(None, min_length=1, max_length=100)
-    place: str | None = Field(None, max_length=100)
+    place: str | None = Field(None, max_length=100)  # 唯一可以顯式送 null 清空的欄位
     description: str | None = Field(None, max_length=2000)
     event_at: datetime | None = None
-    signup_start: datetime | None = None
     signup_end: datetime | None = None
     max_participants: int | None = Field(None, ge=1, le=500)
     requires_confirmation: bool | None = None
@@ -182,7 +186,7 @@ class SignupItemUpdateIn(BaseModel):
     is_open: bool | None = None
     fields: list[SignupFieldIn] | None = Field(None, max_length=30)
 
-    _tz = field_validator("event_at", "signup_start", "signup_end")(_aware)
+    _tz = field_validator("event_at", "signup_end")(_aware)
 
     @field_validator("name")
     @classmethod
@@ -193,6 +197,15 @@ class SignupItemUpdateIn(BaseModel):
         if not v:
             raise ValueError("活動名稱不得為空白")
         return v
+
+    @model_validator(mode="after")
+    def _no_explicit_nulls(self):
+        nulls = [
+            f for f in self.model_fields_set if f != "place" and getattr(self, f) is None
+        ]
+        if nulls:
+            raise ValueError(f"這些欄位不接受空值:{'、'.join(sorted(nulls))}")
+        return self
 
 
 class ManualRegistrationIn(BaseModel):

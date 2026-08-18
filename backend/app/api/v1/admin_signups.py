@@ -76,6 +76,30 @@ async def _default_session(db, item: SignupItem) -> SignupItemSession:
     return session
 
 
+async def _item_out(db, item: SignupItem) -> AdminSignupItemOut:
+    """單活動輸出:統計欄位要算出來,不能讓 schema 的預設 0 冒充「沒有人報名」。"""
+    out = AdminSignupItemOut.model_validate(item)
+    out.accepting = svc.window_open(item)
+    clubs, pending = (
+        await db.execute(
+            sa.select(sa.func.count(), sa.func.count().filter(Signup.confirmed.is_(False)))
+            .select_from(Signup)
+            .where(Signup.item_id == item.id)
+        )
+    ).one()
+    out.clubs_count, out.pending_count = int(clubs), int(pending)
+    out.people_count = int(
+        await db.scalar(
+            sa.select(sa.func.count())
+            .select_from(SignupEntry)
+            .join(Signup, SignupEntry.signup_id == Signup.id)
+            .where(Signup.item_id == item.id)
+        )
+        or 0
+    )
+    return out
+
+
 # ---- 報名活動建立與列表 ----
 
 
@@ -117,9 +141,7 @@ async def create_item(
     )
     await db.commit()
     await db.refresh(item)
-    out = AdminSignupItemOut.model_validate(item)
-    out.accepting = svc.window_open(item)
-    return ApiResponse(data=out)
+    return ApiResponse(data=await _item_out(db, item))
 
 
 @router.patch("/{item_id}")
@@ -134,6 +156,8 @@ async def update_item(
 
     **不發通知**:打錯字改回來、把地點寫清楚,每改一次推一則只會淹掉頻道。
     截止時間可改,但只能改到現在或未來 —— 往回改等於用系統時鐘偽造「當時就截止了」。
+    名額上限可以往下調:已報名的名單不受影響(每社人數上限只在社團送出那一刻檢核),
+    畫面顯示的是實際人數,不是上限。
     """
     item = await db.scalar(
         sa.select(SignupItem).where(SignupItem.id == item_id).with_for_update()
@@ -174,9 +198,7 @@ async def update_item(
     )
     await db.commit()
     await db.refresh(item)
-    out = AdminSignupItemOut.model_validate(item)
-    out.accepting = svc.window_open(item)
-    return ApiResponse(data=out)
+    return ApiResponse(data=await _item_out(db, item))
 
 
 @router.get("")

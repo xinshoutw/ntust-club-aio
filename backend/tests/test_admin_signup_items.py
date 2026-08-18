@@ -451,3 +451,32 @@ async def test_admin_can_add_a_club_that_never_registered(client, db):
     assert dup.status_code == 409
     # 明說是哪一種 409:靠唯一鍵撞出來的話只會回「資料狀態已變更或重複送出」
     assert dup.json()["error"] == "該社團已在報名名單中"
+
+
+async def test_update_item_rejects_explicit_nulls_except_place(client, db):
+    """PATCH 的 None 一律代表「沒帶」;顯式 null 會把 NOT NULL 欄位寫成空、
+    或靜靜清掉整份表單定義。只有地點允許送 null 清空。"""
+    club = await seed(client, db)
+    created = await client.post(URL, json=body(), headers=csrf_headers(client))
+    item_id = created.json()["data"]["id"]
+
+    for field in ("name", "signup_end", "max_participants", "is_open", "fields"):
+        resp = await client.patch(
+            f"{URL}/{item_id}", json={field: None}, headers=csrf_headers(client)
+        )
+        assert resp.status_code == 422, f"{field} 應被擋下,實際 {resp.status_code}"
+
+    cleared = await client.patch(
+        f"{URL}/{item_id}", json={"place": None}, headers=csrf_headers(client)
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["data"]["place"] is None
+
+    # PATCH 回應的統計數字要是真的,不能讓 schema 預設 0 冒充「沒有人報名」
+    db.add(Signup(item_id=item_id, club_id=club.id))
+    await db.commit()
+    resp = await client.patch(
+        f"{URL}/{item_id}", json={"place": "IB-101"}, headers=csrf_headers(client)
+    )
+    data = resp.json()["data"]
+    assert (data["clubs_count"], data["pending_count"]) == (1, 1)

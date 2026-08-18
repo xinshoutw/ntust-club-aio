@@ -62,7 +62,8 @@ export default function SignupEditModal({
               itemId: item.id,
               patch: {
                 name: v.name.trim(),
-                place: v.place?.trim() || undefined,
+                // 清空要送 null:undefined 會被 JSON.stringify 丟掉,後端就當作「沒帶」
+                place: v.place?.trim() || null,
                 description: v.description ?? '',
                 eventAt: v.eventAt.format(DATETIME_FMT),
                 signupEnd: v.signupEnd.format(DATETIME_FMT),

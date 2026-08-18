@@ -34,7 +34,7 @@
 - 刪除先 commit DB 再 unlink 磁碟,失敗只留孤兒檔不會出現「有列無檔」
 - 刪除寫 `audit_logs`
 - **容量水位**(decisions.md OPS-07):`disk_level` 由後端算,`warn` ≥80%、`alert` ≥90%
-- **上傳前置閘**(ISS-43):到 `alert` 水位即不再接受任何上傳(507)。閘門同時掛在 nginx 的 `auth_request` 子請求(`GET /auth/precheck`)上 —— 在 Starlette 把 multipart 落到 `/tmp` 之前就回絕,暫存檔完全不落地;`save_upload` 內另擋一次,直呼 API 也繞不過。容量檢查本質是 TOCTOU,決議不做配額預留,改以「離寫滿還遠就放行、接近就一律擋掉」收斂 —— 並發的幾個大檔最多把使用率再往上推一點,而不是把磁碟吃到 0
+- **上傳前置閘**(ISS-43):到 `alert` 水位即不再接受任何上傳(對前端是 507)。閘門同時掛在 nginx 的 `auth_request` 子請求(`GET /auth/precheck`)上 —— 該子請求回的是 **403 + `X-Upload-Gate: closed`**(`auth_request` 只認 2xx/401/403,其餘一律轉成 500,使用者就只看得到「HTTP 500」),nginx 依那個標頭換成 507 的文案 —— 在 Starlette 把 multipart 落到 `/tmp` 之前就回絕,暫存檔完全不落地;`save_upload` 內另擋一次,直呼 API 也繞不過。容量檢查本質是 TOCTOU,決議不做配額預留,改以「離寫滿還遠就放行、接近就一律擋掉」收斂 —— 並發的幾個大檔最多把使用率再往上推一點,而不是把磁碟吃到 0
 
 ## 未完成 / 問題
 

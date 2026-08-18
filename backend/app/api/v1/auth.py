@@ -80,8 +80,12 @@ async def upload_precheck(auth: AuthDep, request: Request) -> Response:
         raise forbidden("CSRF 驗證失敗,請重新整理頁面", code="CSRF_FAILED")
     if user.must_change_password:
         raise forbidden("首次登入請先變更密碼", code="PASSWORD_CHANGE_REQUIRED")
-    # 容量前置閘(ISS-43):磁碟到告警水位就不收新檔,暫存檔連落地都不落地
-    file_service.ensure_upload_gate_open()
+    # 容量前置閘(ISS-43):磁碟到告警水位就不收新檔,暫存檔連落地都不落地。
+    # **回 403 而不是 507**:`auth_request` 只認 2xx/401/403,其餘一律轉成 500,
+    # 使用者就只會看到「HTTP 500」而不知道是磁碟滿了。真正的 507 由 nginx
+    # 依 `X-Upload-Gate` 標頭換文案送出(見 frontend/nginx.conf)。
+    if file_service.disk_level() == "alert":
+        return Response(status_code=403, headers={"X-Upload-Gate": "closed"})
     return Response(status_code=204)
 
 

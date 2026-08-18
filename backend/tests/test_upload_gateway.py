@@ -93,3 +93,44 @@ def test_the_precheck_subrequest_tolerates_the_largest_upload():
     precheck = sizes["/_upload_precheck"]
     uploads = [v for k, v in sizes.items() if k != "/_upload_precheck" and "login" not in k]
     assert precheck >= max(uploads)
+
+
+def test_the_gate_response_survives_auth_request():
+    """`auth_request` 只認 2xx/401/403,其餘一律轉成 500。
+
+    容量閘因此必須回 403 + `X-Upload-Gate` 標頭,由 nginx 依標頭換成 507 的文案;
+    後端直接回 507 的話使用者只會看到「HTTP 500」,而 nginx 連 500 的 error_page 都沒有。
+    """
+    conf = NGINX_CONF.read_text()
+    # 每個掛 auth_request 的 location 都要把標頭取出來
+    for pattern, block in re.findall(r"location\s+~\s+(\S+)\s+\{(.*?)\n    \}", conf, re.S):
+        if "auth_request /_upload_precheck" not in block:
+            continue
+        assert "auth_request_set $upload_gate $upstream_http_x_upload_gate;" in block, pattern
+    # 403 的處理要能分辨「沒有權限」與「磁碟滿了」
+    forbidden = re.search(r"location @forbidden \{(.*?)\n    \}", conf, re.S)[1]
+    assert "$upload_gate = closed" in forbidden
+    assert "507" in forbidden
+
+
+def test_admin_adjustable_limits_stay_under_the_nginx_caps():
+    """承辦把上限調到 nginx 擋得住的範圍以外,就會出現「畫面說 100MB、送出吃 413」。
+
+    `upload_limits` 的上界必須留在各 location 的 `client_max_body_size` 之內。
+    """
+    from app.schemas.settings import UploadLimitsIn
+
+    conf = NGINX_CONF.read_text()
+    caps = {}
+    for pattern, block in re.findall(r"location\s+~\s+(\S+)\s+\{(.*?)\n    \}", conf, re.S):
+        if "auth_request /_upload_precheck" not in block:
+            continue
+        caps[pattern] = int(re.search(r"client_max_body_size (\d+)m", block)[1])
+    video_cap = max(v for k, v in caps.items() if "maintenance" in k)
+    other_cap = min(v for k, v in caps.items() if "maintenance" not in k)
+
+    bounds = {k: f.metadata[-1].le for k, f in UploadLimitsIn.model_fields.items()}
+    assert bounds["video"] <= video_cap
+    # zip(ARCHIVE)沒有任何端點在用,不對應任何 location
+    for key in ("doc", "img"):
+        assert bounds[key] <= other_cap, f"{key} 上界 {bounds[key]}MB 超過 nginx 的 {other_cap}m"

@@ -531,8 +531,10 @@ async def test_upload_gate_closes_before_the_body_lands(client, db, monkeypatch)
         file_service.shutil, "disk_usage", lambda _p: du(total=1000, used=950, free=50)
     )
     gate = await client.get("/api/v1/auth/precheck", headers=csrf_headers(client))
-    assert gate.status_code == 507
-    assert "告警水位" in gate.json()["error"]
+    # **403 而不是 507**:auth_request 只認 2xx/401/403,其餘一律轉成 500,
+    # 使用者就只看得到「HTTP 500」。真正的 507 由 nginx 依這個標頭換文案送出
+    assert gate.status_code == 403
+    assert gate.headers["X-Upload-Gate"] == "closed"
 
     # 直呼 API(不經 nginx)的上傳同樣擋得住
     png = b"\x89PNG\r\n\x1a\n" + b"0" * 64

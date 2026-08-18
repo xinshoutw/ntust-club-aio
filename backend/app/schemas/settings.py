@@ -39,13 +39,22 @@ class EquipmentBufferIn(BaseModel):
         return {"before": self.before, "after": self.after}
 
 
+# 上界貼齊 `frontend/nginx.conf` 的 `client_max_body_size`:調得比它高的話,
+# 設定頁收下、`/club/config` 下發、畫面照著顯示新上限,而使用者一送出就吃 nginx 的 413
+# ——「畫面說 100MB、系統回超過上限」是最難查的一種不一致。
+# 動這些數字時 `tests/test_upload_gateway.py` 會比對 nginx,不會讓兩邊各走各的。
+_NON_VIDEO_MAX_MB = 50   # 對應 64m 那組 location(留 multipart 邊界的裕度)
+_VIDEO_MAX_MB = 200      # 對應維修佐證的 256m
+
+
 class UploadLimitsIn(BaseModel):
     """各類型上傳上限(MB)。"""
 
-    doc: int = Field(ge=1, le=1024)
-    img: int = Field(ge=1, le=1024)
+    doc: int = Field(ge=1, le=_NON_VIDEO_MAX_MB)
+    img: int = Field(ge=1, le=_NON_VIDEO_MAX_MB)
+    # ARCHIVE 政策目前沒有任何端點在用,所以不受 nginx 逐端點上限約束(預設 100)
     zip: int = Field(ge=1, le=1024)
-    video: int = Field(ge=1, le=1024)
+    video: int = Field(ge=1, le=_VIDEO_MAX_MB)
 
     def to_json(self) -> dict[str, Any]:
         return {"doc": self.doc, "img": self.img, "zip": self.zip, "video": self.video}

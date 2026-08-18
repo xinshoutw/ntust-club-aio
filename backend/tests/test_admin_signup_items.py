@@ -333,3 +333,80 @@ async def test_signup_page_key_opens_the_page(client, db):
     resp = await client.post(URL, json=body(name="別名鍵活動"), headers=csrf_headers(client))
     assert resp.status_code == 201
     assert (await client.get(URL)).status_code == 200
+
+
+async def test_update_item_edits_content_without_notifying(client, db, monkeypatch):
+    """報名活動建立後仍可修改(decisions.md D-09)。
+
+    打錯字改回來、把地點寫清楚,每改一次推一則通知只會淹掉頻道,所以**不發通知**。
+    """
+    sent: list = []
+    from app.services import notify
+
+    monkeypatch.setattr(notify, "club_event", lambda *a, **k: sent.append(a))
+
+    await seed(client, db)
+    created = await client.post(URL, json=body(), headers=csrf_headers(client))
+    item_id = created.json()["data"]["id"]
+
+    resp = await client.patch(
+        f"{URL}/{item_id}",
+        json={"name": "社團幹部訓練", "place": "IB-201", "max_participants": 8},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    assert (data["name"], data["place"], data["max_participants"]) == ("社團幹部訓練", "IB-201", 8)
+    # 沒帶的欄位原封不動
+    assert data["kind"] == "cadre_training"
+    assert data["requires_confirmation"] is True
+    assert sent == []
+
+
+async def test_update_item_deadline_can_only_move_to_now_or_later(client, db):
+    """截止時間往回改等於用系統時鐘偽造「當時就截止了」(decisions.md D-09)。"""
+    await seed(client, db)
+    created = await client.post(URL, json=body(), headers=csrf_headers(client))
+    item_id = created.json()["data"]["id"]
+    now = datetime.now(UTC)
+
+    past = await client.patch(
+        f"{URL}/{item_id}",
+        json={"signup_end": (now - timedelta(days=1)).isoformat()},
+        headers=csrf_headers(client),
+    )
+    assert past.status_code == 422
+    assert "現在或未來" in past.json()["error"]
+
+    ok = await client.patch(
+        f"{URL}/{item_id}",
+        json={"signup_end": (now + timedelta(days=1)).isoformat()},
+        headers=csrf_headers(client),
+    )
+    assert ok.status_code == 200
+
+
+async def test_update_item_locks_fields_once_someone_registered(client, db):
+    """既有回答是以現行 key 存的,改名或刪欄會讓那些答案在名單與匯出裡憑空消失。"""
+    club = await seed(client, db)
+    created = await client.post(URL, json=body(), headers=csrf_headers(client))
+    item_id = created.json()["data"]["id"]
+
+    new_fields = [{"label": "聯絡電話", "type": "text", "required": True}]
+    edit = await client.patch(
+        f"{URL}/{item_id}", json={"fields": new_fields}, headers=csrf_headers(client)
+    )
+    assert edit.status_code == 200
+
+    db.add(Signup(item_id=item_id, club_id=club.id))
+    await db.commit()
+    locked = await client.patch(
+        f"{URL}/{item_id}", json={"fields": new_fields}, headers=csrf_headers(client)
+    )
+    assert locked.status_code == 409
+    assert locked.json()["meta"]["code"] == "SIGNUP_FIELDS_LOCKED"
+    # 其他欄位照樣改得動
+    other = await client.patch(
+        f"{URL}/{item_id}", json={"place": "IB-301"}, headers=csrf_headers(client)
+    )
+    assert other.status_code == 200

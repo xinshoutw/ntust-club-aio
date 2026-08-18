@@ -36,6 +36,7 @@ from app.schemas.signups import (
     EntryOut,
     RegistrationOut,
     SignupItemCreateIn,
+    SignupItemUpdateIn,
 )
 from app.services import audit, notify
 from app.services import booking_service as booking_svc  # advisory lock 工具在此
@@ -111,6 +112,63 @@ async def create_item(
         action="signup_item_created",
         user=user,
         detail=f"name={body.name[:50]};kind={body.kind};capacity={body.max_participants}",
+        ip=client_ip(request),
+    )
+    await db.commit()
+    await db.refresh(item)
+    out = AdminSignupItemOut.model_validate(item)
+    out.accepting = svc.window_open(item)
+    return ApiResponse(data=out)
+
+
+@router.patch("/{item_id}")
+async def update_item(
+    item_id: int,
+    body: SignupItemUpdateIn,
+    user: RegAdmin,
+    db: DbDep,
+    request: Request,
+) -> ApiResponse[AdminSignupItemOut]:
+    """修改已建立的報名活動(decisions.md D-09)。
+
+    **不發通知**:打錯字改回來、把地點寫清楚,每改一次推一則只會淹掉頻道。
+    截止時間可改,但只能改到現在或未來 —— 往回改等於用系統時鐘偽造「當時就截止了」。
+    """
+    item = await db.scalar(
+        sa.select(SignupItem).where(SignupItem.id == item_id).with_for_update()
+    )
+    if item is None:
+        raise not_found("找不到報名活動")
+    changes = body.model_dump(exclude_unset=True)
+
+    now = datetime.now(UTC)
+    signup_end = changes.get("signup_end", item.signup_end)
+    if "signup_end" in changes and signup_end < now:
+        raise validation_error("報名截止只能改到現在或未來")
+    signup_start = changes.get("signup_start", item.signup_start)
+    if signup_start is not None and signup_end is not None and signup_end <= signup_start:
+        raise validation_error("報名截止須晚於報名開始")
+
+    if "fields" in changes:
+        # 已經有人報名之後就不動欄位:既有回答是以現行 key 存的,改名或刪欄
+        # 會讓那些答案在管理彈窗與匯出裡憑空消失,而畫面上看不出來
+        registered = await db.scalar(
+            sa.select(sa.func.count()).select_from(Signup).where(Signup.item_id == item.id)
+        )
+        if registered:
+            raise conflict("已有社團報名,不可再修改表單欄位", code="SIGNUP_FIELDS_LOCKED")
+        try:
+            changes["fields"] = svc.normalize_fields([f.model_dump() for f in body.fields or []])
+        except ValueError as exc:
+            raise validation_error(str(exc)) from None
+
+    for field, value in changes.items():
+        setattr(item, field, value)
+    audit.record(
+        db,
+        action="signup_item_updated",
+        user=user,
+        detail=f"item={item.id};fields={','.join(sorted(changes))}",
         ip=client_ip(request),
     )
     await db.commit()

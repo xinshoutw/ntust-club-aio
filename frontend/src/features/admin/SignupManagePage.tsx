@@ -3,7 +3,7 @@ import { countText } from '../../lib/counts'
 import { useNavigate } from 'react-router'
 import { App, Button, Checkbox, DatePicker, Input, Modal, Tooltip } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
-import { DeleteOutlined, DownloadOutlined, RightOutlined } from '@ant-design/icons'
+import { DeleteOutlined, DownloadOutlined, EditOutlined, RightOutlined } from '@ant-design/icons'
 import type { Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
@@ -12,6 +12,7 @@ import { Cols, Pager } from '../../components/ui/tableControls'
 import { confirmDialog } from '../../lib/confirm'
 import { downloadCsv } from '../../lib/csv'
 import KindBadge from '../signup/KindBadge'
+import SignupEditModal from './SignupEditModal'
 import {
   SIGNUP_PAGE_SIZE,
   useAdminSignupItems,
@@ -46,6 +47,7 @@ function ManageModal({
   const regs = regsQuery.data ?? []
   const totalPeople = regs.reduce((s, r) => s + r.count, 0)
   const { confirm, markAttendance, createSession, deleteSession } = useSignupItemMutations()
+  const [editing, setEditing] = useState(false)
 
   // 場次制(負責人會議):場次清單+逐場簽到;非場次制不發查詢
   const sessionsQuery = useSessions(item.sessionBased ? item.id : undefined)
@@ -183,6 +185,9 @@ function ManageModal({
           每社上限 <span className="num">{item.maxParticipants}</span> 人
         </span>
         <span style={{ flex: 1 }} />
+        <Button size="small" icon={<EditOutlined />} onClick={() => setEditing(true)}>
+          編輯活動
+        </Button>
         <Button size="small" icon={<DownloadOutlined />} onClick={exportCsv}>
           匯出名單
         </Button>
@@ -331,6 +336,8 @@ function ManageModal({
           )}
         </div>
       </LoadingBlock>
+
+      <SignupEditModal item={item} open={editing} onClose={() => setEditing(false)} />
     </Modal>
   )
 }

@@ -162,6 +162,39 @@ class SignupItemCreateIn(BaseModel):
         return self
 
 
+class SignupItemUpdateIn(BaseModel):
+    """報名活動建立後的修改(decisions.md D-09);只帶要改的欄位。
+
+    `kind` 不在裡面:它同時決定行政分採計(ad7/ad8)與是否場次制,
+    改掉會讓既有的場次與簽到失去意義。真要換種類就重建一個活動。
+    起訖與名額的交叉檢核在端點做(要跟資料庫裡的現值合併後才判得準)。
+    """
+
+    name: str | None = Field(None, min_length=1, max_length=100)
+    place: str | None = Field(None, max_length=100)
+    description: str | None = Field(None, max_length=2000)
+    event_at: datetime | None = None
+    signup_start: datetime | None = None
+    signup_end: datetime | None = None
+    max_participants: int | None = Field(None, ge=1, le=500)
+    requires_confirmation: bool | None = None
+    is_eval: bool | None = None
+    is_open: bool | None = None
+    fields: list[SignupFieldIn] | None = Field(None, max_length=30)
+
+    _tz = field_validator("event_at", "signup_start", "signup_end")(_aware)
+
+    @field_validator("name")
+    @classmethod
+    def _strip_name(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        v = v.strip()
+        if not v:
+            raise ValueError("活動名稱不得為空白")
+        return v
+
+
 class AdminSignupItemOut(SignupItemOut):
     """管理端列表:各活動已報名社團數/人數、待確認數。"""
 

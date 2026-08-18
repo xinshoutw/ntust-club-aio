@@ -18,7 +18,7 @@
 - [ ] 阻擋 `SECRET_KEY` = `openssl rand -base64 48`
 - [ ] 阻擋 `POSTGRES_PASSWORD` = 強密碼(compose 以同一個變數插值到 db 與 backend)
 - [ ] 阻擋 `FORWARDED_ALLOW_IPS` = `172.28.0.0/24` + edge VM 內網 IP。**絕不可用 `*`**,否則登入限流可被繞過、稽核 IP 可被投毒。值需與內層 web nginx 的 `set_real_ip_from` 一起核對
-- [ ] 待決 `DISCORD_WEBHOOK_URL`:現值為測試群組,prod 換正式頻道;**絕不入版控**
+- [ ] 阻擋 `DISCORD_WEBHOOK_URL`:現值為測試群組,prod 換正式頻道;**絕不入版控**
 - [ ] 阻擋 `SMTP_*`:校方 relay 已實測可寄(`mail.ntust.edu.tw:465`、`SMTP_SECURITY=ssl`)。
   host / username / password 任一為空即降級 log-only(不報錯,但信不會寄出)。
   **`MAIL_FROM_ADDRESS` 需與認證帳號同網域**,否則 relay 會拒收
@@ -56,7 +56,6 @@
 ## F. 待決清單
 
 1. ~~SMTP relay 最終方案~~ —— 已定案為校方 relay,實測可寄
-2. Discord 正式頻道 webhook
 3. 上傳檔案儲存位置:`compose.yml` 現用具名 volume `uploads`,`architecture.md §3.2` 規劃 bind mount `/srv/club-aio/uploads` 以便備份工具直接同步。二者影響備份做法,擇一並對齊
 4. 備份 owner 與 GCS bucket
 5. GCE 實體磁碟大小(`df` 驗證)與 VM 規格(e2-medium + 2GB swap 是否夠)

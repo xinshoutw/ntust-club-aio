@@ -1,6 +1,7 @@
 # ruff: noqa: E402
 import os
 import time
+from datetime import datetime, timedelta
 
 # 必須在 import app 之前設定:測試一律打獨立資料庫(絕不碰開發庫)。
 # CLUB_AIO_TEST_DB 允許平行 worktree 各用一個測試庫,互不搶鎖
@@ -12,6 +13,11 @@ os.environ["POSTGRES_DB"] = TEST_DB
 # 必須早於測試模組 import(有模組層級的 date.today() 常數)。
 os.environ["TZ"] = "Asia/Taipei"
 time.tzset()
+# tzset() 讀系統 /usr/share/zoneinfo:精簡映像少了 tzdata 就會靜默退回 UTC
+# (ubuntu:24.04 實測即如此),測試會照樣全綠而日期判定全錯一天。寧可在這裡就炸開
+assert datetime.now().astimezone().utcoffset() == timedelta(hours=8), (
+    "行程時區沒有套用 Asia/Taipei:這台機器缺 tzdata"
+)
 
 import httpx
 import pytest

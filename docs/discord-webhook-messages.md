@@ -15,7 +15,7 @@
 
 **身分**:`_with_identity()` 為每個 payload 補 `username="臺科大社團管理系統"`、`avatar_url=SITE_URL/logo.png`(開發站無法解析時 Discord 略過頭貼)。
 
-**投遞**:一律在 `db.commit()` 之後以 `BackgroundTasks` fire-and-forget,回應不被通知阻塞。`httpx` 單次 POST(timeout 5s),**無重試、無佇列**,失敗只記 log,絕不影響業務交易。
+**投遞**:一律在 `db.commit()` 之後以 `BackgroundTasks` fire-and-forget,回應不被通知阻塞。`httpx` POST(timeout 5s),**暫時性失敗在記憶體裡重試**(最多 3 次;429 照 `Retry-After` 等、5xx 與連線失敗退避 1s/3s,4xx 一次就放棄),**不落地佇列表**(decisions.md ISS-65)—— 程序重啟仍會遺失。最終失敗只記 log,絕不影響業務交易。Email 同一套重試,結果照樣寫 `email_logs`。
 
 **格式**:一般事件用單一 embed(`title` + `description` + `color`,無 fields/footer/timestamp);公告用 Components V2(`flags=1<<15`,Container + Text Display,需帶 `with_components=true`)。
 

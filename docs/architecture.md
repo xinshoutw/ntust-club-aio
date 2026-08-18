@@ -53,7 +53,7 @@ Python 3.14 lazy annotation:欄位名與型別同名時型別須別名(`import d
 
 ### 3.3 通知
 
-- Discord webhook:全域 + 社團自設各推一份,URL 走 `.env` 不入版控;訊息清冊見 `discord-webhook-messages.md`
+- Discord webhook:全域 + 社團自設各推一份,URL 走 `.env` 不入版控;暫時性失敗做記憶體重試(3 次,429 照 `Retry-After`)、不落地佇列表;訊息清冊見 `discord-webhook-messages.md`
 - Email:aiosmtplib + `BackgroundTasks`,SMTP 參數全走 `.env` 不綁供應商;host/username/password 任一為空即降級 log-only。寄送結果寫 `email_logs`
 - 目前只有兩個寄信點:勾了「通知」的公告、器材歸還提醒。其餘事件只推 Discord;重設密碼是當場回傳一次性密碼,不寄信
 

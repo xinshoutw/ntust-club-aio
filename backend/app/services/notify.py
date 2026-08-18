@@ -6,6 +6,7 @@
 - 公告通知:Email 基礎 HTML 模板 + Discord Components V2
 """
 
+import asyncio
 import html as html_escape
 import logging
 import ssl
@@ -24,6 +25,31 @@ from app.models.enums import EmailStatus
 logger = logging.getLogger("club_aio.notify")
 
 _TIMEOUT = 5.0
+
+# 記憶體重試(decisions.md ISS-65):不落地佇列表 —— 程序重啟仍會遺失,
+# 但通知本來就是輔助,單筆重送的價值撐不起一張表與它的清理排程。
+# 擋的是「暫時性失敗」:429 限流、5xx、連線中斷。4xx(設定錯的 webhook)重送幾次
+# 也一樣,直接放棄並記 log。
+_RETRIES = 3
+_BACKOFF = (1.0, 3.0)  # 第 1、2 次重試前各等幾秒;429 帶 Retry-After 時以它為準
+_MAX_RETRY_AFTER = 30.0  # Discord 偶爾給很長的 Retry-After,超過就不等了
+
+
+def _retry_delay(attempt: int, resp: httpx.Response | None) -> float | None:
+    """下一次重試前要等幾秒;None=不重試。"""
+    if attempt >= _RETRIES:
+        return None
+    if resp is None:  # 連線層失敗(逾時、DNS、TLS)
+        return _BACKOFF[min(attempt - 1, len(_BACKOFF) - 1)]
+    if resp.status_code == 429:
+        try:
+            wait = float(resp.headers.get("Retry-After", "1"))
+        except ValueError:
+            wait = 1.0
+        return min(wait, _MAX_RETRY_AFTER)
+    if resp.status_code >= 500:
+        return _BACKOFF[min(attempt - 1, len(_BACKOFF) - 1)]
+    return None  # 4xx:重送幾次都一樣
 
 SYSTEM_NAME = "臺科大社團管理系統"
 SITE_URL = "https://clubs.ntust.edu.tw"
@@ -54,19 +80,32 @@ _COLORS = {
 async def _post_webhook(
     url: str, payload: dict[str, Any], label: str, params: dict[str, str] | None = None
 ) -> None:
-    """低階發送:失敗只記 log,絕不影響業務交易。"""
+    """低階發送:暫時性失敗在記憶體裡重試,最終失敗只記 log,絕不影響業務交易。"""
     if not url:
         logger.info("discord disabled: %s", label)
         return
-    try:
-        async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
-            resp = await client.post(url, json=_with_identity(payload), params=params)
-            resp.raise_for_status()
-    except httpx.HTTPStatusError as err:
-        # 不記整條例外:httpx 的訊息含完整 webhook URL,那串路徑就是憑證
-        logger.warning("discord webhook rejected (%s): %s", err.response.status_code, label)
-    except Exception:  # noqa: BLE001 - 通知失敗不得影響業務
-        logger.exception("discord webhook failed: %s", label)
+    for attempt in range(1, _RETRIES + 1):
+        resp: httpx.Response | None = None
+        try:
+            async with httpx.AsyncClient(timeout=_TIMEOUT) as client:
+                resp = await client.post(url, json=_with_identity(payload), params=params)
+                resp.raise_for_status()
+            return
+        except httpx.HTTPStatusError as err:
+            resp = err.response
+            # 不記整條例外:httpx 的訊息含完整 webhook URL,那串路徑就是憑證
+            reason = f"rejected ({resp.status_code})"
+        except Exception as exc:  # noqa: BLE001 - 通知失敗不得影響業務
+            resp = None
+            reason = type(exc).__name__
+        delay = _retry_delay(attempt, resp)
+        if delay is None:
+            logger.warning("discord webhook %s, giving up after %d try(s): %s",
+                           reason, attempt, label)
+            return
+        logger.info("discord webhook %s, retrying in %.1fs (%d/%d): %s",
+                    reason, delay, attempt, _RETRIES, label)
+        await asyncio.sleep(delay)
 
 
 async def discord_to(url: str, kind: str, title: str, description: str = "") -> None:
@@ -216,19 +255,7 @@ async def send_email(
         if html:
             message.add_alternative(html, subtype="html")
         try:
-            await aiosmtplib.send(
-                message,
-                hostname=settings.smtp_host,
-                port=settings.smtp_port,
-                username=settings.smtp_username,
-                password=settings.smtp_password,
-                use_tls=settings.smtp_security == "ssl",
-                start_tls=settings.smtp_security == "starttls",
-                tls_context=(
-                    _smtp_tls_context() if settings.smtp_security != "none" else None
-                ),
-                timeout=15,
-            )
+            await _send_smtp(message)
         except Exception as exc:  # noqa: BLE001 - 失敗留底,不往外拋
             logger.exception("send email failed: to=%s", to_addr)
             status = EmailStatus.FAILED
@@ -241,3 +268,38 @@ async def send_email(
             )
         )
         await db.commit()
+
+
+async def _send_smtp(message: EmailMessage) -> None:
+    """寄一封信,暫時性失敗重試(記憶體;decisions.md ISS-65)。
+
+    校方 relay 偶爾拒接或連線中斷,重送一次通常就過了 —— 而通知裡有
+    「已核准」「已逾期」這種社團真的需要看到的事件。
+    """
+    last: Exception | None = None
+    for attempt in range(1, _RETRIES + 1):
+        try:
+            return await aiosmtplib.send(
+                message,
+                hostname=settings.smtp_host,
+                port=settings.smtp_port,
+                username=settings.smtp_username,
+                password=settings.smtp_password,
+                use_tls=settings.smtp_security == "ssl",
+                start_tls=settings.smtp_security == "starttls",
+                tls_context=(
+                    _smtp_tls_context() if settings.smtp_security != "none" else None
+                ),
+                timeout=15,
+            )
+        except Exception as exc:  # noqa: BLE001 - 由呼叫端統一留底
+            last = exc
+            if attempt == _RETRIES:
+                break
+            delay = _BACKOFF[min(attempt - 1, len(_BACKOFF) - 1)]
+            logger.info(
+                "smtp send failed (%s), retrying in %.1fs (%d/%d)",
+                type(exc).__name__, delay, attempt, _RETRIES,
+            )
+            await asyncio.sleep(delay)
+    raise last if last else RuntimeError("smtp send failed")

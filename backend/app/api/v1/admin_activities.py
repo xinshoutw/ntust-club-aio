@@ -61,6 +61,18 @@ async def _reviewer(user: CurrentUser) -> CurrentUser:
 Reviewer = Annotated[CurrentUser, Depends(_reviewer)]
 
 
+def _require_close_key(user) -> None:
+    """結案核准與退回:`aclose` 或結案單關的 `approve_advisor` 皆可(decisions.md D-08)。
+
+    原本只認 `approve_advisor`,結果只持結案審核鍵的帳號進得了頁面卻按不了核准 ——
+    一頁一件事,能看就要能簽。
+    """
+    if user.is_super:
+        return
+    if not any(k in user.permissions for k in ("aclose", "approve_advisor")):
+        raise forbidden("沒有結案審核的權限")
+
+
 def _require_stage_key(user, key: str) -> None:
     # 學務長關卡=本人操作:即使 super 也必須明確持有 approve_dean(避免代簽)
     if key == "approve_dean":
@@ -245,6 +257,11 @@ async def list_activities(
             conds.append(_large_condition())
         query = query.where(sa.or_(*conds))
     lock_months = await get_setting(db, "close_lock_months")
+    may_see_approved = visible is None or ActivityStatus.APPROVED in visible
+    if (locked or overdue) and not may_see_approved:
+        # 逾期未結案全是 approved 狀態。看不到 approved 的帳號(例如只持 approve_advisor)
+        # 原本會拿到空清單,畫面顯示「0 件」—— 承辦以為真的沒有逾期案件
+        raise forbidden("沒有檢視逾期未結案的權限")
     if locked or overdue:
         # locked 僅未解鎖者,overdue 不分鎖定與否(是否鎖定由回應的 close_locked 區分)
         query = query.where(
@@ -480,7 +497,7 @@ async def close_approve(
     activity = await _get_activity(db, activity_id, for_update=True)
     if activity.status != ActivityStatus.CLOSING_PENDING_ADVISOR:
         raise conflict("此活動不在結案待審狀態")
-    _require_stage_key(user, "approve_advisor")  # 結案:承辦人單關
+    _require_close_key(user)  # 結案:承辦人單關
 
     activity.status = ActivityStatus.CLOSED
     # 繳交確認:未確認之項目評鑑以 0 分計(寫入 report,scoring 讀取)。
@@ -519,7 +536,7 @@ async def close_reject(
     activity = await _get_activity(db, activity_id, for_update=True)
     if activity.status != ActivityStatus.CLOSING_PENDING_ADVISOR:
         raise conflict("此活動不在結案待審狀態")
-    _require_stage_key(user, "approve_advisor")
+    _require_close_key(user)
 
     activity.status = ActivityStatus.APPROVED  # 退回 → 可修正後重送結案
     _record(

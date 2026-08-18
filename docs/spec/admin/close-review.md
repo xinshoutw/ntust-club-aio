@@ -36,6 +36,9 @@
 - 逾期清單 `overdue=true` 含已鎖定與已解鎖兩種,由回應的 `close_locked` 區分
 - 逾期清單在 DB 端篩(`activity_service.close_overdue_sql`),與 `is_close_locked` 共用同一條期限與 `close_lock_months`
 
+- **`aclose` 涵蓋核准與退回**(decisions.md D-08):能看就能簽,不必另持 `approve_advisor`
+- 「逾期未結案」全是 `approved` 狀態:看不到該狀態的帳號查詢直接回 403,**不給一個假的 0 件**
+
 ## 未完成 / 問題
 
 - **繳交確認四層全部 fail-open**:前端初值三項全勾 → 後端 `body` 可整個省略 → schema 三旗標預設 `True` → model 欄位本身也是 `default=True, server_default=true`。承辦人不看就按核准 = 全部視為已繳

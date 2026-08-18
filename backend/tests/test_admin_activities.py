@@ -527,6 +527,48 @@ async def test_large_approval_can_be_corrected_at_a_later_stage(client, db):
     assert resp.json()["data"]["status"] == "approved"
 
 
+async def test_close_key_can_actually_close(client, db):
+    """一頁一件事:進得了結案審核頁的鍵就簽得下去(decisions.md D-08)。"""
+    await seed(client, db)
+    await make_user(db, username="closer", role="admin", permissions=["aclose"])
+    past = (date.today() - timedelta(days=2)).isoformat()
+    aid = await submit_activity(client, db, date=past)
+    await db.execute(sa.update(Activity).where(Activity.id == aid).values(status="approved"))
+    await db.commit()
+
+    await login(client, "club01")
+    await upload_photo(client, aid)
+    resp = await client.post(
+        f"/api/v1/club/activities/{aid}/close",
+        json=close_payload(),
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+
+    # 只持 aclose 就核准得了(原本還要 approve_advisor)
+    await login(client, "closer")
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/close-approve",
+        json={"photos_confirmed": True, "report_confirmed": True, "reflections_confirmed": True},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+
+
+async def test_overdue_close_says_no_permission_instead_of_zero(client, db):
+    """看不到 approved 的帳號問「逾期未結案」要拿到 403,不是一個假的 0(ISS-74c)。"""
+    await seed(client, db)
+    await make_user(db, username="stage_only", role="admin", permissions=["approve_advisor"])
+    await login(client, "stage_only")
+
+    resp = await client.get("/api/v1/admin/activities?overdue=true")
+    assert resp.status_code == 403, resp.text
+
+    await make_user(db, username="closer2", role="admin", permissions=["aclose"])
+    await login(client, "closer2")
+    assert (await client.get("/api/v1/admin/activities?overdue=true")).status_code == 200
+
+
 async def test_review_page_key_lists_every_status(client, db):
     """申請審核頁的鍵看得到全部狀態;只持簽核關卡鍵的帳號視野受限。"""
     await seed(client, db)

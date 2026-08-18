@@ -24,7 +24,7 @@
 | `docs/design-guide.md` | 視覺與互動規範、全站元件慣例 |
 | `docs/discord-webhook-messages.md` | 通知訊息清冊 |
 | `docs/issues.md` | 已知問題(含嚴重度) |
-| `docs/gaps.md` | 未完成功能、維運缺口、待決事項 |
+| `docs/gaps.md` | 未完成功能(需求方已拍板的條目落地即移除,理由留在 `decisions.md`;維運與上線待辦在 `DEPLOY_CHECKLIST.md`) |
 | `docs/decisions.md` | **需求方拍板的規則**;條目永久保留,回答「為什麼系統是這樣」 |
 | `docs/improvements.md` | 可改進方向;不排期、不承諾,與待辦清單無關 |
 | `docs/DEPLOY_CHECKLIST.md` | 上線檢查表 |

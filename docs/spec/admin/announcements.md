@@ -30,12 +30,12 @@
 - `notify=true` 時在交易內就把收件者解析完(各社聯絡 Email 至多 3 組 + 有設 webhook 的社團),背景任務不再碰業務 DB
 - 停用社團不列入通知對象
 - 社團端的可見性由 `target_type` 決定:全體 / 性質命中 / 指定本社;停社社團 `attribute` 為 NULL,不命中任何性質分眾
+- **蓋板公告走專用查詢**(`GET /club/announcements?takeover=true`,只回 `takeover_until >= 台北今天`):蓋板不能靠「最新 N 筆」撈,否則後續公告一多就把它擠掉而靜默失效
 - 發布、切換蓋板、刪除都寫 `audit_logs`
 - 通知投遞失敗做記憶體重試(decisions.md ISS-65),兩條路徑各自重試、都不落地:Discord webhook 至多送 3 次(=重試 2 次),429 照 `Retry-After`(上限 30 秒)、5xx 與連線失敗退避、4xx 一次放棄;Email 同樣至多送 3 次,但收件人拒收/寄件人拒絕/認證失敗這類永久錯誤立即放棄
 
 ## 未完成 / 問題
 
 - 公告發布後**內容與對象都不能改**,只能切蓋板或整篇刪除
-- 蓋板公告會被後續公告擠出社團端取的前 20 筆而靜默失效(見 [shared/shell.md](../shared/shell.md))
 - 通知重試只在記憶體,程序重啟即遺失;`email_logs` 只記結果不重送
 - `announcements` 表除主鍵外沒有任何索引

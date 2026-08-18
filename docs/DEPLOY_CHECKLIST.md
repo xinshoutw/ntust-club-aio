@@ -29,6 +29,7 @@
 
 - [ ] 器材主檔、政府行事曆(見 A)
 - [ ] 應辦 **評鑑 rubric**:`seed.py` 只建預設評鑑年(`eval_window.year`)的 rubric,且**沒有「複製上年」的介面**。換年度時須調 `eval_window` 後重跑 seed,或直接操作 DB。競賽開始前確認該學年已建
+- [ ] 應辦 **社團聯絡 Email**:遷入後 159 社全為空,公告的 Email 通知會寄給 0 個收件人。跑 `migration/set_contact_emails.py`(取最新學期負責人學號 + `@mail.ntust.edu.tw`,decisions.md MIG-05),但**只解得掉約三分之一** —— 59 社位址應可用、68 社名單停在 113-2 以前(學號信箱多半已停用)、32 社沒有負責人。後兩組由腳本分組輸出,要人工補
 - [ ] 待決 **社團性質清單**:D-10 定為維持寫死(自治性/學藝性…),上線前核對現行清單與承辦認定一致 —— 公告分眾與統計都依它
 - [ ] 待決 **場地主檔**:已 seed 19 處含容納人數,上線前確認與現況相符
 - [ ] 待決 **舊資料遷移**:`migration/cms_import.py`(社團/帳號/成員/活動/公告)與 `cc_import.py`(教室與器材借用)已可執行且 idempotent;上線前以正式 dump 再演練一次,確認筆數與 `legacy_id_map`
@@ -75,7 +76,7 @@
 
 ## H. 上線流程
 
-1. 承辦提供:器材清單、正式 DB dump、正式 Discord 頻道、SMTP relay 決定
+1. 承辦提供:正式 DB dump、正式 Discord 頻道(器材主檔由 `cc_import` 帶入不需另外提供,OPS-04;SMTP relay 已定案為校方 relay,F.1)
 2. 掛上三個 cron(備份、逾期提醒、容量告警),補 backend healthcheck(D)
 3. 準備 prod `.env`(B 全填),本機以 `ENV=prod` 起一次全棧確認防呆通過
 4. 目標 VM:建 GCE、裝 Docker、放 `.env`、`docker compose pull && up -d --no-build`,確認 backend 自動 `alembic upgrade head`、`/api/v1/health` 200

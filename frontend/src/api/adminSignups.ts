@@ -313,6 +313,12 @@ export function useSignupItemMutations() {
       }),
     onSuccess: invalidate,
   })
+  /** 撤除補登:選錯社團時的回頭路(只撤得掉沒有名單、沒簽到的補登單) */
+  const removeRegistration = useMutation({
+    mutationFn: ({ itemId, clubId }: { itemId: number; clubId: number }) =>
+      api<null>(`/admin/signup-items/${itemId}/registrations/${clubId}`, { method: 'DELETE' }),
+    onSuccess: invalidate,
+  })
   const confirm = useMutation({
     mutationFn: ({ itemId, clubId }: { itemId: number; clubId: number }) =>
       api<null>(`/admin/signup-items/${itemId}/registrations/${clubId}/confirm`, { method: 'PUT' }),
@@ -344,5 +350,5 @@ export function useSignupItemMutations() {
       api<null>(`/admin/signup-items/${itemId}/sessions/${sessionId}`, { method: 'DELETE' }),
     onSuccess: (_, { itemId }) => invalidateSessions(itemId),
   })
-  return { create, update, addRegistration, confirm, markAttendance, createSession, deleteSession }
+  return { create, update, addRegistration, removeRegistration, confirm, markAttendance, createSession, deleteSession }
 }

@@ -480,3 +480,65 @@ async def test_update_item_rejects_explicit_nulls_except_place(client, db):
     )
     data = resp.json()["data"]
     assert (data["clubs_count"], data["pending_count"]) == (1, 1)
+
+
+async def test_backfilled_registration_can_be_taken_back(client, db):
+    """補登只有 POST 的話,下拉選錯社團按下去就再也回不去 —— 那個社團從此
+    報不了這個活動(社團端「一經報名不得更改」)。撤除只限補登的單。"""
+    club = await seed(client, db)
+    created = await client.post(URL, json=body(), headers=csrf_headers(client))
+    item_id = created.json()["data"]["id"]
+    walk_in = await make_club(db, name="吉他社")
+
+    await client.post(
+        f"{URL}/{item_id}/registrations",
+        json={"club_id": walk_in.id},
+        headers=csrf_headers(client),
+    )
+    gone = await client.delete(
+        f"{URL}/{item_id}/registrations/{walk_in.id}", headers=csrf_headers(client)
+    )
+    assert gone.status_code == 200, gone.text
+    rows = (await client.get(f"{URL}/{item_id}/registrations")).json()["data"]
+    assert rows == []
+
+    # 社團自己送的(有參加人名單)不可由行政端移除
+    own = Signup(item_id=item_id, club_id=club.id)
+    own.entries = [SignupEntry(answers={"name": "陳予恩"})]
+    db.add(own)
+    await db.commit()
+    kept = await client.delete(
+        f"{URL}/{item_id}/registrations/{club.id}", headers=csrf_headers(client)
+    )
+    assert kept.status_code == 409
+    assert "社團自己送出" in kept.json()["error"]
+
+
+async def test_backfill_cannot_be_removed_after_attendance(client, db):
+    """簽到是行政分的資料源:撤掉報名等於連帶讓那筆簽到失去歸屬。"""
+    await seed(client, db)
+    created = await client.post(URL, json=body(), headers=csrf_headers(client))
+    item_id = created.json()["data"]["id"]
+    walk_in = await make_club(db, name="吉他社")
+    await client.post(
+        f"{URL}/{item_id}/registrations",
+        json={"club_id": walk_in.id},
+        headers=csrf_headers(client),
+    )
+    await db.execute(
+        sa.update(SignupItem)
+        .where(SignupItem.id == item_id)
+        .values(event_at=datetime.now(UTC) - timedelta(days=1))
+    )
+    await db.commit()
+    await client.put(
+        f"{URL}/{item_id}/attendance",
+        json={"club_id": walk_in.id, "attended": True},
+        headers=csrf_headers(client),
+    )
+
+    blocked = await client.delete(
+        f"{URL}/{item_id}/registrations/{walk_in.id}", headers=csrf_headers(client)
+    )
+    assert blocked.status_code == 409
+    assert "簽到" in blocked.json()["error"]

@@ -354,6 +354,57 @@ async def add_registration(
     return ApiResponse()
 
 
+@router.delete("/{item_id}/registrations/{club_id}")
+async def remove_registration(
+    item_id: int,
+    club_id: int,
+    user: RegAdmin,
+    db: DbDep,
+    request: Request,
+) -> ApiResponse[None]:
+    """撤掉一筆補登(decisions.md DEC-07)。
+
+    補登只有 POST 的話,下拉選錯一個社團按下去就再也回不去:那筆報名永久留在名單上,
+    而該社團自己想報名會被「一經報名不得更改」擋掉、想存草稿也被擋 ——
+    誤按一次等於讓一個社團永久報不了這個活動。
+
+    只撤得掉補登的單:有參加人名單的是社團自己送的(要退就走社團端),
+    已經登錄過簽到的也不動(那是行政分的資料源)。
+    """
+    item = await db.get(SignupItem, item_id)
+    if item is None:
+        raise not_found("找不到報名活動")
+    signup = await db.scalar(
+        sa.select(Signup)
+        .where(Signup.item_id == item.id, Signup.club_id == club_id)
+        .options(sa.orm.selectinload(Signup.entries))
+        .with_for_update(of=Signup)
+    )
+    if signup is None:
+        raise not_found("該社團不在報名名單中")
+    if signup.entries:
+        raise conflict("這是社團自己送出的報名,不可由行政端移除")
+    attended = await db.scalar(
+        sa.select(sa.func.count())
+        .select_from(SessionAttendance)
+        .join(SignupItemSession, SessionAttendance.session_id == SignupItemSession.id)
+        .where(SignupItemSession.item_id == item.id, SessionAttendance.club_id == club_id)
+    )
+    if attended:
+        raise conflict("已登錄過簽到,請先取消簽到再移除")
+
+    await db.delete(signup)
+    audit.record(
+        db,
+        action="signup_removed_by_admin",
+        user=user,
+        detail=f"item={item.id};club={club_id}",
+        ip=client_ip(request),
+    )
+    await db.commit()
+    return ApiResponse()
+
+
 @router.put("/{item_id}/registrations/{club_id}/confirm")
 async def confirm_registration(
     item_id: int,

@@ -49,7 +49,7 @@ function ManageModal({
   const regsQuery = useRegistrations(item.id)
   const regs = regsQuery.data ?? []
   const totalPeople = regs.reduce((s, r) => s + r.count, 0)
-  const { confirm, addRegistration, markAttendance, createSession, deleteSession } = useSignupItemMutations()
+  const { confirm, addRegistration, removeRegistration, markAttendance, createSession, deleteSession } = useSignupItemMutations()
   const [editing, setEditing] = useState(false)
   // 補登:實際到場但沒線上報名的社團,不補的話簽到登錄不了、行政分就少算一場
   const [walkInClub, setWalkInClub] = useState<number | null>(null)
@@ -65,6 +65,20 @@ function ManageModal({
     s.attendance.some((a) => a.clubId === clubId && a.attended)
   const attendedCount = (clubId: number) =>
     sessions.reduce((n, s) => n + (isAttended(s, clubId) ? 1 : 0), 0)
+
+  const onRemove = (r: Registration) =>
+    confirmDialog(modal, {
+      title: `撤除「${r.club}」的補登?`,
+      content: '這筆報名沒有參加人名單,撤除後該社團可自行線上報名',
+      okText: '撤除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: () =>
+        removeRegistration.mutate(
+          { itemId: item.id, clubId: r.clubId },
+          { onSuccess: () => message.success('已撤除'), onError: (e) => message.error(e.message) },
+        ),
+    })
 
   // 逐人匯出:固定欄位+該活動全部自訂欄位(依欄位順序)
   const exportCsv = () => {
@@ -341,6 +355,18 @@ function ManageModal({
                   <Button size="small" style={{ height: 28 }} loading={confirm.isPending} onClick={() => onConfirm(r)}>
                     確認報名
                   </Button>
+                )}
+                {/* 補登的單(沒有參加人名單)才給撤除:選錯社團的話不撤掉就等於
+                    讓那個社團永久報不了這個活動(社團端「一經報名不得更改」) */}
+                {r.count === 0 && (
+                  <button
+                    type="button"
+                    className="link-btn danger"
+                    aria-label={`撤除 ${r.club} 的補登`}
+                    onClick={() => onRemove(r)}
+                  >
+                    <DeleteOutlined />
+                  </button>
                 )}
               </div>
               {/* 逐場簽到:以各場 attendance 判定現值,切換即登錄該場 */}

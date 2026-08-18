@@ -15,6 +15,7 @@
 | 報名名單 | `GET /admin/signup-items/{id}/registrations` |
 | 修改活動 | `PATCH /admin/signup-items/{id}` |
 | 補登社團 | `POST /admin/signup-items/{id}/registrations` |
+| 撤除補登 | `DELETE /admin/signup-items/{id}/registrations/{club_id}` |
 | 確認報名 | `PUT /admin/signup-items/{id}/registrations/{club_id}/confirm` |
 | 場次 CRUD | `GET\|POST\|DELETE /admin/signup-items/{id}/sessions[/{sid}]` |
 | 登錄簽到 | `PUT /admin/signup-items/{id}/attendance` |
@@ -39,6 +40,7 @@
 - PATCH 的 `null` 一律視為錯誤(422),**只有地點可以送 null 清空**:其餘欄位在 DB 是 NOT NULL,顯式 null 會變成 500 或靜靜清掉整份表單定義
 - **表單欄位一有社團報名就鎖住**(`SIGNUP_FIELDS_LOCKED`):既有回答以現行 key 存,改名或刪欄會讓那些答案在名單與匯出裡憑空消失。UI 目前不提供欄位編輯,端點保留給零報名時的修正
 - **補登社團**(decisions.md DEC-07):簽到硬性要求先有 `signups` 列,現場來了卻沒線上報名的社團原本登錄不了、行政分就少算一場。補登的單直接視為已確認(承辦本人在現場點的名),**參加人名單留空** —— 系統確實不知道來的是誰,不編造
+- **補登撤得回來**:名單列上「0 人」的那幾筆帶刪除鈕。沒有回頭路的話,下拉選錯社團按下去就讓那個社團永久報不了這個活動(社團端「一經報名不得更改」)。只撤得掉補登的單 —— 有參加人名單的是社團自己送的,已登錄過簽到的也不動(那是行政分的資料源)
 - 表單欄位固定前置三個基本欄位 `name`/`studentId`/`dept`(建立時由前端加上),自訂欄位由後端補 `f1`、`f2`… 的 key
 - 審核制活動未確認的報名**不可登錄簽到**(後端 409)
 - 確認前先鎖住該張報名單:重複點擊的第二次會讀到已確認而回 409,不會再推一則通知

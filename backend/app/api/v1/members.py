@@ -45,6 +45,7 @@ _SORTABLE = {
     "kind": _KIND_WEIGHT,
     "title": ClubMember.title,
     "semester": ClubMember.semester,
+    "created_at": ClubMember.created_at,
     "updated_at": ClubMember.updated_at,
 }
 

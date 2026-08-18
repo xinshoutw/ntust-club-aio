@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 import sqlalchemy as sa
 
 from app.models import AuditLog, ClubMember
@@ -410,3 +412,38 @@ async def test_member_phone_and_optional_titles(client, db):
     )
     result = resp.json()["data"]
     assert (result["created"], result["updated"]) == (0, 0)
+
+
+async def test_member_list_exposes_join_time_and_sorts_by_it(client, db):
+    """入社時間(created_at)是遷移寫進來的入社日期唯一的可見副本(ISS-19):
+    行內編輯只動 updated_at,這一欄必須出得來、也排得動。"""
+    club = await setup_club_session(client, db)
+    old = ClubMember(
+        club_id=club.id,
+        name="老社員",
+        student_id="B10709001",
+        kind=MemberKind.MEMBER,
+        semester="114-2",
+        created_at=datetime(2018, 9, 1, tzinfo=UTC),
+    )
+    db.add(old)
+    await db.commit()
+    await client.post(
+        "/api/v1/club/members",
+        json={"name": "新社員", "student_id": "B11409001", "kind": "社員", "semester": "114-2"},
+        headers=csrf_headers(client),
+    )
+
+    rows = (await client.get("/api/v1/club/members", params={"sort": "created_at"})).json()["data"]
+    assert [r["student_id"] for r in rows] == ["B10709001", "B11409001"]
+    assert rows[0]["created_at"].startswith("2018-09-01")
+
+    # 改了值會蓋掉 updated_at,入社時間不受影響
+    await client.patch(
+        f"/api/v1/club/members/{rows[0]['id']}",
+        json={"phone": "0912345678"},
+        headers=csrf_headers(client),
+    )
+    after = (await client.get("/api/v1/club/members", params={"sort": "created_at"})).json()["data"]
+    assert after[0]["created_at"] == rows[0]["created_at"]
+    assert after[0]["updated_at"] > rows[0]["updated_at"]

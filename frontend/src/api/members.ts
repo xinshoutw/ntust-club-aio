@@ -14,6 +14,7 @@ export interface Member {
   title?: string
   phone?: string
   semester: string
+  joinedAt: string
   updatedAt: string
 }
 
@@ -25,6 +26,7 @@ interface MemberOut {
   title: string | null
   phone: string | null
   semester: string
+  created_at: string
   updated_at: string
 }
 
@@ -36,6 +38,7 @@ const toMember = (m: MemberOut): Member => ({
   title: m.title ?? undefined,
   phone: m.phone ?? undefined,
   semester: m.semester,
+  joinedAt: dayjs(m.created_at).format('YYYY/MM/DD HH:mm'),
   updatedAt: dayjs(m.updated_at).format('YYYY/MM/DD HH:mm'),
 })
 

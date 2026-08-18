@@ -107,6 +107,9 @@ class MemberOut(BaseModel):
     title: str | None  # 幹部必填,其他身份選填
     phone: str | None
     semester: str
+    # 入社時間:遷移把舊系統的入社日期寫進 created_at,行內編輯只動 updated_at,
+    # 這一欄是那份日期唯一的可見副本
+    created_at: datetime
     updated_at: datetime
 
 

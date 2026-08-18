@@ -9,6 +9,7 @@ import { Cols, MultiSortButton, Pager, sortParam, useMultiSort } from '../../com
 import { downloadCsv } from '../../lib/csv'
 import { kindLabel } from '../../lib/roles'
 import { currentSemester, semesterOptions } from '../../lib/semester'
+import { useMemberTimeColumns } from '../../lib/memberTable'
 import {
   fetchAllAdminMembers,
   useAdminClubMemberSemesters,
@@ -21,7 +22,7 @@ import { useAdminClub } from './clubContext'
 const PAGE_SIZE = 50
 
 // 伺服器端排序白名單(members 端點;kind=身份權重,負責人→副負責人→幹部→社員)
-type SortKey = 'name' | 'student_id' | 'kind' | 'title' | 'semester' | 'updated_at'
+type SortKey = 'name' | 'student_id' | 'kind' | 'title' | 'semester' | 'created_at' | 'updated_at'
 
 // 唯讀:名單由社團自行維護,行政僅查閱;可選學期、排序、匯出 CSV(比照社團端成員列表)
 export default function AdminMembersPage() {
@@ -31,6 +32,8 @@ export default function AdminMembersPage() {
   const [semester, setSemester] = useState<string>(currentSemester())
   // 名冊慣例的預設序(身份權重→學號)=後端預設:不點排序時不帶 sort
   const { entries, toggle } = useMultiSort<SortKey>()
+  const { showJoined, showUpdated } = useMemberTimeColumns(entries.map((e) => e.key))
+  const colCount = 6 + Number(showJoined) + Number(showUpdated)
   const [exporting, setExporting] = useState(false)
   useEffect(() => setPage(1), [clubId, semester])
   // 換社團要一併回到當前學期:上一社選的學期在新社可能根本不存在,列表與匯出都會是誤導性的空
@@ -108,8 +111,8 @@ export default function AdminMembersPage() {
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         <LoadingBlock pending={clubId != null && listQuery.isPending}>
           <table className="tb fixed" style={{ minWidth: 680 }}>
-            {/* 姓名/職稱吃彈性寬並截斷;學號/身份/電話/學期/更新時間固定 px */}
-            <Cols widths={['15%', 100, 92, 'auto', 105, 80, 140]} />
+            {/* 姓名/職稱吃彈性寬並截斷;其餘固定 px。兩個時間欄依 showJoined/showUpdated 增減 */}
+            <Cols widths={['15%', 100, 92, 'auto', 105, 80, ...(showJoined ? [140] : []), ...(showUpdated ? [140] : [])]} />
             <thead>
               <tr>
                 <th scope="col"><MultiSortButton label="姓名" sortKey="name" entries={entries} onToggle={toggleSort} /></th>
@@ -118,7 +121,8 @@ export default function AdminMembersPage() {
                 <th scope="col"><MultiSortButton label="職稱" sortKey="title" entries={entries} onToggle={toggleSort} /></th>
                 <th scope="col">電話</th>
                 <th scope="col"><MultiSortButton label="學期" sortKey="semester" entries={entries} onToggle={toggleSort} /></th>
-                <th scope="col"><MultiSortButton label="更新時間" sortKey="updated_at" entries={entries} onToggle={toggleSort} /></th>
+                {showJoined && <th scope="col"><MultiSortButton label="入社時間" sortKey="created_at" entries={entries} onToggle={toggleSort} /></th>}
+                {showUpdated && <th scope="col"><MultiSortButton label="更新時間" sortKey="updated_at" entries={entries} onToggle={toggleSort} /></th>}
               </tr>
             </thead>
             <tbody>
@@ -128,14 +132,15 @@ export default function AdminMembersPage() {
                   <td className="num" style={{ color: 'var(--steel)' }}>{m.studentId}</td>
                   <td>{kindLabel(m.kind, clubKind)}</td>
                   <td className="cell-clip" title={m.title ?? undefined}>{m.title ?? '—'}</td>
-                  <td className="num">{m.phone ?? '—'}</td>
-                  <td className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.semester}</td>
-                  <td className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.updatedAt}</td>
+                  <td className="num cell-clip">{m.phone ?? '—'}</td>
+                  <td className="num cell-clip" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.semester}</td>
+                  {showJoined && <td className="num cell-clip" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.joinedAt}</td>}
+                  {showUpdated && <td className="num cell-clip" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.updatedAt}</td>}
                 </tr>
               ))}
               {listQuery.isError && (
                 <tr className="no-hover">
-                  <td colSpan={7}>
+                  <td colSpan={colCount}>
                     <QueryError
                       compact
                       title="成員名單載入失敗"
@@ -151,7 +156,7 @@ export default function AdminMembersPage() {
                   是做不到的指示,選擇器已經被 OptionsError 取代了 */}
               {(clubId == null || (!listQuery.isPending && !listQuery.isError)) && members.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
+                  <td colSpan={colCount} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
                     {clubsQuery.isError
                       ? '社團清單載入失敗,請以頁首的重試鈕重新載入'
                       : clubId == null

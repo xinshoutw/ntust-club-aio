@@ -10,6 +10,7 @@ import { Cols, FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } f
 import { downloadCsv } from '../../lib/csv'
 import { MEMBER_KINDS, kindLabel, type MemberKind } from '../../lib/roles'
 import { currentSemester } from '../../lib/semester'
+import { useMemberTimeColumns } from '../../lib/memberTable'
 import { useAuth } from '../../app/auth'
 import {
   fetchAllMembers,
@@ -21,7 +22,7 @@ import {
 
 const PAGE_SIZE = 50
 // 伺服器端排序白名單(後端 /club/members _SORTABLE);kind 排序鍵=身份權重
-type MemberSortKey = 'name' | 'student_id' | 'kind' | 'title' | 'semester' | 'updated_at'
+type MemberSortKey = 'name' | 'student_id' | 'kind' | 'title' | 'semester' | 'created_at' | 'updated_at'
 
 export default function MembersPage() {
   const { message } = App.useApp()
@@ -40,6 +41,9 @@ export default function MembersPage() {
   const [page, setPage] = useState(1)
   // 預設排序=後端預設(身份權重→學號,準則 4 名冊慣例):未點排序時不送 sort 參數
   const { entries, toggle } = useMultiSort<MemberSortKey>()
+  const { showJoined, showUpdated } = useMemberTimeColumns(entries.map((e) => e.key))
+  // 姓名/學號/身份/職稱/電話/學期 + 兩個時間欄 + 動作
+  const colCount = 7 + Number(showJoined) + Number(showUpdated)
   // 篩選值為顯示詞(社長/會長依社團名稱推導),查詢時轉回標準身份
   const [kindFilter, setKindFilter] = useState<string[]>([])
   const [editing, setEditing] = useState<{ id: number; field: 'kind' | 'title' | 'phone' } | null>(null)
@@ -205,7 +209,8 @@ export default function MembersPage() {
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         <LoadingBlock pending={listQuery.isPending}>
           <table className="tb fixed" style={{ minWidth: 800 }}>
-            <Cols widths={['auto', 100, 120, 'auto', 120, 80, 134, 90]} />
+            {/* 兩個時間欄依 showJoined/showUpdated 增減,colgroup 要跟著長短 */}
+            <Cols widths={['auto', 100, 120, 'auto', 120, 80, ...(showJoined ? [134] : []), ...(showUpdated ? [134] : []), 90]} />
             <thead>
               <tr>
                 <th scope="col">{sortHeader('姓名', 'name')}</th>
@@ -227,7 +232,8 @@ export default function MembersPage() {
                 <th scope="col">{sortHeader('職稱', 'title')}</th>
                 <th scope="col">電話</th>
                 <th scope="col">{sortHeader('學期', 'semester')}</th>
-                <th scope="col">{sortHeader('更新時間', 'updated_at')}</th>
+                {showJoined && <th scope="col">{sortHeader('入社時間', 'created_at')}</th>}
+                {showUpdated && <th scope="col">{sortHeader('更新時間', 'updated_at')}</th>}
                 <th scope="col" className="r">動作</th>
               </tr>
             </thead>
@@ -303,8 +309,9 @@ export default function MembersPage() {
                       </button>
                     )}
                   </td>
-                  <td className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.semester}</td>
-                  <td className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.updatedAt}</td>
+                  <td className="num cell-clip" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.semester}</td>
+                  {showJoined && <td className="num cell-clip" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.joinedAt}</td>}
+                  {showUpdated && <td className="num cell-clip" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.updatedAt}</td>}
                   <td className="r">
                     <Popconfirm
                       title={`移除 ${m.name}?`}
@@ -325,14 +332,14 @@ export default function MembersPage() {
               ))}
               {listQuery.isError && (
                 <tr className="no-hover">
-                  <td colSpan={8}>
+                  <td colSpan={colCount}>
                     <QueryError compact title="成員名單載入失敗" error={listQuery.error} onRetry={() => listQuery.refetch()} />
                   </td>
                 </tr>
               )}
               {!listQuery.isError && !listQuery.isPending && members.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={8} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
+                  <td colSpan={colCount} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
                     尚未建立成員名單
                   </td>
                 </tr>

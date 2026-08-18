@@ -524,8 +524,12 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
                     activity_id=activity.id,
                     member_count=a.ActuallyMemberNumber or a.ExpectedMemberNumber or 0,
                     non_member_count=a.ActuallyNotMemberNumber or a.ExpectedNotMemberNumber or 0,
-                    actual_start=local_time(a.ActuallyStartTime) or local_time(a.StartTime) or time(0, 0),
-                    actual_end=local_time(a.ActuallyEndTime) or local_time(a.EndTime) or time(0, 0),
+                    actual_start=local_time(a.ActuallyStartTime)
+                    or local_time(a.StartTime)
+                    or time(0, 0),
+                    actual_end=local_time(a.ActuallyEndTime)
+                    or local_time(a.EndTime)
+                    or time(0, 0),
                     actual_location=(a.Location or "").strip() or "(未填)",
                     highlights=(a.Review or "").strip(),
                     goals="",
@@ -622,6 +626,7 @@ async def main() -> None:
     async with async_session_factory() as db, legacy_engine.connect() as legacy:
         if "--reset" in sys.argv:
             await reset(db)
+            return  # 只清不匯:借用單掛在活動與社團上,清完立刻重匯會擋住下一支的刪除
         ids = IdMap()
         await ids.load(db)
 

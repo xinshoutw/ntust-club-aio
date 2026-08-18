@@ -80,9 +80,51 @@ def test_unresolvable_booking_units_are_kept_as_office_bookings():
         assert cc_import.resolve_club(lookup, raw) is None
 
 
-def test_cc_import_offers_reset_and_unknown_club_report():
-    """換一份新 dump 之前要清得乾淨(MIG-04);認不出來的帳號要導得出清單(MIG-06)。"""
-    assert callable(cc_import.reset)
+def test_club_resolution_is_not_a_reason_to_skip_a_booking():
+    """MIG-03 真正的改動是「借用單位認不出來不再是跳過的理由」。
+
+    `resolve_club` 回 None 只代表掛「學務處」;匯不匯得進來由 apply_is_importable
+    決定,而它**看不到**借用單位。
+    """
+    assert cc_import.apply_is_importable("pending", [1], date(2026, 5, 1), ["3"])
+    # 真正該跳過的四種:未知狀態/未知場地/壞日期/無節次
+    assert not cc_import.apply_is_importable(None, [1], date(2026, 5, 1), ["3"])
+    assert not cc_import.apply_is_importable("pending", None, date(2026, 5, 1), ["3"])
+    assert not cc_import.apply_is_importable("pending", [1], None, ["3"])
+    assert not cc_import.apply_is_importable("pending", [1], date(2026, 5, 1), [])
+
+
+def test_unidentified_units_split_into_identifiable_and_not():
+    """空白欄位再怎麼看也看不出是誰:960 筆空白混進辨識清單只會把真正該看的淹掉。"""
+    assert cc_import.unidentified_kind("") == "blank"
+    assert cc_import.unidentified_kind(None) == "blank"
+    assert cc_import.unidentified_kind("admin") == "office"
+    assert cc_import.unidentified_kind("80001") == "unknown"
+
+
+def test_reset_clears_without_re_importing():
+    """`--reset` 只清不匯:清除順序與匯入順序相反(借用單掛在活動與社團上,
+    外鍵是 NO ACTION),清完立刻重匯會讓下一支腳本的刪除撞外鍵 —— 而重置正是 MIG-04
+    的全部目的。兩支 main() 的 --reset 分支都必須 return。"""
+    for module in (cc_import, cms_import):
+        src = Path(module.__file__).read_text()
+        branch = src[src.index('if "--reset" in sys.argv:') :][:220]
+        assert "await reset(db)" in branch
+        assert "return" in branch.split("await reset(db)")[1].split("\n\n")[0], (
+            f"{module.__name__} 的 --reset 沒有 return,會清完立刻重匯"
+        )
+
+
+def test_cms_reset_deletes_children_before_parents():
+    """刪除順序寫反就會撞外鍵:活動與成員都掛在社團上,公告不掛任何人。"""
+    order = [t for t, _ in cms_import._RESET_ORDER]
+    assert order.index("Club_activity") < order.index("Club_club")
+    assert order.index("Club_student") < order.index("Club_club")
+    assert order.index("Club_staff") < order.index("Club_club")
+
+
+def test_cc_import_offers_the_unknown_club_report():
+    """認不出來的帳號要導得出清單交承辦辨識(MIG-06)。"""
     assert callable(cc_import.report_unknown_clubs)
 
 

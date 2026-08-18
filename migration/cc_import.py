@@ -127,6 +127,26 @@ async def build_activity_lookup(db: AsyncSession) -> dict[str, int]:
     return {legacy: int(new) for legacy, new in rows.all()}
 
 
+def unidentified_kind(raw: str | None) -> str:
+    """認不出來的借用單位屬於哪一種:blank(欄位空白)/ office(admin)/ unknown(其他)。
+
+    三種都掛「學務處」,但只有 `unknown` 那一桶值得交承辦辨識 —— 空白欄位再怎麼看
+    也看不出是誰,把 960 筆空白混進辨識清單只會把真正該看的那幾百筆淹掉(MIG-06)。
+    """
+    if not raw:
+        return "blank"
+    return "office" if raw == "admin" else "unknown"
+
+
+def apply_is_importable(status: object, targets: object, day: object, periods: list[str]) -> bool:
+    """這張場地借用單匯不匯得進來。
+
+    **借用單位認不出來不在裡面**:欄位沒填不代表那張單不存在(decisions.md MIG-03),
+    認不出來就掛「學務處」,不是丟掉。
+    """
+    return status is not None and targets is not None and day is not None and bool(periods)
+
+
 def resolve_club(club_lookup: dict[str, int], raw: str | None) -> int | None:
     """借用單位 → 新 club id;認不出來就回 None(顯示為「學務處」)。
 
@@ -134,7 +154,7 @@ def resolve_club(club_lookup: dict[str, int], raw: str | None) -> int | None:
     丟掉等於整段借用歷史憑空少一塊,而歸「學務處」至少留得住場地與時間
     (decisions.md MIG-03)。同理適用 `admin` 與已移除的 8 開頭偽社團帳號;
     認不出來的帳號另由 `--unknown-clubs` 導出清單交承辦辨識(MIG-06)。
-    
+
     """
     return club_lookup.get(raw) if raw else None
 
@@ -142,7 +162,10 @@ def resolve_club(club_lookup: dict[str, int], raw: str | None) -> int | None:
 async def ensure_masters(
     legacy, db: AsyncSession, ids: IdMap
 ) -> tuple[dict[int, list[int]], dict[int, int]]:
-    """場地/器材主檔對照;新版已無者建 inactive 列。回 (classroom→venue ids, device→equipment id)。"""
+    """場地/器材主檔對照;新版已無者建 inactive 列。
+
+    回 (classroom→venue ids, device→equipment id)。
+    """
     venues = {v.name: v for v in (await db.scalars(sa.select(Venue))).all()}
 
     venue_ids: dict[int, list[int]] = {}
@@ -208,7 +231,7 @@ async def import_applies(
         club_id = resolve_club(club_lookup, r["club_id"])
         day = valid_date(r["date"])
         periods = periods_of(r)
-        if status is None or targets is None or day is None or not periods:
+        if not apply_is_importable(status, targets, day, periods):
             skipped += 1  # 壞日期/未知狀態/未知場地/無節次
             continue
         activity_id = act_lookup.get(r["activity_id"])
@@ -307,7 +330,9 @@ async def report_unknown_clubs(legacy, club_lookup: dict[str, int]) -> Path:
 
     rows = []
     for r in applies:
-        if resolve_club(club_lookup, r["club_id"]) is None:
+        if resolve_club(club_lookup, r["club_id"]) is None and unidentified_kind(
+            r["club_id"]
+        ) == "unknown":
             rows.append({
                 "類型": "場地",
                 "舊帳號": r["club_id"] or "(空白)",
@@ -319,7 +344,9 @@ async def report_unknown_clubs(legacy, club_lookup: dict[str, int]) -> Path:
                 "電話": (r["phone"] or "").strip(),
             })
     for r in device_applies:
-        if resolve_club(club_lookup, r["club_id"]) is None:
+        if resolve_club(club_lookup, r["club_id"]) is None and unidentified_kind(
+            r["club_id"]
+        ) == "unknown":
             rows.append({
                 "類型": "器材",
                 "舊帳號": r["club_id"] or "(空白)",
@@ -338,8 +365,15 @@ async def report_unknown_clubs(legacy, club_lookup: dict[str, int]) -> Path:
         writer = csv.DictWriter(fh, fieldnames=list(rows[0]) if rows else ["舊帳號"])
         writer.writeheader()
         writer.writerows(rows)
+    blanks = sum(
+        1
+        for r in (*applies, *device_applies)
+        if resolve_club(club_lookup, r["club_id"]) is None
+        and unidentified_kind(r["club_id"]) != "unknown"
+    )
     accounts = Counter(r["舊帳號"] for r in rows)
-    print(f"認不出借用單位的借用共 {len(rows)} 筆,來自 {len(accounts)} 個帳號:")
+    print(f"另有 {blanks} 筆是空白欄位或 admin,一律掛「學務處」,不列入辨識清單")
+    print(f"待辨識的借用共 {len(rows)} 筆,來自 {len(accounts)} 個帳號:")
     for account, count in accounts.most_common():
         print(f"  {account}: {count} 筆")
     print(f"清單 → {path}")
@@ -382,6 +416,7 @@ async def main() -> None:
         async with async_session_factory() as db:
             if "--reset" in sys.argv:
                 await reset(db)
+                return  # 只清不匯:清除順序與匯入順序相反,混在一起跑會撞外鍵
             if "--unknown-clubs" in sys.argv:
                 await report_unknown_clubs(legacy, await build_club_lookup(db))
                 return

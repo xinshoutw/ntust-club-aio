@@ -13,7 +13,7 @@ POSTAL_URL = "/api/v1/admin/postal-changes"
 async def seed(client, db):
     club = await make_club(db)
     await make_user(db, username="clubuser", club_id=club.id)
-    await make_user(db, username="applyadmin", role="admin", permissions=["aapply"])
+    await make_user(db, username="applyadmin", role="admin", permissions=["acert", "apostal"])
     await make_user(db, username="other", role="admin", permissions=["aviol"])
     cert = OfficerCertificate(
         club_id=club.id, term="114-2", position=CertPosition.LEADER, applicant_name="王小明"

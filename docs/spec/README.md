@@ -68,7 +68,8 @@
 | [admin/overdue.md](admin/overdue.md) | `/admin/overdue` | `aoverdue` |
 | [admin/eval.md](admin/eval.md) | `/admin/eval` | `aeval` |
 | [admin/accounts.md](admin/accounts.md) | `/admin/accounts` | `aaccount` |
-| [admin/applications.md](admin/applications.md) | `/admin/applications` | `aapply` |
+| [admin/certificates.md](admin/certificates.md) | `/admin/certificates` | `acert` |
+| [admin/postal.md](admin/postal.md) | `/admin/postal` | `apostal` |
 | [admin/maintenance.md](admin/maintenance.md) | `/admin/maintenance` | `amaint` |
 | [admin/violations.md](admin/violations.md) | `/admin/violations` | `aviol` |
 | [admin/files.md](admin/files.md) | `/admin/files` | `afiles` |

@@ -88,7 +88,7 @@ const keys = {
   all: ['adminApplications'] as const,
   certs: (page: number) => ['adminApplications', 'certs', page] as const,
   postal: (page: number) => ['adminApplications', 'postal', page] as const,
-  pendingTotal: ['adminApplications', 'pendingTotal'] as const,
+  pendingTotal: (kind: ApplicationKind) => ['adminApplications', 'pendingTotal', kind] as const,
 }
 
 export const APPLICATIONS_PAGE_SIZE = 50
@@ -126,21 +126,19 @@ export function useAdminPostalChanges(page: number) {
   })
 }
 
-/** 兩類待處理件數合計(page_size=1 只取 meta.total;分頁後算不出全域數字) */
-export function usePendingApplicationTotal() {
+/** 單類待處理件數(page_size=1 只取 meta.total;分頁後算不出全域數字)。
+ *  拆頁之後兩頁各算各的 —— 合計會讓只有一把鍵的承辦看到自己讀不到的那類件數 */
+function usePendingTotal(kind: ApplicationKind) {
   return useQuery({
-    queryKey: keys.pendingTotal,
-    queryFn: async () => {
-      const totals = await Promise.all(
-        (['cert', 'postal'] as ApplicationKind[]).map(async (kind) =>
-          (await apiPaged<unknown[]>(`${KIND_PATH[kind]}${qs({ status: 'pending', page_size: 1 })}`))
-            .total,
-        ),
-      )
-      return totals.reduce((sum, n) => sum + n, 0)
-    },
+    queryKey: keys.pendingTotal(kind),
+    queryFn: async () =>
+      (await apiPaged<unknown[]>(`${KIND_PATH[kind]}${qs({ status: 'pending', page_size: 1 })}`))
+        .total,
   })
 }
+
+export const usePendingCertTotal = () => usePendingTotal('cert')
+export const usePendingPostalTotal = () => usePendingTotal('postal')
 
 export function useApplicationStatusMutation() {
   const qc = useQueryClient()

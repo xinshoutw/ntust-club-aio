@@ -211,7 +211,8 @@ export function buildAdminNav(
   {
     label: '其他',
     items: [
-      { key: 'a-applications', label: '線上申請管理', path: '/admin/applications', icon: <FormOutlined /> },
+      { key: 'a-certificates', label: '證明管理', path: '/admin/certificates', icon: <FormOutlined /> },
+      { key: 'a-postal', label: '郵局管理', path: '/admin/postal', icon: <BankOutlined /> },
       { key: 'a-maintenance', label: '維修管理', path: '/admin/maintenance', icon: <ToolOutlined /> },
       { key: 'a-violations', label: '違規管理', path: '/admin/violations', icon: <WarningOutlined /> },
       // 稽核軌跡自側欄移除,入口只留 Header 帳號選單

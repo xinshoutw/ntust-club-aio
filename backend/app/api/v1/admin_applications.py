@@ -22,7 +22,9 @@ from app.services import files as file_service
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
-ApplyAdmin = Annotated[CurrentUser, Depends(require_permission("aapply"))]
+# 證明與郵局各自一頁一把鍵(decisions.md D-11)
+CertAdmin = Annotated[CurrentUser, Depends(require_permission("acert"))]
+PostalAdmin = Annotated[CurrentUser, Depends(require_permission("apostal"))]
 
 # 狀態機:審核中 → 處理中 → 請洽學務處(僅允許單步前進,不可回退/跳關)
 _NEXT_STATUS = {
@@ -47,7 +49,7 @@ def _status_order(model) -> sa.Case:
 
 @router.get("/officer-certificates")
 async def list_officer_certs(
-    user: ApplyAdmin,
+    user: CertAdmin,
     db: DbDep,
     page: Pagination,
     status: ApplicationStatus | None = None,
@@ -78,7 +80,7 @@ async def list_officer_certs(
 
 @router.get("/postal-changes")
 async def list_postal_changes(
-    user: ApplyAdmin,
+    user: PostalAdmin,
     db: DbDep,
     page: Pagination,
     status: ApplicationStatus | None = None,
@@ -123,7 +125,7 @@ async def _advance_status(db, row, body: ApplicationStatusIn):
 async def update_officer_cert_status(
     cert_id: int,
     body: ApplicationStatusIn,
-    user: ApplyAdmin,
+    user: CertAdmin,
     db: DbDep,
     request: Request,
     background: BackgroundTasks,
@@ -161,7 +163,7 @@ async def update_officer_cert_status(
 async def update_postal_change_status(
     change_id: int,
     body: ApplicationStatusIn,
-    user: ApplyAdmin,
+    user: PostalAdmin,
     db: DbDep,
     request: Request,
     background: BackgroundTasks,

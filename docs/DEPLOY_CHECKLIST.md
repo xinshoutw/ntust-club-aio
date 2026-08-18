@@ -6,7 +6,7 @@
 
 ## A. 阻擋項
 
-- [ ] **備份機制**:目前 repo 內沒有任何備份 script 或排程。單機部署 = 單點故障。需建立每日 `pg_dump | gzip → GCS`(lifecycle 30 天)、每日 `uploads/` 同步、每週 GCE 磁碟快照、部署前手動 dump 一次
+- [ ] **備份排程**:`backend/scripts/backup_db.sh` 已就緒(每日 `pg_dump` 自訂格式 + 保留 14 天輪替,**存在同一台機器**,decisions.md OPS-01 明定不做異地),**cron 尚未掛上**(cron 行見該檔頂部)。上傳檔案目錄不在腳本範圍內,要靠 GCE 磁碟快照;部署前另手動 dump 一次
 - [ ] **器材主檔的建立順序**:`scripts/seed.py` 只建 5 獎項 + 19 場地 + superadmin,**器材主檔由 `migration/cc_import.py` 從舊 `Device` 表帶入**(品名、數量、單次上限、啟用與否)。正式流程必須 seed 之後跑過遷移,否則器材借用無品項可選
 - [ ] **政府行事曆假日**:`holidays` 表未 seed。未匯入的年度,`booking_service.add_workdays` 會退化成只排除週六日,逢國定假日的逾期判定偏一天
 
@@ -40,6 +40,8 @@
 - [ ] 應辦 **磁碟容量**:系統總量讀實體磁碟可用空間,不設邏輯容量;實體磁碟還要容 OS/Docker/PostgreSQL/log/multipart temp,以 `df` 與 GCE 實際容量驗證
 - [ ] 待決 **限流與 session**:限流是行程內記憶體(單機可行,重啟歸零);過期 session 於登入時順手清除,不另設排程
 - [ ] 應辦 **逾期提醒排程**:host cron 每上班日 10:35 呼叫 `scripts/send_overdue_reminders.py`(cron 行見該檔 docstring);未設排程則只剩人工按鈕
+- [ ] 應辦 **每日備份**:host cron 03:15 呼叫 `scripts/backup_db.sh`
+- [ ] 應辦 **容量告警**:host cron 08:20 呼叫 `scripts/check_disk.py`(80% 警示、90% 告警推 Discord;90% 時上傳前置閘已關閉,沒有告警的話社團會傳不上東西一整天)
 
 ## E. Edge proxy 切換
 
@@ -57,10 +59,10 @@
 
 1. ~~SMTP relay 最終方案~~ —— 已定案為校方 relay,實測可寄
 3. 上傳檔案儲存位置:`compose.yml` 現用具名 volume `uploads`,`architecture.md §3.2` 規劃 bind mount `/srv/club-aio/uploads` 以便備份工具直接同步。二者影響備份做法,擇一並對齊
-4. 備份 owner 與 GCS bucket
+4. 備份保留天數(腳本預設 14 天,`KEEP_DAYS` 可覆寫)與備份目錄位置(預設 `./backups`)
 5. GCE 實體磁碟大小(`df` 驗證)與 VM 規格(e2-medium + 2GB swap 是否夠)
 6. `.env` 的保管與輪替方式
-7. 監控/告警方案
+7. 監控方案(容量告警已有腳本;後端存活與 log 輪替仍未定)
 8. 政府行事曆假日由誰於上線年度匯入
 9. HTTPS:確認 edge 上 `clubs.ntust.edu.tw` 的憑證來源與自動續期(現行憑證路徑不是 certbot 慣例的 `/etc/letsencrypt/live/`,不能假設);內層走 HTTP(僅 compose 內網)
 
@@ -73,7 +75,7 @@
 ## H. 上線流程
 
 1. 承辦提供:器材清單、正式 DB dump、正式 Discord 頻道、SMTP relay 決定
-2. 建立備份排程(A),補 backend healthcheck(D)
+2. 掛上三個 cron(備份、逾期提醒、容量告警),補 backend healthcheck(D)
 3. 準備 prod `.env`(B 全填),本機以 `ENV=prod` 起一次全棧確認防呆通過
 4. 目標 VM:建 GCE、裝 Docker、放 `.env`、`docker compose pull && up -d --no-build`,確認 backend 自動 `alembic upgrade head`、`/api/v1/health` 200
 5. 正式資料:`reset_db.py` 建基礎主檔 + superadmin(記下一次性密碼),匯入器材、假日、舊資料

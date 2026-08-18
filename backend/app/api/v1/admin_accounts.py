@@ -62,10 +62,24 @@ async def _managed_account(db, account_id: int) -> User:
 
 
 def _guard_target(user: User, target: User, action: str) -> None:
+    """接管他人帳號的共同前提:不是自己、不是 super,且對方的權限自己全都有。
+
+    最後那條是 `_check_grantable` 的另一半。光擋住「授予」還不夠 —— 只持 `aaccount`
+    的管理員若能重設 superadmin 或持 `asetting` 同儕的密碼,拿一次性密碼登入就取得了
+    那些權限,授權檢查等於白做。停用與刪除同理:能停掉制衡自己的人也是一種提權。
+    """
     if target.id == user.id:
         raise conflict(f"不可{action}自己的帳號")
     if target.is_super:
         raise conflict(f"不可{action}最高權限帳號")
+    if user.is_super:
+        return
+    beyond = [k for k in target.permissions if k not in user.permissions]
+    if beyond:
+        raise forbidden(
+            f"對方持有你沒有的權限({','.join(beyond)}),不可{action}其帳號",
+            code="TARGET_OUTRANKS_ACTOR",
+        )
 
 
 @router.get("")
@@ -181,6 +195,7 @@ async def reset_password(
     target = await _managed_account(db, account_id)
     if target.id == user.id:
         raise conflict("請由「變更密碼」修改自己的密碼")
+    _guard_target(user, target, "重設密碼")
 
     password = generate_password()
     if target.password_hash:

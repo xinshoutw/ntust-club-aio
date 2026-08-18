@@ -112,3 +112,37 @@ async def test_non_super_may_revoke_a_permission_it_lacks(client, db):
     )
     assert resp.status_code == 200, resp.text
     assert resp.json()["data"]["permissions"] == []
+
+
+async def test_cannot_take_over_an_account_that_outranks_you(client, db):
+    """重設密碼是繞過授權檢查最短的路:拿到一次性密碼登入,就取得對方全部權限。"""
+    from app.models.enums import UserRole
+
+    await make_user(db, username="granter3", role="admin", permissions=["aaccount"])
+    boss = await make_user(db, username="boss", role="admin", is_super=True)
+    peer = await make_user(db, username="peer", role="admin", permissions=["asetting"])
+    plain = await make_user(db, username="plain", role="admin", permissions=[])
+    await login(client, "granter3")
+
+    for target, why in ((boss, "super"), (peer, "持有我沒有的鍵")):
+        for path, method in (
+            (f"/api/v1/admin/accounts/{target.id}/reset-password", "post"),
+            (f"/api/v1/admin/accounts/{target.id}", "delete"),
+        ):
+            resp = await getattr(client, method)(path, headers=csrf_headers(client))
+            assert resp.status_code in (403, 409), f"{why} {path}: {resp.text}"
+
+    # 停用同樣擋掉:能停掉制衡自己的人也是一種提權
+    resp = await client.put(
+        f"/api/v1/admin/accounts/{peer.id}/active",
+        json={"is_active": False},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code in (403, 409), resp.text
+
+    # 權限沒有超過自己的帳號照常管得動
+    resp = await client.post(
+        f"/api/v1/admin/accounts/{plain.id}/reset-password", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+    assert plain.role is UserRole.ADMIN

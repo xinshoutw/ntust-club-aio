@@ -482,6 +482,51 @@ async def test_large_application_denied_by_default(client, db):
     assert data["is_large_approved"] is False
 
 
+async def test_large_approval_can_be_corrected_at_a_later_stage(client, db):
+    """承辦人第一關忘了勾,組長或學務長仍補得回來(decisions.md ISS-54)。
+
+    只在第一關寫入的話就永久固化為「否准」,退回重送也補不回來 —— 而大型活動
+    一次算 3 分行政分,漏一件就直接影響競賽名次。
+    """
+    await seed(client, db)
+    aid = await submit_activity(client, db, is_large=True)  # 有申請補助 → 走三關
+
+    await login(client, "advisor")
+    detail = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/approve",
+        json={
+            "fund_source": "學務處經費",
+            "budget": [
+                {"item_id": i["id"], "approved_subsidy": i["requested_subsidy"]}
+                for i in detail["budget_items"]
+            ],
+        },
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["is_large_approved"] is False  # 沒勾=否准
+
+    # 組長關補認可
+    await login(client, "chief")
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/approve",
+        json={"is_large_approved": True},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["is_large_approved"] is True
+
+    # 學務長關送空 body 不得把認可清掉
+    await login(client, "dean")
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/approve", json={}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["is_large_approved"] is True
+    assert resp.json()["data"]["status"] == "approved"
+
+
 async def test_review_page_key_lists_every_status(client, db):
     """申請審核頁的鍵看得到全部狀態;只持簽核關卡鍵的帳號視野受限。"""
     await seed(client, db)

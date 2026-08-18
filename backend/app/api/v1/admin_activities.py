@@ -373,16 +373,6 @@ async def approve(
             missing = [i for i in activity.budget_items if i.approved_subsidy is None]
             if missing:
                 raise validation_error("尚有經費項目未核定金額")
-        # 大型活動認可:實心=已認可(含未申請但管理員逕行核定)
-        if body.is_large_approved:
-            if activity.type != ActivityType.EVENT:
-                raise validation_error("僅類型為「活動」的案件可認定為大型活動")
-            activity.is_large = True  # 未申請由管理員逕行核定
-            activity.is_large_approved = True
-        elif activity.is_large:
-            activity.is_large_approved = (
-                body.is_large_approved if body.is_large_approved is not None else False
-            )
         if requested_total == 0:
             # 逐項一併歸零:畫面的 approved_total 是逐項加總來的,只清聚合欄位
             # 會讓兩個金額來源對不起來(遷移資料就可能是擬請 0 元卻有核定值)
@@ -393,6 +383,19 @@ async def approve(
             activity.school_approved = sum(
                 i.approved_subsidy for i in activity.budget_items if i.approved_subsidy is not None
             )
+
+    # 大型活動認可:實心=已認可(含未申請但管理員逕行核定)。
+    #
+    # 第一關是認定點,沒勾就是否准;**但後續關卡仍改得動**(decisions.md ISS-54)——
+    # 只在第一關寫入的話,承辦人忘了勾就永久固化為「否准」,連退回重送都補不回來,
+    # 而大型活動一次算 3 分行政分。後兩關省略欄位=不動,否則送空 body 會把認可清掉。
+    if body.is_large_approved:
+        if activity.type != ActivityType.EVENT:
+            raise validation_error("僅類型為「活動」的案件可認定為大型活動")
+        activity.is_large = True  # 未申請由管理員逕行核定
+        activity.is_large_approved = True
+    elif body.is_large_approved is False or stage == "advisor":
+        activity.is_large_approved = False
 
     if stage == "advisor" and requested_total > 0:
         activity.status = ActivityStatus.PENDING_CHIEF

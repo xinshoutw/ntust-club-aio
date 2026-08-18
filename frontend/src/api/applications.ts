@@ -19,6 +19,16 @@ interface FileOut {
   mime: string
 }
 
+/** 逐檔上傳中途失敗:already 是已經上去的檔案,呼叫端據此把它們移出待傳清單 */
+export class PartialUploadError extends Error {
+  already: File[]
+  constructor(message: string, already: File[]) {
+    super(message)
+    this.name = 'PartialUploadError'
+    this.already = already
+  }
+}
+
 /** multipart 單檔上傳(欄位名 file,對應 FastAPI UploadFile) */
 const uploadFile = (path: string, file: File): Promise<FileOut> => {
   const body = new FormData()
@@ -95,10 +105,20 @@ export interface MaintenanceInput {
 
 export function useMaintenanceMutations() {
   const qc = useQueryClient()
-  /** 補傳佐證:第二步失敗留下的無佐證單,不必再送一張新的 */
+  /** 補傳佐證:第二步失敗留下的無佐證單,不必再送一張新的。
+   *  失敗時把已上傳成功的檔案回報給呼叫端 —— 整包重按會把它們再傳一遍,
+   *  直到撞上「每筆報修至多 5 個佐證檔案」 */
   const addEvidence = useMutation({
     mutationFn: async ({ id, files }: { id: number; files: File[] }) => {
-      for (const f of files) await uploadFile(`/club/maintenance/${id}/evidence`, f)
+      const done: File[] = []
+      for (const f of files) {
+        try {
+          await uploadFile(`/club/maintenance/${id}/evidence`, f)
+        } catch (e) {
+          throw new PartialUploadError(e instanceof Error ? e.message : String(e), done)
+        }
+        done.push(f)
+      }
     },
     onSettled: () => void qc.invalidateQueries({ queryKey: keys.maintenance }),
   })
@@ -283,7 +303,6 @@ interface OfficerCertOut {
   applicant_name: string
   status: 'pending' | 'processing' | 'completed'
   created_at: string
-  attachment_count: number
 }
 
 const toCertificate = (c: OfficerCertOut): CertificateRecord => ({

@@ -10,6 +10,7 @@ import StatusPill from '../../components/ui/StatusPill'
 import { Cols } from '../../components/ui/tableControls'
 import { IMAGE_ACCEPT, isImageFile, isVideoFile } from '../../lib/uploads'
 import {
+  PartialUploadError,
   useMaintenanceList,
   useMaintenanceMutations,
   useRecentMaintenance,
@@ -235,7 +236,10 @@ export default function MaintenancePage() {
             await addEvidence.mutateAsync({ id: retryId as number, files })
             message.success('佐證已補傳')
           } catch (e) {
-            message.error(e instanceof Error ? e.message : '上傳失敗')
+            // 逐檔上傳:中途失敗時前面幾檔已經上去了,錯誤訊息要說清楚剩下哪些沒傳
+            const done = e instanceof PartialUploadError ? e.already.length : 0
+            const detail = e instanceof Error ? e.message : '上傳失敗'
+            message.error(done ? `已上傳 ${done} 個檔案,其餘失敗:${detail}` : detail)
             throw e
           }
         }}

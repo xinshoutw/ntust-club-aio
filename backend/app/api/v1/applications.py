@@ -125,16 +125,21 @@ async def create_cert(
 
 
 async def _attachment_counts(db, subject_type: str, ids: list[int]) -> dict[int, int]:
-    """逐單附件數(一次查完,不逐列查)。
+    """逐單附件數(一次查完,不逐列查);**不計已歸檔的檔案**。
 
-    判準與各自的上傳端點一致(都不看 archived_at):列表顯示的「還沒附」
-    要跟按下去之後上傳端點的答案是同一件事。
+    三處判準必須同一條:這裡、上傳端點的「已有附件」守衛、行政端的
+    `files.files_by_subject`(本來就濾 archived_at)。歸檔之後三邊各說各話的話,
+    社團看到「已附」而沒有補傳入口、行政端那一欄卻是空的,想補又被守衛擋掉。
     """
     if not ids:
         return {}
     rows = await db.execute(
         sa.select(File.subject_id, sa.func.count())
-        .where(File.subject_type == subject_type, File.subject_id.in_(ids))
+        .where(
+            File.subject_type == subject_type,
+            File.subject_id.in_(ids),
+            File.archived_at.is_(None),
+        )
         .group_by(File.subject_id)
     )
     return dict(rows.all())
@@ -214,7 +219,11 @@ async def upload_passbook(
     existing = await db.scalar(
         sa.select(sa.func.count())
         .select_from(File)
-        .where(File.subject_type == "postal_change", File.subject_id == row.id)
+        .where(
+            File.subject_type == "postal_change",
+            File.subject_id == row.id,
+            File.archived_at.is_(None),
+        )
     )
     if existing:
         raise validation_error("此申請已有存簿影本")
@@ -298,7 +307,11 @@ async def upload_evidence(
     existing_count = await db.scalar(
         sa.select(sa.func.count())
         .select_from(File)
-        .where(File.subject_type == "maintenance", File.subject_id == row.id)
+        .where(
+            File.subject_type == "maintenance",
+            File.subject_id == row.id,
+            File.archived_at.is_(None),
+        )
     )
     if (existing_count or 0) >= MAX_EVIDENCE_PER_REQUEST:
         raise validation_error(f"每筆報修至多 {MAX_EVIDENCE_PER_REQUEST} 個佐證檔案")

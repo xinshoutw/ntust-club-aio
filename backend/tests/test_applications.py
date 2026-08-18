@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import UTC, date, datetime
 
 import sqlalchemy as sa
 
@@ -521,6 +521,25 @@ async def test_postal_rows_report_whether_the_passbook_arrived(client, db):
     assert up.status_code == 201, up.text
     rows = (await client.get("/api/v1/club/postal-changes")).json()["data"]
     assert [r["attachment_count"] for r in rows] == [1]
+
+    # 歸檔的檔案不算數:三處判準(列表計數、上傳守衛、行政端檔案清單)必須同一條,
+    # 否則社團看到「已附」而沒有補傳入口、行政端那一欄卻是空的
+    from app.models import File as FileModel
+
+    await db.execute(
+        sa.update(FileModel)
+        .where(FileModel.subject_type == "postal_change")
+        .values(archived_at=datetime.now(UTC))
+    )
+    await db.commit()
+    rows = (await client.get("/api/v1/club/postal-changes")).json()["data"]
+    assert [r["attachment_count"] for r in rows] == [0]
+    again = await client.post(
+        f"/api/v1/club/postal-changes/{change_id}/passbook",
+        files={"file": ("重新掃描.jpg", io.BytesIO(jpg), "image/jpeg")},
+        headers=csrf_headers(client),
+    )
+    assert again.status_code == 201, again.text
 
     # 已完成的單不收補傳(另開一張沒附件的單,才不會被「已有存簿影本」那條先擋掉)
     other = (

@@ -25,8 +25,9 @@ export default function AttachmentRetryModal({
   maxTotalBytes?: number
   maxCount?: number
   uploading: boolean
-  /** 回傳 Promise:成功才關閉彈窗,失敗時保留已選檔案讓使用者重試 */
-  onUpload: (files: File[]) => Promise<void>
+  /** 回傳 Promise:成功才關閉彈窗。失敗時保留待傳檔案讓使用者重試,
+   *  但要把已經上去的那幾檔挑掉(回傳 already)—— 整包重按會把它們再傳一遍 */
+  onUpload: (files: File[]) => Promise<{ already: File[] } | void>
   onClose: () => void
 }) {
   const [files, setFiles] = useState<BagFile[]>([])
@@ -44,7 +45,12 @@ export default function AttachmentRetryModal({
       cancelText="取消"
       confirmLoading={uploading}
       okButtonProps={{ disabled: files.length === 0 }}
-      onOk={() => void onUpload(files.map((b) => b.file)).then(close, () => {})}
+      onOk={() =>
+        void onUpload(files.map((b) => b.file)).then(close, (e: unknown) => {
+          const already = (e as { already?: File[] })?.already
+          if (already?.length) setFiles((cur) => cur.filter((b) => !already.includes(b.file)))
+        })
+      }
       onCancel={close}
       destroyOnHidden
     >

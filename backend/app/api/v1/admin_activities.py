@@ -543,6 +543,7 @@ async def close_reject(
     # 補一張照片還得先請行政解鎖(decisions.md D-05)。仍列在「逾期未結案」中,
     # 只是不再屬於「鎖定」那一類
     activity.close_unlocked = True
+    _record(db, activity, ApprovalSubject.ACTIVITY_CLOSE, "advisor", ApprovalDecision.UNLOCK, user)
     _record(
         db,
         activity,
@@ -551,6 +552,13 @@ async def close_reject(
         ApprovalDecision.REJECT,
         user,
         body.reason,
+    )
+    audit.record(
+        db,
+        action="activity_close_unlocked",
+        user=user,
+        detail=f"activity={activity.id};由結案退回自動解除",
+        ip=client_ip(request),
     )
     audit.record(
         db,
@@ -584,8 +592,9 @@ async def unlock(
         raise conflict("僅已核准且未結案的活動可解鎖")
     lock_months = await get_setting(db, "close_lock_months")
     if not svc.is_close_locked(activity, lock_months):
-        # 未逾期不得預先解鎖,否則永久繞過結案鎖定
-        raise conflict("此活動尚未逾期鎖定,無需解鎖")
+        # 未逾期不得預先解鎖,否則永久繞過結案鎖定。
+        # 已解鎖的也走這裡:結案退回會自動解鎖(D-05),那時它可能其實已經逾期了
+        raise conflict("此活動未處於鎖定狀態(未逾期,或已經解鎖)")
     activity.close_unlocked = True
     _record(db, activity, ApprovalSubject.ACTIVITY_CLOSE, "advisor", ApprovalDecision.UNLOCK, user)
     audit.record(

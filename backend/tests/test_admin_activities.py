@@ -2,7 +2,14 @@ from datetime import UTC, date, datetime, timedelta
 
 import sqlalchemy as sa
 
-from app.models import Activity, ActivityBudgetItem, ApprovalRecord, SystemSetting, User
+from app.models import (
+    Activity,
+    ActivityBudgetItem,
+    ApprovalRecord,
+    AuditLog,
+    SystemSetting,
+    User,
+)
 from tests.conftest import csrf_headers, login, make_club, make_user
 from tests.test_activities import close_payload, create_activity, payload, upload_photo
 
@@ -400,6 +407,14 @@ async def test_close_review_flow(client, db):
     assert (
         await db.scalar(sa.select(Activity.status).where(Activity.id == aid))
     ).value == "approved"
+
+    # 自動解鎖要留下痕跡:之後查「這張單是誰解的鎖」不能在稽核軌跡上落空
+    actions = (
+        await db.scalars(
+            sa.select(AuditLog.action).where(AuditLog.action.like("activity_close%"))
+        )
+    ).all()
+    assert "activity_close_unlocked" in actions
 
     # 退回件不受結案期限限制:補件期間跨過期限也重送得了,不必請行政解鎖
     from app.services.settings_service import get_setting

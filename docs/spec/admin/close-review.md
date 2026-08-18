@@ -33,7 +33,8 @@
 - 結案是**承辦人單關**;核准後狀態轉 `closed`,退回則轉回 `approved` 讓社團補件重送
 - 繳交確認寫進 `activity_reports.{photos,report,reflections}_confirmed`,`services/scoring.py` 據此把未確認項目算 0 分
 - 解鎖只對「已核准 + 已逾期鎖定」的活動有效;**未逾期不得預先解鎖**,否則等於永久繞過鎖定
-- **退回結案即自動解鎖**(decisions.md D-05):結案已在期限內送到,補件往返不該再被期限擋下。該活動仍在逾期清單裡,只是狀態顯示「已解鎖」、沒有解鎖鈕
+- **退回結案即自動解鎖**(decisions.md D-05):結案已在期限內送到,補件往返不該再被期限擋下。該活動仍在逾期清單裡,只是狀態顯示「已解鎖」、沒有解鎖鈕。自動解鎖會寫 `activity_close_unlocked` 稽核與一筆 `UNLOCK` 簽核紀錄 —— 「這張單是誰解的鎖」要查得到
+- **解鎖是永久的**:`close_unlocked` 沒有任何地方會設回 false,也就是說被退回過一次的結案從此不受期限約束。仍列在逾期清單裡供承辦追蹤,但期限本身對它不再生效
 - 逾期清單 `overdue=true` 含已鎖定與已解鎖兩種,由回應的 `close_locked` 區分
 - 逾期清單在 DB 端篩(`activity_service.close_overdue_sql`),與 `is_close_locked` 共用同一條期限與 `close_lock_months`
 

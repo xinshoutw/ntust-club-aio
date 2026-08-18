@@ -241,8 +241,8 @@ export default function MembersPage() {
               {members.map((m: Member) => (
                 <tr key={m.id}>
                   <td className="cell-clip" style={{ fontWeight: 500 }} title={m.name}>{m.name}</td>
-                  <td className="num" style={{ color: 'var(--steel)' }}>{m.studentId}</td>
-                  <td>
+                  <td className="num cell-clip" style={{ color: 'var(--steel)' }}>{m.studentId}</td>
+                  <td className="cell-clip">
                     {editing?.id === m.id && editing.field === 'kind' ? (
                       <Select
                         size="small"
@@ -264,7 +264,7 @@ export default function MembersPage() {
                       </button>
                     )}
                   </td>
-                  <td>
+                  <td className="cell-clip" title={m.title ?? undefined}>
                     {editing?.id === m.id && editing.field === 'title' ? (
                       <Input
                         size="small"
@@ -286,7 +286,7 @@ export default function MembersPage() {
                       </button>
                     )}
                   </td>
-                  <td>
+                  <td className="cell-clip">
                     {editing?.id === m.id && editing.field === 'phone' ? (
                       <Input
                         size="small"

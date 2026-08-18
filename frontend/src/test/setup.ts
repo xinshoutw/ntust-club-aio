@@ -3,6 +3,8 @@
 import { afterEach } from 'vitest'
 import { cleanup } from '@testing-library/react'
 
+// 預設「沒有任何斷點成立」:元件測試裡 AntD 的 Grid.useBreakpoint 會量到最窄的一種。
+// 要測特定寬度就在該測試自己覆寫 window.matchMedia(見 lib/memberTable.test.ts 的 screensAt)。
 if (!window.matchMedia) {
   window.matchMedia = (query: string) =>
     ({

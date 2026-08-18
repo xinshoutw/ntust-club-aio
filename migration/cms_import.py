@@ -386,7 +386,7 @@ async def import_members(legacy, db: AsyncSession, ids: IdMap, clubs) -> None:
         if ids.get("Club_student", row.id) is not None:
             continue
         kind, title = member_kind(row.Identity, row.Title)
-        joined = row.Date  # 入社日期 → 更新時間欄
+        joined = row.Date  # 入社日期 → created_at(列表的「入社時間」)與 updated_at
         stamp = datetime.combine(joined, time(12, 0), tzinfo=TAIPEI) if joined else None
         member = ClubMember(
             club_id=clubs[legacy_club_id][0],

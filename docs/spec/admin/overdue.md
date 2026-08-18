@@ -32,11 +32,11 @@
 - 停權寫 `clubs.suspended_until` / `suspend_reason`;**攔截點在社團端的借用申請**(`_ensure_not_suspended`,回 403 `CLUB_SUSPENDED`),不影響登入與其他功能
 - 解除停權即清空兩個欄位
 - 停權與解除都寫 `audit_logs` 並推 Discord
+- **提醒不設次數上限**(decisions.md DEC-11):排程每上班日 10:35 掃一次,逾期當天寄第一封,仍未歸還者每 3 個上班日重寄到歸還為止(`scripts/send_overdue_reminders.py`,host cron)。人工提醒隨時可加寄,兩條路徑都會更新 `last_reminded_at`,列上看得到
+- **停權中的判定要比日期**:前端一律走 `lib/status.suspendedNow`(與後端攔截條件 `suspended_until >= today` 同一條)—— `suspended_until` 過期不會自動清空,裸 truthiness 會讓早就不再被擋的社團永遠掛在表上
 
 ## 未完成 / 問題
 
 - 停權中社團表沒有分頁(停權中的社團極少,且資料取自不分頁的社團主檔端點)
 - 停權不會自動發生:逾期到什麼程度該停權完全靠人工判斷,沒有建議或門檻提示
-- 提醒不設次數上限:排程每上班日 10:35 掃一次,逾期當天寄第一封,仍未歸還者每 3 個上班日重寄到歸還為止(`scripts/send_overdue_reminders.py`,host cron)。人工提醒隨時可加寄,兩條路徑都會更新 `last_reminded_at`,列上看得到
 - 停權中社團的清單靠前端從全部社團篩出來,沒有專屬端點,而且要逐社再打一次詳情才拿得到停權原因
-- 前端只篩 `suspended_until != null` 不比日期,但後端攔截條件是 `suspended_until >= today`:**停權日已過的社團仍留在表格上,實際早已不再被擋**

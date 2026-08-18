@@ -31,10 +31,11 @@
 - 停用社團不列入通知對象
 - 社團端的可見性由 `target_type` 決定:全體 / 性質命中 / 指定本社;停社社團 `attribute` 為 NULL,不命中任何性質分眾
 - 發布、切換蓋板、刪除都寫 `audit_logs`
+- 通知投遞失敗做記憶體重試(decisions.md ISS-65):至多 3 次,429 照 `Retry-After` 等待(上限 30 秒),4xx 一次放棄
 
 ## 未完成 / 問題
 
 - 公告發布後**內容與對象都不能改**,只能切蓋板或整篇刪除
 - 蓋板公告會被後續公告擠出社團端取的前 20 筆而靜默失效(見 [shared/shell.md](../shared/shell.md))
-- Email/Discord 廣播無 429 處理、無重試,程序重啟即遺失;`email_logs` 只記結果不重送
+- 通知重試只在記憶體,程序重啟即遺失;`email_logs` 只記結果不重送
 - `announcements` 表除主鍵外沒有任何索引

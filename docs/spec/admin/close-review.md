@@ -31,7 +31,7 @@
 ## 規則
 
 - 結案是**承辦人單關**;核准後狀態轉 `closed`,退回則轉回 `approved` 讓社團補件重送
-- 繳交確認寫進 `activity_reports.{photos,report,reflections}_confirmed`,`services/scoring.py` 據此把未確認項目算 0 分
+- 繳交確認寫進 `activity_reports.{photos,report,reflections}_confirmed`,`services/scoring.py` 據此把未確認項目算 0 分。三個旗標問的是**承辦認不認可採計**,不是「社團有沒有繳」—— 照片與心得在送出結案時後端就強制存在,所以預設全勾;改成預設不勾(fail-closed)只會在承辦沒動它時無故把評鑑分數歸零,而且沒有回復路徑
 - 解鎖只對「已核准 + 已逾期鎖定」的活動有效;**未逾期不得預先解鎖**,否則等於永久繞過鎖定
 - **退回結案即自動解鎖**(decisions.md D-05):結案已在期限內送到,補件往返不該再被期限擋下。該活動仍在逾期清單裡,只是狀態顯示「已解鎖」、沒有解鎖鈕。自動解鎖會寫 `activity_close_unlocked` 稽核與一筆 `UNLOCK` 簽核紀錄 —— 「這張單是誰解的鎖」要查得到
 - **解鎖是永久的**:`close_unlocked` 沒有任何地方會設回 false,也就是說被退回過一次的結案從此不受期限約束。仍列在逾期清單裡供承辦追蹤,但期限本身對它不再生效
@@ -43,7 +43,4 @@
 
 ## 未完成 / 問題
 
-- **繳交確認四層全部 fail-open**:前端初值三項全勾 → 後端 `body` 可整個省略 → schema 三旗標預設 `True` → model 欄位本身也是 `default=True, server_default=true`。承辦人不看就按核准 = 全部視為已繳
-- 只持 `approve_advisor`(不持 `aclose`)的帳號進得了本頁,但受限視野與逾期分支的條件交集恆空 —— 「逾期未結案」區塊會**靜默顯示 0 件**,而不是告知無權限
-- `aclose` 權限鍵是否應涵蓋「結案核准」動作尚未確認 —— 目前核准要 `approve_advisor`,只持 `aclose` 的帳號進得了頁面但按不了核准
 - 沒有批次核准

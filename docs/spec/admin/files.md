@@ -30,15 +30,14 @@
 - 模組由磁碟路徑前綴推導(`reports`/`eval`/`activities`/`postal`/`maintenance`)
 - 大型檔案的「全部模組」= 明列報修以外的四個模組交給後端篩(報修有專屬區);篩選與總數都由後端決定,換模組或換排序都回到第 1 頁,且不沿用上一份查詢結果
 - **只有報修檔案可直接刪除**,其餘依歸檔政策由系統管理(回 403)
-- 已歸檔(`archived_at` 非 NULL)的檔案已離盤,不計佔用;再下載回 410
+- **歸檔由 infra 執行**(decisions.md GAP-08):系統不做歸檔介面,`archived_at` 由維運直接設定;系統負責的是歸檔之後的行為 —— 已歸檔(`archived_at` 非 NULL)的檔案已離盤,不計佔用、不計補件份數,再下載回 410
 - 刪除先 commit DB 再 unlink 磁碟,失敗只留孤兒檔不會出現「有列無檔」
 - 刪除寫 `audit_logs`
 - **容量水位**(decisions.md OPS-07):`disk_level` 由後端算,`warn` ≥80%、`alert` ≥90%
 - **上傳前置閘**(ISS-43):到 `alert` 水位即不再接受任何上傳(對前端是 507)。閘門同時掛在 nginx 的 `auth_request` 子請求(`GET /auth/precheck`)上 —— 該子請求回的是 **403 + `X-Upload-Gate: closed`**(`auth_request` 只認 2xx/401/403,其餘一律轉成 500,使用者就只看得到「HTTP 500」),nginx 依那個標頭換成 507 的文案 —— 在 Starlette 把 multipart 落到 `/tmp` 之前就回絕,暫存檔完全不落地;`save_upload` 內另擋一次,直呼 API 也繞不過。容量檢查本質是 TOCTOU,決議不做配額預留,改以「離寫滿還遠就放行、接近就一律擋掉」收斂 —— 並發的幾個大檔最多把使用率再往上推一點,而不是把磁碟吃到 0
 
+- **容量告警不必靠人開這頁**:`scripts/check_disk.py`(host cron 每日 08:20)到 80% 推警示、90% 推告警到 Discord;本頁的水位提示是同一份判定的畫面版
+
 ## 未完成 / 問題
 
-- **檔案下載對 admin 一律放行**:`can_access` 對 `UserRole.ADMIN` 直接 `return True`,只持 `afiles` 的管理員可下載全系統檔案,包含郵局存簿影本這類個資
-- **歸檔政策定義了但沒有任何操作介面**:`archived_at` 沒有地方可以設,磁碟只增不減
 - 模組篩選與大小排序沒有對應索引
-- 水位只在本頁顯示,沒有主動推播(承辦不開這頁就不會知道)

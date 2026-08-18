@@ -40,9 +40,9 @@
 - `GET /admin/venues` 一支兩用:預設只回啟用中(場況圖與手動借用的列首),主檔維護頁帶 `include_inactive=true`;讀取開給 `VENUE_READ_KEYS`(`abooking`/`asetting`/`amanual`/`arule`),`include_inactive` 與新增修改限 `asetting`
 - 違規項目與經費科目都不可存成空清單
 - 設定變更寫 `audit_logs`:逐鍵記改前改後值(清單型只記增減,值太長會截斷),值沒變的鍵不留紀錄
+- **政府行事曆假日不做後台介面**(decisions.md GAP-06):資料源是人事行政總處辦公日曆表,每年匯入一次,由行政執行 `scripts/import_holidays.py --year <民國年> --yes`(上線檢查表 A 段列為每年必辦)
 
 ## 未完成 / 問題
 
-- **`holidays` 表沒有匯入介面**:政府行事曆假日只能靠 script 或直接動 DB,未匯入年度的器材逾期判定會退化成只排除週六日
 - 評鑑年度改了之後,該年度的 rubric 要另外 seed;沒有「複製上年 rubric」的介面
 - 郵局存簿與評鑑上傳固定 50MB,**在此調不到**,與其他上限的可調性不一致

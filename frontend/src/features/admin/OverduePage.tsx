@@ -106,6 +106,12 @@ export default function OverduePage() {
                   </td>
                   <td><StatusPill status="overdue" /></td>
                   <td className="r">
+                    {/* 排程每 3 個上班日自動寄一次,人工加寄前要看得到上一封是什麼時候 */}
+                    {l.lastRemindedAt && (
+                      <div className="num" style={{ fontSize: 12, color: 'var(--steel)' }}>
+                        上次提醒 {l.lastRemindedAt}
+                      </div>
+                    )}
                     <button
                       type="button"
                       className="link-btn"

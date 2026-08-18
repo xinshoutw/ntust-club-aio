@@ -3,6 +3,7 @@
 // 借用類轉換沿用 adminBookings.ts 匯出的型別與 slotsToEntries,
 // 查詢鍵掛各 domain 前綴(adminActivities/adminBookings/adminMaintenance)下,
 // 對應 mutations 的整域 invalidate 可一併刷新本頁列表
+import dayjs from 'dayjs'
 import { useQuery } from '@tanstack/react-query'
 import type { StatusKey } from '../lib/status'
 import {
@@ -115,6 +116,7 @@ interface AdminEquipmentLoanOut {
   phone: string | null
   status: 'pending' | 'approved' | 'rejected' | 'checked_out' | 'returned'
   overdue: boolean
+  last_reminded_at: string | null
   available_excluding_self: number | null
 }
 
@@ -156,6 +158,7 @@ const toEquipmentLoan = (l: AdminEquipmentLoanOut): AdminEquipmentLoan => ({
   phone: l.phone ?? '',
   purpose: l.purpose,
   status: l.overdue ? 'overdue' : l.status, // 逾期為推導旗標,顯示上視為狀態
+  lastRemindedAt: l.last_reminded_at ? dayjs(l.last_reminded_at).format('MM/DD HH:mm') : undefined,
   availableExcludingSelf: l.available_excluding_self ?? undefined,
 })
 

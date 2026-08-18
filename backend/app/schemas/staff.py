@@ -60,7 +60,7 @@ class StaffEquipmentLoanOut(BaseModel):
     id: int
     club_name: str | None = None  # None=行政手動借用(前端顯示「學務處」)
     equipment_name: str = ""
-    needs_serial: bool = False  # 依序點交:借出時逐件登記序號
+    needs_serial: bool = False  # 依序點交:點交畫面提醒現場核對序號(序號不入系統)
     qty: int
     start_date: dt.date
     end_date: dt.date
@@ -70,6 +70,8 @@ class StaffEquipmentLoanOut(BaseModel):
     borrower_name: str | None = None  # 借出點交時登記
     overdue: bool = False  # 推導:結束日之隔天上班日 10:30 未歸還
     overdue_deadline: dt.datetime | None = None  # 應歸還時限(台北時區;推導不儲存)
+    # 上次寄出歸還提醒的時間:排程每 3 個上班日自動寄一次,人工按之前先看這個
+    last_reminded_at: dt.datetime | None = None
 
 
 class CheckoutIn(BaseModel):

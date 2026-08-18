@@ -82,6 +82,7 @@ export interface StaffLoan {
   borrower?: string // 借出點交時登記
   overdue: boolean
   due: string // 應歸還時限 YYYY/MM/DD HH:mm(結束日之隔天上班日;後端推導)
+  lastRemindedAt?: string // 上次提醒 MM/DD HH:mm;排程每 3 個上班日自動寄一次
   daysLate: number // 已逾天數(台北時區日差;未逾期為 0)
 }
 
@@ -99,6 +100,7 @@ interface StaffLoanOut {
   borrower_name: string | null
   overdue: boolean
   overdue_deadline: string | null
+  last_reminded_at: string | null
 }
 
 // 台北時區「今天」:使用者可能不在 +08:00,不可直接用本地日期
@@ -120,6 +122,7 @@ const toLoan = (l: StaffLoanOut): StaffLoan => ({
   purpose: l.purpose,
   phone: l.phone ?? '',
   borrower: l.borrower_name ?? undefined,
+  lastRemindedAt: l.last_reminded_at ? dayjs(l.last_reminded_at).format('MM/DD HH:mm') : undefined,
   overdue: l.overdue,
   due: l.overdue_deadline ? dayjs(l.overdue_deadline).format('YYYY/MM/DD HH:mm') : '',
   daysLate: l.overdue_deadline ? daysLate(l.overdue_deadline) : 0,

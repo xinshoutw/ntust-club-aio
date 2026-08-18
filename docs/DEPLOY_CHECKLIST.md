@@ -37,7 +37,7 @@
 - [ ] 應辦 **監控與告警**:至少磁碟使用率、backend 存活、log 輪替與保留
 - [ ] 應辦 **磁碟容量**:系統總量讀實體磁碟可用空間,不設邏輯容量;實體磁碟還要容 OS/Docker/PostgreSQL/log/multipart temp,以 `df` 與 GCE 實際容量驗證
 - [ ] 待決 **限流與 session**:限流是行程內記憶體(單機可行,重啟歸零);過期 session 於登入時順手清除,不另設排程
-- [ ] 待決 **逾期提醒信**:目前只在管理員於逾期頁手動觸發時寄,無排程
+- [ ] 應辦 **逾期提醒排程**:host cron 每上班日 10:35 呼叫 `scripts/send_overdue_reminders.py`(cron 行見該檔 docstring);未設排程則只剩人工按鈕
 
 ## E. Edge proxy 切換
 

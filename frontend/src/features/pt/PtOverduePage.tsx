@@ -76,6 +76,12 @@ export default function PtOverduePage() {
                   </td>
                   <td><StatusPill status="overdue" /></td>
                   <td>
+                    {/* 排程每 3 個上班日自動寄一次,人工加寄前要看得到上一封是什麼時候 */}
+                    {r.lastRemindedAt && (
+                      <div className="num" style={{ fontSize: 12, color: 'var(--steel)' }}>
+                        上次提醒 {r.lastRemindedAt}
+                      </div>
+                    )}
                     {r.manual ? (
                       <Tooltip title="行政手動借用無提醒對象">
                         <Button size="small" disabled>發送提醒</Button>

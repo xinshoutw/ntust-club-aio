@@ -106,4 +106,6 @@ class EquipmentLoan(Base, TimestampMixin):
     checkin_by: Mapped[int | None] = mapped_column(sa.ForeignKey("users.id"))
     checkin_at: Mapped[dt.datetime | None] = mapped_column(sa.DateTime(timezone=True))
     checkin_note: Mapped[str | None] = mapped_column(sa.Text)
+    # 最後一次寄出歸還提醒的時間:畫面顯示,並讓排程知道隔多久該再寄一次
+    last_reminded_at: Mapped[dt.datetime | None] = mapped_column(sa.DateTime(timezone=True))
     returner_name: Mapped[str | None] = mapped_column(sa.Text)  # 歸還人(歸還點交時登記)

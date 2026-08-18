@@ -375,6 +375,8 @@ class AdminEquipmentLoanOut(BaseModel):
     status: LoanStatus
     created_at: datetime
     overdue: bool = False  # 推導:結束日之隔天上班日 10:30 未歸還
+    # 上次寄出歸還提醒的時間:排程每 3 個上班日自動寄,人工按之前先看這個
+    last_reminded_at: datetime | None = None
     # 審核檢核資訊(僅待審單推導):該區間可借數(排除本單)
     available_excluding_self: int | None = None
 

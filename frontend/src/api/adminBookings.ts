@@ -124,6 +124,8 @@ export interface AdminEquipmentLoan {
   purpose: string
   phone: string
   status: StatusKey
+  /** 上次寄出歸還提醒(MM/DD HH:mm);排程每 3 個上班日自動寄一次 */
+  lastRemindedAt?: string
   availableExcludingSelf?: number
 }
 

@@ -33,6 +33,8 @@ _TIMEOUT = 5.0
 _RETRIES = 3
 _BACKOFF = (1.0, 3.0)  # 第 1、2 次重試前各等幾秒;429 帶 Retry-After 時以它為準
 _MAX_RETRY_AFTER = 30.0  # Discord 偶爾給很長的 Retry-After,超過就不等了
+# 公告廣播的並發上限:太小會拖成小時級,太大會打爆 relay 與 Discord 的速率限制
+_BROADCAST_CONCURRENCY = 5
 
 
 def _retry_delay(attempt: int, resp: httpx.Response | None) -> float | None:
@@ -211,14 +213,32 @@ async def announcement_broadcast(
     # webhook 執行 Components V2 必須帶 with_components=true,否則 Discord 拒收元件
     v2 = {"with_components": "true"}
     await _post_webhook(settings.discord_webhook_url, payload, f"announce {title}", params=v2)
-    for url in club_webhooks:
-        await _post_webhook(url, payload, f"announce {title}", params=v2)
 
     html = announcement_email_html(title, content, date)
     plain = f"{title}\n{date}\n\n{content}\n\n-- {SYSTEM_NAME} {SITE_URL}"
     subject = f"【{SYSTEM_NAME}】{title}"
-    for addr in emails:
-        await send_email(addr, subject, plain, template="announcement", html=html)
+
+    # 逐筆序列 × 60+ 社 × 每社 3 個信箱,再乘上重試的等待,relay 掛掉時單一
+    # BackgroundTask 會跑上好幾個小時,期間任何重新部署就整批靜默遺失。
+    # 有上限的並發:壓縮牆鐘時間,又不會一次打爆 relay 或 Discord 的速率限制
+    gate = asyncio.Semaphore(_BROADCAST_CONCURRENCY)
+
+    async def guarded(coro_factory):
+        async with gate:
+            await coro_factory()
+
+    await asyncio.gather(
+        *(
+            guarded(lambda u=url: _post_webhook(u, payload, f"announce {title}", params=v2))
+            for url in club_webhooks
+        ),
+        *(
+            guarded(
+                lambda a=addr: send_email(a, subject, plain, template="announcement", html=html)
+            )
+            for addr in emails
+        ),
+    )
 
 
 def _smtp_tls_context() -> ssl.SSLContext:
@@ -260,16 +280,26 @@ async def send_email(
         await db.commit()
 
 
+# 重送幾次都一樣的 SMTP 錯誤:收件人不存在、寄件人被拒、認證失敗
+_PERMANENT_SMTP = (
+    aiosmtplib.SMTPRecipientsRefused,
+    aiosmtplib.SMTPSenderRefused,
+    aiosmtplib.SMTPAuthenticationError,
+    aiosmtplib.SMTPNotSupported,
+)
+
+
 async def _send_smtp(message: EmailMessage) -> None:
-    """寄一封信,暫時性失敗重試(記憶體;decisions.md ISS-65)。
+    """寄一封信,**暫時性**失敗重試(記憶體;decisions.md ISS-65)。
 
     校方 relay 偶爾拒接或連線中斷,重送一次通常就過了 —— 而通知裡有
     「已核准」「已逾期」這種社團真的需要看到的事件。
+    收件人不存在、認證失敗這種永久錯誤不重試:白等 4 秒不會有不同結果。
     """
     last: Exception | None = None
     for attempt in range(1, _RETRIES + 1):
         try:
-            return await aiosmtplib.send(
+            await aiosmtplib.send(
                 message,
                 hostname=settings.smtp_host,
                 port=settings.smtp_port,
@@ -282,6 +312,9 @@ async def _send_smtp(message: EmailMessage) -> None:
                 ),
                 timeout=15,
             )
+            return
+        except _PERMANENT_SMTP:
+            raise
         except Exception as exc:  # noqa: BLE001 - 由呼叫端統一留底
             last = exc
             if attempt == _RETRIES:

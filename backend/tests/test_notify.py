@@ -89,6 +89,29 @@ def _fast_retry(monkeypatch) -> None:
     monkeypatch.setattr(notify, "_MAX_RETRY_AFTER", 0.0)
 
 
+def test_retry_delay_reads_retry_after_and_classifies_the_status():
+    """`_retry_delay` 決定「等多久 / 要不要再送」;走 `_fast_retry` 的那幾支測試
+    把等待歸零,反而驗不到這裡的判斷,所以直接測這支純函式。"""
+
+    class Resp:
+        def __init__(self, status_code, headers=None):
+            self.status_code = status_code
+            self.headers = headers or {}
+
+    # 429 照 Retry-After;上限夾住(Discord 偶爾給很長的值)
+    assert notify._retry_delay(1, Resp(429, {"Retry-After": "7"})) == 7.0
+    assert notify._retry_delay(1, Resp(429, {"Retry-After": "9999"})) == notify._MAX_RETRY_AFTER
+    assert notify._retry_delay(1, Resp(429, {"Retry-After": "亂寫"})) == 1.0
+    assert notify._retry_delay(1, Resp(429)) == 1.0
+    # 5xx 與連線層失敗走退避;4xx 是設定錯的 webhook,不重送
+    assert notify._retry_delay(1, Resp(503)) == notify._BACKOFF[0]
+    assert notify._retry_delay(2, Resp(503)) == notify._BACKOFF[1]
+    assert notify._retry_delay(1, None) == notify._BACKOFF[0]
+    assert notify._retry_delay(1, Resp(404)) is None
+    # 用完額度就停
+    assert notify._retry_delay(3, Resp(503)) is None
+
+
 async def test_discord_retries_on_rate_limit_then_succeeds(monkeypatch):
     """429 帶 Retry-After 就照它等,重送成功即止(decisions.md ISS-65)。"""
     _fast_retry(monkeypatch)
@@ -133,6 +156,26 @@ async def test_discord_stops_after_the_retry_budget(monkeypatch):
     assert len(calls) == 3  # = _RETRIES;寫死才擋得住有人把上限改掉
 
 
+async def test_email_does_not_retry_a_permanent_failure(db, monkeypatch):
+    """收件人不存在、認證失敗這種重送幾次都一樣,白等 4 秒不會有不同結果。"""
+    _fast_retry(monkeypatch)
+    monkeypatch.setattr(settings, "smtp_host", "mail.test")
+    monkeypatch.setattr(settings, "smtp_username", "u")
+    monkeypatch.setattr(settings, "smtp_password", "p")
+    calls: list[int] = []
+
+    async def refused(*a, **k):
+        calls.append(1)
+        raise notify.aiosmtplib.SMTPAuthenticationError(535, "auth failed")
+
+    monkeypatch.setattr(notify.aiosmtplib, "send", refused)
+    await notify.send_email("someone@example.com", "測試主旨", "內文", template="test")
+
+    assert len(calls) == 1
+    log = (await db.scalars(sa.select(EmailLog).order_by(EmailLog.id.desc()))).first()
+    assert log.status.value == "failed"
+
+
 async def test_email_retries_then_records_the_failure(db, monkeypatch):
     """SMTP 暫時性失敗重送;用完額度才寫 failed 留底。"""
     _fast_retry(monkeypatch)
@@ -153,3 +196,33 @@ async def test_email_retries_then_records_the_failure(db, monkeypatch):
     log = (await db.scalars(sa.select(EmailLog).order_by(EmailLog.id.desc()))).first()
     assert log.status.value == "failed"
     assert "relay 拒接" in log.error
+
+
+async def test_broadcast_fans_out_instead_of_going_one_by_one(monkeypatch):
+    """逐筆序列 × 60+ 社 × 每社 3 個信箱,再乘上重試的等待,單一 BackgroundTask
+    會跑上好幾個小時,期間任何重新部署就整批靜默遺失(ISS-65 的副作用)。"""
+    _fast_retry(monkeypatch)
+    monkeypatch.setattr(settings, "smtp_password", "")  # Email 走 log-only
+    inflight = 0
+    peak = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal inflight, peak
+        inflight += 1
+        peak = max(peak, inflight)
+        inflight -= 1
+        return httpx.Response(204)
+
+    _use(monkeypatch, handler)
+    posted: list[str] = []
+
+    async def spy_post(url, payload, label, params=None):
+        posted.append(url)
+
+    monkeypatch.setattr(notify, "_post_webhook", spy_post)
+    hooks = [f"https://discord.test/{i}" for i in range(20)]
+    await notify.announcement_broadcast("維護公告", "內文", "2026/08/20", [], hooks)
+
+    # 全域 + 20 社,一個都不能少
+    assert len(posted) == 21
+    assert notify._BROADCAST_CONCURRENCY >= 2, "並發上限設成 1 就退回逐筆序列了"

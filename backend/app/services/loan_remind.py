@@ -98,7 +98,9 @@ async def send_due_reminders(db: AsyncSession, *, today: date | None = None) -> 
         )
     ).all()
 
-    sent: list[str] = []
+    # 先把該寄的收齊、commit,再送:網路等待(含 ISS-65 的重試)如果留在
+    # 開著的交易裡,relay 掛掉時這條交易會 idle 上好幾分鐘,擋住別人的列鎖
+    pending: list[tuple[Club, str]] = []
     for loan, club, equipment in rows:
         deadline = svc.overdue_deadline_in(loan.end_date, return_time, holidays)
         if now < deadline:
@@ -112,11 +114,7 @@ async def send_due_reminders(db: AsyncSession, *, today: date | None = None) -> 
                 continue  # 還沒到下一次
 
         desc = _message(club, equipment, loan, deadline)
-        await notify.club_event("alert", TITLE, desc, club.discord_webhook_url)
-        for addr in club.contact_emails or []:
-            await notify.send_email(
-                addr, f"【{notify.SYSTEM_NAME}】{TITLE}", desc, "loan_reminder"
-            )
+        pending.append((club, desc))
         loan.last_reminded_at = now
         audit.record(
             db,
@@ -124,7 +122,13 @@ async def send_due_reminders(db: AsyncSession, *, today: date | None = None) -> 
             role="system",
             detail=f"equipment_loan={loan.id};club={club.id};scheduled",
         )
-        sent.append(desc)
 
     await db.commit()
-    return sent
+
+    for club, desc in pending:
+        await notify.club_event("alert", TITLE, desc, club.discord_webhook_url)
+        for addr in club.contact_emails or []:
+            await notify.send_email(
+                addr, f"【{notify.SYSTEM_NAME}】{TITLE}", desc, "loan_reminder"
+            )
+    return [desc for _club, desc in pending]

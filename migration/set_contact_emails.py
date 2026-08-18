@@ -21,7 +21,7 @@ import argparse
 import asyncio
 import re
 import sys
-from datetime import date
+from datetime import datetime
 from pathlib import Path
 
 MIGRATION_DIR = Path(__file__).resolve().parent
@@ -31,7 +31,7 @@ sys.path.insert(0, str(BACKEND_DIR))
 import sqlalchemy as sa
 
 from app.core.db import async_session_factory
-from app.core.semesters import semester_of
+from app.core.semesters import TAIPEI, semester_of
 from app.models import Club, ClubMember
 from app.models.enums import MemberKind
 
@@ -134,7 +134,7 @@ async def main() -> None:
     )
     args = parser.parse_args()
 
-    now = semester_of(date.today())
+    now = semester_of(datetime.now(TAIPEI).date())
     ready, problems = await collect()
     fresh = [r for r in ready if semesters_between(r[1], now) <= FRESH_WITHIN_SEMESTERS]
     stale = [r for r in ready if semesters_between(r[1], now) > FRESH_WITHIN_SEMESTERS]

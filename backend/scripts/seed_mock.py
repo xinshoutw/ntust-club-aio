@@ -850,7 +850,7 @@ async def _create_bookings(
 
     # 固定借用(整學期每週固定時段)。真實申請歸屬「下一學期」;
     # 展示資料用當前學期起訖,場況圖今天就看得到固定借用格
-    sem_start, sem_end = semester_range(semester_of(date.today()))
+    sem_start, sem_end = semester_range(semester_of(datetime.now(TAIPEI).date()))
     pending_room = RoomBookingRequest(
         club_id=csie.id, venue_id=venue_ids["S304 音樂教室"],
         purpose="每週社課固定教室", status=BookingStatus.PENDING,

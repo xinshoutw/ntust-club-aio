@@ -167,7 +167,7 @@ GitHub Actions:backend job 跑 `ruff check` + `pytest`(起 postgres service),fro
 切換 = 改 `clubs.ntust.edu.tw` 的 vhost,回滾 = 改回舊值:
 
 1. upstream 指到 `<新 VM 內網 IP>:8080` —— edge 現行 upstream 沒寫埠號(預設 80),漏掉會 502
-2. 該 vhost 的 `client_max_body_size` 從全域 3072M 收斂為 `256m`,與內層一致
+2. 該 vhost 的 `client_max_body_size` 從全域 3072M 收斂為 `256m`(內層最大的那個上傳端點就是這個值;其餘上傳端點在內層各自收到 64m)
 3. 該 vhost 加 `proxy_request_buffering off`,上傳串流直通不在 edge 暫存整包
 4. proxy header 改覆寫式:`proxy_set_header X-Forwarded-For $remote_addr;` 並補 `X-Forwarded-Proto $scheme`(現行 `$proxy_add_x_forwarded_for` 會保留客戶端偽造的 XFF,且沒送 XFP)
 5. `.env` 設 `FORWARDED_ALLOW_IPS=172.28.0.0/24,<edge VM 內網 IP>`。**絕不可用 `*`**:XFF 最左值客戶端可控,限流會被繞過、稽核 IP 會被投毒;漏設 edge IP 則所有人 IP 塌縮成 edge IP

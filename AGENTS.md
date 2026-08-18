@@ -109,6 +109,8 @@ pnpm run lint
 
 - `src/api/{domain}.ts` 為接線範本(見 `api/members.ts` + `MembersPage`)
 - 元件與互動慣例一律照 `docs/design-guide.md` §6,不要自刻替代品
+- 測試環境是全域 jsdom(`vite.config.ts` + `src/test/setup.ts` 補 `matchMedia`/`ResizeObserver`);
+  元件測試用 `@testing-library/react` 的 `render`/`screen`/`fireEvent`,`cleanup` 已在 setup 掛好
 - `PERIOD_TIMES` 前後端各一份(`booking_service.py` / `api/bookings.ts`),改動須同步;
   `VenueCategory` 同樣兩份(`models/enums.py` / `api/adminVenues.ts`,後端是 PG enum,新增值另需 revision)
 

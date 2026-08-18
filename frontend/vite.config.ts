@@ -1,9 +1,15 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  test: {
+    // 全域 jsdom:純函式測試在 jsdom 下照跑,不值得為它們維護第二種 environment
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.ts',
+  },
   server: {
     host: '127.0.0.1',
     port: 5173,

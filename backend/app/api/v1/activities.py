@@ -128,6 +128,11 @@ def _require_complete(activity: Activity) -> None:
         raise validation_error(f"送出前請先完成:{'、'.join(missing)}")
 
 
+def _start_at(day, start_time) -> datetime:
+    """活動開始時刻(台北);未填時間以當日 00:00 保守處理。"""
+    return datetime.combine(day, start_time or time(0, 0), tzinfo=TAIPEI)
+
+
 def _require_future_start(activity: Activity) -> None:
     """新申請的開始時刻不得早於現在。
 
@@ -137,7 +142,7 @@ def _require_future_start(activity: Activity) -> None:
     **退回件不走這裡**(decisions.md D-05):活動日期常在審核往返之間就過了,
     強迫改成未來日期等於逼社團竄改真實日期,或整件放棄。
     """
-    start = datetime.combine(activity.date, activity.start_time or time(0, 0), tzinfo=TAIPEI)
+    start = _start_at(activity.date, activity.start_time)
     if start < datetime.now(UTC):
         raise validation_error("活動開始時間早於現在,請調整活動日期與時間")
 
@@ -273,11 +278,20 @@ async def update_activity(
     await _validate_categories(db, body.budget_items)
     if body.is_large != activity.is_large:
         activity.is_large_approved = None  # 大型申請變動,舊認可不得沿用
+    was_rejected = activity.status == ActivityStatus.REJECTED
+    old_start = _start_at(activity.date, activity.start_time) if activity.date else None
     for field, value in body.model_dump(exclude={"budget_items"}).items():
         setattr(activity, field, value)
     svc.replace_budget_items(activity, body.budget_items)
     if activity.status != ActivityStatus.DRAFT:
         _require_complete(activity)  # 退回件僅能存完整資料(部分填寫只屬草稿)
+    if was_rejected and old_start is not None:
+        # 退回件可照原日期重送,但不得再往更早的日期改(decisions.md D-05)。
+        # 活動日期決定它落在哪一個學期,而評鑑是逐學期採計的 ——
+        # 往回搬等於把活動塞進一個已經結案的評鑑年度。往未來改一律放行
+        new_start = _start_at(activity.date, activity.start_time)
+        if new_start < old_start and new_start < datetime.now(UTC):
+            raise validation_error("退回件的活動日期不得再往前調整")
     await db.commit()
     activity = await svc.get_own_activity(db, user, activity_id)
     lock_months = await get_setting(db, "close_lock_months")

@@ -236,8 +236,14 @@ async def test_new_application_rejects_past_start_but_a_rejected_one_keeps_its_d
     assert resp.status_code == 200
 
     # 退回件照原日期重送:活動日期常在審核往返之間就過了,不該逼社團改日期
-    # (decisions.md D-05;新申請仍禁過去,即上面那段)
-    await db.execute(sa.update(Activity).where(Activity.id == aid).values(status="rejected"))
+    # (decisions.md D-05;新申請仍禁過去,即上面那段)。
+    # 模擬「送審期間日期就過了」:直接把單據的日期挪到昨天,再退回
+    await db.execute(
+        sa.update(Activity)
+        .where(Activity.id == aid)
+        .values(status="rejected", date=date.fromisoformat(yesterday),
+                end_date=date.fromisoformat(yesterday))
+    )
     await db.commit()
     resp = await client.put(
         f"/api/v1/club/activities/{aid}",
@@ -250,6 +256,42 @@ async def test_new_application_rejects_past_start_but_a_rejected_one_keeps_its_d
     )
     assert resp.status_code == 200
     assert resp.json()["data"]["date"] == yesterday
+
+
+async def test_rejected_activity_cannot_be_moved_further_into_the_past(client, db):
+    """退回件可照原日期重送,但不得再往更早的日期改(decisions.md D-05)。
+
+    活動日期決定它落在哪一個學期,而評鑑逐學期採計 —— 往回搬等於把活動塞進
+    一個已經結案的評鑑年度。
+    """
+    await setup_session(client, db)
+    yesterday = (date.today() - timedelta(days=1)).isoformat()
+    long_ago = (date.today() - timedelta(days=200)).isoformat()
+    future = (date.today() + timedelta(days=7)).isoformat()
+
+    data = await create_activity(client, date=future)
+    aid = data["id"]
+    await db.execute(
+        sa.update(Activity)
+        .where(Activity.id == aid)
+        .values(status="rejected", date=date.fromisoformat(yesterday),
+                end_date=date.fromisoformat(yesterday))
+    )
+    await db.commit()
+
+    back = await client.put(
+        f"/api/v1/club/activities/{aid}",
+        json=payload(date=long_ago),
+        headers=csrf_headers(client),
+    )
+    assert back.status_code == 422
+    assert "不得再往前" in back.json()["error"]
+
+    # 往未來改一律放行
+    ahead = await client.put(
+        f"/api/v1/club/activities/{aid}", json=payload(date=future), headers=csrf_headers(client)
+    )
+    assert ahead.status_code == 200
 
 
 async def test_club_scoping(client, db):

@@ -237,8 +237,13 @@ function ActivityForm({
   })
 
   // 退回件重送不擋過去時刻:活動日期常在審核往返之間就過了(decisions.md D-05)。
-  // 新申請仍禁過去 —— 兩端同一條界線,後端 activities._require_future_start 同理
+  // 新申請仍禁過去 —— 兩端同一條界線,後端 activities._require_future_start 同理。
+  // 但退回件也只能「照原日期或往後」:活動日期決定它落在哪一個學期,而評鑑逐學期採計,
+  // 往回搬等於把活動塞進已經結案的評鑑年度(後端 update_activity 同一條規則)
   const resubmitting = editing?.status === 'rejected'
+  const earliest = resubmitting && editing?.date ? dayjs(editing.date, 'YYYY/MM/DD') : null
+  const beforeEarliest = (d: dayjs.Dayjs): boolean =>
+    earliest ? d.isBefore(earliest, 'day') && d.isBefore(dayjs(), 'day') : d.isBefore(dayjs().startOf('day'))
 
   const checkTimes = (v: FormValues): boolean => {
     const start = dayjs(`${v.date.format('YYYY/MM/DD')} ${v.startTime.format('HH:mm')}`, 'YYYY/MM/DD HH:mm')
@@ -250,6 +255,11 @@ function ActivityForm({
     // 新申請擋過去開始時刻(草稿不走此檢核;後端亦擋)
     if (!resubmitting && start.isBefore(dayjs())) {
       message.error('活動開始時間早於現在，請調整活動日期與時間')
+      return false
+    }
+    // 退回件:照原日期可以,再往前不行
+    if (earliest && start.isBefore(earliest, 'day') && start.isBefore(dayjs())) {
+      message.error('退回件的活動日期不得再往前調整')
       return false
     }
     return true
@@ -479,7 +489,7 @@ function ActivityForm({
                   <DatePicker
                     style={{ width: '100%' }}
                     format="YYYY/MM/DD"
-                    disabledDate={(d) => !resubmitting && d.isBefore(dayjs().startOf('day'))}
+                    disabledDate={beforeEarliest}
                   />
                 </Form.Item>
                 <Form.Item
@@ -506,7 +516,7 @@ function ActivityForm({
                     style={{ width: '100%' }}
                     format="YYYY/MM/DD"
                     disabledDate={(d) => {
-                      if (!resubmitting && d.isBefore(dayjs().startOf('day'))) return true // 新申請不可選過去日期
+                      if (beforeEarliest(d)) return true // 新申請不可選過去;退回件不可比原日期更早
                       const start = form.getFieldValue('date') as dayjs.Dayjs | undefined
                       return !!start && d.isBefore(start, 'day')
                     }}

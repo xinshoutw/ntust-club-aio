@@ -5,49 +5,41 @@
 
 ## 現在在哪
 
-**全部待決事項都已拍板。** 需求方(學務處承辦)於 2026-08-18 回覆了整份決策清單,
-落地紀錄在 [`decisions.md`](decisions.md)。`docs/issues.md` 剩 8 項,**已無「阻擋」級**。
+**`decisions.md` 裡「已定案且做得完」的項目全部做完了。** `docs/issues.md` 剩 5 項、
+`docs/gaps.md` 的未完成功能剩評鑑鏈與幾項延伸,**全部落在「上線後單獨排程」那一堆**。
 
-接下來就是照 `decisions.md` 逐項實作,不需要再問任何人。
+也就是說:接下來不是照清單逐項修,而是挑一整條線來做(評鑑鏈是最大的一條),
+或先把上線檢查表(`DEPLOY_CHECKLIST.md`)的阻擋項清掉。
 
 ## 接下來做什麼
 
-決策都在 `decisions.md`,以下是尚未動工的部分。**一項一個 commit**,修完從 `issues.md` 刪那一列並同步該頁 spec。
+### 一、評鑑彙總鏈(最大的一條,建議當單一開發段落規劃)
 
-### 一、線上申請與報名
+GAP-01 → 02 → 03 → 04,連帶 ISS-04、ISS-20、ISS-12c/GAP-08b、GAP-07、GAP-19。
+**不要拆散**:分組與評審指派沒有寫入 API(GAP-01)的話,評審端三頁在正式環境永遠是
+「尚未被指派評分」(ISS-04),而後面的總表(GAP-03)與結果頁(GAP-04)都建立在它上面。
 
-| 編號 | 要做什麼 |
+DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— 上線本身不擋這條。
+
+### 二、上線檢查表的阻擋項(`DEPLOY_CHECKLIST.md` A 段)
+
+| 項目 | 現況 |
 |---|---|
-| **D-09 / GAP-10** | 報名活動可修改內容(**不發通知**),截止時間可改但**只能改到現在或未來**。目前只有 POST,要補 PATCH |
-| **DEC-07** | 管理員可手動把社團加進報名活動(補登實際到場但未線上報名者) |
+| 備份排程 | 腳本已就緒(`scripts/backup_db.sh`),**cron 還沒掛上** |
+| 器材主檔 | 由 `migration/cc_import.py` 從舊 `Device` 表帶入,正式流程必須 seed 之後跑過遷移 |
+| 政府行事曆假日 | 匯入腳本已就緒(`scripts/import_holidays.py`),**上線年度還沒跑** |
+| `.env` 正式值 | `MAIL_FROM_ADDRESS`(目前是個人信箱)與 `DISCORD_WEBHOOK_URL`(測試群組)都要換 |
 
-### 二、畫面
-
-| 編號 | 要做什麼 |
-|---|---|
-| **GAP-18** | 補齊九個目前不發通知的事件,文案初稿與呼叫點見 [`discord-webhook-messages.md`](discord-webhook-messages.md) 的「待實作」段。**活動草稿儲存刻意不列**(每存一次推一則會淹掉頻道) |
-
-### 三、工程項(需求方已同意做法,直接動手)
-
-| 編號 | 做法 |
-|---|---|
-| **ISS-43** | 磁碟容量檢查改**上傳前置閘**,不做配額預留 |
-| **ISS-51** | 上傳大小**交給前面的網頁伺服器擋**,不在應用層做串流檢查 |
-| **ISS-65** | 通知發送失敗做**記憶體重試 + 記錄**,不落地佇列表 |
-| **OPS-07** | 容量告警門檻 80% 警示 / 90% 告警 |
-| **MIG-03** | 還原 960 筆因 `club_id` 為空字串被丟棄的舊借用紀錄 |
-| **MIG-04** | 遷移腳本加重置旗標,換新 dump 重跑前先清乾淨 |
-| **OPS-01** | 寫每日 `pg_dump` 備份腳本,存放於同一環境(不做異地) |
-| **MIG-06** | 導出 5 組未知帳號的 560 筆借用清單(場地/器材、時間、目的)供承辦辨識。認不出就永久維持「學務處」,不擋上線 |
-
-### 四、單獨排程(上線後)
+### 三、其餘單獨排程
 
 | 項目 | 內容 |
 |---|---|
-| 評鑑彙總鏈 | GAP-01 → 02 → 03 → 04,連帶 ISS-04、ISS-20、ISS-12c/GAP-08b、GAP-07、GAP-19。當**單一開發段落**規劃,不要拆散;DEC-01 已定案:這學年評鑑在新系統跑,但學年末才用 |
-| ISS-90 | 併發、權限矩陣、時區邊界測試(元件測試環境已建,可直接動工) |
+| ISS-90 | 併發、權限矩陣、時區邊界測試。**前端元件測試環境已建**(jsdom + `@testing-library/react`),可直接動工 |
+| ISS-67 / GAP-18 鈴鐺 | 行政/工讀生/評審端的通知鈴鐺永遠是空的(Discord 事件已補齊,缺的是站內鈴鐺) |
 | GAP-14 / GAP-16 / GAP-17 | 統計與匯出、社團導覽首頁、公開頁 |
-| ISS-67 / GAP-18 鈴鐺 | 行政/工讀生/評審端通知鈴鐺 |
+| GAP-11 / GAP-15 | 社團性質維護、待審申請彙整頁 |
+
+可改進但不排期的方向見 [`improvements.md`](improvements.md)。
 
 ## 本批已完成(2026-08-20)
 
@@ -61,6 +53,16 @@
 | **D-05 / ISS-30** | 結案被退回即 `close_unlocked = True`,補件往返跨過期限也重送得了 |
 | **ISS-33** | 固定借用目標學期改由**受理期間結束日**推導,同一輪申請不再落到兩個學期 |
 | **D-06 / ISS-09** | 報修與郵局異動列表逐列回 `attachment_count`,0 份給補傳入口(`AttachmentRetryModal`);已完成的單不再收附件 |
+| **D-09 / GAP-10** | 報名活動建立後可改(不發通知);截止只能改到現在或未來,一有社團報名就鎖住表單欄位,活動種類與報名開始不可改 |
+| **DEC-07** | 補登未線上報名的社團(視為已確認、名單留空),可撤除、會通知社團、一定出現在匯出的 CSV 裡 |
+| **GAP-18** | 補齊九個原本靜默的事件(K1–K9)+ 補登通知(K10);`tests/test_gap18_notifications.py` 逐事件釘住 |
+| **ISS-43 / OPS-07** | 磁碟水位分級(80% 警示、90% 告警);到告警水位即關閉上傳前置閘,擋在 nginx `auth_request` 子請求上,暫存檔不落地 |
+| **ISS-51** | nginx 上傳上限逐端點貼齊各自的 UploadPolicy(只有維修佐證留 256m);`test_upload_gateway.py` 走 OpenAPI 對照白名單 |
+| **ISS-65** | 通知的暫時性失敗做記憶體重試(3 次;429 照 `Retry-After`、4xx 一次放棄),不落地佇列表 |
+| **MIG-03** | `club_id` 為空字串的 960 筆借用改為保留,掛「學務處」 |
+| **MIG-04 / MIG-06** | 兩支遷移腳本加 `--reset`;`cc_import.py --unknown-clubs` 導出認不出單位的借用清單 |
+| **OPS-01** | `scripts/backup_db.sh`(每日 pg_dump + 14 天輪替,同機存放)、`scripts/check_disk.py`(容量告警) |
+| **GAP-06** | `scripts/import_holidays.py`:人事行政總處辦公日曆表,每年一次,預設只預覽 |
 
 ### 這一批踩到的坑
 
@@ -198,16 +200,17 @@
 - 全域的 401 → 登出 listener 要**排除登入端點**:那裡的 401 是「密碼錯」,已登入者開著 `/login` 打錯一次就把自己登出了
 - 繞過 `api()` 直接 `fetch()` 的地方(檔案下載、docx 預覽)不會走 401 → 登出那條路,session 過期只會顯示「無法取得檔案」。共用 `fetchFile`
 
-## 驗證現況(2026-08-19 實測)
+## 驗證現況(2026-08-20 實測)
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **394 passed**(含 `test_migrations.py`:另開一個庫跑 `alembic upgrade head`,比對欄位、索引名與 CHECK 名 —— 後兩者是子集斷言,擋的是「模型有、revision 漏了」);`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` → 0 錯;`pnpm test` → **97 passed**(22 檔);`pnpm run lint` → **8** 個 fast-refresh warning(全為既有的 `only-export-components` 類)
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **433 passed**(含 `test_migrations.py`:另開一個庫跑 `alembic upgrade head`,比對欄位、索引名與 CHECK 名 —— 後兩者是子集斷言,擋的是「模型有、revision 漏了」);`ruff check .` 全綠
+- 前端 `pnpm exec tsc -b --force` → 0 錯;`pnpm test` → **117 passed**(27 檔);`pnpm run lint` → **8** 個 fast-refresh warning(全為既有的 `only-export-components` 類)
 - `git log --all` 確認 `.env` 與 `migration/out` 從未進版控
-- 本批 21 個 commit 全部做過 mutation 驗證:把修法改回舊寫法,確認新測試真的會紅
+- 本批每一個 commit 都做過 mutation 驗證:把修法改回舊寫法,確認新測試真的會紅
 
 ## 其他待處理
 
 - **`MAIL_FROM_ADDRESS` 目前是開發者個人信箱**(`.env`,僅供測試)。正式環境要換成不綁個人的位址,且**必須與 `SMTP_USERNAME` 同網域**,否則校方 relay 拒收
+- **結案退回的自動解鎖是永久的**:`close_unlocked` 沒有任何地方會設回 false,被退回過一次的結案從此不受期限約束(仍在逾期清單裡供追蹤)。這是 D-05 字面上的意思,但等於期限有一條誰都能走的路;若承辦覺得不妥,需要另外定「寬限幾天」的規則
 - 開機的 `/auth/me` 沒有 timeout:後端連上但不回應時,前端會白畫面到 nginx 的 `proxy_read_timeout`(預設 60 秒)才顯示「無法確認登入狀態」。要收的話得先決定 timeout 值(`AbortSignal.timeout`)與失敗文案
 - `c7e...` migration 的 downgrade 會刪除跨學期重複成員資料,部署前需決定是否接受此語意
 - 內層 nginx 信任所有 RFC1918 網段,目前依賴 GCP firewall;正式部署可收窄至 edge/compose 實際來源

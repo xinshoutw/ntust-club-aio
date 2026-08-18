@@ -1,16 +1,19 @@
 import { useState } from 'react'
 import { countText } from '../../lib/counts'
 import { useNavigate } from 'react-router'
-import { App, Button, Checkbox, DatePicker, Input, Modal, Tooltip } from 'antd'
+import { App, Button, Checkbox, DatePicker, Input, Modal, Select, Tooltip } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { DeleteOutlined, DownloadOutlined, EditOutlined, RightOutlined } from '@ant-design/icons'
 import type { Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
+import OptionsError from '../../components/ui/OptionsError'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import { confirmDialog } from '../../lib/confirm'
 import { downloadCsv } from '../../lib/csv'
+import { notFoundText } from '../../lib/selectOptions'
+import { useClubOptions } from '../../api/adminClubs'
 import KindBadge from '../signup/KindBadge'
 import SignupEditModal from './SignupEditModal'
 import {
@@ -46,8 +49,11 @@ function ManageModal({
   const regsQuery = useRegistrations(item.id)
   const regs = regsQuery.data ?? []
   const totalPeople = regs.reduce((s, r) => s + r.count, 0)
-  const { confirm, markAttendance, createSession, deleteSession } = useSignupItemMutations()
+  const { confirm, addRegistration, markAttendance, createSession, deleteSession } = useSignupItemMutations()
   const [editing, setEditing] = useState(false)
+  // 補登:實際到場但沒線上報名的社團,不補的話簽到登錄不了、行政分就少算一場
+  const [walkInClub, setWalkInClub] = useState<number | null>(null)
+  const clubOptions = useClubOptions()
 
   // 場次制(負責人會議):場次清單+逐場簽到;非場次制不發查詢
   const sessionsQuery = useSessions(item.sessionBased ? item.id : undefined)
@@ -191,6 +197,47 @@ function ManageModal({
         <Button size="small" icon={<DownloadOutlined />} onClick={exportCsv}>
           匯出名單
         </Button>
+      </div>
+
+      {/* 補登社團:簽到硬性要求先有報名列,現場來了卻沒線上報名的社團登錄不了(decisions.md DEC-07) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        <Select
+          size="small"
+          showSearch
+          allowClear
+          placeholder="補登未線上報名的社團"
+          style={{ minWidth: 220 }}
+          value={walkInClub}
+          onChange={setWalkInClub}
+          optionFilterProp="label"
+          loading={clubOptions.isPending}
+          notFoundContent={notFoundText(clubOptions, '沒有社團可補登', '社團清單')}
+          options={(clubOptions.data ?? [])
+            .filter((c) => !regs.some((r) => r.clubId === c.id))
+            .map((c) => ({ value: c.id, label: c.name }))}
+        />
+        <Button
+          size="small"
+          disabled={walkInClub == null}
+          loading={addRegistration.isPending}
+          onClick={() => {
+            addRegistration.mutate(
+              { itemId: item.id, clubId: walkInClub as number },
+              {
+                onSuccess: () => {
+                  message.success('已補登')
+                  setWalkInClub(null)
+                },
+                onError: (e) => message.error(e.message),
+              },
+            )
+          }}
+        >
+          補登
+        </Button>
+        {clubOptions.isError && (
+          <OptionsError what="社團清單" error={clubOptions.error} onRetry={() => void clubOptions.refetch()} />
+        )}
       </div>
 
       <LoadingBlock pending={regsQuery.isPending || (item.sessionBased && sessionsQuery.isPending)}>

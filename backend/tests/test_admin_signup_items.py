@@ -410,3 +410,44 @@ async def test_update_item_locks_fields_once_someone_registered(client, db):
         f"{URL}/{item_id}", json={"place": "IB-301"}, headers=csrf_headers(client)
     )
     assert other.status_code == 200
+
+
+async def test_admin_can_add_a_club_that_never_registered(client, db):
+    """實際到場但沒線上報名的社團,簽到登錄不了 → 行政分少算一場(decisions.md DEC-07)。"""
+    await seed(client, db)
+    created = await client.post(URL, json=body(), headers=csrf_headers(client))
+    item_id = created.json()["data"]["id"]
+    walk_in = await make_club(db, name="吉他社")
+
+    resp = await client.post(
+        f"{URL}/{item_id}/registrations",
+        json={"club_id": walk_in.id},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201, resp.text
+
+    rows = (await client.get(f"{URL}/{item_id}/registrations")).json()["data"]
+    assert [(r["club_name"], r["count"], r["confirmed"]) for r in rows] == [("吉他社", 0, True)]
+
+    # 補登過的社團登錄得了簽到 —— 這才是補登的目的(原本卡在「未報名不可簽到」)
+    await db.execute(
+        sa.update(SignupItem)
+        .where(SignupItem.id == item_id)
+        .values(event_at=datetime.now(UTC) - timedelta(days=1))
+    )
+    await db.commit()
+    attend = await client.put(
+        f"{URL}/{item_id}/attendance",
+        json={"club_id": walk_in.id, "attended": True},
+        headers=csrf_headers(client),
+    )
+    assert attend.status_code == 200, attend.text
+
+    dup = await client.post(
+        f"{URL}/{item_id}/registrations",
+        json={"club_id": walk_in.id},
+        headers=csrf_headers(client),
+    )
+    assert dup.status_code == 409
+    # 明說是哪一種 409:靠唯一鍵撞出來的話只會回「資料狀態已變更或重複送出」
+    assert dup.json()["error"] == "該社團已在報名名單中"

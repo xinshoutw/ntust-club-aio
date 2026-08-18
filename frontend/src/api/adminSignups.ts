@@ -303,6 +303,15 @@ export function useSignupItemMutations() {
       }),
     onSuccess: invalidate,
   })
+  // 補登實際到場但沒線上報名的社團(decisions.md DEC-07)
+  const addRegistration = useMutation({
+    mutationFn: ({ itemId, clubId }: { itemId: number; clubId: number }) =>
+      api<null>(`/admin/signup-items/${itemId}/registrations`, {
+        method: 'POST',
+        body: JSON.stringify({ club_id: clubId }),
+      }),
+    onSuccess: invalidate,
+  })
   const confirm = useMutation({
     mutationFn: ({ itemId, clubId }: { itemId: number; clubId: number }) =>
       api<null>(`/admin/signup-items/${itemId}/registrations/${clubId}/confirm`, { method: 'PUT' }),
@@ -334,5 +343,5 @@ export function useSignupItemMutations() {
       api<null>(`/admin/signup-items/${itemId}/sessions/${sessionId}`, { method: 'DELETE' }),
     onSuccess: (_, { itemId }) => invalidateSessions(itemId),
   })
-  return { create, update, confirm, markAttendance, createSession, deleteSession }
+  return { create, update, addRegistration, confirm, markAttendance, createSession, deleteSession }
 }

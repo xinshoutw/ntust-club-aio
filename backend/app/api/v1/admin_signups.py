@@ -34,6 +34,7 @@ from app.schemas.common import ApiResponse
 from app.schemas.signups import (
     AdminSignupItemOut,
     EntryOut,
+    ManualRegistrationIn,
     RegistrationOut,
     SignupItemCreateIn,
     SignupItemUpdateIn,
@@ -289,6 +290,46 @@ async def list_registrations(
         for s in signups
     ]
     return ApiResponse(data=data)
+
+
+@router.post("/{item_id}/registrations", status_code=201)
+async def add_registration(
+    item_id: int,
+    body: ManualRegistrationIn,
+    user: RegAdmin,
+    db: DbDep,
+    request: Request,
+) -> ApiResponse[None]:
+    """補登一個沒有線上報名的社團(decisions.md DEC-07)。
+
+    簽到硬性要求先有 `signups` 列,所以實際到場卻沒報名的社團原本登錄不了,
+    行政分就少算一場。補登的單直接視為已確認(承辦本人在現場點的名),
+    參加人名單留空 —— 系統確實不知道來的是誰,不編造。
+    """
+    item = await db.get(SignupItem, item_id)
+    if item is None:
+        raise not_found("找不到報名活動")
+    club = await db.get(Club, body.club_id)
+    if club is None:
+        raise not_found("找不到社團")
+    # 併發補登與社團自己送出報名會撞唯一鍵;先鎖住這個活動再判定
+    await booking_svc.lock_resource(db, "signup_item", item.id)
+    existing = await db.scalar(
+        sa.select(Signup).where(Signup.item_id == item.id, Signup.club_id == club.id)
+    )
+    if existing is not None:
+        raise conflict("該社團已在報名名單中")
+
+    db.add(Signup(item_id=item.id, club_id=club.id, confirmed=True))
+    audit.record(
+        db,
+        action="signup_added_by_admin",
+        user=user,
+        detail=f"item={item.id};club={club.id}",
+        ip=client_ip(request),
+    )
+    await db.commit()
+    return ApiResponse()
 
 
 @router.put("/{item_id}/registrations/{club_id}/confirm")

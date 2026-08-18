@@ -195,6 +195,12 @@ class SignupItemUpdateIn(BaseModel):
         return v
 
 
+class ManualRegistrationIn(BaseModel):
+    """補登報名:實際到場但沒有線上報名的社團(decisions.md DEC-07)。"""
+
+    club_id: int
+
+
 class AdminSignupItemOut(SignupItemOut):
     """管理端列表:各活動已報名社團數/人數、待確認數。"""
 

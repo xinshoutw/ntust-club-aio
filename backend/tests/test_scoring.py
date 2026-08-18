@@ -106,6 +106,16 @@ class TestOverrides:
         scores = apply_overrides(compute_ad_scores(ScoringInput(has_website=True, merit=3)), {})
         assert total_of(scores) == 8
 
+    def test_total_floored_at_zero(self):
+        """違規扣分壓不到負數(decisions.md DEC-08)。
+
+        負分會透過最佳社團獎 40%/60% 的加權把營運分一起吃掉,不是扣分該有的效果。
+        """
+        heavy = ScoringInput(violation_count=99)
+        scores = apply_overrides(compute_ad_scores(heavy), {})
+        assert sum(s.final for s in scores) < 0  # 逐項加總確實是負的
+        assert total_of(scores) == 0
+
     def test_total_capped_at_100(self):
         """各項滿分合計恰 100;表現優良加分不破頂(2026-07-15 定案)。"""
         closed = tuple(

@@ -178,5 +178,9 @@ def apply_overrides(scores: list[AdScore], overrides: dict[str, float | None]) -
 
 
 def total_of(scores: list[FinalScore]) -> float:
-    """行政資料總分:各項滿分合計恰為 100,加計表現優良後仍以 100 封頂。"""
-    return min(sum(s.final for s in scores), ADMIN_TOTAL_MAX)
+    """行政資料總分:各項滿分合計恰為 100,加計表現優良後仍以 100 封頂。
+
+    違規勸導的扣分可以把總分壓到負數,但**下限為 0**(decisions.md DEC-08)——
+    負分帶進最佳社團獎的 40%/60% 加權會把營運分一起吃掉,不是扣分該有的效果。
+    """
+    return min(max(sum(s.final for s in scores), 0), ADMIN_TOTAL_MAX)

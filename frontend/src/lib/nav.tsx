@@ -126,20 +126,12 @@ const ADMIN_ROOM_ITEM: NavItem = {
 
 // 側欄徽章=待審數(shell 以共用 query 提供;查詢中/失敗不顯示)。
 // 依 permissions 過濾:受限管理員只看得到自己可用的項目(路由另有 gate)。
-// 開放窗外的「固定場地借用」反灰並移至最末組。
+// 「固定場地借用」不隨開放窗反灰 —— 受理期間只擋社團送件,行政端全年都要審得到。
 export function buildAdminNav(
   user: SessionUser | null,
   pendingReview?: number,
   pendingClose?: number,
-  fixedWindow?: FixedWindow,
-  fixedWindowFailed = false,
 ): NavGroup[] {
-  // 同社團端:查詢失敗就讓項目可點,由頁面自己說失敗(見 buildClubNav)
-  const fixedBookingOpen = fixedWindowFailed || (fixedWindow?.open ?? false)
-  const closedHint =
-    fixedWindow?.openFrom && fixedWindow.openUntil
-      ? `未開放申請;受理期間 ${fixedWindow.openFrom} – ${fixedWindow.openUntil}`
-      : '目前未開放申請'
   const groups: NavGroup[] = [
   {
     items: [{ key: 'a-home', label: '總覽', path: '/admin', icon: <DashboardOutlined /> }],
@@ -180,7 +172,8 @@ export function buildAdminNav(
     label: '借用審核',
     items: [
       { key: 'a-booking', label: '臨時場地器材借用', path: '/admin/bookings', icon: <EnvironmentOutlined /> },
-      ...(fixedBookingOpen ? [ADMIN_ROOM_ITEM] : []),
+      // 受理期間外行政端照樣留著:社團送不了新單,承辦仍要審完手上的(decisions.md D-04)
+      ADMIN_ROOM_ITEM,
       // 以下各頁都有自己的權限鍵,由 canAccessAdminPath 逐項過濾(decisions.md D-01)
       { key: 'a-manual', label: '手動借用', path: '/admin/manual-booking', icon: <PlusSquareOutlined /> },
       { key: 'a-venue-rules', label: '場地不開放規則', path: '/admin/venue-rules', icon: <StopOutlined /> },
@@ -217,9 +210,6 @@ export function buildAdminNav(
       { key: 'a-violations', label: '違規管理', path: '/admin/violations', icon: <WarningOutlined /> },
       // 稽核軌跡自側欄移除,入口只留 Header 帳號選單
       { key: 'a-files', label: '檔案管理', path: '/admin/files', icon: <FolderOpenOutlined /> },
-      ...(fixedBookingOpen
-        ? []
-        : [{ ...ADMIN_ROOM_ITEM, disabled: true, disabledHint: closedHint }]),
     ],
   },
   ]

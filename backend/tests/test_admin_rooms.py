@@ -289,3 +289,36 @@ async def test_revoke_frees_the_slot_and_the_quota(client, db):
             f"{URL}/{done.id}/revoke", json={"reason": "x"}, headers=csrf_headers(client)
         )
     ).status_code == 409
+
+
+async def test_review_stays_open_after_the_window_closes(client, db):
+    """受理期間只擋社團送新單:期間結束後承辦仍要審完已收到的單(decisions.md D-04)。
+
+    後端從來沒有在審核端點檢查開放窗,這條測試是那個保證的釘子 ——
+    日後有人「順手」把開放窗檢查加到審核端點,這裡會紅。
+    """
+    from app.models import SystemSetting
+
+    first, second, _ = await seed(client, db)
+    yesterday = date.today() - timedelta(days=1)
+    db.add(
+        SystemSetting(
+            key="fixed_booking_window",
+            value={
+                "open_from": (yesterday - timedelta(days=14)).isoformat(),
+                "open_until": yesterday.isoformat(),
+            },
+        )
+    )
+    await db.commit()
+    assert (await client.get(f"{URL}/window")).json()["data"]["open"] is False
+
+    rows = (await client.get(URL, params={"status": "pending"})).json()["data"]
+    assert [r["id"] for r in rows] == [first.id, second.id]
+
+    ok = await client.post(f"{URL}/{first.id}/approve", headers=csrf_headers(client))
+    assert ok.status_code == 200
+    resp = await client.post(
+        f"{URL}/{second.id}/reject", json={"reason": "時段已配給他社"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200

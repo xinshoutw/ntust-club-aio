@@ -156,63 +156,20 @@ export default function AdminRoomsPage() {
   const [open, setOpen] = useState(false)
   const [page, setPage] = useState(1)
 
-  // 開放窗外不提供審核面板;與側欄反灰共用同一查詢
+  // 受理期間只擋社團送新單,不擋審核:期間結束後承辦仍要審完已收到的單(decisions.md D-04)
   const windowQuery = useAdminFixedWindow()
-  const windowOpen = windowQuery.data?.open === true
-  const listQuery = usePendingRoomBookings({ page, pageSize: PAGE_SIZE }, windowOpen)
+  const windowClosed = windowQuery.data?.open === false
+  const listQuery = usePendingRoomBookings({ page, pageSize: PAGE_SIZE })
   const pending = listQuery.data?.requests ?? []
   const total = listQuery.data?.total ?? 0
 
   // 標出衝突時段(同場地、學期區間重疊、同星期同節次):對上待審單=擇一核准,
   // 對上已核准單=核准必被後端擋下。兩份名單都取全量,否則跨頁或已核准的衝突會漏標
-  const allPendingQuery = useAllPendingRoomBookings(windowOpen)
-  const approvedQuery = useApprovedRoomBookings(windowOpen)
+  const allPendingQuery = useAllPendingRoomBookings()
+  const approvedQuery = useApprovedRoomBookings()
   const conflictSlots = roomConflictSlots(allPendingQuery.data ?? [], approvedQuery.data ?? [])
   const conflictOf = (apiId: number) => (dow: number, period: string) =>
     conflictSlots.get(apiId)?.get(`${dow}|${period}`)
-
-  if (windowQuery.isPending) {
-    return (
-      <div>
-        <PageHeader title="固定場地借用" />
-        <div className="card" style={{ marginTop: 20, padding: '8px 4px' }}>
-          <LoadingBlock pending rows={6} />
-        </div>
-      </div>
-    )
-  }
-
-  // 開放窗查詢失敗不可誤判為「未開放申請」,顯示錯誤與重試
-  if (windowQuery.isError) {
-    return (
-      <div>
-        <PageHeader title="固定場地借用" />
-        <div style={{ marginTop: 20 }}>
-          <QueryError title="受理期間載入失敗" error={windowQuery.error} onRetry={() => windowQuery.refetch()} />
-        </div>
-      </div>
-    )
-  }
-
-  if (!windowOpen) {
-    const w = windowQuery.data
-    return (
-      <div>
-        <PageHeader title="固定場地借用" />
-        <div className="card" style={{ marginTop: 20, padding: '48px 24px', textAlign: 'center' }}>
-          <div style={{ fontSize: 15, fontWeight: 600 }}>目前未開放申請</div>
-          {w?.openFrom && w.openUntil && (
-            <div className="num" style={{ fontSize: 13, color: 'var(--steel)', marginTop: 8 }}>
-              受理期間 {w.openFrom} – {w.openUntil}
-            </div>
-          )}
-          <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 8 }}>
-            可於系統設定調整開放區間
-          </div>
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div>
@@ -224,6 +181,17 @@ export default function AdminRoomsPage() {
           </>
         }
       />
+
+      {/* 受理期間結束後仍要審完手上的單,只是社團送不了新的 —— 說清楚是哪一種 */}
+      {windowClosed && (
+        <div className="card" style={{ marginTop: 20, padding: '12px 20px', fontSize: 13, color: 'var(--steel)' }}>
+          受理期間已結束
+          {windowQuery.data?.openFrom && windowQuery.data.openUntil && (
+            <span className="num">({windowQuery.data.openFrom} – {windowQuery.data.openUntil})</span>
+          )}
+          ,社團無法再送新申請;已收到的申請仍可審核。開放區間可於系統設定調整
+        </div>
+      )}
 
       {/* 衝突標示算不出來時要說,否則畫面與「確實沒有衝突」完全一樣 */}
       {(allPendingQuery.isError || approvedQuery.isError) && (

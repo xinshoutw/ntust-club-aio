@@ -38,10 +38,9 @@ describe('固定場地借用的側欄項目', () => {
     expect(groupOf(nav, 'booking-fixed')).toBe('空間與器材借用')
   })
 
-  test('行政端同一條規則', () => {
-    expect(findItem(buildAdminNav(superUser, 0, 0, { open: false }), 'a-room')?.disabled).toBe(true)
-    const nav = buildAdminNav(superUser, 0, 0, undefined, true)
-    expect(findItem(nav, 'a-room')).toBeDefined()
+  test('行政端不吃開放窗:受理期間只擋社團送件,承辦全年都要審得到', () => {
+    const nav = buildAdminNav(superUser, 0, 0)
     expect(findItem(nav, 'a-room')?.disabled).toBeFalsy()
+    expect(groupOf(nav, 'a-room')).toBe('借用審核')
   })
 })

@@ -6,7 +6,7 @@
 - 臨時借用/器材借用綁定審核通過活動;器材借用區間由活動起訖 ± 工作天緩衝推導
 """
 
-from datetime import date, datetime
+from datetime import date
 
 import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Query, Request
@@ -14,7 +14,6 @@ from fastapi import APIRouter, BackgroundTasks, Query, Request
 from app.api.pagination import Pagination
 from app.core.deps import ClubUser, DbDep, client_ip
 from app.core.errors import conflict, forbidden, not_found, validation_error
-from app.core.semesters import TAIPEI, next_semester_range
 from app.models import (
     Activity,
     Club,
@@ -187,7 +186,7 @@ async def _used_fixed_periods(db, club_id: int, sem_start) -> int:
 async def fixed_window(user: ClubUser, db: DbDep) -> ApiResponse[ClubFixedWindowOut]:
     """開放窗狀態:系統設定的日期區間(open_from/open_until),期間外不受理。"""
     window = await get_setting(db, "fixed_booking_window")
-    sem_start, _ = next_semester_range(datetime.now(TAIPEI).date())
+    sem_start, _ = svc.fixed_target_semester(window)
     return ApiResponse(
         data=ClubFixedWindowOut(
             open=svc.fixed_window_open(window),
@@ -208,7 +207,8 @@ async def fixed_occupancy(
     衝突判定的權威在後端:核准關檢核的就是這三條(送出關只擋不開放規則),
     這支把同一份判定提前讓畫面標示,前端不自行推導(尤其臨時借用要逐日展開,前端做不對)。
     """
-    sem_start, sem_end = next_semester_range(datetime.now(TAIPEI).date())
+    window = await get_setting(db, "fixed_booking_window")
+    sem_start, sem_end = svc.fixed_target_semester(window)
     occupancy = await svc.fixed_occupancy(db, venue_id, sem_start, sem_end)
     return ApiResponse(
         data=[
@@ -278,8 +278,8 @@ async def create_room_booking(
         if error:
             raise validation_error(f"週{'一二三四五六日'[weekday - 1]}:{error}")
 
-    # 申請自動歸屬「下一學期」,起訖快照存入申請單
-    sem_start, sem_end = next_semester_range(datetime.now(TAIPEI).date())
+    # 申請自動歸屬這一輪受理的目標學期(依受理期間結束日推導),起訖快照存入申請單
+    sem_start, sem_end = svc.fixed_target_semester(window)
 
     # 場地不開放規則:臨時借用送出即檢核,固定借用整學期佔用更該檢核
     blocked = await svc.fixed_slots_blocked(

@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime, time, timedelta
 
 import sqlalchemy as sa
 
-from app.core.semesters import TAIPEI
+from app.core.semesters import TAIPEI, next_semester_range
 from app.models import EquipmentLoan, RoomBookingRequest, VenueBooking
 from app.models.enums import BookingStatus, LoanStatus
 from app.services import booking_service
@@ -530,3 +530,24 @@ async def test_phone_character_whitelist(client, db):
         headers=csrf_headers(client),
     )
     assert resp.status_code == 201, resp.text
+
+
+def test_fixed_target_semester_follows_the_intake_window():
+    """開放窗跨學期邊界時,同一輪申請必須全部落在同一個(較後面的)學期。
+
+    115-1 學期是 2026-08-01 起,受理期間 7/25–8/5 剛好跨過去:
+    照「今天」推導的話 7/28 送的單歸 115-1、8/2 送的單歸 115-2,
+    每社 10 節的額度在期間中途重置一次(ISS-33)。
+    """
+    window = {"open_from": "2026-07-25", "open_until": "2026-08-05"}
+    later = (date(2027, 2, 1), date(2027, 7, 31))  # 115-2
+    assert booking_service.fixed_target_semester(window, date(2026, 7, 28)) == later
+    assert booking_service.fixed_target_semester(window, date(2026, 8, 2)) == later
+
+
+def test_fixed_target_semester_never_falls_back_to_a_finished_semester():
+    """期間已過或未設定就以今天推導 —— 顯示用途不該倒退回一個已結束的學期。"""
+    today = date(2027, 3, 1)
+    stale = {"open_from": "2026-07-25", "open_until": "2026-08-05"}
+    assert booking_service.fixed_target_semester(stale, today) == next_semester_range(today)
+    assert booking_service.fixed_target_semester({}, today) == next_semester_range(today)

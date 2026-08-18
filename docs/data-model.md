@@ -246,7 +246,7 @@ approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,�
 - 每社至多 **10 節**(1 節=1 小時);額度以「同一目標學期、狀態非 rejected/cancelled」的時段數合計,審核中與已核准都佔額度
 - **晚間時段(第 10 節及 A–D 節)至少連續 3 節**:合法如 9–A、8–10、A–C、B–D;不合法如 9–10、C–D
 - 多社可申請同時段,衝突由管理員**整單擇一核准**,不存在部分同意
-- `start_date`/`end_date` 是申請時自動歸屬的下一學期起訖快照;場況圖僅在此區間顯示已核准的固定借用,學期結束即不再佔格
+- `start_date`/`end_date` 是申請時自動歸屬的目標學期起訖快照(依受理期間結束日推導,見 `booking_service.fixed_target_semester`);場況圖僅在此區間顯示已核准的固定借用,學期結束即不再佔格
 
 **venue_bookings**(id, club_id NULL, venue_id, activity_id NULL, date, periods varchar(2)[], purpose, phone NULL, status)
 

@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime, time, timedelta
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.semesters import TAIPEI
+from app.core.semesters import TAIPEI, next_semester_range
 from app.models import (
     Activity,
     Club,
@@ -149,6 +149,22 @@ def fixed_window_open(window: dict, now: datetime | None = None) -> bool:
     if not (open_from and open_until):
         return False
     return date.fromisoformat(open_from) <= today <= date.fromisoformat(open_until)
+
+
+def fixed_target_semester(window: dict, now: date | None = None) -> tuple[date, date]:
+    """固定借用這一輪受理的目標學期起訖(含頭含尾)。
+
+    以**受理期間結束日**推導,而不是「今天」:開放窗跨學期邊界時(例 7/25–8/5),
+    按今天推導會讓同一輪申請落到兩個不同學期,每社 10 節的額度跟著重置。
+    一律取較後面的那個學期(decisions.md ISS-33)。
+
+    期間已過或未設定時退回以今天推導 —— 送件本來就會被 `fixed_window_open` 擋下,
+    剩下的顯示用途不該倒退回一個已經結束的學期。
+    """
+    today = now or today_taipei()
+    open_until = window.get("open_until")
+    basis = max(date.fromisoformat(open_until), today) if open_until else today
+    return next_semester_range(basis)
 
 
 # 資源層 advisory lock:序列化「可用量/衝突檢核 → 寫入」的關鍵區段(隨交易釋放)。

@@ -124,4 +124,9 @@ describe('管理員調整', () => {
     }
     expect(totalOf(applyOverrides(computeAdScores(full), {}))).toBe(100)
   })
+  test('行政資料總分下限 0(勸導扣分不讓總分變成負數)', () => {
+    const scores = applyOverrides(computeAdScores({ ...base, violationCount: 10 }), {})
+    expect(scores.find((s) => s.key === 'adj')!.final).toBe(-10)
+    expect(totalOf(scores)).toBe(0)
+  })
 })

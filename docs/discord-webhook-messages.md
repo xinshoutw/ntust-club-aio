@@ -33,7 +33,7 @@
 
 ## 2. 事件與現行文案
 
-44 個事件(6 個依狀態有兩種文案)。目的地未註明者=全域必推 + 該社團有設 webhook 才推。
+45 個事件(6 個依狀態有兩種文案)。目的地未註明者=全域必推 + 該社團有設 webhook 才推。
 
 **公告**
 
@@ -166,6 +166,9 @@ D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政�
   `公告已刪除` / `{title}`
 - **K9 活動草稿刪除** `DELETE /club/activities/{id}`(草稿狀態)· alert
   `活動草稿已刪除` / `{club.name}:{activity.name}`
+- **K10 行政補登報名** `POST /admin/signup-items/{id}/registrations` · announce
+  `學務處已為貴社補登報名` / `{club.name}:{item.name}(現場到場,參加人名單從缺)`
+  —— 社團會在「我的報名」看到一筆自己沒送過的紀錄,不說一聲會像是名單不見了
 
 蓋板只在**切換**時推:同值再送一次不算事件,否則承辦每次存檔都會多推一則。
 逐事件的呼叫點由 `tests/test_gap18_notifications.py` 釘住。

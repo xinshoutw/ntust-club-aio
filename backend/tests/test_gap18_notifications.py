@@ -193,6 +193,36 @@ async def test_k5_attendance_notifies_the_club(client, db, monkeypatch):
     assert spy.titles() == ["報名簽到已取消"]
 
 
+async def test_backfilled_registration_tells_the_club(client, db, monkeypatch):
+    """社團會在「我的報名」看到一筆自己沒送過的紀錄,不說一聲會像是名單不見了。"""
+    spy = Spy(monkeypatch)
+    club = await make_club(db, name="吉他社")
+    await make_user(db, username="regadmin", role="admin", permissions=["asignup"])
+    await login(client, "regadmin")
+    now = datetime.now(UTC)
+    item = SignupItem(
+        name="社團負責人會議",
+        kind=SignupKind.LEADER_MEETING,
+        event_at=now - timedelta(days=1),
+        signup_start=now - timedelta(days=30),
+        signup_end=now - timedelta(days=2),
+        max_participants=5,
+        fields=[],
+        created_by=1,
+    )
+    db.add(item)
+    await db.commit()
+    await db.refresh(item)
+
+    resp = await client.post(
+        f"/api/v1/admin/signup-items/{item.id}/registrations",
+        json={"club_id": club.id},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201, resp.text
+    assert spy.titles() == ["學務處已為貴社補登報名"]
+
+
 async def test_k6_k7_k8_announcement_takeover_and_delete(client, db, monkeypatch):
     """蓋板會擋住每個社團的畫面,開關與刪除都只推全域。"""
     spy = Spy(monkeypatch)

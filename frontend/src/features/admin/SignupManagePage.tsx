@@ -12,6 +12,7 @@ import StatusPill from '../../components/ui/StatusPill'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import { confirmDialog } from '../../lib/confirm'
 import { downloadCsv } from '../../lib/csv'
+import { signupCsvRows } from './signupCsv'
 import { notFoundText } from '../../lib/selectOptions'
 import { useClubOptions } from '../../api/adminClubs'
 import KindBadge from '../signup/KindBadge'
@@ -95,28 +96,7 @@ function ManageModal({
       message.error('尚無報名名單可匯出')
       return
     }
-    downloadCsv(`報名名單_${item.name}.csv`, [
-      [
-        '社團',
-        ...(item.isEval ? ['參賽獎項'] : []),
-        '姓名',
-        '學號',
-        '系級',
-        ...item.fields.map((f) => f.label),
-        '報名狀態',
-      ],
-      ...regs.flatMap((r) =>
-        r.participants.map((p) => [
-          r.club,
-          ...(item.isEval ? [r.awards.join('、')] : []),
-          answerText(p.name),
-          answerText(p.studentId),
-          answerText(p.dept),
-          ...item.fields.map((f) => answerText(p[f.key])),
-          r.confirmed ? '已確認' : '待確認',
-        ]),
-      ),
-    ])
+    downloadCsv(`報名名單_${item.name}.csv`, signupCsvRows(item, regs))
     message.success(`已匯出 ${totalPeople} 名參加人`)
   }
 

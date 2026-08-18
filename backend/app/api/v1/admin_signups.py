@@ -321,6 +321,7 @@ async def add_registration(
     user: RegAdmin,
     db: DbDep,
     request: Request,
+    background: BackgroundTasks,
 ) -> ApiResponse[None]:
     """補登一個沒有線上報名的社團(decisions.md DEC-07)。
 
@@ -351,6 +352,15 @@ async def add_registration(
         ip=client_ip(request),
     )
     await db.commit()
+    # 社團會在「我的報名」看到一筆自己沒送過的紀錄:不說一聲的話,
+    # 從它的角度像是自己報過名而名單不見了
+    background.add_task(
+        notify.club_event,
+        "announce",
+        "學務處已為貴社補登報名",
+        f"{club.name}:{item.name}(現場到場,參加人名單從缺)",
+        club.discord_webhook_url,
+    )
     return ApiResponse()
 
 

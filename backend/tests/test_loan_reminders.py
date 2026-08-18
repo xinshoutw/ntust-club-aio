@@ -3,7 +3,7 @@
 逾期判定成立後寄第一封,之後每 REMIND_EVERY_WORKDAYS 個上班日重寄,寄到歸還為止。
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import pytest
 
@@ -36,7 +36,7 @@ async def _overdue_loan(db, *, days_ago: int = 5, emails: list[str] | None = Non
     eq = Equipment(name="帳篷", total_qty=10)
     db.add(eq)
     await db.flush()
-    today = datetime.now(UTC).date()
+    today = date.today()
     loan = EquipmentLoan(
         club_id=club.id,
         equipment_id=eq.id,
@@ -85,7 +85,7 @@ async def test_skips_loans_that_are_not_overdue_yet(db, _mute_notify):
     eq = Equipment(name="桌遊", total_qty=5)
     db.add(eq)
     await db.flush()
-    today = datetime.now(UTC).date()
+    today = date.today()
     db.add(
         EquipmentLoan(
             club_id=club.id,
@@ -142,7 +142,7 @@ async def test_manual_booking_without_club_is_not_reminded(db, _mute_notify):
     eq = Equipment(name="延長線", total_qty=3)
     db.add(eq)
     await db.flush()
-    today = datetime.now(UTC).date()
+    today = date.today()
     db.add(
         EquipmentLoan(
             club_id=None,

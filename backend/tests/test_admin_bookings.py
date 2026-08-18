@@ -1,6 +1,6 @@
 """臨時場地與器材借用審核(/admin,權限鍵 abooking)+ 全校單日場況與逾期列表。"""
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 
 import sqlalchemy as sa
 
@@ -287,7 +287,7 @@ async def test_equipment_overdue_filter(client, db):
     club, _ = await seed(client, db)
     eq = await make_equipment(db, name="麥克風", total_qty=9)
     activity = await make_activity(db, club)
-    today = datetime.now(UTC).date()
+    today = date.today()
 
     rows = [
         # 結束日 10 天前仍未歸還 → 逾期

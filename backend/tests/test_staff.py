@@ -1,6 +1,6 @@
 """工讀生端(/staff/*):違規開立/查詢、器材借出/歸還點交、逾期追蹤。"""
 
-from datetime import UTC, datetime, timedelta
+from datetime import date, timedelta
 
 import sqlalchemy as sa
 
@@ -38,7 +38,7 @@ async def make_loan(
     eq = Equipment(name=eq_name, total_qty=10, needs_serial=needs_serial)
     db.add(eq)
     await db.flush()
-    today = datetime.now(UTC).date()
+    today = date.today()
     loan = EquipmentLoan(
         club_id=club_id,
         equipment_id=eq.id,
@@ -252,7 +252,7 @@ async def test_file_violation_validation(client, db):
 
 async def test_loan_lists_and_overdue_filter(client, db):
     _, club = await seed(client, db)
-    today = datetime.now(UTC).date()
+    today = date.today()
     approved, _ = await make_loan(
         db, club.id, eq_name="帳篷",
         start=today + timedelta(days=1), end=today + timedelta(days=3),
@@ -433,7 +433,7 @@ async def test_checkin_flow(client, db, monkeypatch):
 
 async def test_staff_remind(client, db, monkeypatch):
     _, club = await seed(client, db)
-    today = datetime.now(UTC).date()
+    today = date.today()
     loan, _ = await make_loan(
         db, club.id, status="checked_out", eq_name="遮陽棚",
         start=today - timedelta(days=12), end=today - timedelta(days=10), borrower="王網球",

@@ -1,6 +1,6 @@
 """逾期提醒與停權管理(僅最高權限):remind / suspend / 解除停權。"""
 
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 
 import sqlalchemy as sa
 
@@ -32,7 +32,7 @@ async def make_checked_out_loan(db, club, *, status="checked_out", eq_name="帳�
     eq = Equipment(name=eq_name, total_qty=5)
     db.add_all([activity, eq])
     await db.flush()
-    today = datetime.now(UTC).date()
+    today = date.today()
     loan = EquipmentLoan(
         club_id=club.id, equipment_id=eq.id, activity_id=activity.id, qty=2,
         start_date=today - timedelta(days=12), end_date=today - timedelta(days=10),
@@ -115,7 +115,7 @@ async def test_remind_notifies_and_audits(client, db, monkeypatch):
 
 async def test_suspend_and_lift(client, db):
     club = await seed(client, db)
-    until = (datetime.now(UTC).date() + timedelta(days=30)).isoformat()
+    until = (date.today() + timedelta(days=30)).isoformat()
 
     # 原因必填;截止日不可早於今天
     resp = await client.post(

@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 
 import pytest
 import sqlalchemy as sa
@@ -926,7 +926,7 @@ async def test_loan_overdue_flag(client, db):
     club = await setup_session(client, db)
     eq = await make_equipment(db, name="麥克風", total_qty=2)
     activity = await make_activity(db, club)
-    yesterday = datetime.now(UTC).date() - timedelta(days=10)
+    yesterday = date.today() - timedelta(days=10)
     db.add(
         EquipmentLoan(
             club_id=club.id,

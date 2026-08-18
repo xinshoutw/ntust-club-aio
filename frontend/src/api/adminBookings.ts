@@ -299,20 +299,21 @@ interface FixedWindowOut {
   open: boolean
   open_from: string | null
   open_until: string | null
+  state: FixedWindow['state']
 }
 
-/** 固定借用開放窗(行政端):未開放時側欄「固定場地借用」反灰置底;
- *  AdminShell 與 AdminRoomsPage 共用同一查詢;一般 admin 即可讀,不綁 aroom */
-export function useAdminFixedWindow(enabled = true) {
+/** 固定借用受理期間(行政端):**只供頁面上方的說明橫幅**。
+ *  期間不擋審核(decisions.md D-04),側欄與清單都不吃它;一般 admin 即可讀,不綁 aroom */
+export function useAdminFixedWindow() {
   return useQuery({
     queryKey: keys.fixedWindow,
-    enabled,
     queryFn: () =>
       api<FixedWindowOut>('/admin/room-bookings/window').then(
         (w): FixedWindow => ({
           open: w.open,
           openFrom: w.open_from ? toDisplayDate(w.open_from) : undefined,
           openUntil: w.open_until ? toDisplayDate(w.open_until) : undefined,
+          state: w.state,
         }),
       ),
   })
@@ -362,10 +363,9 @@ export function usePendingEquipmentLoans(p: PendingListParams) {
   })
 }
 
-export function usePendingRoomBookings(p: PendingListParams, enabled = true) {
+export function usePendingRoomBookings(p: PendingListParams) {
   return useQuery({
     queryKey: keys.roomBookings(p),
-    enabled,
     queryFn: () =>
       apiPaged<AdminRoomBookingOut[]>(
         `/admin/room-bookings${qs({ status: 'pending', page: p.page, page_size: p.pageSize })}`,

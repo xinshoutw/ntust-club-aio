@@ -142,6 +142,9 @@ class FixedWindowOut(BaseModel):
     open: bool
     open_from: date | None
     open_until: date | None
+    # 未開放的三種情形要分開說:沒設定 / 還沒開始 / 已結束。
+    # 只給 open=false 的話畫面只能猜,而猜錯就是把「還沒開始」講成「已經結束」
+    state: Literal["unset", "upcoming", "open", "closed"] = "unset"
 
 
 class ClubFixedWindowOut(FixedWindowOut):

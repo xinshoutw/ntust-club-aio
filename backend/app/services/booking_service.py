@@ -138,6 +138,24 @@ def late_rule_error(periods: list[str]) -> str | None:
     return None
 
 
+def fixed_window_state(window: dict, today: date | None = None) -> str:
+    """受理期間狀態:unset(沒設)/ upcoming(還沒開始)/ open / closed(已結束)。
+
+    `fixed_window_open()` 只有真假兩種,而「還沒開始」與「已經結束」對使用者是
+    完全相反的兩句話 —— 說錯的話承辦剛排好下一輪受理期間就會看到「受理期間已結束」。
+    """
+    today = today or today_taipei()
+    open_from = window.get("open_from")
+    open_until = window.get("open_until")
+    if not (open_from and open_until):
+        return "unset"
+    if today < date.fromisoformat(open_from):
+        return "upcoming"
+    if today > date.fromisoformat(open_until):
+        return "closed"
+    return "open"
+
+
 def fixed_window_open(window: dict, now: datetime | None = None) -> bool:
     """固定借用開放窗:日期區間 open_from/open_until(含頭含尾;台北時區)。
 

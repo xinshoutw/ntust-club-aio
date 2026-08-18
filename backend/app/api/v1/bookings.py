@@ -198,6 +198,7 @@ async def fixed_window(user: ClubUser, db: DbDep) -> ApiResponse[ClubFixedWindow
             open=svc.fixed_window_open(window),
             open_from=window.get("open_from"),
             open_until=window.get("open_until"),
+            state=svc.fixed_window_state(window),
             used_periods=await _used_fixed_periods(db, user.club_id, sem_start),
             max_periods=svc.MAX_FIXED_SLOTS,
         )

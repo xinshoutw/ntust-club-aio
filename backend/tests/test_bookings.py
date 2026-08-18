@@ -184,6 +184,7 @@ async def test_room_booking_window_gate(client, db):
         "open": False,
         "open_from": None,
         "open_until": None,
+        "state": "unset",
         "used_periods": 0,
         "max_periods": 10,
     }
@@ -191,6 +192,7 @@ async def test_room_booking_window_gate(client, db):
     await open_fixed_window(db)
     window = (await client.get("/api/v1/club/room-bookings/window")).json()["data"]
     assert window["open"] is True
+    assert window["state"] == "open"
     assert window["open_from"] is not None
     resp = await client.post("/api/v1/club/room-bookings", json=body, headers=csrf_headers(client))
     assert resp.status_code == 201

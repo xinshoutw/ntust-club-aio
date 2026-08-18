@@ -561,3 +561,13 @@ def test_period_axis_matches_the_frontend_sort_rule():
     """
     rank = lambda k: int(k) if k.isdigit() else 100 + ord(k)  # noqa: E731
     assert list(booking_service.PERIODS) == sorted(booking_service.PERIODS, key=rank)
+
+
+def test_fixed_window_state_separates_not_yet_from_already_over():
+    """「還沒開始」與「已經結束」對使用者是相反的兩句話,不能都講成「未開放」。"""
+    window = {"open_from": "2026-09-01", "open_until": "2026-09-15"}
+    assert booking_service.fixed_window_state({}, date(2026, 8, 20)) == "unset"
+    assert booking_service.fixed_window_state(window, date(2026, 8, 20)) == "upcoming"
+    assert booking_service.fixed_window_state(window, date(2026, 9, 1)) == "open"
+    assert booking_service.fixed_window_state(window, date(2026, 9, 15)) == "open"
+    assert booking_service.fixed_window_state(window, date(2026, 9, 16)) == "closed"

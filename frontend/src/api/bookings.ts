@@ -114,6 +114,8 @@ export interface FixedWindow {
   open: boolean
   openFrom?: string
   openUntil?: string
+  /** 未開放的三種情形要分開講:沒設定 / 還沒開始 / 已結束(後端 fixed_window_state) */
+  state: 'unset' | 'upcoming' | 'open' | 'closed'
 }
 
 /** 社團端另帶額度:跨申請單合計,與後端送出檢核同一份判定 */
@@ -126,6 +128,7 @@ interface FixedWindowOut {
   open: boolean
   open_from: string | null
   open_until: string | null
+  state: FixedWindow['state']
   used_periods: number
   max_periods: number
 }
@@ -396,6 +399,7 @@ export function useFixedWindow() {
           open: w.open,
           openFrom: w.open_from ? fromIso(w.open_from) : undefined,
           openUntil: w.open_until ? fromIso(w.open_until) : undefined,
+          state: w.state,
           usedPeriods: w.used_periods,
           maxPeriods: w.max_periods,
         }),

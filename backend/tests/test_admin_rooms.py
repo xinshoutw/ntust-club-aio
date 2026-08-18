@@ -69,7 +69,7 @@ async def test_admin_fixed_window(client, db):
     # 無 aroom 的管理員也讀得到(側欄要用)
     await login(client, "other")
     window = (await client.get(f"{URL}/window")).json()["data"]
-    assert window == {"open": False, "open_from": None, "open_until": None}
+    assert window == {"open": False, "open_from": None, "open_until": None, "state": "unset"}
 
     # 設定開放區間後反映開放狀態
     from datetime import timedelta

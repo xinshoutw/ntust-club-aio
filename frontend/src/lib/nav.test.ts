@@ -23,7 +23,7 @@ const superUser: SessionUser = {
 
 describe('固定場地借用的側欄項目', () => {
   test('開放窗關閉:反灰並附受理期間', () => {
-    const item = findItem(buildClubNav({ open: false, openFrom: '2026/09/01', openUntil: '2026/09/14' }), 'booking-fixed')
+    const item = findItem(buildClubNav({ open: false, state: 'closed', openFrom: '2026/09/01', openUntil: '2026/09/14' }), 'booking-fixed')
     expect(item?.disabled).toBe(true)
     expect(item?.disabledHint).toContain('2026/09/01')
   })

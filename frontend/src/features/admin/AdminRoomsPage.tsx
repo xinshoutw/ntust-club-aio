@@ -8,6 +8,7 @@ import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import { DOW_TEXT } from '../../api/bookings'
+import { intakeNote } from './intakeWindow'
 import {
   CONFLICT_TEXT,
   conflictNote,
@@ -156,9 +157,10 @@ export default function AdminRoomsPage() {
   const [open, setOpen] = useState(false)
   const [page, setPage] = useState(1)
 
-  // 受理期間只擋社團送新單,不擋審核:期間結束後承辦仍要審完已收到的單(decisions.md D-04)
+  // 受理期間只擋社團送新單,不擋審核:期間結束後承辦仍要審完已收到的單(decisions.md D-04)。
+  // 這支查詢只餵下面那條說明橫幅 —— 失敗就不顯示橫幅,清單與審核照常
   const windowQuery = useAdminFixedWindow()
-  const windowClosed = windowQuery.data?.open === false
+  const windowNote = intakeNote(windowQuery.data)
   const listQuery = usePendingRoomBookings({ page, pageSize: PAGE_SIZE })
   const pending = listQuery.data?.requests ?? []
   const total = listQuery.data?.total ?? 0
@@ -182,14 +184,10 @@ export default function AdminRoomsPage() {
         }
       />
 
-      {/* 受理期間結束後仍要審完手上的單,只是社團送不了新的 —— 說清楚是哪一種 */}
-      {windowClosed && (
+      {/* 受理期間不影響審核,只影響社團送不送得了新單 —— 說清楚是哪一種未開放 */}
+      {windowNote && (
         <div className="card" style={{ marginTop: 20, padding: '12px 20px', fontSize: 13, color: 'var(--steel)' }}>
-          受理期間已結束
-          {windowQuery.data?.openFrom && windowQuery.data.openUntil && (
-            <span className="num">({windowQuery.data.openFrom} – {windowQuery.data.openUntil})</span>
-          )}
-          ,社團無法再送新申請;已收到的申請仍可審核。開放區間可於系統設定調整
+          {windowNote}
         </div>
       )}
 

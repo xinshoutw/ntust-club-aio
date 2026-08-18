@@ -24,19 +24,24 @@ from app.services.settings_service import get_setting
 router = APIRouter(prefix="/admin/room-bookings", tags=["admin"])
 
 RoomAdmin = Annotated[CurrentUser, Depends(require_permission("aroom"))]
-# 開放窗查詢供側欄反灰用:一般 admin 即可讀,不綁 aroom(與社團端 /club/room-bookings/window 同形)
+# 受理期間查詢:一般 admin 即可讀,不綁 aroom(與社團端 /club/room-bookings/window 同形)
 AnyAdmin = Annotated[CurrentUser, Depends(require_role(UserRole.ADMIN))]
 
 
 @router.get("/window")
 async def fixed_window(user: AnyAdmin, db: DbDep) -> ApiResponse[FixedWindowOut]:
-    """固定借用開放窗狀態:未開放時行政端側欄項目反灰置底、頁面顯示未開放。"""
+    """固定借用受理期間狀態。
+
+    行政端**不吃這個閘**:期間只擋社團送件,承辦全年都要審得到(decisions.md D-04)。
+    這支只供頁面上方的說明橫幅,說清楚是「還沒開始」還是「已經結束」。
+    """
     window = await get_setting(db, "fixed_booking_window")
     return ApiResponse(
         data=FixedWindowOut(
             open=svc.fixed_window_open(window),
             open_from=window.get("open_from"),
             open_until=window.get("open_until"),
+            state=svc.fixed_window_state(window),
         )
     )
 

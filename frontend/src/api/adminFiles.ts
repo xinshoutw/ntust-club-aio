@@ -25,6 +25,8 @@ export interface FileUsage {
   // 實際磁碟空間:diskTotal ≠ total + diskFree,差額是 OS 與同機其他程式的佔用
   diskTotalMb: number
   diskFreeMb: number
+  /** 使用率分級(decisions.md OPS-07):warn ≥80%、alert ≥90%。alert 時上傳前置閘關閉 */
+  diskLevel: 'ok' | 'warn' | 'alert'
 }
 
 interface FileUsageOut {
@@ -33,6 +35,7 @@ interface FileUsageOut {
   total_size: number
   disk_total: number
   disk_free: number
+  disk_level: 'ok' | 'warn' | 'alert'
 }
 
 export interface StoredFile {
@@ -92,6 +95,7 @@ export function useFileUsage() {
           totalMb: toMb(u.total_size),
           diskTotalMb: toMb(u.disk_total),
           diskFreeMb: toMb(u.disk_free),
+          diskLevel: u.disk_level,
         }),
       ),
   })

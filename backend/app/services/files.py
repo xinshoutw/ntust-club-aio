@@ -47,6 +47,12 @@ _STORAGE_LOCK_KEY = 0x_C1AB_A10_5EC3
 
 _CLUB_FULL = "社團儲存空間額度不足,請先清理檔案或聯絡學務處"
 _SYSTEM_FULL = "系統儲存空間不足,請聯絡學務處"
+_GATE_CLOSED = "系統儲存空間已達告警水位,暫停接受上傳,請聯絡學務處"
+
+# 磁碟使用率門檻(decisions.md OPS-07):80% 警示、90% 告警。
+# DB、log 與上傳檔在同一顆磁碟上,寫滿是整個系統停擺而不只是上傳失敗
+DISK_WARN_RATIO = 0.80
+DISK_ALERT_RATIO = 0.90
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +94,33 @@ def _drop_uncommitted_uploads(session: Session, transaction: SessionTransaction)
 
 def _insufficient(message: str) -> AppError:
     return AppError(507, "INSUFFICIENT_STORAGE", message)
+
+
+def disk_level(usage: shutil._ntuple_diskusage | None = None) -> str:
+    """磁碟使用率分級:ok / warn(≥80%)/ alert(≥90%)。"""
+    du = usage or shutil.disk_usage(upload_root())
+    if not du.total:
+        return "ok"
+    used = (du.total - du.free) / du.total
+    if used >= DISK_ALERT_RATIO:
+        return "alert"
+    if used >= DISK_WARN_RATIO:
+        return "warn"
+    return "ok"
+
+
+def ensure_upload_gate_open() -> None:
+    """上傳前置閘(ISS-43):到達告警水位就不再收新檔。
+
+    容量檢查本質上是 TOCTOU —— 檢查與寫入之間別的上傳照樣在寫。決議不做配額預留
+    (`decisions.md` ISS-43),改以「還離寫滿很遠就放行、接近就一律擋掉」收斂:
+    並發的幾個大檔最多把使用率從 90% 再往上推一點,而不是把磁碟吃到 0。
+
+    這支同時給 nginx 的 auth_request 子請求用:在 Starlette 把 multipart 落到
+    /tmp 之前就回絕,暫存檔完全不落地。
+    """
+    if disk_level() == "alert":
+        raise _insufficient(_GATE_CLOSED)
 
 
 async def storage_usage(db: AsyncSession, club_id: int | None = None) -> int:
@@ -259,6 +292,8 @@ async def save_upload(
     if club_id is not None:
         club_remaining = int(limits["per_club_gib"]) * _GIB - await storage_usage(db, club_id)
 
+    # 前置閘:直呼 API 的上傳不走 nginx 的 auth_request,這裡再擋一次
+    ensure_upload_gate_open()
     disk_root = upload_root()
     # 預檢:無宣告大小時以政策上限保守估計,不等 .part 寫完才發現超額
     declared = upload.size if upload.size else max_size

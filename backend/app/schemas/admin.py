@@ -1,5 +1,6 @@
 import uuid
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -463,6 +464,9 @@ class FileUsageOut(BaseModel):
     # 差額為 OS 與同機其他程式的佔用
     disk_total: int  # 磁碟總量(bytes)
     disk_free: int  # 磁碟可用空間(bytes)
+    # 使用率分級(decisions.md OPS-07):ok / warn ≥80% / alert ≥90%。
+    # alert 時上傳前置閘關閉(ISS-43),畫面要說得出「為什麼傳不上去」
+    disk_level: Literal["ok", "warn", "alert"] = "ok"
 
 
 class AdminFileOut(BaseModel):

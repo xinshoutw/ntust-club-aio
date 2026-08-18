@@ -159,6 +159,25 @@ export default function AdminFilesPage() {
             </div>
           </div>
 
+          {/* 容量水位(decisions.md OPS-07):80% 警示、90% 告警。
+              到告警水位時上傳前置閘會關掉 —— 使用者只會看到「傳不上去」,原因要寫在這裡 */}
+          {usage && usage.diskLevel !== 'ok' && (
+            <div
+              style={{
+                marginTop: 14,
+                padding: '10px 14px',
+                borderRadius: 8,
+                fontSize: 13,
+                background: usage.diskLevel === 'alert' ? '#FDECEA' : '#FFF7E6',
+                color: usage.diskLevel === 'alert' ? '#C13B34' : '#8A5A00',
+              }}
+            >
+              {usage.diskLevel === 'alert'
+                ? '磁碟使用率已達 90%:系統已暫停接受新的上傳,請先清理報修影片或擴充磁碟'
+                : '磁碟使用率已超過 80%:請安排清理或擴充,達 90% 時系統會暫停接受上傳'}
+            </div>
+          )}
+
           {/* 整條=磁碟總量:系統各模組 + DB + 其他佔用(OS/同機程式)+ 可用,比例才對得上 */}
           <div style={{ display: 'flex', gap: 2, marginTop: 16, height: 20, borderRadius: 4, overflow: 'hidden' }}>
             {modules

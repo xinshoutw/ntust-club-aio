@@ -92,6 +92,7 @@ async def usage(user: FilesAdmin, db: DbDep) -> ApiResponse[FileUsageOut]:
             total_size=files_total + db_size,
             disk_total=disk.total,
             disk_free=disk.free,
+            disk_level=file_service.disk_level(disk),
         )
     )
 

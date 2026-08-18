@@ -10,7 +10,7 @@ from app.core.config import settings
 from app.core.errors import AppError
 from app.models import File
 from app.services import files as file_service
-from tests.conftest import login, make_club, make_user
+from tests.conftest import csrf_headers, login, make_club, make_user
 
 PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
 JPG_BYTES = b"\xff\xd8\xff\xe0" + b"\x00" * 64
@@ -494,3 +494,57 @@ async def test_staff_limited_to_duty_files(client, db):
     await login(client, "staff01")
     assert (await client.get(f"/api/v1/files/{passbook.id}")).status_code == 404
     assert (await client.get(f"/api/v1/files/{evidence.id}")).status_code == 200
+
+
+def test_disk_level_thresholds():
+    """OPS-07:80% 警示、90% 告警。門檻是含等於的下界。"""
+    from collections import namedtuple
+
+    du = namedtuple("du", "total used free")
+    assert file_service.disk_level(du(total=1000, used=790, free=210)) == "ok"
+    assert file_service.disk_level(du(total=1000, used=800, free=200)) == "warn"
+    assert file_service.disk_level(du(total=1000, used=899, free=101)) == "warn"
+    assert file_service.disk_level(du(total=1000, used=900, free=100)) == "alert"
+    # 沒有磁碟資訊(total=0)不能誤判成滿載,否則上傳整個關掉
+    assert file_service.disk_level(du(total=0, used=0, free=0)) == "ok"
+
+
+async def test_upload_gate_closes_before_the_body_lands(client, db, monkeypatch):
+    """上傳前置閘(ISS-43):到告警水位就不收新檔,而且擋在 nginx 的子請求上 ——
+    Starlette 還沒把 multipart 落到 /tmp 就已經回絕。"""
+    import io
+    from collections import namedtuple
+
+    du = namedtuple("du", "total used free")
+    club = await make_club(db)
+    await make_user(db, username="club01", club_id=club.id)
+    await login(client, "club01")
+
+    # 水位未到:子請求放行
+    monkeypatch.setattr(
+        file_service.shutil, "disk_usage", lambda _p: du(total=1000, used=500, free=500)
+    )
+    ok = await client.get("/api/v1/auth/precheck", headers=csrf_headers(client))
+    assert ok.status_code == 204
+
+    monkeypatch.setattr(
+        file_service.shutil, "disk_usage", lambda _p: du(total=1000, used=950, free=50)
+    )
+    gate = await client.get("/api/v1/auth/precheck", headers=csrf_headers(client))
+    assert gate.status_code == 507
+    assert "告警水位" in gate.json()["error"]
+
+    # 直呼 API(不經 nginx)的上傳同樣擋得住
+    png = b"\x89PNG\r\n\x1a\n" + b"0" * 64
+    resp = await client.post(
+        "/api/v1/club/maintenance",
+        json={"location": "社辦 B1", "items": "冷氣不冷"},
+        headers=csrf_headers(client),
+    )
+    request_id = resp.json()["data"]["id"]
+    blocked = await client.post(
+        f"/api/v1/club/maintenance/{request_id}/evidence",
+        files={"file": ("a.png", io.BytesIO(png), "image/png")},
+        headers=csrf_headers(client),
+    )
+    assert blocked.status_code == 507

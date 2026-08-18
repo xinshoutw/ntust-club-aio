@@ -20,6 +20,7 @@ from app.schemas.auth import AdminPageOut, ChangePasswordRequest, LoginRequest, 
 from app.schemas.common import ApiResponse
 from app.services import auth as auth_service
 from app.services import booking_service
+from app.services import files as file_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -79,6 +80,8 @@ async def upload_precheck(auth: AuthDep, request: Request) -> Response:
         raise forbidden("CSRF 驗證失敗,請重新整理頁面", code="CSRF_FAILED")
     if user.must_change_password:
         raise forbidden("首次登入請先變更密碼", code="PASSWORD_CHANGE_REQUIRED")
+    # 容量前置閘(ISS-43):磁碟到告警水位就不收新檔,暫存檔連落地都不落地
+    file_service.ensure_upload_gate_open()
     return Response(status_code=204)
 
 

@@ -207,7 +207,7 @@ async def test_deleting_a_draft_is_audited(client, db):
     assert "files=1" in detail
 
 
-async def test_submit_rejects_past_start(client, db):
+async def test_new_application_rejects_past_start_but_a_rejected_one_keeps_its_date(client, db):
     """過去時間全面禁止(2026-07-21):送審/退回重送擋過去開始時刻;草稿不擋。"""
     await setup_session(client, db)
     yesterday = (date.today() - timedelta(days=1)).isoformat()
@@ -235,7 +235,8 @@ async def test_submit_rejects_past_start(client, db):
     )
     assert resp.status_code == 200
 
-    # 退回重送(update 非草稿路徑)同樣擋過去時間
+    # 退回件照原日期重送:活動日期常在審核往返之間就過了,不該逼社團改日期
+    # (decisions.md D-05;新申請仍禁過去,即上面那段)
     await db.execute(sa.update(Activity).where(Activity.id == aid).values(status="rejected"))
     await db.commit()
     resp = await client.put(
@@ -243,12 +244,12 @@ async def test_submit_rejects_past_start(client, db):
         json=payload(date=yesterday),
         headers=csrf_headers(client),
     )
-    assert resp.status_code == 422
-    assert "早於現在" in resp.json()["error"]
-    resp = await client.put(
-        f"/api/v1/club/activities/{aid}", json=payload(date=future), headers=csrf_headers(client)
+    assert resp.status_code == 200
+    resp = await client.post(
+        f"/api/v1/club/activities/{aid}/submit", headers=csrf_headers(client)
     )
     assert resp.status_code == 200
+    assert resp.json()["data"]["date"] == yesterday
 
 
 async def test_club_scoping(client, db):

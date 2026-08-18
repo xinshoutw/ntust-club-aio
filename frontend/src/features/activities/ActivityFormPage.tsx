@@ -236,6 +236,10 @@ function ActivityForm({
     })),
   })
 
+  // 退回件重送不擋過去時刻:活動日期常在審核往返之間就過了(decisions.md D-05)。
+  // 新申請仍禁過去 —— 兩端同一條界線,後端 activities._require_future_start 同理
+  const resubmitting = editing?.status === 'rejected'
+
   const checkTimes = (v: FormValues): boolean => {
     const start = dayjs(`${v.date.format('YYYY/MM/DD')} ${v.startTime.format('HH:mm')}`, 'YYYY/MM/DD HH:mm')
     const end = dayjs(`${v.endDate.format('YYYY/MM/DD')} ${v.endTime.format('HH:mm')}`, 'YYYY/MM/DD HH:mm')
@@ -243,8 +247,8 @@ function ActivityForm({
       message.error('活動結束時間須晚於開始時間')
       return false
     }
-    // 過去時間全面禁止:送出/重送擋過去開始時刻(草稿不走此檢核;後端亦擋)
-    if (start.isBefore(dayjs())) {
+    // 新申請擋過去開始時刻(草稿不走此檢核;後端亦擋)
+    if (!resubmitting && start.isBefore(dayjs())) {
       message.error('活動開始時間早於現在，請調整活動日期與時間')
       return false
     }
@@ -475,7 +479,7 @@ function ActivityForm({
                   <DatePicker
                     style={{ width: '100%' }}
                     format="YYYY/MM/DD"
-                    disabledDate={(d) => d.isBefore(dayjs().startOf('day'))}
+                    disabledDate={(d) => !resubmitting && d.isBefore(dayjs().startOf('day'))}
                   />
                 </Form.Item>
                 <Form.Item
@@ -502,7 +506,7 @@ function ActivityForm({
                     style={{ width: '100%' }}
                     format="YYYY/MM/DD"
                     disabledDate={(d) => {
-                      if (d.isBefore(dayjs().startOf('day'))) return true // 過去日期不可選
+                      if (!resubmitting && d.isBefore(dayjs().startOf('day'))) return true // 新申請不可選過去日期
                       const start = form.getFieldValue('date') as dayjs.Dayjs | undefined
                       return !!start && d.isBefore(start, 'day')
                     }}

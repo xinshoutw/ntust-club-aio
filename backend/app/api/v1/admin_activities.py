@@ -355,6 +355,16 @@ async def approve(
             item = items_by_id.get(approval.item_id)
             if item is None:
                 raise validation_error("核定金額對應的經費項目不存在")
+            # 核定不得高於社團擬請(decisions.md D-03)。前端的 InputNumber max
+            # 只擋鍵入,直接呼叫 API 原本可以填任意金額
+            if approval.approved_subsidy is not None and (
+                approval.approved_subsidy > item.requested_subsidy
+            ):
+                raise validation_error(
+                    f"「{item.category}」核定 {approval.approved_subsidy} 元高於擬請補助"
+                    f" {item.requested_subsidy} 元",
+                    code="APPROVED_OVER_REQUESTED",
+                )
             item.approved_subsidy = approval.approved_subsidy
         if requested_total > 0:
             # 有申請補助:經費來源必填、每個項目都要有核定金額,總額由後端加總

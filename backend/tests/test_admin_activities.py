@@ -67,13 +67,16 @@ async def test_three_stage_flow_with_subsidy(client, db):
         f"/api/v1/admin/activities/{aid}/approve",
         json={
             "fund_source": "學務處經費",
-            "budget": [{"item_id": i["id"], "approved_subsidy": 1000} for i in items],
+            # 核定不得高於各項擬請(decisions.md D-03):照擬請金額全額核定
+            "budget": [
+                {"item_id": i["id"], "approved_subsidy": i["requested_subsidy"]} for i in items
+            ],
         },
         headers=csrf_headers(client),
     )
     assert resp.status_code == 200
     assert resp.json()["data"]["status"] == "pending_chief"
-    assert resp.json()["data"]["approved_total"] == 2000
+    assert resp.json()["data"]["approved_total"] == 2500  # 2000 + 500,兩項各照擬請全額
 
     await login(client, "chief")
     resp = await client.post(
@@ -90,8 +93,66 @@ async def test_three_stage_flow_with_subsidy(client, db):
     records = (await db.scalars(sa.select(ApprovalRecord).order_by(ApprovalRecord.id))).all()
     assert [r.stage for r in records] == ["advisor", "chief", "dean"]
 
-    # 學校核定金額 = 逐項核定總和
-    assert await db.scalar(sa.select(Activity.school_approved).where(Activity.id == aid)) == 2000
+    # 學校核定金額 = 逐項核定總和(2000 + 500,兩項各照擬請全額)
+    assert await db.scalar(sa.select(Activity.school_approved).where(Activity.id == aid)) == 2500
+
+
+async def test_approved_subsidy_cannot_exceed_what_was_requested(client, db):
+    """核定不得高於社團擬請(decisions.md D-03)。
+
+    前端的 InputNumber max 只擋鍵入,直接呼叫 API 原本可以核定任意金額。
+    """
+    await seed(client, db)
+    aid = await submit_activity(client, db)
+    await login(client, "advisor")
+    detail = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]
+    items = detail["budget_items"]
+    smallest = min(items, key=lambda i: i["requested_subsidy"])
+
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/approve",
+        json={
+            "fund_source": "學務處經費",
+            "budget": [
+                {
+                    "item_id": i["id"],
+                    "approved_subsidy": (
+                        i["requested_subsidy"] + 1
+                        if i["id"] == smallest["id"]
+                        else i["requested_subsidy"]
+                    ),
+                }
+                for i in items
+            ],
+        },
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422, resp.text
+    assert resp.json()["meta"]["code"] == "APPROVED_OVER_REQUESTED"
+    # 擋下來就不該留下任何核定值
+    assert await db.scalar(sa.select(Activity.school_approved).where(Activity.id == aid)) is None
+
+    # 等額與少於擬請都放行
+    for amount in (smallest["requested_subsidy"], 0):
+        resp = await client.post(
+            f"/api/v1/admin/activities/{aid}/approve",
+            json={
+                "fund_source": "學務處經費",
+                "budget": [
+                    {
+                        "item_id": i["id"],
+                        "approved_subsidy": (
+                            amount if i["id"] == smallest["id"] else i["requested_subsidy"]
+                        ),
+                    }
+                    for i in items
+                ],
+            },
+            headers=csrf_headers(client),
+        )
+        if resp.status_code == 200:
+            break
+    assert resp.status_code == 200, resp.text
 
 
 async def test_single_stage_without_subsidy(client, db):
@@ -708,7 +769,8 @@ async def test_resubmitting_a_rejected_case_voids_the_previous_decision(client, 
         json={
             "fund_source": "學務處經費",
             "budget": [
-                {"item_id": i["id"], "approved_subsidy": 1000} for i in detail["budget_items"]
+                {"item_id": i["id"], "approved_subsidy": i["requested_subsidy"]}
+                for i in detail["budget_items"]
             ],
         },
         headers=csrf_headers(client),

@@ -15,6 +15,9 @@
 #     docker compose exec -T db pg_restore -U club -d club_aio --clean --if-exists \
 #         < backups/club_aio_2026-08-20.dump
 set -eu
+# 備份是整顆 DB 的明文:郵局戶名與局號帳號、學號、姓名、電話都在裡面。
+# 這個 repo 在別處對同一批欄位很嚴格(連 SQL 參數都不進 log),備份不該例外
+umask 077
 
 BACKUP_DIR=${BACKUP_DIR:-./backups}
 KEEP_DAYS=${KEEP_DAYS:-14}
@@ -25,8 +28,13 @@ DB_NAME=${POSTGRES_DB:-club_aio}
 
 stamp=$(date +%F)
 mkdir -p "$BACKUP_DIR"
+chmod 700 "$BACKUP_DIR"
 target="$BACKUP_DIR/club_aio_$stamp.dump"
 tmp="$target.part"
+# 重導向會在 pg_dump 跑之前就建檔:容器沒起、中途失敗、磁碟滿都會留下半截檔,
+# 而輪替只比對完整 basename(*.dump),半截檔永遠不會被刪 ——
+# 一台正在失敗的機器會被自己的失敗殘骸慢慢寫滿,正是這支腳本要防的那件事
+trap 'rm -f "$tmp"' EXIT
 
 # 寫到 .part 再改名:中途失敗(磁碟滿、容器重啟)不會留下一個看起來完整的半截備份,
 # 而半截備份比沒有備份更危險 —— 要用的時候才發現還不回去
@@ -40,6 +48,7 @@ if [ ! -s "$tmp" ]; then
     exit 1
 fi
 mv "$tmp" "$target"
+trap - EXIT
 echo "$(date -Iseconds) 備份完成 $target ($(wc -c < "$target") bytes)"
 
 # 輪替:先確認今天這份在,再刪舊的

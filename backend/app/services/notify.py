@@ -1,6 +1,7 @@
 """事件通知:Discord webhook(全事件)+ Email(模板待需求方,先提供寄送與留底)。
 
-- Discord:讀 .env DISCORD_WEBHOOK_URL,空值即停用;失敗只記 log,絕不影響業務交易
+- Discord:社團事件只推該社團自設的 webhook(管理項目);`.env` 的 DISCORD_WEBHOOK_URL
+  **專供 infra 告警**(磁碟水位),不再收社團事件與公告。空值即停用;失敗只記 log,絕不影響業務交易
 - Email:aiosmtplib;無 SMTP 憑證時降級 log-only;結果一律寫 email_logs
 - 一律由 FastAPI BackgroundTasks 呼叫(fire-and-forget),不阻塞回應
 - 公告通知:Email 基礎 HTML 模板 + Discord Components V2
@@ -125,15 +126,18 @@ async def discord_to(url: str, kind: str, title: str, description: str = "") -> 
 
 
 async def discord(kind: str, title: str, description: str = "") -> None:
-    """推送到學務處全域 webhook(.env)。"""
+    """推送到 `.env` 的 infra 告警頻道。
+
+    只給不屬於任何社團的維運事件用(目前是磁碟水位告警)。社團事件與公告一律
+    只推該社團自設的 webhook —— 學務處不需要每一則社團通知的副本。
+    """
     await discord_to(settings.discord_webhook_url, kind, title, description)
 
 
 async def club_event(
     kind: str, title: str, description: str = "", club_webhook: str | None = None
 ) -> None:
-    """社團相關事件:推全域 webhook,社團自設 webhook(管理項目)另推一份。"""
-    await discord(kind, title, description)
+    """社團相關事件:只推該社團自設的 webhook(管理項目);沒設就不推。"""
     if club_webhook:
         await discord_to(club_webhook, kind, title, description)
 
@@ -205,14 +209,13 @@ async def announcement_broadcast(
     emails: list[str],
     club_webhooks: list[str],
 ) -> None:
-    """公告發布通知(BackgroundTasks):Email 給目標社團聯絡人、Discord 推全域與社團自設 webhook。
+    """公告發布通知(BackgroundTasks):Email 給目標社團聯絡人、Discord 推目標社團自設 webhook。
 
     收件者於請求交易內解析完成,此處不碰業務 DB(email_logs 留底除外)。
     """
     payload = announcement_components(title, content, date)
     # webhook 執行 Components V2 必須帶 with_components=true,否則 Discord 拒收元件
     v2 = {"with_components": "true"}
-    await _post_webhook(settings.discord_webhook_url, payload, f"announce {title}", params=v2)
 
     html = announcement_email_html(title, content, date)
     plain = f"{title}\n{date}\n\n{content}\n\n-- {SYSTEM_NAME} {SITE_URL}"

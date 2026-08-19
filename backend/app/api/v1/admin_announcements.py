@@ -3,7 +3,7 @@
 - scope:全校 / 多個性質(attrs)/ 單一社團(club_id)
 - 蓋板:takeover_until 期限內社團每次登入全版顯示(顯示邏輯在前端,後端供資料)
 - 通知:notify=true 時 BackgroundTasks 寄 Email(社團聯絡 Email,至多 3 組全寄)
-  並推 Discord(全域 webhook + 目標社團自設 webhook,Components V2 格式)
+  並推 Discord(目標社團自設 webhook,Components V2 格式)
 - 刪除公告記 audit
 """
 

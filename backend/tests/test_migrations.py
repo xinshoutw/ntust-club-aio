@@ -129,10 +129,10 @@ async def test_close_lock_setting_converts_between_months_and_days(migration_db)
             )
         )
 
-    _alembic("upgrade", "head")
+    _alembic("upgrade", "a3f7c2e91b48")
     assert await setting() == [("close_lock_days", 60)]
 
-    _alembic("downgrade", "-1")
+    _alembic("downgrade", "c8b1a5d73f26")
     assert await setting() == [("close_lock_months", 2)]
 
     # downgrade 後新程式又存過一次設定 → 兩鍵並存,再 upgrade 不得撞主鍵
@@ -143,5 +143,5 @@ async def test_close_lock_setting_converts_between_months_and_days(migration_db)
                 " VALUES ('close_lock_days', '45'::jsonb, now(), now())"
             )
         )
-    _alembic("upgrade", "head")
+    _alembic("upgrade", "a3f7c2e91b48")
     assert await setting() == [("close_lock_days", 60)]

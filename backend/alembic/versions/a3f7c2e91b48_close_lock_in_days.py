@@ -30,7 +30,7 @@ def upgrade() -> None:
             """
             UPDATE system_settings
             SET key = 'close_lock_days',
-                value = to_jsonb(GREATEST(1, LEAST(366, (value #>> '{}')::int * :per_month)))
+                value = to_jsonb(GREATEST(1, LEAST(366, (value #>> '{}')::numeric * :per_month))::int)
             WHERE key = 'close_lock_months' AND jsonb_typeof(value) = 'number'
             """
         ),
@@ -51,7 +51,7 @@ def downgrade() -> None:
             UPDATE system_settings
             SET key = 'close_lock_months',
                 value = to_jsonb(
-                    LEAST(6, GREATEST(1, CEIL((value #>> '{}')::numeric / :per_month)::int))
+                    LEAST(6, GREATEST(1, CEIL((value #>> '{}')::numeric / :per_month))::int)
                 )
             WHERE key = 'close_lock_days' AND jsonb_typeof(value) = 'number'
             """

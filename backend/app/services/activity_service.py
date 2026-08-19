@@ -140,7 +140,7 @@ def decorate(out, activity: Activity, lock_days: int) -> None:
     out.semester = semester_of(activity.date) if activity.date else ""
     out.close_locked = is_close_locked(activity, lock_days)
     base = activity.end_date or activity.date
-    out.close_deadline = base + timedelta(days=lock_days) if base else None
+    out.close_deadline = base + timedelta(days=int(lock_days)) if base else None
     out.can_close = can_close(activity, lock_days)
     out.has_close_draft = activity.close_draft is not None
 

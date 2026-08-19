@@ -1,5 +1,5 @@
 // 公告 API 層:總覽公告卡、蓋板公告(TakeoverOverlay)、通知鈴鐺共用同一查詢
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api, apiPaged, qs } from './client'
 
@@ -37,25 +37,30 @@ const toAnnouncement = (a: AnnouncementOut): Announcement => ({
   unread: a.unread,
 })
 
-// 總覽公告卡與鈴鐺共用近 20 筆
-const PAGE_SIZE = 20
+// 總覽公告卡一頁 10 筆;鈴鐺取第 1 頁的最新幾筆
+const PAGE_SIZE = 10
 
 export const announcementKeys = {
   all: ['announcements'] as const,
   list: ['announcements', 'list'] as const,
+  page: (page: number) => ['announcements', 'list', page] as const,
   takeover: ['announcements', 'takeover'] as const,
 }
 
-export function useAnnouncements(enabled = true) {
+/** 第 1 頁與鈴鐺共用同一把 key(鈴鐺只取最新 BELL_COUNT 筆),總覽翻頁才另外發請求。 */
+export function useAnnouncements(enabled = true, page = 1) {
   return useQuery({
-    queryKey: announcementKeys.list,
+    queryKey: announcementKeys.page(page),
     queryFn: () =>
-      apiPaged<AnnouncementOut[]>(`/club/announcements${qs({ page: 1, page_size: PAGE_SIZE })}`).then(
+      apiPaged<AnnouncementOut[]>(`/club/announcements${qs({ page, page_size: PAGE_SIZE })}`).then(
         ({ data, total }) => ({ announcements: data.map(toAnnouncement), total }),
       ),
     enabled,
+    placeholderData: keepPreviousData,
   })
 }
+
+export const ANNOUNCEMENT_PAGE_SIZE = PAGE_SIZE
 
 /**
  * 蓋板公告:後端只回仍在期限內者。不能從「最新 20 筆」裡挑 —— 期限內但被後續

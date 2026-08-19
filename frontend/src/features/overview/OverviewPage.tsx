@@ -7,7 +7,12 @@ import StatusPill from '../../components/ui/StatusPill'
 import Markdown from '../../components/ui/Markdown'
 import AnnouncementModal from '../../components/ui/AnnouncementModal'
 import QueryError from '../../components/ui/QueryError'
-import { useAnnouncements, useMarkAnnouncementsRead, type Announcement } from '../../api/announcements'
+import {
+  ANNOUNCEMENT_PAGE_SIZE,
+  useAnnouncements,
+  useMarkAnnouncementsRead,
+  type Announcement,
+} from '../../api/announcements'
 import { useOverviewActivities, type TrackedItem } from '../../api/overview'
 import {
   useActiveEquipmentLoans,
@@ -17,6 +22,7 @@ import {
 import { useCertificates, useMaintenanceList, usePostalList } from '../../api/applications'
 import './overview.css'
 import { clickableProps } from '../../lib/clickable'
+import { Pager } from '../../components/ui/tableControls'
 
 const countBadge: React.CSSProperties = {
   fontSize: 12,
@@ -45,13 +51,19 @@ function EmptyRow({ text }: { text: string }) {
   )
 }
 
+// 三張卡都可能長到上百列(遷移進來的舊件尤其多),一頁 10 列
+const CARD_PAGE_SIZE = 10
+
 export default function OverviewPage() {
   const navigate = useNavigate()
   const categories = ['活動', '借用', '線上申請'] as const
   const [viewing, setViewing] = useState<Announcement | null>(null)
   const [viewOpen, setViewOpen] = useState(false)
+  const [todoPage, setTodoPage] = useState(1)
+  const [announcementPage, setAnnouncementPage] = useState(1)
+  const [trackedPage, setTrackedPage] = useState(1)
 
-  const announcementsQuery = useAnnouncements()
+  const announcementsQuery = useAnnouncements(true, announcementPage)
   const announcements = announcementsQuery.data?.announcements ?? []
   const announcementTotal = announcementsQuery.data?.total ?? 0
 
@@ -65,6 +77,7 @@ export default function OverviewPage() {
 
   const activitiesQuery = useOverviewActivities()
   const todos = activitiesQuery.data?.todos ?? []
+  const pagedTodos = todos.slice((todoPage - 1) * CARD_PAGE_SIZE, todoPage * CARD_PAGE_SIZE)
 
   // 線上申請近況:與各申請頁共用查詢(近 5 筆)
   const maintenanceQuery = useMaintenanceList()
@@ -132,11 +145,16 @@ export default function OverviewPage() {
         path: '/bookings',
       })),
   ]
-  const tracked = [
-    ...(activitiesQuery.data?.tracked ?? []),
-    ...bookingTracked,
-    ...onlineTracked,
-  ]
+  // 分組只是視覺分隔,切頁以攤平後的順序為準 —— 先分組再切頁會出現有標題沒有列的頁
+  const tracked = categories.flatMap((cat) =>
+    [...(activitiesQuery.data?.tracked ?? []), ...bookingTracked, ...onlineTracked].filter(
+      (t) => t.category === cat,
+    ),
+  )
+  const pagedTracked = tracked.slice(
+    (trackedPage - 1) * CARD_PAGE_SIZE,
+    trackedPage * CARD_PAGE_SIZE,
+  )
 
   // 空分類會被 filter 濾掉,查詢失敗時整個分類會安靜消失 —— 六支一起看載入與錯誤
   const trackedQueries = [
@@ -166,7 +184,7 @@ export default function OverviewPage() {
         <div className="card" style={{ marginTop: 20 }}>
           <CardTitle title="待辦" count={todosLoading || activitiesQuery.isError ? '—' : todos.length} />
           <LoadingBlock pending={todosLoading} rows={2}>
-          {todos.map((t) => (
+          {pagedTodos.map((t) => (
             <div key={t.id} className="todo-row">
               <StatusPill status={t.kind} />
               <div style={{ fontSize: 14, lineHeight: 1.6 }}>
@@ -189,11 +207,11 @@ export default function OverviewPage() {
               </div>
               <div className="todo-action">
                 {t.kind === 'locked' ? (
-                  <Button size="small" style={{ height: 30 }} onClick={() => navigate('/activities')}>
+                  <Button size="small" style={{ height: 30 }} onClick={() => navigate(t.path)}>
                     查看活動
                   </Button>
                 ) : (
-                  <Button type="primary" size="small" style={{ height: 30 }} onClick={() => navigate('/activities')}>
+                  <Button type="primary" size="small" style={{ height: 30 }} onClick={() => navigate(t.path)}>
                     去結案
                   </Button>
                 )}
@@ -206,6 +224,9 @@ export default function OverviewPage() {
             </div>
           )}
           {!activitiesQuery.isError && todos.length === 0 && <EmptyRow text="無待辦事項" />}
+          {todos.length > CARD_PAGE_SIZE && (
+            <Pager page={todoPage} pageSize={CARD_PAGE_SIZE} total={todos.length} onChange={setTodoPage} />
+          )}
           </LoadingBlock>
         </div>
 
@@ -243,6 +264,14 @@ export default function OverviewPage() {
               </div>
             )}
             {!announcementsQuery.isError && announcements.length === 0 && <EmptyRow text="無公告" />}
+            {announcementTotal > ANNOUNCEMENT_PAGE_SIZE && (
+              <Pager
+                page={announcementPage}
+                pageSize={ANNOUNCEMENT_PAGE_SIZE}
+                total={announcementTotal}
+                onChange={setAnnouncementPage}
+              />
+            )}
             </LoadingBlock>
           </div>
 
@@ -255,7 +284,7 @@ export default function OverviewPage() {
               </div>
             )}
             {categories
-              .filter((cat) => tracked.some((t) => t.category === cat))
+              .filter((cat) => pagedTracked.some((t) => t.category === cat))
               .map((cat) => (
                 <Fragment key={cat}>
                   <div
@@ -269,7 +298,7 @@ export default function OverviewPage() {
                   >
                     {cat}
                   </div>
-                  {tracked
+                  {pagedTracked
                     .filter((t) => t.category === cat)
                     .map((t) => (
                       <Link key={t.key} to={t.path} className="tracked-row">
@@ -282,6 +311,14 @@ export default function OverviewPage() {
                 </Fragment>
               ))}
             {trackedErrored.length === 0 && tracked.length === 0 && <EmptyRow text="無進行中的申請" />}
+            {tracked.length > CARD_PAGE_SIZE && (
+              <Pager
+                page={trackedPage}
+                pageSize={CARD_PAGE_SIZE}
+                total={tracked.length}
+                onChange={setTrackedPage}
+              />
+            )}
             </LoadingBlock>
           </div>
         </div>

@@ -80,6 +80,7 @@
 
 - `alembic downgrade base` 在含 seed 資料的庫上會於 venues category CHECK 收窄那一輪失敗;回滾演練請逐版降,不要一路降到 base
 - **跨過遷移的回滾要先 `alembic downgrade` 再換映像**:舊映像的 `upgrade head` 找不到新 revision,backend 直接起不來
+- 結案期限改天制後固定 30 天,月制給的是 28–31 天:切換當下期限最多縮短 2 天,原本剛好在期限邊緣的已核准活動會立刻變成逾期鎖定
 - migration 的 enum 欄位用 `native_enum=False, create_constraint=True`,Alembic 於 `add_column` 時會自動補 CHECK。**不要再顯式補**,會 `DuplicateObject`
 - E2E 必須打 web 容器的 `:8080`,直接打 `:8000` 會繞過 nginx 層的上傳上限、登入限流、`auth_request` 與安全標頭
 

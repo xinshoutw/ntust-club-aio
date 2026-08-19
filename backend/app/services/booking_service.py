@@ -108,12 +108,19 @@ def venue_booking_started_expr(now: datetime | None = None) -> sa.ColumnElement[
     return expr
 
 
-# 「進行中」的三條界線:社團端總覽、行政端社團總覽、固定借用衝突標示共用同一份。
-# 狀態不夠用 —— 借用不會因為日期過了就換狀態,只篩 status 會把整段歷史當成進行中。
+# 「進行中」的界線。狀態不夠用 —— 借用不會因為日期過了就換狀態,
+# 只篩 status 會把整段歷史當成進行中。
+#
+# 每條界線都對齊「那一端還動得了什麼」:清單看不到的單就沒有入口,
+# 所以看得到的範圍必須涵蓋動得了的範圍(見 AGENTS.md「看得到與動得了是兩個判定」)。
+# 固定借用與器材兩端的可動範圍相同,共用一支;臨時借用兩端不同,分兩支。
 
 
 def room_booking_ongoing_expr(now: datetime | None = None) -> sa.ColumnElement[bool]:
-    """固定借用進行中:審核中,或已核准且學期尚未結束。"""
+    """固定借用進行中:審核中,或已核准且學期尚未結束。
+
+    社團端取消與行政端撤銷都擋在 `end_date < today`,兩端同一條界線。
+    """
     return sa.and_(
         RoomBookingRequest.status.in_([BookingStatus.PENDING, BookingStatus.APPROVED]),
         RoomBookingRequest.end_date >= today_taipei(now),
@@ -121,7 +128,24 @@ def room_booking_ongoing_expr(now: datetime | None = None) -> sa.ColumnElement[b
 
 
 def venue_booking_ongoing_expr(now: datetime | None = None) -> sa.ColumnElement[bool]:
-    """臨時借用進行中:審核中或已核准,且申請起始時刻未到。"""
+    """臨時借用未結束:審核中或已核准,且借用日未過。
+
+    行政端「借用中」用這條 —— 與撤銷端點 `date < today` 同一界線。
+    比 upcoming 寬:當天已開始的單社團動不了了,承辦仍可撤銷到當日結束,
+    卡片就必須繼續列出來,否則誤核的單當天就再也解不開。
+    """
+    return sa.and_(
+        VenueBooking.status.in_([BookingStatus.PENDING, BookingStatus.APPROVED]),
+        VenueBooking.date >= today_taipei(now),
+    )
+
+
+def venue_booking_upcoming_expr(now: datetime | None = None) -> sa.ColumnElement[bool]:
+    """臨時借用尚未開始:審核中或已核准,且最早節次起點未到。
+
+    社團端「正在申請」用這條 —— 與社團端取消的界線相同(起始時刻一過即不可取消),
+    「正在申請」表內必有取消入口。起點一過即落到「最近申請」。
+    """
     return sa.and_(
         VenueBooking.status.in_([BookingStatus.PENDING, BookingStatus.APPROVED]),
         sa.not_(venue_booking_started_expr(now)),

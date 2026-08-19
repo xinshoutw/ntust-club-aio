@@ -343,7 +343,7 @@ async def list_venue_bookings(
         .where(VenueBooking.club_id == user.club_id)
     )
     if active is not None:
-        ongoing = svc.venue_booking_ongoing_expr()
+        ongoing = svc.venue_booking_upcoming_expr()
         query = query.where(ongoing if active else sa.not_(ongoing))
     if active:
         # 正在申請:借用日早的在前(即將到來優先)

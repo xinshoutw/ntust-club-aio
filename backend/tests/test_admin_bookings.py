@@ -683,3 +683,33 @@ async def test_admin_active_filter_excludes_finished_bookings(client, db):
     }
     resp = await client.get("/api/v1/admin/equipment-loans", params={"active": "false"})
     assert {row["id"] for row in resp.json()["data"]} == {loans["returned"], loans["cancelled"]}
+
+
+async def test_admin_active_keeps_everything_still_revocable(client, db):
+    """看得到的範圍必須涵蓋動得了的範圍:社團總覽是唯一的撤銷入口。
+
+    撤銷擋在「借用日已過」,社團端的 active 卻擋在「最早節次起點已到」——
+    行政端若照抄社團端那條界線,當天開始後到午夜的單就撤銷得了卻找不到入口。
+    """
+    club, _ = await seed(client, db)
+    venue = await make_venue(db)
+    # 今天、第 1 節(08:10 起):跑測試時多半已經開始,社團端視為「已開始」
+    today = VenueBooking(
+        club_id=club.id, venue_id=venue.id, date=date.today(),
+        periods=["1"], purpose="今天已開始", status="approved",
+    )
+    db.add(today)
+    await db.commit()
+    await db.refresh(today)
+
+    listed = (
+        await client.get("/api/v1/admin/venue-bookings", params={"active": "true"})
+    ).json()["data"]
+    assert today.id in {v["id"] for v in listed}, "當天的單還撤銷得了,就不能從卡片上消失"
+
+    resp = await client.post(
+        f"/api/v1/admin/venue-bookings/{today.id}/revoke",
+        json={"reason": "誤核"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200

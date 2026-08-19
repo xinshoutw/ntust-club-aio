@@ -239,7 +239,7 @@ export default function MaintenancePage() {
             // 逐檔上傳:中途失敗時前面幾檔已經上去了,錯誤訊息要說清楚剩下哪些沒傳
             const done = e instanceof PartialUploadError ? e.already.length : 0
             const detail = e instanceof Error ? e.message : '上傳失敗'
-            message.error(done ? `已上傳 ${done} 個檔案,其餘失敗:${detail}` : detail)
+            message.error(done ? `已成功上傳 ${done} 個檔案，其餘失敗:${detail}` : detail)
             throw e
           }
         }}

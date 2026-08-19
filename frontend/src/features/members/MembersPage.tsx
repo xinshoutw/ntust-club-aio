@@ -88,7 +88,7 @@ export default function MembersPage() {
 
   const doImport = () => {
     if (!csvText.trim()) {
-      message.error('請先選擇檔案或貼上內容;格式:姓名,學號,身份[,職稱[,電話]]')
+      message.error('請先選擇檔案或貼上內容。格式：姓名,學號,身份[,職稱[,電話]]')
       return
     }
     importCsv.mutate(
@@ -98,7 +98,7 @@ export default function MembersPage() {
           if (result.errors.length) {
             message.warning(`已匯入 ${result.created + result.updated} 筆;${result.errors[0]} 等 ${result.errors.length} 項問題`)
           } else if (result.created + result.updated === 0) {
-            message.info('內容與名單相同,未有變更')
+            message.info('匯入內容與原名單相同')
           } else {
             message.success(`已匯入 ${result.created + result.updated} 名社員至 ${csvSemester}`)
           }

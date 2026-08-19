@@ -246,7 +246,7 @@ export default function SignupFormPage() {
                     ))}
                     {!item.fields.length && (
                       <div style={{ fontSize: 13, color: 'var(--steel)', gridColumn: '1 / -1' }}>
-                        本活動無需填寫資料,送出即完成報名。
+                        本活動無需填寫資料，送出即完成報名
                       </div>
                     )}
                   </div>

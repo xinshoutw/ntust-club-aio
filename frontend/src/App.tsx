@@ -131,7 +131,7 @@ function AdminPermissionGate() {
       <div className="card" style={{ marginTop: 20, padding: 32, textAlign: 'center' }}>
         <div style={{ fontSize: 15, fontWeight: 600 }}>您沒有此頁面的存取權限</div>
         <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 8 }}>
-          如需使用此功能,請聯絡系統管理員調整帳號權限
+          如需使用此功能，請聯絡系統管理員調整帳號權限
         </div>
       </div>
     )

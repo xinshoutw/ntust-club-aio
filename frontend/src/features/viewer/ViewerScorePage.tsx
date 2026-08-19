@@ -74,10 +74,10 @@ export default function ViewerScorePage() {
     const ordered = [...clubs.slice(idx + 1), ...clubs.slice(0, Math.max(idx, 0))]
     const nextClub = ordered.find((c) => !c.scored && c.clubId !== selectedClubId)
     if (nextClub) {
-      message.success(`已儲存「${savedName}」評分,前往「${nextClub.clubName}」`)
+      message.success(`已儲存「${savedName}」評分，前往「${nextClub.clubName}」`)
       setSelectedClubId(nextClub.clubId)
     } else {
-      message.success(`已儲存「${savedName}」評分,此獎項社團皆已完成評分`)
+      message.success(`已儲存「${savedName}」評分，此獎項社團皆已完成評分`)
       setOpen(false)
     }
   }
@@ -451,7 +451,7 @@ function ScorePanel({
                 <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 500 }}>
                   現場簡報(<span className="num">{PRESENTATION_MAX}</span>)
                   <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: 'var(--steel)' }}>
-                    選填,可於簡報後補登
+                    選填
                   </span>
                 </div>
                 <InputNumber<number>

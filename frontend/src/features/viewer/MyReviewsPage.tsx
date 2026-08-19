@@ -50,7 +50,7 @@ export default function MyReviewsPage() {
                     <div style={{ fontSize: 16, fontWeight: 600 }}>{a.awardName}</div>
                     <div style={{ marginTop: 4, fontSize: 12, color: 'var(--steel)' }}>{a.groupName}</div>
                     <div style={{ marginTop: 8, fontSize: 13, color: 'var(--steel)' }}>
-                      評分細項 <span className="num">{a.items.length}</span> 項,滿分{' '}
+                      評分細項 <span className="num">{a.items.length}</span> 項，滿分{' '}
                       <span className="num">{max}</span>
                       {a.hasPresentation && (
                         <>

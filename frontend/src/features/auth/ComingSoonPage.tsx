@@ -23,7 +23,7 @@ export default function ComingSoonPage() {
       <div className="card" style={{ width: 420, maxWidth: '100%', padding: '40px 36px', textAlign: 'center' }}>
         <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 6 }}>面板尚未開放</div>
         <div style={{ fontSize: 13, color: 'var(--steel)', lineHeight: 1.8 }}>
-          {user?.name} 您好,您的帳號所屬面板仍在建置中
+          {user?.name} 您好，您的帳號所屬面板仍在建置中，更多疑問請洽學務處
         </div>
         <Button
           style={{ marginTop: 20 }}

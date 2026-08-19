@@ -82,7 +82,7 @@ export default function AwardDetailPage() {
     }
     const hash = await sha256(f)
     if ([...sessionHashes.current.values()].includes(hash)) {
-      message.error(`「${f.name}」與已上傳的檔案內容相同,已拒絕重複上傳`)
+      message.error(`「${f.name}」檔案重複`)
       return
     }
     upload.mutate(

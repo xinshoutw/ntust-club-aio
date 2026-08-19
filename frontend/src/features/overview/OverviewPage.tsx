@@ -172,7 +172,7 @@ export default function OverviewPage() {
               <div style={{ fontSize: 14, lineHeight: 1.6 }}>
                 {t.kind === 'locked' ? (
                   <>
-                    「{t.name}」應於 <span className="num">{t.deadline}</span> 前結案,現已鎖定;請洽課外活動指導組解鎖
+                    「{t.name}」應於 <span className="num">{t.deadline}</span> 前結案，已被鎖定。更多疑問請洽學務處
                   </>
                 ) : (
                   <>

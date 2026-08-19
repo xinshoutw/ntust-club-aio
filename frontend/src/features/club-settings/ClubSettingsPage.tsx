@@ -153,7 +153,7 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
         // 首登強制改密等使用者旗標可能變動,原地更新 auth context
         void refresh()
       }
-      message.success(changingPw ? '設定已儲存,密碼已更新' : '設定已儲存')
+      message.success(changingPw ? '已儲存設定，密碼已更新' : '設定已儲存')
     } catch (e) {
       // 簡介儲存成功、密碼失敗時:簡介基準已前移,僅密碼欄維持 dirty
       message.error(e instanceof Error ? e.message : '儲存失敗')
@@ -332,7 +332,7 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
                     }
                     return PASSWORD_RULE.test(v)
                       ? Promise.resolve()
-                      : Promise.reject(new Error('新密碼須至少 10 碼,含大小寫字母、數字與特殊符號'))
+                      : Promise.reject(new Error('新密碼含大小寫字母、數字與特殊符號，長度至少 10 碼'))
                   },
                 }),
               ]}

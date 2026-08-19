@@ -69,15 +69,15 @@ function ManageModal({
 
   const onRemove = (r: Registration) =>
     confirmDialog(modal, {
-      title: `撤除「${r.club}」的補登?`,
-      content: '這筆報名沒有參加人名單,撤除後該社團可自行線上報名',
-      okText: '撤除',
+      title: `確定刪除「${r.club}」的登記？`,
+      content: '刪除後該社團仍可自行線上報名',
+      okText: '刪除',
       okButtonProps: { danger: true },
       cancelText: '取消',
       onOk: () =>
         removeRegistration.mutate(
           { itemId: item.id, clubId: r.clubId },
-          { onSuccess: () => message.success('已撤除'), onError: (e) => message.error(e.message) },
+          { onSuccess: () => message.success('已刪除'), onError: (e) => message.error(e.message) },
         ),
     })
 
@@ -266,7 +266,7 @@ function ManageModal({
               </div>
             )}
             {!sessionsQuery.isPending && !sessionsQuery.isError && sessions.length === 0 && (
-              <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 8 }}>尚未建立場次,新增場次後即可逐場登錄簽到</div>
+              <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 8 }}>尚未建立場次，新增場次後即可逐場登錄簽到</div>
             )}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <Input
@@ -325,7 +325,7 @@ function ManageModal({
                     簽到
                   </Checkbox>
                 ) : (
-                  <Tooltip title="活動結束後開放登錄簽到">
+                  <Tooltip title="活動尚未開始">
                     <Checkbox disabled>簽到</Checkbox>
                   </Tooltip>
                 )}
@@ -336,13 +336,13 @@ function ManageModal({
                     確認報名
                   </Button>
                 )}
-                {/* 補登的單(沒有參加人名單)才給撤除:選錯社團的話不撤掉就等於
+                {/* 補登的單(沒有參加人名單)才給刪除:選錯社團的話不撤掉就等於
                     讓那個社團永久報不了這個活動(社團端「一經報名不得更改」) */}
                 {r.count === 0 && (
                   <button
                     type="button"
                     className="link-btn danger"
-                    aria-label={`撤除 ${r.club} 的補登`}
+                    aria-label={`刪除 ${r.club} 的登記`}
                     onClick={() => onRemove(r)}
                   >
                     <DeleteOutlined />

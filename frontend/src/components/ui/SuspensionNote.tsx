@@ -11,7 +11,7 @@ export default function SuspensionNote() {
   // 被停權的社團會看到一張完全正常的表單,填完送出才撞 403(正是本元件要避免的事)
   if (failed) {
     return (
-      <span style={{ color: '#C13B34' }}>無法確認停權狀態,若送出後被拒請重新整理頁面</span>
+      <span style={{ color: '#C13B34' }}>無法確認停權狀態，若送出後被拒請重新整理頁面</span>
     )
   }
   if (!suspended) return null
@@ -19,7 +19,7 @@ export default function SuspensionNote() {
     <Tooltip title={reason || undefined}>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
         <StatusPill status="suspended" />
-        停權至 {until},暫停借用申請
+        停權至 {until}，暫停借用申請
       </span>
     </Tooltip>
   )

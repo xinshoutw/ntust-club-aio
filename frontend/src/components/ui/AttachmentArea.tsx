@@ -79,7 +79,7 @@ export default function AttachmentArea({
         }
         const hash = await sha256(f)
         if (valueRef.current.some((b) => b.hash === hash)) {
-          message.error(`「${f.name}」與已加入的檔案內容相同,已拒絕重複上傳`)
+          message.error(`「${f.name}」檔案重複`)
           return
         }
         commit([...valueRef.current, { key: `bag${++bagSeq}`, file: f, hash }])

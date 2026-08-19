@@ -284,7 +284,7 @@ function CloseForm({
           photosRef.current.some((p) => p.hash === hash) ||
           existingRef.current.some((p) => p.hash === hash)
         ) {
-          message.error(`「${f.name}」與已選照片內容相同,已略過`)
+          message.error(`「${f.name}」檔案重複`)
           return
         }
         const item: PhotoBag = { key: ++photoKeyRef.current, file: f, url: URL.createObjectURL(f), hash }
@@ -369,7 +369,7 @@ function CloseForm({
 
   const submit = async () => {
     if (processing > 0) {
-      message.error('照片處理中,請稍候再送出')
+      message.error('照片處理中，請稍候再送出')
       return
     }
     // 除影片連結外全必填:一次收集所有缺漏欄位,全部標紅框,訊息提示第一項
@@ -455,7 +455,7 @@ function CloseForm({
       // 送出 → closing_pending_advisor;成果報告/心得 PDF 由後端依模板於下載時生成
       await submitClose(activity.id, body)
       invalidate()
-      message.success('結案已送出,等待審核')
+      message.success('已送出結案，等待審核')
       onDone()
     } catch (e) {
       await Promise.allSettled(uploaded.map((id) => deleteActivityPhoto(activity.id, id)))

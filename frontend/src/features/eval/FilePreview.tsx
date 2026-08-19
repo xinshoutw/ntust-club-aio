@@ -60,7 +60,7 @@ function DocView({ file }: { file: EvalFile }) {
   if (!file.raw) {
     return (
       <Center>
-        {file.url ? '此文件無法線上預覽,請下載後檢視' : '示意檔案無實際內容;實際上傳的 .docx 可在此預覽'}
+        {file.url ? '此文件無法線上預覽，請下載後檢視' : '純示意檔案'}
         <DownloadLink file={file} />
       </Center>
     )

@@ -305,6 +305,10 @@ function CloseReviewModal({
 
 export default function CloseReviewPage() {
   const { message } = App.useApp()
+  const { user } = useAuth()
+  // 解鎖是本頁唯一只認 aclose 的動作(核准/退回另有 approve_advisor 這條路,
+  // decisions.md D-08);持 approve_advisor 而無 aclose 的帳號進得了頁,按下去必 403
+  const canUnlock = !!user && (user.isSuper || user.permissions.includes('aclose'))
   const [selected, setSelected] = useState<AdminActivity | null>(null)
   const [open, setOpen] = useState(false)
   // 逾期列另開 ActivityReviewModal(唯讀活動詳情),與待審結案的 CloseReviewModal 各自獨立
@@ -474,7 +478,7 @@ export default function CloseReviewPage() {
                     <StatusPill status={l.closeLocked ? 'locked' : 'unlocked'} />
                   </td>
                   <td className="r">
-                    {l.closeLocked && (
+                    {l.closeLocked && canUnlock && (
                       <Button
                         size="small"
                         style={{ height: 28 }}

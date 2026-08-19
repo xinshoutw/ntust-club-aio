@@ -50,7 +50,9 @@ export default function Sidebar({ groups, onNavigate }: SidebarProps) {
               // 未開放的功能反灰、不可點(如固定場地借用於開放期外)
               <Tooltip key={item.key} title={item.disabledHint} placement="right">
                 <span className="sidebar-item disabled" aria-disabled="true">
-                  <span className="sidebar-item-icon">{item.icon}</span>
+                  <span className="sidebar-item-icon" aria-hidden="true">
+                  {item.icon}
+                </span>
                   <span className="sidebar-item-label">{item.label}</span>
                 </span>
               </Tooltip>
@@ -62,7 +64,9 @@ export default function Sidebar({ groups, onNavigate }: SidebarProps) {
                 className={({ isActive }) => `sidebar-item${isActive ? ' active' : ''}`}
                 onClick={(e) => onItemClick(e, item.path)}
               >
-                <span className="sidebar-item-icon">{item.icon}</span>
+                <span className="sidebar-item-icon" aria-hidden="true">
+                  {item.icon}
+                </span>
                 <span className="sidebar-item-label">{item.label}</span>
                 {item.badge != null && item.badge > 0 && (
                   // role=generic 禁止 aria-label(規範上會被丟掉),給它 img 才命名得了;

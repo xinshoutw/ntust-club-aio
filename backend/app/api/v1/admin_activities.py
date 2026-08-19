@@ -43,7 +43,7 @@ _STAGE_BY_STATUS = {
 _STAGE_LABEL = {"advisor": "承辦人", "chief": "組長", "dean": "學務長"}
 
 # aclose=結案審核頁:僅持該鍵的帳號也需要讀列表/詳情(動作端點另有各自關卡檢查),
-# 但視野僅限結案範圍(_visible_statuses),不得看到申請中/已退回等非結案狀態
+# 但視野僅限結案範圍(svc.visible_statuses),不得看到申請中/已退回等非結案狀態
 _FULL_VIEW_KEYS = svc.FULL_VIEW_KEYS
 _REVIEW_PAGE_KEYS = (*_FULL_VIEW_KEYS, "aclose")
 _REVIEW_KEYS = (*_REVIEW_PAGE_KEYS, "approve_advisor", "approve_chief", "approve_dean")

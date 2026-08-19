@@ -52,10 +52,9 @@ FULL_VIEW_KEYS = ("areview",)
 
 
 def visible_statuses(user) -> set[ActivityStatus] | None:
-    """受限關卡帳號只看得到自己關卡相關的狀態;None=不限(super 或持活動審核頁權限)。
+    """受限關卡帳號**看得到**哪些狀態;None=不限(super 或持活動審核頁權限)。
 
-    列表、詳情與側欄徽章共用同一份 —— 徽章算了看不到的狀態,就等於把無權過問的
-    件數揭露給該帳號,而且點進去的筆數會對不上。
+    列表與詳情用它。側欄徽章要的是「簽得下去」而非「看得到」,走 `actionable_statuses`。
     """
     if user.is_super or any(k in user.permissions for k in FULL_VIEW_KEYS):
         return None

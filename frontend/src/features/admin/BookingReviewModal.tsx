@@ -221,7 +221,7 @@ export default function BookingReviewModal({
         onCancel={closeReason}
       >
         <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 8 }}>
-          {reasonMode === 'revoke' ? '撤銷原因(必填,通知社團)' : '退回原因(必填,通知社團)'}
+          {reasonMode === 'revoke' ? '撤銷原因' : '退回原因'}
         </div>
         <Input.TextArea
           autoFocus

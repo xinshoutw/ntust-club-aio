@@ -44,7 +44,8 @@ uv run python ../migration/cc_import.py            # 4. 匯入借用
 ## 範圍與對映(2026-07-21 需求方拍板)
 
 > **遷移範圍限 114-1 / 114-2 / 115-1 三學期,社員名單全遷**(decisions.md MIG-08)。
-> 兩支腳本目前尚未實作學期過濾,見 `docs/gaps.md` MIG-09。
+> `cms_import.py` 依 `SCOPE_SEMESTERS` 過濾活動與公告(換學年只改這個常數);
+> 借用資料是否同受此限制未定,見 `docs/gaps.md` MIG-10。
 
 | 舊 | 新 | 說明 |
 |---|---|---|
@@ -80,5 +81,4 @@ uv run python ../migration/cc_import.py            # 4. 匯入借用
 
 ## TODO
 
-- [ ] 學期過濾(MIG-08 的三學期範圍)尚未實作:活動與公告目前全史匯入(社員名單全遷,不需過濾);借用是否同受限制見 MIG-10
 - [ ] 行政歷史文件(clubrecordfromstaff,7 筆停社/成立/改名申請)如何處理(MIG-10)

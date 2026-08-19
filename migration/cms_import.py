@@ -12,7 +12,7 @@ import asyncio
 import csv
 import os
 import sys
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -26,6 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from app.core.config import settings
 from app.core.db import async_session_factory
 from app.core.security import generate_password, hash_password
+from app.core.semesters import semester_range
 from app.models import (
     Activity,
     ActivityBudgetItem,
@@ -48,6 +49,20 @@ from app.models.enums import (
 )
 
 TAIPEI = ZoneInfo("Asia/Taipei")
+
+# 遷移範圍(decisions.md MIG-08):活動與公告只帶這幾個學期,社員名單全遷。
+# 換學年只改這兩個標籤;起訖由 semester_range 推,不要再自己算日期。
+SCOPE_SEMESTERS = ("114-1", "115-1")
+
+
+def _scope_bounds() -> tuple[datetime, datetime]:
+    """遷移範圍的 timestamptz 半開區間 [start, end),以台北時區日界計。"""
+    start = semester_range(SCOPE_SEMESTERS[0])[0]
+    end = semester_range(SCOPE_SEMESTERS[1])[1] + timedelta(days=1)
+    return (
+        datetime(start.year, start.month, start.day, tzinfo=TAIPEI),
+        datetime(end.year, end.month, end.day, tzinfo=TAIPEI),
+    )
 
 # ---------------------------------------------------------------------------
 # 對映規則
@@ -422,14 +437,17 @@ async def import_members(legacy, db: AsyncSession, ids: IdMap, clubs) -> None:
 
 
 async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None:
+    scope_start, scope_end = _scope_bounds()
     acts = (
         await legacy.execute(
             sa.text(
                 'SELECT id, "Name", "Type", "ExpectedMemberNumber", "ActuallyMemberNumber",'
                 ' "ExpectedNotMemberNumber", "ActuallyNotMemberNumber", "StartTime", "EndTime",'
                 ' "ActuallyStartTime", "ActuallyEndTime", "Location", "Review", "SetupTime",'
-                ' "FinishTime", status, "FK_Club_id" FROM "Club_activity" ORDER BY id'
-            )
+                ' "FinishTime", status, "FK_Club_id" FROM "Club_activity"'
+                ' WHERE "StartTime" >= :start AND "StartTime" < :end ORDER BY id'
+            ),
+            {"start": scope_start, "end": scope_end},
         )
     ).all()
     funds_rows = (
@@ -552,9 +570,14 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
 
 
 async def import_news(legacy, db: AsyncSession, ids: IdMap) -> None:
+    scope_start, scope_end = _scope_bounds()
     rows = (
         await legacy.execute(
-            sa.text('SELECT id, title, url, create_date FROM "Club_news" ORDER BY id')
+            sa.text(
+                "SELECT id, title, url, create_date FROM \"Club_news\""
+                " WHERE create_date >= :start AND create_date < :end ORDER BY id"
+            ),
+            {"start": scope_start, "end": scope_end},
         )
     ).all()
     creator = await db.scalar(

@@ -572,14 +572,13 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
 
 
 async def import_news(legacy, db: AsyncSession, ids: IdMap) -> None:
-    scope_start, scope_end = _scope_bounds()
+    # 公告不套 SCOPE_*:`create_date` 是 Django auto_now_add(貼出來的時刻),
+    # 不是公告的有效期間。舊庫 8 則全在 2017–2023,套學期軸會 100% 濾光,
+    # 而其中「照片請直接上傳」「教育優先區活動須上傳系統」這幾則今天仍然有效。
+    # 8 列也不是量的問題(活動是 14,239→1,495)—— 範圍是為了活動的量而定的。
     rows = (
         await legacy.execute(
-            sa.text(
-                "SELECT id, title, url, create_date FROM \"Club_news\""
-                " WHERE create_date >= :start AND create_date < :end ORDER BY id"
-            ),
-            {"start": scope_start, "end": scope_end},
+            sa.text('SELECT id, title, url, create_date FROM "Club_news" ORDER BY id')
         )
     ).all()
     creator = await db.scalar(

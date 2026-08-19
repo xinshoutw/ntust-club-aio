@@ -54,6 +54,8 @@ export default function ClubCascader({
         label: a,
         children: clubs.filter((c) => attrOf(c) === a).map((c) => ({ value: c.name, label: c.name })),
       }))}
+      // 社團數可破 60:預設彈窗一次只看得到 5 個社團,拉高與縮列距在 index.css 的 .club-cascader-popup
+      classNames={{ popup: { root: 'club-cascader-popup' } }}
     />
   )
 }

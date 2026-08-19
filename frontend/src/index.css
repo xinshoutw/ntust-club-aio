@@ -272,3 +272,14 @@ body {
 .ant-image-preview-wrap .ant-image-preview-img {
   transform-origin: center center !important;
 }
+
+/* 行政端社團選擇器彈窗(ClubCascader):社團數可破 60,預設一次只看得到 5 個。
+   AntD 的 dropdownHeight token 是固定 height,拉高會讓只有幾列的第一層(性質)留一大片空白,
+   所以改成 max-height,並縮小每列上下內距 */
+.club-cascader-popup .ant-cascader-menu {
+  height: auto;
+  max-height: 360px;
+}
+.club-cascader-popup .ant-cascader-menu-item {
+  padding-block: 2px;
+}

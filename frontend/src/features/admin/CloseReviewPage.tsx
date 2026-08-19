@@ -309,6 +309,9 @@ export default function CloseReviewPage() {
   // 解鎖是本頁唯一只認 aclose 的動作(核准/退回另有 approve_advisor 這條路,
   // decisions.md D-08);持 approve_advisor 而無 aclose 的帳號進得了頁,按下去必 403
   const canUnlock = !!user && (user.isSuper || user.permissions.includes('aclose'))
+  // 看得到逾期表的條件比解鎖寬:後端只要求「看得到 approved」,而 areview 也看得到
+  const canSeeOverdue =
+    !!user && (user.isSuper || ['aclose', 'areview'].some((k) => user.permissions.includes(k)))
   const [selected, setSelected] = useState<AdminActivity | null>(null)
   const [open, setOpen] = useState(false)
   // 逾期列另開 ActivityReviewModal(唯讀活動詳情),與待審結案的 CloseReviewModal 各自獨立
@@ -333,7 +336,7 @@ export default function CloseReviewPage() {
     pageSize: PAGE_SIZE,
     // 逾期清單全是 approved:看不到該狀態的帳號送出去只會拿 403,
     // 畫面上就是每次開頁一片紅字。本頁對 approve_advisor 也開放,而它看不到 approved
-    enabled: canUnlock,
+    enabled: canSeeOverdue,
   })
   const { unlock } = useAdminActivityMutations()
 
@@ -369,7 +372,7 @@ export default function CloseReviewPage() {
         sub={
           <>
             待審 <span className="num">{countText(pendingTotal, pendingQuery)}</span> 件
-            {canUnlock && (
+            {canSeeOverdue && (
               <>
                 {' · '}逾期未結案{' '}
                 <span className="num">{countText(overdueTotal, overdueQuery)}</span> 件
@@ -442,7 +445,7 @@ export default function CloseReviewPage() {
 
       {/* 逾期未結案:已鎖定與已解鎖皆列出(狀態欄區分),整列可點開活動詳情。
           整段只給看得到 approved 的帳號 —— 停用的查詢恆為 isPending,留著會永遠鋪 Skeleton */}
-      {canUnlock && (
+      {canSeeOverdue && (
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
         <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>逾期未結案</div>
         <LoadingBlock pending={overdueQuery.isPending}>

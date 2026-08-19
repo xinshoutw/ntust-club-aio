@@ -49,7 +49,10 @@ DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— �
 | **待審筆數徽章** | `GET /badges` 一支端點回該角色所有頁面的待辦數(鍵=前端 nav item key),四端側欄與行政總覽六張卡共用同一份。只有「有時效性或在等使用者下一步」的頁面給數字;行政端依權限鍵過濾 —— 徽章也是資料量 |
 | **Discord 分流** | 社團事件與公告只推各社團自設的 webhook;`.env` 的 `DISCORD_WEBHOOK_URL` 收無社團可推的系統事件(行政手動借用、公告蓋板與刪除、報名場次刪除)與 infra 告警 |
 | **Uptime Kuma 心跳** | 後端 lifespan 每 30 秒推一次(cron 到不了這個粒度):backend 以 `SELECT 1` 的來回當 ping,frontend 由後端探測 web 容器成功才推 up。只在 `ENV=prod` 送出 |
-| **MIG-08** | 遷移範圍限 114-1 / 114-2 / 115-1 三學期,社員名單全遷;media 與舊評鑑檔案庫不遷 |
+| **MIG-08** | 遷移範圍限 114-1 / 114-2 / 115-1 三學期,社員名單全遷;media 與舊評鑑檔案庫不遷。腳本尚未實作過濾(MIG-09) |
+| **簽核關卡授予** | `approve_advisor`/`chief`/`dean` 三把鍵原本沒有任何授予入口(白名單收得下、彈窗畫不出),而 super 不得代簽學務長關 —— 正式庫的第一件有補助活動會卡在 `pending_dean`。`APPROVAL_STAGES` 目錄隨 `/auth/me` 下發,彈窗與頁面權限一起授出 |
+| **權限接管路徑** | `set_permissions` 缺位階檢查:收回不需要自己持有,清空同儕權限後 `_guard_target` 的「對方權限我全都有」變成恆真,接著重設密碼即可登入接管。四個端點現在同一條守衛 |
+| **應用層 log** | uvicorn 只設定自己的 logger,root 停在 WARNING 且無 handler —— 所有 `logger.info` 都是 no-op。`main.py` 補 `basicConfig`,同時把 `httpx` 壓到 WARNING(它在 INFO 記完整 URL,而 Kuma push 尾段與 Discord webhook 路徑都是憑證) |
 
 ## 前一批已完成(文件對齊)
 
@@ -62,7 +65,14 @@ DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— �
 | **ISS-91** | 對齊過程驗出:固定借用審核的衝突標示不含臨時借用,畫面標「無衝突」而核准端會擋 |
 | **頁級缺口** | spec 各頁的零散缺口(建立後不可修改的幾張單、缺索引的查詢、缺篩選入口)收進 `improvements.md`,不再只存在於單頁 spec |
 
-### 交叉審查(3 opus + 1 codex)抓到的
+### 這一批的判斷依據
+
+- **徽章算的是「簽得下去」不是「看得到」**:只持 `areview` 的帳號看得到全部卻一件也簽不了,徽章跟著待審佇列走才不會出現「側欄 5、點進去 0」;差額本身也是它無權過問的件數
+- **同一條規則只留一份字面值**:簽核鍵的白名單與彈窗目錄各寫一次,就會出現「後端收得下、彈窗授不出」;`max_length` 寫死的數字每加一把鍵就少一格,改由白名單大小推導
+- **停用的查詢恆為 `isPending`**:條件式送查詢時,連同它驅動的區塊與標題數字一起收掉,否則永遠鋪著 Skeleton
+- **「看得到」與「動得了」是兩個判定**:結案審核頁的逾期表對 `areview` 開放,解鎖只認 `aclose`
+
+### 更早一批的交叉審查(3 opus + 1 codex)抓到的
 
 四輪審查共 20 條 findings,其中 7 條是這批自己製造或誇大的:
 
@@ -253,7 +263,7 @@ DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— �
 
 ## 驗證現況
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **456 passed**;前端 `pnpm test` → **120 passed**(27 檔)、`pnpm exec tsc -b --force` 0 錯、`pnpm run lint` 8 個既有的 fast-refresh warning
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **464 passed**;前端 `pnpm test` → **120 passed**(27 檔)、`pnpm exec tsc -b --force` 0 錯、`pnpm run lint` 8 個既有的 fast-refresh warning
 - `ruff check . ../migration` 全綠(CI 也 lint `migration/`);測試含 `test_migrations.py`(另開一個庫跑 `alembic upgrade head`,比對欄位、索引名與 CHECK 名 —— 後兩者是子集斷言,擋的是「模型有、revision 漏了」)
 - `git log --all` 確認 `.env` 與 `migration/out` 從未進版控
 - 每一個 commit 都做過 mutation 驗證:把修法改回舊寫法,確認新測試真的會紅

@@ -227,7 +227,7 @@ async def set_permissions(
     # 位階檢查與刪除/停用/重設密碼同一條:少了它,只持 aaccount 的人可以先把同儕的權限
     # 清空(收回不需要自己持有),讓 _guard_target 的「對方權限我全都有」變成恆真,
     # 再去重設對方密碼、拿一次性密碼登入 —— 接管路徑就繞過整組守衛
-    _guard_target(user, target, "設定權限")
+    _guard_target(user, target, "調整")
     # 收回別人的權限不必自己持有,但授出的每一把都必須自己也有
     _check_grantable(user, [k for k in body.permissions if k not in target.permissions])
 

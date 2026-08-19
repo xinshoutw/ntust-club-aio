@@ -10,7 +10,7 @@
 ## 開工前先讀
 
 1. **`docs/HANDOFF.md`** — 現在進行到哪、接下來做什麼。本檔只記永久知識,不記進度
-2. **`docs/spec/README.md`** — 51 頁的逐頁規格索引;動任何一頁前先讀該頁的 spec
+2. **`docs/spec/README.md`** — 逐頁規格索引;動任何一頁前先讀該頁的 spec
 3. **`docs/issues.md`** / **`docs/gaps.md`** — 已知問題與未完成功能,全部尚未修
 
 ## 文件分工
@@ -104,7 +104,7 @@ pnpm run lint
 - 簽核一律寫 `approval_records`;高風險操作 `audit.record`(add 不 commit,隨交易)
 - 事件推 Discord:`notify.club_event` 只推社團自設的 webhook;`notify.discord` 走 `.env` 的 `DISCORD_WEBHOOK_URL`(無社團的系統事件與 infra 告警)
 - 歷史型列表一律分頁 + 排序白名單(主檔與選項端點全量回傳);錯誤用 `core/errors` 工廠
-- 側欄徽章由 `services/badges.py` 一支端點供給(鍵=前端 nav item key),行政端依權限鍵過濾
+- 側欄徽章由 `services/badges.py` 一支端點供給(鍵=前端 nav item key),行政端依權限鍵過濾;申請審核算的是**簽得下去**的關卡(`actionable_statuses`),與待審佇列同一集合
 - 測試:`tests/conftest.py` 於 import app 前切測試庫;factories(`make_club`/`make_user`)、`csrf_headers()`;每測試 TRUNCATE;`asyncio_default_*_loop_scope=session`(連線池綁 loop)。測試庫是 `create_all` 建的,遷移鏈另由 `tests/test_migrations.py` 在獨立庫跑 `upgrade head` 並比對欄位
 
 **前端**
@@ -118,11 +118,21 @@ pnpm run lint
   **晚間節次集合與最少連續節數仍是前後端各一份**(`booking_service.LATE_PERIODS` / `FixedRoomPage.LATE`);
   `VenueCategory` 同樣兩份(`models/enums.py` / `api/adminVenues.ts`,後端是 PG enum,新增值另需 revision)
 
-**修 issues.md 的條目時**(A/B/C 三堆的作業流程,見 `docs/HANDOFF.md`)
+**修 issues.md 的條目時**
 
 - **一項一個 commit**,修完該項就從 `docs/issues.md` 刪掉那一列,並同步 `docs/spec/` 對應頁的「未完成 / 問題」段(修好的敘述要改成正面規則,不是只刪掉)
-- **每一項都要 mutation 驗證**:把修法改回舊寫法,確認新測試真的會紅。前兩批各抓到兩處恆真測試、四個「靠 bug 才通過」的既有測試
-- 交叉審查的提示詞要明確要求兩件事:**找漏掉的同類呼叫點**、**找這批新引入的問題**。四輪下來這兩類佔了 findings 的大半,其中兩輪抓到的是修的過程自己製造的錯
+- **每一項都要 mutation 驗證**:把修法改回舊寫法,確認新測試真的會紅
+- 交叉審查的提示詞必須明確要求兩件事:**找漏掉的同類呼叫點**、**找這批新引入的問題**
+
+**反覆踩到的坑**(逐批審查累積,每一條都真的出過事)
+
+- **同一份判定有幾份要數到底**:前後端各一份、多頁各一份都算。改了一處就 grep 全端,commit message 寫「全部」之前先數一次
+- **拿不到值不要用預設值頂替**:`?? 0`、`'00:00'` 這種會說謊 —— 查詢失敗與「真的是 0」對使用者是兩件事,全站慣例是 `—`
+- **`isError` 有兩種**:`isLoadingError`(首載失敗、手上沒資料)才換錯誤畫面;`isRefetchError` 換掉的是已知事實。`enabled:false` 的查詢恆為 `isPending`,而且不會清掉先前的 error
+- **「看得到」與「動得了」是兩個判定**:一個旗標兼差兩用,不是多擋就是少擋
+- **加鎖會改變鎖序**:加任何列鎖前先確認同一組表在別處的取用順序,否則換來 deadlock
+- **一頁修完要問「另一端有沒有同一份判定」**:社團端與行政端、前端必填與後端 fail-open,常常只修了一半
+- **測不出來就別假裝測得出來**:小表的回傳順序由 planner 決定,那種斷言只能當契約標記
 
 **平行開發**
 
@@ -130,5 +140,5 @@ pnpm run lint
 
 ## Roadmap
 
-- **首頁改導覽頁**:展示所有社團、圖片、介紹,右上角登入鈕進 dashboard。現行 `/` 直接是登入頁為過渡做法
+- **首頁改導覽頁**:展示所有社團、圖片、介紹,右上角登入鈕進 dashboard。現行 `/` 是社團總覽(未登入才轉 `/login`),沒有免登入的入口
 - Telegram Bot 通知(低優先)

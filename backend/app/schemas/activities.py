@@ -15,9 +15,16 @@ class BudgetItemIn(BaseModel):
     requested_subsidy: int = Field(0, ge=0, le=10_000_000)
 
 
-class BudgetItemOut(BudgetItemIn):
+# Out 一律不繼承 In:輸出描述的是「庫裡是什麼」,輸入的長度與範圍限制是「使用者能送什麼」。
+# 兩者混在一起的話,舊系統遷入、或規則收緊之前存下的列會讓讀取端點 500 —— 使用者
+# 什麼都沒做錯,卻連看都看不到(遷移資料實測:71 筆經費明細超過 200 字,最長 633)。
+class BudgetItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    category: str
+    description: str
+    self_fund: int
+    requested_subsidy: int
     id: int
     approved_subsidy: int | None
 
@@ -94,9 +101,14 @@ class ReflectionIn(BaseModel):
     body: str = Field(min_length=1, max_length=5000)
 
 
-class ReflectionOut(ReflectionIn):
+class ReflectionOut(BaseModel):
+    """同 BudgetItemOut:不繼承 In 的長度限制。"""
+
     model_config = ConfigDict(from_attributes=True)
 
+    student_name: str
+    dept: str
+    body: str
     id: int
 
 

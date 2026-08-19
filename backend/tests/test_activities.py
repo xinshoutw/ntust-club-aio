@@ -116,6 +116,33 @@ async def test_negative_amounts_are_rejected_by_the_database(client, db):
         await db.rollback()
 
 
+async def test_reading_tolerates_rows_longer_than_the_input_limit(client, db):
+    """輸出 schema 不得沿用輸入的長度限制:舊系統遷入的明細有 633 字。
+
+    沿用的話使用者什麼都沒做錯,活動卻一點開就 500(遷移資料實測 60 個活動打不開)。
+    """
+    await setup_session(client, db)
+    activity_id = (await create_activity(client))["id"]
+    long_text = "線" * 633  # BudgetItemIn 的上限是 200
+    await db.execute(
+        sa.text("UPDATE activity_budget_items SET description = :d WHERE activity_id = :id"),
+        {"d": long_text, "id": activity_id},
+    )
+    await db.commit()
+
+    resp = await client.get(f"/api/v1/club/activities/{activity_id}")
+    assert resp.status_code == 200
+    assert resp.json()["data"]["budget_items"][0]["description"] == long_text
+
+    # 送件端的限制不受影響:超長仍然擋得住
+    resp = await client.post(
+        "/api/v1/club/activities",
+        json={"name": "超長", "budget_items": [{"category": "印刷費", "description": long_text}]},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+
+
 async def test_budget_category_check_tolerates_legacy_strings(client, db):
     """殘留舊 list[str] 經費科目設定時,建立申請與 /club/config 都不得 500。"""
     await setup_session(client, db)

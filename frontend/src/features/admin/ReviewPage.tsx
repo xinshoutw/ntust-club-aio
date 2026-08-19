@@ -110,6 +110,12 @@ export default function ReviewPage() {
   })
   const pagedRows = listQuery.data?.rows ?? []
   const total = listQuery.data?.total ?? 0
+  // 別關簽掉一件就會讓最近審核少一筆;停在末頁只會看到「無審核紀錄」。
+  // 失敗時 total 也是 0,一起 clamp 會把錯誤說明洗掉,所以只在成功後收斂
+  const listLoaded = listQuery.isSuccess
+  useEffect(() => {
+    if (listLoaded) setPage((p) => clampPage(p, total, RECENT_PAGE_SIZE))
+  }, [listLoaded, total])
 
   // 點列即抓詳情(經費/附件),載入完成後彈窗自動補齊
   const detailQuery = useAdminActivityDetail(current?.activityId)

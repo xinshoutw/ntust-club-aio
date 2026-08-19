@@ -144,7 +144,7 @@ function CloseReviewModal({
               type="primary"
               ref={approveRef}
               style={{ height: 38 }}
-              disabled={!report}
+              disabled={!report || detailQuery.isFetching}
               loading={closeApprove.isPending}
               onClick={submitApprove}
             >

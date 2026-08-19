@@ -50,6 +50,7 @@ const detail: AdminActivityDetail = {
 }
 
 const approve = vi.fn()
+let refetching = false
 
 vi.mock('../../api/adminActivities', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/adminActivities')>()),
@@ -59,7 +60,12 @@ vi.mock('../../api/adminActivities', async (importOriginal) => ({
     isError: false,
     isSuccess: true,
   }),
-  useAdminActivityDetail: () => ({ data: detail, isPending: false, isError: false }),
+  useAdminActivityDetail: () => ({
+    data: detail,
+    isPending: false,
+    isError: false,
+    isFetching: refetching,
+  }),
   useAdminActivityMutations: () => ({
     closeApprove: { mutate: approve, isPending: false },
     closeReject: { mutate: vi.fn(), isPending: false },
@@ -68,6 +74,7 @@ vi.mock('../../api/adminActivities', async (importOriginal) => ({
 }))
 
 const openModal = async () => {
+  approve.mockClear()
   render(
     <App>
       <CloseReviewPage />
@@ -91,6 +98,18 @@ describe('結案審核的繳交確認', () => {
   })
 
   // 承辦勾回去是遷移件唯一的補救路徑:送出的必須是畫面上的值,不是推導值
+  // 補件重送後手上的快取還是舊那份,推導出來的勾選會把新繳的算成沒繳
+  test('詳情還在重抓時不給核准', async () => {
+    refetching = true
+    try {
+      await openModal()
+      const approveBtn = screen.getByRole('button', { name: '核准結案' }) as HTMLButtonElement
+      expect(approveBtn.disabled).toBe(true)
+    } finally {
+      refetching = false
+    }
+  })
+
   test('承辦勾回的項目要真的送出去', async () => {
     await openModal()
 

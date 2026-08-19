@@ -6,8 +6,7 @@ import sqlalchemy as sa
 
 from app.models import AuditLog, Equipment, EquipmentLoan, Violation
 from app.services import notify
-from app.services.activity_service import add_months
-from app.services.violation_service import today_taipei
+from app.services.violation_service import add_months, today_taipei
 from tests.conftest import csrf_headers, login, make_club, make_user
 
 

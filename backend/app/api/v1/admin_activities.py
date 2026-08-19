@@ -236,7 +236,7 @@ async def list_activities(
         if "大型活動" in type_:
             conds.append(_large_condition())
         query = query.where(sa.or_(*conds))
-    lock_months = await get_setting(db, "close_lock_months")
+    lock_days = await get_setting(db, "close_lock_days")
     may_see_approved = visible is None or ActivityStatus.APPROVED in visible
     if (locked or overdue) and not may_see_approved:
         # 逾期未結案全是 approved 狀態。看不到 approved 的帳號(例如只持 approve_advisor)
@@ -246,7 +246,7 @@ async def list_activities(
         # locked 僅未解鎖者,overdue 不分鎖定與否(是否鎖定由回應的 close_locked 區分)
         query = query.where(
             Activity.status == ActivityStatus.APPROVED,
-            svc.close_overdue_sql(lock_months),
+            svc.close_overdue_sql(lock_days),
         )
         if locked:
             query = query.where(Activity.close_unlocked.is_(False))
@@ -266,7 +266,7 @@ async def list_activities(
     data = []
     for activity, club_name, reviewed_at in rows:
         out = ActivityOut.model_validate(activity)
-        svc.decorate(out, activity, lock_months)
+        svc.decorate(out, activity, lock_days)
         out.club_name = club_name
         out.reviewed_at = reviewed_at
         data.append(out)
@@ -293,9 +293,9 @@ async def get_activity(
     visible = svc.visible_statuses(user)
     if visible is not None and activity.status not in visible:
         raise not_found("找不到活動")  # 受限關卡帳號視同不存在,避免探測
-    lock_months = await get_setting(db, "close_lock_months")
+    lock_days = await get_setting(db, "close_lock_days")
     out = ActivityDetailOut.model_validate(activity)
-    svc.decorate(out, activity, lock_months)
+    svc.decorate(out, activity, lock_days)
     club = await db.get(Club, activity.club_id)
     out.club_name = club.name if club else ""
     out.photos = [
@@ -420,9 +420,9 @@ async def approve(
         "活動申請已核准" if final else "活動申請通過關卡",
         f"{activity.name}(關卡:{_STAGE_LABEL.get(stage, stage)})",
     )
-    lock_months = await get_setting(db, "close_lock_months")
+    lock_days = await get_setting(db, "close_lock_days")
     out = ActivityOut.model_validate(activity)
-    svc.decorate(out, activity, lock_months)
+    svc.decorate(out, activity, lock_days)
     return ApiResponse(data=out)
 
 
@@ -570,8 +570,8 @@ async def unlock(
     activity = await _get_activity(db, activity_id, for_update=True)
     if activity.status != ActivityStatus.APPROVED:
         raise conflict("僅已核准且未結案的活動可解鎖")
-    lock_months = await get_setting(db, "close_lock_months")
-    if not svc.is_close_locked(activity, lock_months):
+    lock_days = await get_setting(db, "close_lock_days")
+    if not svc.is_close_locked(activity, lock_days):
         # 未逾期不得預先解鎖,否則永久繞過結案鎖定。
         # 已解鎖的也走這裡:結案退回會自動解鎖(D-05),那時它可能其實已經逾期了
         raise conflict("此活動未處於鎖定狀態(未逾期,或已經解鎖)")

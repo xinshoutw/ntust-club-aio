@@ -4,7 +4,7 @@
 draft → pending_advisor →(有補助)pending_chief → pending_dean → approved
      └(無補助)→ approved;任一關退回 → rejected(可修改重送)
 approved →(活動結束後)close → closing_pending_advisor → closed;退回 → approved
-逾期鎖定=推導(活動日+1 個月未送結案),管理員可解鎖(close_unlocked)。
+逾期鎖定=推導(活動結束日+N 天未送結案),管理員可解鎖(close_unlocked)。
 """
 
 from datetime import UTC, datetime, time
@@ -101,9 +101,9 @@ async def _club_of(db, user) -> Club:
     return await db.get(Club, user.club_id)
 
 
-def _to_out(activity: Activity, lock_months: int) -> ActivityOut:
+def _to_out(activity: Activity, lock_days: int) -> ActivityOut:
     out = ActivityOut.model_validate(activity)
-    svc.decorate(out, activity, lock_months)
+    svc.decorate(out, activity, lock_days)
     return out
 
 
@@ -152,8 +152,8 @@ def _require_future_start(activity: Activity) -> None:
 _LOCKED = "locked"
 
 
-def _display_status_condition(key: str, lock_months: int) -> sa.ColumnElement[bool]:
-    locked = svc.close_locked_sql(lock_months)
+def _display_status_condition(key: str, lock_days: int) -> sa.ColumnElement[bool]:
+    locked = svc.close_locked_sql(lock_days)
     if key == _LOCKED:
         return locked
     if key == ActivityStatus.APPROVED:
@@ -182,21 +182,21 @@ async def list_activities(
     if semester:
         start, end = semester_range(semester)
         query = query.where(Activity.date >= start, Activity.date <= end)
-    lock_months = await get_setting(db, "close_lock_months")
+    lock_days = await get_setting(db, "close_lock_days")
     if status:
         allowed = {s.value for s in ActivityStatus} | {_LOCKED}
         unknown = [s for s in status if s not in allowed]
         if unknown:
             raise validation_error(f"未知的狀態:{','.join(unknown)}")
         query = query.where(
-            sa.or_(*[_display_status_condition(s, lock_months) for s in status])
+            sa.or_(*[_display_status_condition(s, lock_days) for s in status])
         )
     if type:
         query = query.where(Activity.type.in_(type))
     if ended is not None:
         query = query.where(svc.ended_sql() if ended else sa.not_(svc.ended_sql()))
     if closable:
-        query = query.where(svc.can_close_sql(lock_months))
+        query = query.where(svc.can_close_sql(lock_days))
 
     # 計數不必排序:budget 排序是相關子查詢,套在 count 的子查詢上是白工
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
@@ -205,7 +205,7 @@ async def list_activities(
         *parse_sort(sort, _SORTABLE, Activity.date.desc()), Activity.id.desc()
     )
     rows = (await db.scalars(query.offset(page.offset).limit(page.page_size))).all()
-    return ApiResponse(data=[_to_out(a, lock_months) for a in rows], meta=page.meta(total or 0))
+    return ApiResponse(data=[_to_out(a, lock_days) for a in rows], meta=page.meta(total or 0))
 
 
 @router.get("/semesters")
@@ -232,8 +232,8 @@ async def create_activity(body: ActivityIn, user: ClubUser, db: DbDep) -> ApiRes
     db.add(activity)
     await db.commit()
     activity = await svc.get_own_activity(db, user, activity.id)
-    lock_months = await get_setting(db, "close_lock_months")
-    return ApiResponse(data=_to_out(activity, lock_months))
+    lock_days = await get_setting(db, "close_lock_days")
+    return ApiResponse(data=_to_out(activity, lock_days))
 
 
 @router.get("/{activity_id}")
@@ -241,9 +241,9 @@ async def get_activity(
     activity_id: int, user: ClubUser, db: DbDep
 ) -> ApiResponse[ActivityDetailOut]:
     activity = await svc.get_own_activity(db, user, activity_id, with_detail=True)
-    lock_months = await get_setting(db, "close_lock_months")
+    lock_days = await get_setting(db, "close_lock_days")
     out = ActivityDetailOut.model_validate(activity)
-    svc.decorate(out, activity, lock_months)
+    svc.decorate(out, activity, lock_days)
     out.photos = [
         FileOut.model_validate(f) for f in await svc.activity_files(db, activity, svc.PHOTO_SLOT)
     ]
@@ -294,8 +294,8 @@ async def update_activity(
             raise validation_error("退回件的活動日期不得再往前調整")
     await db.commit()
     activity = await svc.get_own_activity(db, user, activity_id)
-    lock_months = await get_setting(db, "close_lock_months")
-    return ApiResponse(data=_to_out(activity, lock_months))
+    lock_days = await get_setting(db, "close_lock_days")
+    return ApiResponse(data=_to_out(activity, lock_days))
 
 
 @router.delete("/{activity_id}")
@@ -381,8 +381,8 @@ async def submit_activity(
         f"{club.name}:{activity.name}({activity.date} @ {activity.location})",
         club.discord_webhook_url,
     )
-    lock_months = await get_setting(db, "close_lock_months")
-    return ApiResponse(data=_to_out(activity, lock_months))
+    lock_days = await get_setting(db, "close_lock_days")
+    return ApiResponse(data=_to_out(activity, lock_days))
 
 
 @router.put("/{activity_id}/close-draft")
@@ -586,7 +586,7 @@ async def submit_close(
     background: BackgroundTasks,
 ) -> ApiResponse[ActivityOut]:
     activity = await svc.get_own_activity(db, user, activity_id, with_detail=True)
-    lock_months = await get_setting(db, "close_lock_months")
+    lock_days = await get_setting(db, "close_lock_days")
     # 鎖活動列並重讀狀態:與 upload/delete_photo 統一鎖序,送出與照片增刪序列化
     await db.refresh(activity, attribute_names=["status"], with_for_update=True)
     if activity.status != ActivityStatus.APPROVED:
@@ -594,7 +594,7 @@ async def submit_close(
     now = datetime.now(UTC)
     if now < svc.end_datetime(activity):
         raise conflict("活動尚未結束,不可結案")
-    if svc.is_close_locked(activity, lock_months, now):
+    if svc.is_close_locked(activity, lock_days, now):
         raise conflict("已逾結案期限並鎖定,請洽學務處解鎖")
     # 實際時間先後僅單日活動可用純時間比較;跨日活動(18:00–翌日 10:00)整段合法
     if activity.end_date == activity.date and body.actual_end <= body.actual_start:
@@ -642,4 +642,4 @@ async def submit_close(
         club.discord_webhook_url,
     )
     activity = await svc.get_own_activity(db, user, activity_id)
-    return ApiResponse(data=_to_out(activity, lock_months))
+    return ApiResponse(data=_to_out(activity, lock_days))

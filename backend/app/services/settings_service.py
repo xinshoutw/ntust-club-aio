@@ -32,8 +32,8 @@ DEFAULTS: dict[str, Any] = {
         "器材未歸還或損壞",
         "其他",
     ],
-    # 結案鎖定:活動日 +N 個月未結案即鎖定(管理員可解鎖)
-    "close_lock_months": 1,
+    # 結案鎖定:活動日 +N 天未結案即鎖定(管理員可解鎖)
+    "close_lock_days": 30,
     # 器材歸還時限:結束日之隔天上班日此時刻前
     "equipment_return_time": "10:30",
     # 器材借用區間緩衝(工作天):活動開始日 −before ~ 活動結束日 +after

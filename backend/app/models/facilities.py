@@ -75,7 +75,7 @@ class Holiday(Base, TimestampMixin):
 
 
 class SystemSetting(Base, TimestampMixin):
-    """會變/可能變的營運參數(報名窗、結案鎖定月數、學期規則、經費科目…)。"""
+    """會變/可能變的營運參數(報名窗、結案鎖定天數、學期規則、經費科目…)。"""
 
     __tablename__ = "system_settings"
 

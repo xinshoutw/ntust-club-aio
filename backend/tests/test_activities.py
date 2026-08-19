@@ -375,7 +375,7 @@ async def test_close_eligibility_and_lock_derive_from_end_date(client, db):
     assert resp.status_code == 409
     assert "尚未結束" in resp.json()["error"]
 
-    # 開始日已逾 1 個月但結束日在近期 → 以 end_date 推導,不鎖定、可結案
+    # 開始日已逾結案期限但結束日在近期 → 以 end_date 推導,不鎖定、可結案
     start = (date.today() - timedelta(days=70)).isoformat()
     end = (date.today() - timedelta(days=3)).isoformat()
     data = await create_activity(client, name="跨日活動", date=start, end_date=end)
@@ -477,9 +477,26 @@ async def test_close_submit_and_report(client, db):
     assert detail["report"]["review_conclusion"] == "下次提前一週彩排"
 
 
+def test_close_lock_boundary_is_the_whole_deadline_day():
+    """期限日當天整天仍可結案,隔日零時起鎖定(改天制後這條界線只剩這裡驗)。"""
+    from datetime import datetime, time
+
+    from app.core.semesters import TAIPEI
+    from app.models.enums import ActivityStatus
+    from app.services.activity_service import is_close_locked
+
+    base = date(2026, 3, 1)
+    activity = Activity(
+        status=ActivityStatus.APPROVED, close_unlocked=False, date=base, end_date=base
+    )
+    last_moment = datetime.combine(base + timedelta(days=30), time(23, 59), tzinfo=TAIPEI)
+    assert not is_close_locked(activity, 30, last_moment)
+    assert is_close_locked(activity, 30, last_moment + timedelta(minutes=1))
+
+
 async def test_close_locked_after_deadline(client, db):
     await setup_session(client, db)
-    stale = (date.today() - timedelta(days=63)).isoformat()  # 超過 1 個月
+    stale = (date.today() - timedelta(days=63)).isoformat()  # 超過預設 30 天
     data = await create_activity(client, date=stale)
     aid = data["id"]
     await approve(db, aid)

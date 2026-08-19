@@ -9,9 +9,32 @@ import sqlalchemy as sa
 
 from app.core.semesters import TAIPEI
 from app.models import Violation
-from app.services.activity_service import add_months
 
 RESOLVE_MONTHS = 1
+
+
+def add_months(d: date, months: int) -> date:
+    month = d.month - 1 + months
+    year = d.year + month // 12
+    month = month % 12 + 1
+    day = min(
+        d.day,
+        [
+            31,
+            29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28,
+            31,
+            30,
+            31,
+            30,
+            31,
+            31,
+            30,
+            31,
+            30,
+            31,
+        ][month - 1],
+    )
+    return date(year, month, day)
 
 
 def resolve_deadline(v: Violation) -> date:

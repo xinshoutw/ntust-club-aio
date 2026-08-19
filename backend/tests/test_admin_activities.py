@@ -362,7 +362,7 @@ async def test_admin_list_includes_club_name_and_close_deadline(client, db):
     row = next(r for r in listing["data"] if r["id"] == aid)
     assert row["club_id"] == club.id
     assert row["club_name"] == club.name
-    assert row["close_deadline"]  # 推導:活動結束日 + 鎖定月數
+    assert row["close_deadline"]  # 推導:活動結束日 + 鎖定天數
 
     detail = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]
     assert detail["club_name"] == club.name
@@ -419,8 +419,8 @@ async def test_close_review_flow(client, db):
     # 退回件不受結案期限限制:補件期間跨過期限也重送得了,不必請行政解鎖
     from app.services.settings_service import get_setting
 
-    lock_months = int(await get_setting(db, "close_lock_months"))
-    long_past = date.today() - timedelta(days=31 * (lock_months + 1))
+    lock_days = int(await get_setting(db, "close_lock_days"))
+    long_past = date.today() - timedelta(days=lock_days + 1)
     await db.execute(
         sa.update(Activity).where(Activity.id == aid).values(date=long_past, end_date=long_past)
     )
@@ -723,8 +723,8 @@ async def test_overdue_filter_includes_unlocked(client, db):
     assert {r["name"] for r in resp.json()["data"]} == {"逾期鎖定"}
 
 
-async def test_overdue_filter_follows_close_lock_months(client, db):
-    """逾期清單(SQL)與每列的 close_locked(Python)必須同源:改鎖定月數,兩邊要一起動。"""
+async def test_overdue_filter_follows_close_lock_days(client, db):
+    """逾期清單(SQL)與每列的 close_locked(Python)必須同源:改鎖定天數,兩邊要一起動。"""
     club = await seed(client, db)
     creator = await club_account(db)
     day = date.today() - timedelta(days=45)
@@ -738,7 +738,7 @@ async def test_overdue_filter_follows_close_lock_months(client, db):
     rows = (await client.get("/api/v1/admin/activities", params={"overdue": "true"})).json()["data"]
     assert [r["close_locked"] for r in rows] == [True]
 
-    db.add(SystemSetting(key="close_lock_months", value=3))
+    db.add(SystemSetting(key="close_lock_days", value=60))
     await db.commit()
     overdue = await client.get("/api/v1/admin/activities", params={"overdue": "true"})
     assert overdue.json()["data"] == []
@@ -810,7 +810,6 @@ async def test_large_type_filter_and_locked_boundary(client, db):
     assert datetime.now().astimezone().utcoffset() == timedelta(hours=8)
 
     from app.models import Activity
-    from app.services.activity_service import add_months
     from app.services.settings_service import get_setting
 
     club = await seed(client, db)
@@ -842,18 +841,9 @@ async def test_large_type_filter_and_locked_boundary(client, db):
     assert names == {"被否准", "一般活動"}
 
     # 鎖定日界:期限日當天不鎖、隔天鎖(與 is_close_locked 同界)
-    lock_months = int(await get_setting(db, "close_lock_months"))
-    # 找 base 使 add_months(base, N) == today(當天不鎖)與 == 昨天(鎖)
-    base_today = None
-    base_locked = None
-    probe = date.today() - timedelta(days=25)
-    for delta in range(70):
-        candidate = probe - timedelta(days=delta)
-        if add_months(candidate, lock_months) == date.today():
-            base_today = candidate
-        if add_months(candidate, lock_months) == date.today() - timedelta(days=1):
-            base_locked = candidate
-    assert base_today and base_locked
+    lock_days = int(await get_setting(db, "close_lock_days"))
+    base_today = date.today() - timedelta(days=lock_days)
+    base_locked = base_today - timedelta(days=1)
     a_edge = Activity(
         club_id=club.id, name="期限日當天", location="x", type="社課或會議",
         date=base_today, end_date=base_today, status="approved", created_by=creator.id,

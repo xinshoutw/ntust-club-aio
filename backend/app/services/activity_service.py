@@ -1,6 +1,6 @@
 """活動申請/結案的推導規則與共用查詢。"""
 
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, datetime, time, timedelta
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,30 +21,6 @@ def end_datetime(activity: Activity) -> datetime:
     """活動結束時刻(台北時區):end_date + end_time;未填時間以當日 23:59 計。"""
     t = activity.end_time or time(23, 59)
     return datetime.combine(activity.end_date or activity.date, t, tzinfo=TAIPEI)
-
-
-def add_months(d: date, months: int) -> date:
-    month = d.month - 1 + months
-    year = d.year + month // 12
-    month = month % 12 + 1
-    day = min(
-        d.day,
-        [
-            31,
-            29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28,
-            31,
-            30,
-            31,
-            30,
-            31,
-            31,
-            30,
-            31,
-            30,
-            31,
-        ][month - 1],
-    )
-    return date(year, month, day)
 
 
 # 只持簽核關卡鍵的帳號(如學務長)視野受限;持 areview 才看得到全部
@@ -90,23 +66,22 @@ def actionable_statuses(user) -> set[ActivityStatus]:
     return out
 
 
-def is_close_locked(activity: Activity, lock_months: int, now: datetime | None = None) -> bool:
-    """逾期鎖定(推導):已核准、活動結束日(end_date)+N 個月已過、未送結案、未解鎖。"""
+def is_close_locked(activity: Activity, lock_days: int, now: datetime | None = None) -> bool:
+    """逾期鎖定(推導):已核准、活動結束日(end_date)+N 天已過、未送結案、未解鎖。"""
     if activity.status != ActivityStatus.APPROVED or activity.close_unlocked:
         return False
     now = now or datetime.now(UTC)
     base = activity.end_date or activity.date
     deadline = datetime.combine(
-        add_months(base, lock_months) + timedelta(days=1), time(0, 0), tzinfo=TAIPEI
+        base + timedelta(days=int(lock_days) + 1), time(0, 0), tzinfo=TAIPEI
     )
     return now >= deadline
 
 
-def close_overdue_sql(lock_months: int) -> sa.ColumnElement[bool]:
-    """同一條期限的 SQL 版(逾期清單在 DB 端篩);PG 月加法與 add_months 同為日夾底。"""
+def close_overdue_sql(lock_days: int) -> sa.ColumnElement[bool]:
+    """同一條期限的 SQL 版(逾期清單在 DB 端篩);PG 的 date + 整數即加天數。"""
     return (
-        sa.func.coalesce(Activity.end_date, Activity.date)
-        + sa.func.make_interval(0, int(lock_months))
+        sa.func.coalesce(Activity.end_date, Activity.date) + int(lock_days)
         < datetime.now(TAIPEI).date()
     )
 
@@ -119,7 +94,7 @@ def ended_sql() -> sa.ColumnElement[bool]:
     ) <= datetime.now(TAIPEI).replace(tzinfo=None)
 
 
-def close_locked_sql(lock_months: int) -> sa.ColumnElement[bool]:
+def close_locked_sql(lock_days: int) -> sa.ColumnElement[bool]:
     """`is_close_locked` 的 SQL 版:已核准、未解鎖、結案期限已過。
 
     畫面把這種列顯示成「已逾期」而不是「已核准」,清單的狀態篩選要跟著同一條判定。
@@ -127,11 +102,11 @@ def close_locked_sql(lock_months: int) -> sa.ColumnElement[bool]:
     return sa.and_(
         Activity.status == ActivityStatus.APPROVED,
         Activity.close_unlocked.is_(False),
-        close_overdue_sql(lock_months),
+        close_overdue_sql(lock_days),
     )
 
 
-def can_close_sql(lock_months: int) -> sa.ColumnElement[bool]:
+def can_close_sql(lock_days: int) -> sa.ColumnElement[bool]:
     """can_close 的 SQL 版(結案清單在 DB 端篩,不是抓回全部已核准再過濾)。
 
     「已結束」在 PG 以 date + time 相加成 timestamp 比對台北當下;
@@ -140,21 +115,21 @@ def can_close_sql(lock_months: int) -> sa.ColumnElement[bool]:
     return sa.and_(
         Activity.status == ActivityStatus.APPROVED,
         ended_sql(),
-        sa.not_(close_locked_sql(lock_months)),
+        sa.not_(close_locked_sql(lock_days)),
     )
 
 
-def can_close(activity: Activity, lock_months: int, now: datetime | None = None) -> bool:
+def can_close(activity: Activity, lock_days: int, now: datetime | None = None) -> bool:
     """結案資格:已核准且活動已結束且未被鎖定。"""
     now = now or datetime.now(UTC)
     return (
         activity.status == ActivityStatus.APPROVED
         and now >= end_datetime(activity)
-        and not is_close_locked(activity, lock_months, now)
+        and not is_close_locked(activity, lock_days, now)
     )
 
 
-def decorate(out, activity: Activity, lock_months: int) -> None:
+def decorate(out, activity: Activity, lock_days: int) -> None:
     """填 ActivityOut 的推導欄位。"""
     items = activity.budget_items
     out.self_fund_total = sum(i.self_fund for i in items)
@@ -163,10 +138,10 @@ def decorate(out, activity: Activity, lock_months: int) -> None:
     out.approved_total = sum(approved) if approved else None
     # 部分填寫的草稿可能無日期;日期推導欄位留空
     out.semester = semester_of(activity.date) if activity.date else ""
-    out.close_locked = is_close_locked(activity, lock_months)
+    out.close_locked = is_close_locked(activity, lock_days)
     base = activity.end_date or activity.date
-    out.close_deadline = add_months(base, lock_months) if base else None
-    out.can_close = can_close(activity, lock_months)
+    out.close_deadline = base + timedelta(days=lock_days) if base else None
+    out.can_close = can_close(activity, lock_days)
     out.has_close_draft = activity.close_draft is not None
 
 

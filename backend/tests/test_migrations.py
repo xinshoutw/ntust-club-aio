@@ -108,3 +108,40 @@ async def test_upgrade_head_builds_the_same_tables_as_the_models(migration_db):
         if isinstance(ck, sa.CheckConstraint) and ck.name
     }
     assert expected_checks <= checks
+
+
+async def test_close_lock_setting_converts_between_months_and_days(migration_db):
+    """`a3f7c2e91b48` 是純資料遷移:空庫跑等於 no-op,值的換算只有這裡驗得到。"""
+    _alembic("upgrade", "c8b1a5d73f26")
+
+    async def setting() -> list[tuple[str, object]]:
+        async with migration_db.connect() as conn:
+            rows = await conn.execute(
+                sa.text("SELECT key, value FROM system_settings WHERE key LIKE 'close_lock%'")
+            )
+            return sorted(rows.all())
+
+    async with migration_db.begin() as conn:
+        await conn.execute(
+            sa.text(
+                "INSERT INTO system_settings (key, value, created_at, updated_at)"
+                " VALUES ('close_lock_months', '2'::jsonb, now(), now())"
+            )
+        )
+
+    _alembic("upgrade", "head")
+    assert await setting() == [("close_lock_days", 60)]
+
+    _alembic("downgrade", "-1")
+    assert await setting() == [("close_lock_months", 2)]
+
+    # downgrade 後新程式又存過一次設定 → 兩鍵並存,再 upgrade 不得撞主鍵
+    async with migration_db.begin() as conn:
+        await conn.execute(
+            sa.text(
+                "INSERT INTO system_settings (key, value, created_at, updated_at)"
+                " VALUES ('close_lock_days', '45'::jsonb, now(), now())"
+            )
+        )
+    _alembic("upgrade", "head")
+    assert await setting() == [("close_lock_days", 60)]

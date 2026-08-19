@@ -80,14 +80,14 @@ async def _overdue_loan_filter(db: AsyncSession) -> sa.ColumnElement[bool]:
     )
 
 
-async def _club(db: AsyncSession, club_id: int, lock_months: int) -> dict[str, int]:
+async def _club(db: AsyncSession, club_id: int, lock_days: int) -> dict[str, int]:
     today = datetime.now(TAIPEI).date()
     now = datetime.now(TAIPEI)
     mine = Activity.club_id == club_id
 
     columns = {
         # 活動結案:已結束、未鎖定、還沒送出結案
-        "act-close": _count(mine, can_close_sql(lock_months), of=Activity),
+        "act-close": _count(mine, can_close_sql(lock_days), of=Activity),
         # 活動列表:被退回,等社團修改重送
         "act-list": _count(mine, Activity.status == ActivityStatus.REJECTED, of=Activity),
         # 借用總覽:已核准待領取 + 借出中已逾期
@@ -135,7 +135,7 @@ async def _club(db: AsyncSession, club_id: int, lock_months: int) -> dict[str, i
     return await _run(db, columns)
 
 
-async def _admin(db: AsyncSession, user: User, lock_months: int) -> dict[str, int]:
+async def _admin(db: AsyncSession, user: User, lock_days: int) -> dict[str, int]:
     """受限管理員只拿得到自己看得到的頁面 —— 徽章也是資料量,不對無權限者揭露。"""
     # 徽章=待審佇列的筆數,不是「看得到幾件」:只持 areview 的帳號看得到全部卻一件也簽不了,
     # 那個差額正是它無權過問的件數(services/activity_service.actionable_statuses)
@@ -240,11 +240,11 @@ async def for_user(db: AsyncSession, user: User) -> dict[str, int]:
     """該使用者側欄的徽章數;0 也照回,前端才知道是「沒有待辦」而不是「還沒算」。"""
     match user.role:
         case UserRole.CLUB if user.club_id is not None:
-            lock_months = int(await get_setting(db, "close_lock_months"))
-            return await _club(db, user.club_id, lock_months)
+            lock_days = int(await get_setting(db, "close_lock_days"))
+            return await _club(db, user.club_id, lock_days)
         case UserRole.ADMIN:
-            lock_months = int(await get_setting(db, "close_lock_months"))
-            return await _admin(db, user, lock_months)
+            lock_days = int(await get_setting(db, "close_lock_days"))
+            return await _admin(db, user, lock_days)
         case UserRole.STAFF:
             return await _staff(db)
         case UserRole.VIEWER:

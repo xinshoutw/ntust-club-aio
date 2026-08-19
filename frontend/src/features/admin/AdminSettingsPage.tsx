@@ -81,7 +81,7 @@ interface FormValues {
   fixedWindow?: [Dayjs, Dayjs] | null
   loanBefore: number
   loanAfter: number
-  closeLockMonths: number
+  closeLockDays: number
   docMb: number
   imgMb: number
   zipMb: number
@@ -121,7 +121,7 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
         fixedUntil: v.fixedWindow?.[1] ? v.fixedWindow[1].format(DATE_FMT) : undefined,
         loanBefore: v.loanBefore,
         loanAfter: v.loanAfter,
-        closeLockMonths: v.closeLockMonths,
+        closeLockDays: v.closeLockDays,
         docMb: v.docMb,
         imgMb: v.imgMb,
         zipMb: v.zipMb,
@@ -156,7 +156,7 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
             : undefined,
         loanBefore: initial.loanBefore,
         loanAfter: initial.loanAfter,
-        closeLockMonths: initial.closeLockMonths,
+        closeLockDays: initial.closeLockDays,
         docMb: initial.docMb,
         imgMb: initial.imgMb,
         zipMb: initial.zipMb,
@@ -189,10 +189,8 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
         <div className="card" style={{ padding: 24 }}>
           <div style={sectionTitle}>活動與評鑑</div>
           <div className="form-grid-2">
-            {/* 文案已先改成「天」;後端仍是 close_lock_months(add_months、上限 6)。
-                改天制要一併動:此處 max→366、後端設定鍵與 activity_service 的期限推導 */}
-            <Form.Item name="closeLockMonths" label="活動結案期限（天）">
-              <InputNumber min={1} max={6} precision={0} style={{ width: '100%' }} />
+            <Form.Item name="closeLockDays" label="活動結案期限（天）">
+              <InputNumber min={1} max={366} precision={0} style={{ width: '100%' }} />
             </Form.Item>
             <Form.Item name="evalYear" label="評鑑年度" style={{ marginBottom: 0 }}>
               <Select options={evalYears.map((y) => ({ value: y, label: evalYearLabel(y) }))} />

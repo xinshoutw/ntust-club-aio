@@ -117,7 +117,7 @@ class SettingsUpdateIn(BaseModel):
 
     fixed_booking_window: FixedBookingWindowIn | None = None
     equipment_workday_buffer: EquipmentBufferIn | None = None
-    close_lock_months: int | None = Field(None, ge=1, le=6)
+    close_lock_days: int | None = Field(None, ge=1, le=366)
     upload_limits: UploadLimitsIn | None = None
     activity_attachment_total_mb: int | None = Field(None, ge=1, le=1024)
     maintenance_total_mb: int | None = Field(None, ge=1, le=1024)

@@ -110,9 +110,16 @@ export default function AdminMembersPage() {
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         <LoadingBlock pending={clubId != null && listQuery.isPending}>
-          <table className="tb fixed" style={{ minWidth: 680 }}>
-            {/* 姓名/職稱吃彈性寬並截斷;其餘固定 px。兩個時間欄依 showJoined/showUpdated 增減 */}
-            <Cols widths={['15%', 100, 92, 'auto', 105, 80, ...(showJoined ? [140] : []), ...(showUpdated ? [140] : [])]} />
+          <table className="tb fixed" style={{ minWidth: 960 }}>
+            {/* 姓名放得下四字中文名、學號放得下 9 碼、電話放得下 10 碼不截斷,職稱固定為身份的 1.5 倍。
+                兩個時間欄依 showJoined/showUpdated 增減;餘裕一律丟給最後一欄吸收 ——
+                table-layout:fixed 下若每欄都給 px,瀏覽器會把餘裕按比例攤回每一欄,姓名與職稱又會被撐開 */}
+            <Cols
+              widths={[
+                ...[100, 130, 92, 138, 140, 80, ...(showJoined ? [140] : []), ...(showUpdated ? [140] : [])].slice(0, -1),
+                'auto',
+              ]}
+            />
             <thead>
               <tr>
                 <th scope="col"><MultiSortButton label="姓名" sortKey="name" entries={entries} onToggle={toggleSort} /></th>
@@ -129,7 +136,7 @@ export default function AdminMembersPage() {
               {members.map((m) => (
                 <tr key={m.id}>
                   <td className="cell-clip" title={m.name} style={{ fontWeight: 500 }}>{m.name}</td>
-                  <td className="num" style={{ color: 'var(--steel)' }}>{m.studentId}</td>
+                  <td className="num cell-clip" style={{ color: 'var(--steel)' }}>{m.studentId}</td>
                   <td>{kindLabel(m.kind, clubKind)}</td>
                   <td className="cell-clip" title={m.title ?? undefined}>{m.title ?? '—'}</td>
                   <td className="num cell-clip">{m.phone ?? '—'}</td>

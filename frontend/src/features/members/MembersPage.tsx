@@ -208,9 +208,11 @@ export default function MembersPage() {
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         <LoadingBlock pending={listQuery.isPending}>
-          <table className="tb fixed" style={{ minWidth: 800 }}>
-            {/* 兩個時間欄依 showJoined/showUpdated 增減,colgroup 要跟著長短 */}
-            <Cols widths={['auto', 100, 120, 'auto', 120, 80, ...(showJoined ? [134] : []), ...(showUpdated ? [134] : []), 90]} />
+          <table className="tb fixed" style={{ minWidth: 860 }}>
+            {/* 兩個時間欄依 showJoined/showUpdated 增減,colgroup 要跟著長短。
+                姓名放得下四字中文名、學號放得下 9 碼、電話放得下 10 碼不截斷,職稱固定為身份的 1.5 倍;
+                餘裕由靠右的動作欄吸收(給 auto 的欄才不會被 table-layout:fixed 按比例攤回去) */}
+            <Cols widths={[100, 130, 120, 180, 140, 80, ...(showJoined ? [134] : []), ...(showUpdated ? [134] : []), 'auto']} />
             <thead>
               <tr>
                 <th scope="col">{sortHeader('姓名', 'name')}</th>

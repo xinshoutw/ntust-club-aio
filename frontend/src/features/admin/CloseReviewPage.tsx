@@ -137,6 +137,9 @@ function CloseReviewModal({
           </div>
         ) : canReview ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
+            {detailQuery.isFetching && (
+              <span style={{ fontSize: 12, color: 'var(--steel)', marginRight: 'auto' }}>結案內容更新中</span>
+            )}
             <Button danger style={{ height: 38 }} disabled={closeApprove.isPending} onClick={() => setRejectOpen(true)}>
               退回
             </Button>
@@ -206,7 +209,9 @@ function CloseReviewModal({
                 ' · 無影片連結'
               )}
               {' '}· 心得 <span className="num">{report.reflections.length}</span> 人
-              {photoShort && <div style={{ color: '#C13B34', fontSize: 12 }}>照片未達 5 張且無影片</div>}
+              {photoShort && (
+                <div style={{ color: '#C13B34', fontSize: 12 }}>照片未達 {MIN_PHOTOS} 張且無影片</div>
+              )}
             </div>
             <div style={detailLabel}>活動重點</div><div style={{ lineHeight: 1.7 }}>{report.highlights}</div>
             <div style={detailLabel}>達成目標</div><div style={{ lineHeight: 1.7 }}>{report.goals}</div>
@@ -305,7 +310,7 @@ function CloseReviewModal({
           rows={3}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder="例:成果照片不足 5 張且未附影片連結"
+          placeholder={`例：成果照片不足 ${MIN_PHOTOS} 張且未附影片連結`}
         />
       </Modal>
     </Modal>

@@ -771,16 +771,10 @@ function CloseForm({
                   <Button icon={<UploadOutlined />} loading={processing > 0}>選擇照片</Button>
                 </Upload>
                 <span className="num" style={{ fontSize: 12, color: existing.length + photos.length >= MIN_PHOTOS ? '#1F6B45' : 'var(--steel)' }}>
-                  {existing.length + photos.length} 張
-                  <span className="num">
-                  {fmtMB(existing.reduce((s, f) => s + f.size, 0) + photos.reduce((s, p) => s + p.file.size, 0))}
+                  {existing.length + photos.length} 張 ·{' '}
+                  {fmtMB(existing.reduce((s, f) => s + f.size, 0) + photos.reduce((s, p) => s + p.file.size, 0))}/
+                  {Math.round(closePhotoBytes / 1024 / 1024)} MB
                 </span>
-                /<span className="num">{Math.round(closePhotoBytes / 1024 / 1024)}</span> MB
-                </span>
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 6 }}>
-                已選{' '}
-
               </div>
             </div>
             <div className="form-grid-2" style={{ marginTop: 12 }}>
@@ -793,7 +787,7 @@ function CloseForm({
                     clearErr('videoLink')
                     setVideoLink(e.target.value)
                   }}
-                  placeholder="YouTube 等"
+                  placeholder="https://youtu.be/..."
                 />
               </div>
               <div>

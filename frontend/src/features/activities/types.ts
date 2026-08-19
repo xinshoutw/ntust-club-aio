@@ -29,6 +29,9 @@ export interface WorkItem {
   owner: string
 }
 
+/** 結案送出的心得下限(後端 `CloseSubmitIn.reflections` 的 min_length) */
+export const MIN_REFLECTIONS = 3
+
 export interface Reflection {
   name: string
   dept: string

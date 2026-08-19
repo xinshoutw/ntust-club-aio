@@ -25,7 +25,7 @@ const item: AdminActivity = {
   status: 'closing_pending_advisor',
 }
 
-// 遷移件:舊系統說報告表與心得沒交,照片交了但檔案沒搬進來
+// 遷移件:舊系統說報告表沒交,照片與心得的內容都沒搬進來(心得只有 1 篇,未達送出下限)
 const detail: AdminActivityDetail = {
   ...item,
   detail: { attachments: [], budget: [] },
@@ -98,7 +98,7 @@ describe('結案審核的繳交確認', () => {
 
     expect(box('活動照片').checked).toBe(false) // 0 張且無影片
     expect(box('成果報告表').checked).toBe(false) // 舊庫旗標為 false
-    expect(box('學習心得').checked).toBe(true) // 有一篇即計 ad4
+    expect(box('學習心得').checked).toBe(false) // 只有 1 篇,未達送出下限 3 篇
   })
 
   // 承辦勾回去是遷移件唯一的補救路徑:送出的必須是畫面上的值,不是推導值
@@ -139,7 +139,7 @@ describe('結案審核的繳交確認', () => {
         id: 1,
         photosConfirmed: false,
         reportConfirmed: true,
-        reflectionsConfirmed: true,
+        reflectionsConfirmed: false,
       }),
       expect.anything(),
     )

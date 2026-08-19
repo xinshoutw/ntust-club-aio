@@ -22,6 +22,7 @@ import { clickableProps } from '../../lib/clickable'
 import { SUBMISSION_CHECKS, defaultConfirmations, type CheckKey } from './closeChecks'
 import { clampPage } from '../../lib/paging'
 import { MIN_PHOTOS } from '../eval/scoring'
+import { MIN_REFLECTIONS } from '../activities/types'
 
 // 兩張表各自分頁:待審是逐件處理的佇列,逾期是追蹤用的清單
 const PENDING_PAGE_SIZE = 8
@@ -297,8 +298,8 @@ function CloseReviewModal({
                   </Checkbox>
                 ))}
               </div>
-              <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 8 }}>
-                未達採計門檻者已自動取消勾選，核實無誤可自行勾回
+              <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 8, lineHeight: 1.7 }}>
+                <span>照片未達 <span className="num">{MIN_PHOTOS}</span> 張且無影片、心得未達 <span className="num">{MIN_REFLECTIONS}</span> 篇、或原本就未確認的項目，已自動取消勾選；核實無誤可自行勾回</span>
               </div>
             </div>
           )}

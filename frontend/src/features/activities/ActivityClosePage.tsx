@@ -25,7 +25,7 @@ import {
 import { useClubConfig } from '../../api/clubConfig'
 import type { EvalFile } from '../eval/types'
 import { MIN_PHOTOS } from '../eval/scoring'
-import { activityPath } from './types'
+import { MIN_REFLECTIONS, activityPath } from './types'
 import type { Reflection } from './types'
 import { TIME_RANGE_SEP, dateRangeText } from './utils'
 import './actform.css'
@@ -44,7 +44,6 @@ interface PhotoBag {
 }
 
 const isReflectEmpty = (r: ReflectRow) => !r.name.trim() && !r.dept.trim() && !r.text.trim()
-const MIN_REFLECTIONS = 3
 
 const label: React.CSSProperties = { fontSize: 13, fontWeight: 500, marginBottom: 6 }
 const requiredMark = <span style={{ color: '#C13B34' }}> *</span>

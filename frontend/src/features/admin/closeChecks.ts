@@ -1,5 +1,6 @@
 // 結案的繳交確認:承辦人逐項確認,未確認之項目評鑑以 0 分計(核准時隨 body 落庫)。
 import { MIN_PHOTOS } from '../eval/scoring'
+import { MIN_REFLECTIONS } from '../activities/types'
 
 export const SUBMISSION_CHECKS = [
   { key: 'photos', label: '活動照片' },
@@ -23,9 +24,9 @@ export interface ConfirmableReport {
  * 一律預設全勾等於承辦沒動它就把舊庫的「未繳」翻成「已繳」。反向也不會誤判:
  * 判定只決定預設值,承辦核實後仍可自行勾回。
  *
- * 門檻取的是各旗標實際控制的評鑑項目:ad2 照片 ≥5 張或有影片、ad3 報告表這一列存在、
- * ad4 心得有上傳。**不是結案送件的下限** —— 送件下限(照片 1 張、心得 3 篇)是社團端的事,
- * 拿它當門檻會把後端本來計得到的分數勾掉。
+ * 門檻:照片 ≥5 張或有影片(與評鑑 ad2 同一條,也是彈窗紅字提示的那條)、報告表這一列存在、
+ * 心得達送出下限 3 篇。心得 1–2 篇因此預設不勾 —— 後端的 ad4 只要求「有上傳」,
+ * 這一段區間是承辦自己判斷要不要採計,勾回去就算數。
  */
 export const defaultConfirmations = (
   report: ConfirmableReport | undefined,
@@ -34,5 +35,5 @@ export const defaultConfirmations = (
   photos: !!report && report.photosConfirmed && (photoCount >= MIN_PHOTOS || !!report.videoUrl),
   // ad3 只問這一列在不在,不看內容:報告表讀得到就是有交
   report: !!report?.reportConfirmed,
-  reflections: !!report?.reflectionsConfirmed && report.reflections.length > 0,
+  reflections: !!report?.reflectionsConfirmed && report.reflections.length >= MIN_REFLECTIONS,
 })

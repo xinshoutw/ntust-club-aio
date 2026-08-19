@@ -44,7 +44,7 @@ _STAGE_LABEL = {"advisor": "承辦人", "chief": "組長", "dean": "學務長"}
 
 # aclose=結案審核頁:僅持該鍵的帳號也需要讀列表/詳情(動作端點另有各自關卡檢查),
 # 但視野僅限結案範圍(_visible_statuses),不得看到申請中/已退回等非結案狀態
-_FULL_VIEW_KEYS = ("areview",)
+_FULL_VIEW_KEYS = svc.FULL_VIEW_KEYS
 _REVIEW_PAGE_KEYS = (*_FULL_VIEW_KEYS, "aclose")
 _REVIEW_KEYS = (*_REVIEW_PAGE_KEYS, "approve_advisor", "approve_chief", "approve_dean")
 
@@ -112,26 +112,6 @@ async def _require_different_actor(db, activity: Activity, stage: str, user) -> 
             f"「{_STAGE_LABEL[previous]}」關卡已由本人簽核,不得再簽「{_STAGE_LABEL[stage]}」",
             code="SAME_ACTOR",
         )
-
-
-def _visible_statuses(user) -> set[ActivityStatus] | None:
-    """受限關卡帳號只看得到自己關卡相關的狀態;None=不限(super 或持活動審核頁權限)。"""
-    if user.is_super or any(k in user.permissions for k in _FULL_VIEW_KEYS):
-        return None
-    visible: set[ActivityStatus] = set()
-    if "approve_advisor" in user.permissions:
-        visible |= {ActivityStatus.PENDING_ADVISOR, ActivityStatus.CLOSING_PENDING_ADVISOR}
-    if "approve_chief" in user.permissions:
-        visible.add(ActivityStatus.PENDING_CHIEF)
-    if "approve_dean" in user.permissions:
-        visible.add(ActivityStatus.PENDING_DEAN)
-    if "aclose" in user.permissions:
-        visible |= {
-            ActivityStatus.CLOSING_PENDING_ADVISOR,
-            ActivityStatus.APPROVED,
-            ActivityStatus.CLOSED,
-        }
-    return visible
 
 
 async def _get_activity(db, activity_id: int, *, for_update: bool = False) -> Activity:
@@ -237,7 +217,7 @@ async def list_activities(
         .where(Activity.status != ActivityStatus.DRAFT)  # 草稿不進審核視野
         .options(sa.orm.selectinload(Activity.budget_items))
     )
-    visible = _visible_statuses(user)
+    visible = svc.visible_statuses(user)
     if visible is not None:
         query = query.where(Activity.status.in_(visible))
     if status:
@@ -310,7 +290,7 @@ async def get_activity(
     )
     if activity is None:
         raise not_found("找不到活動")
-    visible = _visible_statuses(user)
+    visible = svc.visible_statuses(user)
     if visible is not None and activity.status not in visible:
         raise not_found("找不到活動")  # 受限關卡帳號視同不存在,避免探測
     lock_months = await get_setting(db, "close_lock_months")

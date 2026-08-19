@@ -142,3 +142,28 @@ async def test_postal_with_an_attachment_stops_asking_for_one(client, db):
     )
     await db.commit()
     assert (await _badges(client))["postal"] == 0
+
+
+async def test_review_badge_counts_only_the_stage_the_account_can_see(client, db):
+    """學務長只審得到自己那一關:徽章不能把另外兩關的件數也報出去。"""
+    club = await make_club(db)
+    creator = await make_user(db, username="club04", role="club", club_id=club.id)
+    day = date.today() + timedelta(days=10)
+    db.add_all(
+        [
+            Activity(
+                club_id=club.id, name=f"待{stage}", location="x", type="活動", date=day,
+                end_date=day, status=status, created_by=creator.id,
+            )
+            for stage, status in [
+                ("承辦", "pending_advisor"),
+                ("組長", "pending_chief"),
+                ("學務長", "pending_dean"),
+            ]
+        ]
+    )
+    await make_user(db, username="dean", role="admin", permissions=["approve_dean"])
+    await db.commit()
+
+    await login(client, "dean")
+    assert (await _badges(client))["a-review"] == 1

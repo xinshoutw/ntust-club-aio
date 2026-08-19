@@ -47,6 +47,34 @@ def add_months(d: date, months: int) -> date:
     return date(year, month, day)
 
 
+# 只持簽核關卡鍵的帳號(如學務長)視野受限;持 areview 才看得到全部
+FULL_VIEW_KEYS = ("areview",)
+
+
+def visible_statuses(user) -> set[ActivityStatus] | None:
+    """受限關卡帳號只看得到自己關卡相關的狀態;None=不限(super 或持活動審核頁權限)。
+
+    列表、詳情與側欄徽章共用同一份 —— 徽章算了看不到的狀態,就等於把無權過問的
+    件數揭露給該帳號,而且點進去的筆數會對不上。
+    """
+    if user.is_super or any(k in user.permissions for k in FULL_VIEW_KEYS):
+        return None
+    visible: set[ActivityStatus] = set()
+    if "approve_advisor" in user.permissions:
+        visible |= {ActivityStatus.PENDING_ADVISOR, ActivityStatus.CLOSING_PENDING_ADVISOR}
+    if "approve_chief" in user.permissions:
+        visible.add(ActivityStatus.PENDING_CHIEF)
+    if "approve_dean" in user.permissions:
+        visible.add(ActivityStatus.PENDING_DEAN)
+    if "aclose" in user.permissions:
+        visible |= {
+            ActivityStatus.CLOSING_PENDING_ADVISOR,
+            ActivityStatus.APPROVED,
+            ActivityStatus.CLOSED,
+        }
+    return visible
+
+
 def is_close_locked(activity: Activity, lock_months: int, now: datetime | None = None) -> bool:
     """逾期鎖定(推導):已核准、活動結束日(end_date)+N 個月已過、未送結案、未解鎖。"""
     if activity.status != ActivityStatus.APPROVED or activity.close_unlocked:

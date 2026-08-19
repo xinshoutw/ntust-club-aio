@@ -42,7 +42,7 @@ from app.models.enums import (
     ViolationStatus,
 )
 from app.services import booking_service as svc
-from app.services.activity_service import can_close_sql
+from app.services.activity_service import can_close_sql, visible_statuses
 from app.services.evaluation import get_eval_window
 from app.services.settings_service import get_setting
 
@@ -137,17 +137,18 @@ async def _club(db: AsyncSession, club_id: int, lock_months: int) -> dict[str, i
 
 async def _admin(db: AsyncSession, user: User, lock_months: int) -> dict[str, int]:
     """受限管理員只拿得到自己看得到的頁面 —— 徽章也是資料量,不對無權限者揭露。"""
+    # 只持單一簽核鍵的帳號(學務長)在審核頁只列得到自己那一關 —— 徽章要算同一個集合,
+    # 否則數字大於它審得到的筆數,而那個差額本身就是它無權過問的件數
+    pending = {
+        ActivityStatus.PENDING_ADVISOR,
+        ActivityStatus.PENDING_CHIEF,
+        ActivityStatus.PENDING_DEAN,
+    }
+    visible = visible_statuses(user)
+    if visible is not None:
+        pending &= visible
     columns = {
-        "a-review": _count(
-            Activity.status.in_(
-                [
-                    ActivityStatus.PENDING_ADVISOR,
-                    ActivityStatus.PENDING_CHIEF,
-                    ActivityStatus.PENDING_DEAN,
-                ]
-            ),
-            of=Activity,
-        ),
+        "a-review": _count(Activity.status.in_(pending), of=Activity),
         "a-close": _count(
             Activity.status == ActivityStatus.CLOSING_PENDING_ADVISOR, of=Activity
         ),

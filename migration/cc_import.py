@@ -224,7 +224,7 @@ async def import_applies(
     with legacy.cursor() as cur:
         cur.execute("SELECT * FROM Apply ORDER BY id")
         rows = cur.fetchall()
-    created = skipped = 0
+    created = skipped = unlinked = 0
     for r in rows:
         status = BOOKING_STATUS_MAP.get(r["status"])
         targets = venue_ids.get(r["classroom_id"])
@@ -235,6 +235,8 @@ async def import_applies(
             skipped += 1  # 壞日期/未知狀態/未知場地/無節次
             continue
         activity_id = act_lookup.get(r["activity_id"])
+        if activity_id is None:
+            unlinked += 1  # 活動已刪,或不在 cms_import 的 SCOPE_* 內
         purpose = (r["purpose"] or "").strip() or (r["activity"] or "").strip() or "(未填)"
         created_at = epoch_dt(r["created_at"])
         for seq, venue_id in enumerate(targets):
@@ -258,7 +260,10 @@ async def import_applies(
             created += 1
         if created and created % 2000 == 0:
             print(f"  applies … {created}")
-    print(f"applies: 新增 {created} 筆場地借用、跳過 {skipped} 單(髒資料)")
+    print(
+        f"applies: 新增 {created} 筆場地借用、跳過 {skipped} 單(髒資料)"
+        f";其中 {unlinked} 單接不回活動(已刪或不在遷移範圍)"
+    )
 
 
 async def import_device_loans(
@@ -271,7 +276,7 @@ async def import_device_loans(
         cur.execute("SELECT * FROM DeviceLog ORDER BY id")
         logs = cur.fetchall()
     today = datetime.now(TAIPEI).date()
-    created = skipped = 0
+    created = skipped = unlinked = 0
     for log in logs:
         if ids.get("DeviceLog", log["id"]) is not None:
             continue
@@ -293,6 +298,8 @@ async def import_device_loans(
         if status == LoanStatus.APPROVED and end < today:
             status = LoanStatus.RETURNED
         created_at = epoch_dt(head["created_at"])
+        if act_lookup.get(head["activity_id"]) is None:
+            unlinked += 1  # 活動已刪,或不在 cms_import 的 SCOPE_* 內
         loan = EquipmentLoan(
             club_id=club_id,
             equipment_id=equipment_id,
@@ -311,7 +318,10 @@ async def import_device_loans(
         await db.flush()
         ids.record(db, "DeviceLog", log["id"], "equipment_loans", loan.id)
         created += 1
-    print(f"device loans: 新增 {created} 筆器材借用、跳過 {skipped}(孤兒/髒資料)")
+    print(
+        f"device loans: 新增 {created} 筆器材借用、跳過 {skipped}(孤兒/髒資料)"
+        f";其中 {unlinked} 筆接不回活動(已刪或不在遷移範圍)"
+    )
 
 
 # 沒有任何未知單位時檔頭也要長一樣,否則承辦拿到的兩份 CSV 欄位對不起來

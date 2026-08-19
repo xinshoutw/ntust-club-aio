@@ -50,14 +50,16 @@ from app.models.enums import (
 
 TAIPEI = ZoneInfo("Asia/Taipei")
 
-# 遷移範圍(decisions.md MIG-08):活動與公告只帶這幾個學期,社員名單全遷。
-# 換學年只改這兩個標籤;起訖由 semester_range 推,不要再自己算日期。
-SCOPE_SEMESTERS = ("114-1", "115-1")
+# 遷移範圍(decisions.md MIG-08):活動只帶這個區間,社員名單全遷。
+# 是「頭尾兩個學期」不是「要遷的學期清單」—— 中間的學期本來就含在區間裡,
+# 想加學期是把尾端往後挪,不是往裡面塞。換學年只改這兩個標籤。
+SCOPE_FIRST_SEMESTER = "114-1"
+SCOPE_LAST_SEMESTER = "115-1"
 
 
 def _scope_bounds() -> tuple[datetime, datetime]:
     """遷移範圍的 timestamptz 半開區間 [start, end);日界推導只有 semesters.py 一份。"""
-    return semester_bounds(SCOPE_SEMESTERS[0])[0], semester_bounds(SCOPE_SEMESTERS[1])[1]
+    return semester_bounds(SCOPE_FIRST_SEMESTER)[0], semester_bounds(SCOPE_LAST_SEMESTER)[1]
 
 # ---------------------------------------------------------------------------
 # 對映規則
@@ -445,6 +447,7 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
             {"start": scope_start, "end": scope_end},
         )
     ).all()
+    total = await legacy.scalar(sa.text('SELECT count(*) FROM "Club_activity"'))
     funds_rows = (
         await legacy.execute(
             sa.text(
@@ -561,7 +564,11 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
         if created % 500 == 0:
             await db.flush()
             print(f"  activities … {created}/{len(acts)}")
-    print(f"activities: 新增 {created}、跳過 {skipped}(已遷/不遷社團/未知狀態)")
+    print(
+        f"activities: 新增 {created}、跳過 {skipped}(已遷/不遷社團/未知狀態)"
+        f";範圍外未讀取 {(total or 0) - len(acts)}"
+        f"({SCOPE_FIRST_SEMESTER}~{SCOPE_LAST_SEMESTER} 之外)"
+    )
 
 
 async def import_news(legacy, db: AsyncSession, ids: IdMap) -> None:

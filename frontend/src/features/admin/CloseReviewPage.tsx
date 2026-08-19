@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { countText } from '../../lib/counts'
 import { App, Button, Checkbox, Input, Modal, Skeleton } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
@@ -19,9 +19,11 @@ import {
 } from '../../api/adminActivities'
 import ActivityReviewModal from './ActivityReviewModal'
 import { clickableProps } from '../../lib/clickable'
+import { clampPage } from '../../lib/paging'
 
-// 一頁最多 25 筆(50 筆太長,減半)、活動時間新在前
-const PAGE_SIZE = 25
+// 兩張表各自分頁:待審是逐件處理的佇列,逾期是追蹤用的清單
+const PENDING_PAGE_SIZE = 8
+const OVERDUE_PAGE_SIZE = 10
 
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 
@@ -330,7 +332,7 @@ export default function CloseReviewPage() {
     statuses: ['closing_pending_advisor'],
     sort: '-date',
     page: pendingPage,
-    pageSize: PAGE_SIZE,
+    pageSize: PENDING_PAGE_SIZE,
   })
   // 逾期未結案:後端推導過濾,含已鎖定與已解鎖(overdue=true 不分鎖定與否);
   // 活動日舊在前=逾期最久的先處理(期限=活動日+鎖定月數,單調)
@@ -338,7 +340,7 @@ export default function CloseReviewPage() {
     overdue: true,
     sort: 'date',
     page: overduePage,
-    pageSize: PAGE_SIZE,
+    pageSize: OVERDUE_PAGE_SIZE,
     // 逾期清單全是 approved:看不到該狀態的帳號送出去只會拿 403,
     // 畫面上就是每次開頁一片紅字。本頁對 approve_advisor 也開放,而它看不到 approved
     enabled: canSeeOverdue,
@@ -349,6 +351,14 @@ export default function CloseReviewPage() {
   const pendingTotal = pendingQuery.data?.total ?? 0
   const overdue = overdueQuery.data?.rows ?? []
   const overdueTotal = overdueQuery.data?.total ?? 0
+
+  // 伺服器分頁:簽掉一件後總數變少,停在末頁會看到空卡片(空狀態只在真的 0 筆時才對)
+  useEffect(() => {
+    setPendingPage((p) => clampPage(p, pendingTotal, PENDING_PAGE_SIZE))
+  }, [pendingTotal])
+  useEffect(() => {
+    setOverduePage((p) => clampPage(p, overdueTotal, OVERDUE_PAGE_SIZE))
+  }, [overdueTotal])
 
   // 點列即抓詳情,載入完成後彈窗自動補齊(照 ReviewPage 的立即開窗模式)
   const overdueDetailQuery = useAdminActivityDetail(overdueItem?.activityId)
@@ -445,7 +455,7 @@ export default function CloseReviewPage() {
             </div>
           )}
         </LoadingBlock>
-          <Pager page={pendingPage} pageSize={PAGE_SIZE} total={pendingTotal} onChange={setPendingPage} />
+          <Pager page={pendingPage} pageSize={PENDING_PAGE_SIZE} total={pendingTotal} onChange={setPendingPage} />
       </div>
 
       {/* 逾期未結案:已鎖定與已解鎖皆列出(狀態欄區分),整列可點開活動詳情。
@@ -535,7 +545,7 @@ export default function CloseReviewPage() {
             </tbody>
           </table>
         </LoadingBlock>
-          <Pager page={overduePage} pageSize={PAGE_SIZE} total={overdueTotal} onChange={setOverduePage} />
+          <Pager page={overduePage} pageSize={OVERDUE_PAGE_SIZE} total={overdueTotal} onChange={setOverduePage} />
       </div>
       )}
 

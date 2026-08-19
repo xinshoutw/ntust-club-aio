@@ -29,7 +29,7 @@ DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— �
 | 器材主檔 | 由 `migration/cc_import.py` 從舊 `Device` 表帶入,正式流程必須 seed 之後跑過遷移 |
 | 政府行事曆假日 | 匯入腳本已就緒(`scripts/import_holidays.py`),**上線年度還沒跑** |
 | `.env` 正式值 | `MAIL_FROM_ADDRESS` 是個人信箱要換;Uptime Kuma 兩支 push URL 待填 |
-| 遷移學期範圍 | MIG-08 定為三學期,兩支腳本尚未實作過濾(MIG-09)—— 照現況跑會把全史匯進正式庫 |
+| 遷移學期範圍 | `cms_import.py` 已依 `SCOPE_SEMESTERS` 過濾;借用是否同受此限制仍未定(MIG-10) |
 
 ### 三、其餘單獨排程
 
@@ -52,7 +52,7 @@ DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— �
 | **簽核關卡授予** | `APPROVAL_STAGES` 隨 `/auth/me` 下發,權限彈窗與頁面權限一起授出 —— 先前三把鍵沒有任何授予入口,而 super 不得代簽學務長關 |
 | **權限接管路徑** | `set_permissions` 補上位階檢查,四個端點同一條守衛 |
 | **應用層 log** | `main.py` 補 `basicConfig`(uvicorn 只設定自己的 logger,root 無 handler);`httpx` 壓到 WARNING —— 它在 INFO 記完整 URL,而 Kuma push 尾段與 Discord webhook 路徑都是憑證 |
-| **MIG-08** | 遷移範圍限 114-1 / 114-2 / 115-1 三學期,社員名單全遷;media 與舊評鑑檔案庫不遷。腳本尚未實作過濾(MIG-09) |
+| **MIG-08** | 遷移範圍限 114-1 / 114-2 / 115-1 三學期,社員名單全遷;media 與舊評鑑檔案庫不遷 |
 
 ## 驗證現況
 

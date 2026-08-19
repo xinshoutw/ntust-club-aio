@@ -36,8 +36,17 @@ class Settings(BaseSettings):
     postgres_password: str = "club"
     postgres_db: str = "club_aio"
 
-    # Discord webhook(公告/審核/通過/拒絕等事件推送;空值=停用)
+    # Discord webhook:**infra 告警專用**(磁碟水位)。社團事件與公告只推各社團
+    # 自設的 webhook(管理項目),學務處不收副本。空值=停用
     discord_webhook_url: str = ""
+
+    # Uptime Kuma push monitor(空值=停用)。心跳只在 ENV=prod 送出 —— 開發機也推的話,
+    # 正式站掛掉時 kuma 仍會被開發機的心跳餵成 up
+    uptime_push_backend_url: str = ""
+    uptime_push_frontend_url: str = ""
+    uptime_push_interval: int = 30  # 秒
+    # frontend 沒有自己的程序,由後端打這個位址確認 web 層活著才推 up
+    web_health_url: str = "http://web:8080/"
 
     smtp_host: str = ""
     smtp_port: int = 587

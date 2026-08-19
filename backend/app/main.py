@@ -1,4 +1,7 @@
+import asyncio
+import contextlib
 import logging
+from collections.abc import AsyncIterator
 
 from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
@@ -12,10 +15,24 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from app.api.v1 import router as api_v1_router
 from app.core.config import settings
 from app.core.errors import AppError
+from app.services import heartbeat
 
 logger = logging.getLogger("club_aio")
 
 _IS_DEV = settings.env == "dev"
+
+@contextlib.asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    """背景心跳的起停(唯一在程序內跑的排程;業務排程一律走 host cron)。"""
+    task = asyncio.create_task(heartbeat.run()) if heartbeat.enabled() else None
+    try:
+        yield
+    finally:
+        if task is not None:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
 
 # docs 掛在 /api 下,經 nginx 反代一樣可用;正式環境不暴露 API 介面說明
 app = FastAPI(
@@ -23,6 +40,7 @@ app = FastAPI(
     docs_url="/api/docs" if _IS_DEV else None,
     openapi_url="/api/openapi.json" if _IS_DEV else None,
     redoc_url=None,
+    lifespan=lifespan,
 )
 app.include_router(api_v1_router, prefix="/api/v1")
 

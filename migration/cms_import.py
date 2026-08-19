@@ -50,7 +50,7 @@ from app.models.enums import (
 
 TAIPEI = ZoneInfo("Asia/Taipei")
 
-# 遷移範圍(decisions.md MIG-08):活動只帶這個區間,社員名單全遷。
+# 遷移範圍(decisions.md MIG-08):只有活動受這個區間限制;社員名單與公告全遷(MIG-11)。
 # 是「頭尾兩個學期」不是「要遷的學期清單」—— 中間的學期本來就含在區間裡,
 # 想加學期是把尾端往後挪,不是往裡面塞。換學年只改這兩個標籤。
 SCOPE_FIRST_SEMESTER = "114-1"

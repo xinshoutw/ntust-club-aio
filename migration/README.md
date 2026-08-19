@@ -43,8 +43,9 @@ uv run python ../migration/cc_import.py            # 4. 匯入借用
 
 ## 範圍與對映(2026-07-21 需求方拍板)
 
-> **遷移範圍限 114-1 / 114-2 / 115-1 三學期,社員名單全遷**(decisions.md MIG-08)。
-> `cms_import.py` 依 `SCOPE_SEMESTERS` 過濾活動與公告(換學年只改這個常數);
+> **遷移範圍限 114-1 / 114-2 / 115-1 三學期**(decisions.md MIG-08),只套在**活動**上:
+> `cms_import.py` 的 `SCOPE_FIRST_SEMESTER` / `SCOPE_LAST_SEMESTER`,換學年只改這兩個常數。
+> **社員名單與公告全遷**(MIG-08 / MIG-11 —— 公告的 `create_date` 是貼出來的時刻,不是有效期間)。
 > 借用資料是否同受此限制未定,見 `docs/gaps.md` MIG-10。
 >
 > **範圍外的活動不遷,借用單就接不回去**:`cc_import.py` 的 `act_lookup` 只認範圍內的活動,

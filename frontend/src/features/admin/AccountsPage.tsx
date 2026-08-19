@@ -166,7 +166,7 @@ export default function AccountsPage() {
   const askResetPassword = (a: Account) =>
     confirmDialog(modal, {
       title: `重設密碼 — ${a.name}`,
-      content: '重設後原密碼立即失效,並須於首次登入時變更密碼',
+      content: '原密碼立即失效，並須於首次登入時變更密碼',
       okText: '確認重設',
       cancelText: '取消',
       onOk: () => {
@@ -227,7 +227,7 @@ export default function AccountsPage() {
     if (c.isActive) {
       confirmDialog(modal, {
         title: `停用 ${c.name}`,
-        content: '社團與其帳號將一併停用，停用後無法登入；可隨時重新啟用',
+        content: '社團停權後無法登入，隨時可以恢復',
         okText: '確認停用',
         okButtonProps: { danger: true },
         cancelText: '取消',
@@ -235,7 +235,7 @@ export default function AccountsPage() {
           clubMutations.update.mutate(
             { id: c.id, isActive: false },
             {
-              onSuccess: () => message.success(`已停用 ${c.name}，社團與其帳號已一併停用`),
+              onSuccess: () => message.success(`已停權 ${c.name}`),
               onError: (e) => message.error(e.message),
             },
           )
@@ -245,7 +245,7 @@ export default function AccountsPage() {
       clubMutations.update.mutate(
         { id: c.id, isActive: true },
         {
-          onSuccess: () => message.success(`已啟用 ${c.name}，社團與其帳號已一併啟用`),
+          onSuccess: () => message.success(`已啟用 ${c.name}`),
           onError: (e) => message.error(e.message),
         },
       )
@@ -481,7 +481,7 @@ export default function AccountsPage() {
                 <ActiveTag active={c.isActive} inactiveLabel="停用" />
                 {/* 停權(器材逾期)與帳號啟停是兩回事:停權中但仍啟用的社團在這裡本來看起來完全正常 */}
                 {suspendedNow(c.suspendedUntil) && (
-                  <Tooltip title="停權中,期間不得申請借用(原因見逾期追蹤與停權管理)">
+                  <Tooltip title="停權中，期間不得申請借用">
                     <div className="num" style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>
                       停權至 {c.suspendedUntil}
                     </div>
@@ -518,7 +518,7 @@ export default function AccountsPage() {
                       disabled={!canClubSettings}
                       onClick={() => toggleClubActive(c)}
                     >
-                      {c.isActive ? '停用' : '啟用'}
+                      {c.isActive ? '停權' : '恢復'}
                     </button>
                   </span>
                 </Tooltip>
@@ -687,7 +687,7 @@ export default function AccountsPage() {
                       border: changed ? '1px solid #d48806' : '1px solid transparent',
                       boxShadow: changed ? '0 0 0 1px rgba(212, 136, 6, 0.45)' : undefined,
                     }}
-                    title={locked ? '你本身沒有這項權限,無法授予他人' : undefined}
+                    title={locked ? '你沒有權限' : undefined}
                   >
                     <Checkbox
                       checked={permDraft.includes(value)}
@@ -732,7 +732,7 @@ export default function AccountsPage() {
             placeholder={USERNAME_HINT}
           />
           <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 8 }}>
-            建立後將產生一次性密碼；社團首次登入須立即更改密碼
+            建立後將產生一次性密碼
           </div>
         </div>
       </Modal>

@@ -68,7 +68,7 @@ export default function AnnouncementsPage() {
   const onPublish = (values: FormValues) => {
     const clubId = values.target === 'club' ? resolveClubId(clubsQuery.data, values.club) : undefined
     if (values.target === 'club' && clubId == null) {
-      message.error('無法識別所選社團,請重新選擇')
+      message.error('無法識別所選社團，請重新選擇')
       return
     }
     create.mutate(
@@ -83,7 +83,7 @@ export default function AnnouncementsPage() {
       },
       {
         onSuccess: () => {
-          message.success(values.notify ? '公告已發布,並已寄送通知' : '公告已發布')
+          message.success(values.notify ? '公告已發布，並已寄送通知' : '公告已發布')
           form.resetFields()
           setPage(1)
         },
@@ -119,8 +119,8 @@ export default function AnnouncementsPage() {
           <Form.Item name="title" label="標題" rules={[{ required: true, message: '請輸入標題' }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="content" label="內容(支援 Markdown)" rules={[{ required: true, message: '請輸入內容' }]}>
-            <Input.TextArea rows={5} placeholder="支援 **粗體**、清單、連結等 Markdown 語法" />
+          <Form.Item name="content" label="內容" rules={[{ required: true, message: '請輸入內容' }]}>
+            <Input.TextArea rows={5} placeholder="支援 Markdown 語法" />
           </Form.Item>
           <div className="form-grid-2">
             <Form.Item name="target" label="發布對象" style={{ marginBottom: 0 }}>
@@ -133,7 +133,7 @@ export default function AnnouncementsPage() {
               />
             </Form.Item>
             {target === 'attr' && (
-              <Form.Item name="attrs" label="性質(可複選)" preserve={false} rules={[{ required: true, message: '請選擇性質' }]} style={{ marginBottom: 0 }}>
+              <Form.Item name="attrs" label="性質" preserve={false} rules={[{ required: true, message: '請選擇性質' }]} style={{ marginBottom: 0 }}>
                 <Select mode="multiple" options={CLUB_ATTRIBUTES.map((a) => ({ value: a, label: a }))} placeholder="請選擇" />
               </Form.Item>
             )}
@@ -146,7 +146,7 @@ export default function AnnouncementsPage() {
 
           <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginTop: 18, alignItems: 'center' }}>
             <Form.Item name="takeover" valuePropName="checked" style={{ marginBottom: 0 }}>
-              <Checkbox>蓋板(每次登入全版顯示,5 秒後可關閉)</Checkbox>
+              <Checkbox>蓋板</Checkbox>
             </Form.Item>
             {takeover && (
               <Form.Item
@@ -165,7 +165,7 @@ export default function AnnouncementsPage() {
           </div>
           <div style={{ marginTop: 12 }}>
             <Form.Item name="notify" valuePropName="checked" style={{ marginBottom: 0 }}>
-              <Checkbox>通知(寄送 Email 給各社聯絡人;已設定 Discord Webhook 的社團一併推送)</Checkbox>
+              <Checkbox>通知</Checkbox>
             </Form.Item>
           </div>
 

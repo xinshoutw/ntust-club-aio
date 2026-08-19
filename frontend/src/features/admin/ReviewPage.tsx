@@ -262,7 +262,7 @@ export default function ReviewPage() {
                     <button
                       type="button"
                       className="row-open-btn"
-                      aria-label={`開啟「${item.name || '未命名活動'}」詳情`}
+                      aria-label={`開啟「${item.name || '未命名活動'}」詳細資訊`}
                       onClick={(e) => {
                         e.stopPropagation()
                         openItem(item)

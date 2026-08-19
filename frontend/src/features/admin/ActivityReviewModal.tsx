@@ -232,7 +232,7 @@ export default function ActivityReviewModal({
         // 本來就沒有鈕,別叫人去審核 —— 頁面對每一列都傳 onApprove,判準只能是 canReview
         detailFailed ? (
           <div style={{ fontSize: 12, color: 'var(--steel)' }}>
-            詳情載入失敗,請重試{canReview ? '後再審核' : ''}
+            詳細資訊載入失敗，請重試{canReview ? '後再審核' : ''}
           </div>
         ) : canReview ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
@@ -268,7 +268,7 @@ export default function ActivityReviewModal({
           而列表列那半份基本資料也不能留 —— 經費逐項與附件都不在,「地點 —」看起來就像沒填 */}
       {detailFailed && (
         <div style={{ marginTop: 8 }}>
-          <QueryError compact title="活動詳情載入失敗" error={detailError} onRetry={onRetryDetail} />
+          <QueryError compact title="活動詳細資訊載入失敗" error={detailError} onRetry={onRetryDetail} />
         </div>
       )}
       {/* 詳情未到位先鋪 Skeleton(彈窗立即開啟,內容漸進補齊) */}
@@ -465,7 +465,7 @@ export default function ActivityReviewModal({
         onCancel={closeReject}
       >
         <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 8 }}>
-          退回原因(必填,將顯示於社團的活動列表)
+          退回原因
         </div>
         <Input.TextArea
           autoFocus

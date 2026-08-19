@@ -165,7 +165,7 @@ export default function AdminMembersPage() {
                 <tr className="no-hover">
                   <td colSpan={colCount} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
                     {clubsQuery.isError
-                      ? '社團清單載入失敗,請以頁首的重試鈕重新載入'
+                      ? '社團清單載入失敗，請以頁首的重試鈕重新載入'
                       : clubId == null
                         ? '請先選擇社團'
                         : `${club} 尚未建立成員名單`}

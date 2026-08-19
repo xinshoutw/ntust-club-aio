@@ -186,12 +186,12 @@ export default function AdminViolationsPage() {
                   <td className="r">
                     {v.status === 'violation_open' &&
                       (v.expired ? (
-                        <Tooltip title="已逾 1 個月銷案期限,不再受理銷案">
+                        <Tooltip title="已逾 1 個月銷案期限，不再受理銷案">
                           <span style={{ fontSize: 13, color: 'var(--steel)' }}>已截止</span>
                         </Tooltip>
                       ) : (
                         <button type="button" className="link-btn primary" onClick={() => askResolve(v)}>
-                          銷案…
+                          銷案
                         </button>
                       ))}
                   </td>

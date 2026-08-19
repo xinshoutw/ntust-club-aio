@@ -174,7 +174,7 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
       {/* 詳情載入失敗:整塊改為錯誤呈現,避免結案資料/附件被誤看成不存在 */}
       {error != null ? (
         <div style={{ marginTop: 10 }}>
-          <QueryError compact title="活動詳情載入失敗" error={error} onRetry={onRetry} />
+          <QueryError compact title="活動詳細資訊載入失敗" error={error} onRetry={onRetry} />
         </div>
       ) : (
       <div style={{ display: 'grid', gridTemplateColumns: rep ? 'minmax(0, 1fr) minmax(0, 1fr)' : '1fr', gap: 32, marginTop: 10, alignItems: 'start' }}>
@@ -302,7 +302,7 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
 
           {a.status === 'locked' && (
             <div style={{ fontSize: 13, color: '#A3341F', marginTop: 16 }}>
-              已逾結案期限並鎖定,請洽學務處申請解鎖
+              已逾期並鎖定，更多疑問請洽學務處
             </div>
           )}
         </div>
@@ -454,7 +454,7 @@ export default function ActivityListPage() {
         <button
           type="button"
           className="row-open-btn"
-          aria-label={`開啟「${a.name || '未命名活動'}」詳情`}
+          aria-label={`開啟「${a.name || '未命名活動'}」詳細資訊`}
           onClick={(e) => {
             e.stopPropagation()
             onRowClick(a)

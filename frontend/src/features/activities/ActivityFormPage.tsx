@@ -354,7 +354,7 @@ function ActivityForm({
           setFiles((prev) => prev.filter((x) => x.key !== b.key))
         } catch (e) {
           invalidate()
-          message.error(`附件「${b.file.name}」上傳失敗:${errMsg(e)};申請已存為草稿,請補齊附件後再送出`)
+          message.error(`附件「${b.file.name}」上傳失敗，已存為草稿並請稍後再試 (${errMsg(e)})`)
           navigate(`/activities/${saved.id}/edit`)
           return
         }
@@ -363,7 +363,7 @@ function ActivityForm({
         await submitActivity(saved.id)
       } catch (e) {
         invalidate()
-        message.error(`送出申請失敗:${errMsg(e)};申請已存為草稿`)
+        message.error(`送出申請失敗，已存為草稿並請稍後再試 (${errMsg(e)})`)
         // 新建流程轉入編輯路由:再按送出走更新,不會重複建立草稿
         if (!editing) navigate(`/activities/${saved.id}/edit`)
         return

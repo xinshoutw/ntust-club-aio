@@ -228,7 +228,7 @@ export default function BookingReviewModal({
           rows={3}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder={reasonMode === 'revoke' ? '例:場地整修,該時段停止開放' : '例:所選時段已有其他社團借用'}
+          placeholder={reasonMode === 'revoke' ? '場地整修' : '所選時段已有其他社團借用'}
         />
       </Modal>
     </Modal>

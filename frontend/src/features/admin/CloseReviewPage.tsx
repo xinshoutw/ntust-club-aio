@@ -78,12 +78,7 @@ function CloseReviewModal({
       },
       {
         onSuccess: () => {
-          const missing = SUBMISSION_CHECKS.filter((c) => !checks[c.key]).map((c) => c.label)
-          message.success(
-            missing.length
-              ? `已核准「${item.name}」結案(${missing.join('、')}未繳,該項以 0 分計)`
-              : `已核准「${item.name}」結案`,
-          )
+          message.success(`已核准「${item.name}」結案`)
           onClose()
         },
         onError: (e) => message.error(e.message),
@@ -133,7 +128,7 @@ function CloseReviewModal({
         // 等於整份 fail-open;退回也不該在讀不到內容時按
         detailFailed ? (
           <div style={{ fontSize: 12, color: 'var(--steel)' }}>
-            詳情載入失敗,請重試{canReview ? '後再審核' : ''}
+            詳細資訊載入失敗，請重試{canReview ? '後再審核' : ''}
           </div>
         ) : canReview ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
@@ -162,7 +157,7 @@ function CloseReviewModal({
         <Skeleton active paragraph={{ rows: 8 }} style={{ marginTop: 12 }} />
       ) : detailFailed ? (
         <div style={{ marginTop: 12 }}>
-          <QueryError compact title="結案詳情載入失敗" error={detailQuery.error} onRetry={() => void detailQuery.refetch()} />
+          <QueryError compact title="結案詳細資訊載入失敗" error={detailQuery.error} onRetry={() => void detailQuery.refetch()} />
         </div>
       ) : !report ? (
         <div style={{ marginTop: 16, fontSize: 13, color: 'var(--steel)' }}>此活動尚無結案資料</div>
@@ -291,7 +286,7 @@ function CloseReviewModal({
         onCancel={closeReject_}
       >
         <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 8 }}>
-          退回原因(必填,將顯示於社團的活動列表)
+          退回原因
         </div>
         <Input.TextArea
           autoFocus
@@ -478,7 +473,7 @@ export default function CloseReviewPage() {
                     <button
                       type="button"
                       className="row-open-btn"
-                      aria-label={`開啟「${l.name || '未命名活動'}」詳情`}
+                      aria-label={`開啟「${l.name || '未命名活動'}」詳細資訊`}
                       onClick={(e) => {
                         e.stopPropagation()
                         openOverdue(l)

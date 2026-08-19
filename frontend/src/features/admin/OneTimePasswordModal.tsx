@@ -32,7 +32,7 @@ export default function OneTimePasswordModal({
       await navigator.clipboard.writeText(password)
       message.success('已複製密碼')
     } catch {
-      message.error('複製失敗,請按下顯示密碼後手動複製')
+      message.error('複製失敗，請按下顯示密碼後手動複製')
     }
   }
 

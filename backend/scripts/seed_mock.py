@@ -893,7 +893,7 @@ async def _create_bookings(
             start_date=date(2026, 7, 10), end_date=date(2026, 7, 20),
             purpose="整備週戶外器材點檢遮陽", status=LoanStatus.CHECKED_OUT,
             checkout_by=staff.id, checkout_at=_dt(2026, 7, 10, 9, 30),
-            serials=["TENT-01", "TENT-02"], borrower_name="顏志明",
+            borrower_name="顏志明",
         ),
         EquipmentLoan(  # 已歸還(完整借出+歸還點交)
             club_id=csie.id, equipment_id=equipment["擴音機MA101"].id,
@@ -901,7 +901,7 @@ async def _create_bookings(
             start_date=date(2026, 4, 23), end_date=date(2026, 4, 27),
             purpose="宿營團康與營火晚會擴音", status=LoanStatus.RETURNED,
             checkout_by=staff.id, checkout_at=_dt(2026, 4, 23, 10, 0),
-            serials=["MA101-1"], borrower_name="顏志明",
+            borrower_name="顏志明",
             checkin_by=staff.id, checkin_at=_dt(2026, 4, 27, 9, 50),
             checkin_note="功能正常,附件齊全", returner_name="林小芳",
         ),

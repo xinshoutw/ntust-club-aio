@@ -31,12 +31,13 @@ def upgrade() -> None:
             UPDATE system_settings
             SET key = 'close_lock_days',
                 value = to_jsonb(GREATEST(1, LEAST(366, (value #>> '{}')::numeric * :per_month))::int)
-            WHERE key = 'close_lock_months' AND jsonb_typeof(value) = 'number'
+            WHERE key = 'close_lock_months' AND value #>> '{}' ~ '^-?[0-9]+(\.[0-9]+)?$'
             """
         ),
         {"per_month": DAYS_PER_MONTH},
     )
-    # 非數字的髒值換算不出天數,留著只會讓新程式讀到一個它不認得的鍵
+    # 數字與數字字串都換算(新程式的 int() 兩種都吃);真的不是數字才刪 ——
+    # 留著只會讓新程式讀到一個它不認得的鍵
     conn.execute(sa.text("DELETE FROM system_settings WHERE key = 'close_lock_months'"))
 
 
@@ -53,7 +54,7 @@ def downgrade() -> None:
                 value = to_jsonb(
                     LEAST(6, GREATEST(1, CEIL((value #>> '{}')::numeric / :per_month))::int)
                 )
-            WHERE key = 'close_lock_days' AND jsonb_typeof(value) = 'number'
+            WHERE key = 'close_lock_days' AND value #>> '{}' ~ '^-?[0-9]+(\.[0-9]+)?$'
             """
         ),
         {"per_month": DAYS_PER_MONTH},

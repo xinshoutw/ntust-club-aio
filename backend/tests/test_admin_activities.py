@@ -362,7 +362,12 @@ async def test_admin_list_includes_club_name_and_close_deadline(client, db):
     row = next(r for r in listing["data"] if r["id"] == aid)
     assert row["club_id"] == club.id
     assert row["club_name"] == club.name
-    assert row["close_deadline"]  # 推導:活動結束日 + 鎖定天數
+    # 推導:活動結束日 + 鎖定天數。社團端的倒數與鎖定都讀這個值,差一天就是差一天
+    from app.services.settings_service import get_setting
+
+    lock_days = int(await get_setting(db, "close_lock_days"))
+    end = date.fromisoformat(row["end_date"])
+    assert row["close_deadline"] == (end + timedelta(days=lock_days)).isoformat()
 
     detail = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]
     assert detail["club_name"] == club.name

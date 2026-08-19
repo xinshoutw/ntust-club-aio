@@ -18,7 +18,7 @@
 - [ ] 阻擋 `SECRET_KEY` = `openssl rand -base64 48`
 - [ ] 阻擋 `POSTGRES_PASSWORD` = 強密碼(compose 以同一個變數插值到 db 與 backend)
 - [ ] 阻擋 `FORWARDED_ALLOW_IPS` = `172.28.0.0/24` + edge VM 內網 IP。**絕不可用 `*`**,否則登入限流可被繞過、稽核 IP 可被投毒。值需與內層 web nginx 的 `set_real_ip_from` 一起核對
-- [ ] 阻擋 `DISCORD_WEBHOOK_URL`:現值為測試群組,prod 換正式頻道;**絕不入版控**
+- [ ] 阻擋 `DISCORD_WEBHOOK_URL`:infra 告警專用(磁碟水位),已是正式頻道;**絕不入版控**
 - [ ] 阻擋 `SMTP_*`:校方 relay 已實測可寄(`mail.ntust.edu.tw:465`、`SMTP_SECURITY=ssl`)。
   host / username / password 任一為空即降級 log-only(不報錯,但信不會寄出)。
   **`MAIL_FROM_ADDRESS` 需與認證帳號同網域**,否則 relay 會拒收
@@ -37,12 +37,15 @@
 
 ## D. 維運
 
+> 三個 cron 與心跳都掛在**正式 VM**;開發機不跑(心跳另以 `ENV=prod` 把關)。
+
 - [ ] 應辦 **backend healthcheck**:`compose.yml` 只有 db 有,web 的 `depends_on: backend` 也沒有 `condition: service_healthy`。啟動時可能短暫 502(內層 nginx 變數 upstream + resolver 會自行恢復,不會卡死)
 - [ ] 應辦 **監控與告警**:至少磁碟使用率、backend 存活、log 輪替與保留
 - [ ] 應辦 **磁碟容量**:系統總量讀實體磁碟可用空間,不設邏輯容量;實體磁碟還要容 OS/Docker/PostgreSQL/log/multipart temp,以 `df` 與 GCE 實際容量驗證
 - [ ] 待決 **限流與 session**:限流是行程內記憶體(單機可行,重啟歸零);過期 session 於登入時順手清除,不另設排程
 - [ ] 應辦 **逾期提醒排程**:host cron 每上班日 10:35 呼叫 `scripts/send_overdue_reminders.py`(cron 行見該檔 docstring);未設排程則只剩人工按鈕
 - [ ] 應辦 **每日備份**:host cron 03:15 呼叫 `scripts/backup_db.sh`
+- [ ] 應辦 **Uptime Kuma**:`.env` 填兩支 push URL 與 `WEB_HEALTH_URL`,後端每 30 秒推一次心跳
 - [ ] 應辦 **容量告警**:host cron 08:20 呼叫 `scripts/check_disk.py`(80% 警示、90% 告警推 Discord;90% 時上傳前置閘已關閉,沒有告警的話社團會傳不上東西一整天)
 
 ## E. Edge proxy 切換

@@ -80,7 +80,7 @@
 | **OPS-01** | **僅自動備份 DB 並存放於同一環境**(防誤刪與系統錯誤),不做異地備份。需要時 infra 主動連上處理 |
 | **MIG-07 / OPS-05** | 有一天會**將所有系統完全關閉**,遷移與對外網址切換都在該期間執行。(此處的 OPS-05 指切換**時機**;edge proxy 那六項設定變更在 `DEPLOY_CHECKLIST.md` B / E 兩段) |
 | **OPS-06** | 校方 relay:`mail.ntust.edu.tw`,port 465,SSL/TLS,一般密碼認證。**2026-08-19 實測寄出成功**。該主機憑證鏈上有一張 CA 缺 Subject Key Identifier,Python 3.13+ 的嚴格模式會拒絕 —— SMTP 專用的 TLS context 清掉 `VERIFY_X509_STRICT`,鏈與主機名驗證全部保留 |
-| **MIG-01** | 系統關閉當天匯入與前一學期／新學期相關的檔案;舊系統的檔案式架構改為文字匯入 |
+| **MIG-08** | **遷移範圍限於 114-1、114-2、115-1 三個學期的資料與全部社員名單**;舊機 media 目錄、舊評鑑檔案庫與歷史活動資料一律不遷(取代原 MIG-01 的檔案匯入計畫) |
 | **MIG-04** | 系統關閉前一天提供即時最新資料,供遷移預演 |
 | **MIG-05** | 社團聯絡 Email 由腳本自動生成:取**最新學期「負責人」身份的學生學號** + `@mail.ntust.edu.tw`。無負責人者列為例外輸出。Discord webhook 預設留空 |
 | **MIG-06** | 認不出借用單位的 560 筆借用:導出清單供承辦辨識,認不出則永久維持「學務處」。不擋上線。清單由 `migration/cc_import.py --unknown-clubs` 產生 |
@@ -109,12 +109,13 @@
 | 項目 | 現況 |
 |---|---|
 | `MAIL_FROM_ADDRESS` | 開發者個人信箱,僅供測試。正式環境換成不綁個人的位址,且**必須與 `SMTP_USERNAME` 同網域**,否則校方 relay 拒收 |
-| `DISCORD_WEBHOOK_URL` | 指向測試群組 |
+| `DISCORD_WEBHOOK_URL` | infra 告警專用(磁碟水位),已是正式頻道。社團事件與公告只推各社團自設的 webhook |
 
 ### 上線時要做的事(不是程式待辦)
 
 | 項目 | 說明 |
 |---|---|
 | 政府行事曆假日 | `backend/scripts/import_holidays.py --year <民國年> --yes`,**每年一次** |
-| 三個 host cron | 逾期提醒、每日備份、容量告警(cron 行各見腳本頂部) |
+| 三個 host cron | 逾期提醒、每日備份、容量告警(cron 行各見腳本頂部)。**只掛在正式 VM** |
+| Uptime Kuma | 心跳由後端程序內推送(30 秒一次,cron 到不了這個粒度),只在 `ENV=prod` 送出 |
 | 器材主檔 | seed 之後跑 `migration/cc_import.py` 帶入(OPS-04) |

@@ -4,14 +4,12 @@
 
 ## 1. 投遞機制
 
-**兩條路徑**,內容完全相同:
+| 路徑 | 設定位置 | 收什麼 |
+|------|----------|--------|
+| 社團 webhook | `clubs.discord_webhook_url`(社團於管理項目自設) | 本清冊的全部事件與公告;沒設就不推 |
+| infra webhook | `.env` `DISCORD_WEBHOOK_URL` | **只有磁碟水位告警**(空值=停用並僅記 log) |
 
-| 路徑 | 設定位置 |
-|------|----------|
-| 全域 webhook | `.env` `DISCORD_WEBHOOK_URL`(學務處頻道,**每個事件必推**;空值=停用並僅記 log) |
-| 社團 webhook | `clubs.discord_webhook_url`(社團於管理項目自設,有設才另推一份) |
-
-路由函式:`club_event()` 先推全域再推社團,一般事件全走這條;`announcement_broadcast()` 為公告專用,推全域 + 逐一推目標社團並寄 Email。
+路由函式:`club_event()` 推該社團自設的 webhook,一般事件全走這條;`announcement_broadcast()` 為公告專用,逐一推目標社團並寄 Email;`discord()` 是 infra 專用那一條。
 
 **身分**:`_with_identity()` 為每個 payload 補 `username="臺科大社團管理系統"`、`avatar_url=SITE_URL/logo.png`(開發站無法解析時 Discord 略過頭貼)。
 

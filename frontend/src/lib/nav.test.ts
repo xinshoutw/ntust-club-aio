@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { buildAdminNav, buildClubNav, type NavGroup } from './nav'
+import { buildAdminNav, buildClubNav, buildPtNav, buildViewerNav, type NavGroup } from './nav'
 import type { SessionUser } from '../api/auth'
 
 const findItem = (groups: NavGroup[], key: string) =>
@@ -39,8 +39,23 @@ describe('固定場地借用的側欄項目', () => {
   })
 
   test('行政端不吃開放窗:受理期間只擋社團送件,承辦全年都要審得到', () => {
-    const nav = buildAdminNav(superUser, 0, 0)
+    const nav = buildAdminNav(superUser)
     expect(findItem(nav, 'a-room')?.disabled).toBeFalsy()
     expect(groupOf(nav, 'a-room')).toBe('借用審核')
+  })
+})
+
+describe('側欄徽章', () => {
+  test('依 key 掛到對應項目;0 與未回傳都不顯示', () => {
+    const nav = buildAdminNav(superUser, { 'a-review': 3, 'a-close': 0 })
+    expect(findItem(nav, 'a-review')?.badge).toBe(3)
+    expect(findItem(nav, 'a-close')?.badge).toBeUndefined()
+    expect(findItem(nav, 'a-booking')?.badge).toBeUndefined()
+  })
+
+  test('四端都吃同一份徽章', () => {
+    expect(findItem(buildClubNav(undefined, true, { 'act-close': 2 }), 'act-close')?.badge).toBe(2)
+    expect(findItem(buildPtNav({ 'pt-overdue': 5 }), 'pt-overdue')?.badge).toBe(5)
+    expect(findItem(buildViewerNav({ 'v-my': 1 }), 'v-my')?.badge).toBe(1)
   })
 })

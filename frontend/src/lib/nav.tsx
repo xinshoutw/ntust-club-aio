@@ -43,6 +43,15 @@ export interface NavGroup {
   items: NavItem[]
 }
 
+/** 側欄徽章:鍵即 NavItem.key(後端 services/badges.py 出的同一份)。0 與未回傳都不顯示 */
+export type Badges = Record<string, number>
+
+const withBadges = (groups: NavGroup[], badges: Badges = {}): NavGroup[] =>
+  groups.map((g) => ({
+    ...g,
+    items: g.items.map((i) => (badges[i.key] ? { ...i, badge: badges[i.key] } : i)),
+  }))
+
 const FIXED_BOOKING_ITEM: NavItem = {
   key: 'booking-fixed',
   label: '固定場地',
@@ -54,7 +63,11 @@ const FIXED_BOOKING_ITEM: NavItem = {
 // 固定場地借用開放窗由後端系統設定提供(GET /club/room-bookings/window),
 // nav 因此無法再是模組層級常數:改為 builder,由 App 的 ClubShell 以 useFixedWindow() 查詢後組合;
 // 未開放(或查詢未完成)時項目反灰並移至「其他」。
-export function buildClubNav(window?: FixedWindow, windowFailed = false): NavGroup[] {
+export function buildClubNav(
+  window?: FixedWindow,
+  windowFailed = false,
+  badges: Badges = {},
+): NavGroup[] {
   // 查詢失敗不能說成「未開放」:開放窗一年只開幾週,那句話完全合理,
   // 而項目一反灰,頁面裡寫好的錯誤與重試就永遠到不了(spec booking-fixed.md 也是這樣寫的)
   const fixedBookingOpen = windowFailed || (window?.open ?? false)
@@ -62,7 +75,7 @@ export function buildClubNav(window?: FixedWindow, windowFailed = false): NavGro
     window?.openFrom && window.openUntil
       ? `未開放申請;受理期間 ${window.openFrom} – ${window.openUntil}`
       : '目前未開放申請'
-  return [
+  return withBadges([
     {
       items: [{ key: 'overview', label: '總覽', path: '/', icon: <HomeOutlined /> }],
     },
@@ -114,7 +127,7 @@ export function buildClubNav(window?: FixedWindow, windowFailed = false): NavGro
           : [{ ...FIXED_BOOKING_ITEM, disabled: true, disabledHint: closedHint }]),
       ],
     },
-  ]
+  ], badges)
 }
 
 const ADMIN_ROOM_ITEM: NavItem = {
@@ -124,14 +137,10 @@ const ADMIN_ROOM_ITEM: NavItem = {
   icon: <ScheduleOutlined />,
 }
 
-// 側欄徽章=待審數(shell 以共用 query 提供;查詢中/失敗不顯示)。
+// 側欄徽章由 GET /badges 一次供給(查詢中/失敗不顯示)。
 // 依 permissions 過濾:受限管理員只看得到自己可用的項目(路由另有 gate)。
 // 「固定場地借用」不隨開放窗反灰 —— 受理期間只擋社團送件,行政端全年都要審得到。
-export function buildAdminNav(
-  user: SessionUser | null,
-  pendingReview?: number,
-  pendingClose?: number,
-): NavGroup[] {
+export function buildAdminNav(user: SessionUser | null, badges: Badges = {}): NavGroup[] {
   const groups: NavGroup[] = [
   {
     items: [{ key: 'a-home', label: '總覽', path: '/admin', icon: <DashboardOutlined /> }],
@@ -144,14 +153,12 @@ export function buildAdminNav(
         label: '申請審核',
         path: '/admin/review',
         icon: <AuditOutlined />,
-        badge: pendingReview || undefined,
       },
       {
         key: 'a-close',
         label: '結案審核',
         path: '/admin/close-review',
         icon: <FileDoneOutlined />,
-        badge: pendingClose || undefined,
       },
     ],
   },
@@ -213,14 +220,17 @@ export function buildAdminNav(
     ],
   },
   ]
-  return groups
-    .map((g) => ({ ...g, items: g.items.filter((i) => canAccessAdminPath(user, i.path)) }))
-    .filter((g) => g.items.length > 0)
+  return withBadges(
+    groups
+      .map((g) => ({ ...g, items: g.items.filter((i) => canAccessAdminPath(user, i.path)) }))
+      .filter((g) => g.items.length > 0),
+    badges,
+  )
 }
 
 // 工讀生端(URL 前綴 /pt;登入角色鍵維持 staff)
-export function buildPtNav(): NavGroup[] {
-  return [
+export function buildPtNav(badges: Badges = {}): NavGroup[] {
+  return withBadges([
     {
       label: '違規勸導',
       items: [
@@ -236,12 +246,12 @@ export function buildPtNav(): NavGroup[] {
         { key: 'pt-overdue', label: '逾期追蹤', path: '/pt/overdue', icon: <StopOutlined /> },
       ],
     },
-  ]
+  ], badges)
 }
 
 // 評審端
-export function buildViewerNav(): NavGroup[] {
-  return [
+export function buildViewerNav(badges: Badges = {}): NavGroup[] {
+  return withBadges([
     {
       items: [
         { key: 'v-my', label: '我負責的評分', path: '/viewer', icon: <HomeOutlined /> },
@@ -249,5 +259,5 @@ export function buildViewerNav(): NavGroup[] {
         { key: 'v-done', label: '已完成評分', path: '/viewer/done', icon: <FileDoneOutlined /> },
       ],
     },
-  ]
+  ], badges)
 }

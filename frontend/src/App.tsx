@@ -4,7 +4,7 @@ import { useAuth, type Role } from './app/auth'
 import { buildAdminNav, buildClubNav, buildPtNav, buildViewerNav } from './lib/nav'
 import { canAccessAdminPath } from './lib/permissions'
 import { useFixedWindow } from './api/bookings'
-import { usePendingActivityTotal, usePendingCloseTotal } from './api/adminActivities'
+import { useBadges } from './api/badges'
 import { homeOf } from './lib/home'
 import AppShell from './components/layout/AppShell'
 import QueryError from './components/ui/QueryError'
@@ -93,33 +93,32 @@ function RequireRole({ roles, children }: { roles: Role[]; children: ReactNode }
 // 查詢未完成前先視為未開放,載入後自動更新
 function ClubShell() {
   const windowQuery = useFixedWindow()
+  const badges = useBadges()
   const nav = useMemo(
-    () => buildClubNav(windowQuery.data, windowQuery.isError),
-    [windowQuery.data, windowQuery.isError],
+    () => buildClubNav(windowQuery.data, windowQuery.isError, badges.data),
+    [windowQuery.data, windowQuery.isError, badges.data],
   )
   return <AppShell nav={nav} />
 }
 
-// 行政端側欄徽章=申請/結案待審數(共用審核頁查詢);
-// 側欄項目與徽章查詢皆依 permissions 過濾,受限管理員看不到無權限的頁
+// 側欄徽章:GET /badges 一次回該角色所有頁面的待辦數;
+// 後端已依 permissions 過濾,受限管理員拿不到無權限頁面的數字
 function AdminShell() {
   const { user } = useAuth()
-  const pendingReview = usePendingActivityTotal(canAccessAdminPath(user, '/admin/review'))
-  const pendingClose = usePendingCloseTotal(canAccessAdminPath(user, '/admin/close-review'))
-  const nav = useMemo(
-    () => buildAdminNav(user, pendingReview.data, pendingClose.data),
-    [user, pendingReview.data, pendingClose.data],
-  )
+  const badges = useBadges()
+  const nav = useMemo(() => buildAdminNav(user, badges.data), [user, badges.data])
   return <AppShell nav={nav} badgeLabel="行政後台" />
 }
 
 function PtShell() {
-  const nav = useMemo(() => buildPtNav(), [])
+  const badges = useBadges()
+  const nav = useMemo(() => buildPtNav(badges.data), [badges.data])
   return <AppShell nav={nav} badgeLabel="工讀生" />
 }
 
 function ViewerShell() {
-  const nav = useMemo(() => buildViewerNav(), [])
+  const badges = useBadges()
+  const nav = useMemo(() => buildViewerNav(badges.data), [badges.data])
   return <AppShell nav={nav} badgeLabel="評審" />
 }
 

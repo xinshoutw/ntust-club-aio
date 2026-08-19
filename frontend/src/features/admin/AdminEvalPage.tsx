@@ -186,7 +186,7 @@ export default function AdminEvalPage() {
                 <td>
                   <div style={{ fontWeight: 500 }}>表現優良加分</div>
                   <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 2 }}>
-                    義務協助學校活動或校外性活動得獎;計入(五)加減分,最多 +5
+                    義務協助學校活動或校外性活動得獎。計入(五)加減分，最多 +5
                   </div>
                 </td>
                 <td className="r num" style={{ fontSize: 13, color: 'var(--steel)' }}>—</td>
@@ -277,7 +277,7 @@ export default function AdminEvalPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 4 }}>
             {mode.kind === 'revert' ? (
               <div style={{ fontSize: 13, color: 'var(--steel)' }}>
-                註銷此項的手動調整,改採系統自動計算結果。
+                註銷此項的手動調整，改採系統自動計算結果
               </div>
             ) : (
               <div>

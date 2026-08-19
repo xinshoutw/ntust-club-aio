@@ -10,13 +10,13 @@ describe('notFoundText', () => {
 
   test('失敗不說成沒有資料,並給下一步', () => {
     expect(notFoundText({ isPending: false, isError: true }, '無場地', '場地清單')).toBe(
-      '場地清單載入失敗,請重新整理頁面',
+      '場地清單載入失敗，請重新整理頁面',
     )
   })
 
   test('載入中也不說成沒有資料(給了 notFoundContent 就沒有 spinner 了)', () => {
     expect(notFoundText({ isPending: true, isError: false }, '無場地', '場地清單')).toBe(
-      '場地清單載入中…',
+      '場地清單載入中...',
     )
   })
 })

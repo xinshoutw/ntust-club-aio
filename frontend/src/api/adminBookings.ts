@@ -228,9 +228,9 @@ export const CONFLICT_TEXT: Record<RoomConflictKind, string> = {
 /** 整單的衝突說明:撞到已核准單就不是「擇一」的問題,核准必被後端擋下 */
 export const conflictNote = (kinds: (RoomConflictKind | undefined)[]): string | null =>
   kinds.includes('taken')
-    ? '此申請的時段已有已核准的固定借用,核准會被系統擋下;請退回本單,或先撤銷已核准的那筆'
+    ? '此申請的時段與已核准的固定借用衝突，請退回此申請或撤銷已核准的那筆'
     : kinds.includes('pending')
-      ? '此申請與其他申請衝突,請擇一核准'
+      ? '此申請與其他申請衝突，請擇一核准'
       : null
 
 /**

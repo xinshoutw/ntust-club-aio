@@ -140,7 +140,7 @@ export function useMaintenanceMutations() {
       } catch (e) {
         // 主體已建立、佐證失敗:讓使用者知道不需重送報修單
         const msg = e instanceof Error ? e.message : String(e)
-        throw new Error(`報修單已建立,但佐證上傳失敗:${msg}`)
+        throw new Error(`報修單已建立，但佐證上傳失敗（${msg}）`)
       }
       return row
     },
@@ -262,7 +262,7 @@ export function usePostalMutations() {
         await uploadFile(`/club/postal-changes/${row.id}/passbook`, b.passbook)
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e)
-        throw new Error(`申請已建立,但附件上傳失敗:${msg}`)
+        throw new Error(`申請已建立，但附件上傳失敗（${msg}）`)
       }
       return row
     },

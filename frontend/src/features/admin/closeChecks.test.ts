@@ -2,7 +2,6 @@ import { describe, expect, test } from 'vitest'
 import { defaultConfirmations, type ConfirmableReport } from './closeChecks'
 
 const report = (over: Partial<ConfirmableReport> = {}): ConfirmableReport => ({
-  highlights: '活動順利完成',
   reflections: [{}, {}, {}],
   photosConfirmed: true,
   reportConfirmed: true,
@@ -24,12 +23,10 @@ describe('繳交確認的預設勾選', () => {
     expect(defaultConfirmations(report({ videoUrl: 'https://x.test/v' }), 0).photos).toBe(true)
   })
 
-  test('心得一篇也沒有、報告表只有空白 → 不預設打勾', () => {
-    expect(defaultConfirmations(report({ highlights: '   ', reflections: [] }), 5)).toEqual({
-      photos: true,
-      report: false,
-      reflections: false,
-    })
+  // 門檻是後端計不計分,不是結案送件的下限(心得下限 3 篇)
+  test('心得只有一篇也計 ad4,照樣預設打勾;一篇都沒有才不勾', () => {
+    expect(defaultConfirmations(report({ reflections: [{}] }), 5).reflections).toBe(true)
+    expect(defaultConfirmations(report({ reflections: [] }), 5).reflections).toBe(false)
   })
 
   // 遷移件帶著舊系統的旗標:核准會整組覆寫,預設勾回去等於把「未繳」翻成「已繳」

@@ -11,7 +11,6 @@ export type CheckKey = (typeof SUBMISSION_CHECKS)[number]['key']
 
 export interface ConfirmableReport {
   videoUrl?: string
-  highlights: string
   reflections: unknown[]
   photosConfirmed: boolean
   reportConfirmed: boolean
@@ -24,14 +23,16 @@ export interface ConfirmableReport {
  * 一律預設全勾等於承辦沒動它就把舊庫的「未繳」翻成「已繳」。反向也不會誤判:
  * 判定只決定預設值,承辦核實後仍可自行勾回。
  *
- * 門檻取的是各旗標實際控制的評鑑項目(ad2 照片、ad3 報告表、ad4 心得),
- * 不是結案送件的下限 —— 送件下限是社團端的事,這裡決定的是採不採計。
+ * 門檻取的是各旗標實際控制的評鑑項目:ad2 照片 ≥5 張或有影片、ad3 報告表這一列存在、
+ * ad4 心得有上傳。**不是結案送件的下限** —— 送件下限(照片 1 張、心得 3 篇)是社團端的事,
+ * 拿它當門檻會把後端本來計得到的分數勾掉。
  */
 export const defaultConfirmations = (
   report: ConfirmableReport | undefined,
   photoCount: number,
 ): Record<CheckKey, boolean> => ({
   photos: !!report && report.photosConfirmed && (photoCount >= MIN_PHOTOS || !!report.videoUrl),
-  report: !!report?.reportConfirmed && !!report.highlights.trim(),
+  // ad3 只問這一列在不在,不看內容:報告表讀得到就是有交
+  report: !!report?.reportConfirmed,
   reflections: !!report?.reflectionsConfirmed && report.reflections.length > 0,
 })

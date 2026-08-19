@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { countText } from '../../lib/counts'
 import { Button } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
@@ -76,8 +76,10 @@ export default function ReviewPage() {
     [queueQuery.data],
   )
 
-  // 簽掉一件後佇列變短,停在末頁會看到空卡片;clampPage 對合法頁碼回傳原值
+  // 簽掉一件後佇列變短,停在末頁會看到空卡片;clampPage 對合法頁碼回傳原值。
+  // 收斂的結果要寫回 state,否則佇列之後又變長(新送件)會把承辦彈回它原本停的那一頁
   const queuePageNow = clampPage(queuePage, queue.length, QUEUE_PAGE_SIZE)
+  useEffect(() => setQueuePage(queuePageNow), [queuePageNow])
   const pagedQueue = queue.slice((queuePageNow - 1) * QUEUE_PAGE_SIZE, queuePageNow * QUEUE_PAGE_SIZE)
 
   // 篩選:社團名 → id(選項自最小社團主檔);狀態標籤 → 狀態值(待審三關同標籤合併)

@@ -52,7 +52,7 @@ def downgrade() -> None:
             UPDATE system_settings
             SET key = 'close_lock_months',
                 value = to_jsonb(
-                    LEAST(6, GREATEST(1, CEIL((value #>> '{}')::numeric / :per_month))::int)
+                    LEAST(6, GREATEST(1, CEIL((value #>> '{}')::numeric / :per_month)))::int
                 )
             WHERE key = 'close_lock_days' AND value #>> '{}' ~ '^-?[0-9]+(\.[0-9]+)?$'
             """

@@ -55,7 +55,10 @@ function ManageModal({
   // 社團選擇一律走 ClubCascader(二級選單,全站同一支);它以名稱為介面,送出前對回 id
   const [walkInClub, setWalkInClub] = useState<string | undefined>(undefined)
   const clubOptions = useClubOptions()
-  const walkInClubId = (clubOptions.data ?? []).find((c) => c.name === walkInClub)?.id ?? null
+  // 可補登的社團(已在名單上的排除掉)。omit 與 id 對照必須看同一份清單 —— 分兩份的話,
+  // 選好之後該社團才進名單時,選單顯示空白、walkInClubId 卻還在,按下去送的是看不見的社團
+  const walkInOptions = (clubOptions.data ?? []).filter((c) => !regs.some((r) => r.clubId === c.id))
+  const walkInClubId = walkInOptions.find((c) => c.name === walkInClub)?.id ?? null
 
   // 場次制(負責人會議):場次清單+逐場簽到;非場次制不發查詢
   const sessionsQuery = useSessions(item.sessionBased ? item.id : undefined)
@@ -204,7 +207,7 @@ function ManageModal({
           value={walkInClub}
           onChange={setWalkInClub}
           omit={(clubOptions.data ?? [])
-            .filter((c) => regs.some((r) => r.clubId === c.id))
+            .filter((c) => !walkInOptions.includes(c))
             .map((c) => c.name)}
         />
         <Button

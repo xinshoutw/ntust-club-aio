@@ -725,7 +725,8 @@ function CloseForm({
             <div>
               <div style={label}>
                 活動照片{requiredMark}
-                <Tooltip title={`至少 ${MIN_PHOTOS} 張照片或附影片連結`}>
+                {/* 送出門檻是 1 張(:398);MIN_PHOTOS 是評鑑計分的門檻,兩者不同 */}
+                <Tooltip title={`至少 1 張即可送出;達 ${MIN_PHOTOS} 張或附影片連結才計評鑑分`}>
                   <InfoCircleOutlined style={{ marginLeft: 6, color: 'var(--steel)' }} />
                 </Tooltip>
               </div>
@@ -777,6 +778,10 @@ function CloseForm({
                   {fmtMB(existing.reduce((s, f) => s + f.size, 0) + photos.reduce((s, p) => s + p.file.size, 0))}/
                   {Math.round(closePhotoBytes / 1024 / 1024)} MB
                 </span>
+              </div>
+              {/* 照片只在送出時才上傳(:448):不講的話中途離開會以為草稿存住了 */}
+              <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 6 }}>
+                送出結案時才上傳,不隨草稿保存
               </div>
             </div>
             <div className="form-grid-2" style={{ marginTop: 12 }}>

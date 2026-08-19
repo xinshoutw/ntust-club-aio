@@ -144,7 +144,7 @@ export default function AdminClubSettingsPage() {
     if (saved.active && !form.active) {
       confirmDialog(modal, {
         title: `停用 ${club} 帳號`,
-        content: '社團將無法登入，將不會影響進行中的申請',
+        content: '社團將無法登入，正進行中的申請將不受影響',
         okText: '確認並儲存',
         okButtonProps: { danger: true },
         cancelText: '取消',

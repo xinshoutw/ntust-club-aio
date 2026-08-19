@@ -238,10 +238,7 @@ async def list_room_bookings(
         .options(sa.orm.selectinload(RoomBookingRequest.slots))
     )
     if active is not None:
-        ongoing = sa.and_(
-            RoomBookingRequest.status.in_([BookingStatus.PENDING, BookingStatus.APPROVED]),
-            RoomBookingRequest.end_date >= svc.today_taipei(),
-        )
+        ongoing = svc.room_booking_ongoing_expr()
         query = query.where(ongoing if active else sa.not_(ongoing))
     if active:
         # 正在借用:開始日早的在前(即將到來優先;同日依建立序穩定分頁)
@@ -346,10 +343,7 @@ async def list_venue_bookings(
         .where(VenueBooking.club_id == user.club_id)
     )
     if active is not None:
-        ongoing = sa.and_(
-            VenueBooking.status.in_([BookingStatus.PENDING, BookingStatus.APPROVED]),
-            sa.not_(svc.venue_booking_started_expr()),
-        )
+        ongoing = svc.venue_booking_ongoing_expr()
         query = query.where(ongoing if active else sa.not_(ongoing))
     if active:
         # 正在申請:借用日早的在前(即將到來優先)
@@ -455,9 +449,7 @@ async def list_equipment_loans(
         .where(EquipmentLoan.club_id == user.club_id)
     )
     if active is not None:
-        ongoing = EquipmentLoan.status.in_(
-            [LoanStatus.PENDING, LoanStatus.APPROVED, LoanStatus.CHECKED_OUT]
-        )
+        ongoing = svc.equipment_loan_ongoing_expr()
         query = query.where(ongoing if active else sa.not_(ongoing))
     if status is not None:
         query = query.where(EquipmentLoan.status == status)

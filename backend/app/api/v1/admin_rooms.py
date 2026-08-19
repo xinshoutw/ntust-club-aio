@@ -74,12 +74,8 @@ async def list_room_bookings(
     if club_id:
         query = query.where(RoomBookingRequest.club_id == club_id)
     if active is not None:
-        # 進行中=審核中或學期未結束的已核准(與社團端 /club/room-bookings 同一條界線)。
         # 衝突標示只需要還佔著時段的已核准單,歷年的不必抓回前端
-        ongoing = sa.and_(
-            RoomBookingRequest.status.in_([BookingStatus.PENDING, BookingStatus.APPROVED]),
-            RoomBookingRequest.end_date >= svc.today_taipei(),
-        )
+        ongoing = svc.room_booking_ongoing_expr()
         query = query.where(ongoing if active else sa.not_(ongoing))
 
     if sort:

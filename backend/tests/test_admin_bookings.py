@@ -631,3 +631,55 @@ async def test_revoke_approved_venue_booking_and_stale_loan(client, db):
             headers=csrf_headers(client),
         )
     ).status_code == 409
+
+
+async def test_admin_active_filter_excludes_finished_bookings(client, db):
+    """社團總覽的「借用中」不能收整段歷史:借用不會因為日期過了就換狀態。
+
+    只篩 status 的話,已核准的過期單永遠留在卡上(遷移資料下單一社團上千筆)。
+    這條界線與社團端 /club/venue-bookings?active=true 是同一支推導。
+    """
+    club, _ = await seed(client, db)
+    venue = await make_venue(db)
+    today = date.today()
+    rows = {
+        "future": VenueBooking(club_id=club.id, venue_id=venue.id, date=today + timedelta(days=7),
+                               periods=["3"], purpose="未來", status="approved"),
+        "past": VenueBooking(club_id=club.id, venue_id=venue.id, date=today - timedelta(days=7),
+                             periods=["3"], purpose="已過", status="approved"),
+        "pending": VenueBooking(club_id=club.id, venue_id=venue.id, date=today + timedelta(days=3),
+                                periods=["4"], purpose="待審", status="pending"),
+        "rejected": VenueBooking(club_id=club.id, venue_id=venue.id, date=today + timedelta(days=3),
+                                 periods=["5"], purpose="退回", status="rejected"),
+    }
+    db.add_all(rows.values())
+    await db.commit()
+    for row in rows.values():
+        await db.refresh(row)
+
+    resp = await client.get("/api/v1/admin/venue-bookings", params={"active": "true"})
+    assert {v["id"] for v in resp.json()["data"]} == {rows["future"].id, rows["pending"].id}
+    resp = await client.get("/api/v1/admin/venue-bookings", params={"active": "false"})
+    assert {v["id"] for v in resp.json()["data"]} == {rows["past"].id, rows["rejected"].id}
+
+    eq = await make_equipment(db)
+    loans = {}
+    for key, status in {
+        "pending": "pending", "approved": "approved", "out": "checked_out",
+        "returned": "returned", "cancelled": "cancelled",
+    }.items():
+        loan = EquipmentLoan(
+            club_id=club.id, equipment_id=eq.id, qty=1, purpose="x", status=status,
+            start_date=today - timedelta(days=1), end_date=today + timedelta(days=1),
+        )
+        db.add(loan)
+        await db.commit()
+        await db.refresh(loan)
+        loans[key] = loan.id
+
+    resp = await client.get("/api/v1/admin/equipment-loans", params={"active": "true"})
+    assert {row["id"] for row in resp.json()["data"]} == {
+        loans["pending"], loans["approved"], loans["out"]
+    }
+    resp = await client.get("/api/v1/admin/equipment-loans", params={"active": "false"})
+    assert {row["id"] for row in resp.json()["data"]} == {loans["returned"], loans["cancelled"]}

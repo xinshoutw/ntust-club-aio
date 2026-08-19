@@ -107,6 +107,37 @@ def venue_booking_started_expr(now: datetime | None = None) -> sa.ColumnElement[
         )
     return expr
 
+
+# 「進行中」的三條界線:社團端總覽、行政端社團總覽、固定借用衝突標示共用同一份。
+# 狀態不夠用 —— 借用不會因為日期過了就換狀態,只篩 status 會把整段歷史當成進行中。
+
+
+def room_booking_ongoing_expr(now: datetime | None = None) -> sa.ColumnElement[bool]:
+    """固定借用進行中:審核中,或已核准且學期尚未結束。"""
+    return sa.and_(
+        RoomBookingRequest.status.in_([BookingStatus.PENDING, BookingStatus.APPROVED]),
+        RoomBookingRequest.end_date >= today_taipei(now),
+    )
+
+
+def venue_booking_ongoing_expr(now: datetime | None = None) -> sa.ColumnElement[bool]:
+    """臨時借用進行中:審核中或已核准,且申請起始時刻未到。"""
+    return sa.and_(
+        VenueBooking.status.in_([BookingStatus.PENDING, BookingStatus.APPROVED]),
+        sa.not_(venue_booking_started_expr(now)),
+    )
+
+
+def equipment_loan_ongoing_expr() -> sa.ColumnElement[bool]:
+    """器材借用進行中:審核中、已核准、借出中。
+
+    只看狀態即可 —— 器材有點交流程,歸還會把狀態推到 returned,
+    不像場地借用要靠日期才分得出結束。
+    """
+    return EquipmentLoan.status.in_(
+        [LoanStatus.PENDING, LoanStatus.APPROVED, LoanStatus.CHECKED_OUT]
+    )
+
 # 固定借用規則
 MAX_FIXED_SLOTS = 10  # 每社至多 10 節(1 節 = 1 小時)
 LATE_PERIODS = frozenset({"10", "A", "B", "C", "D"})  # 晚間時段:需至少連續 3 節起借

@@ -82,10 +82,7 @@ export default function ClubOverviewPage() {
   const activitiesQuery = useAdminClubActivities(clubId, canActivities)
   const roomsQuery = useAdminClubRoomBookings(clubId, canRooms)
   const venuesQuery = useAdminClubVenueBookings(clubId, canBookings)
-  const loansQuery = useAdminEquipmentLoanList(
-    { clubId, statuses: ['pending', 'approved', 'cancelled', 'checked_out'] },
-    canBookings,
-  )
+  const loansQuery = useAdminEquipmentLoanList({ clubId, active: true }, canBookings)
   const maintQuery = useAdminClubMaintenance(clubId, canMaint)
   const actMutations = useAdminActivityMutations()
   const bookingMutations = useAdminBookingMutations()

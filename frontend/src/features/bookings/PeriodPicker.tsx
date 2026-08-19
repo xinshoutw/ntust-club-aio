@@ -1,37 +1,57 @@
-import { PERIODS } from './mock'
+import { useRef } from 'react'
+import { periodKeys, usePeriods } from '../../lib/periods'
+import { useDragSelect } from './useDragSelect'
 
 interface PeriodPickerProps {
   value: string[]
   onChange: (next: string[]) => void
+  size?: 'small' | 'middle'
+  nowrap?: boolean
+  /** 禁選節次(例:選「今天」時已開始的節次);拖曳掃過也不套用 */
+  disabledPeriods?: string[]
 }
 
-// 節次複選按鈕(第 1–10、A–D)
-export default function PeriodPicker({ value, onChange }: PeriodPickerProps) {
-  const toggle = (p: string) =>
-    onChange(value.includes(p) ? value.filter((x) => x !== p) : [...value, p])
+// 節次複選按鈕(第 1–10、A–D);支援按住拖曳批量選取/取消
+export default function PeriodPicker({ value, onChange, size = 'middle', nowrap = false, disabledPeriods = [] }: PeriodPickerProps) {
+  const periodAxis = periodKeys(usePeriods())
+  const valueRef = useRef(value)
+  valueRef.current = value
 
+  const apply = (p: string, to: boolean) => {
+    if (disabledPeriods.includes(p)) return
+    const cur = valueRef.current
+    const has = cur.includes(p)
+    if (to && !has) onChange([...cur, p])
+    if (!to && has) onChange(cur.filter((x) => x !== p))
+  }
+  const { containerProps, cellProps } = useDragSelect(apply)
+
+  const h = size === 'small' ? 28 : 32
   return (
-    <div role="group" aria-label="節次" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-      {PERIODS.map((p) => {
+    <div role="group" aria-label="時段" {...containerProps} style={{ display: 'flex', flexWrap: nowrap ? 'nowrap' : 'wrap', overflowX: nowrap ? 'auto' : undefined, gap: 6, userSelect: 'none', paddingBottom: nowrap ? 2 : 0 }}>
+      {periodAxis.map((p) => {
         const on = value.includes(p)
+        const off = disabledPeriods.includes(p)
         return (
           <button
             key={p}
             type="button"
             aria-pressed={on}
-            onClick={() => toggle(p)}
+            disabled={off}
+            title={off ? '該時段已開始' : undefined}
+            {...cellProps(p, on, off)}
             className="num"
             style={{
-              minWidth: 42,
-              height: 32,
+              minWidth: 40,
+              height: h,
               padding: '0 8px',
               borderRadius: 6,
               border: on ? '1px solid var(--seal)' : '1px solid var(--line)',
-              background: on ? 'var(--seal)' : '#fff',
-              color: on ? '#fff' : 'var(--ink)',
+              background: off ? '#EEF0F3' : on ? 'var(--seal)' : '#fff',
+              color: off ? 'var(--muted)' : on ? '#fff' : 'var(--ink)',
               fontSize: 13,
               fontFamily: 'inherit',
-              cursor: 'pointer',
+              cursor: off ? 'not-allowed' : 'pointer',
             }}
           >
             {p}

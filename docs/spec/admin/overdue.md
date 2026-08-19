@@ -1,0 +1,42 @@
+# 逾期追蹤與停權
+
+`/admin/overdue` · `admin` · 權限鍵 `aoverdue` · `features/admin/OverduePage.tsx`
+
+## 用途
+
+看逾期未還器材、寄提醒、停權社團與解除停權。停權會直接擋掉該社的所有借用申請。
+
+## 資料來源
+
+| 動作 | 端點 |
+|---|---|
+| 逾期清單 | `GET /admin/equipment-loans?status=overdue`(伺服器端分頁,每頁 20) |
+| 停權中社團 | `GET /admin/clubs`(前端篩 `suspended_until`)+ 逐社 `GET /admin/clubs/{id}` 補 `suspend_reason`(列表的 `AdminClubOut` 不含此欄) |
+| 停權表單的社團選單 | `GET /admin/clubs/options`(`require_role(ADMIN)`,不綁頁面鍵) |
+| 寄提醒 | `POST /admin/equipment-loans/{id}/remind` |
+| 停權 / 解除 | `POST\|DELETE /admin/clubs/{id}/suspend` |
+
+## 畫面
+
+**逾期未還器材** — 社團、器材與數量、借用資訊(區間 + 活動)、狀態、寄送提醒(提醒過的列另顯示上次提醒時間),底部分頁。
+
+**停權中社團** — 社團、狀態、停權資訊(至 YYYY/MM/DD · 原因)、解除停權。
+
+右上「停權社團…」開表單:社團(Cascader)、停權至(不可早於今天)、原因(必填,會通知社團)。社團選項載不到時 `ClubCascader` 整個換成「社團清單載入失敗 + 重試」,表單因此選不出社團(空選單會看起來像全校沒有社團)。
+
+## 規則
+
+- 逾期清單附申請時填的聯絡電話:這頁的主要動作是催還,聯絡方式要在手邊
+
+- 逾期定義與工讀生端一致:`checked_out` 且已過「結束日之隔天上班日 10:30」,以單調門檻日在 SQL 篩選
+- 停權寫 `clubs.suspended_until` / `suspend_reason`;**攔截點在社團端的借用申請**(`_ensure_not_suspended`,回 403 `CLUB_SUSPENDED`),不影響登入與其他功能
+- 解除停權即清空兩個欄位
+- 停權與解除都寫 `audit_logs` 並推 Discord
+- **提醒不設次數上限**(decisions.md DEC-11):排程每上班日 10:35 掃一次,逾期當天寄第一封,仍未歸還者每 3 個上班日重寄到歸還為止(`scripts/send_overdue_reminders.py`,host cron)。人工提醒隨時可加寄,兩條路徑都會更新 `last_reminded_at`,列上看得到
+- **停權中的判定要比日期**:前端一律走 `lib/status.suspendedNow`,判準與後端攔截條件 `suspended_until >= today` 相同 —— `suspended_until` 過期不會自動清空,裸 truthiness 會讓早就不再被擋的社團永遠掛在表上。但前端比的是**瀏覽器本地日期**、後端比台北日期,不在 +08:00 的使用者在跨日那幾小時會看到兩邊不一致
+
+## 未完成 / 問題
+
+- 停權中社團表沒有分頁(停權中的社團極少,且資料取自不分頁的社團主檔端點)
+- 停權不會自動發生:逾期到什麼程度該停權完全靠人工判斷,沒有建議或門檻提示
+- 停權中社團的清單靠前端從全部社團篩出來,沒有專屬端點,而且要逐社再打一次詳情才拿得到停權原因

@@ -5,6 +5,21 @@
   gap: 20px;
   align-items: start;
 }
+/* grid item 預設 min-width:auto,長內容會把 1fr 撐破版;收口後由內層自行換行/截斷 */
+.overview-grid > .card {
+  min-width: 0;
+}
+
+/* 公告預覽:渲染 markdown、鉗制兩行(截斷需要可換行,長英數/URL 以 anywhere 斷行) */
+.announcement-preview {
+  margin-top: 6px;
+  color: var(--steel);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
 @media (max-width: 1199px) {
   .overview-grid {
     grid-template-columns: 1fr;

@@ -1,89 +1,123 @@
-import { App, Button, Upload } from 'antd'
-import { FileTextOutlined, UploadOutlined } from '@ant-design/icons'
+import { useNavigate } from 'react-router'
+import { Tooltip } from 'antd'
+import { RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
-import { useAuth } from '../../app/auth'
+import QueryError from '../../components/ui/QueryError'
+import { useEvalOverview } from '../../api/eval'
+import type { AdKey, FinalScore } from './scoring'
+import { AD_LABELS } from './types'
+import { clickableProps } from '../../lib/clickable'
 
-interface RubricSlot {
-  key: string
-  group: string
-  name: string
-  hint: string
-  files: string[]
+// 各項分數的資料來源頁:點字卡跳轉(如網頁經營 → 管理項目)
+const AD_ROUTES: Record<AdKey, string> = {
+  ad1: '/activities',
+  ad2: '/activities/close',
+  ad3: '/activities/close',
+  ad4: '/activities/close',
+  ad5: '/members',
+  ad6: '/club-settings',
+  ad7: '/signup',
+  ad8: '/signup',
+  adj: '/violations',
 }
 
-const SLOTS: RubricSlot[] = [
-  { key: 'ad1', group: '(一) 活動及社課申請 15%', name: '活動及社課申請', hint: '結案始算,大型活動加權', files: ['活動申請彙整.pdf'] },
-  { key: 'ad2', group: '(二) 活動/社課成果 60%', name: '照片/影片', hint: '每活動 ≥5 張照片或影片連結', files: ['迎新_照片.zip'] },
-  { key: 'ad3', group: '(二) 活動/社課成果 60%', name: '成果單', hint: '每活動一份', files: ['迎新_成果報告.pdf'] },
-  { key: 'ad4', group: '(二) 活動/社課成果 60%', name: '心得回饋', hint: '每活動彙整', files: ['迎新_心得.pdf'] },
-  { key: 'ad5', group: '(三) 社團資料更新 15%', name: '社員、幹部名單更新', hint: '由系統名單更新紀錄自動採計', files: [] },
-  { key: 'ad6', group: '(三) 社團資料更新 15%', name: '社團網頁經營', hint: '由「管理項目」網頁連結自動採計', files: [] },
-  { key: 'ad7', group: '(四) 參與會議與活動 10%', name: '負責人會議', hint: '由線上報名出席紀錄自動採計', files: [] },
-  { key: 'ad8', group: '(四) 參與會議與活動 10%', name: '幹訓', hint: '由線上報名紀錄自動採計', files: [] },
-  { key: 'o1', group: '社團營運 — 組織運作及財務管理 50%', name: '管理運作(章程、傳承交接)', hint: '', files: ['章程_114.pdf'] },
-  { key: 'o3', group: '社團營運 — 組織運作及財務管理 50%', name: '財務管理', hint: '帳本、財報、器材管理', files: ['收支表_114上.xlsx'] },
-  { key: 'a4', group: '社團營運 — 社團活動績效 50%', name: '活動特色', hint: '', files: ['成果照片.zip'] },
-]
+function ScoreValue({ s }: { s: FinalScore }) {
+  const color = s.final > 0 ? '#1F6B45' : s.final < 0 ? '#C13B34' : 'var(--steel)'
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+      <span className="num" style={{ fontSize: 26, fontWeight: 600, color, lineHeight: 1 }}>
+        {s.key === 'adj' && s.final > 0 ? '+' : ''}
+        {s.final}
+      </span>
+      <span className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>/ {s.key === 'adj' ? '+5' : s.max}</span>
+    </div>
+  )
+}
 
+// 資料總覽:行政資料各項分數(唯讀,後端自動計算+管理員調整)+ 五獎項資料入口
 export default function EvalDocsPage() {
-  const { user } = useAuth()
-  const { message } = App.useApp()
-  const groups = [...new Set(SLOTS.map((s) => s.group))]
-  const uploaded = SLOTS.filter((s) => s.files.length > 0).length
+  const navigate = useNavigate()
+  const overviewQuery = useEvalOverview()
+  const { data, error } = overviewQuery
+
+  const go = (path: string) => navigate(path)
 
   return (
-    <div style={{ maxWidth: 1000 }}>
+    <div>
       <PageHeader
         title="資料總覽"
         sub={
-          <>
-            {user?.club} · 已上傳 <span className="num">{uploaded}</span>/<span className="num">{SLOTS.length}</span> 項
-          </>
+          data && (
+            <>
+              {data.windowLabel} · 採計期間 <span className="num">{data.windowRange}</span>
+            </>
+          )
+        }
+        extra={
+          <div style={{ textAlign: 'right', height: 40, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <div style={{ fontSize: 12, color: 'var(--steel)', lineHeight: 1.1 }}>行政資料總分</div>
+            <div style={{ lineHeight: 1.1 }}>
+              <span className="num" style={{ fontSize: 22, fontWeight: 600 }}>{data ? data.total : '—'}</span>
+              <span className="num" style={{ fontSize: 13, color: 'var(--steel)' }}> / 100</span>
+            </div>
+          </div>
         }
       />
-      <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        社團競賽(評鑑)採計資料;標示「自動採計」的項目由系統資料計算,無須上傳。
+
+      {error && (
+        <div style={{ marginTop: 20 }}>
+          <QueryError
+            title="評鑑資料載入失敗"
+            error={error}
+            onRetry={() => void overviewQuery.refetch()}
+          />
+        </div>
+      )}
+
+      <div style={{ marginTop: 20, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 12 }}>
+        {(data?.scores ?? []).map((s) => (
+          <div
+            key={s.key}
+            className="card click-tint"
+            {...clickableProps(() => go(AD_ROUTES[s.key]))}
+            style={{ padding: '14px 18px', cursor: 'pointer' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, flex: 1 }}>{AD_LABELS[s.key].name}</div>
+              {s.overridden && (
+                <Tooltip title={`學務處調整(自動計算為 ${s.auto} 分)`}>
+                  <span style={{ fontSize: 11, color: 'var(--steel)', border: '1px solid var(--line)', borderRadius: 4, padding: '0 4px' }}>調整</span>
+                </Tooltip>
+              )}
+            </div>
+            <div style={{ marginTop: 10 }}>
+              <ScoreValue s={s} />
+            </div>
+          </div>
+        ))}
       </div>
 
-      {groups.map((g) => (
-        <div className="card" key={g} style={{ marginTop: 16 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, padding: '14px 20px 6px' }}>{g}</div>
-          {SLOTS.filter((s) => s.group === g).map((s) => {
-            const auto = s.hint.includes('自動採計')
-            return (
-              <div
-                key={s.key}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '12px 20px',
-                  borderTop: '1px solid var(--line)',
-                  flexWrap: 'wrap',
-                }}
-              >
-                <div style={{ flex: 1, minWidth: 200 }}>
-                  <div style={{ fontSize: 14, fontWeight: 500 }}>{s.name}</div>
-                  {s.hint && <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 2 }}>{s.hint}</div>}
-                </div>
-                {s.files.map((f) => (
-                  <span key={f} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
-                    <FileTextOutlined style={{ color: 'var(--steel)' }} />
-                    {f}
-                  </span>
-                ))}
-                {!auto && (
-                  <Upload beforeUpload={() => false} showUploadList={false} onChange={() => message.success(`已上傳至「${s.name}」`)}>
-                    <Button size="small" style={{ height: 30 }} icon={<UploadOutlined />}>
-                      上傳
-                    </Button>
-                  </Upload>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      ))}
+      {/* 五獎項 */}
+      <div style={{ fontSize: 15, fontWeight: 600, margin: '28px 0 4px' }}>競賽獎項資料</div>
+      <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
+        {(data?.awards ?? []).map((award) => (
+          <div
+            key={award.id}
+            className="card click-tint"
+            {...clickableProps(() => navigate(`/eval/award/${award.id}`))}
+            style={{ padding: '16px 18px', cursor: 'pointer' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ fontSize: 15, fontWeight: 600, flex: 1 }}>{award.name}</div>
+              <RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />
+            </div>
+            <div style={{ fontSize: 12, marginTop: 10 }}>
+              已上傳 <span className="num" style={{ fontWeight: 600 }}>{award.filled}</span>
+              <span className="num" style={{ color: 'var(--steel)' }}>/{award.total}</span> 項
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

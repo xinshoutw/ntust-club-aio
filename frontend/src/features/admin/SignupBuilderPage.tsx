@@ -1,8 +1,13 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { App, Button, Checkbox, DatePicker, Input, InputNumber, Select, Tag } from 'antd'
+import dayjs, { type Dayjs } from 'dayjs'
 import { HolderOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
-import { FIELD_TYPE_LABEL, type FieldType } from '../signup/types'
+import TagListInput from '../../components/ui/TagListInput'
+import { FIELD_TYPE_LABEL, type FieldType, type SignupKind } from '../signup/types'
+import KindBadge from '../signup/KindBadge'
+import { useSignupItemMutations } from '../../api/adminSignups'
 import './builder.css'
 
 interface BuilderField {
@@ -19,15 +24,75 @@ const requiredMark = <span style={{ color: '#C13B34' }}> *</span>
 
 export default function SignupBuilderPage() {
   const { message } = App.useApp()
-  const [name, setName] = useState('社團幹訓')
-  const [cap, setCap] = useState<number | null>(5)
-  const [fields, setFields] = useState<BuilderField[]>([
-    { key: 1, label: '聯絡電話', type: 'text', required: true, options: [] },
-    { key: 2, label: '膳食需求', type: 'select', required: true, options: ['葷', '素'] },
-    { key: 3, label: '是否攜帶筆電', type: 'radio', required: false, options: ['是', '否'] },
-    { key: 4, label: '備註', type: 'textarea', required: false, options: [] },
-  ])
-  const [nextKey, setNextKey] = useState(5)
+  const navigate = useNavigate()
+  const { create } = useSignupItemMutations()
+  const [name, setName] = useState('')
+  // 評鑑對幹訓/負責人會議有特別採計,建立時即標記類型
+  const [kind, setKind] = useState<SignupKind>('normal')
+  const [cap, setCap] = useState<number | null>(null)
+  const [place, setPlace] = useState('')
+  const [eventTime, setEventTime] = useState<Dayjs | null>(null)
+  const [signupStart, setSignupStart] = useState<Dayjs | null>(dayjs()) // 報名開始預設今天
+  const [signupEnd, setSignupEnd] = useState<Dayjs | null>(null)
+  const [needsReview, setNeedsReview] = useState(false) // 審核制:報名送出後須管理員核准
+  const [isEval, setIsEval] = useState(false) // 競賽報名:社團須勾選參賽獎項
+  const [description, setDescription] = useState('')
+  const [fields, setFields] = useState<BuilderField[]>([])
+  const [nextKey, setNextKey] = useState(1)
+
+  // 拖曳排序:pointer 事件自製(HTML5 DnD 到 drop 才換位、ghost 突兀且不支援觸控);
+  // 按住把手即開始,掃過其他列的中線就即時重排,放開結束
+  const [dragKey, setDragKey] = useState<number | null>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (dragKey == null) return
+    const move = (ev: PointerEvent) => {
+      const rows = [...(listRef.current?.querySelectorAll<HTMLElement>('[data-field-key]') ?? [])]
+      const over = rows.find((r) => {
+        const rect = r.getBoundingClientRect()
+        return ev.clientY >= rect.top && ev.clientY <= rect.bottom
+      })
+      if (!over) return
+      const overKey = Number(over.dataset.fieldKey)
+      if (overKey === dragKey) return
+      const rect = over.getBoundingClientRect()
+      // 越過目標列中線才換位,避免列高不同時來回抖動
+      const after = ev.clientY > rect.top + rect.height / 2
+      setFields((fs) => {
+        const from = fs.findIndex((f) => f.key === dragKey)
+        const to = fs.findIndex((f) => f.key === overKey)
+        if (from < 0 || to < 0) return fs
+        let insert = to + (after ? 1 : 0)
+        if (insert > from) insert -= 1
+        if (insert === from) return fs
+        const next = [...fs]
+        const [moved] = next.splice(from, 1)
+        next.splice(insert, 0, moved)
+        return next
+      })
+    }
+    const up = () => setDragKey(null)
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+    return () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+    }
+  }, [dragKey])
+
+  // 鍵盤重排(無障礙):把手為可聚焦按鈕,方向鍵上/下移一格;拖曳仍為指標增強
+  const moveField = (key: number, delta: -1 | 1) =>
+    setFields((fs) => {
+      const from = fs.findIndex((f) => f.key === key)
+      const to = from + delta
+      if (from < 0 || to < 0 || to >= fs.length) return fs
+      const next = [...fs]
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
+      return next
+    })
 
   const update = (key: number, patch: Partial<BuilderField>) =>
     setFields((fs) => fs.map((f) => (f.key === key ? { ...f, ...patch } : f)))
@@ -37,31 +102,78 @@ export default function SignupBuilderPage() {
     setNextKey((k) => k + 1)
   }
 
-  const addOption = (key: number) => {
-    const value = window.prompt('選項內容')?.trim()
-    if (!value) return
-    setFields((fs) =>
-      fs.map((f) => {
-        if (f.key !== key) return f
-        if (f.options.includes(value)) {
-          message.error(`選項「${value}」已存在`)
-          return f
-        }
-        return { ...f, options: [...f.options, value] }
-      }),
+  // 發布驗證未過的欄位集合:對應欄位標紅框,修改該欄即解除
+  const [errs, setErrs] = useState<ReadonlySet<string>>(new Set())
+  const errOf = (k: string) => (errs.has(k) ? ('error' as const) : undefined)
+  const clearErr = (k: string) =>
+    setErrs((s) => {
+      if (!s.has(k)) return s
+      const n = new Set(s)
+      n.delete(k)
+      return n
+    })
+
+  const publish = () => {
+    const missing: [key: string, msg: string][] = []
+    if (!name.trim()) missing.push(['name', '請輸入活動名稱'])
+    if (!eventTime) missing.push(['eventTime', '請選擇活動時間'])
+    if (cap == null || cap < 1) missing.push(['cap', '名額上限為必填,最少 1 名'])
+    if (!signupStart) missing.push(['signupStart', '請選擇報名開始時間'])
+    if (!signupEnd) missing.push(['signupEnd', '請選擇報名截止時間'])
+    if (missing.length === 0 && signupStart && signupEnd && !signupEnd.isAfter(signupStart)) {
+      missing.push(['signupEnd', '報名截止須晚於報名開始'])
+    }
+    // 過去時間全面禁止:活動時間/報名截止不得早於現在(後端亦擋)
+    if (missing.length === 0 && eventTime?.isBefore(dayjs())) {
+      missing.push(['eventTime', '活動時間不得早於現在'])
+    }
+    if (missing.length === 0 && signupEnd?.isBefore(dayjs())) {
+      missing.push(['signupEnd', '報名截止不得早於現在'])
+    }
+    if (missing.length || !eventTime || !signupStart || !signupEnd || cap == null) {
+      setErrs(new Set(missing.map(([k]) => k)))
+      if (missing.length) message.error(missing[0][1])
+      return
+    }
+    // 自訂欄位:未命名者不送出(與預覽一致);選項型欄位至少需一個選項(後端同樣驗證)
+    const named = fields.filter((f) => f.label.trim())
+    const noOptions = named.find((f) => OPTION_TYPES.includes(f.type) && f.options.length === 0)
+    if (noOptions) {
+      message.error(`「${noOptions.label.trim()}」為選項型欄位,請至少新增一個選項`)
+      return
+    }
+    setErrs(new Set())
+    create.mutate(
+      {
+        name: name.trim(),
+        kind,
+        place: place.trim() || undefined,
+        description: description.trim(),
+        eventAt: eventTime.format('YYYY/MM/DD HH:mm'),
+        signupStart: signupStart.format('YYYY/MM/DD HH:mm'),
+        signupEnd: signupEnd.format('YYYY/MM/DD HH:mm'),
+        maxParticipants: cap,
+        requiresConfirmation: needsReview,
+        isEval,
+        // 陣列順序=顯示順序(拖曳排序後整包送)
+        fields: named.map((f) => ({ label: f.label.trim(), type: f.type, required: f.required, options: f.options })),
+      },
+      {
+        onSuccess: () => {
+          message.success('已發布')
+          navigate('/admin/signups')
+        },
+        onError: (e) => message.error(e.message),
+      },
     )
   }
 
   return (
     <div>
       <PageHeader
-        title="報名活動建立"
-        sub="自訂報名欄位;社團端子頁即時預覽於右側"
+        title="活動建立"
         extra={
-          <div style={{ display: 'flex', gap: 10 }}>
-            <Button style={{ height: 36 }} onClick={() => message.success('已儲存草稿')}>儲存草稿</Button>
-            <Button type="primary" style={{ height: 36 }} onClick={() => message.success('已發布')}>發布</Button>
-          </div>
+          <Button type="primary" loading={create.isPending} onClick={publish}>發布</Button>
         }
       />
 
@@ -72,43 +184,153 @@ export default function SignupBuilderPage() {
             <div className="form-grid-2">
               <label style={{ gridColumn: '1 / -1' }}>
                 <div style={fieldLabel}>活動名稱{requiredMark}</div>
-                <Input value={name} onChange={(e) => setName(e.target.value)} />
+                <Input
+                  value={name}
+                  status={errOf('name')}
+                  onChange={(e) => {
+                    clearErr('name')
+                    setName(e.target.value)
+                  }}
+                />
               </label>
               <label>
-                <div style={fieldLabel}>活動時間{requiredMark}</div>
-                <Input className="num" defaultValue="2026/09/20 09:00-17:00" />
+                <div style={fieldLabel}>活動類型{requiredMark}</div>
+                <Select
+                  value={kind}
+                  onChange={setKind}
+                  style={{ width: '100%' }}
+                  options={[
+                    { value: 'normal', label: '普通活動' },
+                    { value: 'cadre_training', label: '幹訓' },
+                    { value: 'leader_meeting', label: '社團負責人會議' },
+                  ]}
+                />
               </label>
               <label>
                 <div style={fieldLabel}>地點</div>
-                <Input defaultValue="國際大樓 IB-101" />
+                <Input value={place} onChange={(e) => setPlace(e.target.value)} placeholder="例:國際大樓 IB-101" />
+              </label>
+              <label>
+                <div style={fieldLabel}>活動時間{requiredMark}</div>
+                <DatePicker
+                  showTime={{ format: 'HH:mm' }}
+                  style={{ width: '100%' }}
+                  format="YYYY/MM/DD HH:mm"
+                  disabledDate={(d) => d.isBefore(dayjs().startOf('day'))}
+                  status={errOf('eventTime')}
+                  value={eventTime}
+                  onChange={(v) => {
+                    clearErr('eventTime')
+                    setEventTime(v)
+                  }}
+                />
+              </label>
+              <label>
+                <div style={fieldLabel}>名額上限{requiredMark}</div>
+                <InputNumber
+                  style={{ width: '100%' }}
+                  min={1}
+                  status={errOf('cap')}
+                  value={cap}
+                  onChange={(v) => {
+                    clearErr('cap')
+                    setCap(v)
+                  }}
+                />
+              </label>
+              <label>
+                <div style={fieldLabel}>報名開始{requiredMark}</div>
+                <DatePicker
+                  showTime={{ format: 'HH:mm' }}
+                  style={{ width: '100%' }}
+                  format="YYYY/MM/DD HH:mm"
+                  disabledDate={(d) => d.isBefore(dayjs().startOf('day'))}
+                  status={errOf('signupStart')}
+                  value={signupStart}
+                  onChange={(v) => {
+                    clearErr('signupStart')
+                    setSignupStart(v)
+                  }}
+                />
               </label>
               <label>
                 <div style={fieldLabel}>報名截止{requiredMark}</div>
-                <DatePicker style={{ width: '100%' }} format="YYYY/MM/DD" />
+                <DatePicker
+                  showTime={{ format: 'HH:mm' }}
+                  style={{ width: '100%' }}
+                  format="YYYY/MM/DD HH:mm"
+                  disabledDate={(d) => d.isBefore(dayjs().startOf('day'))}
+                  status={errOf('signupEnd')}
+                  value={signupEnd}
+                  onChange={(v) => {
+                    clearErr('signupEnd')
+                    setSignupEnd(v)
+                  }}
+                />
               </label>
-              <label>
-                <div style={fieldLabel}>每社團名額上限</div>
-                <InputNumber style={{ width: '100%' }} min={1} value={cap} onChange={setCap} />
-              </label>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Checkbox checked={needsReview} onChange={(e) => setNeedsReview(e.target.checked)}>
+                  審核制(報名送出後須管理員核准才算報名成功)
+                </Checkbox>
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
+                <Checkbox checked={isEval} onChange={(e) => setIsEval(e.target.checked)}>
+                  競賽報名(社團須勾選參賽獎項,至少一項)
+                </Checkbox>
+              </div>
               <label style={{ gridColumn: '1 / -1' }}>
-                <div style={fieldLabel}>對象說明</div>
-                <Input defaultValue="各社團幹部(至少 3 人)" />
+                <div style={fieldLabel}>活動描述</div>
+                <Input.TextArea
+                  rows={3}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="活動內容、對象、注意事項"
+                />
               </label>
             </div>
           </div>
 
           <div className="card" style={{ padding: 24 }}>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 6 }}>
-              <div style={{ fontSize: 16, fontWeight: 600 }}>報名欄位</div>
-              <div style={{ fontSize: 12, color: 'var(--steel)' }}>
-                姓名、學號、系級為系統預設欄位,不需另建
-              </div>
+              <div style={{ fontSize: 16, fontWeight: 600 }}>資訊調查</div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+            <div
+              ref={listRef}
+              style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12, userSelect: dragKey != null ? 'none' : undefined }}
+            >
               {fields.map((f) => (
-                <div key={f.key} className="builder-field">
+                <div
+                  key={f.key}
+                  data-field-key={f.key}
+                  className="builder-field"
+                  style={dragKey === f.key ? { opacity: 0.45, boxShadow: '0 2px 10px rgba(31,36,48,.18)' } : undefined}
+                >
                   <div className="builder-field-main">
-                    <HolderOutlined style={{ color: 'var(--muted)', cursor: 'grab' }} />
+                    <button
+                      type="button"
+                      aria-label={`調整「${f.label || '未命名欄位'}」順序:方向鍵上下移動,亦可拖曳`}
+                      style={{
+                        border: 'none',
+                        background: 'none',
+                        padding: 2,
+                        display: 'inline-flex',
+                        color: 'var(--steel)',
+                        cursor: dragKey === f.key ? 'grabbing' : 'grab',
+                        touchAction: 'none',
+                      }}
+                      onPointerDown={(e) => {
+                        e.preventDefault()
+                        setDragKey(f.key)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                          e.preventDefault()
+                          moveField(f.key, e.key === 'ArrowUp' ? -1 : 1)
+                        }
+                      }}
+                    >
+                      <HolderOutlined />
+                    </button>
                     <Input
                       value={f.label}
                       onChange={(e) => update(f.key, { label: e.target.value })}
@@ -138,24 +360,14 @@ export default function SignupBuilderPage() {
                       刪除
                     </button>
                   </div>
+                  {/* 選項用行內輸入(與系統設定同一顆元件):window.prompt 在行動裝置可能整個叫不出來 */}
                   {OPTION_TYPES.includes(f.type) && (
                     <div className="builder-field-options">
                       <span style={{ fontSize: 12, color: 'var(--steel)' }}>選項</span>
-                      {f.options.map((o) => (
-                        <Tag
-                          key={o}
-                          closable
-                          onClose={() =>
-                            update(f.key, { options: f.options.filter((x) => x !== o) })
-                          }
-                          style={{ marginInlineEnd: 0 }}
-                        >
-                          {o}
-                        </Tag>
-                      ))}
-                      <button type="button" className="link-btn" style={{ color: 'var(--focus)', fontSize: 12 }} onClick={() => addOption(f.key)}>
-                        + 選項
-                      </button>
+                      <TagListInput
+                        value={f.options}
+                        onChange={(options) => update(f.key, { options })}
+                      />
                     </div>
                   )}
                 </div>
@@ -169,36 +381,42 @@ export default function SignupBuilderPage() {
 
         <div className="builder-preview-col">
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <span style={{ fontSize: 11, color: 'var(--steel)', letterSpacing: 2, fontWeight: 500 }}>預覽</span>
-            <span style={{ fontSize: 12, color: 'var(--steel)' }}>社團端呈現(即時)</span>
+            <span style={{ fontSize: 11, color: 'var(--steel)', letterSpacing: 2, fontWeight: 500 }}>即時預覽</span>
           </div>
           <div className="builder-preview-frame">
-            <div style={{ background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 6, padding: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
               <div style={{ fontSize: 16, fontWeight: 600 }}>{name || '(未命名活動)'} — 報名</div>
-              <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 6, padding: 14, marginTop: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>
-                    參加人 <span className="num">1</span>
-                  </div>
-                  <div style={{ flex: 1 }} />
-                  <span style={{ fontSize: 12, color: 'var(--steel)' }}>移除</span>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    <PreviewInput label="姓名" required />
-                    <PreviewInput label="學號" required />
-                  </div>
-                  <PreviewInput label="系級" required />
-                  {fields.map((f) => (
-                    <PreviewField key={f.key} field={f} />
-                  ))}
-                </div>
-              </div>
-              <div className="builder-preview-add num">
-                + 新增參加人(1/{cap ?? '—'})
-              </div>
-              <div className="builder-preview-submit">送出報名</div>
+              <KindBadge kind={kind} />
+              {needsReview && (
+                <Tag color="gold" style={{ marginInlineEnd: 0 }}>審核制</Tag>
+              )}
             </div>
+            {description.trim() && (
+              <div style={{ fontSize: 12, color: 'var(--steel)', lineHeight: 1.7, marginTop: 6 }}>{description}</div>
+            )}
+            <div style={{ background: '#fff', border: '1px solid var(--line)', borderRadius: 6, padding: 14, marginTop: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 10 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>
+                  參加人 <span className="num">1</span>
+                </div>
+                <div style={{ flex: 1 }} />
+                <span style={{ fontSize: 12, color: 'var(--steel)' }}>移除</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <PreviewInput label="姓名" required />
+                  <PreviewInput label="學號" required />
+                </div>
+                <PreviewInput label="系級" required />
+                {fields.map((f) => (
+                  <PreviewField key={f.key} field={f} />
+                ))}
+              </div>
+            </div>
+            <div className="builder-preview-add num">
+              + 新增參加人(1/{cap ?? '—'})
+            </div>
+            <div className="builder-preview-submit">送出報名</div>
           </div>
         </div>
       </div>
@@ -262,7 +480,7 @@ function PreviewField({ field }: { field: BuilderField }) {
             alignItems: 'center',
             padding: '0 10px',
             fontSize: 12,
-            color: 'var(--muted)',
+            color: 'var(--steel)',
           }}
         >
           請選擇

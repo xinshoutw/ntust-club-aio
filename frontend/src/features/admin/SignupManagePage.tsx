@@ -1,85 +1,509 @@
 import { useState } from 'react'
+import { countText } from '../../lib/counts'
 import { useNavigate } from 'react-router'
-import { App, Button, DatePicker } from 'antd'
+import { App, Button, Checkbox, DatePicker, Input, Modal, Select, Tooltip } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
+import { DeleteOutlined, DownloadOutlined, EditOutlined, RightOutlined } from '@ant-design/icons'
+import type { Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
+import OptionsError from '../../components/ui/OptionsError'
+import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
-import { SIGNUP_ITEMS } from '../signup/mock'
+import { Cols, Pager } from '../../components/ui/tableControls'
+import { confirmDialog } from '../../lib/confirm'
+import { downloadCsv } from '../../lib/csv'
+import { signupCsvRows } from './signupCsv'
+import { notFoundText } from '../../lib/selectOptions'
+import { useClubOptions } from '../../api/adminClubs'
+import KindBadge from '../signup/KindBadge'
+import SignupEditModal from './SignupEditModal'
+import {
+  SIGNUP_PAGE_SIZE,
+  useAdminSignupItems,
+  useOpenSignupTotal,
+  useRegistrations,
+  useSessions,
+  useSignupItemMutations,
+  type AdminSignupItem,
+  type Registration,
+  type SignupSession,
+} from '../../api/adminSignups'
 
-const REGISTRATIONS: Record<string, { club: string; count: number; confirmed: boolean }[]> = {
-  'cadre-training': [
-    { club: '資工系學會', count: 2, confirmed: true },
-    { club: '電機系學會', count: 3, confirmed: false },
-  ],
-  'leader-meeting': [{ club: '電機系學會', count: 1, confirmed: true }],
-  evaluation: [{ club: '電機系學會', count: 1, confirmed: true }],
+// 簽到:活動結束後由管理員登錄,評鑑僅採計簽到(僅報名不計分)
+// 負責人會議為場次制(每學期 2 場、全學年 4 場):管理員建立場次後逐場登錄
+
+const answerText = (v: unknown): string => (Array.isArray(v) ? v.join('、') : v == null ? '' : String(v))
+
+// 單一報名活動的管理彈窗:名單、報名確認、簽到登錄、匯出
+function ManageModal({
+  item,
+  open,
+  onClose,
+  afterClose,
+}: {
+  item: AdminSignupItem
+  open: boolean
+  onClose: () => void
+  afterClose: () => void
+}) {
+  const { message, modal } = App.useApp()
+  const regsQuery = useRegistrations(item.id)
+  const regs = regsQuery.data ?? []
+  const totalPeople = regs.reduce((s, r) => s + r.count, 0)
+  const { confirm, addRegistration, removeRegistration, markAttendance, createSession, deleteSession } = useSignupItemMutations()
+  const [editing, setEditing] = useState(false)
+  // 補登:實際到場但沒線上報名的社團,不補的話簽到登錄不了、行政分就少算一場
+  const [walkInClub, setWalkInClub] = useState<number | null>(null)
+  const clubOptions = useClubOptions()
+
+  // 場次制(負責人會議):場次清單+逐場簽到;非場次制不發查詢
+  const sessionsQuery = useSessions(item.sessionBased ? item.id : undefined)
+  const sessions = sessionsQuery.data ?? []
+  const [newSessionName, setNewSessionName] = useState('')
+  const [newSessionDate, setNewSessionDate] = useState<Dayjs | null>(null)
+
+  const isAttended = (s: SignupSession, clubId: number) =>
+    s.attendance.some((a) => a.clubId === clubId && a.attended)
+  const attendedCount = (clubId: number) =>
+    sessions.reduce((n, s) => n + (isAttended(s, clubId) ? 1 : 0), 0)
+
+  const onRemove = (r: Registration) =>
+    confirmDialog(modal, {
+      title: `撤除「${r.club}」的補登?`,
+      content: '這筆報名沒有參加人名單,撤除後該社團可自行線上報名',
+      okText: '撤除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: () =>
+        removeRegistration.mutate(
+          { itemId: item.id, clubId: r.clubId },
+          { onSuccess: () => message.success('已撤除'), onError: (e) => message.error(e.message) },
+        ),
+    })
+
+  // 逐人匯出:固定欄位+該活動全部自訂欄位(依欄位順序)
+  const exportCsv = () => {
+    // 匯出鈕在 LoadingBlock 外面:載入中按下去會落到「尚無報名名單」那句假答案
+    if (regsQuery.isPending) {
+      message.error('報名名單尚在載入,請稍候再匯出')
+      return
+    }
+    if (regsQuery.isError) {
+      message.error('報名名單載入失敗,無法匯出;請重試後再匯出')
+      return
+    }
+    if (!regs.length) {
+      message.error('尚無報名名單可匯出')
+      return
+    }
+    downloadCsv(`報名名單_${item.name}.csv`, signupCsvRows(item, regs))
+    message.success(`已匯出 ${totalPeople} 名參加人`)
+  }
+
+  const onConfirm = (r: Registration) => {
+    confirm.mutate(
+      { itemId: item.id, clubId: r.clubId },
+      {
+        onSuccess: () => message.success(`已確認 ${r.club} 報名`),
+        onError: (e) => message.error(e.message),
+      },
+    )
+  }
+
+  // 逐場簽到:場次日未到後端回 409,錯誤訊息直接呈現
+  const onMark = (r: Registration, attended: boolean, session?: SignupSession) => {
+    markAttendance.mutate(
+      { itemId: item.id, clubId: r.clubId, attended, sessionId: session?.id },
+      {
+        onSuccess: () =>
+          message.success(`${r.club}${session ? ` ${session.name}` : ''} ${attended ? '已簽到' : '取消簽到'}`),
+        onError: (e) => message.error(e.message),
+      },
+    )
+  }
+
+  const addSession = () => {
+    // Enter 直接叫這裡,繞過鈕的 loading;場次表沒有唯一約束,連按就落兩筆同名場次
+    if (createSession.isPending) return
+    const name = newSessionName.trim()
+    if (!name || !newSessionDate) return
+    createSession.mutate(
+      { itemId: item.id, name, date: newSessionDate.format('YYYY/MM/DD') },
+      {
+        onSuccess: () => {
+          setNewSessionName('')
+          setNewSessionDate(null)
+          message.success(`已新增場次 ${name}`)
+        },
+        onError: (e) => message.error(e.message),
+      },
+    )
+  }
+
+  const askDeleteSession = (s: SignupSession) =>
+    confirmDialog(modal, {
+      title: '刪除場次',
+      content: `「${s.name}」(${s.date})刪除後,該場出席紀錄將一併刪除`,
+      okText: '確認刪除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: () => {
+        deleteSession.mutate(
+          { itemId: item.id, sessionId: s.id },
+          {
+            onSuccess: () => message.success('場次已刪除'),
+            onError: (e) => message.error(e.message),
+          },
+        )
+      },
+    })
+
+  return (
+    <Modal
+      open={open}
+      onCancel={onClose}
+      afterClose={afterClose}
+      width={item.sessionBased ? 760 : 620}
+      footer={null}
+      title={
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 26 }}>
+          <span style={{ fontSize: 16, fontWeight: 600 }}>{item.name}</span>
+          <KindBadge kind={item.kind} />
+          <StatusPill status={item.status} />
+        </div>
+      }
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 13, color: 'var(--steel)', marginTop: 4, flexWrap: 'wrap' }}>
+        <span>
+          截止 <span className="num">{item.deadline}</span>
+        </span>
+        <span>
+          已報名 <span className="num">{countText(regs.length, regsQuery)}</span> 社團 ·{' '}
+          <span className="num">{countText(totalPeople, regsQuery)}</span> 人
+        </span>
+        <span>
+          每社上限 <span className="num">{item.maxParticipants}</span> 人
+        </span>
+        <span style={{ flex: 1 }} />
+        <Button size="small" icon={<EditOutlined />} onClick={() => setEditing(true)}>
+          編輯活動
+        </Button>
+        <Button size="small" icon={<DownloadOutlined />} onClick={exportCsv}>
+          匯出名單
+        </Button>
+      </div>
+
+      {/* 補登社團:簽到硬性要求先有報名列,現場來了卻沒線上報名的社團登錄不了(decisions.md DEC-07) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+        <Select
+          size="small"
+          showSearch
+          allowClear
+          placeholder="補登未線上報名的社團"
+          style={{ minWidth: 220 }}
+          value={walkInClub}
+          onChange={setWalkInClub}
+          optionFilterProp="label"
+          loading={clubOptions.isPending}
+          notFoundContent={notFoundText(clubOptions, '沒有社團可補登', '社團清單')}
+          options={(clubOptions.data ?? [])
+            .filter((c) => !regs.some((r) => r.clubId === c.id))
+            .map((c) => ({ value: c.id, label: c.name }))}
+        />
+        <Button
+          size="small"
+          disabled={walkInClub == null}
+          loading={addRegistration.isPending}
+          onClick={() => {
+            addRegistration.mutate(
+              { itemId: item.id, clubId: walkInClub as number },
+              {
+                onSuccess: () => {
+                  message.success('已補登')
+                  setWalkInClub(null)
+                },
+                onError: (e) => message.error(e.message),
+              },
+            )
+          }}
+        >
+          補登
+        </Button>
+        {clubOptions.isError && (
+          <OptionsError what="社團清單" error={clubOptions.error} onRetry={() => void clubOptions.refetch()} />
+        )}
+      </div>
+
+      <LoadingBlock pending={regsQuery.isPending || (item.sessionBased && sessionsQuery.isPending)}>
+        {/* 場次管理:名稱+日期新增、刪除(出席紀錄一併刪除);逐場簽到於下方名單列登錄 */}
+        {item.sessionBased && (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>場次</div>
+            {sessions.length > 0 && (
+              <div style={{ border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden', marginBottom: 8 }}>
+                {sessions.map((s) => (
+                  <div
+                    key={s.id}
+                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '7px 14px', borderTop: '1px solid var(--line)', marginTop: -1 }}
+                  >
+                    <div style={{ fontSize: 13, flex: 1, minWidth: 120 }}>{s.name}</div>
+                    <div className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>{s.date}</div>
+                    <button
+                      type="button"
+                      className="link-btn danger"
+                      aria-label={`刪除場次 ${s.name}`}
+                      onClick={() => askDeleteSession(s)}
+                    >
+                      <DeleteOutlined />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {sessionsQuery.isError && (
+              <div style={{ marginBottom: 8 }}>
+                <QueryError compact title="場次載入失敗" error={sessionsQuery.error} onRetry={() => sessionsQuery.refetch()} />
+              </div>
+            )}
+            {!sessionsQuery.isPending && !sessionsQuery.isError && sessions.length === 0 && (
+              <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 8 }}>尚未建立場次,新增場次後即可逐場登錄簽到</div>
+            )}
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <Input
+                size="small"
+                placeholder="場次名稱"
+                value={newSessionName}
+                maxLength={100}
+                style={{ width: 200 }}
+                onChange={(e) => setNewSessionName(e.target.value)}
+                onPressEnter={addSession}
+              />
+              <DatePicker
+                size="small"
+                placeholder="場次日期"
+                format="YYYY/MM/DD"
+                value={newSessionDate}
+                onChange={setNewSessionDate}
+              />
+              <Button
+                size="small"
+                loading={createSession.isPending}
+                disabled={!newSessionName.trim() || !newSessionDate}
+                onClick={addSession}
+              >
+                新增場次
+              </Button>
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 600, marginTop: 16 }}>報名名單</div>
+          </div>
+        )}
+
+        <div style={{ marginTop: item.sessionBased ? 8 : 12, border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden' }}>
+          {regs.map((r) => (
+            <div key={r.clubId} style={{ padding: '10px 14px', borderTop: '1px solid var(--line)', marginTop: -1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ fontSize: 14, flex: 1, minWidth: 140 }}>
+                  {r.club}
+                  {r.awards.length > 0 && (
+                    <span style={{ fontSize: 12, color: 'var(--steel)', marginLeft: 8 }}>{r.awards.join('、')}</span>
+                  )}
+                </div>
+                <div className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>{r.count} 人</div>
+                {/* 簽到:評鑑僅採計簽到;負責人會議逐場登錄,出席場次數=各場加總 */}
+                {item.sessionBased ? (
+                  sessions.length > 0 && (
+                    <span style={{ fontSize: 13, color: 'var(--steel)' }}>
+                      出席 <span className="num">{attendedCount(r.clubId)}</span> / <span className="num">{sessions.length}</span> 場
+                    </span>
+                  )
+                ) : item.eventEnded ? (
+                  <Checkbox
+                    checked={r.attendedSessions > 0}
+                    disabled={markAttendance.isPending}
+                    onChange={(e) => onMark(r, e.target.checked)}
+                  >
+                    簽到
+                  </Checkbox>
+                ) : (
+                  <Tooltip title="活動結束後開放登錄簽到">
+                    <Checkbox disabled>簽到</Checkbox>
+                  </Tooltip>
+                )}
+                {r.confirmed ? (
+                  <StatusPill status="approved" />
+                ) : (
+                  <Button size="small" style={{ height: 28 }} loading={confirm.isPending} onClick={() => onConfirm(r)}>
+                    確認報名
+                  </Button>
+                )}
+                {/* 補登的單(沒有參加人名單)才給撤除:選錯社團的話不撤掉就等於
+                    讓那個社團永久報不了這個活動(社團端「一經報名不得更改」) */}
+                {r.count === 0 && (
+                  <button
+                    type="button"
+                    className="link-btn danger"
+                    aria-label={`撤除 ${r.club} 的補登`}
+                    onClick={() => onRemove(r)}
+                  >
+                    <DeleteOutlined />
+                  </button>
+                )}
+              </div>
+              {/* 逐場簽到:以各場 attendance 判定現值,切換即登錄該場 */}
+              {item.sessionBased && sessions.length > 0 && (
+                <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 13, color: 'var(--steel)' }}>簽到</span>
+                  {sessions.map((s) => (
+                    <Checkbox
+                      key={s.id}
+                      checked={isAttended(s, r.clubId)}
+                      disabled={markAttendance.isPending}
+                      onChange={(e) => onMark(r, e.target.checked, s)}
+                    >
+                      {s.name}
+                    </Checkbox>
+                  ))}
+                </div>
+              )}
+              {/* 逐人明細:姓名/學號/系級+自訂欄位回答 */}
+              <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {r.participants.map((p, i) => (
+                  <div key={i} style={{ fontSize: 12, color: 'var(--steel)', lineHeight: 1.7 }}>
+                    <span style={{ color: 'var(--ink)', fontWeight: 500 }}>{answerText(p.name)}</span>
+                    <span className="num"> {answerText(p.studentId)}</span> · {answerText(p.dept)}
+                    {item.fields
+                      .filter((f) => answerText(p[f.key]))
+                      .map((f) => (
+                        <span key={f.key}> · {f.label}:{answerText(p[f.key])}</span>
+                      ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+          {regsQuery.isError && (
+            <QueryError compact title="報名名單載入失敗" error={regsQuery.error} onRetry={() => regsQuery.refetch()} />
+          )}
+          {!regsQuery.isPending && !regsQuery.isError && regs.length === 0 && (
+            <div style={{ padding: '16px 14px', fontSize: 13, color: 'var(--steel)' }}>尚無社團報名</div>
+          )}
+        </div>
+      </LoadingBlock>
+
+      <SignupEditModal item={item} open={editing} onClose={() => setEditing(false)} />
+    </Modal>
+  )
 }
 
 export default function SignupManagePage() {
-  const { message } = App.useApp()
   const navigate = useNavigate()
-  const [expanded, setExpanded] = useState<string | null>('cadre-training')
+  const [selected, setSelected] = useState<AdminSignupItem | null>(null)
+  const [open, setOpen] = useState(false)
+
+  const [page, setPage] = useState(1)
+  const listQuery = useAdminSignupItems(page)
+  const items = listQuery.data?.rows ?? []
+  const total = listQuery.data?.total ?? 0
+  const openTotal = useOpenSignupTotal()
+
+  const openItem = (item: AdminSignupItem) => {
+    setSelected(item)
+    setOpen(true)
+  }
 
   return (
-    <div style={{ maxWidth: 1000 }}>
+    <div>
       <PageHeader
-        title="報名管理"
+        title="活動管理"
+        sub={
+          <>
+            開放中 <span className="num">{openTotal.data ?? '—'}</span> 項
+          </>
+        }
         extra={
-          <Button type="primary" style={{ height: 36 }} onClick={() => navigate('/admin/signup-items/new')}>
-            + 報名活動建立
+          <Button type="primary" onClick={() => navigate('/admin/signup-items/new')}>
+            + 建立活動
           </Button>
         }
       />
 
-      <div className="card" style={{ marginTop: 20, padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <div style={{ fontSize: 14, fontWeight: 500 }}>報名時間窗</div>
-        <DatePicker.RangePicker format="YYYY/MM/DD" />
-        <Button style={{ height: 34 }} onClick={() => message.success('已儲存報名時間')}>儲存</Button>
-        <div style={{ fontSize: 12, color: 'var(--steel)' }}>窗外時間社團無法送出報名。</div>
+      <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+        <LoadingBlock pending={listQuery.isPending}>
+          <table className="tb dense fixed" style={{ minWidth: 720 }} aria-label="報名活動列表">
+            {/* 活動名吃剩餘寬且允許換行(含類別徽章);截止/人數/狀態/開啟固定 px */}
+            <Cols widths={['auto', 100, 130, 96, 90, 32]} />
+            <thead>
+              <tr>
+                <th scope="col">活動</th>
+                <th scope="col">截止</th>
+                <th scope="col" className="r">已報名</th>
+                <th scope="col" className="r">每社上限</th>
+                <th scope="col">狀態</th>
+                <th scope="col" aria-label="開啟" />
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item) => (
+                <tr key={item.id} onClick={() => openItem(item)} style={{ cursor: 'pointer' }}>
+                  <td>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className="row-open-btn"
+                        style={{ fontWeight: 500 }}
+                        aria-label={`開啟「${item.name || '未命名活動'}」報名管理`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          openItem(item)
+                        }}
+                      >
+                        {item.name}
+                      </button>
+                      <KindBadge kind={item.kind} />
+                    </span>
+                  </td>
+                  <td className="num" style={{ fontSize: 13 }}>{item.deadline}</td>
+                  <td className="r num">
+                    {item.clubsCount} 社團
+                    {item.pendingCount > 0 && (
+                      <span style={{ color: '#8A5A00', fontSize: 12 }}>(待確認 {item.pendingCount})</span>
+                    )}
+                  </td>
+                  <td className="r num">{item.maxParticipants} 人</td>
+                  <td><StatusPill status={item.status} /></td>
+                  <td className="r"><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>
+                </tr>
+              ))}
+              {listQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={6}>
+                    <QueryError compact title="活動列表載入失敗" error={listQuery.error} onRetry={() => listQuery.refetch()} />
+                  </td>
+                </tr>
+              )}
+              {!listQuery.isPending && !listQuery.isError && items.length === 0 && (
+                <tr className="no-hover">
+                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
+                    尚未建立報名活動
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </LoadingBlock>
+          <Pager page={page} pageSize={SIGNUP_PAGE_SIZE} total={total} onChange={setPage} />
       </div>
 
-      {SIGNUP_ITEMS.map((item) => {
-        const regs = REGISTRATIONS[item.id] ?? []
-        const open = expanded === item.id
-        return (
-          <div className="card" key={item.id} style={{ marginTop: 12 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 20px', flexWrap: 'wrap' }}>
-              <div style={{ fontSize: 15, fontWeight: 500 }}>{item.name}</div>
-              <StatusPill status={item.status} />
-              <div style={{ fontSize: 13, color: 'var(--steel)' }}>
-                截止 <span className="num">{item.deadline}</span> · 已報名{' '}
-                <span className="num">{regs.length}</span> 社團
-              </div>
-              <div style={{ flex: 1 }} />
-              <button type="button" className="link-btn" onClick={() => setExpanded(open ? null : item.id)}>
-                {open ? '收合' : '展開名單'}
-              </button>
-            </div>
-            {open &&
-              (regs.length ? (
-                regs.map((r) => (
-                  <div
-                    key={r.club}
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', borderTop: '1px solid var(--line)' }}
-                  >
-                    <div style={{ fontSize: 14, flex: 1 }}>{r.club}</div>
-                    <div className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>{r.count} 人</div>
-                    {r.confirmed ? (
-                      <StatusPill status="approved" />
-                    ) : (
-                      <Button size="small" style={{ height: 28 }} onClick={() => message.success(`已確認 ${r.club} 報名`)}>
-                        確認報名
-                      </Button>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <div style={{ padding: '14px 20px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
-                  尚無社團報名。
-                </div>
-              ))}
-          </div>
-        )
-      })}
+      {/* Modal 常駐至關閉動畫結束(afterClose)才卸載 */}
+      {selected && (
+        <ManageModal
+          key={selected.id}
+          item={selected}
+          open={open}
+          onClose={() => setOpen(false)}
+          afterClose={() => setSelected(null)}
+        />
+      )}
     </div>
   )
 }

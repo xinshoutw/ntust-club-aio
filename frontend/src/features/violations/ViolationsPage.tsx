@@ -1,53 +1,96 @@
+import { useState } from 'react'
+import { countText } from '../../lib/counts'
+import dayjs from 'dayjs'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
-import { useAuth } from '../../app/auth'
-import { VIOLATIONS } from './mock'
+import { Cols, Pager } from '../../components/ui/tableControls'
+import { useViolations } from '../../api/violations'
+
+const PAGE_SIZE = 20
 
 export default function ViolationsPage() {
-  const { user } = useAuth()
-  const mine = VIOLATIONS.filter((v) => v.club === user?.club)
+  const [page, setPage] = useState(1)
+  const listQuery = useViolations({ page, pageSize: PAGE_SIZE })
+  const violations = listQuery.data?.violations ?? []
+  const total = listQuery.data?.total ?? 0
 
   return (
-    <div style={{ maxWidth: 1000 }}>
+    <div>
       <PageHeader
         title="違規勸導紀錄"
         sub={
           <>
-            {user?.club} · 共 <span className="num">{mine.length}</span> 筆
+            共 <span className="num">{countText(total, listQuery)}</span> 筆
           </>
         }
       />
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        未銷案紀錄請洽課外活動指導組辦理銷案(如愛校服務)。
+        請於 <span className="num">1</span> 個月內至學務處活動辦理銷案，逾期將不受理
       </div>
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-        <table className="tb" style={{ minWidth: 640 }}>
-          <thead>
-            <tr>
-              <th>單號</th>
-              <th>日期</th>
-              <th>地點</th>
-              <th>違規項目</th>
-              <th>狀態</th>
-            </tr>
-          </thead>
-          <tbody>
-            {mine.map((v) => (
-              <tr key={v.id}>
-                <td className="num" style={{ color: 'var(--steel)' }}>{v.id}</td>
-                <td className="num" style={{ fontSize: 13 }}>{v.date}</td>
-                <td>{v.location}</td>
-                <td>
-                  <div>{v.items.join('、')}</div>
-                  {v.note && <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 2 }}>{v.note}</div>}
-                </td>
-                <td><StatusPill status={v.status} /></td>
+        <LoadingBlock pending={listQuery.isPending}>
+          <table className="tb fixed" style={{ minWidth: 720 }}>
+            <Cols widths={[110, '22%', 'auto', 180, 100]} />
+            <thead>
+              <tr>
+                <th scope="col">日期</th>
+                <th scope="col">地點</th>
+                <th scope="col">違規項目</th>
+                <th scope="col">銷案期限</th>
+                <th scope="col">狀態</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {violations.map((v) => {
+                const daysLeft = v.deadline
+                  ? dayjs(v.deadline, 'YYYY/MM/DD').diff(dayjs().startOf('day'), 'day')
+                  : 0
+                return (
+                  <tr key={v.id}>
+                    <td className="num" style={{ fontSize: 13 }}>{v.date}</td>
+                    <td>{v.location}</td>
+                    <td>
+                      <div>{v.items.join('、')}</div>
+                      {v.note && <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 2 }}>{v.note}</div>}
+                    </td>
+                    <td className="num" style={{ fontSize: 13 }}>
+                      {v.status === 'violation_resolved' || !v.deadline ? (
+                        <span style={{ color: 'var(--steel)' }}>—</span>
+                      ) : v.expired ? (
+                        <span style={{ color: '#C13B34', fontWeight: 500 }}>{v.deadline} 已截止</span>
+                      ) : (
+                        <>
+                          {v.deadline}
+                          <span style={{ color: 'var(--steel)' }}>{daysLeft > 0 ? `(剩 ${daysLeft} 天)` : '(今日截止)'}</span>
+                        </>
+                      )}
+                    </td>
+                    <td><StatusPill status={v.status} /></td>
+                  </tr>
+                )
+              })}
+              {listQuery.isError && (
+                <tr className="no-hover">
+                  <td colSpan={5}>
+                    <QueryError compact title="違規勸導紀錄載入失敗" error={listQuery.error} onRetry={() => listQuery.refetch()} />
+                  </td>
+                </tr>
+              )}
+              {!listQuery.isError && !listQuery.isPending && violations.length === 0 && (
+                <tr className="no-hover">
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
+                    沒有違規勸導紀錄
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </LoadingBlock>
       </div>
+      <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
     </div>
   )
 }

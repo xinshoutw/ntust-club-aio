@@ -1,0 +1,41 @@
+# 登入 / 強制改密 / 面板未開放
+
+`/login`、`/change-password`、`/coming-soon` · 全角色 · `features/auth/`
+
+## 用途
+
+唯一入口。目前 `/` 對未登入者即導向 `/login`(Roadmap 要改成社團導覽頁,登入鈕移到右上角)。
+
+## 資料來源
+
+| 動作 | 端點 |
+|---|---|
+| 登入 | `POST /auth/login` |
+| 恢復 session | `GET /auth/me` |
+| 登出 | `POST /auth/logout` |
+| 改密 | `POST /auth/change-password` |
+| 上傳前置驗證(nginx `auth_request`) | `GET /auth/precheck` |
+
+## 畫面
+
+**登入頁**:標題「社團管理系統」、帳號、密碼、登入鈕;頁尾 `Copyright © 2026 國立臺灣科技大學` + 維護者資訊 Popover(姓名、Discord、信箱)。跨年後自動顯示 `2026-{今年}`。
+
+**改密頁**:目前密碼、新密碼、確認新密碼;副標依 `mustChangePassword` 切換為「首次登入需變更密碼後才能繼續使用」或「變更登入密碼」。密碼規則以說明文字呈現。底部「改用其他帳號登入」= 登出。
+
+**面板未開放頁**:`homeOf()` 對未知角色的落點,只有姓名與登出鈕。四種角色現皆有面板,實際到不了。
+
+## 規則
+
+- 登入成功後依 `mustChangePassword` 導向 `/change-password`,否則導向 `homeOf(role)`:`admin`→`/admin`、`club`→`/`、`staff`→`/pt`、`viewer`→`/viewer`
+- 未改密時後端 `get_current_user` 對所有業務端點回 403 `PASSWORD_CHANGE_REQUIRED`,只放行 `/auth/me`、改密、登出
+- session 存 DB,cookie `session_id` 為 HttpOnly;7 天滑動效期,剩餘 < 6 天 23 小時才續期,續期時一併重送 cookie
+- CSRF double-submit:`csrf_token` cookie 非 HttpOnly,前端 `client.ts` 對 POST/PUT/PATCH/DELETE 自動附 `X-CSRF-Token`
+- 登入限流在應用層(`login_limiter`,只計失敗)與 nginx `limit_req` 各一道;帳號本身連錯 5 次鎖 15 分
+- 密碼驗過才鎖該帳號列(argon2 不在鎖區內),鎖到手後重讀 hash:驗證期間被重設密碼就當作登入失敗,新 session 才不會活過那次撤銷。**取鎖順序固定 users → sessions**(重設密碼與停權也是),反序會死鎖
+- 登入成功會清 `sessionStorage` 的蓋板已關閉紀錄,使蓋板公告每次登入重新顯示
+- **開機恢復 session 的兩種失敗要分開**:`GET /auth/me` 回 **401**(無 cookie / 過期 / 帳號停用,後端一律 401)= 真的沒有登入,導到本頁;**其他失敗**(500、斷線)= 無法確認,整頁顯示「無法確認登入狀態」+ 重試 + 「改用其他帳號登入」,**不可導到本頁** —— 那等於告訴使用者「你被登出了」。判準取 `ApiError.status`,不依賴事件派發時序;登入或登出會清掉這個狀態(並結束 `booting`,否則登入成功會停在空白頁),`refresh()`(改密後)同一條規則 —— 它失敗時改以整頁重載收尾,因為 `mustChangePassword` 還是舊值會被 gate 彈回改密頁。按重試時保留原本的錯誤卡片(不清空、不變白),請求回來才更新;停在 `/login` 時例外,登入表單照常可用
+- **登入端點的 401 不算 session 過期**:那是「帳號或密碼錯誤」,`client.ts` 因此不對 `/auth/login` 廣播 `UNAUTHORIZED_EVENT` —— 否則已登入的人開著本頁打錯一次密碼,前端就把自己登出了
+
+## 未完成 / 問題
+
+- `/coming-soon` 是死路由,四角色皆有面板

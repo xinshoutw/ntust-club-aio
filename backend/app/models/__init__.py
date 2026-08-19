@@ -1,21 +1,95 @@
-from sqlalchemy import MetaData
-from sqlalchemy.orm import DeclarativeBase
+"""SQLAlchemy models:docs/data-model.md 的落地;schema 以 Alembic migration 為準。"""
 
-# 固定約束命名,Alembic autogenerate 才能穩定 diff。
-# 注意:ck 使用 %(constraint_name)s → 所有 CheckConstraint 一律要給 name=;
-# 複合 unique 建議也自行命名,避免 column_0 撞名。
-NAMING_CONVENTION = {
-    "ix": "ix_%(column_0_label)s",
-    "uq": "uq_%(table_name)s_%(column_0_name)s",
-    "ck": "ck_%(table_name)s_%(constraint_name)s",
-    "fk": "fk_%(table_name)s_%(column_0_name)s_%(referent_table_name)s",
-    "pk": "pk_%(table_name)s",
-}
+from app.models.activities import (
+    Activity,
+    ActivityBudgetItem,
+    ActivityReflection,
+    ActivityReport,
+    ApprovalRecord,
+)
+from app.models.applications import MaintenanceRequest, OfficerCertificate, PostalAccountChange
+from app.models.base import Base
+from app.models.bookings import EquipmentLoan, RoomBookingRequest, RoomBookingSlot, VenueBooking
+from app.models.clubs import Club, ClubMember
+from app.models.evaluation import (
+    Award,
+    AwardRubricItem,
+    EvalAdjustment,
+    EvalGroup,
+    EvalGroupClub,
+    EvalGroupReviewer,
+    EvalSetting,
+    EvalUpload,
+    ReviewScore,
+    ReviewScoreItem,
+)
+from app.models.facilities import Equipment, Holiday, SystemSetting, Venue, VenueBlockRule
+from app.models.files import File
+from app.models.misc import (
+    Announcement,
+    AnnouncementDismissal,
+    AuditLog,
+    EmailLog,
+    LegacyIdMap,
+    Violation,
+)
+from app.models.signups import (
+    SessionAttendance,
+    Signup,
+    SignupAward,
+    SignupDraft,
+    SignupEntry,
+    SignupItem,
+    SignupItemSession,
+)
+from app.models.users import PasswordHistory, Session, User
 
-
-class Base(DeclarativeBase):
-    metadata = MetaData(naming_convention=NAMING_CONVENTION)
-
-
-# 之後每個 model 模組都必須在此 import,Alembic autogenerate 才看得到
-# from app.models.users import User  # noqa: ERA001
+__all__ = [
+    "Activity",
+    "ActivityBudgetItem",
+    "ActivityReflection",
+    "ActivityReport",
+    "Announcement",
+    "AnnouncementDismissal",
+    "ApprovalRecord",
+    "AuditLog",
+    "Award",
+    "AwardRubricItem",
+    "Base",
+    "Club",
+    "ClubMember",
+    "EmailLog",
+    "Equipment",
+    "EquipmentLoan",
+    "EvalAdjustment",
+    "EvalGroup",
+    "EvalGroupClub",
+    "EvalGroupReviewer",
+    "EvalSetting",
+    "EvalUpload",
+    "File",
+    "Holiday",
+    "LegacyIdMap",
+    "MaintenanceRequest",
+    "OfficerCertificate",
+    "PasswordHistory",
+    "PostalAccountChange",
+    "ReviewScore",
+    "ReviewScoreItem",
+    "RoomBookingRequest",
+    "RoomBookingSlot",
+    "Session",
+    "SessionAttendance",
+    "Signup",
+    "SignupAward",
+    "SignupDraft",
+    "SignupEntry",
+    "SignupItem",
+    "SignupItemSession",
+    "SystemSetting",
+    "User",
+    "Venue",
+    "VenueBlockRule",
+    "VenueBooking",
+    "Violation",
+]

@@ -1,0 +1,242 @@
+"""違規勸導管理:銷案期限(開立日 +1 個月)推導、逾期截止、列表排序/過濾。"""
+
+from datetime import date, timedelta
+
+import sqlalchemy as sa
+
+from app.models import AuditLog, Violation
+from app.services import violation_service
+from app.services.violation_service import resolve_deadline, resolve_expired
+from tests.conftest import csrf_headers, login, make_club, make_user
+
+
+async def seed(client, db):
+    club = await make_club(db)
+    other = await make_club(db, name="吉他社")
+    staff = await make_user(db, username="staff01", role="staff", name="李工讀")
+    staff2 = await make_user(db, username="staff02", role="staff", name="陳工讀")
+    await make_user(db, username="violadmin", role="admin", permissions=["aviol"])
+    await login(client, "violadmin")
+
+    rows = [
+        # 未銷案、已逾期(3 月開立)
+        Violation(
+            club_id=club.id, occurred_on=date(2026, 3, 1), location="操場",
+            items=["未經申請使用場地"], filler_id=staff.id,
+        ),
+        # 未銷案、未逾期(近 10 天)
+        Violation(
+            club_id=other.id, occurred_on=date.today() - timedelta(days=10), location="社辦 S312",
+            items=["噪音影響他人"], filler_id=staff2.id,
+        ),
+        # 已銷案
+        Violation(
+            club_id=club.id, occurred_on=date(2026, 2, 1), location="活動中心",
+            items=["張貼未核可文宣"], filler_id=staff.id, status="resolved", resolve_note="已改善",
+        ),
+    ]
+    db.add_all(rows)
+    await db.commit()
+    for row in rows:
+        await db.refresh(row)
+    return club, other, staff, rows
+
+
+def test_deadline_boundary_unit():
+    """期限=開立日+1 個月;期限當天仍可銷案,隔日起截止。"""
+    v = Violation(occurred_on=date(2026, 6, 16), status="open")
+    assert resolve_deadline(v) == date(2026, 7, 16)
+    assert resolve_expired(v, today=date(2026, 7, 16)) is False  # 期限當天可銷案
+    assert resolve_expired(v, today=date(2026, 7, 17)) is True
+    # 月底收斂:1/31 開立 → 期限 2/28
+    v2 = Violation(occurred_on=date(2026, 1, 31), status="open")
+    assert resolve_deadline(v2) == date(2026, 2, 28)
+
+
+async def test_list_default_order_sort_and_filters(client, db):
+    club, other, staff, rows = await seed(client, db)
+
+    data = (await client.get("/api/v1/admin/violations")).json()["data"]
+    # 預設:未銷案在前(時間升冪),已銷案在後
+    assert [d["status"] for d in data] == ["open", "open", "resolved"]
+    assert data[0]["occurred_on"] == "2026-03-01"
+    assert data[0]["resolve_deadline"] == "2026-04-01"
+    assert data[0]["resolve_expired"] is True
+    assert data[1]["resolve_expired"] is False
+    assert data[0]["club_name"] == "熱舞社"
+    assert data[0]["filler_name"] == "李工讀"
+
+    # 排序白名單
+    resp = await client.get("/api/v1/admin/violations", params={"sort": "-date"})
+    dates = [d["occurred_on"] for d in resp.json()["data"]]
+    assert dates == sorted(dates, reverse=True)
+    assert (
+        await client.get("/api/v1/admin/violations", params={"sort": "hack"})
+    ).status_code == 422
+    for key in ("location", "items", "filler", "deadline", "status"):
+        assert (
+            await client.get("/api/v1/admin/violations", params={"sort": key})
+        ).status_code == 200
+
+    # 過濾:狀態/項目/填寫人/期限/社團
+    resp = await client.get("/api/v1/admin/violations", params={"status": "resolved"})
+    assert [d["location"] for d in resp.json()["data"]] == ["活動中心"]
+    resp = await client.get("/api/v1/admin/violations", params={"item": "噪音影響他人"})
+    assert [d["club_name"] for d in resp.json()["data"]] == ["吉他社"]
+    resp = await client.get("/api/v1/admin/violations", params={"filler_id": staff.id})
+    assert all(d["filler_name"] == "李工讀" for d in resp.json()["data"])
+    resp = await client.get("/api/v1/admin/violations", params={"expired": "true"})
+    assert [d["occurred_on"] for d in resp.json()["data"]] == ["2026-03-01"]
+    resp = await client.get("/api/v1/admin/violations", params={"expired": "false"})
+    assert [d["status"] for d in resp.json()["data"]] == ["open"]
+    assert resp.json()["data"][0]["resolve_expired"] is False
+
+
+async def test_multi_value_filters_and_options(client, db):
+    """漏斗是多選:status/item/filler_id 都要收多值,選項來源取自實際紀錄。"""
+    club, other, staff, rows = await seed(client, db)
+
+    options = (await client.get("/api/v1/admin/violations/options")).json()["data"]
+    assert set(options["items"]) == {"未經申請使用場地", "噪音影響他人", "張貼未核可文宣"}
+    # 李工讀開了兩張:選項要去重(否則漏斗會出現兩個同名的人)
+    assert len(options["fillers"]) == 2
+    filler_ids = {f["name"]: f["id"] for f in options["fillers"]}
+    assert filler_ids["李工讀"] == staff.id
+
+    # item 多值 = 命中任一項
+    resp = await client.get(
+        "/api/v1/admin/violations",
+        params=[("item", "噪音影響他人"), ("item", "張貼未核可文宣")],
+    )
+    assert {d["location"] for d in resp.json()["data"]} == {"社辦 S312", "活動中心"}
+
+    # status 多值
+    resp = await client.get(
+        "/api/v1/admin/violations", params=[("status", "open"), ("status", "resolved")]
+    )
+    assert len(resp.json()["data"]) == 3
+
+    # filler_id 多值
+    resp = await client.get(
+        "/api/v1/admin/violations",
+        params=[("filler_id", filler_ids["李工讀"]), ("filler_id", filler_ids["陳工讀"])],
+    )
+    assert len(resp.json()["data"]) == 3
+    resp = await client.get(
+        "/api/v1/admin/violations", params=[("filler_id", filler_ids["陳工讀"])]
+    )
+    assert [d["filler_name"] for d in resp.json()["data"]] == ["陳工讀"]
+
+    # 分頁:每頁 2 筆、總數仍為 3(前端據此顯示頁碼)
+    resp = await client.get("/api/v1/admin/violations", params={"page_size": 2})
+    assert len(resp.json()["data"]) == 2
+    assert resp.json()["meta"]["total"] == 3
+
+
+async def test_status_sort_follows_resolution_progress(client, db):
+    """畫面預設會顯式送 sort=status,date,那條路徑必須等同不帶 sort 的預設排序。
+
+    等價性這一段是護欄(拿掉預設分支的 _STATUS_ORDER 會紅);「未銷案在前」那兩條
+    目前只是契約標記 —— 現行列舉剛好 'open' < 'resolved',換回列舉欄位排序照樣綠。
+    """
+    await seed(client, db)
+
+    default = (await client.get("/api/v1/admin/violations")).json()["data"]
+    explicit = (
+        await client.get("/api/v1/admin/violations", params={"sort": "status,date"})
+    ).json()["data"]
+    assert [d["id"] for d in explicit] == [d["id"] for d in default]
+    # 未銷案在前是業務語意,不是 'open' < 'resolved' 的字面值巧合
+    assert [d["status"] for d in explicit] == ["open", "open", "resolved"]
+    resp = await client.get("/api/v1/admin/violations", params={"sort": "-status"})
+    assert [d["status"] for d in resp.json()["data"]] == ["resolved", "open", "open"]
+
+
+async def test_options_requires_permission(client, db):
+    await seed(client, db)
+    await make_user(db, username="nope-admin", role="admin", permissions=["areview"])
+    await login(client, "nope-admin")
+    assert (await client.get("/api/v1/admin/violations/options")).status_code == 403
+
+
+async def test_expired_filter_follows_resolve_months(client, db, monkeypatch):
+    """SQL 端的逾期篩選與 Python 端的推導必須同源:改期限月數,兩邊要一起動。"""
+    await seed(client, db)
+    # 遠大於 seed 資料的年齡:這個測試不能因為時間流逝而變紅
+    monkeypatch.setattr(violation_service, "RESOLVE_MONTHS", 1200)
+
+    resp = await client.get("/api/v1/admin/violations", params={"expired": "true"})
+    assert resp.json()["data"] == []  # SQL 端的篩選跟著改
+    resp = await client.get("/api/v1/admin/violations", params={"expired": "false"})
+    data = resp.json()["data"]
+    assert len(data) == 2  # 兩筆未銷案都還在期限內
+    assert data[0]["resolve_deadline"] == "2126-03-01"  # Python 端的期限也跟著改
+
+
+async def test_multi_key_sort(client, db):
+    """?sort=a,-b 多鍵排序:依鍵序生效、重複鍵去重保留首見、至多 3 鍵。"""
+    await seed(client, db)
+
+    # status 升冪 + 組內 date 降冪
+    resp = await client.get("/api/v1/admin/violations", params={"sort": "status,-date"})
+    data = resp.json()["data"]
+    assert [d["status"] for d in data] == ["open", "open", "resolved"]
+    assert data[0]["occurred_on"] > data[1]["occurred_on"]
+
+    # 重複鍵(含一升一降)保留首見:-date,date 等同 -date
+    base = (await client.get("/api/v1/admin/violations", params={"sort": "-date"})).json()["data"]
+    dup = (
+        await client.get("/api/v1/admin/violations", params={"sort": "-date,date"})
+    ).json()["data"]
+    assert [d["id"] for d in dup] == [d["id"] for d in base]
+
+    # 超過 3 鍵/白名單外鍵 → 422 INVALID_SORT
+    resp = await client.get(
+        "/api/v1/admin/violations", params={"sort": "date,location,status,created_at"}
+    )
+    assert resp.status_code == 422
+    assert resp.json()["meta"]["code"] == "INVALID_SORT"
+    resp = await client.get("/api/v1/admin/violations", params={"sort": "date,hack"})
+    assert resp.status_code == 422
+    assert resp.json()["meta"]["code"] == "INVALID_SORT"
+
+
+async def test_resolve_within_deadline_and_reject_expired(client, db):
+    club, other, staff, rows = await seed(client, db)
+    expired_row, active_row, resolved_row = rows
+
+    # 未逾期 → 銷案成功 + 稽核
+    resp = await client.post(
+        f"/api/v1/admin/violations/{active_row.id}/resolve",
+        json={"note": "已完成愛校服務 2 小時"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["status"] == "resolved"
+    assert resp.json()["data"]["resolve_note"] == "已完成愛校服務 2 小時"
+    audit_count = await db.scalar(
+        sa.select(sa.func.count()).where(AuditLog.action == "violation_resolved")
+    )
+    assert audit_count == 1
+
+    # 已逾期 → 拒絕(截止,−1 扣分成立)
+    resp = await client.post(
+        f"/api/v1/admin/violations/{expired_row.id}/resolve",
+        json={"note": "x"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 409
+    assert resp.json()["meta"]["code"] == "RESOLVE_EXPIRED"
+
+    # 已銷案 → 409
+    resp = await client.post(
+        f"/api/v1/admin/violations/{resolved_row.id}/resolve",
+        json={"note": "x"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 409
+
+    # 權限:無 aviol 的管理員 → 403
+    await make_user(db, username="other-admin", role="admin", permissions=["areview"])
+    await login(client, "other-admin")
+    assert (await client.get("/api/v1/admin/violations")).status_code == 403

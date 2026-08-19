@@ -7,15 +7,15 @@ export interface StampStage {
   note?: string
 }
 
-// 關卡色相與 pill 一致(輔=琥珀、組=藍、長=紫)
+// 關卡色相與 pill 一致(承=琥珀、組=藍、長=紫)
 const STAGE_HUE: Record<string, { color: string; pulse: string }> = {
-  輔: { color: '#8A5A00', pulse: 'stampPulseAmber' },
+  承: { color: '#8A5A00', pulse: 'stampPulseAmber' },
   組: { color: '#1D5A9E', pulse: 'stampPulseBlue' },
   長: { color: '#6B4FA3', pulse: 'stampPulsePurple' },
 }
 
 function StampNode({ stage }: { stage: StampStage }) {
-  const hue = STAGE_HUE[stage.char] ?? STAGE_HUE['輔']
+  const hue = STAGE_HUE[stage.char] ?? STAGE_HUE['承']
   const base: React.CSSProperties = {
     boxSizing: 'border-box',
     width: 32,

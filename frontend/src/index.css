@@ -63,6 +63,20 @@ body {
 .tb .r {
   text-align: right;
 }
+/* 固定欄寬版面(2026-07-21 需求方:欄寬不得隨內容浮動):
+   搭配 <Cols widths={...}/> 指定各欄寬;窄語意欄給 px、文字欄給 % 或 auto 吸收餘裕 */
+.tb.fixed {
+  table-layout: fixed;
+}
+.tb.fixed td {
+  overflow-wrap: break-word;
+}
+/* 單行截斷欄(名稱類):配 title 屬性 hover 看全文 */
+.tb .cell-clip {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 /* 行政密表 */
 .tb.dense {
   font-size: 13px;
@@ -94,6 +108,112 @@ body {
 }
 .link-btn.danger:hover {
   color: #c13b34;
+}
+
+/* 可點的場地名稱:hover 整字圓角反白(取代底線) */
+.venue-btn {
+  border: none;
+  background: transparent;
+  padding: 3px 8px;
+  margin-left: -8px;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.venue-btn:hover {
+  background: var(--seal-tint);
+  color: var(--seal);
+}
+.venue-btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+
+/* 可點擊卡片/列 hover 一律變色(全站一致);!important 蓋過各列 inline background */
+.click-tint {
+  transition: background-color 0.08s;
+}
+.click-tint:hover {
+  background-color: var(--seal-tint) !important;
+}
+.click-tint:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: -2px;
+}
+
+/* 可點表格列的鍵盤入口:名稱欄放真按鈕,整列 click 僅作滑鼠增強
+   (tr 不設 role=button,保住 table/row 讀屏語意) */
+.row-open-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.row-open-btn:hover {
+  color: var(--seal);
+}
+.row-open-btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* 非單一控件的區塊(照片區等)送出驗證未過時的紅框;搭配常駐透明邊框避免版面位移 */
+.area-error {
+  border-color: #c13b34 !important;
+}
+
+/* 已修改未儲存的欄位:橘黃色外框(box-shadow 避免與 AntD 邊框樣式打架) */
+.field-dirty :is(.ant-input-outlined, .ant-input-affix-wrapper-outlined) {
+  border-color: #d48806;
+  box-shadow: 0 0 0 1px rgba(212, 136, 6, 0.45);
+}
+
+/* ---- 公告 markdown 內容 ---- */
+.md-body {
+  font-size: 13px;
+  line-height: 1.8;
+  /* 長英數/URL 必要時斷行,防撐破容器 */
+  overflow-wrap: anywhere;
+}
+.md-body p,
+.md-body ul,
+.md-body ol {
+  margin: 0 0 8px;
+}
+.md-body ul,
+.md-body ol {
+  padding-left: 20px;
+}
+.md-body h1,
+.md-body h2,
+.md-body h3,
+.md-body h4 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 12px 0 6px;
+}
+.md-body :last-child {
+  margin-bottom: 0;
+}
+.md-body img {
+  max-width: 100%;
+}
+.md-body pre {
+  background: var(--paper);
+  border-radius: 6px;
+  padding: 10px 12px;
+  overflow-x: auto;
+}
+.md-body blockquote {
+  margin: 0 0 8px;
+  padding-left: 10px;
+  border-left: 3px solid var(--line);
+  color: var(--steel);
 }
 
 /* ---- 表單 ---- */
@@ -144,4 +264,11 @@ body {
     animation: none !important;
     transition: none !important;
   }
+}
+
+/* 彈窗進場固定在目的地淡入/縮放,取消自點擊位置飛入的 transform-origin
+   (2026-07-21 需求方:過場位移動畫造成不適;AntD 以 inline style 設 origin,需 !important 蓋過) */
+.ant-modal,
+.ant-image-preview-wrap .ant-image-preview-img {
+  transform-origin: center center !important;
 }

@@ -1,300 +1,344 @@
-import { useState } from 'react'
-import { App, Button, Checkbox, Drawer, Input, InputNumber, Modal } from 'antd'
+import { useMemo, useState } from 'react'
+import { countText } from '../../lib/counts'
+import { Button } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
+import QueryError from '../../components/ui/QueryError'
+import { RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
-import StampTrail, { type StampStage } from '../../components/ui/StampTrail'
+import LargeBadge from '../../components/ui/LargeBadge'
+import { Cols, FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
+import { STATUS } from '../../lib/status'
+import { useAuth } from '../../app/auth'
 import { fmtMoney } from '../activities/types'
-import { REVIEW_ITEMS, type ReviewItem } from './reviewMock'
+import {
+  canActOn,
+  useAdminActivities,
+  useAdminActivitiesPaged,
+  useAdminActivityDetail,
+  useAdminActivityMutations,
+  type AdminActivity,
+  type AdminActivityStatus,
+} from '../../api/adminActivities'
+import { useClubOptions } from '../../api/adminClubs'
+import ActivityReviewModal from './ActivityReviewModal'
+import { clickableProps } from '../../lib/clickable'
 
-const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
+const PAGE_SIZE = 20
+const ALL_STATUSES: AdminActivityStatus[] = [
+  'pending_advisor',
+  'pending_chief',
+  'pending_dean',
+  'approved',
+  'rejected',
+  'closing_pending_advisor',
+  'closed',
+]
 
-// 章軌由單據狀態推導;登入者(mock)為輔導老師,僅本關可簽核
-function stagesOf(status: ReviewItem['status']): StampStage[] {
-  const mk = (advisor: StampStage['state'], chief: StampStage['state'], dean: StampStage['state']): StampStage[] => [
-    { char: '輔', label: '輔導老師', state: advisor, note: noteOf(advisor) },
-    { char: '組', label: '組長', state: chief, note: noteOf(chief) },
-    { char: '長', label: '學務長', state: dean, note: noteOf(dean) },
-  ]
-  switch (status) {
-    case 'pending_advisor':
-      return mk('current', 'todo', 'todo')
-    case 'pending_chief':
-      return mk('done', 'current', 'todo')
-    case 'pending_dean':
-      return mk('done', 'done', 'current')
-    case 'approved':
-    case 'closed':
-      return mk('done', 'done', 'done')
-    case 'rejected':
-      return mk('rejected', 'todo', 'todo')
-    default:
-      return mk('todo', 'todo', 'todo')
-  }
-}
+// 類型篩選由後端推導(「大型活動」=類型活動且已認可或申請中未被否准);
+// 排序亦為伺服器端白名單(type 排序以原始類型為準,大型不獨立成一級)
+const TYPE_OPTIONS = ['社課或會議', '活動', '大型活動']
 
-function noteOf(state: StampStage['state']): string | undefined {
-  switch (state) {
-    case 'current':
-      return '審核中'
-    case 'todo':
-      return '未到關'
-    case 'done':
-      return '已核'
-    case 'rejected':
-      return '已退回'
-  }
-}
-
-function DetailDrawer({ item, onClose }: { item: ReviewItem; onClose: () => void }) {
-  const { message } = App.useApp()
-  const [rejectOpen, setRejectOpen] = useState(false)
-  const [reason, setReason] = useState('')
-  const d = item.detail
-  // 核定金額:controlled,依預算列 id 管理
-  const [approvals, setApprovals] = useState<Record<number, number>>(() =>
-    Object.fromEntries((d?.budget ?? []).map((b) => [b.id, b.approved])),
-  )
-
-  const canReview = item.status === 'pending_advisor'
-  const requestedTotal = d?.budget.reduce((s, b) => s + b.requested, 0) ?? 0
-  const approvedTotal = d?.budget.reduce((s, b) => s + (approvals[b.id] ?? 0), 0) ?? 0
-
-  const closeReject = () => {
-    setRejectOpen(false)
-    setReason('')
-  }
-
-  const submitReject = () => {
-    if (!reason.trim()) {
-      message.error('退回原因為必填。')
-      return
-    }
-    message.success(`已退回 ${item.id}(通知社團修正重送)`)
-    closeReject()
-    onClose()
-  }
-
-  return (
-    <Drawer
-      open
-      onClose={onClose}
-      size={560}
-      mask={false}
-      rootStyle={{ top: 56 }}
-      title={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <span className="num" style={{ fontSize: 13, color: 'var(--steel)', fontWeight: 400 }}>{item.id}</span>
-          <span style={{ fontSize: 16, fontWeight: 600 }}>{item.name}</span>
-          <StatusPill status={item.status} />
-        </div>
-      }
-      footer={
-        canReview ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ fontSize: 12, color: 'var(--steel)', flex: 1 }}>
-              退回將通知社團修正重送;退回原因必填。
-            </div>
-            <Button danger style={{ height: 38 }} onClick={() => setRejectOpen(true)}>
-              退回…
-            </Button>
-            <Button
-              type="primary"
-              style={{ height: 38 }}
-              onClick={() => {
-                message.success(`已核准 ${item.id},送組長關`)
-                onClose()
-              }}
-            >
-              核准,送組長關
-            </Button>
-          </div>
-        ) : (
-          <div style={{ fontSize: 12, color: 'var(--steel)' }}>
-            {item.status === 'rejected' ? '此申請已退回社團修正。' : '非本關卡待審單據,僅供查看。'}
-          </div>
-        )
-      }
-    >
-      <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
-        <StampTrail stages={stagesOf(item.status)} />
-      </div>
-
-      <div style={{ fontSize: 14, fontWeight: 600, margin: '16px 0 10px' }}>基本資料</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '96px 1fr', gap: '8px 12px', fontSize: 13 }}>
-        <div style={detailLabel}>社團</div><div>{item.club}</div>
-        <div style={detailLabel}>類型</div><div>{item.type}</div>
-        <div style={detailLabel}>日期時間</div><div className="num">{d?.timeRange ?? item.date}</div>
-        <div style={detailLabel}>地點</div><div>{d?.location ?? '—'}</div>
-        <div style={detailLabel}>參加人數</div>
-        <div>
-          校內 <span className="num">{d?.participantsIn ?? '—'}</span> · 校外{' '}
-          <span className="num">{d?.participantsOut ?? '—'}</span>
-        </div>
-        <div style={detailLabel}>送件</div>
-        <div>
-          <span className="num">{d?.submittedAt ?? '—'}</span>
-          {d?.submittedBy ? ` · ${d.submittedBy}` : ''}
-        </div>
-        <div style={detailLabel}>附件</div>
-        <div>
-          {d?.attachments.length
-            ? d.attachments.map((f, i) => (
-                <span key={f}>
-                  {i > 0 && ' · '}
-                  <button type="button" className="link-btn" style={{ color: 'var(--focus)', padding: 0 }}>
-                    {f}
-                  </button>
-                </span>
-              ))
-            : '—'}
-        </div>
-      </div>
-
-      {d && d.budget.length > 0 && (
-        <>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, margin: '22px 0 10px' }}>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>經費明細 — 逐項核定</div>
-            <div style={{ fontSize: 12, color: 'var(--steel)' }}>
-              {canReview ? '核定金額由本關填寫' : '核定金額(唯讀)'}
-            </div>
-          </div>
-          <table className="tb dense">
-            <thead>
-              <tr>
-                <th style={{ paddingLeft: 0 }}>摘要</th>
-                <th>說明</th>
-                <th className="r">自籌</th>
-                <th className="r">擬請</th>
-                <th className="r" style={{ width: 96, paddingRight: 0 }}>核定</th>
-              </tr>
-            </thead>
-            <tbody>
-              {d.budget.map((b) => (
-                <tr key={b.id} className="no-hover">
-                  <td style={{ paddingLeft: 0, whiteSpace: 'nowrap' }}>{b.category}</td>
-                  <td style={{ color: 'var(--steel)' }}>{b.description}</td>
-                  <td className="r num">{b.selfFund.toLocaleString()}</td>
-                  <td className="r num">{b.requested.toLocaleString()}</td>
-                  <td style={{ paddingRight: 0 }}>
-                    {canReview ? (
-                      <InputNumber
-                        size="small"
-                        style={{ width: '100%' }}
-                        min={0}
-                        max={b.requested}
-                        precision={0}
-                        value={approvals[b.id]}
-                        onChange={(v) => setApprovals((prev) => ({ ...prev, [b.id]: v ?? 0 }))}
-                        controls={false}
-                      />
-                    ) : (
-                      <div className="r num" style={{ textAlign: 'right' }}>{(approvals[b.id] ?? 0).toLocaleString()}</div>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td colSpan={3} style={{ borderBottom: 'none', padding: '10px 8px 0 0', fontSize: 12, color: 'var(--steel)', textAlign: 'right' }}>
-                  擬請合計 <span className="num" style={{ fontSize: 13, color: 'var(--ink)' }}>{fmtMoney(requestedTotal)}</span>
-                </td>
-                <td colSpan={2} style={{ borderBottom: 'none', padding: '10px 0 0', textAlign: 'right', fontSize: 12, color: 'var(--steel)' }}>
-                  核定合計 <span className="num" style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{fmtMoney(approvedTotal)}</span>
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </>
-      )}
-
-      <Modal
-        open={rejectOpen}
-        title="退回申請"
-        okText="確認退回"
-        okButtonProps={{ danger: true }}
-        cancelText="取消"
-        onOk={submitReject}
-        onCancel={closeReject}
-      >
-        <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 8 }}>
-          退回原因(必填,將顯示於社團的活動列表)
-        </div>
-        <Input.TextArea
-          rows={3}
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder="例:經費明細第 3 項未附估價單"
-        />
-      </Modal>
-    </Drawer>
-  )
-}
+type SortKey = 'club' | 'name' | 'type' | 'date' | 'status' | 'reviewed_at'
 
 export default function ReviewPage() {
-  const [selected, setSelected] = useState<ReviewItem | null>(null)
-  const pendingCount = REVIEW_ITEMS.filter((i) => i.status === 'pending_advisor').length
-  const rejectedCount = REVIEW_ITEMS.filter((i) => i.status === 'rejected').length
+  const { user } = useAuth()
+  const [current, setCurrent] = useState<AdminActivity | null>(null)
+  const [open, setOpen] = useState(false)
+  // 預設審核時間新→舊(無審核紀錄者殿後);點欄位依點擊序疊加多鍵,全清除後回到預設
+  const { entries, toggle } = useMultiSort<SortKey>([{ key: 'reviewed_at', dir: -1 }])
+  const toggleSort = (k: SortKey) => {
+    toggle(k)
+    setPage(1) // 伺服器端分頁:換排序回到第 1 頁
+  }
+  const [clubFilter, setClubFilter] = useState<string[]>([])
+  const [typeFilter, setTypeFilter] = useState<string[]>([])
+  const [statusFilter, setStatusFilter] = useState<string[]>([])
+  const [page, setPage] = useState(1)
+
+  // 待審佇列:僅撈登入者可簽核的狀態(小結果集);最近審核表改伺服器端分頁,
+  // 14k+ 筆必須分批,不得整批撈取
+  const queueStatuses = useMemo(
+    () => ALL_STATUSES.filter((st) => canActOn(user, st)),
+    [user],
+  )
+  const queueQuery = useAdminActivities(
+    { statuses: queueStatuses },
+    { enabled: queueStatuses.length > 0 },
+  )
+  const queue = useMemo(
+    () =>
+      [...(queueQuery.data ?? [])].sort((a, b) => a.submittedAt.localeCompare(b.submittedAt)),
+    [queueQuery.data],
+  )
+
+  // 篩選:社團名 → id(選項自最小社團主檔);狀態標籤 → 狀態值(待審三關同標籤合併)
+  const othersStatuses = useMemo(
+    () => ALL_STATUSES.filter((st) => !canActOn(user, st)),
+    [user],
+  )
+  const clubsQuery = useClubOptions()
+  const clubOptions = (clubsQuery.data ?? []).map((c) => c.name)
+  const statusOptions = [...new Set(othersStatuses.map((st) => STATUS[st].label))]
+
+  const clubIdMatches = clubFilter.length
+    ? (clubsQuery.data ?? []).filter((c) => clubFilter.includes(c.name)).map((c) => c.id)
+    : undefined
+  // 有選社團但主檔未載入/名稱失效 → 強制空集,不可 fail-open 回全部
+  const clubIds = clubIdMatches && clubIdMatches.length === 0 ? [-1] : clubIdMatches
+  const statuses = statusFilter.length
+    ? othersStatuses.filter((st) => statusFilter.includes(STATUS[st].label))
+    : othersStatuses
+  const listQuery = useAdminActivitiesPaged({
+    statuses,
+    clubIds,
+    types: typeFilter.length ? typeFilter : undefined,
+    // 顯式預設(-reviewed_at)寫在 useMultiSort defaults:entries 一律非空,固定帶 sort
+    sort: sortParam(entries),
+    page,
+    pageSize: PAGE_SIZE,
+  })
+  const pagedRows = listQuery.data?.rows ?? []
+  const total = listQuery.data?.total ?? 0
+
+  // 點列即抓詳情(經費/附件),載入完成後彈窗自動補齊
+  const detailQuery = useAdminActivityDetail(current?.activityId)
+  const { approve, reject } = useAdminActivityMutations()
+
+  const openItem = (item: AdminActivity) => {
+    setCurrent(item)
+    setOpen(true)
+  }
+
+  const resetPage = () => setPage(1)
 
   return (
     <div>
       <PageHeader
-        title="活動申請審核"
+        title="申請審核"
         sub={
           <>
-            待審 <span className="num">{pendingCount}</span> 件 · 已退回{' '}
-            <span className="num">{rejectedCount}</span> 件
+            待本關 <span className="num">{countText(queue.length, { isPending: queueQuery.isLoading, isError: queueQuery.isError })}</span> 件
           </>
         }
       />
 
-      <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-        <table className="tb dense" style={{ minWidth: 900 }}>
-          <thead>
-            <tr>
-              <th style={{ width: 36, paddingRight: 0 }}>
-                <Checkbox aria-label="全選" />
-              </th>
-              <th>單號</th>
-              <th>社團</th>
-              <th>活動名稱</th>
-              <th>類型</th>
-              <th>活動日期</th>
-              <th className="r">擬請補助</th>
-              <th>狀態</th>
-              <th className="r">動作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {REVIEW_ITEMS.map((item) => (
-              <tr key={item.id} style={selected?.id === item.id ? { background: 'var(--seal-tint)' } : undefined}>
-                <td style={{ paddingRight: 0 }}>
-                  <Checkbox aria-label="選取" />
-                </td>
-                <td className="num" style={{ color: 'var(--steel)' }}>{item.id}</td>
-                <td>{item.club}</td>
-                <td style={{ fontWeight: 500 }}>{item.name}</td>
-                <td>{item.type}</td>
-                <td className="num">{item.date}</td>
-                <td className="r num">{fmtMoney(item.requested)}</td>
-                <td><StatusPill status={item.status} /></td>
-                <td className="r">
-                  <button
-                    type="button"
-                    className={item.status === 'pending_advisor' ? 'link-btn primary' : 'link-btn'}
-                    onClick={() => setSelected(item)}
-                  >
-                    {item.status === 'pending_advisor' ? '審核' : '查看'}
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* 待審佇列:本關可簽核的單據,送件早的在前 */}
+      <div className="card" style={{ marginTop: 20 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 6px' }}>待審佇列</div>
+        <LoadingBlock pending={queueQuery.isLoading} rows={3}>
+          {queue.map((item) => (
+            <div
+              key={item.id}
+              className="click-tint"
+              {...clickableProps(() => openItem(item))}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 14,
+                padding: '13px 20px',
+                borderTop: '1px solid var(--line)',
+                cursor: 'pointer',
+                flexWrap: 'wrap',
+                ...(current?.id === item.id && open ? { background: 'var(--seal-tint)' } : {}),
+              }}
+            >
+              <div style={{ flex: '1 1 240px', minWidth: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 14, fontWeight: 500 }}>{item.name}</span>
+                  <LargeBadge applied={item.isLarge} approved={item.largeApproved} />
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 2 }}>
+                  {item.club} · {item.type} · 送件 <span className="num">{item.submittedAt}</span>
+                </div>
+              </div>
+              <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: 12, color: 'var(--steel)' }}>活動日期</div>
+                <div className="num" style={{ fontSize: 13, marginTop: 2 }}>{item.date}</div>
+              </div>
+              <div style={{ textAlign: 'right', whiteSpace: 'nowrap', minWidth: 84 }}>
+                <div style={{ fontSize: 12, color: 'var(--steel)' }}>擬請補助</div>
+                <div className="num" style={{ fontSize: 13, marginTop: 2 }}>{fmtMoney(item.requested)}</div>
+              </div>
+              <Button
+                type="primary"
+                size="small"
+                style={{ height: 30 }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  openItem(item)
+                }}
+              >
+                審核
+              </Button>
+            </div>
+          ))}
+          {queue.length === 0 && (
+            <div style={{ borderTop: '1px solid var(--line)' }}>
+              {queueQuery.isError ? (
+                <QueryError
+                  compact
+                  title="待審佇列載入失敗"
+                  error={queueQuery.error}
+                  onRetry={() => void queueQuery.refetch()}
+                />
+              ) : (
+                <div style={{ padding: '20px 20px 24px', fontSize: 13, color: 'var(--steel)' }}>
+                  沒有待本關簽核的申請
+                </div>
+              )}
+            </div>
+          )}
+        </LoadingBlock>
       </div>
 
-      {/* key 依單據重掛,核定金額與退回原因不會殘留到下一張 */}
-      {selected && <DetailDrawer key={selected.id} item={selected} onClose={() => setSelected(null)} />}
+      {/* 最近審核(他關審核中/已核准/已退回):供查閱與追蹤,預設審核時間新→舊 */}
+      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近審核</div>
+        <LoadingBlock pending={listQuery.isPending} rows={6}>
+          <table className="tb dense fixed" style={{ minWidth: 880 }} aria-label="最近審核的活動申請">
+            {/* 社團/名稱吃剩餘寬並截斷;類型允許換行(含大型徽章);日期/金額/狀態/審核時間固定 px */}
+            <Cols widths={['18%', 'auto', 130, 104, 90, 100, 140, 32]} />
+            <thead>
+              <tr>
+                <th scope="col">
+                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                    <MultiSortButton label="社團" sortKey="club" entries={entries} onToggle={toggleSort} />
+                    <FilterButton
+                      options={clubOptions}
+                      selected={clubFilter}
+                      onChange={(next) => {
+                        setClubFilter(next)
+                        resetPage()
+                      }}
+                      label="篩選社團"
+                    />
+                  </span>
+                </th>
+                <th scope="col"><MultiSortButton label="活動名稱" sortKey="name" entries={entries} onToggle={toggleSort} /></th>
+                <th scope="col">
+                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                    <MultiSortButton label="類型" sortKey="type" entries={entries} onToggle={toggleSort} />
+                    <FilterButton
+                      options={TYPE_OPTIONS}
+                      selected={typeFilter}
+                      onChange={(next) => {
+                        setTypeFilter(next)
+                        resetPage()
+                      }}
+                      label="篩選類型"
+                    />
+                  </span>
+                </th>
+                <th scope="col"><MultiSortButton label="活動日期" sortKey="date" entries={entries} onToggle={toggleSort} /></th>
+                <th scope="col" className="r">擬請補助</th>
+                <th scope="col">
+                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                    <MultiSortButton label="狀態" sortKey="status" entries={entries} onToggle={toggleSort} />
+                    <FilterButton
+                      options={statusOptions}
+                      selected={statusFilter}
+                      onChange={(next) => {
+                        setStatusFilter(next)
+                        resetPage()
+                      }}
+                      label="篩選狀態"
+                    />
+                  </span>
+                </th>
+                <th scope="col"><MultiSortButton label="審核時間" sortKey="reviewed_at" entries={entries} onToggle={toggleSort} /></th>
+                <th scope="col" aria-label="開啟" />
+              </tr>
+            </thead>
+            <tbody>
+              {pagedRows.map((item) => (
+                <tr
+                  key={item.id}
+                  onClick={() => openItem(item)}
+                  style={{ cursor: 'pointer', ...(current?.id === item.id && open ? { background: 'var(--seal-tint)' } : {}) }}
+                >
+                  <td className="cell-clip" title={item.club}>{item.club}</td>
+                  <td className="cell-clip" title={item.name} style={{ fontWeight: 500 }}>
+                    <button
+                      type="button"
+                      className="row-open-btn"
+                      aria-label={`開啟「${item.name || '未命名活動'}」詳情`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openItem(item)
+                      }}
+                    >
+                      {item.name}
+                    </button>
+                  </td>
+                  <td>
+                    {item.type}
+                    <LargeBadge applied={item.isLarge} approved={item.largeApproved} />
+                  </td>
+                  <td className="num">{item.date}</td>
+                  <td className="r num">{fmtMoney(item.requested)}</td>
+                  <td><StatusPill status={item.status} /></td>
+                  <td className="num">{item.reviewedAt ?? '—'}</td>
+                  <td className="r"><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>
+                </tr>
+              ))}
+              {/* 兩種失敗都要有出口:列表失敗時 isPending 已為 false、pagedRows 是空陣列,
+                  不說出來就會顯示成「無符合篩選條件的申請」;社團選項失敗則讓漏斗靜靜地空著 */}
+              {(listQuery.isError || clubsQuery.isError) && (
+                <tr className="no-hover">
+                  <td colSpan={8}>
+                    <QueryError
+                      compact
+                      title={listQuery.isError ? '最近審核載入失敗' : '篩選選項載入失敗'}
+                      error={listQuery.error ?? clubsQuery.error}
+                      onRetry={() => {
+                        if (listQuery.isError) void listQuery.refetch()
+                        if (clubsQuery.isError) void clubsQuery.refetch()
+                      }}
+                    />
+                  </td>
+                </tr>
+              )}
+              {!listQuery.isPending && !listQuery.isError && !clubsQuery.isError && pagedRows.length === 0 && (
+                <tr className="no-hover">
+                  <td colSpan={8} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
+                    {/* 沒下篩選時說「無符合篩選條件」是在指責使用者的操作:新學期本來就一筆都沒有 */}
+                    {clubFilter.length || typeFilter.length || statusFilter.length
+                      ? '無符合篩選條件的申請'
+                      : '目前沒有審核紀錄'}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </LoadingBlock>
+        <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} />
+      </div>
+
+      {/* Modal 常駐待關閉動畫結束(afterClose)才卸載;key 依單據重掛,核定金額與退回原因不殘留;
+          詳情載入完成後以完整資料(經費/附件/經費來源)替換列表列 */}
+      {current && (
+        <ActivityReviewModal
+          key={current.id}
+          item={detailQuery.data ?? current}
+          detailError={detailQuery.error}
+          onRetryDetail={() => void detailQuery.refetch()}
+          open={open}
+          onClose={() => setOpen(false)}
+          afterClose={() => setCurrent(null)}
+          onApprove={(p) =>
+            approve.mutateAsync({
+              id: current.activityId,
+              // 僅第一關送核定內容;組長/學務長關空 body 過關(後端規則)
+              fundSource: current.status === 'pending_advisor' ? p.fundSource : undefined,
+              budget: current.status === 'pending_advisor' ? p.budget : [],
+              isLargeApproved:
+                current.status === 'pending_advisor' && current.type === '活動' ? p.largeApproved : undefined,
+            })
+          }
+          onReject={(reason) => reject.mutateAsync({ id: current.activityId, reason })}
+        />
+      )}
     </div>
   )
 }

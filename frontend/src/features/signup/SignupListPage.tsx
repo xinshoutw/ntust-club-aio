@@ -1,55 +1,112 @@
+import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Button } from 'antd'
+import { Button, Modal } from 'antd'
+import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
+import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
-import { SIGNUP_ITEMS } from './mock'
+import { Pager } from '../../components/ui/tableControls'
+import { useSignupItem, useSignupItems, type SignupItem } from '../../api/signups'
+import SubmissionRecord from './SubmissionRecord'
+import KindBadge from './KindBadge'
 import './signup.css'
+import { clickableProps } from '../../lib/clickable'
+
+const PAGE_SIZE = 20
+
+// 已報名(含審核制待確認)可回看紀錄;開放中可進入填寫
+const hasRecord = (item: SignupItem) => item.myStatus === 'signed' || item.myStatus === 'pending'
 
 export default function SignupListPage() {
   const navigate = useNavigate()
+  const [page, setPage] = useState(1)
+  const [recordOpen, setRecordOpen] = useState(false)
+  const [recordId, setRecordId] = useState<number | null>(null)
+
+  const listQuery = useSignupItems({ page, pageSize: PAGE_SIZE })
+  const items = listQuery.data?.items ?? []
+  const total = listQuery.data?.total ?? 0
+  // 報名紀錄含填答內容,需另打詳情端點(列表不附)
+  const recordQuery = useSignupItem(recordId ?? undefined)
+
+  const openCard = (item: SignupItem) => {
+    if (hasRecord(item)) {
+      setRecordId(item.id)
+      setRecordOpen(true)
+    } else if (item.accepting) {
+      navigate(`/signup/${item.id}`)
+    }
+  }
 
   return (
-    <div style={{ maxWidth: 1000 }}>
+    <div>
       <PageHeader title="線上報名" />
-      <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 6 }}>
-        學務處開放報名之會議與活動;人數上限為單一社團配額。
-      </div>
 
-      <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {SIGNUP_ITEMS.map((item) => {
-          const ended = item.status === 'ended'
-          return (
-            <div
-              key={item.id}
-              className="card signup-card"
-              style={{ opacity: ended ? 0.72 : undefined }}
-            >
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <div style={{ fontSize: 15, fontWeight: 500 }}>{item.name}</div>
-                  <StatusPill status={item.status} />
+      <LoadingBlock pending={listQuery.isPending}>
+        <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {listQuery.isError && (
+            <QueryError title="報名活動載入失敗" error={listQuery.error} onRetry={() => listQuery.refetch()} />
+          )}
+          {items.map((item) => {
+            const clickable = item.accepting || hasRecord(item)
+            const info = [item.eventAt, item.place, `每社名額上限 ${item.maxParticipants} 人`]
+              .filter(Boolean)
+              .join(' · ')
+            return (
+              <div
+                key={item.id}
+                className={clickable ? 'card signup-card click-tint' : 'card signup-card'}
+                {...clickableProps(() => openCard(item))}
+                tabIndex={clickable ? 0 : -1}
+                aria-disabled={!clickable}
+                style={{ opacity: item.accepting ? undefined : 0.72, cursor: clickable ? 'pointer' : 'default' }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: 15, fontWeight: 500 }}>{item.name}</div>
+                    <StatusPill status={item.accepting ? 'open' : 'ended'} />
+                    <KindBadge kind={item.kind} />
+                    {item.myStatus === 'signed' && <StatusPill status="registered" />}
+                    {item.myStatus === 'pending' && <StatusPill status="pending" />}
+                    {item.myStatus === 'draft' && item.accepting && <StatusPill status="draft" />}
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 5, lineHeight: 1.6 }}>
+                    {info}
+                  </div>
                 </div>
-                <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 5, lineHeight: 1.6 }}>
-                  {item.info}
+                <div className="signup-card-side">
+                  <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: 12, color: 'var(--steel)' }}>截止日</div>
+                    <div className="num" style={{ fontSize: 13, marginTop: 2 }}>{item.deadline ?? '—'}</div>
+                  </div>
                 </div>
               </div>
-              <div className="signup-card-side">
-                <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                  <div style={{ fontSize: 12, color: 'var(--steel)' }}>報名截止</div>
-                  <div className="num" style={{ fontSize: 13, marginTop: 2 }}>{item.deadline}</div>
-                </div>
-                <Button
-                  style={{ height: 36 }}
-                  disabled={ended}
-                  onClick={() => navigate(`/signup/${item.id}`)}
-                >
-                  {ended ? '已截止' : '前往報名'}
-                </Button>
-              </div>
+            )
+          })}
+          {!listQuery.isPending && !listQuery.isError && !items.length && (
+            <div className="card" style={{ padding: '40px 24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
+              目前沒有報名活動
             </div>
-          )
-        })}
-      </div>
+          )}
+        </div>
+      </LoadingBlock>
+      <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
+
+      <Modal
+        open={recordOpen}
+        title={recordQuery.data ? `${recordQuery.data.name} — 報名紀錄` : '報名紀錄'}
+        onCancel={() => setRecordOpen(false)}
+        afterClose={() => setRecordId(null)}
+        footer={<Button onClick={() => setRecordOpen(false)}>關閉</Button>}
+      >
+        {recordQuery.isPending ? (
+          <LoadingBlock pending rows={4} />
+        ) : recordQuery.isError ? (
+          <QueryError compact title="報名紀錄載入失敗" error={recordQuery.error} onRetry={() => recordQuery.refetch()} />
+        ) : recordQuery.data ? (
+          <SubmissionRecord item={recordQuery.data} />
+        ) : null}
+      </Modal>
     </div>
   )
 }

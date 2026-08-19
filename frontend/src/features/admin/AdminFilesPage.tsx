@@ -149,7 +149,7 @@ export default function AdminFilesPage() {
               <div style={{ fontSize: 12, color: 'var(--steel)' }}>系統佔用</div>
               <div style={{ lineHeight: 1.15, marginTop: 2 }}>
                 <span className="num" style={{ fontSize: 30, fontWeight: 600 }}>{fmtSize(usedMb)}</span>
-                <span className="num" style={{ fontSize: 14, color: 'var(--steel)' }}> / 磁碟 {usage ? fmtSize(diskTotalMb) : '—'}({pct(usedMb, diskTotalMb)})</span>
+                <span className="num" style={{ fontSize: 14, color: 'var(--steel)' }}> / 磁碟 {usage ? fmtSize(diskTotalMb) : '—'} ({pct(usedMb, diskTotalMb)})</span>
               </div>
             </div>
             <div style={{ flex: 1 }} />
@@ -173,8 +173,8 @@ export default function AdminFilesPage() {
               }}
             >
               {usage.diskLevel === 'alert'
-                ? '磁碟使用率已達 90%:系統已暫停接受新的上傳,請先清理報修影片或擴充磁碟'
-                : '磁碟使用率已超過 80%:請安排清理或擴充,達 90% 時系統會暫停接受上傳'}
+                ? '由於磁碟使用率已達 90%，系統已暫停接受新的上傳'
+                : '由於磁碟使用率已超過 80%，請安排清理或擴充，達 90% 時系統會暫停接受上傳'}
             </div>
           )}
 
@@ -202,7 +202,7 @@ export default function AdminFilesPage() {
               <Tooltip
                 title={
                   <span style={{ fontSize: 13 }}>
-                    {DB_TEXT.label}(表單等資料庫內容)· {fmtSize(usage.dbSizeMb)}({pct(usage.dbSizeMb, diskTotalMb)})
+                    {DB_TEXT.label}(資料庫)· {fmtSize(usage.dbSizeMb)}({pct(usage.dbSizeMb, diskTotalMb)})
                   </span>
                 }
               >
@@ -217,7 +217,7 @@ export default function AdminFilesPage() {
               <Tooltip
                 title={
                   <span style={{ fontSize: 13 }}>
-                    其他佔用(作業系統與同機程式)· {fmtSize(otherUsedMb)}({pct(otherUsedMb, diskTotalMb)})
+                    其他佔用· {fmtSize(otherUsedMb)}({pct(otherUsedMb, diskTotalMb)})
                   </span>
                 }
               >
@@ -269,7 +269,6 @@ export default function AdminFilesPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px 8px', flexWrap: 'wrap' }}>
             <span style={{ width: 10, height: 10, borderRadius: 3, background: MODULE_COLORS.repair }} />
             <div style={{ fontSize: 15, fontWeight: 600 }}>空間報修</div>
-            <div style={{ fontSize: 12, color: 'var(--steel)' }}>檔案大、迭代快,可直接刪除釋放空間</div>
             <div style={{ flex: 1 }} />
             <span style={{ fontSize: 12, color: 'var(--steel)' }}>
               共 <span className="num">{countText(repairTotal, repairQuery)}</span> 個
@@ -371,7 +370,7 @@ export default function AdminFilesPage() {
                   <td style={{ fontSize: 13, color: 'var(--steel)' }}>{f.archived ? '已歸檔' : '使用中'}</td>
                   <td className="r" style={{ whiteSpace: 'nowrap' }}>
                     <DownloadButton file={f} message={message} />
-                    <Tooltip title="競賽採計與流程檔案依歸檔政策由系統管理">
+                    <Tooltip title="競賽採計與流程檔案由系統管理">
                       <span style={{ color: 'var(--muted)', padding: '0 7px' }}>
                         <DeleteOutlined />
                       </span>
@@ -394,7 +393,7 @@ export default function AdminFilesPage() {
               {!largeQuery.isPending && !largeQuery.isError && largeList.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 24 }}>
-                    此模組尚無大型檔案
+                    無大型檔案
                   </td>
                 </tr>
               )}

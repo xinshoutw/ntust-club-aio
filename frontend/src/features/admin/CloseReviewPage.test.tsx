@@ -117,7 +117,8 @@ describe('結案審核的繳交確認', () => {
       await openModal()
       const approveBtn = screen.getByRole('button', { name: '核准結案' }) as HTMLButtonElement
       expect(approveBtn.disabled).toBe(true)
-      expect(screen.getByText('結案內容更新失敗，請重試後再核准')).toBeTruthy()
+      expect(screen.getByText(/結案內容更新失敗/)).toBeTruthy()
+      expect(screen.getByRole('button', { name: '重試' })).toBeTruthy()
     } finally {
       refetchFailed = false
     }

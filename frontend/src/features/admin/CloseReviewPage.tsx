@@ -140,9 +140,18 @@ function CloseReviewModal({
           </div>
         ) : canReview ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
-            {detailStale && (
+            {detail && detailStale && (
               <span style={{ fontSize: 12, color: 'var(--steel)', marginRight: 'auto' }}>
-                {detailQuery.isError ? '結案內容更新失敗，請重試後再核准' : '結案內容更新中'}
+                {detailQuery.isError ? (
+                  <>
+                    結案內容更新失敗{' '}
+                    <Button type="link" size="small" style={{ padding: 0 }} onClick={() => void detailQuery.refetch()}>
+                      重試
+                    </Button>
+                  </>
+                ) : (
+                  '結案內容更新中'
+                )}
               </span>
             )}
             <Button danger style={{ height: 38 }} disabled={closeApprove.isPending} onClick={() => setRejectOpen(true)}>

@@ -73,10 +73,14 @@ export default function OverviewPage() {
 
   // 公告顯示於本頁:進入頁面即視為已讀(鈴鐺紅點熄滅);標記後查詢刷新使 unread 歸零
   // 公告是伺服器分頁(資料就是那一頁),不像另外兩張卡可以純推導:total 縮到頁碼失效時
-  // 要把 state 收回去,查詢才會跟著換頁。clampPage 對合法頁碼回傳原值,不會來回觸發
+  // 要把 state 收回去,查詢才會跟著換頁。clampPage 對合法頁碼回傳原值,不會來回觸發。
+  // 只在查詢成功後收 —— 失敗時 total 同樣是 0,一起 clamp 會把錯誤說明彈掉
+  const announcementsLoaded = announcementsQuery.isSuccess
   useEffect(() => {
-    setAnnouncementPage((p) => clampPage(p, announcementTotal, ANNOUNCEMENT_PAGE_SIZE))
-  }, [announcementTotal])
+    if (announcementsLoaded) {
+      setAnnouncementPage((p) => clampPage(p, announcementTotal, ANNOUNCEMENT_PAGE_SIZE))
+    }
+  }, [announcementsLoaded, announcementTotal])
 
   const markRead = useMarkAnnouncementsRead()
   const { mutate: markReadMutate } = markRead

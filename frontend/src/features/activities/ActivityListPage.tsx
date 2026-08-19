@@ -49,6 +49,10 @@ const LISTED_STATUSES = [
 ] as const
 const STATUS_LABELS = [...new Set(LISTED_STATUSES.map((s) => STATUS[s].label))]
 
+// 經費列與合計共用同一組欄寬,右側數字才對得齊。金額上限 999,999(7 字),
+// tabular-nums 下約 3.6em —— 給 4.6em 留餘裕,其餘寬度讓給說明欄(遷移資料的說明可以很長)
+const BUDGET_COLS = '110px 1fr 4.6em 0.7em 4.6em'
+
 function money(a: ClubActivity): string {
   if (a.selfFundTotal === 0 && a.requestedTotal === 0) return '–'
   return `${fmtMoney(a.selfFundTotal)} / ${fmtMoney(a.requestedTotal)}`
@@ -207,7 +211,27 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
             {a.works.length > 0 && (
               <>
                 <div style={{ color: 'var(--steel)' }}>工作分配</div>
-                <div style={{ lineHeight: 1.7 }}>{a.works.map((w) => [w.task, w.owner].filter(Boolean).join(':')).join('、')}</div>
+                <div>
+                  {a.works.map((w, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        display: 'grid',
+                        // auto:項目欄依內容決定寬度(新系統多是「器材組」,舊系統是
+                        // 「職稱:工作內容」的長句),名單拿剩下的空間 —— 長的通常是名單
+                        gridTemplateColumns: 'auto 1fr',
+                        gap: 16,
+                        padding: '4px 0',
+                        borderTop: i ? '1px solid var(--line)' : undefined,
+                        lineHeight: 1.6,
+                      }}
+                    >
+                      {/* 舊系統的項目常是「職稱:工作內容」,原樣留在同一格 —— 拆開會猜錯 */}
+                      <span style={{ color: 'var(--steel)' }}>{w.task || '—'}</span>
+                      <span>{w.owner || '—'}</span>
+                    </div>
+                  ))}
+                </div>
               </>
             )}
             {attachments.length > 0 && (
@@ -224,18 +248,33 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
 
           <SectionTitle>
             經費
-            <span style={{ fontWeight: 400, color: 'var(--steel)', marginLeft: 8, fontSize: 12 }}>
-              {money(a) === '–' ? '無申請經費' : <>自籌 <span className="num">{fmtMoney(a.selfFundTotal)}</span> · 擬請 <span className="num">{fmtMoney(a.requestedTotal)}</span></>}
-              {rep && <> · 實際支出 <span className="num">{fmtMoney(rep.expense)}</span></>}
-            </span>
+            {money(a) === '–' && (
+              <span style={{ fontWeight: 400, color: 'var(--steel)', marginLeft: 8, fontSize: 12 }}>無申請經費</span>
+            )}
           </SectionTitle>
           {budget.map((b) => (
-            <div key={b.id} style={{ display: 'flex', gap: 8, fontSize: 13, padding: '5px 0', borderBottom: '1px solid var(--line)' }}>
-              <span style={{ width: 110, color: 'var(--steel)' }}>{b.category}</span>
-              <span style={{ flex: 1 }}>{b.description}</span>
-              <span className="num">{b.selfFund.toLocaleString()} / {b.requestedSubsidy.toLocaleString()}</span>
+            <div key={b.id} style={{ display: 'grid', gridTemplateColumns: BUDGET_COLS, gap: 8, fontSize: 13, padding: '5px 0', borderBottom: '1px solid var(--line)' }}>
+              <span style={{ color: 'var(--steel)' }}>{b.category}</span>
+              <span>{b.description}</span>
+              <span className="num" style={{ textAlign: 'right' }}>{b.selfFund.toLocaleString()}</span>
+              <span style={{ textAlign: 'center', color: 'var(--steel)' }}>/</span>
+              <span className="num" style={{ textAlign: 'right' }}>{b.requestedSubsidy.toLocaleString()}</span>
             </div>
           ))}
+          {budget.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: BUDGET_COLS, gap: 8, fontSize: 13, padding: '7px 0 0' }}>
+              <span />
+              <span style={{ textAlign: 'right', color: 'var(--steel)' }}>合計(自籌 / 擬請)</span>
+              <span className="num" style={{ textAlign: 'right', fontWeight: 600 }}>{a.selfFundTotal.toLocaleString()}</span>
+              <span style={{ textAlign: 'center', color: 'var(--steel)' }}>/</span>
+              <span className="num" style={{ textAlign: 'right', fontWeight: 600 }}>{a.requestedTotal.toLocaleString()}</span>
+            </div>
+          )}
+          {rep && (
+            <div style={{ textAlign: 'right', fontSize: 13, color: 'var(--steel)', paddingTop: 4 }}>
+              實際支出 <span className="num" style={{ color: 'var(--ink)' }}>{fmtMoney(rep.expense)}</span>
+            </div>
+          )}
 
           {detail?.rejectReason && (
             <div style={{ background: 'var(--paper)', borderRadius: 6, padding: '10px 12px', fontSize: 13, lineHeight: 1.7, marginTop: 16 }}>

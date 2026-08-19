@@ -51,6 +51,7 @@ const detail: AdminActivityDetail = {
 
 const approve = vi.fn()
 let refetching = false
+let refetchFailed = false
 
 vi.mock('../../api/adminActivities', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/adminActivities')>()),
@@ -63,7 +64,7 @@ vi.mock('../../api/adminActivities', async (importOriginal) => ({
   useAdminActivityDetail: () => ({
     data: detail,
     isPending: false,
-    isError: false,
+    isError: refetchFailed,
     isFetching: refetching,
   }),
   useAdminActivityMutations: () => ({
@@ -107,6 +108,18 @@ describe('結案審核的繳交確認', () => {
       expect(approveBtn.disabled).toBe(true)
     } finally {
       refetching = false
+    }
+  })
+
+  test('重抓失敗但手上還有舊詳情時也不給核准', async () => {
+    refetchFailed = true
+    try {
+      await openModal()
+      const approveBtn = screen.getByRole('button', { name: '核准結案' }) as HTMLButtonElement
+      expect(approveBtn.disabled).toBe(true)
+      expect(screen.getByText('結案內容更新失敗，請重試後再核准')).toBeTruthy()
+    } finally {
+      refetchFailed = false
     }
   })
 

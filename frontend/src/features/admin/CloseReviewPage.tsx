@@ -60,6 +60,9 @@ function CloseReviewModal({
   // 手上還沒有詳情才算失敗:背景重抓失敗時 TanStack 保留既有 data,
   // 內容與按鈕都照舊(同 ActivityReviewModal)
   const detailFailed = detailQuery.isError && !detail
+  // 手上這份可能不是最新的:重抓在途或重抓失敗都不給簽 —— 繳交確認是從它推導的,
+  // 而核准一次寫死三個旗標並轉 closed,沒有第二條路能改
+  const detailStale = detailQuery.isFetching || (detailQuery.isError && !!detail)
   const autoChecks = defaultConfirmations(report, photos.length)
   const checks = { ...autoChecks, ...override }
   const canReview = item.status === 'closing_pending_advisor' && canActOnClose(user)
@@ -137,8 +140,10 @@ function CloseReviewModal({
           </div>
         ) : canReview ? (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
-            {detailQuery.isFetching && (
-              <span style={{ fontSize: 12, color: 'var(--steel)', marginRight: 'auto' }}>結案內容更新中</span>
+            {detailStale && (
+              <span style={{ fontSize: 12, color: 'var(--steel)', marginRight: 'auto' }}>
+                {detailQuery.isError ? '結案內容更新失敗，請重試後再核准' : '結案內容更新中'}
+              </span>
             )}
             <Button danger style={{ height: 38 }} disabled={closeApprove.isPending} onClick={() => setRejectOpen(true)}>
               退回
@@ -147,7 +152,7 @@ function CloseReviewModal({
               type="primary"
               ref={approveRef}
               style={{ height: 38 }}
-              disabled={!report || detailQuery.isFetching}
+              disabled={!report || detailStale}
               loading={closeApprove.isPending}
               onClick={submitApprove}
             >

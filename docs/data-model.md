@@ -193,7 +193,7 @@ approved 且 end_date + N 天已過且未送結案 → 逾期鎖定(推導,非�
 | video_url | text NULL | **唯一選填**;http(s) 驗證。照片 <5 張且無影片 → ad2 該活動不計分 |
 | expense | int | 實際支出(核銷依據) |
 | submitted_at | timestamptz | |
-| photos_confirmed / report_confirmed / reflections_confirmed | bool 預設 true | 承辦人核准結案時逐項確認繳交;**未確認者評鑑以 0 分計**(照片確認同時涵蓋影片連結) |
+| photos_confirmed / report_confirmed / reflections_confirmed | bool 預設 true | 承辦人核准結案時逐項確認繳交,**ad2–ad4 完全以這三個值為準**(D-14):系統不數照片張數也不數心得筆數,社團可能是交紙本。照片確認同時涵蓋影片連結;沒有 activity_reports 就沒有旗標可讀,三項一律不計 |
 
 照片走 `files`(slot=`report_photo`),收所有常見影像格式(jpg/png/gif/webp/bmp/tiff/heic/heif/avif),魔術位元組與大小後端重驗,sha256 於同社團內跨活動拒重複。成果報告與心得 PDF 依模板於下載時動態生成,不落檔。
 
@@ -339,9 +339,9 @@ approved 且 end_date + N 天已過且未送結案 → 逾期鎖定(推導,非�
 | 項目 | 規則 | 資料來源 |
 |---|---|---|
 | ad1 活動申請 15 | 結案始算;一般 1 分、認可之大型 3 分;一天至多計 1 件(取當日最高) | activities(closed, is_large_approved) |
-| ad2 照/影片 15 | 每活動照片 ≥5 張**或**有影片連結 → 1 分;大型 3 分 | files(slot=report_photo)+ activity_reports.video_url |
-| ad3 成果單 15 | 有上傳即 1 分;大型 3 分 | activity_reports |
-| ad4 心得回饋 30 | 有上傳即 2 分;大型 6 分 | activity_reflections |
+| ad2 照/影片 15 | 每活動**經承辦確認**照片或影片 → 1 分;大型 3 分 | activity_reports.photos_confirmed |
+| ad3 成果單 15 | 每活動**經承辦確認** → 1 分;大型 3 分 | activity_reports.report_confirmed |
+| ad4 心得回饋 30 | 每活動**經承辦確認** → 2 分;大型 6 分 | activity_reports.reflections_confirmed |
 | ad5 名單更新 10 | 每學期:0 人 0 分、1–9 人 2.5 分、10 人以上 5 分;兩學期合計 | club_members × semester |
 | ad6 網頁經營 5 | 有連結即 5 分(不追蹤更新時間) | clubs.website_url |
 | ad7 負責人會議 5 | 每場簽到 1.25 分(每學期 2 場、全學年 4 場滿分) | session_attendance(leader_meeting) |

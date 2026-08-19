@@ -21,6 +21,16 @@ logger = logging.getLogger("club_aio")
 
 _IS_DEV = settings.env == "dev"
 
+# uvicorn 只設定自己的 logger,root 停在 WARNING 且沒有 handler —— 應用層的 logger.info
+# 因此一行都不會輸出,而 warning 走 lastResort(裸訊息,無時間戳無等級)。
+# httpx 壓到 WARNING:它在 INFO 記每一次請求的完整 URL,而 Kuma push URL 的尾段與
+# Discord webhook 的路徑都是憑證
+logging.basicConfig(
+    level=logging.DEBUG if _IS_DEV else logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+
 @contextlib.asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     """背景心跳的起停(唯一在程序內跑的排程;業務排程一律走 host cron)。"""

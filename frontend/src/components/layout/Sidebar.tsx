@@ -65,7 +65,10 @@ export default function Sidebar({ groups, onNavigate }: SidebarProps) {
                 <span className="sidebar-item-icon">{item.icon}</span>
                 <span className="sidebar-item-label">{item.label}</span>
                 {item.badge != null && item.badge > 0 && (
-                  <span className="sidebar-item-badge num">{item.badge}</span>
+                  // 數字直接併進連結的 accessible name 會讀成「申請審核 3」,補上單位才成句
+                  <span className="sidebar-item-badge num" aria-label={`${item.badge} 件待辦`}>
+                    {item.badge}
+                  </span>
                 )}
               </NavLink>
             ),

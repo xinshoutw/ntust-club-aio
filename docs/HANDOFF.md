@@ -28,7 +28,7 @@ DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— �
 | 備份排程 | 腳本已就緒(`scripts/backup_db.sh`),**cron 還沒掛上** |
 | 器材主檔 | 由 `migration/cc_import.py` 從舊 `Device` 表帶入,正式流程必須 seed 之後跑過遷移 |
 | 政府行事曆假日 | 匯入腳本已就緒(`scripts/import_holidays.py`),**上線年度還沒跑** |
-| `.env` 正式值 | `MAIL_FROM_ADDRESS`(目前是個人信箱)與 `DISCORD_WEBHOOK_URL`(測試群組)都要換 |
+| `.env` 正式值 | `MAIL_FROM_ADDRESS` 是個人信箱要換;Uptime Kuma 三個變數待填 |
 
 ### 三、其餘單獨排程
 
@@ -41,7 +41,16 @@ DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— �
 
 可改進但不排期的方向見 [`improvements.md`](improvements.md)。
 
-## 最新一批已完成(文件對齊)
+## 最新一批已完成(徽章與監控)
+
+| 項目 | 內容 |
+|---|---|
+| **待審筆數徽章** | `GET /badges` 一支端點回該角色所有頁面的待辦數(鍵=前端 nav item key),四端側欄與行政總覽六張卡共用同一份。只有「有時效性或在等使用者下一步」的頁面給數字;行政端依權限鍵過濾 —— 徽章也是資料量 |
+| **Discord 分流** | 社團事件與公告只推各社團自設的 webhook;`.env` 的 `DISCORD_WEBHOOK_URL` 專供 infra 告警(磁碟水位) |
+| **Uptime Kuma 心跳** | 後端 lifespan 每 30 秒推一次(cron 到不了這個粒度):backend 以 `SELECT 1` 的來回當 ping,frontend 由後端探測 web 容器成功才推 up。只在 `ENV=prod` 送出 |
+| **MIG-08** | 遷移範圍限 114-1 / 114-2 / 115-1 三學期,社員名單全遷;media 與舊評鑑檔案庫不遷。腳本尚未實作學期過濾(MIG-09),邊界待決(MIG-10) |
+
+## 前一批已完成(文件對齊)
 
 | 項目 | 內容 |
 |---|---|
@@ -241,12 +250,12 @@ DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— �
 - 全域的 401 → 登出 listener 要**排除登入端點**:那裡的 401 是「密碼錯」,已登入者開著 `/login` 打錯一次就把自己登出了
 - 繞過 `api()` 直接 `fetch()` 的地方(檔案下載、docx 預覽)不會走 401 → 登出那條路,session 過期只會顯示「無法取得檔案」。共用 `fetchFile`
 
-## 驗證現況(2026-08-20 實測)
+## 驗證現況
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **445 passed**(含 `test_migrations.py`:另開一個庫跑 `alembic upgrade head`,比對欄位、索引名與 CHECK 名 —— 後兩者是子集斷言,擋的是「模型有、revision 漏了」);`ruff check . ../migration` 全綠(CI 現在也 lint `migration/`)
-- 前端 `pnpm exec tsc -b --force` → 0 錯;`pnpm test` → **118 passed**(27 檔);`pnpm run lint` → **8** 個 fast-refresh warning(全為既有的 `only-export-components` 類)
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **456 passed**;前端 `pnpm test` → **120 passed**(27 檔)、`pnpm exec tsc -b --force` 0 錯、`pnpm run lint` 8 個既有的 fast-refresh warning
+- `ruff check . ../migration` 全綠(CI 也 lint `migration/`);測試含 `test_migrations.py`(另開一個庫跑 `alembic upgrade head`,比對欄位、索引名與 CHECK 名 —— 後兩者是子集斷言,擋的是「模型有、revision 漏了」)
 - `git log --all` 確認 `.env` 與 `migration/out` 從未進版控
-- 本批每一個 commit 都做過 mutation 驗證:把修法改回舊寫法,確認新測試真的會紅
+- 每一個 commit 都做過 mutation 驗證:把修法改回舊寫法,確認新測試真的會紅
 
 ## 其他待處理
 

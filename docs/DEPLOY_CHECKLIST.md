@@ -18,17 +18,19 @@
 - [ ] 阻擋 `SECRET_KEY` = `openssl rand -base64 48`
 - [ ] 阻擋 `POSTGRES_PASSWORD` = 強密碼(compose 以同一個變數插值到 db 與 backend)
 - [ ] 阻擋 `FORWARDED_ALLOW_IPS` = `172.28.0.0/24` + edge VM 內網 IP。**絕不可用 `*`**,否則登入限流可被繞過、稽核 IP 可被投毒。值需與內層 web nginx 的 `set_real_ip_from` 一起核對
-- [ ] 阻擋 `DISCORD_WEBHOOK_URL`:infra 告警專用(磁碟水位),已是正式頻道;**絕不入版控**
+- [ ] 應辦 `DISCORD_WEBHOOK_URL`:已是正式頻道。收 不屬於任何社團的系統事件(行政手動借用、公告蓋板與刪除、報名場次刪除)與 infra 告警(磁碟水位);**絕不入版控**
 - [ ] 阻擋 `SMTP_*`:校方 relay 已實測可寄(`mail.ntust.edu.tw:465`、`SMTP_SECURITY=ssl`)。
   host / username / password 任一為空即降級 log-only(不報錯,但信不會寄出)。
   **`MAIL_FROM_ADDRESS` 需與認證帳號同網域**,否則 relay 會拒收
 - [ ] 應辦 `BACKEND_IMAGE` / `WEB_IMAGE` = GHCR 映像路徑。CI 對 main 的每次 push 同時打 `latest` 與 commit sha 兩個 tag:**正式環境釘 sha**,要回滾就換成上一版的 sha,不必等重新建置
 - [ ] 應辦 `WEB_PORT`(預設 8080)—— edge upstream 要帶埠號
+- [ ] 應辦 `UPTIME_PUSH_BACKEND_URL` / `UPTIME_PUSH_FRONTEND_URL` / `WEB_HEALTH_URL`(見 D)
 
 ## C. 資料準備
 
 - [ ] 器材主檔、政府行事曆(見 A)
 - [ ] 應辦 **評鑑 rubric**:`seed.py` 只建預設評鑑年(`eval_window.year`)的 rubric,且**沒有「複製上年」的介面**。換年度時須調 `eval_window` 後重跑 seed,或直接操作 DB。競賽開始前確認該學年已建
+- [ ] 應辦 **社團 Discord webhook**:遷入後 159 社全為空(MIG-05),而社團事件只推社團自設的 webhook —— 未設即整社不推。上線公告請社團自行於「管理項目」填寫
 - [ ] 應辦 **社團聯絡 Email**:遷入後 159 社全為空,公告的 Email 通知會寄給 0 個收件人。跑 `migration/set_contact_emails.py`(取最新學期負責人學號 + `@mail.ntust.edu.tw`,decisions.md MIG-05),但**只解得掉約三分之一** —— 59 社位址應可用、68 社名單停在 113-2 以前(學號信箱多半已停用)、32 社沒有負責人。後兩組由腳本分組輸出,要人工補
 - [ ] 待決 **社團性質清單**:D-10 定為維持寫死(自治性/學藝性…),上線前核對現行清單與承辦認定一致 —— 公告分眾與統計都依它
 - [ ] 待決 **場地主檔**:已 seed 19 處含容納人數,上線前確認與現況相符
@@ -40,12 +42,12 @@
 > 三個 cron 與心跳都掛在**正式 VM**;開發機不跑(心跳另以 `ENV=prod` 把關)。
 
 - [ ] 應辦 **backend healthcheck**:`compose.yml` 只有 db 有,web 的 `depends_on: backend` 也沒有 `condition: service_healthy`。啟動時可能短暫 502(內層 nginx 變數 upstream + resolver 會自行恢復,不會卡死)
-- [ ] 應辦 **監控與告警**:至少磁碟使用率、backend 存活、log 輪替與保留
+- [ ] 應辦 **log 輪替與保留**(磁碟使用率見容量告警、backend 存活見 Uptime Kuma)
 - [ ] 應辦 **磁碟容量**:系統總量讀實體磁碟可用空間,不設邏輯容量;實體磁碟還要容 OS/Docker/PostgreSQL/log/multipart temp,以 `df` 與 GCE 實際容量驗證
 - [ ] 待決 **限流與 session**:限流是行程內記憶體(單機可行,重啟歸零);過期 session 於登入時順手清除,不另設排程
 - [ ] 應辦 **逾期提醒排程**:host cron 每上班日 10:35 呼叫 `scripts/send_overdue_reminders.py`(cron 行見該檔 docstring);未設排程則只剩人工按鈕
 - [ ] 應辦 **每日備份**:host cron 03:15 呼叫 `scripts/backup_db.sh`
-- [ ] 應辦 **Uptime Kuma**:`.env` 填兩支 push URL 與 `WEB_HEALTH_URL`,後端每 30 秒推一次心跳
+- [ ] 應辦 **Uptime Kuma**:建 backend / frontend 兩個 push monitor,URL 填入 `.env`;`WEB_HEALTH_URL` 走 compose 內網 `http://web/`(容器內 nginx 聽 80,`WEB_PORT` 是宿主機發布埠)。後端每 30 秒推一次,只在 `ENV=prod` 送出
 - [ ] 應辦 **容量告警**:host cron 08:20 呼叫 `scripts/check_disk.py`(80% 警示、90% 告警推 Discord;90% 時上傳前置閘已關閉,沒有告警的話社團會傳不上東西一整天)
 
 ## E. Edge proxy 切換
@@ -67,7 +69,7 @@
 4. 備份保留天數(腳本預設 14 天,`KEEP_DAYS` 可覆寫)與備份目錄位置(預設 `./backups`)
 5. GCE 實體磁碟大小(`df` 驗證)與 VM 規格(e2-medium + 2GB swap 是否夠)
 6. `.env` 的保管與輪替方式
-7. 監控方案(容量告警已有腳本;後端存活與 log 輪替仍未定)
+7. log 輪替與保留方案(容量告警與後端存活已有)
 8. 政府行事曆假日由誰於每年年初執行匯入(腳本已有)
 9. HTTPS:確認 edge 上 `clubs.ntust.edu.tw` 的憑證來源與自動續期(現行憑證路徑不是 certbot 慣例的 `/etc/letsencrypt/live/`,不能假設);內層走 HTTP(僅 compose 內網)
 
@@ -80,7 +82,7 @@
 ## H. 上線流程
 
 1. 承辦提供:正式 DB dump、正式 Discord 頻道(器材主檔由 `cc_import` 帶入不需另外提供,OPS-04;SMTP relay 已定案為校方 relay,F.1)
-2. 掛上三個 cron(備份、逾期提醒、容量告警),補 backend healthcheck(D)
+2. 掛上三個 cron(備份、逾期提醒、容量告警)、建 Kuma 兩個 push monitor,補 backend healthcheck(D)
 3. 準備 prod `.env`(B 全填),本機以 `ENV=prod` 起一次全棧確認防呆通過
 4. 目標 VM:建 GCE、裝 Docker、放 `.env`、`docker compose pull && up -d --no-build`,確認 backend 自動 `alembic upgrade head`、`/api/v1/health` 200
 5. 正式資料:`reset_db.py` 建基礎主檔 + superadmin(記下一次性密碼),匯入器材、假日、舊資料

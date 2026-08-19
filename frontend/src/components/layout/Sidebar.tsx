@@ -65,8 +65,13 @@ export default function Sidebar({ groups, onNavigate }: SidebarProps) {
                 <span className="sidebar-item-icon">{item.icon}</span>
                 <span className="sidebar-item-label">{item.label}</span>
                 {item.badge != null && item.badge > 0 && (
-                  // 數字直接併進連結的 accessible name 會讀成「申請審核 3」,補上單位才成句
-                  <span className="sidebar-item-badge num" aria-label={`${item.badge} 件待辦`}>
+                  // role=generic 禁止 aria-label(規範上會被丟掉),給它 img 才命名得了;
+                  // 少了這層,數字併進連結名稱會讀成「申請審核 3」
+                  <span
+                    className="sidebar-item-badge num"
+                    role="img"
+                    aria-label={`${item.badge} 件待辦`}
+                  >
                     {item.badge}
                   </span>
                 )}

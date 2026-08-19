@@ -88,7 +88,7 @@
 - **D13 器材借用已撤銷** `POST /admin/equipment-loans/{id}/revoke` · reject
   `器材借用已撤銷` / `{equipment.name} ×{qty}({start}~{end}):{body.reason}`
 
-D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政手動借用)或社團不存在時直接跳過不通知。
+D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政手動借用)或社團不存在時推系統 webhook。
 
 **線上申請**
 
@@ -135,7 +135,7 @@ D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政�
 - **J2 器材已歸還** `POST /staff/equipment-loans/{id}/checkin` · approve
   `器材已歸還` / `{equipment.name} ×{qty}(歸還人 {returner_name})`
 
-行政手動借用推系統 webhook(`club_id` NULL,沒有社團可推):見 K4。
+行政手動借用推系統 webhook(`club_id` NULL,沒有社團可推;`staff._notify_loan_club` 與 `admin_bookings._notify_club` 同一條):見 K4。
 
 **帳號與停權**
 

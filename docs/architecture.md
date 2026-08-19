@@ -60,7 +60,7 @@ Python 3.14 lazy annotation:欄位名與型別同名時型別須別名(`import d
 ### 3.4 不引入任務佇列
 
 逾期、結案鎖定、器材可借數一律於查詢時推導,不排程改狀態,故不需要 Celery/Redis/scheduler。
-唯一的行程內迴圈是 Uptime Kuma 心跳(`lifespan` 起停,30 秒一次,只在 `ENV=prod`)——push monitor 的間隔小於 cron 的最小粒度。業務排程一律走 host cron。
+唯一的行程內迴圈是 Uptime Kuma 心跳(`lifespan` 起停,30 秒一次,只在 `ENV=prod`)——push monitor 的間隔小於 cron 的最小粒度。業務排程一律走 host cron。**心跳假設單 worker**:加 uvicorn worker 時每個行程各推一份,卡住的那個不會讓 monitor 翻紅。
 
 ### 3.5 併發鎖
 

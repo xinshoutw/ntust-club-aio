@@ -58,6 +58,8 @@ const BUDGET_GRID: React.CSSProperties = {
   gridTemplateColumns: 'max-content 1fr max-content max-content max-content',
   columnGap: 16,
 }
+// 核定金額:null=承辦人還沒核定(不是核了 0 元),兩者對社團是兩件事
+const approvedText = (n: number | null | undefined): string => (n == null ? '—' : n.toLocaleString())
 const BUDGET_ROW: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'subgrid', gridColumn: '1 / -1' }
 
 function money(a: ClubActivity): string {
@@ -233,16 +235,16 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
                 {money(a) === '–' && '無申請經費'}
               </span>
               <span style={{ textAlign: 'right', fontWeight: 400, color: 'var(--steel)' }}>自籌</span>
-              <span style={{ fontWeight: 400, color: 'var(--steel)' }}>/</span>
               <span style={{ textAlign: 'right', fontWeight: 400, color: 'var(--steel)' }}>擬請</span>
+              <span style={{ textAlign: 'right', fontWeight: 400, color: 'var(--steel)' }}>核定</span>
             </div>
             {budget.map((b) => (
               <div key={b.id} style={{ ...BUDGET_ROW, fontSize: 13, padding: '5px 0', borderBottom: '1px solid var(--line)' }}>
                 <span style={{ color: 'var(--steel)' }}>{b.category}</span>
                 <span>{b.description}</span>
                 <span className="num" style={{ textAlign: 'right' }}>{b.selfFund.toLocaleString()}</span>
-                <span style={{ color: 'var(--steel)' }}>/</span>
                 <span className="num" style={{ textAlign: 'right' }}>{b.requestedSubsidy.toLocaleString()}</span>
+                <span className="num" style={{ textAlign: 'right' }}>{approvedText(b.approvedSubsidy)}</span>
               </div>
             ))}
             {budget.length > 0 && (
@@ -250,8 +252,8 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
                 <span />
                 <span style={{ textAlign: 'right', color: 'var(--steel)' }}>合計</span>
                 <span className="num" style={{ textAlign: 'right', fontWeight: 600 }}>{a.selfFundTotal.toLocaleString()}</span>
-                <span style={{ color: 'var(--steel)' }}>/</span>
                 <span className="num" style={{ textAlign: 'right', fontWeight: 600 }}>{a.requestedTotal.toLocaleString()}</span>
+                <span className="num" style={{ textAlign: 'right', fontWeight: 600 }}>{approvedText(a.approvedTotal)}</span>
               </div>
             )}
           </div>

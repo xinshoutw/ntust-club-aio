@@ -66,7 +66,7 @@ export default function ManualBookingPage() {
 
   return (
     <div>
-      <PageHeader title="手動借用" sub="行政直接借用,免審核直接核准;佔用以「學務處」顯示" />
+      <PageHeader title="手動借用"/>
       <div className="form-grid-2" style={{ marginTop: 20, alignItems: 'start' }}>
           <div className="card" style={{ padding: 24 }}>
             <div style={sectionTitle}>臨時場地</div>

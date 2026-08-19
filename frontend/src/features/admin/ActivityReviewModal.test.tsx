@@ -9,13 +9,13 @@ vi.mock('../../app/auth', () => ({
   useAuth: () => ({ user: { role: 'admin', isSuper: true, permissions: [] } }),
 }))
 
-const budgetRow = (id: number, requested: number) => ({
+const budgetRow = (id: number, requested: number, approved = 0) => ({
   id,
   category: `科目${id}`,
   description: '說明',
   selfFund: 1000,
   requested,
-  approved: 0,
+  approved,
 })
 
 const item = (budget: ReturnType<typeof budgetRow>[]): ReviewItem => ({
@@ -51,6 +51,16 @@ describe('ActivityReviewModal 的核定欄', () => {
     expect(screen.queryByRole('columnheader', { name: '核定' })).toBeNull()
     expect(screen.queryByPlaceholderText('xxx補助')).toBeNull()
     expect(screen.getByRole('columnheader', { name: '擬請' })).toBeTruthy()
+  })
+
+  // 舊系統允許沒申請卻核發,遷移資料就有這種列(最大一筆 12,000)。
+  // 拿「能不能核」當「看不看得到」用,會把已經核定的錢從承辦人眼前藏掉。
+  test('沒申請補助但已核定過的,核定欄要出現(只是不給改)', () => {
+    show([budgetRow(1, 0, 12000), budgetRow(2, 0)])
+
+    expect(screen.getByRole('columnheader', { name: '核定' })).toBeTruthy()
+    expect(document.querySelectorAll('tbody input')).toHaveLength(0)
+    expect(screen.getAllByText('12,000')).toHaveLength(2) // 明細列 + 合計
   })
 
   test('有申請補助時核定欄出現,但擬請 0 的那一列不給輸入框', () => {

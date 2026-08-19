@@ -28,7 +28,7 @@ import {
   type ClubActivity,
   type ClubActivityDetail,
 } from '../../api/activities'
-import { approvedText, fmtMoney } from './types'
+import { approvedText, fmtMoney, showsApproved } from './types'
 import WorkTable from './WorkTable'
 import { TIME_RANGE_SEP, dateRangeText } from './utils'
 
@@ -117,8 +117,8 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
   const timeChanged = !!rep && normTime(actualTime) !== normTime(a.timeRange ?? '')
   const locationChanged = !!rep && rep.actualLocation !== a.location
   const plannedCountsText = `社員 ${a.participantsIn} · 非社員 ${a.participantsOut}`
-  // 一毛都沒申請就沒有核定可看(與行政端審核彈窗同一條界線),整欄收掉而不是列一排 —
-  const hasSubsidy = a.requestedTotal > 0
+  // 核定欄:有申請補助,或雖沒申請但確實核了錢(遷移資料有這種列)才出現
+  const hasSubsidy = budget.some((b) => showsApproved(b.requestedSubsidy, b.approvedSubsidy))
   const countChanged = !!rep && (rep.memberCount !== a.participantsIn || rep.nonMemberCount !== a.participantsOut)
 
   const downloadItems = [
@@ -376,7 +376,10 @@ export default function ActivityListPage() {
   // 不把學期一起帶過來的話落地就是一片空白
   const [searchParams, setSearchParams] = useSearchParams()
   const openParam = Number(searchParams.get('open')) || null
-  const [semesterSel, setSemesterSel] = useState<string | null>(searchParams.get('semester'))
+  const [semesterSel, setSemesterSel] = useState<string | null>(() => {
+    const v = searchParams.get('semester')
+    return v && /^\d{3}-[12]$/.test(v) ? v : null // 不合法就當沒帶:後端同一條 pattern,亂帶會 422
+  })
   const [page, setPage] = useState(1)
   const { entries, toggle } = useMultiSort<SortKey>([{ key: 'date', dir: -1 }])
   const [typeFilter, setTypeFilter] = useState<string[]>([])
@@ -391,6 +394,16 @@ export default function ActivityListPage() {
   const semestersQuery = useActivitySemesters()
   const semOptions = semesterOptions(semestersQuery.data ?? [])
   const semester = semesterSel ?? semOptions[0].value
+  // 使用者換學期時網址跟著走,否則重新整理會跳回連結帶來的那個學期
+  const pickSemester = (v: string) => {
+    setSemesterSel(v)
+    setPage(1)
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.set('semester', v)
+      return next
+    }, { replace: true })
+  }
 
   // 草稿不分學期,獨立區置頂(量少、排序特殊,整批抓回自排);
   // 主列表的學期/類型/狀態篩選、排序與分頁一律由後端處理
@@ -422,17 +435,23 @@ export default function ActivityListPage() {
   // (它可能落在第 3 頁,或被目前的狀態/類型篩選擋掉)
   const linkedQuery = useActivityDetail(openParam ?? undefined)
   const linked = linkedQuery.data
+  const linkedFailed = linkedQuery.isError
   useEffect(() => {
-    if (!linked) return
-    setPreview(linked)
-    setPreviewOpen(true)
-    // 用掉就從網址移除:重新整理或返回時不該又跳出同一個彈窗
+    if (!linked && !linkedFailed) return
+    if (linked) {
+      setPreview(linked)
+      setPreviewOpen(true)
+    } else {
+      // 別社的活動或已刪除:靜默不動的話網址卡著 open、畫面像什麼都沒發生
+      message.error('找不到這個活動，可能已被刪除')
+    }
+    // 用掉(或確定用不了)就從網址移除:重新整理或返回時不該又試一次
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev)
       next.delete('open')
       return next
     }, { replace: true })
-  }, [linked, setSearchParams])
+  }, [linked, linkedFailed, message, setSearchParams])
   const { submit, remove } = useActivityMutations()
 
   const paged = listQuery.data?.rows ?? []
@@ -501,10 +520,7 @@ export default function ActivityListPage() {
             )}
             <Select
               value={semester}
-              onChange={(v) => {
-                setSemesterSel(v)
-                setPage(1)
-              }}
+              onChange={pickSemester}
               style={{ width: 110 }}
               options={semOptions}
             />

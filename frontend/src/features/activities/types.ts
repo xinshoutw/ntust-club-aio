@@ -136,3 +136,12 @@ export const approvedText = (
   n: number | null | undefined,
   fmt: (v: number) => string = (v) => v.toLocaleString(),
 ): string => (n == null ? '—' : fmt(n))
+
+/** 核定欄要不要出現。
+ *
+ * 與「能不能核」是**兩個判定**:能不能核只看擬請(核定 ≤ 擬請,擬請 0 就核不出金額);
+ * 要不要顯示還得看實際核了多少 —— 舊系統允許沒申請卻核發,遷移資料就有這種列
+ * (最大一筆 12,000)。只用一個旗標兼差,就會把已經核定的錢從畫面上藏掉。
+ */
+export const showsApproved = (requested: number, approved: number | null | undefined): boolean =>
+  requested > 0 || (approved ?? 0) > 0

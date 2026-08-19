@@ -6,7 +6,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
-import { approvedText, fmtMoney } from '../activities/types'
+import { approvedText, fmtMoney, showsApproved } from '../activities/types'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import { useModalAutoFocus } from '../../components/ui/useModalAutoFocus'
 import SectionTitle from '../../components/ui/SectionTitle'
@@ -104,10 +104,11 @@ function CloseReviewModal({
     )
   }
 
-  // 沒申請補助就沒有核定可看(與申請審核彈窗同一條界線);有申請卻還沒核定時 approvedTotal
-  // 是 null —— `?? 0` 會把「還沒核定」說成「核定 0 元」,連帶讓超支判定幾乎必然成立
-  const hasSubsidy = item.requested > 0
-  const approvedKnown = !hasSubsidy || item.approvedTotal != null
+  // 核定補助:有申請補助,或雖沒申請但確實核了錢(遷移資料有這種列)才顯示。
+  // 有申請卻還沒核定時 approvedTotal 是 null —— `?? 0` 會把「還沒核定」說成「核定 0 元」,
+  // 連帶讓超支判定拿一個假的上限去比
+  const hasSubsidy = showsApproved(item.requested, item.approvedTotal)
+  const approvedKnown = item.requested === 0 || item.approvedTotal != null
   // 實際支出含自籌:與「自籌+核定補助」的總經費比較才可比(僅比核定補助幾乎必超)
   const totalBudget = item.selfFundTotal + (item.approvedTotal ?? 0)
   const overBudget = !!report && approvedKnown && report.expense > totalBudget

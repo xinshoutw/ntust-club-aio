@@ -8,6 +8,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import LargeBadge from '../../components/ui/LargeBadge'
 import { Cols, FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
+import { clampPage } from '../../lib/paging'
 import { STATUS } from '../../lib/status'
 import { useAuth } from '../../app/auth'
 import { fmtMoney } from '../activities/types'
@@ -24,7 +25,9 @@ import { useClubOptions } from '../../api/adminClubs'
 import ActivityReviewModal from './ActivityReviewModal'
 import { clickableProps } from '../../lib/clickable'
 
-const PAGE_SIZE = 20
+// 待審佇列是整批撈回來的小結果集(僅本關可簽核者),分頁在前端切;最近審核走伺服器分頁
+const QUEUE_PAGE_SIZE = 8
+const RECENT_PAGE_SIZE = 10
 const ALL_STATUSES: AdminActivityStatus[] = [
   'pending_advisor',
   'pending_chief',
@@ -51,6 +54,7 @@ export default function ReviewPage() {
     toggle(k)
     setPage(1) // 伺服器端分頁:換排序回到第 1 頁
   }
+  const [queuePage, setQueuePage] = useState(1)
   const [clubFilter, setClubFilter] = useState<string[]>([])
   const [typeFilter, setTypeFilter] = useState<string[]>([])
   const [statusFilter, setStatusFilter] = useState<string[]>([])
@@ -71,6 +75,10 @@ export default function ReviewPage() {
       [...(queueQuery.data ?? [])].sort((a, b) => a.submittedAt.localeCompare(b.submittedAt)),
     [queueQuery.data],
   )
+
+  // 簽掉一件後佇列變短,停在末頁會看到空卡片;clampPage 對合法頁碼回傳原值
+  const queuePageNow = clampPage(queuePage, queue.length, QUEUE_PAGE_SIZE)
+  const pagedQueue = queue.slice((queuePageNow - 1) * QUEUE_PAGE_SIZE, queuePageNow * QUEUE_PAGE_SIZE)
 
   // 篩選:社團名 → id(選項自最小社團主檔);狀態標籤 → 狀態值(待審三關同標籤合併)
   const othersStatuses = useMemo(
@@ -96,7 +104,7 @@ export default function ReviewPage() {
     // 顯式預設(-reviewed_at)寫在 useMultiSort defaults:entries 一律非空,固定帶 sort
     sort: sortParam(entries),
     page,
-    pageSize: PAGE_SIZE,
+    pageSize: RECENT_PAGE_SIZE,
   })
   const pagedRows = listQuery.data?.rows ?? []
   const total = listQuery.data?.total ?? 0
@@ -127,7 +135,7 @@ export default function ReviewPage() {
       <div className="card" style={{ marginTop: 20 }}>
         <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 6px' }}>待審佇列</div>
         <LoadingBlock pending={queueQuery.isLoading} rows={3}>
-          {queue.map((item) => (
+          {pagedQueue.map((item) => (
             <div
               key={item.id}
               className="click-tint"
@@ -188,6 +196,9 @@ export default function ReviewPage() {
                 </div>
               )}
             </div>
+          )}
+          {queue.length > QUEUE_PAGE_SIZE && (
+            <Pager page={queuePageNow} pageSize={QUEUE_PAGE_SIZE} total={queue.length} onChange={setQueuePage} />
           )}
         </LoadingBlock>
       </div>
@@ -312,7 +323,7 @@ export default function ReviewPage() {
             </tbody>
           </table>
         </LoadingBlock>
-        <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} />
+        <Pager page={page} pageSize={RECENT_PAGE_SIZE} total={total} onChange={setPage} />
       </div>
 
       {/* Modal 常駐待關閉動畫結束(afterClose)才卸載;key 依單據重掛,核定金額與退回原因不殘留;

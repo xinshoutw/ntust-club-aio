@@ -83,3 +83,16 @@ export function budgetTotals(items: BudgetItem[]): { self: number; requested: nu
 }
 
 export const fmtMoney = (n: number): string => `$${n.toLocaleString('en-US')}`
+
+/** 工作分配的項目欄對齊寬度(全形字數≈em)。
+ *
+ * 以「非離群」的最長項目為準:與最短相差超過 3 字的項目不參與對齊。舊系統的項目是
+ * 「職稱:工作內容」的長句(可到 23 字),讓它決定寬度的話,其餘「文化指揮」這類短項目
+ * 後面會空掉一大截;長項目就讓它自己撐開,只是不再拖著所有列一起縮排。
+ */
+export const taskAlignEm = (tasks: readonly string[]): number => {
+  const lens = tasks.map((t) => [...t].length).filter((n) => n > 0).sort((x, y) => x - y)
+  if (!lens.length) return 0
+  const within = lens.filter((n) => n - lens[0] <= 3)
+  return within[within.length - 1]
+}

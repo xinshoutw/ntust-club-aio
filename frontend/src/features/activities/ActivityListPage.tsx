@@ -27,7 +27,7 @@ import {
   type ClubActivity,
   type ClubActivityDetail,
 } from '../../api/activities'
-import { fmtMoney } from './types'
+import { fmtMoney, taskAlignEm } from './types'
 import { TIME_RANGE_SEP, dateRangeText } from './utils'
 
 // 排序鍵=後端 /club/activities 白名單(budget=自籌+擬請補助合計;同值的 id 降冪
@@ -49,9 +49,14 @@ const LISTED_STATUSES = [
 ] as const
 const STATUS_LABELS = [...new Set(LISTED_STATUSES.map((s) => STATUS[s].label))]
 
-// 經費列與合計共用同一組欄寬,右側數字才對得齊。金額上限 999,999(7 字),
-// tabular-nums 下約 3.6em —— 給 4.6em 留餘裕,其餘寬度讓給說明欄(遷移資料的說明可以很長)
-const BUDGET_COLS = '110px 1fr 4.6em 0.7em 4.6em'
+// 經費:欄寬一律由內容決定(max-content),明細列與合計以 subgrid 共用同一組軌道 ——
+// 各自開一個 grid 的話兩邊會各自算寬度,數字就對不齊了
+const BUDGET_GRID: React.CSSProperties = {
+  display: 'grid',
+  gridTemplateColumns: 'max-content 1fr max-content max-content max-content',
+  columnGap: 16,
+}
+const BUDGET_ROW: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'subgrid', gridColumn: '1 / -1' }
 
 function money(a: ClubActivity): string {
   if (a.selfFundTotal === 0 && a.requestedTotal === 0) return '–'
@@ -118,6 +123,7 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
   const timeChanged = !!rep && normTime(actualTime) !== normTime(a.timeRange ?? '')
   const locationChanged = !!rep && rep.actualLocation !== a.location
   const plannedCountsText = `社員 ${a.participantsIn} · 非社員 ${a.participantsOut}`
+  const workAlign = taskAlignEm(a.works.map((w) => w.task))
   const countChanged = !!rep && (rep.memberCount !== a.participantsIn || rep.nonMemberCount !== a.participantsOut)
 
   const downloadItems = [
@@ -216,19 +222,17 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
                     <div
                       key={i}
                       style={{
-                        display: 'grid',
-                        // auto:項目欄依內容決定寬度(新系統多是「器材組」,舊系統是
-                        // 「職稱:工作內容」的長句),名單拿剩下的空間 —— 長的通常是名單
-                        gridTemplateColumns: 'auto 1fr',
+                        display: 'flex',
                         gap: 16,
                         padding: '4px 0',
                         borderTop: i ? '1px solid var(--line)' : undefined,
                         lineHeight: 1.6,
                       }}
                     >
-                      {/* 舊系統的項目常是「職稱:工作內容」,原樣留在同一格 —— 拆開會猜錯 */}
-                      <span style={{ color: 'var(--steel)' }}>{w.task || '—'}</span>
-                      <span>{w.owner || '—'}</span>
+                      {/* 舊系統的項目常是「職稱:工作內容」,原樣留在同一格 —— 拆開會猜錯。
+                          minWidth 讓短項目補齊到對齊寬度,超出的項目自己撐開(見 taskAlignEm) */}
+                      <span style={{ color: 'var(--steel)', minWidth: `${workAlign}em` }}>{w.task || '—'}</span>
+                      <span style={{ flex: 1 }}>{w.owner || '—'}</span>
                     </div>
                   ))}
                 </div>
@@ -246,30 +250,36 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
             )}
           </div>
 
-          <SectionTitle>
-            經費
-            {money(a) === '–' && (
-              <span style={{ fontWeight: 400, color: 'var(--steel)', marginLeft: 8, fontSize: 12 }}>無申請經費</span>
+          <div style={{ ...BUDGET_GRID, margin: '22px 0 0' }}>
+            {/* 表頭與明細同一組軌道:「自籌 / 擬請」正好落在兩欄數字上方 */}
+            <div style={{ ...BUDGET_ROW, fontSize: 13, fontWeight: 600, paddingBottom: 6, borderBottom: '1px solid var(--line)' }}>
+              <span>經費</span>
+              <span style={{ fontWeight: 400, color: 'var(--steel)', fontSize: 12 }}>
+                {money(a) === '–' && '無申請經費'}
+              </span>
+              <span style={{ textAlign: 'right', fontWeight: 400, color: 'var(--steel)' }}>自籌</span>
+              <span style={{ fontWeight: 400, color: 'var(--steel)' }}>/</span>
+              <span style={{ textAlign: 'right', fontWeight: 400, color: 'var(--steel)' }}>擬請</span>
+            </div>
+            {budget.map((b) => (
+              <div key={b.id} style={{ ...BUDGET_ROW, fontSize: 13, padding: '5px 0', borderBottom: '1px solid var(--line)' }}>
+                <span style={{ color: 'var(--steel)' }}>{b.category}</span>
+                <span>{b.description}</span>
+                <span className="num" style={{ textAlign: 'right' }}>{b.selfFund.toLocaleString()}</span>
+                <span style={{ color: 'var(--steel)' }}>/</span>
+                <span className="num" style={{ textAlign: 'right' }}>{b.requestedSubsidy.toLocaleString()}</span>
+              </div>
+            ))}
+            {budget.length > 0 && (
+              <div style={{ ...BUDGET_ROW, fontSize: 13, padding: '7px 0 0' }}>
+                <span />
+                <span style={{ textAlign: 'right', color: 'var(--steel)' }}>合計</span>
+                <span className="num" style={{ textAlign: 'right', fontWeight: 600 }}>{a.selfFundTotal.toLocaleString()}</span>
+                <span style={{ color: 'var(--steel)' }}>/</span>
+                <span className="num" style={{ textAlign: 'right', fontWeight: 600 }}>{a.requestedTotal.toLocaleString()}</span>
+              </div>
             )}
-          </SectionTitle>
-          {budget.map((b) => (
-            <div key={b.id} style={{ display: 'grid', gridTemplateColumns: BUDGET_COLS, gap: 8, fontSize: 13, padding: '5px 0', borderBottom: '1px solid var(--line)' }}>
-              <span style={{ color: 'var(--steel)' }}>{b.category}</span>
-              <span>{b.description}</span>
-              <span className="num" style={{ textAlign: 'right' }}>{b.selfFund.toLocaleString()}</span>
-              <span style={{ textAlign: 'center', color: 'var(--steel)' }}>/</span>
-              <span className="num" style={{ textAlign: 'right' }}>{b.requestedSubsidy.toLocaleString()}</span>
-            </div>
-          ))}
-          {budget.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: BUDGET_COLS, gap: 8, fontSize: 13, padding: '7px 0 0' }}>
-              <span />
-              <span style={{ textAlign: 'right', color: 'var(--steel)' }}>合計(自籌 / 擬請)</span>
-              <span className="num" style={{ textAlign: 'right', fontWeight: 600 }}>{a.selfFundTotal.toLocaleString()}</span>
-              <span style={{ textAlign: 'center', color: 'var(--steel)' }}>/</span>
-              <span className="num" style={{ textAlign: 'right', fontWeight: 600 }}>{a.requestedTotal.toLocaleString()}</span>
-            </div>
-          )}
+          </div>
           {rep && (
             <div style={{ textAlign: 'right', fontSize: 13, color: 'var(--steel)', paddingTop: 4 }}>
               實際支出 <span className="num" style={{ color: 'var(--ink)' }}>{fmtMoney(rep.expense)}</span>

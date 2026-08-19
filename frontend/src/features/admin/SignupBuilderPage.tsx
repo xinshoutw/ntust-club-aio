@@ -117,7 +117,7 @@ export default function SignupBuilderPage() {
     const missing: [key: string, msg: string][] = []
     if (!name.trim()) missing.push(['name', '請輸入活動名稱'])
     if (!eventTime) missing.push(['eventTime', '請選擇活動時間'])
-    if (cap == null || cap < 1) missing.push(['cap', '名額上限為必填,最少 1 名'])
+    if (cap == null || cap < 1) missing.push(['cap', '名額上限最少 1 名'])
     if (!signupStart) missing.push(['signupStart', '請選擇報名開始時間'])
     if (!signupEnd) missing.push(['signupEnd', '請選擇報名截止時間'])
     if (missing.length === 0 && signupStart && signupEnd && !signupEnd.isAfter(signupStart)) {
@@ -139,7 +139,7 @@ export default function SignupBuilderPage() {
     const named = fields.filter((f) => f.label.trim())
     const noOptions = named.find((f) => OPTION_TYPES.includes(f.type) && f.options.length === 0)
     if (noOptions) {
-      message.error(`「${noOptions.label.trim()}」為選項型欄位,請至少新增一個選項`)
+      message.error(`「${noOptions.label.trim()}」請至少新增一個選項`)
       return
     }
     setErrs(new Set())
@@ -208,7 +208,7 @@ export default function SignupBuilderPage() {
               </label>
               <label>
                 <div style={fieldLabel}>地點</div>
-                <Input value={place} onChange={(e) => setPlace(e.target.value)} placeholder="例:國際大樓 IB-101" />
+                <Input value={place} onChange={(e) => setPlace(e.target.value)} placeholder="TR-214" />
               </label>
               <label>
                 <div style={fieldLabel}>活動時間{requiredMark}</div>
@@ -226,7 +226,7 @@ export default function SignupBuilderPage() {
                 />
               </label>
               <label>
-                <div style={fieldLabel}>名額上限{requiredMark}</div>
+                <div style={fieldLabel}>每社名額限制{requiredMark}</div>
                 <InputNumber
                   style={{ width: '100%' }}
                   min={1}
@@ -270,12 +270,12 @@ export default function SignupBuilderPage() {
               </label>
               <div style={{ gridColumn: '1 / -1' }}>
                 <Checkbox checked={needsReview} onChange={(e) => setNeedsReview(e.target.checked)}>
-                  審核制(報名送出後須管理員核准才算報名成功)
+                  審核制
                 </Checkbox>
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
                 <Checkbox checked={isEval} onChange={(e) => setIsEval(e.target.checked)}>
-                  競賽報名(社團須勾選參賽獎項,至少一項)
+                  社團競賽
                 </Checkbox>
               </div>
               <label style={{ gridColumn: '1 / -1' }}>
@@ -308,7 +308,7 @@ export default function SignupBuilderPage() {
                   <div className="builder-field-main">
                     <button
                       type="button"
-                      aria-label={`調整「${f.label || '未命名欄位'}」順序:方向鍵上下移動,亦可拖曳`}
+                      aria-label={`拖曳或方向鍵調整「${f.label || '未命名欄位'}」順序`}
                       style={{
                         border: 'none',
                         background: 'none',
@@ -363,7 +363,6 @@ export default function SignupBuilderPage() {
                   {/* 選項用行內輸入(與系統設定同一顆元件):window.prompt 在行動裝置可能整個叫不出來 */}
                   {OPTION_TYPES.includes(f.type) && (
                     <div className="builder-field-options">
-                      <span style={{ fontSize: 12, color: 'var(--steel)' }}>選項</span>
                       <TagListInput
                         value={f.options}
                         onChange={(options) => update(f.key, { options })}

@@ -85,11 +85,11 @@ function ManageModal({
   const exportCsv = () => {
     // 匯出鈕在 LoadingBlock 外面:載入中按下去會落到「尚無報名名單」那句假答案
     if (regsQuery.isPending) {
-      message.error('報名名單尚在載入,請稍候再匯出')
+      message.error('報名名單尚在載入，請稍候')
       return
     }
     if (regsQuery.isError) {
-      message.error('報名名單載入失敗,無法匯出;請重試後再匯出')
+      message.error('報名名單載入失敗，請稍後再重試')
       return
     }
     if (!regs.length) {
@@ -143,7 +143,7 @@ function ManageModal({
   const askDeleteSession = (s: SignupSession) =>
     confirmDialog(modal, {
       title: '刪除場次',
-      content: `「${s.name}」(${s.date})刪除後,該場出席紀錄將一併刪除`,
+      content: `「${s.name}」(${s.date}) 刪除後，出席紀錄將一併刪除`,
       okText: '確認刪除',
       okButtonProps: { danger: true },
       cancelText: '取消',

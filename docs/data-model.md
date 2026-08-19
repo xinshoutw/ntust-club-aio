@@ -190,7 +190,7 @@ approved 且 end_date + N 天已過且未送結案 → 逾期鎖定(推導,非�
 | highlights / goals / others | text | 活動重點 / 如何達成目標 / 其他執行狀況 |
 | review_meeting | bool | true 時 `review_date`、`review_attendees`、`review_topics`、`review_conclusion` 皆必填(應用層) |
 | review_date / attendees / topics / conclusion | date / int / text / text,皆 NULL | |
-| video_url | text NULL | **唯一選填**;http(s) 驗證。照片 <5 張且無影片 → ad2 該活動不計分 |
+| video_url | text NULL | **唯一選填**;http(s) 驗證。照片 <5 張且無影片時畫面紅字提示承辦,計不計分仍看繳交確認(D-14) |
 | expense | int | 實際支出(核銷依據) |
 | submitted_at | timestamptz | |
 | photos_confirmed / report_confirmed / reflections_confirmed | bool 預設 true | 承辦人核准結案時逐項確認繳交,**ad2–ad4 完全以這三個值為準**(D-14):系統不數照片張數也不數心得筆數,社團可能是交紙本。照片確認同時涵蓋影片連結;沒有 activity_reports 就沒有旗標可讀,三項一律不計 |

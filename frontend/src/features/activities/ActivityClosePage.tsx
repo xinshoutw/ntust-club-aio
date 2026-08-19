@@ -723,8 +723,8 @@ function CloseForm({
             <div>
               <div style={label}>
                 活動照片{requiredMark}
-                {/* 送出門檻是 1 張(:398);MIN_PHOTOS 是評鑑計分的門檻,兩者不同 */}
-                <Tooltip title={`至少 1 張即可送出;達 ${MIN_PHOTOS} 張或附影片連結才計評鑑分`}>
+                {/* 送出門檻是 1 張;MIN_PHOTOS 是承辦審核時的參考張數,計不計分看承辦的確認 */}
+                <Tooltip title={`至少 1 張即可送出;達 ${MIN_PHOTOS} 張或附影片連結,承辦通常會採計評鑑分`}>
                   <InfoCircleOutlined style={{ marginLeft: 6, color: 'var(--steel)' }} />
                 </Tooltip>
               </div>

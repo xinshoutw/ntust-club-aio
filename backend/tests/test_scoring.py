@@ -56,6 +56,11 @@ class TestAd3Ad4:
         assert score("ad3", closed=closed, results=results) == 1
         assert score("ad4", closed=closed, results=results) == 8
 
+        # 兩項各自獨立:承辦只確認了報告表,心得那一項就是 0
+        report_only = (ActivityResult(1, has_report=True), ActivityResult(2, has_report=True))
+        assert score("ad3", closed=closed, results=report_only) == 4
+        assert score("ad4", closed=closed, results=report_only) == 0
+
         many = tuple(act(i, f"2026/04/0{i + 1}", large=True) for i in range(6))
         many_results = tuple(ActivityResult(a.id, has_feedback=True) for a in many)
         assert score("ad4", closed=many, results=many_results) == 30

@@ -31,7 +31,8 @@ async def setup(client, db):
 
 
 async def seed_closed_activity(
-    db, club, user, *, day, large=False, photos=0, video=None, with_report=True, confirmed=True
+    db, club, user, *, day, large=False, photos=0, video=None, with_report=True,
+    confirmed=True, reflections=3,
 ):
     activity = Activity(
         club_id=club.id,
@@ -69,7 +70,7 @@ async def seed_closed_activity(
     )
     if report:
         db.add(report)
-        for i in range(3):
+        for i in range(reflections):
             db.add(
                 ActivityReflection(report_id=activity.id, student_name=f"s{i}", dept="d", body="b")
             )
@@ -397,14 +398,16 @@ async def test_activity_scores_follow_the_reviewer_confirmation(client, db):
     反過來,檔案齊全但承辦沒確認的一分都不給。
     """
     club, user, admin = await setup(client, db)
-    await seed_closed_activity(db, club, user, day=date(2026, 3, 1), photos=0)
+    # 紙本那件:一個照片檔與心得列都沒有,只有承辦的確認
+    await seed_closed_activity(db, club, user, day=date(2026, 3, 1), photos=0, reflections=0)
+    # 檔案齊全但承辦沒確認
     await seed_closed_activity(db, club, user, day=date(2026, 3, 2), photos=9, confirmed=False)
 
     data = (await client.get("/api/v1/club/eval/overview")).json()["data"]
     by_key = {s["key"]: s for s in data["scores"]}
     assert by_key["ad2"]["auto"] == 1  # 紙本那件照樣計;檔案齊全但未確認的不計
     assert by_key["ad3"]["auto"] == 1
-    assert by_key["ad4"]["auto"] == 2
+    assert by_key["ad4"]["auto"] == 2  # 零心得列也計:承辦確認了就是交了
 
 
 async def test_photo_score_needs_a_report_row(client, db):
@@ -422,3 +425,4 @@ async def test_photo_score_needs_a_report_row(client, db):
     by_key = {s["key"]: s for s in data["scores"]}
     assert by_key["ad2"]["auto"] == 0
     assert by_key["ad3"]["auto"] == 0
+    assert by_key["ad4"]["auto"] == 0

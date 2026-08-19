@@ -13,15 +13,6 @@ export interface EvalFile {
   raw?: File // 本次 session 上傳的原始檔(docx 預覽用)
 }
 
-// 每個結案活動的成果上傳(行政分 ad2–ad4 依此計算)
-export interface ActivityResult {
-  activityId: string
-  photos: EvalFile[]
-  videoLink: string
-  report: EvalFile | null
-  feedback: EvalFile | null
-}
-
 // 獎項簡述(前端文案;獎項主檔與評分細項在後端,鍵=awards.id slug)
 export const AWARD_BRIEFS: Record<string, string> = {
   club: '行政資料 40% + 社團營運 60%',

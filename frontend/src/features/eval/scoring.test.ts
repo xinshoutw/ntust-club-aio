@@ -62,6 +62,14 @@ describe('ad3/ad4 成果單與心得', () => {
     const many = Array.from({ length: 6 }, (_, i) => act(`x${i}`, `2026/04/0${i + 1}`, true))
     expect(score({ closed: many, results: many.map((a) => result(a.id, { hasFeedback: true })) }, 'ad4')).toBe(30)
   })
+
+  // 兩項各自獨立:承辦只確認了報告表,心得那一項就是 0
+  test('沒確認心得就不計 ad4', () => {
+    const closed = [act('a', '2026/03/01'), act('b', '2026/03/02', true)]
+    const results = [result('a', { hasReport: true }), result('b', { hasReport: true })]
+    expect(score({ closed, results }, 'ad3')).toBe(4)
+    expect(score({ closed, results }, 'ad4')).toBe(0)
+  })
 })
 
 describe('ad5 名單更新', () => {

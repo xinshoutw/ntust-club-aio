@@ -32,7 +32,6 @@ export const defaultConfirmations = (
   photoCount: number,
 ): Record<CheckKey, boolean> => ({
   photos: !!report && report.photosConfirmed && (photoCount >= MIN_PHOTOS || !!report.videoUrl),
-  // ad3 只問這一列在不在,不看內容:報告表讀得到就是有交
   report: !!report?.reportConfirmed,
   reflections: !!report?.reflectionsConfirmed && report.reflections.length >= MIN_REFLECTIONS,
 })

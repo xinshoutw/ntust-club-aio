@@ -23,7 +23,7 @@ describe('繳交確認的預設勾選', () => {
     expect(defaultConfirmations(report({ videoUrl: 'https://x.test/v' }), 0).photos).toBe(true)
   })
 
-  // 未達送出下限 3 篇就不預設勾;後端的 ad4 只要求有上傳,這段區間由承辦自己判斷
+  // 未達送出下限 3 篇就不預設勾;承辦核實後勾回去,ad4 照樣計分
   test('心得未達 3 篇不預設打勾,滿 3 篇才勾', () => {
     expect(defaultConfirmations(report({ reflections: [{}, {}] }), 5).reflections).toBe(false)
     expect(defaultConfirmations(report({ reflections: [{}, {}, {}] }), 5).reflections).toBe(true)

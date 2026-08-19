@@ -134,8 +134,12 @@ def compute_ad_scores(i: ScoringInput) -> list[AdScore]:
             AD_MAX["ad2"],
             f"每活動經承辦確認照片或影片;大型 ×{LARGE_MULTIPLIER}",
         ),
-        AdScore("ad3", ad3, AD_MAX["ad3"], f"每活動 1 分;大型 ×{LARGE_MULTIPLIER}"),
-        AdScore("ad4", ad4, AD_MAX["ad4"], f"每活動 2 分;大型 ×{LARGE_MULTIPLIER}"),
+        AdScore(
+            "ad3", ad3, AD_MAX["ad3"], f"每活動經承辦確認成果報告表;大型 ×{LARGE_MULTIPLIER}"
+        ),
+        AdScore(
+            "ad4", ad4, AD_MAX["ad4"], f"每活動經承辦確認學習心得 2 分;大型 ×{LARGE_MULTIPLIER}"
+        ),
         AdScore("ad5", ad5, AD_MAX["ad5"], ad5_note or "無名單資料"),
         AdScore("ad6", ad6, AD_MAX["ad6"], "已設定網頁連結" if i.has_website else "未設定網頁連結"),
         AdScore(

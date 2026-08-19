@@ -98,7 +98,7 @@ class EquipmentLoan(Base, TimestampMixin):
     status: Mapped[LoanStatus] = mapped_column(
         db_enum(LoanStatus, "loan_status"), default=LoanStatus.PENDING
     )
-    # 借出點交(工讀生;需序號類登記序號)
+    # 借出點交(工讀生)
     checkout_by: Mapped[int | None] = mapped_column(sa.ForeignKey("users.id"))
     checkout_at: Mapped[dt.datetime | None] = mapped_column(sa.DateTime(timezone=True))
     borrower_name: Mapped[str | None] = mapped_column(sa.Text)  # 借用人(借出點交時登記)

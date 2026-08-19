@@ -12,7 +12,7 @@ import asyncio
 import csv
 import os
 import sys
-from datetime import date, datetime, time, timedelta
+from datetime import date, datetime, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from app.core.config import settings
 from app.core.db import async_session_factory
 from app.core.security import generate_password, hash_password
-from app.core.semesters import semester_range
+from app.core.semesters import semester_bounds
 from app.models import (
     Activity,
     ActivityBudgetItem,
@@ -56,13 +56,8 @@ SCOPE_SEMESTERS = ("114-1", "115-1")
 
 
 def _scope_bounds() -> tuple[datetime, datetime]:
-    """遷移範圍的 timestamptz 半開區間 [start, end),以台北時區日界計。"""
-    start = semester_range(SCOPE_SEMESTERS[0])[0]
-    end = semester_range(SCOPE_SEMESTERS[1])[1] + timedelta(days=1)
-    return (
-        datetime(start.year, start.month, start.day, tzinfo=TAIPEI),
-        datetime(end.year, end.month, end.day, tzinfo=TAIPEI),
-    )
+    """遷移範圍的 timestamptz 半開區間 [start, end);日界推導只有 semesters.py 一份。"""
+    return semester_bounds(SCOPE_SEMESTERS[0])[0], semester_bounds(SCOPE_SEMESTERS[1])[1]
 
 # ---------------------------------------------------------------------------
 # 對映規則

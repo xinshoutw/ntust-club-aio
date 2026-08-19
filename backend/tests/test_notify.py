@@ -223,7 +223,7 @@ async def test_broadcast_fans_out_instead_of_going_one_by_one(monkeypatch):
     hooks = [f"https://discord.test/{i}" for i in range(20)]
     await notify.announcement_broadcast("維護公告", "內文", "2026/08/20", [], hooks)
 
-    # 20 社,一個都不能少(公告不再推 .env 的 infra 頻道)
+    # 20 社,一個都不能少(公告不再推 .env 的系統頻道)
     assert len(posted) == 20
     assert settings.discord_webhook_url not in posted
     assert notify._BROADCAST_CONCURRENCY >= 2, "並發上限設成 1 就退回逐筆序列了"

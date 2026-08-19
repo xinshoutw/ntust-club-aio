@@ -31,7 +31,7 @@
 - 核准臨時場地時以 `pg_advisory_xact_lock` 鎖場地,檢查同場地同日**已核准**借用的節次重疊(`SLOT_TAKEN`)與不開放規則(`SLOT_BLOCKED`)。臨時與固定搶同一間場地,兩端共用 `venue` 命名空間的鎖並互相交叉檢核
 - **器材可借數不足仍可核准**(decisions.md DEC-04):屬管理員裁量,只以紅字警示,不硬擋
 - 核准/退回都寫 `approval_records`(stage=`single`)與 `audit_logs`,並推 Discord
-- 行政手動借用(`club_id` 為 NULL)在列表顯示「學務處」,不推通知
+- 行政手動借用(`club_id` 為 NULL)在列表顯示「學務處」;沒有社團可推,建立與撤銷改推系統 webhook(K4 / K4b)
 
 ## 未完成 / 問題
 

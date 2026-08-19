@@ -29,13 +29,13 @@ class Spy:
 
     def __init__(self, monkeypatch):
         self.club: list[tuple] = []
-        self.global_only: list[tuple] = []
+        self.system_only: list[tuple] = []
 
         async def club_event(kind, title, description="", club_webhook=None):
             self.club.append((kind, title, description))
 
         async def discord(kind, title, description=""):
-            self.global_only.append((kind, title, description))
+            self.system_only.append((kind, title, description))
 
         monkeypatch.setattr(notify, "club_event", club_event)
         monkeypatch.setattr(notify, "discord", discord)
@@ -44,7 +44,7 @@ class Spy:
         return [t for _, t, _ in self.club]
 
     def global_titles(self) -> list[str]:
-        return [t for _, t, _ in self.global_only]
+        return [t for _, t, _ in self.system_only]
 
 
 async def test_k1_room_booking_self_cancel(client, db, monkeypatch):
@@ -125,7 +125,7 @@ async def test_k3_equipment_loan_self_cancel(client, db, monkeypatch):
 
 
 async def test_k4_manual_booking_notifies_the_office_only(client, db, monkeypatch):
-    """手動借用沒有社團可推,只推全域;而它直接就是已核准,場況圖會憑空多一格。"""
+    """手動借用沒有社團可推,只推系統 webhook;而它直接就是已核准,場況圖會憑空多一格。"""
     spy = Spy(monkeypatch)
     await make_user(db, username="manual", role="admin", permissions=["amanual", "abooking"])
     await login(client, "manual")
@@ -145,11 +145,11 @@ async def test_k4_manual_booking_notifies_the_office_only(client, db, monkeypatc
     )
     assert resp.status_code == 201, resp.text
     assert spy.global_titles() == ["行政手動借用建立"]
-    assert "精誠廣場" in spy.global_only[0][2]
+    assert "精誠廣場" in spy.system_only[0][2]
     assert spy.club == []
 
     # 器材那一半走另一支端點,一樣要推
-    spy.global_only.clear()
+    spy.system_only.clear()
     eq = await make_equipment(db, total_qty=5)
     loan = await client.post(
         "/api/v1/admin/bookings/manual-equipment",
@@ -165,10 +165,10 @@ async def test_k4_manual_booking_notifies_the_office_only(client, db, monkeypatc
     )
     assert loan.status_code == 201, loan.text
     assert spy.global_titles() == ["行政手動借用建立"]
-    assert "帳篷 ×2" in spy.global_only[0][2]
+    assert "帳篷 ×2" in spy.system_only[0][2]
 
     # 撤銷手動借用同樣要推:場況圖少一格而頻道一片安靜的話,K4 的理由反向就不成立
-    spy.global_only.clear()
+    spy.system_only.clear()
     booking_id = resp.json()["data"]["id"]
     revoked = await client.post(
         f"/api/v1/admin/venue-bookings/{booking_id}/revoke",
@@ -256,7 +256,7 @@ async def test_backfilled_registration_tells_the_club(client, db, monkeypatch):
 
 
 async def test_k6_k7_k8_announcement_takeover_and_delete(client, db, monkeypatch):
-    """蓋板會擋住每個社團的畫面,開關與刪除都只推全域。"""
+    """蓋板會擋住每個社團的畫面,開關與刪除都只推系統 webhook。"""
     spy = Spy(monkeypatch)
     await make_user(db, username="announcer", role="admin", permissions=["aannounce"])
     await login(client, "announcer")
@@ -267,7 +267,7 @@ async def test_k6_k7_k8_announcement_takeover_and_delete(client, db, monkeypatch
     )
     assert created.status_code == 201, created.text
     announcement_id = created.json()["data"]["id"]
-    spy.global_only.clear()
+    spy.system_only.clear()
 
     future = (date.today() + timedelta(days=30)).isoformat()
     on = await client.patch(
@@ -279,7 +279,7 @@ async def test_k6_k7_k8_announcement_takeover_and_delete(client, db, monkeypatch
     assert spy.global_titles() == ["公告已設為蓋板"]
 
     # 同值再送一次不重複推:切換才是事件
-    spy.global_only.clear()
+    spy.system_only.clear()
     await client.patch(
         f"/api/v1/admin/announcements/{announcement_id}",
         json={"takeover_until": future},
@@ -294,12 +294,12 @@ async def test_k6_k7_k8_announcement_takeover_and_delete(client, db, monkeypatch
     )
     assert spy.global_titles() == ["公告已取消蓋板"]
 
-    spy.global_only.clear()
+    spy.system_only.clear()
     gone = await client.delete(
         f"/api/v1/admin/announcements/{announcement_id}", headers=csrf_headers(client)
     )
     assert gone.status_code == 200
-    assert spy.global_only == [("alert", "公告已刪除", "暑期系統維護公告")]
+    assert spy.system_only == [("alert", "公告已刪除", "暑期系統維護公告")]
     assert await db.scalar(sa.select(sa.func.count()).select_from(Announcement)) == 0
 
 
@@ -417,9 +417,9 @@ async def test_deleting_a_session_says_how_much_attendance_went_with_it(client, 
         json={"club_id": club.id, "attended": True, "session_id": session_id},
         headers=csrf_headers(client),
     )
-    spy.global_only.clear()
+    spy.system_only.clear()
 
     gone = await client.delete(f"{base}/{session_id}", headers=csrf_headers(client))
     assert gone.status_code == 200, gone.text
     assert spy.global_titles() == ["報名場次已刪除"]
-    assert "1 筆簽到" in spy.global_only[0][2]
+    assert "1 筆簽到" in spy.system_only[0][2]

@@ -28,13 +28,14 @@ DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— �
 | 備份排程 | 腳本已就緒(`scripts/backup_db.sh`),**cron 還沒掛上** |
 | 器材主檔 | 由 `migration/cc_import.py` 從舊 `Device` 表帶入,正式流程必須 seed 之後跑過遷移 |
 | 政府行事曆假日 | 匯入腳本已就緒(`scripts/import_holidays.py`),**上線年度還沒跑** |
-| `.env` 正式值 | `MAIL_FROM_ADDRESS` 是個人信箱要換;Uptime Kuma 三個變數待填 |
+| `.env` 正式值 | `MAIL_FROM_ADDRESS` 是個人信箱要換;Uptime Kuma 兩支 push URL 待填 |
 
 ### 三、其餘單獨排程
 
 | 項目 | 內容 |
 |---|---|
 | ISS-90 | 併發、權限矩陣、時區邊界測試。**前端元件測試環境已建**(jsdom + `@testing-library/react`),可直接動工 |
+| MIG-09 | 遷移腳本的三學期過濾尚未實作 —— **上線當天要用的就是這兩支**,見 `DEPLOY_CHECKLIST.md` C 段 |
 | ISS-67 / GAP-18 鈴鐺 | 行政/工讀生/評審端的通知鈴鐺永遠是空的(Discord 事件已補齊,缺的是站內鈴鐺) |
 | GAP-14 / GAP-16 / GAP-17 | 統計與匯出、社團導覽首頁、公開頁 |
 | GAP-15 | 待審申請彙整頁(報修/借用/活動的待審件併看) |
@@ -46,9 +47,9 @@ DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— �
 | 項目 | 內容 |
 |---|---|
 | **待審筆數徽章** | `GET /badges` 一支端點回該角色所有頁面的待辦數(鍵=前端 nav item key),四端側欄與行政總覽六張卡共用同一份。只有「有時效性或在等使用者下一步」的頁面給數字;行政端依權限鍵過濾 —— 徽章也是資料量 |
-| **Discord 分流** | 社團事件與公告只推各社團自設的 webhook;`.env` 的 `DISCORD_WEBHOOK_URL` 專供 infra 告警(磁碟水位) |
+| **Discord 分流** | 社團事件與公告只推各社團自設的 webhook;`.env` 的 `DISCORD_WEBHOOK_URL` 收無社團可推的系統事件(行政手動借用、公告蓋板與刪除、報名場次刪除)與 infra 告警 |
 | **Uptime Kuma 心跳** | 後端 lifespan 每 30 秒推一次(cron 到不了這個粒度):backend 以 `SELECT 1` 的來回當 ping,frontend 由後端探測 web 容器成功才推 up。只在 `ENV=prod` 送出 |
-| **MIG-08** | 遷移範圍限 114-1 / 114-2 / 115-1 三學期,社員名單全遷;media 與舊評鑑檔案庫不遷。腳本尚未實作學期過濾(MIG-09),邊界待決(MIG-10) |
+| **MIG-08** | 遷移範圍限 114-1 / 114-2 / 115-1 三學期,社員名單全遷;media 與舊評鑑檔案庫不遷 |
 
 ## 前一批已完成(文件對齊)
 

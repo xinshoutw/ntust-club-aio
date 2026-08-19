@@ -6,7 +6,7 @@
 
 | 路徑 | 設定位置 | 收什麼 |
 |------|----------|--------|
-| 社團 webhook | `clubs.discord_webhook_url`(社團於管理項目自設) | 本清冊的全部事件與公告;沒設就不推 |
+| 社團 webhook | `clubs.discord_webhook_url`(社團於管理項目自設) | 未註明目的地的事件與公告;沒設就不推 |
 | 系統 webhook | `.env` `DISCORD_WEBHOOK_URL` | 不屬於任何社團的系統事件(行政手動借用、公告蓋板與刪除、報名場次刪除)與 infra 告警(磁碟水位)(空值=停用並僅記 log) |
 
 路由函式:`club_event()` 推該社團自設的 webhook,一般事件全走這條;`announcement_broadcast()` 為公告專用,逐一推目標社團並寄 Email;`discord()` 是系統事件那一條(無社團可推者一律走它)。

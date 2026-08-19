@@ -18,13 +18,13 @@
 - [ ] 阻擋 `SECRET_KEY` = `openssl rand -base64 48`
 - [ ] 阻擋 `POSTGRES_PASSWORD` = 強密碼(compose 以同一個變數插值到 db 與 backend)
 - [ ] 阻擋 `FORWARDED_ALLOW_IPS` = `172.28.0.0/24` + edge VM 內網 IP。**絕不可用 `*`**,否則登入限流可被繞過、稽核 IP 可被投毒。值需與內層 web nginx 的 `set_real_ip_from` 一起核對
-- [ ] 應辦 `DISCORD_WEBHOOK_URL`:已是正式頻道。收 不屬於任何社團的系統事件(行政手動借用、公告蓋板與刪除、報名場次刪除)與 infra 告警(磁碟水位);**絕不入版控**
+- [ ] 應辦 `DISCORD_WEBHOOK_URL`:已是正式頻道。收不屬於任何社團的系統事件(行政手動借用、公告蓋板與刪除、報名場次刪除)與 infra 告警(磁碟水位);**絕不入版控**
 - [ ] 阻擋 `SMTP_*`:校方 relay 已實測可寄(`mail.ntust.edu.tw:465`、`SMTP_SECURITY=ssl`)。
   host / username / password 任一為空即降級 log-only(不報錯,但信不會寄出)。
   **`MAIL_FROM_ADDRESS` 需與認證帳號同網域**,否則 relay 會拒收
 - [ ] 應辦 `BACKEND_IMAGE` / `WEB_IMAGE` = GHCR 映像路徑。CI 對 main 的每次 push 同時打 `latest` 與 commit sha 兩個 tag:**正式環境釘 sha**,要回滾就換成上一版的 sha,不必等重新建置
 - [ ] 應辦 `WEB_PORT`(預設 8080)—— edge upstream 要帶埠號
-- [ ] 應辦 `UPTIME_PUSH_BACKEND_URL` / `UPTIME_PUSH_FRONTEND_URL` / `WEB_HEALTH_URL`(見 D)
+- [ ] 應辦 `UPTIME_PUSH_BACKEND_URL` / `UPTIME_PUSH_FRONTEND_URL`(見 D;`WEB_HEALTH_URL` 有可用預設)
 
 ## C. 資料準備
 
@@ -34,6 +34,7 @@
 - [ ] 應辦 **社團聯絡 Email**:遷入後 159 社全為空,公告的 Email 通知會寄給 0 個收件人。跑 `migration/set_contact_emails.py`(取最新學期負責人學號 + `@mail.ntust.edu.tw`,decisions.md MIG-05),但**只解得掉約三分之一** —— 59 社位址應可用、68 社名單停在 113-2 以前(學號信箱多半已停用)、32 社沒有負責人。後兩組由腳本分組輸出,要人工補
 - [ ] 待決 **社團性質清單**:D-10 定為維持寫死(自治性/學藝性…),上線前核對現行清單與承辦認定一致 —— 公告分眾與統計都依它
 - [ ] 待決 **場地主檔**:已 seed 19 處含容納人數,上線前確認與現況相符
+- [ ] **阻擋** **舊資料遷移的學期範圍**:MIG-08 定為 114-1 / 114-2 / 115-1(社員名單全遷),但兩支腳本尚未實作過濾(gaps.md MIG-09)—— 照現況跑會把全史匯進正式庫,`legacy_id_map` 建完再收斂代價極高
 - [ ] 待決 **舊資料遷移**:`migration/cms_import.py`(社團/帳號/成員/活動/公告)與 `cc_import.py`(教室與器材借用)已可執行且 idempotent;上線前以正式 dump 再演練一次,確認筆數與 `legacy_id_map`
 - [ ] `reset_db.py` 建立 superadmin 並印出一次性密碼(首登強制改密)
 

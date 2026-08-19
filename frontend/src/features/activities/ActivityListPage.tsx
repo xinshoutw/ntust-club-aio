@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { countText } from '../../lib/counts'
-import { useNavigate } from 'react-router'
+import { useNavigate, useSearchParams } from 'react-router'
 import { App, Button, Dropdown, Modal, Popconfirm, Select, Tooltip } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { DownloadOutlined, EllipsisOutlined, FileTextOutlined, LinkOutlined } from '@ant-design/icons'
@@ -340,7 +340,11 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
 export default function ActivityListPage() {
   const navigate = useNavigate()
   const { message } = App.useApp()
-  const [semesterSel, setSemesterSel] = useState<string | null>(null)
+  // 總覽的活動列連到 ?semester=&open=:總覽的活動多半不在預設(最新)學期,
+  // 不把學期一起帶過來的話落地就是一片空白
+  const [searchParams, setSearchParams] = useSearchParams()
+  const openParam = Number(searchParams.get('open')) || null
+  const [semesterSel, setSemesterSel] = useState<string | null>(searchParams.get('semester'))
   const [page, setPage] = useState(1)
   const { entries, toggle } = useMultiSort<SortKey>([{ key: 'date', dir: -1 }])
   const [typeFilter, setTypeFilter] = useState<string[]>([])
@@ -382,6 +386,21 @@ export default function ActivityListPage() {
     [draftsQuery.data],
   )
   const detailQuery = useActivityDetail(preview?.id)
+  // 深連結:詳情本身就是完整的 ClubActivity,不必等它出現在當頁列表
+  // (它可能落在第 3 頁,或被目前的狀態/類型篩選擋掉)
+  const linkedQuery = useActivityDetail(openParam ?? undefined)
+  const linked = linkedQuery.data
+  useEffect(() => {
+    if (!linked) return
+    setPreview(linked)
+    setPreviewOpen(true)
+    // 用掉就從網址移除:重新整理或返回時不該又跳出同一個彈窗
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev)
+      next.delete('open')
+      return next
+    }, { replace: true })
+  }, [linked, setSearchParams])
   const { submit, remove } = useActivityMutations()
 
   const paged = listQuery.data?.rows ?? []

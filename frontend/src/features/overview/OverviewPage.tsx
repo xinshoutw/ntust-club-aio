@@ -51,7 +51,9 @@ function EmptyRow({ text }: { text: string }) {
   )
 }
 
-// 三張卡都可能長到上百列(遷移進來的舊件尤其多),一頁 10 列
+// 三張卡都可能長到上百列(遷移進來的舊件尤其多)。待辦每列較高(整句敘述 + 動作鈕),
+// 一頁 8 列才與右下兩張卡等高
+const TODO_PAGE_SIZE = 8
 const CARD_PAGE_SIZE = 10
 
 export default function OverviewPage() {
@@ -77,7 +79,7 @@ export default function OverviewPage() {
 
   const activitiesQuery = useOverviewActivities()
   const todos = activitiesQuery.data?.todos ?? []
-  const pagedTodos = todos.slice((todoPage - 1) * CARD_PAGE_SIZE, todoPage * CARD_PAGE_SIZE)
+  const pagedTodos = todos.slice((todoPage - 1) * TODO_PAGE_SIZE, todoPage * TODO_PAGE_SIZE)
 
   // 線上申請近況:與各申請頁共用查詢(近 5 筆)
   const maintenanceQuery = useMaintenanceList()
@@ -224,8 +226,8 @@ export default function OverviewPage() {
             </div>
           )}
           {!activitiesQuery.isError && todos.length === 0 && <EmptyRow text="無待辦事項" />}
-          {todos.length > CARD_PAGE_SIZE && (
-            <Pager page={todoPage} pageSize={CARD_PAGE_SIZE} total={todos.length} onChange={setTodoPage} />
+          {todos.length > TODO_PAGE_SIZE && (
+            <Pager page={todoPage} pageSize={TODO_PAGE_SIZE} total={todos.length} onChange={setTodoPage} />
           )}
           </LoadingBlock>
         </div>

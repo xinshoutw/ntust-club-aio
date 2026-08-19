@@ -71,7 +71,7 @@ export default function OverduePage() {
         title="逾期追蹤與停權"
         extra={
           <Button danger onClick={() => setSuspendOpen(true)}>
-            停權社團…
+            停權社團
           </Button>
         }
       />
@@ -232,7 +232,7 @@ export default function OverduePage() {
               disabledDate={(d) => d.isBefore(dayjs(), 'day')}
             />
           </Form.Item>
-          <Form.Item name="reason" label="原因(必填,通知社團)" rules={[{ required: true, message: '停權原因為必填' }]}>
+          <Form.Item name="reason" label="原因" rules={[{ required: true, message: '停權原因為必填' }]}>
             <Input.TextArea rows={2} />
           </Form.Item>
         </Form>

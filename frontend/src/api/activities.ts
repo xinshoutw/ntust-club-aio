@@ -8,6 +8,7 @@ import { useInvalidateBadges } from './badges'
 import { fetchAllPages } from './fetchAll'
 import type { StatusKey } from '../lib/status'
 import { fileTypeOf, type EvalFile, type EvalFileType } from '../features/eval/types'
+import { staffTextToWorks } from '../features/activities/types'
 import type { ActivityReport, BudgetItem, Reflection, WorkItem } from '../features/activities/types'
 
 export type ActivityType = '社課或會議' | '活動'
@@ -148,15 +149,6 @@ const hm = (t: string): string => t.slice(0, 5) // 'HH:MM:SS' → 'HH:MM'
 const worksToStaffText = (works: WorkItem[]): string =>
   works.map((w) => `${w.task}:${w.owner}`).join('\n')
 
-const staffTextToWorks = (text: string): WorkItem[] =>
-  text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const i = line.lastIndexOf(':')
-      return i >= 0 ? { task: line.slice(0, i), owner: line.slice(i + 1) } : { task: line, owner: '' }
-    })
 
 // 逾期鎖定為推導狀態:已核准且 close_locked 時以前端顯示鍵 'locked' 呈現
 const toStatusKey = (o: ActivityOut): StatusKey =>

@@ -5,6 +5,7 @@ import dayjs from 'dayjs'
 import { api, apiPaged, qs } from './client'
 import { useInvalidateBadges } from './badges'
 import { fetchAllPages } from './fetchAll'
+import { staffTextToWorks, type WorkItem } from '../features/activities/types'
 import { fileUrl } from './activities'
 import type { SessionUser } from './auth'
 import type { StatusKey } from '../lib/status'
@@ -31,6 +32,8 @@ export interface ReviewItem {
     participantsOut?: number
     submittedAt?: string
     submittedBy?: string
+    content?: string
+    works?: WorkItem[]
     attachments: string[]
     attachmentFiles?: { id: string; name: string; url: string }[]
     budget: { id: number; category: string; description: string; selfFund: number; requested: number; approved: number }[]
@@ -146,6 +149,7 @@ interface AdminActivityOut {
   end_time: string | null
   location: string
   content: string
+  staff_text: string
   participants_in: number
   participants_out: number
   fund_source: string | null
@@ -238,6 +242,8 @@ const toAdminDetail = (o: AdminActivityDetailOut): AdminActivityDetail => ({
     location: o.location,
     participantsIn: o.participants_in,
     participantsOut: o.participants_out,
+    content: o.content,
+    works: staffTextToWorks(o.staff_text),
     submittedAt: slashDateTime(o.created_at),
     attachments: o.attachments.map((f) => f.original_name),
     attachmentFiles: o.attachments.map(toFileRef),

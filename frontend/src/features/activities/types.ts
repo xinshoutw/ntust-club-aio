@@ -10,6 +10,18 @@ export interface BudgetItem {
   approvedSubsidy?: number | null
 }
 
+/** staff_text → 工作分配。後端只存文字,格式是前端約定的「每行 項目:負責人」;
+ *  舊系統的項目常是「職稱:工作內容」的長句,故只切**最後**一個半形冒號。 */
+export const staffTextToWorks = (text: string): WorkItem[] =>
+  text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const i = line.lastIndexOf(':')
+      return i >= 0 ? { task: line.slice(0, i), owner: line.slice(i + 1) } : { task: line, owner: '' }
+    })
+
 export interface WorkItem {
   task: string
   owner: string

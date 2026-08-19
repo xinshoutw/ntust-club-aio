@@ -6,7 +6,7 @@ import LargeBadge from '../../components/ui/LargeBadge'
 import { Cols } from '../../components/ui/tableControls'
 import StampTrail, { type StampStage } from '../../components/ui/StampTrail'
 import { useModalAutoFocus } from '../../components/ui/useModalAutoFocus'
-import { fmtMoney } from '../activities/types'
+import WorkTable from '../activities/WorkTable'
 import { useAuth } from '../../app/auth'
 import { canActOn, stageOfStatus, type ReviewItem } from '../../api/adminActivities'
 
@@ -132,6 +132,7 @@ export default function ActivityReviewModal({
   // 經費來源/逐項核定/大型認可僅第一關(承辦人)可編輯;組長/學務長關唯讀核准
   const isFirstStage = item?.status === 'pending_advisor'
   const canEdit = canReview && isFirstStage
+  const selfFundTotal = d?.budget.reduce((s, b) => s + b.selfFund, 0) ?? 0
   const requestedTotal = d?.budget.reduce((s, b) => s + b.requested, 0) ?? item?.requested ?? 0
   const approvedTotal = d?.budget.reduce((s, b) => s + (approvals[b.id] ?? 0), 0) ?? 0
   const singleStage = requestedTotal === 0 // 無補助 → 承辦人單關即核准
@@ -290,6 +291,18 @@ export default function ActivityReviewModal({
               <span className="num">{d?.submittedAt ?? '—'}</span>
               {d?.submittedBy ? ` · ${d.submittedBy}` : ''}
             </div>
+            {d?.content && (
+              <>
+                <div style={detailLabel}>內容</div>
+                <div style={{ lineHeight: 1.7 }}>{d.content}</div>
+              </>
+            )}
+            {!!d?.works?.length && (
+              <>
+                <div style={detailLabel}>工作分配</div>
+                <WorkTable works={d.works} />
+              </>
+            )}
             <div style={detailLabel}>附件</div>
             <div>
               {files?.length
@@ -321,7 +334,7 @@ export default function ActivityReviewModal({
                 disabled={!canEdit}
                 onChange={(e) => setLargeApproved(e.target.checked)}
               >
-                認可為大型活動(評鑑行政分 ×3 加權)
+                認可為大型活動
               </Checkbox>
               {item.isLarge && (
                 <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>社團已申請認定為大型活動</div>
@@ -333,10 +346,7 @@ export default function ActivityReviewModal({
         {hasBudget && (
           <div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>經費明細 — 逐項核定</div>
-              <div style={{ fontSize: 12, color: 'var(--steel)' }}>
-                {canEdit ? '核定金額由本關填寫' : '核定金額(唯讀)'}
-              </div>
+              <div style={{ fontSize: 14, fontWeight: 600 }}>經費明細</div>
             </div>
             {/* 經費來源:有申請補助時第一關必填認定 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 13 }}>
@@ -346,15 +356,16 @@ export default function ActivityReviewModal({
                   size="small"
                   value={fundSource}
                   onChange={(e) => setFundSource(e.target.value)}
-                  placeholder="例:課指組補助、學生會費"
+                  placeholder="xxx補助"
                 />
               ) : (
                 <span>{item.fundSource || '—'}</span>
               )}
             </div>
             <table className="tb dense fixed">
-              {/* 摘要吃剩餘寬(說明允許換行);金額欄固定 px */}
-              <Cols widths={['auto', 90, 90, 96]} />
+              {/* table-layout: fixed 要有明確寬度。金額上限 999,999(13px tabular 約 52px),
+                  自籌/擬請給 72、核定 88(內含 InputNumber),其餘全給摘要 —— 遷移資料的說明很長 */}
+              <Cols widths={['auto', 72, 72, 88]} />
               <thead>
                 <tr>
                   <th scope="col" style={{ paddingLeft: 0 }}>摘要</th>
@@ -391,13 +402,20 @@ export default function ActivityReviewModal({
                   </tr>
                 ))}
               </tbody>
+              {/* 合計落在各自欄位正下方 —— 併格的話「核定合計」會壓在擬請欄上,對不回欄名 */}
               <tfoot>
                 <tr>
-                  <td colSpan={2} style={{ borderBottom: 'none', padding: '10px 8px 0 0', fontSize: 12, color: 'var(--steel)', textAlign: 'right' }}>
-                    擬請合計 <span className="num" style={{ fontSize: 13, color: 'var(--ink)' }}>{fmtMoney(requestedTotal)}</span>
+                  <th scope="row" style={{ borderBottom: 'none', padding: '10px 8px 0 0', fontSize: 12, fontWeight: 400, color: 'var(--steel)', textAlign: 'right' }}>
+                    合計
+                  </th>
+                  <td className="r num" style={{ borderBottom: 'none', padding: '10px 8px 0 0' }}>
+                    {selfFundTotal.toLocaleString()}
                   </td>
-                  <td colSpan={2} style={{ borderBottom: 'none', padding: '10px 0 0', textAlign: 'right', fontSize: 12, color: 'var(--steel)' }}>
-                    核定合計 <span className="num" style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{fmtMoney(approvedTotal)}</span>
+                  <td className="r num" style={{ borderBottom: 'none', padding: '10px 8px 0 0' }}>
+                    {requestedTotal.toLocaleString()}
+                  </td>
+                  <td className="r num" style={{ borderBottom: 'none', padding: '10px 0 0', fontWeight: 600 }}>
+                    {approvedTotal.toLocaleString()}
                   </td>
                 </tr>
               </tfoot>

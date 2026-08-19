@@ -27,7 +27,8 @@ import {
   type ClubActivity,
   type ClubActivityDetail,
 } from '../../api/activities'
-import { fmtMoney, taskAlignEm } from './types'
+import { fmtMoney } from './types'
+import WorkTable from './WorkTable'
 import { TIME_RANGE_SEP, dateRangeText } from './utils'
 
 // 排序鍵=後端 /club/activities 白名單(budget=自籌+擬請補助合計;同值的 id 降冪
@@ -123,7 +124,6 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
   const timeChanged = !!rep && normTime(actualTime) !== normTime(a.timeRange ?? '')
   const locationChanged = !!rep && rep.actualLocation !== a.location
   const plannedCountsText = `社員 ${a.participantsIn} · 非社員 ${a.participantsOut}`
-  const workAlign = taskAlignEm(a.works.map((w) => w.task))
   const countChanged = !!rep && (rep.memberCount !== a.participantsIn || rep.nonMemberCount !== a.participantsOut)
 
   const downloadItems = [
@@ -217,25 +217,7 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
             {a.works.length > 0 && (
               <>
                 <div style={{ color: 'var(--steel)' }}>工作分配</div>
-                <div>
-                  {a.works.map((w, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        display: 'flex',
-                        gap: 16,
-                        padding: '4px 0',
-                        borderTop: i ? '1px solid var(--line)' : undefined,
-                        lineHeight: 1.6,
-                      }}
-                    >
-                      {/* 舊系統的項目常是「職稱:工作內容」,原樣留在同一格 —— 拆開會猜錯。
-                          minWidth 讓短項目補齊到對齊寬度,超出的項目自己撐開(見 taskAlignEm) */}
-                      <span style={{ color: 'var(--steel)', minWidth: `${workAlign}em` }}>{w.task || '—'}</span>
-                      <span style={{ flex: 1 }}>{w.owner || '—'}</span>
-                    </div>
-                  ))}
-                </div>
+                <WorkTable works={a.works} />
               </>
             )}
             {attachments.length > 0 && (

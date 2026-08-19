@@ -231,8 +231,9 @@ function CloseForm({
 
   // 照片一律於送出結案時才上傳,不進草稿,在此之前僅暫存於前端。
   // 頁內去重以 SHA-256、加總容量上限皆於選檔時檢核;跨活動重複由後端 sha256 於送出時拒絕。
-  // APPROVED 狀態下 detail.photos 只會是「前次送出失敗殘留」的孤兒照片:
-  // 顯示為可移除的既有照片(佔加總與張數),使用者才能回收額度、避免重選同張被去重卡死
+  // APPROVED 狀態下 detail.photos 有兩種來源:結案送出後被退回(admin close-reject 不刪照片,
+  // 這是常態路徑),或送出失敗而回滾沒刪乾淨。兩者對使用者是同一件事 —— 這張已經在伺服器上、
+  // 佔加總與張數、按 × 就刪掉,所以畫面不分辨、也不多寫一句(分辨了也不影響他要做的決定)
   const [existing, setExisting] = useState<EvalFile[]>(() => detail.photos)
   const existingRef = useRef(existing)
   existingRef.current = existing
@@ -304,7 +305,7 @@ function CloseForm({
     commitPhotos(photosRef.current.filter((p) => p.key !== key))
   }
 
-  // 既有照片=前次送出失敗的殘留,移除即後端刪檔(回收加總額度)
+  // 移除既有照片=後端刪檔(回收加總額度),不是只從畫面拿掉
   const removeExisting = async (f: EvalFile) => {
     try {
       await deleteActivityPhoto(activity.id, f.id)
@@ -722,7 +723,7 @@ function CloseForm({
             <div>
               <div style={label}>
                 活動照片{requiredMark}
-                <Tooltip title={`至少 1 張即可送出;達 ${MIN_PHOTOS} 張或附影片連結,評鑑「照片 / 影片」項才計分`}>
+                <Tooltip title={`至少 ${MIN_PHOTOS} 張照片或附影片連結`}>
                   <InfoCircleOutlined style={{ marginLeft: 6, color: 'var(--steel)' }} />
                 </Tooltip>
               </div>
@@ -732,7 +733,7 @@ function CloseForm({
               >
                 {existing.map((f) => (
                   <span key={f.id} style={{ position: 'relative', display: 'inline-flex' }}>
-                    <img src={f.url} alt={f.name} title={`${f.name}(前次送出殘留,已在伺服器)`} style={{ width: 52, height: 40, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--line)' }} />
+                    <img src={f.url} alt={f.name} title={f.name} style={{ width: 52, height: 40, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--line)' }} />
                     <button
                       type="button"
                       className="link-btn danger"
@@ -771,19 +772,15 @@ function CloseForm({
                 </Upload>
                 <span className="num" style={{ fontSize: 12, color: existing.length + photos.length >= MIN_PHOTOS ? '#1F6B45' : 'var(--steel)' }}>
                   {existing.length + photos.length} 張
-                </span>
-              </div>
-              <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 6 }}>
-                送出結案時才上傳,不隨草稿保存。已選{' '}
-                <span className="num">
+                  <span className="num">
                   {fmtMB(existing.reduce((s, f) => s + f.size, 0) + photos.reduce((s, p) => s + p.file.size, 0))}
                 </span>
                 /<span className="num">{Math.round(closePhotoBytes / 1024 / 1024)}</span> MB
-                {existing.length > 0 && (
-                  <>
-                    ；含前次送出未完成殘留的 <span className="num">{existing.length}</span> 張(可移除回收額度)
-                  </>
-                )}
+                </span>
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 6 }}>
+                已選{' '}
+
               </div>
             </div>
             <div className="form-grid-2" style={{ marginTop: 12 }}>

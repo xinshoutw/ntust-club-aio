@@ -6,7 +6,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
-import { fmtMoney } from '../activities/types'
+import { approvedText, fmtMoney } from '../activities/types'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import { useModalAutoFocus } from '../../components/ui/useModalAutoFocus'
 import SectionTitle from '../../components/ui/SectionTitle'
@@ -104,10 +104,13 @@ function CloseReviewModal({
     )
   }
 
-  const approvedBudget = item.approvedTotal ?? 0
+  // 沒申請補助就沒有核定可看(與申請審核彈窗同一條界線);有申請卻還沒核定時 approvedTotal
+  // 是 null —— `?? 0` 會把「還沒核定」說成「核定 0 元」,連帶讓超支判定幾乎必然成立
+  const hasSubsidy = item.requested > 0
+  const approvedKnown = !hasSubsidy || item.approvedTotal != null
   // 實際支出含自籌:與「自籌+核定補助」的總經費比較才可比(僅比核定補助幾乎必超)
-  const totalBudget = item.selfFundTotal + approvedBudget
-  const overBudget = !!report && report.expense > totalBudget
+  const totalBudget = item.selfFundTotal + (item.approvedTotal ?? 0)
+  const overBudget = !!report && approvedKnown && report.expense > totalBudget
   const photoShort = !!detail && photos.length < 5 && !report?.videoUrl
   const dateRange = item.endDate !== item.date ? `${item.date} – ${item.endDate}` : item.date
 
@@ -178,8 +181,12 @@ function CloseReviewModal({
             <div style={detailLabel}>送件</div><div className="num">{report.submittedAt}</div>
             <div style={detailLabel}>經費</div>
             <div>
-              核定補助 <span className="num">{fmtMoney(approvedBudget)}</span> · 自籌{' '}
-              <span className="num">{fmtMoney(item.selfFundTotal)}</span> · 實支{' '}
+              {hasSubsidy && (
+                <>
+                  核定補助 <span className="num">{approvedText(item.approvedTotal, fmtMoney)}</span> ·{' '}
+                </>
+              )}
+              自籌 <span className="num">{fmtMoney(item.selfFundTotal)}</span> · 實支{' '}
               <span className="num" style={overBudget ? { color: '#C13B34', fontWeight: 500 } : undefined}>
                 {fmtMoney(report.expense)}
               </span>
@@ -257,7 +264,7 @@ function CloseReviewModal({
           {/* 繳交確認:未勾選之項目評鑑以 0 分計 */}
           {canReview && (
             <div style={{ marginTop: 16, padding: '12px 14px', background: 'var(--paper)', borderRadius: 6 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>繳交確認(未確認項目評鑑以 0 分計)</div>
+              <SectionTitle first>繳交確認</SectionTitle>
               <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
                 {SUBMISSION_CHECKS.map((c) => (
                   <Checkbox

@@ -28,7 +28,7 @@ import {
   type ClubActivity,
   type ClubActivityDetail,
 } from '../../api/activities'
-import { fmtMoney } from './types'
+import { approvedText, fmtMoney } from './types'
 import WorkTable from './WorkTable'
 import { TIME_RANGE_SEP, dateRangeText } from './utils'
 
@@ -53,13 +53,11 @@ const STATUS_LABELS = [...new Set(LISTED_STATUSES.map((s) => STATUS[s].label))]
 
 // 經費:欄寬一律由內容決定(max-content),明細列與合計以 subgrid 共用同一組軌道 ——
 // 各自開一個 grid 的話兩邊會各自算寬度,數字就對不齊了
-const BUDGET_GRID: React.CSSProperties = {
+const budgetGrid = (withApproved: boolean): React.CSSProperties => ({
   display: 'grid',
-  gridTemplateColumns: 'max-content 1fr max-content max-content max-content',
+  gridTemplateColumns: `max-content 1fr max-content max-content${withApproved ? ' max-content' : ''}`,
   columnGap: 16,
-}
-// 核定金額:null=承辦人還沒核定(不是核了 0 元),兩者對社團是兩件事
-const approvedText = (n: number | null | undefined): string => (n == null ? '—' : n.toLocaleString())
+})
 const BUDGET_ROW: React.CSSProperties = { display: 'grid', gridTemplateColumns: 'subgrid', gridColumn: '1 / -1' }
 
 function money(a: ClubActivity): string {
@@ -119,6 +117,8 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
   const timeChanged = !!rep && normTime(actualTime) !== normTime(a.timeRange ?? '')
   const locationChanged = !!rep && rep.actualLocation !== a.location
   const plannedCountsText = `社員 ${a.participantsIn} · 非社員 ${a.participantsOut}`
+  // 一毛都沒申請就沒有核定可看(與行政端審核彈窗同一條界線),整欄收掉而不是列一排 —
+  const hasSubsidy = a.requestedTotal > 0
   const countChanged = !!rep && (rep.memberCount !== a.participantsIn || rep.nonMemberCount !== a.participantsOut)
 
   const downloadItems = [
@@ -227,7 +227,7 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
             )}
           </div>
 
-          <div style={{ ...BUDGET_GRID, margin: '22px 0 0' }}>
+          <div style={{ ...budgetGrid(hasSubsidy), margin: '22px 0 0' }}>
             {/* 表頭與明細同一組軌道:「自籌 / 擬請」正好落在兩欄數字上方 */}
             <div style={{ ...BUDGET_ROW, fontSize: 13, fontWeight: 600, paddingBottom: 6, borderBottom: '1px solid var(--line)' }}>
               <span>經費</span>
@@ -236,7 +236,9 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
               </span>
               <span style={{ textAlign: 'right', fontWeight: 400, color: 'var(--steel)' }}>自籌</span>
               <span style={{ textAlign: 'right', fontWeight: 400, color: 'var(--steel)' }}>擬請</span>
-              <span style={{ textAlign: 'right', fontWeight: 400, color: 'var(--steel)' }}>核定</span>
+              {hasSubsidy && (
+                <span style={{ textAlign: 'right', fontWeight: 400, color: 'var(--steel)' }}>核定</span>
+              )}
             </div>
             {budget.map((b) => (
               <div key={b.id} style={{ ...BUDGET_ROW, fontSize: 13, padding: '5px 0', borderBottom: '1px solid var(--line)' }}>
@@ -244,7 +246,9 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
                 <span>{b.description}</span>
                 <span className="num" style={{ textAlign: 'right' }}>{b.selfFund.toLocaleString()}</span>
                 <span className="num" style={{ textAlign: 'right' }}>{b.requestedSubsidy.toLocaleString()}</span>
-                <span className="num" style={{ textAlign: 'right' }}>{approvedText(b.approvedSubsidy)}</span>
+                {hasSubsidy && (
+                  <span className="num" style={{ textAlign: 'right' }}>{approvedText(b.approvedSubsidy)}</span>
+                )}
               </div>
             ))}
             {budget.length > 0 && (
@@ -253,7 +257,9 @@ function PreviewModal({ a, detail, loading, error, onRetry, open, onClose, after
                 <span style={{ textAlign: 'right', color: 'var(--steel)' }}>合計</span>
                 <span className="num" style={{ textAlign: 'right', fontWeight: 600 }}>{a.selfFundTotal.toLocaleString()}</span>
                 <span className="num" style={{ textAlign: 'right', fontWeight: 600 }}>{a.requestedTotal.toLocaleString()}</span>
-                <span className="num" style={{ textAlign: 'right', fontWeight: 600 }}>{approvedText(a.approvedTotal)}</span>
+                {hasSubsidy && (
+                  <span className="num" style={{ textAlign: 'right', fontWeight: 600 }}>{approvedText(a.approvedTotal)}</span>
+                )}
               </div>
             )}
           </div>

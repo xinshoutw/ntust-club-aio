@@ -39,9 +39,12 @@ uv run python ../migration/cc_import.py            # 4. 匯入借用
 
 - 一次性密碼輸出到 `migration/out/one_time_passwords_*.csv`(**含明碼,不入版控**,
   交承辦發放後銷毀);所有帳號 `must_change_password=True`
-- 檔案實體(企劃書/活動照片/附件)另需舊機 media 目錄,本輪未匯入(見 TODO)
+- 檔案實體(企劃書/活動照片/附件)**不遷**(decisions.md MIG-08)
 
 ## 範圍與對映(2026-07-21 需求方拍板)
+
+> **遷移範圍限 114-1 / 114-2 / 115-1 三學期,社員名單全遷**(decisions.md MIG-08)。
+> 兩支腳本目前尚未實作學期過濾,見 `docs/gaps.md` MIG-09。
 
 | 舊 | 新 | 說明 |
 |---|---|---|
@@ -54,7 +57,7 @@ uv run python ../migration/cc_import.py            # 4. 匯入借用
 
 **不遷**(dump 留檔備查):club token/session、密碼歷史、Django 內建表、
 稽核 staffactivitylog、審核歷程 auditactivityrecord、行事曆、歷年評鑑期間、
-社團評鑑檔案庫 clubfiles(TODO:待決議)、行政歷史文件 clubrecordfromstaff(TODO)。
+社團評鑑檔案庫 clubfiles(MIG-08 定案不遷)、行政歷史文件 clubrecordfromstaff(待決,見 MIG-10)。
 
 ## clubclass(cc_import.py,2026-07-21)
 
@@ -77,7 +80,5 @@ uv run python ../migration/cc_import.py            # 4. 匯入借用
 
 ## TODO
 
-- [ ] 舊機 media 目錄抓回後匯入檔案實體(PlanFile/activityfiles/activityimages),
-      並回填 files 列 + 活動附件關聯
-- [ ] 評鑑檔案庫(Club_clubfiles,12,752 檔、14 分類)是否歸檔匯入待需求方決議
-- [ ] 行政歷史文件(clubrecordfromstaff,7 筆停社/成立/改名申請)同上
+- [ ] 學期過濾(MIG-08 的三學期範圍)尚未實作:社員、活動、公告與借用目前全量匯入
+- [ ] 行政歷史文件(clubrecordfromstaff,7 筆停社/成立/改名申請)如何處理(MIG-10)

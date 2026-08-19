@@ -46,7 +46,8 @@ class Settings(BaseSettings):
     uptime_push_frontend_url: str = ""
     uptime_push_interval: int = 30  # 秒
     # frontend 沒有自己的程序,由後端打這個位址確認 web 層活著才推 up
-    web_health_url: str = "http://web:8080/"
+    # (compose 內網:容器內 nginx 聽 80,`WEB_PORT` 是宿主機發布埠)
+    web_health_url: str = "http://web/"
 
     smtp_host: str = ""
     smtp_port: int = 587

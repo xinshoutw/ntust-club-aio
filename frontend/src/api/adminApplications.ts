@@ -4,6 +4,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api, apiPaged, qs } from './client'
+import { useInvalidateBadges } from './badges'
 
 export type ApplicationStatus = 'pending' | 'processing' | 'completed'
 
@@ -142,12 +143,16 @@ export const usePendingPostalTotal = () => usePendingTotal('postal')
 
 export function useApplicationStatusMutation() {
   const qc = useQueryClient()
+  const invalidateBadges = useInvalidateBadges()
   return useMutation({
     mutationFn: ({ kind, id, status }: { kind: ApplicationKind; id: number; status: ApplicationStatus }) =>
       api(`${KIND_PATH[kind]}/${id}/status`, {
         method: 'POST',
         body: JSON.stringify({ status }),
       }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.all }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.all })
+      invalidateBadges()
+    },
   })
 }

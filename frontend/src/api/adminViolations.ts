@@ -5,6 +5,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api, apiPaged, qs } from './client'
+import { useInvalidateBadges } from './badges'
 
 export type ViolationStatusKey = 'violation_open' | 'violation_resolved'
 export type ViolationStatus = 'open' | 'resolved'
@@ -139,6 +140,7 @@ export function useViolationOptions() {
 
 export function useResolveViolation() {
   const qc = useQueryClient()
+  const invalidateBadges = useInvalidateBadges()
   return useMutation({
     mutationFn: ({ id, note }: { id: number; note: string }) =>
       api<AdminViolationOut>(`/admin/violations/${id}/resolve`, {
@@ -147,7 +149,8 @@ export function useResolveViolation() {
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.all })
-      void qc.invalidateQueries({ queryKey: ['adminOverview'] }) // 未銷案違規數字卡
+      void qc.invalidateQueries({ queryKey: ['adminOverview'] }) // 本頁標題的未銷案筆數
+      invalidateBadges()
     },
   })
 }

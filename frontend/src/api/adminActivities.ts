@@ -3,6 +3,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api, apiPaged, qs } from './client'
+import { useInvalidateBadges } from './badges'
 import { fetchAllPages } from './fetchAll'
 import { fileUrl } from './activities'
 import type { SessionUser } from './auth'
@@ -376,9 +377,10 @@ export interface ApproveActivityInput {
 
 export function useAdminActivityMutations() {
   const qc = useQueryClient()
+  const invalidateBadges = useInvalidateBadges()
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: keys.all })
-    void qc.invalidateQueries({ queryKey: ['adminOverview'] })
+    invalidateBadges()
   }
   const approve = useMutation({
     mutationFn: ({ id, ...v }: ApproveActivityInput) =>

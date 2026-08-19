@@ -3,6 +3,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api, apiPaged, qs } from './client'
+import { useInvalidateBadges } from './badges'
 import { fileUrl } from './activities'
 import { fileTypeOf, type EvalFile } from '../features/eval/types'
 
@@ -280,6 +281,7 @@ export interface ScoreSaveInput {
 
 export function useSaveScore() {
   const qc = useQueryClient()
+  const invalidateBadges = useInvalidateBadges()
   return useMutation({
     mutationFn: ({ clubId, awardId, input }: { clubId: number; awardId: string; input: ScoreSaveInput }) =>
       api<ScoreOut>(`/viewer/clubs/${clubId}/awards/${awardId}/score`, {
@@ -294,6 +296,9 @@ export function useSaveScore() {
           presentation_score: input.presentationScore,
         }),
       }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.all }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.all })
+      invalidateBadges()
+    },
   })
 }

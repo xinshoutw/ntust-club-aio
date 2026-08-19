@@ -4,6 +4,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api, apiPaged, qs } from './client'
+import { useInvalidateBadges } from './badges'
 
 export type MaintenanceStatus = 'pending' | 'in_progress' | 'done'
 
@@ -83,12 +84,16 @@ export function usePendingMaintenanceTotal() {
 
 export function useMaintenanceStatusMutation() {
   const qc = useQueryClient()
+  const invalidateBadges = useInvalidateBadges()
   return useMutation({
     mutationFn: ({ id, status, handleNote }: { id: number; status: MaintenanceStatus; handleNote?: string }) =>
       api<AdminMaintenanceOut>(`/admin/maintenance/${id}/status`, {
         method: 'POST',
         body: JSON.stringify({ status, handle_note: handleNote }),
       }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.all }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.all })
+      invalidateBadges()
+    },
   })
 }

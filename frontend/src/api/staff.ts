@@ -4,6 +4,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs, { type Dayjs } from 'dayjs'
 import { api, apiPaged, qs } from './client'
+import { useInvalidateBadges } from './badges'
 
 export const STAFF_PAGE_SIZE = 20
 
@@ -190,7 +191,11 @@ export interface ViolationInput {
 
 export function useStaffMutations() {
   const qc = useQueryClient()
-  const invalidate = () => void qc.invalidateQueries({ queryKey: keys.all })
+  const invalidateBadges = useInvalidateBadges()
+  const invalidate = () => {
+    void qc.invalidateQueries({ queryKey: keys.all })
+    invalidateBadges()
+  }
   const fileViolation = useMutation({
     mutationFn: (b: ViolationInput) =>
       api<StaffViolationOut>('/staff/violations', {

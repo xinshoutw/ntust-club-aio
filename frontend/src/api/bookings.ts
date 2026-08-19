@@ -3,6 +3,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs, { type Dayjs } from 'dayjs'
 import { api, apiPaged, apiWithMeta, qs } from './client'
+import { useInvalidateBadges } from './badges'
 import { fetchAllPages } from './fetchAll'
 import type { StatusKey } from '../lib/status'
 import { periodRank } from '../lib/periods'
@@ -514,7 +515,11 @@ export interface EquipmentLoanInput {
 
 export function useBookingMutations() {
   const qc = useQueryClient()
-  const invalidate = () => void qc.invalidateQueries({ queryKey: keys.all })
+  const invalidateBadges = useInvalidateBadges()
+  const invalidate = () => {
+    void qc.invalidateQueries({ queryKey: keys.all })
+    invalidateBadges()
+  }
   const createRoomBooking = useMutation({
     mutationFn: (b: RoomBookingInput) =>
       api<RoomBookingOut>('/club/room-bookings', {

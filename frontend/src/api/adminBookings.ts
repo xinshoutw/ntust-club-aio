@@ -4,6 +4,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs, { type Dayjs } from 'dayjs'
 import { api, apiPaged, qs } from './client'
+import { useInvalidateBadges } from './badges'
 import { fetchAllPages } from './fetchAll'
 import type { FixedWindow } from './bookings'
 import type { StatusKey } from '../lib/status'
@@ -408,9 +409,10 @@ interface RejectParams {
 
 export function useAdminBookingMutations() {
   const qc = useQueryClient()
+  const invalidateBadges = useInvalidateBadges()
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: keys.all })
-    void qc.invalidateQueries({ queryKey: ['adminOverview'] }) // 待審/逾期數字卡
+    invalidateBadges() // 側欄徽章與總覽數字卡
   }
   const post = (path: string, body?: object) =>
     api<unknown>(path, { method: 'POST', body: body ? JSON.stringify(body) : undefined })

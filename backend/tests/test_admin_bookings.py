@@ -637,7 +637,8 @@ async def test_admin_active_filter_excludes_finished_bookings(client, db):
     """社團總覽的「借用中」不能收整段歷史:借用不會因為日期過了就換狀態。
 
     只篩 status 的話,已核准的過期單永遠留在卡上(遷移資料下單一社團上千筆)。
-    這條界線與社團端 /club/venue-bookings?active=true 是同一支推導。
+    這條只鎖「光篩 status 不夠」;界線本身的粒度由
+    test_admin_active_keeps_everything_still_revocable 鎖。
     """
     club, _ = await seed(client, db)
     venue = await make_venue(db)

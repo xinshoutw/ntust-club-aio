@@ -36,8 +36,8 @@ function DownloadButton({ file, message }: { file: StoredFile; message: ReturnTy
   if (file.archived || !file.canDownload) {
     // 檔案管理頁看得到清單不等於看得到內容:下載要該類檔案的頁面權限(decisions.md D-02)
     const why = file.archived
-      ? '已歸檔:檔案已由行政備份後離線保存'
-      : '需要該類檔案所屬頁面的權限才能下載'
+      ? '此檔案已被封存'
+      : '你沒有權限'
     return (
       <Tooltip title={why}>
         <span style={{ color: 'var(--muted)', padding: '0 7px' }}>

@@ -56,6 +56,12 @@ function EmptyRow({ text }: { text: string }) {
 const TODO_PAGE_SIZE = 8
 const CARD_PAGE_SIZE = 10
 
+// 停在第 3 頁時清單縮短(送出/刪除後 invalidate、公告標為已讀後重抓),頁碼會指到不存在的
+// 那一頁,卡片就只剩標題與徽章、內容全空 —— 而空狀態只在「一筆都沒有」時才出現,看不出原因。
+// 用推導而不是 useEffect+setState:狀態只有一份,不會有「畫面已空、頁碼還沒回正」的中間格
+export const clampPage = (page: number, total: number, size: number): number =>
+  Math.min(page, Math.max(1, Math.ceil(total / size)))
+
 export default function OverviewPage() {
   const navigate = useNavigate()
   const categories = ['活動', '借用', '線上申請'] as const
@@ -70,6 +76,12 @@ export default function OverviewPage() {
   const announcementTotal = announcementsQuery.data?.total ?? 0
 
   // 公告顯示於本頁:進入頁面即視為已讀(鈴鐺紅點熄滅);標記後查詢刷新使 unread 歸零
+  // 公告是伺服器分頁(資料就是那一頁),不像另外兩張卡可以純推導:total 縮到頁碼失效時
+  // 要把 state 收回去,查詢才會跟著換頁。clampPage 對合法頁碼回傳原值,不會來回觸發
+  useEffect(() => {
+    setAnnouncementPage((p) => clampPage(p, announcementTotal, ANNOUNCEMENT_PAGE_SIZE))
+  }, [announcementTotal])
+
   const markRead = useMarkAnnouncementsRead()
   const { mutate: markReadMutate } = markRead
   const hasUnread = announcements.some((a) => a.unread)
@@ -79,7 +91,8 @@ export default function OverviewPage() {
 
   const activitiesQuery = useOverviewActivities()
   const todos = activitiesQuery.data?.todos ?? []
-  const pagedTodos = todos.slice((todoPage - 1) * TODO_PAGE_SIZE, todoPage * TODO_PAGE_SIZE)
+  const todoPageNow = clampPage(todoPage, todos.length, TODO_PAGE_SIZE)
+  const pagedTodos = todos.slice((todoPageNow - 1) * TODO_PAGE_SIZE, todoPageNow * TODO_PAGE_SIZE)
 
   // 線上申請近況:與各申請頁共用查詢(近 5 筆)
   const maintenanceQuery = useMaintenanceList()
@@ -153,9 +166,10 @@ export default function OverviewPage() {
       (t) => t.category === cat,
     ),
   )
+  const trackedPageNow = clampPage(trackedPage, tracked.length, CARD_PAGE_SIZE)
   const pagedTracked = tracked.slice(
-    (trackedPage - 1) * CARD_PAGE_SIZE,
-    trackedPage * CARD_PAGE_SIZE,
+    (trackedPageNow - 1) * CARD_PAGE_SIZE,
+    trackedPageNow * CARD_PAGE_SIZE,
   )
 
   // 空分類會被 filter 濾掉,查詢失敗時整個分類會安靜消失 —— 六支一起看載入與錯誤
@@ -227,7 +241,7 @@ export default function OverviewPage() {
           )}
           {!activitiesQuery.isError && todos.length === 0 && <EmptyRow text="無待辦事項" />}
           {todos.length > TODO_PAGE_SIZE && (
-            <Pager page={todoPage} pageSize={TODO_PAGE_SIZE} total={todos.length} onChange={setTodoPage} />
+            <Pager page={todoPageNow} pageSize={TODO_PAGE_SIZE} total={todos.length} onChange={setTodoPage} />
           )}
           </LoadingBlock>
         </div>
@@ -315,7 +329,7 @@ export default function OverviewPage() {
             {trackedErrored.length === 0 && tracked.length === 0 && <EmptyRow text="無進行中的申請" />}
             {tracked.length > CARD_PAGE_SIZE && (
               <Pager
-                page={trackedPage}
+                page={trackedPageNow}
                 pageSize={CARD_PAGE_SIZE}
                 total={tracked.length}
                 onChange={setTrackedPage}

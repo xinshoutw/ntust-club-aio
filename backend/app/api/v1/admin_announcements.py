@@ -132,7 +132,7 @@ async def update_takeover(
         ip=client_ip(request),
     )
     await db.commit()
-    # 蓋板會擋住每個社團的畫面,開關都要留下痕跡(GAP-18 K6/K7);只推全域
+    # 蓋板會擋住每個社團的畫面,開關都要留下痕跡(GAP-18 K6/K7);推系統 webhook
     now_on = row.takeover_until is not None
     if now_on != was_on:
         background.add_task(
@@ -165,6 +165,6 @@ async def delete_announcement(
     title = row.title
     await db.delete(row)
     await db.commit()
-    # 公告刪掉之後就查不到內容了,標題至少留在頻道裡(GAP-18 K8);只推全域
+    # 公告刪掉之後就查不到內容了,標題至少留在頻道裡(GAP-18 K8);推系統 webhook
     background.add_task(notify.discord, "alert", "公告已刪除", title)
     return ApiResponse()

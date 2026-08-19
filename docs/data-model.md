@@ -109,7 +109,7 @@ erDiagram
 | attribute | enum(自治性,學藝性,服務性,聯誼性,藝術性,體育性) NULL | 公告分眾與統計;停社舊社團原性質不可考故可為 NULL |
 | intro / website_url | text / text NULL | `website_url` 是行政分 ad6 的依據 |
 | contact_emails | text[] | 至多 3 組、第 1 組必填;公告通知寄送對象 |
-| discord_webhook_url | text NULL | 社團自設;該社事件另推一份 |
+| discord_webhook_url | text NULL | 社團自設;該社事件只推這裡,NULL 即不推 |
 | advisor_name / dept / email / ext | text NULL | 校內指導老師 |
 | advisor_out_name / dept / email / phone | text NULL | 校外指導老師(校內外各至多一位) |
 | suspended_until / suspend_reason | date NULL / text NULL | NULL=未停權 |

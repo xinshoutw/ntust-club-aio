@@ -53,13 +53,14 @@ Python 3.14 lazy annotation:欄位名與型別同名時型別須別名(`import d
 
 ### 3.3 通知
 
-- Discord webhook:全域 + 社團自設各推一份,URL 走 `.env` 不入版控;暫時性失敗做記憶體重試(3 次,429 照 `Retry-After`)、不落地佇列表;訊息清冊見 `discord-webhook-messages.md`
+- Discord webhook:社團事件與公告只推該社團自設的 webhook(未設即不推);`.env` 的 `DISCORD_WEBHOOK_URL` 走無社團的系統事件與 infra 告警,不入版控;暫時性失敗做記憶體重試(3 次,429 照 `Retry-After`)、不落地佇列表;訊息清冊見 `discord-webhook-messages.md`
 - Email:aiosmtplib + `BackgroundTasks`,SMTP 參數全走 `.env` 不綁供應商;host/username/password 任一為空即降級 log-only。寄送結果寫 `email_logs`
 - 目前只有兩個寄信點:勾了「通知」的公告、器材歸還提醒。其餘事件只推 Discord;重設密碼是當場回傳一次性密碼,不寄信
 
 ### 3.4 不引入任務佇列
 
 逾期、結案鎖定、器材可借數一律於查詢時推導,不排程改狀態,故不需要 Celery/Redis/scheduler。
+唯一的行程內迴圈是 Uptime Kuma 心跳(`lifespan` 起停,30 秒一次,只在 `ENV=prod`)——push monitor 的間隔小於 cron 的最小粒度。業務排程一律走 host cron。
 
 ### 3.5 併發鎖
 

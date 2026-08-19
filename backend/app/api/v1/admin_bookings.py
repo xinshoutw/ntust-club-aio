@@ -72,7 +72,7 @@ LoanStatusFilter = Literal[
 async def _notify_club(
     background: BackgroundTasks, db, club_id: int | None, kind: str, title: str, desc: str
 ) -> None:
-    """推給該社團 + 全域;沒有社團(行政手動借用)時只推全域。
+    """推給該社團自設的 webhook;沒有社團(行政手動借用)時走系統 webhook。
 
     早期版本在 `club_id is None` 直接 return —— 於是承辦撤掉一筆手動借用,
     場況圖少一格而頻道上一片安靜,與「手動借用建立」會推的理由正好相反。
@@ -552,7 +552,7 @@ async def manual_venue_booking(
         ip=client_ip(request),
     )
     await db.commit()
-    # 手動借用直接就是已核准,場況圖上會憑空多一格 —— 只推全域(沒有社團可推)
+    # 手動借用直接就是已核准,場況圖上會憑空多一格 —— 推系統 webhook(沒有社團可推)
     background.add_task(
         notify.discord,
         "alert",

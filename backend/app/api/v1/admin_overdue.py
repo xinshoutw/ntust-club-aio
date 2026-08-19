@@ -1,7 +1,7 @@
 """行政端:逾期追蹤與停權管理(權限鍵 aoverdue)。
 
 - 逾期列表由 /admin/equipment-loans?status=overdue 支援(admin_bookings.py)
-- 提醒:Discord(全域+社團自設 webhook)+ Email(社團聯絡人);audit
+- 提醒:Discord(社團自設 webhook)+ Email(社團聯絡人);audit
 - 停權:寫 clubs.suspended_until / suspend_reason(推導的借用申請攔截點在社團端);
   解除即清空兩欄位;audit + notify
 """

@@ -29,7 +29,7 @@
 
 - 密碼三欄只要填了任一欄就三欄一起驗;密碼與 profile 是兩支 API,profile 成功而改密失敗時只有密碼欄維持 dirty
 - 網頁連結填了即得 ad6 的 5 分(不追蹤更新時間)
-- Discord Webhook 前端驗 `https://discord.com/api/webhooks/…`;該社事件會在全域 webhook 之外另推一份到這裡
+- Discord Webhook 前端驗 `https://discord.com/api/webhooks/…`;該社事件只推這裡,**未填即整社不推**(學務處不收副本)
 - 聯絡信箱是公告 Email 通知的收件人
 - 社團名稱與屬性(自治性/學藝性…)不可自行修改,只能由行政端改
 - profile 變更寫 `audit_logs`

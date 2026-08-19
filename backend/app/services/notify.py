@@ -1,7 +1,8 @@
-"""事件通知:Discord webhook(全事件)+ Email(模板待需求方,先提供寄送與留底)。
+"""事件通知:Discord webhook + Email(模板待需求方,先提供寄送與留底)。
 
 - Discord:社團事件只推該社團自設的 webhook(管理項目);`.env` 的 DISCORD_WEBHOOK_URL
-  **專供 infra 告警**(磁碟水位),不再收社團事件與公告。空值即停用;失敗只記 log,絕不影響業務交易
+  收**沒有社團可推**的系統事件與 infra 告警,不再收社團事件與公告。
+  空值即停用;失敗只記 log,絕不影響業務交易
 - Email:aiosmtplib;無 SMTP 憑證時降級 log-only;結果一律寫 email_logs
 - 一律由 FastAPI BackgroundTasks 呼叫(fire-and-forget),不阻塞回應
 - 公告通知:Email 基礎 HTML 模板 + Discord Components V2
@@ -126,10 +127,10 @@ async def discord_to(url: str, kind: str, title: str, description: str = "") -> 
 
 
 async def discord(kind: str, title: str, description: str = "") -> None:
-    """推送到 `.env` 的 infra 告警頻道。
+    """推送到 `.env` 的系統頻道。
 
-    只給不屬於任何社團的維運事件用(目前是磁碟水位告警)。社團事件與公告一律
-    只推該社團自設的 webhook —— 學務處不需要每一則社團通知的副本。
+    給**沒有社團可推**的事件用:行政手動借用、公告蓋板與刪除、報名場次刪除,
+    以及 infra 告警(磁碟水位)。社團事件與公告一律只推該社團自設的 webhook。
     """
     await discord_to(settings.discord_webhook_url, kind, title, description)
 

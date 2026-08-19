@@ -7,9 +7,9 @@
 | 路徑 | 設定位置 | 收什麼 |
 |------|----------|--------|
 | 社團 webhook | `clubs.discord_webhook_url`(社團於管理項目自設) | 本清冊的全部事件與公告;沒設就不推 |
-| infra webhook | `.env` `DISCORD_WEBHOOK_URL` | **只有磁碟水位告警**(空值=停用並僅記 log) |
+| 系統 webhook | `.env` `DISCORD_WEBHOOK_URL` | 不屬於任何社團的系統事件(行政手動借用、公告蓋板與刪除、報名場次刪除)與 infra 告警(磁碟水位)(空值=停用並僅記 log) |
 
-路由函式:`club_event()` 推該社團自設的 webhook,一般事件全走這條;`announcement_broadcast()` 為公告專用,逐一推目標社團並寄 Email;`discord()` 是 infra 專用那一條。
+路由函式:`club_event()` 推該社團自設的 webhook,一般事件全走這條;`announcement_broadcast()` 為公告專用,逐一推目標社團並寄 Email;`discord()` 是系統事件那一條(無社團可推者一律走它)。
 
 **身分**:`_with_identity()` 為每個 payload 補 `username="臺科大社團管理系統"`、`avatar_url=SITE_URL/logo.png`(開發站無法解析時 Discord 略過頭貼)。
 
@@ -31,11 +31,11 @@
 
 ## 2. 事件與現行文案
 
-48 個事件(7 個依狀態有兩種文案)。目的地未註明者=全域必推 + 該社團有設 webhook 才推。
+48 個事件(7 個依狀態有兩種文案)。目的地未註明者=推該社團自設的 webhook,沒設就不推。
 
 **公告**
 
-- **A1 公告發布** `POST /admin/announcements`(勾「通知」時)· Components V2 藍 · 全域 + **全部目標社團** + Email
+- **A1 公告發布** `POST /admin/announcements`(勾「通知」時)· Components V2 藍 · **全部目標社團** + Email
   `**{title}**\n\n{content}\n\n-# {date}`(title+content 合併截 3800;content 為 markdown 原文)
   Email:subject `【臺科大社團管理系統】{title}`,HTML 模板 `announcement_email_html()`,寄給各目標社團 `contact_emails` 前 3 組
 
@@ -135,7 +135,7 @@ D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政�
 - **J2 器材已歸還** `POST /staff/equipment-loans/{id}/checkin` · approve
   `器材已歸還` / `{equipment.name} ×{qty}(歸還人 {returner_name})`
 
-行政手動借用只推全域(`club_id` NULL,沒有社團可推):見 K4。
+行政手動借用推系統 webhook(`club_id` NULL,沒有社團可推):見 K4。
 
 **帳號與停權**
 
@@ -152,16 +152,16 @@ D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政�
   `臨時場地借用已取消` / `{user.name}:{venue.name}({date} 時段 {periods})`
 - **K3 器材借用社團自行取消** `POST /club/equipment-loans/{id}/cancel` · reject
   `器材借用已取消` / `{user.name}:{equipment.name} ×{qty}({start}~{end})`
-- **K4 行政手動借用建立** `POST /admin/bookings/manual-{venue,equipment}` · alert · **僅推全域**(無社團)
+- **K4 行政手動借用建立** `POST /admin/bookings/manual-{venue,equipment}` · alert · **僅推系統 webhook**(無社團)
   `行政手動借用建立` / `{user.name}:{venue 或 equipment 名}(時間)`
 - **K5 報名簽到登錄** `PUT /admin/signup-items/{id}/attendance` · 登錄 approve、取消 alert
   `報名簽到已登錄` 或 `報名簽到已取消` / `{club.name}:{item.name}({session.name})`
   —— **只在真的翻面時推**(同值再送一次不是事件);非場次制的預設場次名就是活動名,那時不重複印
-- **K6 公告蓋板開啟** `PATCH /admin/announcements/{id}`(`takeover_until` 由 null 轉為日期)· announce · 僅推全域
+- **K6 公告蓋板開啟** `PATCH /admin/announcements/{id}`(`takeover_until` 由 null 轉為日期)· announce · 僅推系統 webhook
   `公告已設為蓋板` / `{title}`
-- **K7 公告蓋板關閉** 同上(轉回 null)· announce · 僅推全域
+- **K7 公告蓋板關閉** 同上(轉回 null)· announce · 僅推系統 webhook
   `公告已取消蓋板` / `{title}`
-- **K8 公告刪除** `DELETE /admin/announcements/{id}` · alert · 僅推全域
+- **K8 公告刪除** `DELETE /admin/announcements/{id}` · alert · 僅推系統 webhook
   `公告已刪除` / `{title}`
 - **K9 活動草稿刪除** `DELETE /club/activities/{id}`(草稿狀態)· alert
   `活動草稿已刪除` / `{club.name}:{activity.name}`
@@ -170,10 +170,10 @@ D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政�
   —— 社團會在「我的報名」看到一筆自己沒送過的紀錄,不說一聲會像是名單不見了
 - **K11 撤除補登報名** `DELETE /admin/signup-items/{id}/registrations/{club_id}` · alert
   `學務處已撤除貴社的補登報名` / `{club.name}:{item.name}` —— K10 的反面,名單這次真的不見了
-- **K12 報名場次刪除** `DELETE /admin/signup-items/{id}/sessions/{sid}` · alert · 僅推全域
+- **K12 報名場次刪除** `DELETE /admin/signup-items/{id}/sessions/{sid}` · alert · 僅推系統 webhook
   `報名場次已刪除` / `{item.name}:{session.name}(連帶清掉 N 筆簽到)`
   —— 該場次所有社團的簽到隨 FK CASCADE 一起消失,而簽到是行政分 ad7 的唯一資料源
-- **K4b 行政手動借用撤銷** `POST /admin/{venue-bookings,equipment-loans}/{id}/revoke` · reject · 無社團時僅推全域
+- **K4b 行政手動借用撤銷** `POST /admin/{venue-bookings,equipment-loans}/{id}/revoke` · reject · 無社團時推系統 webhook
   文案同一般撤銷 —— 手動借用沒有社團可推,但場況圖少一格的理由與 K4 一樣成立
 
 蓋板只在**切換**時推:同值再送一次不算事件,否則承辦每次存檔都會多推一則。
@@ -217,4 +217,4 @@ Discord webhook 可用而現行未用的:embed 的 `url`(標題超連結)、`tim
 
 - **共通版型**(加 fields/footer/timestamp/url):只改 `notify.py` 的 `discord_to()` 與 `announcement_components()`,21 處呼叫點簽名不動
 - **逐事件差異化版型**:現行呼叫點把資料扁平化成 title/description 兩個字串才進 `notify`。模板若要結構化欄位(社團名、金額、連結各自成 field),須把 `club_event(kind, title, description, club_webhook)` 改吃結構化參數,並同步調整各呼叫點傳入原始欄位
-- **全域版與社團版分流**(如全域補社團名、社團版省略):在 `club_event()` 內分岔,單點改動
+- **社團版與系統版分流**:兩者已是不同函式(`club_event()` / `discord()`),各改各的

@@ -8,11 +8,11 @@
 
 ## 資料來源
 
-`GET /badges` 一支查詢供給六張卡,與側欄徽章同一份數字:
+`GET /badges` 一支查詢供給六張卡,與側欄徽章同一份數字。第一張算的是**簽得下去**的關卡(與待審佇列同一集合),其餘算該頁的預設漏斗:
 
 | 卡片 | 導向 | 需要權限 |
 |---|---|---|
-| 待審活動申請 | `/admin/review` | `areview`/簽核鍵 |
+| 待我簽核的活動申請 | `/admin/review` | `areview`/簽核鍵 |
 | 待審結案 | `/admin/close-review` | `aclose`/`approve_advisor` |
 | 待審固定借用 | `/admin/rooms` | `aroom` |
 | 待審臨時借用 | `/admin/bookings` | `abooking` |

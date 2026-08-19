@@ -75,7 +75,7 @@ uv run python ../migration/cc_import.py            # 4. 匯入借用
 | Classroom(22) | venues 對照表 `VENUE_MAP` | 一舍 B2 一律拆 樓梯+白板 兩筆;新版已無的 4 處建 inactive 承接 |
 | Device(25) | equipment(含 max_lease_count) | 名稱正規化 `DEVICE_RENAME`;停用 8 項建 inactive |
 | Apply(15,021) | venue_bookings | status 0/1/4/2→pending/approved/rejected/cancelled;phone 保留、其餘申請人明細丟棄 |
-| DeviceApply+DeviceLog | equipment_loans(一品項一筆) | 已核准且區間已過→returned;活動已刪或不在 `SCOPE_SEMESTERS` 內→activity_id NULL |
+| DeviceApply+DeviceLog | equipment_loans(一品項一筆) | 已核准且區間已過→returned;活動已刪或不在遷移範圍內→activity_id NULL |
 | 認不出借用單位的單(空字串 / admin / 8 開頭偽帳號 / 未知) | club_id NULL(顯示「學務處」) | 舊系統有 960 筆 `club_id` 是空字串,**不丟掉**(decisions.md MIG-03);帳號認得出形狀的那一桶另以 `--unknown-clubs` 導出清單交承辦辨識(MIG-06);欄位空白與 admin 不列入(看不出是誰)|
 | ClassroomRule(2,848)、Admin、Notice | 不遷 | 場地封鎖=新 Rule Page 功能;未過期封鎖上線時人工重建 |
 

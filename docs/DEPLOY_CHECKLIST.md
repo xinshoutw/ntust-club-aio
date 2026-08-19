@@ -8,6 +8,7 @@
 
 - [ ] **備份排程**:`backend/scripts/backup_db.sh` 已就緒(每日 `pg_dump` 自訂格式 + 保留 14 天輪替,**存在同一台機器**,decisions.md OPS-01 明定不做異地),**cron 尚未掛上**(cron 行見該檔頂部)。上傳目錄由 compose 的 `db-backup` 服務備份 volume,另以 GCE 磁碟快照兜底;部署前另手動 dump 一次
 - [ ] **器材主檔的建立順序**:`scripts/seed.py` 只建 5 獎項 + 19 場地 + superadmin,**器材主檔由 `migration/cc_import.py` 從舊 `Device` 表帶入**(品名、數量、單次上限、啟用與否)。正式流程必須 seed 之後跑過遷移,否則器材借用無品項可選
+- [ ] **帳號開通**:遷移進來的 15 個行政帳號**權限鍵全空**(只有 `super` 看得到頁面),分工由承辦決定後於帳號管理逐一授出;舊系統沒有工讀生角色,`role=staff` 是 0 筆,上線前要開。所有遷移帳號 `must_change_password=True`,明碼在 `migration/out/one_time_passwords_*.csv`,交承辦發放後銷毀
 - [ ] **政府行事曆假日**:`holidays` 表未 seed。匯入腳本已就緒(`scripts/import_holidays.py --year <民國年> --yes`,資料源見 decisions.md GAP-06),**每年上線年度都要跑一次**;未匯入的年度 `booking_service.add_workdays` 會退化成只排除週六日,逢國定假日的逾期判定偏一天
 
 ## B. `.env`(prod)

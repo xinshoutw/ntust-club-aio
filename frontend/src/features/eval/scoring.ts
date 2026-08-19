@@ -94,7 +94,7 @@ export function computeAdScores(i: ScoringInput): AdScore[] {
   return [
     { key: 'ad1', auto: ad1, max: AD_MAX.ad1, note: `結案 ${i.closed.length} 件(大型 ${larges});一天至多計 1 件` },
     { key: 'ad2', auto: ad2, max: AD_MAX.ad2, note: `每活動經承辦確認照片或影片;大型 ×${LARGE_MULTIPLIER}` },
-    { key: 'ad3', auto: ad3, max: AD_MAX.ad3, note: `每活動經承辦確認成果報告表;大型 ×${LARGE_MULTIPLIER}` },
+    { key: 'ad3', auto: ad3, max: AD_MAX.ad3, note: `每活動經承辦確認成果報告表 1 分;大型 ×${LARGE_MULTIPLIER}` },
     { key: 'ad4', auto: ad4, max: AD_MAX.ad4, note: `每活動經承辦確認學習心得 2 分;大型 ×${LARGE_MULTIPLIER}` },
     {
       key: 'ad5',

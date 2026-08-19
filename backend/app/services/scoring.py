@@ -135,7 +135,7 @@ def compute_ad_scores(i: ScoringInput) -> list[AdScore]:
             f"每活動經承辦確認照片或影片;大型 ×{LARGE_MULTIPLIER}",
         ),
         AdScore(
-            "ad3", ad3, AD_MAX["ad3"], f"每活動經承辦確認成果報告表;大型 ×{LARGE_MULTIPLIER}"
+            "ad3", ad3, AD_MAX["ad3"], f"每活動經承辦確認成果報告表 1 分;大型 ×{LARGE_MULTIPLIER}"
         ),
         AdScore(
             "ad4", ad4, AD_MAX["ad4"], f"每活動經承辦確認學習心得 2 分;大型 ×{LARGE_MULTIPLIER}"

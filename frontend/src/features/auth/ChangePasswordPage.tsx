@@ -56,7 +56,7 @@ export default function ChangePasswordPage() {
       <div className="card" style={{ width: 420, maxWidth: '100%', padding: '40px 40px 32px' }}>
         <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 4 }}>設定新密碼</div>
         <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 22 }}>
-          {user?.mustChangePassword ? '首次登入需變更密碼後才能繼續使用' : '變更登入密碼'}
+          {user?.mustChangePassword ? '首次登入請更新密碼' : '變更登入密碼'}
         </div>
         <form
           style={{ display: 'flex', flexDirection: 'column', gap: 14 }}
@@ -73,7 +73,7 @@ export default function ChangePasswordPage() {
             <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>新密碼</div>
             <Input.Password value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" />
             <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>
-              至少 <span className="num">10</span> 碼,含大小寫字母、數字與特殊符號;不得與近三代相同
+              含大小寫字母、數字與特殊符號，長度至少 <span className="num">10</span> 碼，不得與近三次相同
             </div>
           </label>
           <label>

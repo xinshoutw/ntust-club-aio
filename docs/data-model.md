@@ -86,7 +86,7 @@ erDiagram
 | email | text NULL | |
 | club_id | FK clubs NULL | 僅 role=club;部分唯一索引 `uq_users_club_id`(WHERE club_id IS NOT NULL)在 DB 層釘住一社一帳號 |
 | is_super | bool | 僅 admin:最高權限 |
-| permissions | text[] | 僅 admin。**頁面權限鍵一頁一把,單一真相在 `core/permissions.ADMIN_PAGES`**(隨 `/auth/me` 送給前端,前端不得另存一份);沒有「僅 super 可達」的頁面,super 仍全通。簽核關卡鍵 `approve_advisor`/`approve_chief`/`approve_dean` 寫在同一欄但不是頁面權限,權限彈窗不列。**非 super 只授得出自己也持有的鍵**(`admin_accounts._check_grantable`),否則 `aaccount` 等同最高權限。檔案下載另依 `core/permissions.FILE_SUBJECT_KEYS` 對照檔案類型 |
+| permissions | text[] | 僅 admin。**頁面權限鍵一頁一把,單一真相在 `core/permissions.ADMIN_PAGES`**(隨 `/auth/me` 送給前端,前端不得另存一份);沒有「僅 super 可達」的頁面,super 仍全通。簽核關卡鍵 `approve_advisor`/`approve_chief`/`approve_dean` 寫在同一欄但不開頁、只開簽核動作,目錄在 `APPROVAL_STAGES`,權限彈窗與頁面權限一起授出(`super` 也不得代簽學務長關,所以只有這個入口)。**非 super 只授得出自己也持有的鍵**(`admin_accounts._check_grantable`),否則 `aaccount` 等同最高權限。檔案下載另依 `core/permissions.FILE_SUBJECT_KEYS` 對照檔案類型 |
 | can_view_eval | bool | 僅 viewer |
 | must_change_password | bool | 預設 true,首登強制改密 |
 | is_active | bool | 停用而非刪除 |

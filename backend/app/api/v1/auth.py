@@ -30,6 +30,7 @@ async def _user_out(db: DbDep, user: User) -> UserOut:
     out.periods = [PeriodOut(**p) for p in booking_service.period_catalogue()]
     if user.role == UserRole.ADMIN:
         out.admin_pages = [AdminPageOut(**p) for p in permissions.catalogue()]
+        out.approval_stages = permissions.stage_catalogue()
     if user.club_id is not None:
         club = await db.get(Club, user.club_id)
         out.club_name = club.name if club else None

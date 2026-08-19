@@ -264,3 +264,27 @@ async def test_set_permissions(client, db):
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
+
+
+async def test_approval_stage_keys_are_grantable_through_the_api(client, db):
+    """簽核關卡只能由權限彈窗授出 —— super 也不得代簽學務長關,少了這條就沒人簽得了。"""
+    await make_user(db, username="root2", role="admin", is_super=True)
+    target = await make_user(db, username="dean2", role="admin")
+    await db.commit()
+    await login(client, "root2")
+
+    me = (await client.get("/api/v1/auth/me")).json()["data"]
+    assert {s["key"] for s in me["approval_stages"]} == {
+        "approve_advisor",
+        "approve_chief",
+        "approve_dean",
+    }
+
+    resp = await client.put(
+        f"/api/v1/admin/accounts/{target.id}/permissions",
+        json={"permissions": ["areview", "approve_dean"]},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200
+    await db.refresh(target)
+    assert "approve_dean" in target.permissions

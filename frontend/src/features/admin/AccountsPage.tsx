@@ -96,7 +96,10 @@ export default function AccountsPage() {
   // 頁面權限目錄由 session 帶來(後端 core/permissions);前端不維護第二份
   const { user: me } = useAuth()
   const adminPages = me?.adminPages ?? []
-  const pageKeySet = new Set(adminPages.map((p) => p.key))
+  // 簽核關卡與頁面權限一起在這個彈窗授出:少了它,正式庫沒有任何人簽得了學務長關
+  const approvalStages = me?.approvalStages ?? []
+  const grantKeys = [...adminPages, ...approvalStages]
+  const pageKeySet = new Set(grantKeys.map((p) => p.key))
   // 非最高權限只授得出自己也持有的鍵(後端 _check_grantable 同一條規則),
   // 勾不到的直接反灰,不要讓人按了儲存才吃 403
   const grantable = (key: string) => me?.isSuper === true || me?.permissions.includes(key) === true
@@ -628,7 +631,7 @@ export default function AccountsPage() {
       {/* 權限設定(一般管理員):變更的項目以橘框標示,按「儲存」才生效 */}
       {(() => {
         const original = permTarget ? permTarget.permissions.filter((k) => pageKeySet.has(k)) : []
-        // 頁面清單以外的既有鍵(簽核關卡等)不受此彈窗管理,儲存時原樣保留
+        // 目錄以外的既有鍵不受此彈窗管理,儲存時原樣保留
         const extraKeys = permTarget ? permTarget.permissions.filter((k) => !pageKeySet.has(k)) : []
         const permDirty =
           permDraft.length !== original.length || permDraft.some((k) => !original.includes(k))
@@ -661,7 +664,7 @@ export default function AccountsPage() {
                 {
                   onSuccess: () => {
                     setPermOpen(false)
-                    message.success(`已更新 ${permTarget.name} 的頁面權限`)
+                    message.success(`已更新 ${permTarget.name} 的權限`)
                   },
                   onError: (e) => message.error(e.message),
                 },
@@ -677,7 +680,7 @@ export default function AccountsPage() {
             )}
           >
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8 }}>
-              {adminPages.map(({ key: value, label }) => {
+              {grantKeys.map(({ key: value, label }) => {
                 const changed = permDraft.includes(value) !== original.includes(value)
                 const locked = !grantable(value) && !original.includes(value)
                 return (

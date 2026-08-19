@@ -19,6 +19,9 @@ export interface SessionUser {
   /** 行政端頁面權限目錄(後端 core/permissions.ADMIN_PAGES);非 admin 為 undefined。
    *  側欄過濾、路由守衛與權限彈窗全部讀這一份,前端不得自行維護第二份鍵表 */
   adminPages?: AdminPage[]
+  /** 簽核關卡目錄(後端 core/permissions.APPROVAL_STAGES):不開頁,只開簽核動作。
+   *  沒有這一區就沒有任何地方授得出 approve_dean —— super 也不得代簽 */
+  approvalStages?: { key: string; label: string }[]
   /** 節次目錄(後端 services/booking_service.PERIOD_TIMES);借用畫面的節次軸與
    *  起訖時刻全部讀這一份,前端不得自行維護第二份 */
   periods: Period[]
@@ -54,6 +57,7 @@ interface UserOut {
   can_view_eval: boolean
   must_change_password: boolean
   admin_pages: AdminPage[] | null
+  approval_stages: { key: string; label: string }[] | null
   periods: Period[]
 }
 
@@ -70,6 +74,7 @@ const toUser = (u: UserOut): SessionUser => ({
   canViewEval: u.can_view_eval,
   mustChangePassword: u.must_change_password,
   adminPages: u.admin_pages ?? undefined,
+  approvalStages: u.approval_stages ?? undefined,
   periods: u.periods,
 })
 

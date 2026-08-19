@@ -47,5 +47,7 @@ class UserOut(BaseModel):
     must_change_password: bool
     # 行政端頁面權限目錄:側欄過濾、路由守衛與權限彈窗的唯一來源。非 admin 為 None
     admin_pages: list[AdminPageOut] | None = None
+    # 簽核關卡目錄(權限彈窗的第二區;不是頁面權限,不開頁只開簽核動作)
+    approval_stages: list[dict[str, str]] | None = None
     # 節次目錄:借用相關畫面的節次軸與「已開始節次」判定都讀這一份,前端不維護第二份
     periods: list[PeriodOut] = []

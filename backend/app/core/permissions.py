@@ -55,7 +55,13 @@ ADMIN_PAGES: tuple[AdminPage, ...] = (
 
 PAGE_KEYS = frozenset(p.key for p in ADMIN_PAGES)
 
-# 簽核關卡鍵:寫在同一個 `users.permissions`,但不是頁面權限,權限彈窗不列
+# 簽核關卡鍵:寫在同一個 `users.permissions`,但不是頁面權限(不開頁,只開簽核動作)。
+# 顯示詞為「承辦人」,程式鍵維持 advisor(AGENTS.md 核心業務規則)
+APPROVAL_STAGES: tuple[tuple[str, str], ...] = (
+    ("approve_advisor", "承辦人簽核"),
+    ("approve_chief", "組長簽核"),
+    ("approve_dean", "學務長簽核"),
+)
 STAGE_KEYS = frozenset(_STAGES)
 
 PERMISSION_KEYS = PAGE_KEYS | STAGE_KEYS
@@ -110,3 +116,11 @@ def catalogue() -> list[dict[str, object]]:
         {"key": p.key, "label": p.label, "paths": list(p.paths), "also": list(p.also)}
         for p in ADMIN_PAGES
     ]
+
+
+def stage_catalogue() -> list[dict[str, str]]:
+    """簽核關卡目錄:權限彈窗要授得出去,否則正式庫沒有人簽得了學務長關。
+
+    `super` 也不能代簽學務長(`_require_stage_key`),所以這三把鍵**只能**由這裡授出。
+    """
+    return [{"key": k, "label": label} for k, label in APPROVAL_STAGES]

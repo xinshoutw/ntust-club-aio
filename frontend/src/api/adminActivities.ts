@@ -432,49 +432,13 @@ export function useAdminActivityMutations() {
   return { approve, reject, closeApprove, closeReject, unlock }
 }
 
-// ---- 總覽數字卡(page_size=1 只取 meta.total;多路徑加總)----
-
-const totalOf = async (path: string): Promise<number> => (await apiPaged<unknown[]>(path)).total
-
-// enabled=false 時不打 API:呼叫端依 permissions 決定,受限管理員不製造整排 403
-function useAdminTotal(name: string, paths: string[], enabled: boolean) {
-  return useQuery({
-    queryKey: ['adminOverview', name] as const,
-    queryFn: async () => (await Promise.all(paths.map(totalOf))).reduce((sum, n) => sum + n, 0),
-    enabled,
-  })
-}
+// ---- 未銷案違規數(違規管理頁的標題數字;側欄徽章與總覽卡走 GET /badges)----
 
 const countPath = (base: string, status: string): string => `${base}${qs({ status, page_size: 1 })}`
 
-/** 待審活動申請(三關合計) */
-export const usePendingActivityTotal = (enabled = true) =>
-  useAdminTotal(
-    'pendingActivities',
-    ['pending_advisor', 'pending_chief', 'pending_dean'].map((s) => countPath('/admin/activities', s)),
-    enabled,
-  )
-
-/** 待審結案 */
-export const usePendingCloseTotal = (enabled = true) =>
-  useAdminTotal('pendingClose', [countPath('/admin/activities', 'closing_pending_advisor')], enabled)
-
-/** 待審固定場地借用 */
-export const usePendingRoomBookingTotal = (enabled = true) =>
-  useAdminTotal('pendingRoomBookings', [countPath('/admin/room-bookings', 'pending')], enabled)
-
-/** 待審臨時借用(臨時場地+器材) */
-export const usePendingTempBookingTotal = (enabled = true) =>
-  useAdminTotal(
-    'pendingTempBookings',
-    [countPath('/admin/venue-bookings', 'pending'), countPath('/admin/equipment-loans', 'pending')],
-    enabled,
-  )
-
-/** 逾期未還器材(推導:結束日之隔天上班日 10:30 未歸還) */
-export const useOverdueLoanTotal = (enabled = true) =>
-  useAdminTotal('overdueLoans', [countPath('/admin/equipment-loans', 'overdue')], enabled)
-
-/** 未銷案違規 */
 export const useOpenViolationTotal = (enabled = true) =>
-  useAdminTotal('openViolations', [countPath('/admin/violations', 'open')], enabled)
+  useQuery({
+    queryKey: ['adminOverview', 'openViolations'] as const,
+    queryFn: async () => (await apiPaged<unknown[]>(countPath('/admin/violations', 'open'))).total,
+    enabled,
+  })

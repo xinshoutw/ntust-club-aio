@@ -1,21 +1,14 @@
 import { Link } from 'react-router'
-import type { UseQueryResult } from '@tanstack/react-query'
 import PageHeader from '../../components/ui/PageHeader'
 import { currentSemester } from '../../lib/semester'
 import { useAuth } from '../../app/auth'
 import { canAccessAdminPath } from '../../lib/permissions'
-import {
-  useOpenViolationTotal,
-  useOverdueLoanTotal,
-  usePendingActivityTotal,
-  usePendingCloseTotal,
-  usePendingRoomBookingTotal,
-  usePendingTempBookingTotal,
-} from '../../api/adminActivities'
+import { useBadges } from '../../api/badges'
 
 interface Stat {
   label: string
-  query: UseQueryResult<number>
+  /** 側欄徽章的同一把鍵:數字兩處顯示,來源只有一個(services/badges.py) */
+  key: string
   path: string
 }
 
@@ -25,18 +18,21 @@ const semesterLabel = (s: string): string => {
   return `${year} 學年第 ${term} 學期`
 }
 
+// 卡片=側欄徽章的展開版:同一支查詢、同一組定義,不會出現「側欄 3 筆、卡片 5 筆」
+const STATS: Stat[] = [
+  { label: '待審活動申請', key: 'a-review', path: '/admin/review' },
+  { label: '待審結案', key: 'a-close', path: '/admin/close-review' },
+  { label: '待審固定借用', key: 'a-room', path: '/admin/rooms' },
+  { label: '待審臨時借用', key: 'a-booking', path: '/admin/bookings' },
+  { label: '逾期未還器材', key: 'a-overdue', path: '/admin/overdue' },
+  { label: '未銷案違規', key: 'a-violations', path: '/admin/violations' },
+]
+
 export default function AdminHomePage() {
   const { user } = useAuth()
-  // 依 permissions 過濾:無權限的卡不顯示也不打 API(hooks 須無條件呼叫,以 enabled 擋)
-  const can = (path: string) => canAccessAdminPath(user, path)
-  const stats: Stat[] = [
-    { label: '待審活動申請', query: usePendingActivityTotal(can('/admin/review')), path: '/admin/review' },
-    { label: '待審結案', query: usePendingCloseTotal(can('/admin/close-review')), path: '/admin/close-review' },
-    { label: '待審固定借用', query: usePendingRoomBookingTotal(can('/admin/rooms')), path: '/admin/rooms' },
-    { label: '待審臨時借用', query: usePendingTempBookingTotal(can('/admin/bookings')), path: '/admin/bookings' },
-    { label: '逾期未還器材', query: useOverdueLoanTotal(can('/admin/overdue')), path: '/admin/overdue' },
-    { label: '未銷案違規', query: useOpenViolationTotal(can('/admin/violations')), path: '/admin/violations' },
-  ].filter((s) => can(s.path))
+  const badges = useBadges()
+  // 依 permissions 過濾:無權限的卡不顯示(後端也不會回那把鍵)
+  const stats = STATS.filter((s) => canAccessAdminPath(user, s.path))
 
   return (
     <div>
@@ -50,7 +46,8 @@ export default function AdminHomePage() {
         }}
       >
         {stats.map((s) => {
-          const count = s.query.data
+          // 查詢未完成或失敗一律 — :「0 筆」看起來就是一個確定的答案
+          const count = badges.isPending || badges.isError ? undefined : (badges.data?.[s.key] ?? 0)
           return (
             <Link
               key={s.label}

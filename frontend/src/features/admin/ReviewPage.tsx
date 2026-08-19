@@ -197,10 +197,8 @@ export default function ReviewPage() {
               )}
             </div>
           )}
-          {queue.length > QUEUE_PAGE_SIZE && (
-            <Pager page={queuePageNow} pageSize={QUEUE_PAGE_SIZE} total={queue.length} onChange={setQueuePage} />
-          )}
         </LoadingBlock>
+        <Pager page={queuePageNow} pageSize={QUEUE_PAGE_SIZE} total={queue.length} onChange={setQueuePage} />
       </div>
 
       {/* 最近審核(他關審核中/已核准/已退回):供查閱與追蹤,預設審核時間新→舊 */}

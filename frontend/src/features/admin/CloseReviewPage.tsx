@@ -355,12 +355,14 @@ export default function CloseReviewPage() {
   const overdueTotal = overdueQuery.data?.total ?? 0
 
   // 伺服器分頁:簽掉一件後總數變少,停在末頁會看到空卡片(空狀態只在真的 0 筆時才對)
+  const pendingLoaded = pendingQuery.isSuccess
+  const overdueLoaded = overdueQuery.isSuccess
   useEffect(() => {
-    setPendingPage((p) => clampPage(p, pendingTotal, PENDING_PAGE_SIZE))
-  }, [pendingTotal])
+    if (pendingLoaded) setPendingPage((p) => clampPage(p, pendingTotal, PENDING_PAGE_SIZE))
+  }, [pendingLoaded, pendingTotal])
   useEffect(() => {
-    setOverduePage((p) => clampPage(p, overdueTotal, OVERDUE_PAGE_SIZE))
-  }, [overdueTotal])
+    if (overdueLoaded) setOverduePage((p) => clampPage(p, overdueTotal, OVERDUE_PAGE_SIZE))
+  }, [overdueLoaded, overdueTotal])
 
   // 點列即抓詳情,載入完成後彈窗自動補齊(照 ReviewPage 的立即開窗模式)
   const overdueDetailQuery = useAdminActivityDetail(overdueItem?.activityId)

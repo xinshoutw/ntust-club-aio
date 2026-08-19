@@ -16,13 +16,22 @@ export default function ClubCascader({
   onChange,
   width = 220,
   placeholder,
+  size,
+  allowClear = false,
+  omit,
 }: {
   value?: string
-  onChange?: (club: string) => void
+  /** allowClear 時清除會給 undefined */
+  onChange?: (club: string | undefined) => void
   width?: number | string
   placeholder?: string
+  size?: 'small' | 'middle' | 'large'
+  allowClear?: boolean
+  /** 不列入選單的社團名稱(如已報名者不必再補登) */
+  omit?: readonly string[]
 }) {
-  const { data: clubs = [], isError, error, refetch } = useClubOptions()
+  const { data: all = [], isError, error, refetch } = useClubOptions()
+  const clubs = omit?.length ? all.filter((c) => !omit.includes(c.name)) : all
   // 停社舊社團 attribute 為 null → 歸「未分類」資料夾
   const attrOf = (c: { attribute: string | null }) => c.attribute ?? '未分類'
   const attr = (() => {
@@ -36,10 +45,16 @@ export default function ClubCascader({
   if (isError) return <OptionsError what="社團清單" error={error} onRetry={() => void refetch()} />
   return (
     <Cascader<CascaderOption>
-      allowClear={false}
+      allowClear={allowClear}
+      size={size}
       value={value && attr ? [attr, value] : undefined}
       onChange={(v) => {
-        const name = v?.[1]
+        // 清除時 v 為 undefined:選了社團與沒選是兩種狀態,不能一律當成沒事發生
+        if (v == null) {
+          if (allowClear) onChange?.(undefined)
+          return
+        }
+        const name = v[1]
         if (typeof name === 'string') onChange?.(name)
       }}
       style={{ width }}

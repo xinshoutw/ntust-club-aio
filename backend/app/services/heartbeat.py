@@ -26,6 +26,7 @@ from app.core.db import async_session_factory
 logger = logging.getLogger("club_aio.heartbeat")
 
 _TIMEOUT = 10.0
+_MIN_INTERVAL = 5.0  # 設定值再小也不轉成忙迴圈
 
 
 async def push(
@@ -40,8 +41,11 @@ async def push(
     try:
         resp = await client.get(url, params=params, timeout=_TIMEOUT)
         resp.raise_for_status()
+    except httpx.HTTPStatusError as err:
+        # 不記整條例外:push URL 的尾段 `/api/push/<token>` 就是憑證
+        logger.warning("uptime push failed (%s): rejected (%s)", status, err.response.status_code)
     except Exception as exc:  # noqa: BLE001 - 心跳失敗絕不影響服務
-        logger.warning("uptime push failed (%s): %s", status, exc)
+        logger.warning("uptime push failed (%s): %s", status, type(exc).__name__)
 
 
 async def _beat_backend(client: httpx.AsyncClient) -> None:
@@ -91,7 +95,11 @@ def enabled() -> bool:
 async def run() -> None:
     """心跳迴圈;由 lifespan 起停。"""
     logger.info("uptime heartbeat every %ss", settings.uptime_push_interval)
+    interval = max(settings.uptime_push_interval, _MIN_INTERVAL)
     async with httpx.AsyncClient() as client:
         while True:
+            started = time.monotonic()
             await beat_once(client)
-            await asyncio.sleep(settings.uptime_push_interval)
+            # 扣掉這一拍花掉的時間:web 層卡住(不回應而非拒絕)時單次要等到逾時,
+            # 不補償的話後端 monitor 會跟著慢一整個逾時的長度
+            await asyncio.sleep(max(0.0, interval - (time.monotonic() - started)))

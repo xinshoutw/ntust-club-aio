@@ -33,7 +33,7 @@ async def test_frontend_beat_reports_down_when_the_web_layer_is_unreachable(monk
     """nginx 掛掉時要推 down —— 後端自己還活著,不能拿它的狀態代表前端。"""
     monkeypatch.setattr(settings, "uptime_push_backend_url", "")
     monkeypatch.setattr(settings, "uptime_push_frontend_url", "https://kuma.test/api/push/front")
-    monkeypatch.setattr(settings, "web_health_url", "http://web:8080/")
+    monkeypatch.setattr(settings, "web_health_url", "http://web/")
     seen: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -75,3 +75,21 @@ def test_enabled_only_in_prod_with_a_url(monkeypatch, env, url, expected):
     monkeypatch.setattr(settings, "uptime_push_backend_url", url)
     monkeypatch.setattr(settings, "uptime_push_frontend_url", "")
     assert heartbeat.enabled() is expected
+
+
+async def test_a_rejected_push_never_logs_the_url(monkeypatch, caplog):
+    """push URL 的尾段就是憑證:例外訊息含完整 URL,不得整條進 log。"""
+    token = "s3cr3t-token"
+    monkeypatch.setattr(settings, "uptime_push_backend_url", f"https://kuma.test/api/push/{token}")
+    monkeypatch.setattr(settings, "uptime_push_frontend_url", "")
+    monkeypatch.setattr(settings, "web_health_url", "")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(404)
+
+    with caplog.at_level("WARNING"):
+        async with _client(handler) as client:
+            await heartbeat.beat_once(client)
+
+    assert token not in caplog.text
+    assert "404" in caplog.text

@@ -253,9 +253,6 @@ export default function AdminClubSettingsPage() {
                   disabled={deriveKind(form.name.trim()) != null}
                   onChange={(v) => setForm({ ...form, kind: v })}
                 />
-                <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>
-                  名稱以「社」/「會」結尾時自動判定;其他結尾請手動指定(影響社長/會長顯示詞)
-                </div>
               </div>
               <div className={form.account !== saved.account ? 'field-dirty' : undefined}>
                 <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>社團帳號</div>

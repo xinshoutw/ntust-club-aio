@@ -21,8 +21,7 @@ import ActivityReviewModal from './ActivityReviewModal'
 import { clickableProps } from '../../lib/clickable'
 import { SUBMISSION_CHECKS, defaultConfirmations, type CheckKey } from './closeChecks'
 import { clampPage } from '../../lib/paging'
-import { MIN_PHOTOS } from '../eval/scoring'
-import { MIN_REFLECTIONS } from '../activities/types'
+import { MIN_PHOTOS, MIN_REFLECTIONS } from '../activities/types'
 
 // 兩張表各自分頁:待審是逐件處理的佇列,逾期是追蹤用的清單
 const PENDING_PAGE_SIZE = 8

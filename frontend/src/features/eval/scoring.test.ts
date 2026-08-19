@@ -15,8 +15,7 @@ const base: ScoringInput = {
 const act = (id: string, date: string, large = false) => ({ id, name: id, date, large })
 const result = (activityId: string, patch: Partial<ScoringInput['results'][number]> = {}) => ({
   activityId,
-  photoCount: 0,
-  hasVideoLink: false,
+  hasPhotos: false,
   hasReport: false,
   hasFeedback: false,
   ...patch,
@@ -41,15 +40,15 @@ describe('ad1 活動及社課申請', () => {
 })
 
 describe('ad2 照片/影片', () => {
-  test('照片不足 5 張且無影片連結不計分', () => {
+  // 系統不自己數張數:社團可能是交紙本,由承辦在結案審核時確認(D-14)
+  test('承辦沒確認照片就不計分,確認了就計', () => {
     const closed = [act('a', '2026/03/01')]
-    expect(score({ closed, results: [result('a', { photoCount: 4 })] }, 'ad2')).toBe(0)
-    expect(score({ closed, results: [result('a', { photoCount: 5 })] }, 'ad2')).toBe(1)
-    expect(score({ closed, results: [result('a', { hasVideoLink: true })] }, 'ad2')).toBe(1)
+    expect(score({ closed, results: [result('a', { hasPhotos: false })] }, 'ad2')).toBe(0)
+    expect(score({ closed, results: [result('a', { hasPhotos: true })] }, 'ad2')).toBe(1)
   })
   test('大型 ×3;未結案活動的上傳不採計', () => {
     const closed = [act('a', '2026/03/01', true)]
-    const results = [result('a', { photoCount: 5 }), result('ghost', { photoCount: 9 })]
+    const results = [result('a', { hasPhotos: true }), result('ghost', { hasPhotos: true })]
     expect(score({ closed, results }, 'ad2')).toBe(3)
   })
 })
@@ -114,7 +113,7 @@ describe('管理員調整', () => {
     )
     const full: ScoringInput = {
       closed,
-      results: closed.map((a) => result(a.id, { photoCount: 9, hasReport: true, hasFeedback: true })),
+      results: closed.map((a) => result(a.id, { hasPhotos: true, hasReport: true, hasFeedback: true })),
       rosterBySemester: { '114-2': 30, '115-1': 30 },
       hasWebsite: true,
       leaderMeetingsAttended: 4,

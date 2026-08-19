@@ -11,12 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.semesters import semester_of
 from app.models import (
     Activity,
-    ActivityReflection,
     ActivityReport,
     Club,
     ClubMember,
     EvalAdjustment,
-    File,
     SessionAttendance,
     SignupItem,
     SignupItemSession,
@@ -139,51 +137,28 @@ async def gather_scoring_inputs(
 async def _activity_results(
     db: AsyncSession, activity_ids: Sequence[int]
 ) -> dict[int, ActivityResult]:
-    photo_counts: dict[int, int] = {}
+    """ad2–ad4 的依據只有結案審核的三個繳交確認(D-14)。
+
+    不數照片張數、不數心得筆數:社團可能是交紙本,承辦確認了就是交了。
+    沒有成果報告表就沒有旗標可讀,三項一律不計。
+    """
     reports: dict[int, ActivityReport] = {}
-    reflection_counts: dict[int, int] = {}
     if activity_ids:
-        rows = await db.execute(
-            sa.select(File.subject_id, sa.func.count())
-            .where(
-                File.subject_type == "activity",
-                File.slot == "report_photo",
-                File.subject_id.in_(activity_ids),
-                File.archived_at.is_(None),
-            )
-            .group_by(File.subject_id)
-        )
-        photo_counts = dict(rows.all())
         for report in await db.scalars(
             sa.select(ActivityReport).where(ActivityReport.activity_id.in_(activity_ids))
         ):
             reports[report.activity_id] = report
-        rows = await db.execute(
-            sa.select(ActivityReflection.report_id, sa.func.count())
-            .where(ActivityReflection.report_id.in_(activity_ids))
-            .group_by(ActivityReflection.report_id)
-        )
-        reflection_counts = dict(rows.all())
 
-    # 結案審核的繳交確認:未確認之項目以 0 分計(照片確認同時涵蓋影片連結)
     def _confirmed(aid: int, field: str) -> bool:
-        # 沒有成果報告表就沒有繳交可言:照片分不得繞過報告表存在與否
         report = reports.get(aid)
         return bool(getattr(report, field)) if report is not None else False
 
     return {
         aid: ActivityResult(
             activity_id=aid,
-            photo_count=photo_counts.get(aid, 0) if _confirmed(aid, "photos_confirmed") else 0,
-            has_video_link=(
-                bool(reports[aid].video_url)
-                if aid in reports and _confirmed(aid, "photos_confirmed")
-                else False
-            ),
-            has_report=aid in reports and _confirmed(aid, "report_confirmed"),
-            has_feedback=(
-                reflection_counts.get(aid, 0) > 0 and _confirmed(aid, "reflections_confirmed")
-            ),
+            has_photos=_confirmed(aid, "photos_confirmed"),
+            has_report=_confirmed(aid, "report_confirmed"),
+            has_feedback=_confirmed(aid, "reflections_confirmed"),
         )
         for aid in activity_ids
     }

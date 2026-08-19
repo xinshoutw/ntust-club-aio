@@ -24,8 +24,7 @@ import {
 } from '../../api/activities'
 import { useClubConfig } from '../../api/clubConfig'
 import type { EvalFile } from '../eval/types'
-import { MIN_PHOTOS } from '../eval/scoring'
-import { MIN_REFLECTIONS, activityPath } from './types'
+import { MIN_PHOTOS, MIN_REFLECTIONS, activityPath } from './types'
 import type { Reflection } from './types'
 import { TIME_RANGE_SEP, dateRangeText } from './utils'
 import './actform.css'
@@ -424,7 +423,7 @@ function CloseForm({
     }
     setErrors(new Set())
     if (existing.length + photos.length < MIN_PHOTOS && !videoLink.trim()) {
-      message.warning(`照片未達 ${MIN_PHOTOS} 張且無影片連結，評鑑項目「照片 / 影片」將不計分`)
+      message.warning(`照片未達 ${MIN_PHOTOS} 張且無影片連結，承辦審核時可能不予採計`)
     }
 
     const body: CloseSubmitInput = {

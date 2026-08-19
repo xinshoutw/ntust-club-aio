@@ -34,15 +34,15 @@ class TestAd1:
 
 
 class TestAd2:
-    def test_needs_5_photos_or_video(self):
+    def test_follows_the_reviewer_confirmation(self):
+        """依 D-14 只看承辦的繳交確認,系統不自己數張數(社團可能是交紙本)。"""
         closed = (act(1, "2026/03/01"),)
-        assert score("ad2", closed=closed, results=(ActivityResult(1, photo_count=4),)) == 0
-        assert score("ad2", closed=closed, results=(ActivityResult(1, photo_count=5),)) == 1
-        assert score("ad2", closed=closed, results=(ActivityResult(1, has_video_link=True),)) == 1
+        assert score("ad2", closed=closed, results=(ActivityResult(1, has_photos=False),)) == 0
+        assert score("ad2", closed=closed, results=(ActivityResult(1, has_photos=True),)) == 1
 
     def test_large_x3_and_unclosed_uploads_ignored(self):
         closed = (act(1, "2026/03/01", large=True),)
-        results = (ActivityResult(1, photo_count=5), ActivityResult(999, photo_count=9))
+        results = (ActivityResult(1, has_photos=True), ActivityResult(999, has_photos=True))
         assert score("ad2", closed=closed, results=results) == 3
 
 
@@ -122,9 +122,7 @@ class TestOverrides:
             act(i, f"2026/{(i // 27) + 3:02d}/{(i % 27) + 1:02d}", large=True) for i in range(30)
         )
         results = tuple(
-            ActivityResult(
-                a.id, photo_count=9, has_video_link=True, has_report=True, has_feedback=True
-            )
+            ActivityResult(a.id, has_photos=True, has_report=True, has_feedback=True)
             for a in closed
         )
         full = ScoringInput(

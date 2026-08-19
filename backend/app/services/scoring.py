@@ -8,7 +8,6 @@ from dataclasses import dataclass
 
 AD_KEYS = ("ad1", "ad2", "ad3", "ad4", "ad5", "ad6", "ad7", "ad8", "adj")
 
-MIN_PHOTOS = 5
 LARGE_MULTIPLIER = 3
 MERIT_MAX = 5
 PENALTY_MAX = 10
@@ -38,9 +37,13 @@ class ClosedActivity:
 
 @dataclass(frozen=True)
 class ActivityResult:
+    """ad2–ad4 一律以承辦在結案審核時的三個繳交確認為準(D-14)。
+
+    系統不自己數照片張數或心得筆數 —— 社團可能是交紙本,承辦確認了就是交了。
+    """
+
     activity_id: int
-    photo_count: int = 0
-    has_video_link: bool = False
+    has_photos: bool = False  # 照片或影片(同一個確認框)
     has_report: bool = False
     has_feedback: bool = False
 
@@ -93,7 +96,7 @@ def compute_ad_scores(i: ScoringInput) -> list[AdScore]:
         if r is None:
             continue
         w = LARGE_MULTIPLIER if a.large else 1
-        if r.photo_count >= MIN_PHOTOS or r.has_video_link:
+        if r.has_photos:
             photo += 1 * w
         if r.has_report:
             report += 1 * w
@@ -129,7 +132,7 @@ def compute_ad_scores(i: ScoringInput) -> list[AdScore]:
             "ad2",
             ad2,
             AD_MAX["ad2"],
-            f"每活動照片 ≥{MIN_PHOTOS} 張或影片連結;大型 ×{LARGE_MULTIPLIER}",
+            f"每活動經承辦確認照片或影片;大型 ×{LARGE_MULTIPLIER}",
         ),
         AdScore("ad3", ad3, AD_MAX["ad3"], f"每活動 1 分;大型 ×{LARGE_MULTIPLIER}"),
         AdScore("ad4", ad4, AD_MAX["ad4"], f"每活動 2 分;大型 ×{LARGE_MULTIPLIER}"),

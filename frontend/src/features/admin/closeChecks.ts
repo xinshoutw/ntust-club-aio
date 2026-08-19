@@ -1,6 +1,5 @@
 // 結案的繳交確認:承辦人逐項確認,未確認之項目評鑑以 0 分計(核准時隨 body 落庫)。
-import { MIN_PHOTOS } from '../eval/scoring'
-import { MIN_REFLECTIONS } from '../activities/types'
+import { MIN_PHOTOS, MIN_REFLECTIONS } from '../activities/types'
 
 export const SUBMISSION_CHECKS = [
   { key: 'photos', label: '活動照片' },

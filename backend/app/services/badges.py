@@ -135,7 +135,7 @@ async def _club(db: AsyncSession, club_id: int, lock_days: int) -> dict[str, int
     return await _run(db, columns)
 
 
-async def _admin(db: AsyncSession, user: User, lock_days: int) -> dict[str, int]:
+async def _admin(db: AsyncSession, user: User) -> dict[str, int]:
     """受限管理員只拿得到自己看得到的頁面 —— 徽章也是資料量,不對無權限者揭露。"""
     # 徽章=待審佇列的筆數,不是「看得到幾件」:只持 areview 的帳號看得到全部卻一件也簽不了,
     # 那個差額正是它無權過問的件數(services/activity_service.actionable_statuses)
@@ -243,8 +243,7 @@ async def for_user(db: AsyncSession, user: User) -> dict[str, int]:
             lock_days = int(await get_setting(db, "close_lock_days"))
             return await _club(db, user.club_id, lock_days)
         case UserRole.ADMIN:
-            lock_days = int(await get_setting(db, "close_lock_days"))
-            return await _admin(db, user, lock_days)
+            return await _admin(db, user)
         case UserRole.STAFF:
             return await _staff(db)
         case UserRole.VIEWER:

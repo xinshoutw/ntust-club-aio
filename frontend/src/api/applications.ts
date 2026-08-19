@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api, apiPaged, qs } from './client'
+import { useInvalidateBadges } from './badges'
 import { fetchAllPages } from './fetchAll'
 import type { MemberKind } from '../lib/roles'
 import type { StatusKey } from '../lib/status'
@@ -105,6 +106,7 @@ export interface MaintenanceInput {
 
 export function useMaintenanceMutations() {
   const qc = useQueryClient()
+  const invalidateBadges = useInvalidateBadges()
   /** 補傳佐證:第二步失敗留下的無佐證單,不必再送一張新的。
    *  失敗時把已上傳成功的檔案回報給呼叫端 —— 整包重按會把它們再傳一遍,
    *  直到撞上「每筆報修至多 5 個佐證檔案」 */
@@ -120,7 +122,10 @@ export function useMaintenanceMutations() {
         done.push(f)
       }
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: keys.maintenance }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.maintenance })
+      invalidateBadges()
+    },
   })
   const submit = useMutation({
     mutationFn: async ({ location, items, files }: MaintenanceInput) => {
@@ -140,7 +145,10 @@ export function useMaintenanceMutations() {
       return row
     },
     // 主體建立後不論佐證成敗,列表都已變動
-    onSettled: () => void qc.invalidateQueries({ queryKey: keys.maintenance }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.maintenance })
+      invalidateBadges()
+    },
   })
   return { submit, addEvidence }
 }
@@ -228,11 +236,15 @@ export interface PostalInput {
 
 export function usePostalMutations() {
   const qc = useQueryClient()
+  const invalidateBadges = useInvalidateBadges()
   /** 補傳存簿影本:第二步失敗留下的無附件單,不必再送一張新的 */
   const addPassbook = useMutation({
     mutationFn: ({ id, file }: { id: number; file: File }) =>
       uploadFile(`/club/postal-changes/${id}/passbook`, file),
-    onSettled: () => void qc.invalidateQueries({ queryKey: keys.postal }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.postal })
+      invalidateBadges()
+    },
   })
   const submit = useMutation({
     mutationFn: async (b: PostalInput) => {
@@ -254,7 +266,10 @@ export function usePostalMutations() {
       }
       return row
     },
-    onSettled: () => void qc.invalidateQueries({ queryKey: keys.postal }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: keys.postal })
+      invalidateBadges()
+    },
   })
   return { submit, addPassbook }
 }
@@ -327,13 +342,17 @@ export function useCertificates() {
 
 export function useCertificateMutations() {
   const qc = useQueryClient()
+  const invalidateBadges = useInvalidateBadges()
   const create = useMutation({
     mutationFn: ({ term, position }: { term: string; position: MemberKind }) =>
       api<OfficerCertOut>('/club/officer-certificates', {
         method: 'POST',
         body: JSON.stringify({ term, position: POSITION_TO_API[position] ?? position }),
       }).then(toCertificate),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.certificates }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.certificates })
+      invalidateBadges()
+    },
   })
   return { create }
 }

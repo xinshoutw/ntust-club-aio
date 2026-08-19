@@ -3,6 +3,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api, apiPaged, qs } from './client'
+import { useInvalidateBadges } from './badges'
 import { FIELD_TYPE_LABEL, type FieldType, type SignupField, type SignupKind } from '../features/signup/types'
 
 export type MyStatus = 'none' | 'draft' | 'pending' | 'signed'
@@ -150,7 +151,11 @@ export function useSignupItem(id: number | undefined) {
 
 export function useSignupMutations() {
   const qc = useQueryClient()
-  const invalidate = () => void qc.invalidateQueries({ queryKey: keys.all })
+  const invalidateBadges = useInvalidateBadges()
+  const invalidate = () => {
+    void qc.invalidateQueries({ queryKey: keys.all })
+    invalidateBadges()
+  }
   const saveDraft = useMutation({
     mutationFn: ({ id, participants }: { id: number; participants: Participant[] }) =>
       api<null>(`/club/signup-items/${id}/draft`, {

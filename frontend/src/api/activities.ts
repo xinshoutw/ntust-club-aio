@@ -4,6 +4,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { API_BASE, api, apiPaged, qs } from './client'
+import { useInvalidateBadges } from './badges'
 import { fetchAllPages } from './fetchAll'
 import type { StatusKey } from '../lib/status'
 import { fileTypeOf, type EvalFile, type EvalFileType } from '../features/eval/types'
@@ -410,7 +411,11 @@ export function useActivityDetail(id: number | undefined) {
 
 export function useInvalidateActivities() {
   const qc = useQueryClient()
-  return () => void qc.invalidateQueries({ queryKey: keys.all })
+  const invalidateBadges = useInvalidateBadges()
+  return () => {
+    void qc.invalidateQueries({ queryKey: keys.all })
+    invalidateBadges()
+  }
 }
 
 // ---- 申請(建立/更新/送出/刪除)----
@@ -473,7 +478,11 @@ export const submitActivity = (id: number): Promise<ClubActivity> =>
 // 列表頁動作(送出/刪除草稿)
 export function useActivityMutations() {
   const qc = useQueryClient()
-  const invalidate = () => void qc.invalidateQueries({ queryKey: keys.all })
+  const invalidateBadges = useInvalidateBadges()
+  const invalidate = () => {
+    void qc.invalidateQueries({ queryKey: keys.all })
+    invalidateBadges()
+  }
   const submit = useMutation({ mutationFn: submitActivity, onSuccess: invalidate })
   const remove = useMutation({
     mutationFn: (id: number) => api<null>(`/club/activities/${id}`, { method: 'DELETE' }),

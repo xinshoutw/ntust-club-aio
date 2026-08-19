@@ -1,18 +1,16 @@
 version: 2
 
 updates:
-  # 都指 dev:升版跟一般開發一樣先進 dev,別直接動 main 觸發映像發佈
   - package-ecosystem: uv
     directory: /backend
     target-branch: dev
     schedule:
       interval: weekly
-    # 一個生態系一包 PR,不然每週開一堆
     groups:
       backend:
         patterns: ["*"]
 
-  - package-ecosystem: npm   # 吃得到 pnpm-lock.yaml
+  - package-ecosystem: npm
     directory: /frontend
     target-branch: dev
     schedule:

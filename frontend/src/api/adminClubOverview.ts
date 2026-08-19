@@ -188,24 +188,13 @@ export function useAdminClubVenueBookings(clubId: number | null, canView = true)
   })
 }
 
-export type LoanStatusFilter =
-  | 'pending'
-  | 'approved'
-  | 'rejected'
-  | 'cancelled'
-  | 'checked_out'
-  | 'returned'
-  | 'overdue' // 後端推導(checked_out 且已過歸還門檻)
-
 export interface LoanListParams {
   clubId?: number | null
-  /** 可多值(後端取聯集);overdue 為後端推導 */
-  statuses?: LoanStatusFilter[]
-  /** 進行中(審核中/已核准/借出中);與社團端總覽同一支推導 */
+  /** 進行中(審核中/已核准/借出中);判定在後端,見 booking_service */
   active?: boolean
 }
 
-/** 器材借用列表:社團總覽帶 clubId + active;逾期追蹤帶 statuses */
+/** 器材借用列表:社團總覽用(帶 clubId + active)。逾期追蹤走 `useOverdueLoans`(伺服器分頁) */
 export function useAdminEquipmentLoanList(p: LoanListParams, canView = true) {
   return useQuery({
     queryKey: overviewKeys.equipmentLoans(p),
@@ -213,7 +202,6 @@ export function useAdminEquipmentLoanList(p: LoanListParams, canView = true) {
     queryFn: () =>
       fetchAllPages<AdminEquipmentLoanOut>('/admin/equipment-loans', {
         club_id: p.clubId,
-        status: p.statuses,
         active: p.active,
       }).then((rows) => rows.map(toEquipmentLoan)),
   })

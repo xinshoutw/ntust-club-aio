@@ -189,7 +189,9 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
         <div className="card" style={{ padding: 24 }}>
           <div style={sectionTitle}>活動與評鑑</div>
           <div className="form-grid-2">
-            <Form.Item name="closeLockMonths" label="活動結案期限（月）">
+            {/* 文案已先改成「天」;後端仍是 close_lock_months(add_months、上限 6)。
+                改天制要一併動:此處 max→366、後端設定鍵與 activity_service 的期限推導 */}
+            <Form.Item name="closeLockMonths" label="活動結案期限（天）">
               <InputNumber min={1} max={6} precision={0} style={{ width: '100%' }} />
             </Form.Item>
             <Form.Item name="evalYear" label="評鑑年度" style={{ marginBottom: 0 }}>

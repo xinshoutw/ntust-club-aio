@@ -32,7 +32,14 @@ DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— �
 | 行政帳號權限 | 遷移進來的 15 個 admin 權限鍵全空,只有 `super` 看得到東西;分工由承辦決定 |
 | 工讀生帳號 | 舊系統沒有這個角色,遷移後 `role=staff` 是 0 筆,上線前要開 |
 
-### 三、其餘單獨排程
+### 三、下一個 session 要做的兩件
+
+| 項目 | 內容 |
+|---|---|
+| **結案期限改天制** | `close_lock_months` → 天,可輸入 1–366。前端 label 已先改成「天」,**其餘都還沒動**:`AdminSettingsPage` 的 `max` 仍是 6、後端設定鍵與 `activity_service` 的 `add_months`/`make_interval` 都還是月。設定鍵改名要一併處理既有值的換算 |
+| **UI 標點全形化** | `design-guide.md` §7 定案:畫面字串一律全形、不寫句號。現況待改 —— 句號 2、半形逗號 15、半形括號 23、半形冒號 23 |
+
+### 四、其餘單獨排程
 
 | 項目 | 內容 |
 |---|---|
@@ -62,8 +69,7 @@ DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— �
 
 - 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **467 passed**;
   前端 `pnpm exec tsc -b --force` 0 錯、`pnpm run lint` 8 個既有的 fast-refresh warning
-- 前端 `pnpm test` → **136 中 133 passed**;紅的 3 條是 `lib/selectOptions.test.ts`(2)與
-  `features/admin/intakeWindow.test.ts`(1),文案改了但斷言沒同步
+- 前端 `pnpm test` → **136 passed**(32 檔)
 - `ruff check . ../migration` 全綠
 - 每一個 commit 都做過 mutation 驗證:把修法改回舊寫法,確認新測試真的會紅
 

@@ -23,7 +23,7 @@
 - [ ] 阻擋 `SMTP_*`:校方 relay 已實測可寄(`mail.ntust.edu.tw:465`、`SMTP_SECURITY=ssl`)。
   host / username / password 任一為空即降級 log-only(不報錯,但信不會寄出)。
   **`MAIL_FROM_ADDRESS` 需與認證帳號同網域**,否則 relay 會拒收
-- [ ] 應辦 `BACKEND_IMAGE` / `WEB_IMAGE` = GHCR 映像路徑。CI 對 main 的每次 push 同時打 `latest` 與 commit sha 兩個 tag:**正式環境釘 sha**,要回滾就換成上一版的 sha,不必等重新建置。**跨過 alembic 遷移的回滾要先 `alembic downgrade`**:backend 啟動就跑 `upgrade head`,舊映像找不到新 revision 會直接起不來
+- [ ] 應辦 `BACKEND_IMAGE` / `WEB_IMAGE` = GHCR 映像路徑。CI 對 main 的每次 push 同時打 `latest` 與 commit sha 兩個 tag:**正式環境釘 sha**,要回滾就換成上一版的 sha,不必等重新建置
 - [ ] 應辦 `SITE_URL` = `https://clubs.ntust.edu.tw` —— 通知信正文與 Discord 頭像的連結來源,漏填會指向 localhost
 - [ ] 應辦 `WEB_PORT`(預設 8080)—— edge upstream 要帶埠號
 - [ ] 應辦 `UPTIME_PUSH_BACKEND_URL` / `UPTIME_PUSH_FRONTEND_URL`(見 D;`WEB_HEALTH_URL` 有可用預設)
@@ -79,6 +79,7 @@
 ## G. 已知限制
 
 - `alembic downgrade base` 在含 seed 資料的庫上會於 venues category CHECK 收窄那一輪失敗;回滾演練請逐版降,不要一路降到 base
+- **跨過遷移的回滾要先 `alembic downgrade` 再換映像**:舊映像的 `upgrade head` 找不到新 revision,backend 直接起不來
 - migration 的 enum 欄位用 `native_enum=False, create_constraint=True`,Alembic 於 `add_column` 時會自動補 CHECK。**不要再顯式補**,會 `DuplicateObject`
 - E2E 必須打 web 容器的 `:8080`,直接打 `:8000` 會繞過 nginx 層的上傳上限、登入限流、`auth_request` 與安全標頭
 

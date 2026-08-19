@@ -193,7 +193,7 @@ approved 且 end_date + N 天已過且未送結案 → 逾期鎖定(推導,非�
 | video_url | text NULL | **唯一選填**;http(s) 驗證。照片 <5 張且無影片 → ad2 該活動不計分 |
 | expense | int | 實際支出(核銷依據) |
 | submitted_at | timestamptz | |
-| photos_confirmed / report_confirmed / reflections_confirmed | bool 預設 true | 承辦人核准結案時逐項確認繳交;**未確認者評鑑以 0 分計**(照片確認同時涵蓋影片連結)。核准彈窗的預設勾選由「已落庫的值 且 內容達採計門檻」推導 |
+| photos_confirmed / report_confirmed / reflections_confirmed | bool 預設 true | 承辦人核准結案時逐項確認繳交;**未確認者評鑑以 0 分計**(照片確認同時涵蓋影片連結) |
 
 照片走 `files`(slot=`report_photo`),收所有常見影像格式(jpg/png/gif/webp/bmp/tiff/heic/heif/avif),魔術位元組與大小後端重驗,sha256 於同社團內跨活動拒重複。成果報告與心得 PDF 依模板於下載時動態生成,不落檔。
 

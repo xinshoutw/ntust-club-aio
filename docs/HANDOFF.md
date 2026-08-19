@@ -6,7 +6,7 @@
 ## 現在在哪
 
 **開發庫已改用正式資料 snapshot**(不是 mock),demo 與後續開發都以它為準。
-`docs/issues.md` 剩 12 項、`docs/gaps.md` 的未完成功能剩評鑑鏈與幾項延伸。
+`docs/issues.md` 剩 14 項、`docs/gaps.md` 的未完成功能剩評鑑鏈與幾項延伸。
 
 接下來不是照清單逐項修,而是挑一整條線來做(評鑑鏈是最大的一條),
 或先把上線檢查表(`DEPLOY_CHECKLIST.md`)的阻擋項清掉。
@@ -64,7 +64,7 @@ DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— �
 
 - 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **469 passed**;
   前端 `pnpm exec tsc -b --force` 0 錯、`pnpm run lint` 8 個既有的 fast-refresh warning
-- 前端 `pnpm test` → **143 passed**(34 檔)
+- 前端 `pnpm test` → **144 passed**(34 檔)
 - `ruff check . ../migration` 全綠
 - 每一個 commit 都做過 mutation 驗證:把修法改回舊寫法,確認新測試真的會紅
 

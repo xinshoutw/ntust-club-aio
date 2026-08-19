@@ -30,7 +30,7 @@
 
 ## 規則
 
-- 結案期限、鎖定與可結案一律讀後端的 `close_deadline` / `close_locked` / `can_close`(鎖定月數在系統設定可調)
+- 結案期限、鎖定與可結案一律讀後端的 `close_deadline` / `close_locked` / `can_close`(鎖定天數在系統設定可調)
 - 「進行中」的活動狀態集合:`pending_advisor`、`pending_chief`、`pending_dean`、`approved`、`closing_pending_advisor`;草稿、退回、已結案不列入
 - 線上申請只列 `pending`(報修另含 `in_progress`)
 - 借用三類只列 `pending`:已核准的是「正在借用」,在借用總覽頁看

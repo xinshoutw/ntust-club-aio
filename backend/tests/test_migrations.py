@@ -125,7 +125,8 @@ async def test_close_lock_setting_converts_between_months_and_days(migration_db)
         await conn.execute(
             sa.text(
                 "INSERT INTO system_settings (key, value, created_at, updated_at)"
-                " VALUES ('close_lock_months', '2'::jsonb, now(), now())"
+                # 手改 DB 塞得進來的數字字串:新程式的 int() 吃得下,遷移不得把它當髒值刪掉
+                " VALUES ('close_lock_months', '\"2\"'::jsonb, now(), now())"
             )
         )
 

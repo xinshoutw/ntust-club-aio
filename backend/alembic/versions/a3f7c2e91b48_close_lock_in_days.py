@@ -27,7 +27,7 @@ def upgrade() -> None:
     conn.execute(sa.text("DELETE FROM system_settings WHERE key = 'close_lock_days'"))
     conn.execute(
         sa.text(
-            """
+            r"""
             UPDATE system_settings
             SET key = 'close_lock_days',
                 value = to_jsonb(GREATEST(1, LEAST(366, (value #>> '{}')::numeric * :per_month))::int)
@@ -48,7 +48,7 @@ def downgrade() -> None:
     conn.execute(sa.text("DELETE FROM system_settings WHERE key = 'close_lock_months'"))
     conn.execute(
         sa.text(
-            """
+            r"""
             UPDATE system_settings
             SET key = 'close_lock_months',
                 value = to_jsonb(

@@ -141,7 +141,7 @@ export default function VenueBookingPage() {
                 placeholder="請選擇"
                 loading={venuesQuery.isPending}
                 options={tempVenues.map((v) => ({ value: v.id, label: venueLabel(v) }))}
-                notFoundContent={notFoundText(venuesQuery, '目前沒有可借用的場地', '場地清單')}
+                notFoundContent={notFoundText(venuesQuery, '無可借用的場地', '場地清單')}
               />
             </Form.Item>
 
@@ -250,7 +250,7 @@ export default function VenueBookingPage() {
               )}
               {!activeQuery.isError && !activeQuery.isPending && activeRows.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>目前沒有進行中的申請</td>
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>無進行中的申請</td>
                 </tr>
               )}
             </tbody>

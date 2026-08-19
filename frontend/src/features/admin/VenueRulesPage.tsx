@@ -86,7 +86,7 @@ export default function VenueRulesPage() {
                 showSearch
                 options={venues.map((v) => ({ value: v.id, label: v.name }))}
                 placeholder="請選擇"
-                notFoundContent={notFoundText(venuesQuery, '目前沒有場地', '場地清單')}
+                notFoundContent={notFoundText(venuesQuery, '無場地', '場地清單')}
               />
             </Form.Item>
             <Form.Item name="range" label="期間" rules={[{ required: true, message: '請選擇期間' }]} style={{ marginBottom: 12 }}>

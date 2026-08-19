@@ -305,7 +305,7 @@ export default function ReviewPage() {
                     {/* 沒下篩選時說「無符合篩選條件」是在指責使用者的操作:新學期本來就一筆都沒有 */}
                     {clubFilter.length || typeFilter.length || statusFilter.length
                       ? '無符合篩選條件的申請'
-                      : '目前沒有審核紀錄'}
+                      : '無審核紀錄'}
                   </td>
                 </tr>
               )}

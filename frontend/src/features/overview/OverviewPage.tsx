@@ -205,7 +205,7 @@ export default function OverviewPage() {
               <QueryError compact title="待辦事項載入失敗" error={activitiesQuery.error} onRetry={() => activitiesQuery.refetch()} />
             </div>
           )}
-          {!activitiesQuery.isError && todos.length === 0 && <EmptyRow text="目前沒有待辦事項" />}
+          {!activitiesQuery.isError && todos.length === 0 && <EmptyRow text="無待辦事項" />}
           </LoadingBlock>
         </div>
 
@@ -242,7 +242,7 @@ export default function OverviewPage() {
                 <QueryError compact title="公告載入失敗" error={announcementsQuery.error} onRetry={() => announcementsQuery.refetch()} />
               </div>
             )}
-            {!announcementsQuery.isError && announcements.length === 0 && <EmptyRow text="目前沒有公告" />}
+            {!announcementsQuery.isError && announcements.length === 0 && <EmptyRow text="無公告" />}
             </LoadingBlock>
           </div>
 
@@ -281,7 +281,7 @@ export default function OverviewPage() {
                     ))}
                 </Fragment>
               ))}
-            {trackedErrored.length === 0 && tracked.length === 0 && <EmptyRow text="目前沒有進行中的申請" />}
+            {trackedErrored.length === 0 && tracked.length === 0 && <EmptyRow text="無進行中的申請" />}
             </LoadingBlock>
           </div>
         </div>

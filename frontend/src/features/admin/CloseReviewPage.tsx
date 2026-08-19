@@ -435,7 +435,7 @@ export default function CloseReviewPage() {
                   onRetry={() => void pendingQuery.refetch()}
                 />
               ) : (
-                <div style={{ padding: '20px 20px 24px', fontSize: 13, color: 'var(--steel)' }}>目前沒有待審結案</div>
+                <div style={{ padding: '20px 20px 24px', fontSize: 13, color: 'var(--steel)' }}>無待審結案</div>
               )}
             </div>
           )}

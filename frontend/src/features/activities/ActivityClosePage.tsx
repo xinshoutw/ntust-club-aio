@@ -91,7 +91,7 @@ export default function ActivityClosePage() {
             onChange={(id) => setParams({ id: String(id) }, { replace: true })}
             loading={approvedQuery.isPending}
             options={closable.map((a) => ({ value: a.id, label: `${a.name}(${dateRangeText(a)})` }))}
-            notFoundContent={notFoundText(approvedQuery, '目前沒有可結案的活動', '活動清單')}
+            notFoundContent={notFoundText(approvedQuery, '無可結案的活動', '活動清單')}
           />
         }
       />
@@ -137,7 +137,7 @@ export default function ActivityClosePage() {
           )}
           {!approvedQuery.isPending && closable.length === 0 && (
             <div className="card" style={{ marginTop: 20, padding: '40px 24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
-              目前沒有可結案的活動
+              無可結案的活動
             </div>
           )}
         </LoadingBlock>

@@ -216,7 +216,7 @@ export default function AdminViolationsPage() {
               {!loading && !listQuery.isError && !optionsQuery.isError && rows.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={8} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
-                    {filtered ? '沒有符合篩選條件的紀錄' : '目前沒有違規勸導紀錄'}
+                    {filtered ? '無符合篩選條件的紀錄' : '無違規勸導紀錄'}
                   </td>
                 </tr>
               )}

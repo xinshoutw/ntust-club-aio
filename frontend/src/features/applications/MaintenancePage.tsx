@@ -171,7 +171,7 @@ export default function MaintenancePage() {
               )}
               {!listQuery.isPending && !listQuery.isError && activeRows.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有進行中的申請</td>
+                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>無進行中的申請</td>
                 </tr>
               )}
             </tbody>

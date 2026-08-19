@@ -145,7 +145,7 @@ export default function AwardDetailPage() {
 
       {award.items.length === 0 && (
         <div className="card" style={{ marginTop: 16, padding: '40px 24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
-          {award.year} 年度評分項目尚未建立,請待學務處公告
+          {award.year} 年度評分項目尚未建立，請待學務處公告
         </div>
       )}
 

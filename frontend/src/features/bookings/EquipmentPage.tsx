@@ -316,7 +316,7 @@ export default function EquipmentPage() {
               )}
               {!activeQuery.isError && !activeQuery.isPending && activeRows.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>目前沒有進行中的借用</td>
+                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>無進行中的借用</td>
                 </tr>
               )}
             </tbody>

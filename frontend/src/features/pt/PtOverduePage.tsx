@@ -108,7 +108,7 @@ export default function PtOverduePage() {
               )}
               {!listQuery.isPending && !listQuery.isError && rows.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有逾期未歸還的器材</td>
+                  <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>無逾期未歸還的器材</td>
                 </tr>
               )}
             </tbody>

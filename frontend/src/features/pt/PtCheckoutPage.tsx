@@ -104,7 +104,7 @@ export default function PtCheckoutPage() {
               )}
               {!listQuery.isPending && !listQuery.isError && rows.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有待借出的核准單</td>
+                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>無待借出的核准單</td>
                 </tr>
               )}
             </tbody>

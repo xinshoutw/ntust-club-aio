@@ -115,7 +115,7 @@ export default function PtCheckinPage() {
               )}
               {!listQuery.isPending && !listQuery.isError && rows.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有借出中的器材</td>
+                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>無借出中的器材</td>
                 </tr>
               )}
             </tbody>

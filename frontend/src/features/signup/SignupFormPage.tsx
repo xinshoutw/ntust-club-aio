@@ -210,7 +210,7 @@ export default function SignupFormPage() {
             ) : (
               // 獎項全停用時 required 規則永遠過不了,直接說明而不是讓表單無解
               <div style={{ fontSize: 13, color: 'var(--steel)' }}>
-                目前沒有開放中的參賽獎項,請洽學務處。
+                無開放中的參賽獎項，更多疑問請洽學務處
               </div>
             )}
           </div>

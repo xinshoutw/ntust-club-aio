@@ -233,7 +233,7 @@ export default function FixedRoomPage() {
                 options={(venuesQuery.data ?? [])
                   .filter((v) => v.allowFixed)
                   .map((v) => ({ value: v.id, label: venueLabel(v) }))}
-                notFoundContent={notFoundText(venuesQuery, '目前沒有可固定借用的場地', '場地清單')}
+                notFoundContent={notFoundText(venuesQuery, '無可固定借用的場地', '場地清單')}
               />
             </Form.Item>
             <Form.Item name="note" label="用途" rules={[{ required: true, message: '請輸入用途' }]} style={{ marginBottom: 0 }}>
@@ -377,7 +377,7 @@ export default function FixedRoomPage() {
               )}
               {!activeQuery.isError && !activeQuery.isPending && activeRows.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>目前沒有進行中的申請</td>
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>無進行中的申請</td>
                 </tr>
               )}
             </tbody>

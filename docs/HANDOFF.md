@@ -64,9 +64,9 @@ DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— �
 
 - 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **469 passed**;
   前端 `pnpm exec tsc -b --force` 0 錯、`pnpm run lint` 8 個既有的 fast-refresh warning
-- 前端 `pnpm test` → **144 passed**(34 檔)
+- 前端 `pnpm test` → **145 passed**(34 檔)
 - `ruff check . ../migration` 全綠
-- 新測試逐一做過 mutation 驗證(把修法改回舊寫法會紅)。**兩處 clamp 的 `isSuccess` 守衛沒有測試接得住** ——
+- 新測試逐一做過 mutation 驗證(把修法改回舊寫法會紅)。**clamp 的 `isSuccess` 守衛沒有測試接得住** ——
   拿掉它前後端測試全綠,要測得出來得先有能模擬查詢失敗的真實 query client
 
 ## 開發庫(正式資料 snapshot)

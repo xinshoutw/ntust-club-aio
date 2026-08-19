@@ -147,10 +147,30 @@ async def test_non_super_cannot_grant_a_permission_it_lacks(client, db):
     assert granter.is_super is False
 
 
-async def test_non_super_may_revoke_a_permission_it_lacks(client, db):
+async def test_non_super_cannot_strip_an_account_that_outranks_it(client, db):
+    """收回不需要自己持有,但「清空同儕權限」正是接管的第一步。
+
+    清完之後對方就不再持有 actor 沒有的鍵,`_guard_target` 對重設密碼變成恆真 ——
+    拿一次性密碼登入即取得對方身分。設定權限因此與刪除/停用/重設密碼同一條位階檢查。
+    """
     await make_user(db, username="granter2", role="admin", permissions=["aaccount"])
     target = await make_user(db, username="target2", role="admin", permissions=["asetting"])
     await login(client, "granter2")
+
+    resp = await client.put(
+        f"/api/v1/admin/accounts/{target.id}/permissions",
+        json={"permissions": []},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 403, resp.text
+    assert resp.json()["meta"]["code"] == "TARGET_OUTRANKS_ACTOR"
+
+
+async def test_non_super_may_revoke_a_permission_it_also_holds(client, db):
+    """位階相當就管得動:對方持有的鍵 actor 全都有,收回不必額外授權。"""
+    await make_user(db, username="granter3", role="admin", permissions=["aaccount", "asetting"])
+    target = await make_user(db, username="target3", role="admin", permissions=["asetting"])
+    await login(client, "granter3")
 
     resp = await client.put(
         f"/api/v1/admin/accounts/{target.id}/permissions",
@@ -222,3 +242,45 @@ def test_unclassified_files_are_fail_closed():
     """`subject_type` 認不得的檔案只有 super 下載得到,不落到「開放給所有管理員」。"""
     assert permissions.can_download(None, ["afiles", "aeval", "apostal"]) is False
     assert permissions.can_download("something_new", ["aeval"]) is False
+
+
+async def test_the_full_takeover_path_is_closed(client, db):
+    """清權限 → 重設密碼 → 登入:三步各自看起來合理,串起來就是接管。"""
+    await make_user(db, username="actor9", role="admin", permissions=["aaccount"])
+    peer = await make_user(
+        db, username="peer9", role="admin", permissions=["asetting", "approve_dean"]
+    )
+    await login(client, "actor9")
+
+    # 第一步就要擋下來 —— 少了它,後面兩步都會變成合法操作
+    strip = await client.put(
+        f"/api/v1/admin/accounts/{peer.id}/permissions",
+        json={"permissions": []},
+        headers=csrf_headers(client),
+    )
+    assert strip.status_code == 403
+
+    reset = await client.post(
+        f"/api/v1/admin/accounts/{peer.id}/reset-password", headers=csrf_headers(client)
+    )
+    assert reset.status_code == 403
+    await db.refresh(peer)
+    assert peer.permissions == ["asetting", "approve_dean"]
+
+
+async def test_every_grantable_key_fits_in_one_request(client, db):
+    """彈窗會把目錄整個列出來,全勾就是使用者做得到的操作 —— 上限不能比目錄小。"""
+    from app.core.permissions import PERMISSION_KEYS
+
+    await make_user(db, username="root9", role="admin", is_super=True)
+    target = await make_user(db, username="tgt9", role="admin")
+    await db.commit()
+    await login(client, "root9")
+
+    resp = await client.put(
+        f"/api/v1/admin/accounts/{target.id}/permissions",
+        json={"permissions": sorted(PERMISSION_KEYS)},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    assert len(resp.json()["data"]["permissions"]) == len(PERMISSION_KEYS)

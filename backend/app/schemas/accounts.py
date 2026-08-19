@@ -46,7 +46,8 @@ class AccountCreateIn(BaseModel):
     name: str = Field(min_length=1, max_length=50)
     username: str
     email: str | None = Field(None, max_length=100)
-    permissions: list[str] = Field(default_factory=list, max_length=20)  # 僅 role=admin 有效
+    # 上限=白名單大小:全勾是合法輸入,寫死的數字每加一把鍵就少一格
+    permissions: list[str] = Field(default_factory=list, max_length=len(PERMISSION_KEYS))
 
     @field_validator("name")
     @classmethod
@@ -74,7 +75,7 @@ class AccountCreatedOut(AccountOut):
 
 
 class PermissionsIn(BaseModel):
-    permissions: list[str] = Field(max_length=20)
+    permissions: list[str] = Field(max_length=len(PERMISSION_KEYS))
 
     _perms = field_validator("permissions")(_validate_permissions)
 

@@ -22,6 +22,7 @@ from app.api.v1 import (
     admin_violations,
     applications,
     auth,
+    badges,
     bookings,
     club_config,
     club_profile,
@@ -38,6 +39,7 @@ from app.schemas.common import ApiResponse
 
 router = APIRouter()
 router.include_router(auth.router)
+router.include_router(badges.router)
 router.include_router(files.router)
 router.include_router(club_config.router)
 router.include_router(club_profile.router)

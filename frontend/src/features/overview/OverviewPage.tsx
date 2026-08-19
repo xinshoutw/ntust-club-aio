@@ -23,6 +23,7 @@ import { useCertificates, useMaintenanceList, usePostalList } from '../../api/ap
 import './overview.css'
 import { clickableProps } from '../../lib/clickable'
 import { Pager } from '../../components/ui/tableControls'
+import { clampPage } from '../../lib/paging'
 
 const countBadge: React.CSSProperties = {
   fontSize: 12,
@@ -56,11 +57,6 @@ function EmptyRow({ text }: { text: string }) {
 const TODO_PAGE_SIZE = 8
 const CARD_PAGE_SIZE = 10
 
-// 停在第 3 頁時清單縮短(送出/刪除後 invalidate、公告標為已讀後重抓),頁碼會指到不存在的
-// 那一頁,卡片就只剩標題與徽章、內容全空 —— 而空狀態只在「一筆都沒有」時才出現,看不出原因。
-// 用推導而不是 useEffect+setState:狀態只有一份,不會有「畫面已空、頁碼還沒回正」的中間格
-export const clampPage = (page: number, total: number, size: number): number =>
-  Math.min(page, Math.max(1, Math.ceil(total / size)))
 
 export default function OverviewPage() {
   const navigate = useNavigate()

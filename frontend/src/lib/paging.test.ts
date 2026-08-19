@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clampPage } from './OverviewPage'
+import { clampPage } from './paging'
 
 // 停在第 3 頁時清單縮短,頁碼會指到不存在的那一頁:卡片只剩標題,而空狀態只在
 // 「一筆都沒有」時出現 —— 使用者看到的是一張空卡,沒有任何線索也回不去。

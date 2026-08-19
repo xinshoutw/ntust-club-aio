@@ -331,6 +331,9 @@ export default function CloseReviewPage() {
     sort: 'date',
     page: overduePage,
     pageSize: PAGE_SIZE,
+    // 逾期清單全是 approved:看不到該狀態的帳號送出去只會拿 403,
+    // 畫面上就是每次開頁一片紅字。本頁對 approve_advisor 也開放,而它看不到 approved
+    enabled: canUnlock,
   })
   const { unlock } = useAdminActivityMutations()
 
@@ -365,7 +368,13 @@ export default function CloseReviewPage() {
         title="結案審核"
         sub={
           <>
-            待審 <span className="num">{countText(pendingTotal, pendingQuery)}</span> 件 · 逾期未結案 <span className="num">{countText(overdueTotal, overdueQuery)}</span> 件
+            待審 <span className="num">{countText(pendingTotal, pendingQuery)}</span> 件
+            {canUnlock && (
+              <>
+                {' · '}逾期未結案{' '}
+                <span className="num">{countText(overdueTotal, overdueQuery)}</span> 件
+              </>
+            )}
           </>
         }
       />
@@ -431,7 +440,9 @@ export default function CloseReviewPage() {
           <Pager page={pendingPage} pageSize={PAGE_SIZE} total={pendingTotal} onChange={setPendingPage} />
       </div>
 
-      {/* 逾期未結案:已鎖定與已解鎖皆列出(狀態欄區分),整列可點開活動詳情 */}
+      {/* 逾期未結案:已鎖定與已解鎖皆列出(狀態欄區分),整列可點開活動詳情。
+          整段只給看得到 approved 的帳號 —— 停用的查詢恆為 isPending,留著會永遠鋪 Skeleton */}
+      {canUnlock && (
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
         <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>逾期未結案</div>
         <LoadingBlock pending={overdueQuery.isPending}>
@@ -518,6 +529,7 @@ export default function CloseReviewPage() {
         </LoadingBlock>
           <Pager page={overduePage} pageSize={PAGE_SIZE} total={overdueTotal} onChange={setOverduePage} />
       </div>
+      )}
 
       {/* Modal 常駐至關閉動畫結束(afterClose)才卸載 */}
       {selected && (

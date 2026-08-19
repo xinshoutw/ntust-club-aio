@@ -305,6 +305,8 @@ export interface AdminActivityPageParams {
   sort?: string
   page: number
   pageSize: number
+  /** 用於「這個帳號看不到這批狀態」的情形:不送查詢,而不是送出去吃 403 */
+  enabled?: boolean
 }
 
 const keys = {
@@ -342,6 +344,7 @@ export function useAdminActivities(p: AdminActivityListParams = {}, opts: { enab
 export function useAdminActivitiesPaged(p: AdminActivityPageParams) {
   return useQuery({
     queryKey: keys.paged(p),
+    enabled: p.enabled ?? true,
     queryFn: () =>
       apiPaged<AdminActivityOut[]>(
         `/admin/activities${qs({

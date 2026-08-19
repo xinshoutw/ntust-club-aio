@@ -11,6 +11,9 @@ Push monitor 由被監控端主動推,kuma 逾時收不到就判定 down。間�
 
 **只在 ENV=prod 送出**:開發機也推的話,正式站掛掉時 kuma 會被開發機的心跳餵成 up,
 監控就成了裝飾。
+
+**前提是單 worker**(`Dockerfile` 的 uvicorn 無 `--workers`)。加 worker 的話每個行程
+各推一份,卡住的那個不會讓 monitor 翻紅 —— 屆時要改由單一 worker 或外部排程負責。
 """
 
 import asyncio

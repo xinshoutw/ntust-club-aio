@@ -208,11 +208,14 @@ async def _locked_loan(db, loan_id: int) -> EquipmentLoan:
 async def _notify_loan_club(
     background: BackgroundTasks, db, club_id: int | None, kind: str, title: str, desc: str
 ) -> None:
-    # NULL club=行政手動借用:無社團可通知
-    if club_id is None:
-        return
-    club = await db.get(Club, club_id)
+    """推給該社團自設的 webhook;沒有社團(行政手動借用)時走系統 webhook。
+
+    與 `admin_bookings._notify_club` 同一條:手動借用的點交與歸還一樣要留下紀錄,
+    只因為它沒有社團就整筆靜默,頻道上會看不出那批器材借出去過。
+    """
+    club = await db.get(Club, club_id) if club_id is not None else None
     if club is None:
+        background.add_task(notify.discord, kind, title, desc)
         return
     background.add_task(notify.club_event, kind, title, desc, club.discord_webhook_url)
 

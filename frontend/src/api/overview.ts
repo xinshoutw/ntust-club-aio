@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { fetchAllPages } from './fetchAll'
-import { semesterOf } from '../lib/semester'
+import { activityPath } from '../features/activities/types'
 import type { StatusKey } from '../lib/status'
 
 export interface OverviewTodo {
@@ -46,14 +46,6 @@ const IN_PROGRESS = [
   // 後端的 approved 已排除逾期鎖定的列(那些顯示成「已逾期」),待辦要靠這個推導狀態拿回來
   'locked',
 ] as const
-
-// 活動列表預設落在最新學期,而總覽列的多半是舊學期的 —— 不帶學期過去就是一片空白。
-// 帶 open 讓列表直接開該活動的詳情;無日期的草稿沒有學期可帶,交給列表用預設值。
-export const activityPath = (a: Pick<ActivityOut, 'id' | 'date'>): string => {
-  const params = new URLSearchParams({ open: String(a.id) })
-  if (a.date) params.set('semester', semesterOf(dayjs(a.date).format('YYYY/MM/DD')))
-  return `/activities?${params}`
-}
 
 const trackedStatus = (a: ActivityOut): StatusKey => {
   if (a.close_locked) return 'locked'

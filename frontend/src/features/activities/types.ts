@@ -1,3 +1,5 @@
+import dayjs from 'dayjs'
+import { semesterOf } from '../../lib/semester'
 import type { StatusKey } from '../../lib/status'
 import type { EvalFile } from '../eval/types'
 
@@ -115,3 +117,22 @@ export const numColWidth = (values: readonly number[], padPx: number): string =>
   const chars = Math.max(4, ...values.map((v) => v.toLocaleString().length))
   return `calc(${chars}ch + ${padPx}px)`
 }
+
+/** 導向活動列表並定位到某個活動。
+ *
+ * 列表預設落在最新學期,而會被連過去的活動多半在舊學期(總覽的待辦、剛送出的結案、
+ * 被退回待修的申請,依定義都不是本學期的新案),不帶學期就是落地一片空白。
+ * `open` 讓列表直接開該活動的詳情;沒有日期的草稿推不出學期,交給列表用預設值。
+ */
+export const activityPath = (a: { id: number | string; date?: string | null }): string => {
+  const params = new URLSearchParams({ open: String(a.id) })
+  if (a.date) params.set('semester', semesterOf(dayjs(a.date).format('YYYY/MM/DD')))
+  return `/activities?${params}`
+}
+
+/** 核定金額的顯示:`null`=承辦人還沒核定,不是核了 0 元 —— 對正在追經費的社團是兩件事。
+ *  預設純數字(表格欄要對齊);行內敘述傳 fmtMoney 才與同一行的其他金額一致。 */
+export const approvedText = (
+  n: number | null | undefined,
+  fmt: (v: number) => string = (v) => v.toLocaleString(),
+): string => (n == null ? '—' : fmt(n))

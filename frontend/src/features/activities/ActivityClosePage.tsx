@@ -24,6 +24,7 @@ import {
 } from '../../api/activities'
 import { useClubConfig } from '../../api/clubConfig'
 import type { EvalFile } from '../eval/types'
+import { activityPath } from './types'
 import type { Reflection } from './types'
 import { TIME_RANGE_SEP, dateRangeText } from './utils'
 import './actform.css'
@@ -150,7 +151,8 @@ export default function ActivityClosePage() {
             activity={activity}
             detail={detailQuery.data}
             closePhotoBytes={configQuery.data.uploadLimits.closePhotoBytes}
-            onDone={() => navigate('/activities')}
+            // 可結案的活動依定義已經結束,多半落在舊學期 —— 不帶學期回去就是空清單
+            onDone={() => navigate(activityPath(activity))}
           />
         ) : detailQuery.isError ? (
           <div style={{ marginTop: 20 }}>

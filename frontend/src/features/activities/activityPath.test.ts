@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { activityPath } from './overview'
+import { activityPath } from './types'
 
 describe('activityPath', () => {
   // 總覽列的活動多半不在活動列表的預設學期(最新),不帶學期過去就是落地一片空白

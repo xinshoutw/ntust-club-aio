@@ -75,7 +75,7 @@ export default function VenueRulesPage() {
 
   return (
     <div>
-      <PageHeader title="場地不開放規則" sub="場況圖顯示不開放;社團申請與核准命中規則即擋" />
+      <PageHeader title="場地不開放規則"/>
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
         <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>新增規則</div>
@@ -89,14 +89,14 @@ export default function VenueRulesPage() {
                 notFoundContent={notFoundText(venuesQuery, '目前沒有場地', '場地清單')}
               />
             </Form.Item>
-            <Form.Item name="range" label="期間(單日=起訖同日)" rules={[{ required: true, message: '請選擇期間' }]} style={{ marginBottom: 12 }}>
+            <Form.Item name="range" label="期間" rules={[{ required: true, message: '請選擇期間' }]} style={{ marginBottom: 12 }}>
               <RangePicker style={{ width: '100%' }} format="YYYY/MM/DD" />
             </Form.Item>
-            <Form.Item name="weekdays" label="限定星期(不選=每天)" style={{ marginBottom: 12 }}>
-              <Select mode="multiple" allowClear options={WEEKDAY_OPTIONS} placeholder="每天" />
+            <Form.Item name="weekdays" label="特定星期" style={{ marginBottom: 12 }}>
+              <Select mode="multiple" allowClear options={WEEKDAY_OPTIONS} placeholder="每日" />
             </Form.Item>
             <Form.Item name="reason" label="原因" rules={[{ required: true, message: '請輸入原因' }]} style={{ marginBottom: 12 }}>
-              <Input placeholder="例:端午連假不開放、行政徵用" maxLength={200} />
+              <Input placeholder="端午連假不開放、行政徵用" maxLength={200} />
             </Form.Item>
           </div>
           <div style={{ fontSize: 13, fontWeight: 500, margin: '4px 0 8px' }}>

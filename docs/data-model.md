@@ -390,7 +390,7 @@ approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,�
 - 學期起訖規則實作在 `core/semesters.py`,後台不可調;`system_settings.current_year` 只存目前學年度
 - 活動只存日期,統計與行政分依當年度區間篩選,學年度規則變動不影響歷史資料
 
-設定分層:**恆不變** → `.env`(DB 連線、SMTP、secret key);**會變/可能變** → `system_settings`,管理員後台即時調整。目前的 key:
+設定分層:**恆不變** → `.env`(DB 連線、SMTP、secret key);**會變/可能變** → `system_settings`。下表為全部的 key,其中可由後台編輯的見 `admin_settings.MANAGED_KEYS`(`equipment_return_time` 與 `current_year` 不在其列,改值需動 DB):
 
 | key | 內容 |
 |---|---|

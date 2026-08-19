@@ -32,7 +32,7 @@
 | GAP-15 | 待審申請彙整 | 幹部證明與郵局異動已各自成頁(D-11),社團總覽也把單一社團的活動/報修/借用併看了,但沒有一頁**跨社團**把待審件併起來 |
 | GAP-16 | 社團導覽首頁 | Roadmap 項目:`/` 現在是社團總覽(未登入才轉 `/login`),沒有免登入的導覽頁 |
 | GAP-17 | 公開頁 | 舊系統的公開頁三件套退役後直接 404(網域是復用的)。**已定案暫緩**,其餘完成後再議 |
-| GAP-18 | 通知鈴鐺 | 行政/工讀生/評審端的鈴鐺永遠是空的(`AppShell` 的資料來源只對 club 角色啟用)。Discord 事件已補齊(K1–K12,見 [discord-webhook-messages.md](discord-webhook-messages.md)),缺的是站內鈴鐺 |
+| GAP-18 | 通知鈴鐺 | 行政/工讀生/評審端的鈴鐺永遠是空的(`AppShell` 的資料來源只對 club 角色啟用)。Discord 事件已補齊(見 [discord-webhook-messages.md](discord-webhook-messages.md)),缺的是站內鈴鐺 |
 | GAP-19 | 評分草稿跨裝置 | 評審評分只存在元件狀態,關窗即失 |
 
 ## 4. 資料遷移待決

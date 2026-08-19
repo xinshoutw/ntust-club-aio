@@ -31,7 +31,7 @@
 
 ## 2. 事件與現行文案
 
-48 個事件(7 個依狀態有兩種文案)。目的地未註明者=推該社團自設的 webhook,沒設就不推。
+事件依模組分段,同一則依狀態有兩種文案者於條目內註明。目的地未註明者=推該社團自設的 webhook,沒設就不推。
 
 **公告**
 
@@ -215,6 +215,6 @@ D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政�
 
 Discord webhook 可用而現行未用的:embed 的 `url`(標題超連結)、`timestamp`、`fields[]`(≤25,name ≤256 / value ≤1024,可 inline)、`footer`、`author`、`image`/`thumbnail`(單訊息所有 embed 文字合計 ≤6000);Components V2 的 Section、Separator、Media Gallery(啟用後不得再用 content/embeds)。
 
-- **共通版型**(加 fields/footer/timestamp/url):只改 `notify.py` 的 `discord_to()` 與 `announcement_components()`,21 處呼叫點簽名不動
+- **共通版型**(加 fields/footer/timestamp/url):只改 `notify.py` 的 `discord_to()` 與 `announcement_components()`,各呼叫點簽名不動
 - **逐事件差異化版型**:現行呼叫點把資料扁平化成 title/description 兩個字串才進 `notify`。模板若要結構化欄位(社團名、金額、連結各自成 field),須把 `club_event(kind, title, description, club_webhook)` 改吃結構化參數,並同步調整各呼叫點傳入原始欄位
-- **社團版與系統版分流**:兩者已是不同函式(`club_event()` / `discord()`),各改各的
+- **社團版與系統版分流**:兩者已是不同函式(`club_event()` / `discord()`),各改各的;呼叫端簽名不動

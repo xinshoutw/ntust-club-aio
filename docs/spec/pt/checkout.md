@@ -24,7 +24,7 @@ Modal:器材與數量、借用區間、申請時填的用途與聯絡電話、�
 - 排序依起借日升冪(即將領用在前)
 - 狀態轉移 `approved` → `checked_out`;不需 advisory lock —— 核准時已佔用區間額度,點交不改變佔用量
 - **序號不入系統**:`needs_serial` 只驅動點交畫面的核對提醒,系統不記錄任何序號值(decisions.md ISS-55b)
-- 完成後推 Discord 給該社;行政手動借用(`club_id` 為 NULL)顯示「學務處」且不推通知
+- 完成後推 Discord 給該社;行政手動借用(`club_id` 為 NULL)顯示「學務處」,沒有社團可推,改推系統 webhook(J1)
 
 ## 未完成 / 問題
 

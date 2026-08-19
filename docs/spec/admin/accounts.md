@@ -10,6 +10,7 @@
 
 | 動作 | 端點 |
 |---|---|
+| 權限目錄 | `GET /auth/me`(`ADMIN_PAGES` + `APPROVAL_STAGES`,權限彈窗的清單來源) |
 | 管理員/工讀生/評審清單 | `GET /admin/accounts?role=…`(伺服器端分頁,每頁 20;一次一類) |
 | 建立 / 刪除 / 啟停 / 重設密碼 / 權限 | `POST /admin/accounts`、`DELETE`、`PUT /{id}/active`、`POST /{id}/reset-password`、`PUT /{id}/permissions` |
 | 社團分頁 | `GET /admin/clubs`、`POST /admin/clubs/{id}/account`、`POST /admin/clubs/{id}/reset-password`、`PATCH /admin/clubs/{id}` |

@@ -6,7 +6,7 @@
 
 ## A. 阻擋項(其餘段落內也有標記為**阻擋**的列,以標記為準)
 
-- [ ] **備份排程**:`backend/scripts/backup_db.sh` 已就緒(每日 `pg_dump` 自訂格式 + 保留 14 天輪替,**存在同一台機器**,decisions.md OPS-01 明定不做異地),**cron 尚未掛上**(cron 行見該檔頂部)。上傳檔案目錄不在腳本範圍內,要靠 GCE 磁碟快照;部署前另手動 dump 一次
+- [ ] **備份排程**:`backend/scripts/backup_db.sh` 已就緒(每日 `pg_dump` 自訂格式 + 保留 14 天輪替,**存在同一台機器**,decisions.md OPS-01 明定不做異地),**cron 尚未掛上**(cron 行見該檔頂部)。上傳目錄由 compose 的 `db-backup` 服務備份 volume,另以 GCE 磁碟快照兜底;部署前另手動 dump 一次
 - [ ] **器材主檔的建立順序**:`scripts/seed.py` 只建 5 獎項 + 19 場地 + superadmin,**器材主檔由 `migration/cc_import.py` 從舊 `Device` 表帶入**(品名、數量、單次上限、啟用與否)。正式流程必須 seed 之後跑過遷移,否則器材借用無品項可選
 - [ ] **政府行事曆假日**:`holidays` 表未 seed。匯入腳本已就緒(`scripts/import_holidays.py --year <民國年> --yes`,資料源見 decisions.md GAP-06),**每年上線年度都要跑一次**;未匯入的年度 `booking_service.add_workdays` 會退化成只排除週六日,逢國定假日的逾期判定偏一天
 
@@ -23,6 +23,7 @@
   host / username / password 任一為空即降級 log-only(不報錯,但信不會寄出)。
   **`MAIL_FROM_ADDRESS` 需與認證帳號同網域**,否則 relay 會拒收
 - [ ] 應辦 `BACKEND_IMAGE` / `WEB_IMAGE` = GHCR 映像路徑。CI 對 main 的每次 push 同時打 `latest` 與 commit sha 兩個 tag:**正式環境釘 sha**,要回滾就換成上一版的 sha,不必等重新建置
+- [ ] 應辦 `SITE_URL` = `https://clubs.ntust.edu.tw` —— 通知信正文與 Discord 頭像的連結來源,漏填會指向 localhost
 - [ ] 應辦 `WEB_PORT`(預設 8080)—— edge upstream 要帶埠號
 - [ ] 應辦 `UPTIME_PUSH_BACKEND_URL` / `UPTIME_PUSH_FRONTEND_URL`(見 D;`WEB_HEALTH_URL` 有可用預設)
 

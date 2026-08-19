@@ -105,7 +105,7 @@ REST JSON,前綴 `/api/v1`。回應信封:
 | 500 | `INTERNAL` | 未預期錯誤(訊息固定,不洩漏) |
 | 507 | `INSUFFICIENT_STORAGE` | 社團配額或實體磁碟空間不足 |
 
-- **分頁**:`?page=1&page_size=20`(1-based,page_size 上限 100),回應 `meta = { page, page_size, total }`。歷史型列表一律分頁;主檔與選項端點為全量回傳。行政分清單 `/admin/eval/clubs` 未分頁,是已知待修(ISS-47)
+- **分頁**:`?page=1&page_size=20`(1-based,page_size 上限 100),回應 `meta = { page, page_size, total }`。歷史型列表一律分頁;主檔與選項端點為全量回傳
 - **排序**:`?sort=field` 升冪、`-field` 降冪,逗號分隔多鍵;欄位採各端點白名單,未知欄位 422;非唯一排序鍵一律補 id tiebreak
 - **CSRF**:登入時發 `csrf_token` cookie(非 HttpOnly,double-submit 綁 session 列);除 `/auth/login`(此時尚無 session)外,所有寫入請求須帶 `X-CSRF-Token`,前端 `client.ts` 自動附帶
 
@@ -113,7 +113,7 @@ REST JSON,前綴 `/api/v1`。回應信封:
 
 ```
 club-aio/
-├── compose.yml                 # db + backend + web
+├── compose.yml                 # db + backend + web + db-backup
 ├── backend/
 │   ├── app/{core,models,schemas,api/v1,services,assets}
 │   ├── alembic/  scripts/  tests/
@@ -145,16 +145,15 @@ Internet ──▶ [既有 edge proxy VM]  nginx:443
 
 ### 6.2 備份
 
-- 每日 `pg_dump | gzip` → GCS bucket(lifecycle 保留 30 天)
-- 每日 `uploads/` 增量同步 → GCS
-- GCE 磁碟快照每週
+- 每日 `pg_dump`(自訂格式)+ 14 天輪替,**存放於同一環境**(`scripts/backup_db.sh`;decisions.md OPS-01 明定不做異地備份)
+- 上傳目錄不在腳本範圍:由 compose 的 `db-backup` 服務備份 volume,另以 GCE 磁碟快照兜底
 - 部署前手動加跑一次 dump
 
 單機即單點故障,校內系統可接受短暫維護窗口,但資料不可失。
 
 ### 6.3 CI/CD
 
-GitHub Actions:backend job 跑 `ruff check` + `pytest`(起 postgres service),frontend job 目前只跑 `pnpm build`,**尚未跑 lint 與 test**。`main` 分支推送時 build 前後端映像 → push GHCR(校方就緒後改 Artifact Registry,只換位址與認證)。部署以 `gcloud compute ssh` 執行 `docker compose pull && up -d`;backend 容器啟動時自動 `alembic upgrade head`(單 instance 無競態)。
+GitHub Actions:backend job 跑 `ruff check` + `pytest`(起 postgres service),frontend job 跑 `pnpm run lint` → `tsc -b --force` → vitest → `pnpm build`。`main` 分支推送時 build 前後端映像 → push GHCR(校方就緒後改 Artifact Registry,只換位址與認證)。部署以 `gcloud compute ssh` 執行 `docker compose pull && up -d`;backend 容器啟動時自動 `alembic upgrade head`(單 instance 無競態)。
 
 ### 6.4 內層安全
 
@@ -185,6 +184,4 @@ GitHub Actions:backend job 跑 `ruff check` + `pytest`(起 postgres service),fro
 - 覆蓋率目標依全域規範 80%
 - **E2E 必須打 web 容器的 `:8080`**:上傳大小上限、登入限流、`auth_request` 前置認證、CSP 與檔案 framing 標頭全在 nginx 層,直接打 backend 的 `:8000` 會整組繞過
 
-## 9. 未定
 
-- 最終 SMTP relay(校方 relay / Google Workspace / 第三方)

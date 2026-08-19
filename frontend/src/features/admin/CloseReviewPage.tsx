@@ -60,7 +60,7 @@ function CloseReviewModal({
   // 手上還沒有詳情才算失敗:背景重抓失敗時 TanStack 保留既有 data,
   // 內容與按鈕都照舊(同 ActivityReviewModal)
   const detailFailed = detailQuery.isError && !detail
-  // 手上這份可能不是最新的:重抓在途或重抓失敗都不給簽 —— 繳交確認是從它推導的,
+  // 手上這份可能不是最新的:重抓在途或重抓失敗都不給核准 —— 繳交確認是從它推導的,
   // 而核准一次寫死三個旗標並轉 closed,沒有第二條路能改
   const detailStale = detailQuery.isFetching || (detailQuery.isError && !!detail)
   const autoChecks = defaultConfirmations(report, photos.length)

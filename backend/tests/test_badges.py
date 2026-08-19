@@ -144,8 +144,8 @@ async def test_postal_with_an_attachment_stops_asking_for_one(client, db):
     assert (await _badges(client))["postal"] == 0
 
 
-async def test_review_badge_counts_only_the_stage_the_account_can_see(client, db):
-    """學務長只審得到自己那一關:徽章不能把另外兩關的件數也報出去。"""
+async def test_review_badge_counts_only_the_stages_the_account_can_sign(client, db):
+    """徽章=待審佇列的筆數。學務長只有自己那一關;只持頁面鍵的帳號一件也簽不了。"""
     club = await make_club(db)
     creator = await make_user(db, username="club04", role="club", club_id=club.id)
     day = date.today() + timedelta(days=10)
@@ -163,7 +163,20 @@ async def test_review_badge_counts_only_the_stage_the_account_can_see(client, db
         ]
     )
     await make_user(db, username="dean", role="admin", permissions=["approve_dean"])
+    # 權限彈窗只列得出頁面鍵,所以「授了申請審核」的帳號就是這個樣子:看得到、簽不了
+    await make_user(db, username="viewer_only", role="admin", permissions=["areview"])
+    await make_user(
+        db, username="advisor2", role="admin", permissions=["areview", "approve_advisor"]
+    )
+    await make_user(db, username="boss", role="admin", is_super=True)
     await db.commit()
 
     await login(client, "dean")
     assert (await _badges(client))["a-review"] == 1
+    await login(client, "viewer_only")
+    assert (await _badges(client))["a-review"] == 0
+    await login(client, "advisor2")
+    assert (await _badges(client))["a-review"] == 1
+    # super 也不得代簽學務長關:三關裡只算得到前兩關
+    await login(client, "boss")
+    assert (await _badges(client))["a-review"] == 2

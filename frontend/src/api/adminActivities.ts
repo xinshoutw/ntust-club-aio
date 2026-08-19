@@ -276,9 +276,12 @@ export function canActOn(user: SessionUser | null, status: StatusKey): boolean {
   return user.isSuper || user.permissions.includes(`approve_${stage}`)
 }
 
-/** 結案審核(承辦人單關)可否簽核 */
+/** 結案審核(承辦人單關)可否簽核:`aclose` 涵蓋核准與退回(decisions.md D-08),
+ *  看得到就簽得下去 —— 後端 `_require_close_key` 認同一組鍵 */
 export const canActOnClose = (user: SessionUser | null): boolean =>
-  !!user && user.role === 'admin' && (user.isSuper || user.permissions.includes('approve_advisor'))
+  !!user &&
+  user.role === 'admin' &&
+  (user.isSuper || ['aclose', 'approve_advisor'].some((k) => user.permissions.includes(k)))
 
 // ---- 查詢 ----
 

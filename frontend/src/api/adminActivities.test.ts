@@ -39,10 +39,12 @@ describe('canActOn(申請審核「本關」推導)', () => {
 })
 
 describe('canActOnClose(結案承辦人單關)', () => {
-  it('approve_advisor 或 super 可簽;僅持 aclose(頁面權限)不可', () => {
+  it('aclose 或 approve_advisor 或 super 可簽(decisions.md D-08:看得到就簽得下去)', () => {
     expect(canActOnClose(admin({ permissions: ['approve_advisor'] }))).toBe(true)
     expect(canActOnClose(admin({ isSuper: true }))).toBe(true)
-    expect(canActOnClose(admin({ permissions: ['aclose'] }))).toBe(false)
+    // 後端 _require_close_key 認這把鍵,前端關掉按鈕等於頁面進得去卻永遠簽不了
+    expect(canActOnClose(admin({ permissions: ['aclose'] }))).toBe(true)
+    expect(canActOnClose(admin({ permissions: ['areview'] }))).toBe(false)
     expect(canActOnClose(null)).toBe(false)
   })
 })

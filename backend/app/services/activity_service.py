@@ -75,6 +75,22 @@ def visible_statuses(user) -> set[ActivityStatus] | None:
     return visible
 
 
+def actionable_statuses(user) -> set[ActivityStatus]:
+    """該帳號**簽得下去**的待審狀態(徽章與待審佇列用;`visible_statuses` 是看得到的範圍)。
+
+    與 `_require_stage_key` 同一條規則:學務長關卡即使 super 也要明確持有 `approve_dean`。
+    只持頁面鍵 `areview` 的帳號看得到全部、一件也簽不了 —— 徽章要跟著佇列是 0。
+    """
+    out: set[ActivityStatus] = set()
+    if user.is_super or "approve_advisor" in user.permissions:
+        out.add(ActivityStatus.PENDING_ADVISOR)
+    if user.is_super or "approve_chief" in user.permissions:
+        out.add(ActivityStatus.PENDING_CHIEF)
+    if "approve_dean" in user.permissions:
+        out.add(ActivityStatus.PENDING_DEAN)
+    return out
+
+
 def is_close_locked(activity: Activity, lock_months: int, now: datetime | None = None) -> bool:
     """逾期鎖定(推導):已核准、活動結束日(end_date)+N 個月已過、未送結案、未解鎖。"""
     if activity.status != ActivityStatus.APPROVED or activity.close_unlocked:

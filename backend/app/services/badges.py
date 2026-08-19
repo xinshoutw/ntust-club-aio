@@ -1,8 +1,8 @@
 """側欄徽章:每個角色「還等著誰動作」的筆數。
 
 只給**有時效性、或在等使用者下一步**的頁面出數字 —— 主檔維護、查詢型清單一律不給,
-徽章一多就沒有人會看。定義與各頁清單的預設漏斗一致(同一組狀態),否則側欄說 3 筆、
-點進去看到 5 筆。
+徽章一多就沒有人會看。定義與該頁的預設漏斗一致,否則側欄說 3 筆、點進去看到 5 筆;
+申請審核算的是**簽得下去**的關卡(`actionable_statuses`),與待審佇列同一集合。
 
 一個角色一次 SELECT:每個徽章是一個純量子查詢,往返次數不隨項目數成長。
 鍵名即前端 nav item 的 key,前端不需要第二份對照表。
@@ -42,7 +42,7 @@ from app.models.enums import (
     ViolationStatus,
 )
 from app.services import booking_service as svc
-from app.services.activity_service import can_close_sql, visible_statuses
+from app.services.activity_service import actionable_statuses, can_close_sql
 from app.services.evaluation import get_eval_window
 from app.services.settings_service import get_setting
 
@@ -137,18 +137,10 @@ async def _club(db: AsyncSession, club_id: int, lock_months: int) -> dict[str, i
 
 async def _admin(db: AsyncSession, user: User, lock_months: int) -> dict[str, int]:
     """受限管理員只拿得到自己看得到的頁面 —— 徽章也是資料量,不對無權限者揭露。"""
-    # 只持單一簽核鍵的帳號(學務長)在審核頁只列得到自己那一關 —— 徽章要算同一個集合,
-    # 否則數字大於它審得到的筆數,而那個差額本身就是它無權過問的件數
-    pending = {
-        ActivityStatus.PENDING_ADVISOR,
-        ActivityStatus.PENDING_CHIEF,
-        ActivityStatus.PENDING_DEAN,
-    }
-    visible = visible_statuses(user)
-    if visible is not None:
-        pending &= visible
+    # 徽章=待審佇列的筆數,不是「看得到幾件」:只持 areview 的帳號看得到全部卻一件也簽不了,
+    # 那個差額正是它無權過問的件數(services/activity_service.actionable_statuses)
     columns = {
-        "a-review": _count(Activity.status.in_(pending), of=Activity),
+        "a-review": _count(Activity.status.in_(actionable_statuses(user)), of=Activity),
         "a-close": _count(
             Activity.status == ActivityStatus.CLOSING_PENDING_ADVISOR, of=Activity
         ),

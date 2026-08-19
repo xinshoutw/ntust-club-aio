@@ -9,6 +9,7 @@ import { useAuth } from '../../app/auth'
 import { fmtMoney } from '../activities/types'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import { useModalAutoFocus } from '../../components/ui/useModalAutoFocus'
+import SectionTitle from '../../components/ui/SectionTitle'
 import {
   canActOnClose,
   useAdminActivitiesPaged,
@@ -120,7 +121,7 @@ function CloseReviewModal({
       open={open}
       onCancel={onClose}
       afterClose={afterClose}
-      width={640}
+      width={760}
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 26 }}>
           <span style={{ fontSize: 16, fontWeight: 600 }}>{item.name}</span>
@@ -167,7 +168,8 @@ function CloseReviewModal({
         <div style={{ marginTop: 16, fontSize: 13, color: 'var(--steel)' }}>此活動尚無結案資料</div>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: '88px 1fr', gap: '9px 12px', fontSize: 13, marginTop: 4 }}>
+          <SectionTitle first>結案成果</SectionTitle>
+          <div style={{ display: 'grid', gridTemplateColumns: '88px 1fr', gap: '9px 12px', fontSize: 13 }}>
             <div style={detailLabel}>社團</div><div>{item.club}</div>
             <div style={detailLabel}>活動日期</div><div className="num">{dateRange}</div>
             <div style={detailLabel}>實際時間</div>
@@ -200,7 +202,7 @@ function CloseReviewModal({
                 ' · 無影片連結'
               )}
               {' '}· 心得 <span className="num">{report.reflections.length}</span> 人
-              {photoShort && <div style={{ color: '#C13B34', fontSize: 12 }}>照片未達 5 張且無影片連結,成果照片項不計分</div>}
+              {photoShort && <div style={{ color: '#C13B34', fontSize: 12 }}>照片未達 5 張且無影片</div>}
             </div>
             <div style={detailLabel}>活動重點</div><div style={{ lineHeight: 1.7 }}>{report.highlights}</div>
             <div style={detailLabel}>達成目標</div><div style={{ lineHeight: 1.7 }}>{report.goals}</div>
@@ -224,8 +226,8 @@ function CloseReviewModal({
 
           {/* 照片縮圖:點擊開原圖(GET /files/{id}) */}
           {photos.length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>活動照片</div>
+            <div>
+              <SectionTitle>活動照片(<span className="num">{photos.length}</span> 張)</SectionTitle>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {photos.map((p) => (
                   <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer" title={p.name}>
@@ -244,8 +246,8 @@ function CloseReviewModal({
           )}
 
           {/* 學習心得全文:審核者須核實內容 */}
-          <div style={{ marginTop: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>學習心得</div>
+          <div>
+            <SectionTitle>學習心得(<span className="num">{report.reflections.length}</span> 人)</SectionTitle>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto' }}>
               {report.reflections.map((r, i) => (
                 <div key={i} style={{ padding: '8px 12px', background: 'var(--paper)', borderRadius: 6, fontSize: 13 }}>

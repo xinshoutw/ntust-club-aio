@@ -108,3 +108,10 @@ export const taskAlignEm = (tasks: readonly string[]): number => {
   const within = lens.filter((n) => n - lens[0] <= 3)
   return within[within.length - 1]
 }
+
+/** 表格數字欄寬:以最寬的一個數字為準(1ch=一個數字寬,逗號更窄所以一定夠),另加內距。
+ *  下限 4ch 是給欄名(「自籌」這類兩個全形字)留的,否則整欄都是 0 時標題會被擠。 */
+export const numColWidth = (values: readonly number[], padPx: number): string => {
+  const chars = Math.max(4, ...values.map((v) => v.toLocaleString().length))
+  return `calc(${chars}ch + ${padPx}px)`
+}

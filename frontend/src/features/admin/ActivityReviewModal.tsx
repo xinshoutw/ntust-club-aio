@@ -2,13 +2,20 @@ import { useEffect, useRef, useState } from 'react'
 import { App, Button, Checkbox, Input, InputNumber, Modal, Skeleton } from 'antd'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
+import SectionTitle from '../../components/ui/SectionTitle'
 import LargeBadge from '../../components/ui/LargeBadge'
 import { Cols } from '../../components/ui/tableControls'
 import StampTrail, { type StampStage } from '../../components/ui/StampTrail'
 import { useModalAutoFocus } from '../../components/ui/useModalAutoFocus'
 import WorkTable from '../activities/WorkTable'
+import { numColWidth } from '../activities/types'
 import { useAuth } from '../../app/auth'
 import { canActOn, stageOfStatus, type ReviewItem } from '../../api/adminActivities'
+
+// .tb.dense td 的左右內距(index.css);核定欄的 td 右內距歸零、改由 InputNumber 自己的
+// 內距與邊框佔掉,兩者分開算才不會少估而讓數字換行
+const CELL_PAD = 24
+const INPUT_CHROME = 18
 
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 
@@ -201,7 +208,7 @@ export default function ActivityReviewModal({
       open={open}
       onCancel={onClose}
       afterClose={afterClose}
-      width={hasBudget ? 880 : 620}
+      width={hasBudget ? 1080 : 640}
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 26 }}>
           <span style={{ fontSize: 16, fontWeight: 600 }}>{item?.name ?? pendingName ?? ''}</span>
@@ -275,7 +282,7 @@ export default function ActivityReviewModal({
         }}
       >
         <div>
-          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 10 }}>基本資料</div>
+          <SectionTitle first>基本資料</SectionTitle>
           <div style={{ display: 'grid', gridTemplateColumns: '96px 1fr', gap: '8px 12px', fontSize: 13 }}>
             <div style={detailLabel}>社團</div><div>{item.club}</div>
             <div style={detailLabel}>類型</div><div>{item.type}</div>
@@ -345,9 +352,7 @@ export default function ActivityReviewModal({
 
         {hasBudget && (
           <div>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>經費明細</div>
-            </div>
+            <SectionTitle first>經費明細</SectionTitle>
             {/* 經費來源:有申請補助時第一關必填認定 */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 13 }}>
               <span style={{ color: 'var(--steel)', whiteSpace: 'nowrap' }}>經費來源</span>
@@ -363,9 +368,16 @@ export default function ActivityReviewModal({
               )}
             </div>
             <table className="tb dense fixed">
-              {/* table-layout: fixed 要有明確寬度。金額上限 999,999(13px tabular 約 52px),
-                  自籌/擬請給 72、核定 88(內含 InputNumber),其餘全給摘要 —— 遷移資料的說明很長 */}
-              <Cols widths={['auto', 72, 72, 88]} />
+              {/* table-layout: fixed 要有明確寬度,但寬度由資料決定:自籌/擬請各看自己的最大值,
+                  核定跟擬請同寬(核定 ≤ 擬請)再加輸入框的內距與邊框。其餘全給摘要 —— 遷移資料的說明很長 */}
+              <Cols
+                widths={[
+                  'auto',
+                  numColWidth(d.budget.map((b) => b.selfFund), CELL_PAD),
+                  numColWidth(d.budget.map((b) => b.requested), CELL_PAD),
+                  numColWidth(d.budget.map((b) => b.requested), CELL_PAD + INPUT_CHROME),
+                ]}
+              />
               <thead>
                 <tr>
                   <th scope="col" style={{ paddingLeft: 0 }}>摘要</th>

@@ -9,6 +9,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { Cols, FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
 import StatusPill from '../../components/ui/StatusPill'
+import SectionTitle from '../../components/ui/SectionTitle'
 import LargeBadge from '../../components/ui/LargeBadge'
 import { STATUS } from '../../lib/status'
 import { semesterOptions } from '../../lib/semester'
@@ -80,14 +81,6 @@ function FileChip({ f, onPreview }: { f: EvalFile; onPreview: (f: EvalFile) => v
 }
 
 // 詳情彈窗的分區標題
-function SectionTitle({ children, first }: { children: React.ReactNode; first?: boolean }) {
-  return (
-    <div style={{ fontSize: 13, fontWeight: 600, margin: first ? '0 0 10px' : '22px 0 10px', paddingBottom: 6, borderBottom: '1px solid var(--line)' }}>
-      {children}
-    </div>
-  )
-}
-
 // 與申請不一致的實際值:直接取代申請值並以色彩標示,hover 顯示預計值
 function ActualValue({ actual, planned }: { actual: React.ReactNode; planned: string }) {
   return (

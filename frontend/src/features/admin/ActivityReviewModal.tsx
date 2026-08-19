@@ -143,6 +143,8 @@ export default function ActivityReviewModal({
   const requestedTotal = d?.budget.reduce((s, b) => s + b.requested, 0) ?? item?.requested ?? 0
   const approvedTotal = d?.budget.reduce((s, b) => s + (approvals[b.id] ?? 0), 0) ?? 0
   const singleStage = requestedTotal === 0 // 無補助 → 承辦人單關即核准
+  // 一毛都沒申請就沒有東西可核:核定欄與經費來源整個收掉(後端也擋非零核定與必填來源)
+  const hasSubsidy = requestedTotal > 0
   const nextStageNote =
     isFirstStage && !singleStage ? ',送組長關' : item?.status === 'pending_chief' ? ',送學務長關' : ''
 
@@ -353,7 +355,8 @@ export default function ActivityReviewModal({
         {hasBudget && (
           <div>
             <SectionTitle first>經費明細</SectionTitle>
-            {/* 經費來源:有申請補助時第一關必填認定 */}
+            {/* 經費來源:有申請補助時第一關必填認定(submitApprove 同一條判定) */}
+            {hasSubsidy && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 13 }}>
               <span style={{ color: 'var(--steel)', whiteSpace: 'nowrap' }}>經費來源</span>
               {canEdit ? (
@@ -367,6 +370,7 @@ export default function ActivityReviewModal({
                 <span>{item.fundSource || '—'}</span>
               )}
             </div>
+            )}
             <table className="tb dense fixed">
               {/* table-layout: fixed 要有明確寬度,但寬度由資料決定:自籌/擬請各看自己的最大值,
                   核定跟擬請同寬(核定 ≤ 擬請)再加輸入框的內距與邊框。其餘全給摘要 —— 遷移資料的說明很長 */}
@@ -375,15 +379,17 @@ export default function ActivityReviewModal({
                   'auto',
                   numColWidth(d.budget.map((b) => b.selfFund), CELL_PAD),
                   numColWidth(d.budget.map((b) => b.requested), CELL_PAD),
-                  numColWidth(d.budget.map((b) => b.requested), CELL_PAD + INPUT_CHROME),
+                  ...(hasSubsidy
+                    ? [numColWidth(d.budget.map((b) => b.requested), CELL_PAD + INPUT_CHROME)]
+                    : []),
                 ]}
               />
               <thead>
                 <tr>
                   <th scope="col" style={{ paddingLeft: 0 }}>摘要</th>
                   <th scope="col" className="r">自籌</th>
-                  <th scope="col" className="r">擬請</th>
-                  <th scope="col" className="r" style={{ paddingRight: 0 }}>核定</th>
+                  <th scope="col" className="r" style={hasSubsidy ? undefined : { paddingRight: 0 }}>擬請</th>
+                  {hasSubsidy && <th scope="col" className="r" style={{ paddingRight: 0 }}>核定</th>}
                 </tr>
               </thead>
               <tbody>
@@ -394,9 +400,13 @@ export default function ActivityReviewModal({
                       <div style={{ fontSize: 12, color: 'var(--steel)' }}>{b.description}</div>
                     </td>
                     <td className="r num">{b.selfFund.toLocaleString()}</td>
-                    <td className="r num">{b.requested.toLocaleString()}</td>
+                    <td className="r num" style={hasSubsidy ? undefined : { paddingRight: 0 }}>
+                      {b.requested.toLocaleString()}
+                    </td>
+                    {hasSubsidy && (
                     <td style={{ paddingRight: 0 }}>
-                      {canEdit ? (
+                      {/* 擬請 0 的列核不出金額(max=0),輸入框只會是個永遠打不動的 0 */}
+                      {canEdit && b.requested > 0 ? (
                         <InputNumber
                           size="small"
                           style={{ width: '100%' }}
@@ -411,6 +421,7 @@ export default function ActivityReviewModal({
                         <div className="r num" style={{ textAlign: 'right' }}>{(approvals[b.id] ?? 0).toLocaleString()}</div>
                       )}
                     </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -423,12 +434,17 @@ export default function ActivityReviewModal({
                   <td className="r num" style={{ borderBottom: 'none', padding: '10px 8px 0 0' }}>
                     {selfFundTotal.toLocaleString()}
                   </td>
-                  <td className="r num" style={{ borderBottom: 'none', padding: '10px 8px 0 0' }}>
+                  <td
+                    className="r num"
+                    style={{ borderBottom: 'none', padding: hasSubsidy ? '10px 8px 0 0' : '10px 0 0' }}
+                  >
                     {requestedTotal.toLocaleString()}
                   </td>
-                  <td className="r num" style={{ borderBottom: 'none', padding: '10px 0 0', fontWeight: 600 }}>
-                    {approvedTotal.toLocaleString()}
-                  </td>
+                  {hasSubsidy && (
+                    <td className="r num" style={{ borderBottom: 'none', padding: '10px 0 0', fontWeight: 600 }}>
+                      {approvedTotal.toLocaleString()}
+                    </td>
+                  )}
                 </tr>
               </tfoot>
             </table>

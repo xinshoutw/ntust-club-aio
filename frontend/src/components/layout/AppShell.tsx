@@ -199,7 +199,7 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
               })
             }
           >
-            <span className="sidebar-item-icon"><LogoutOutlined /></span>
+            <span className="sidebar-item-icon" aria-hidden="true"><LogoutOutlined /></span>
             <span className="sidebar-item-label">登出({user?.name})</span>
           </button>
         </div>

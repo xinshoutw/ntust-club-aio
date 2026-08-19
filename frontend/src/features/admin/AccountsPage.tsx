@@ -19,21 +19,12 @@ import {
 import { useAdminClubMutations, useAdminClubs, type AdminClub } from '../../api/adminClubs'
 import { useAuth } from '../../app/auth'
 import { canAccessAdminPath } from '../../lib/permissions'
-import type { AdminPage } from '../../api/auth'
 
-// 權限彈窗以外的既有鍵(簽核關卡)僅供顯示;儲存時原樣保留
-const EXTRA_KEY_LABELS: Record<string, string> = {
-  approve_advisor: '承辦人簽核',
-  approve_chief: '組長簽核',
-  approve_dean: '學務長簽核',
-}
-
-// 頁面權限鍵一律取自 session 的目錄表(後端 core/permissions),前端不留第二份
-const permsText = (a: Account, pages: AdminPage[]): string => {
+// 顯示詞一律取自 session 的目錄表(後端 core/permissions 的頁面權限 + 簽核關卡),
+// 前端不留第二份 —— 目錄裡沒有的鍵直接印鍵名,那代表目錄漏了東西
+const permsText = (a: Account, catalogue: { key: string; label: string }[]): string => {
   if (a.isSuper) return '全部'
-  const labels = a.permissions.map(
-    (k) => pages.find((p) => p.key === k)?.label ?? EXTRA_KEY_LABELS[k] ?? k,
-  )
+  const labels = a.permissions.map((k) => catalogue.find((p) => p.key === k)?.label ?? k)
   return labels.length ? labels.join('、') : '—'
 }
 
@@ -351,7 +342,7 @@ export default function AccountsPage() {
             <td className="cell-clip" title={a.name} style={{ fontWeight: 500 }}>{a.name}</td>
             <td className="num cell-clip" title={a.username} style={{ color: 'var(--steel)' }}>{a.username}</td>
             <td>{a.isSuper ? '最高權限' : '一般'}</td>
-            <td style={{ fontSize: 13, color: 'var(--steel)' }}>{permsText(a, adminPages)}</td>
+            <td style={{ fontSize: 13, color: 'var(--steel)' }}>{permsText(a, grantKeys)}</td>
             <td><ActiveTag active={a.active} /></td>
             {actions(
               a,

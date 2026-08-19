@@ -4,7 +4,7 @@
 
 程式碼層面的待修項目不在此表,見 `issues.md`(已知問題)與 `gaps.md`(未完成功能)。
 
-## A. 阻擋項
+## A. 阻擋項(其餘段落內也有標記為**阻擋**的列,以標記為準)
 
 - [ ] **備份排程**:`backend/scripts/backup_db.sh` 已就緒(每日 `pg_dump` 自訂格式 + 保留 14 天輪替,**存在同一台機器**,decisions.md OPS-01 明定不做異地),**cron 尚未掛上**(cron 行見該檔頂部)。上傳檔案目錄不在腳本範圍內,要靠 GCE 磁碟快照;部署前另手動 dump 一次
 - [ ] **器材主檔的建立順序**:`scripts/seed.py` 只建 5 獎項 + 19 場地 + superadmin,**器材主檔由 `migration/cc_import.py` 從舊 `Device` 表帶入**(品名、數量、單次上限、啟用與否)。正式流程必須 seed 之後跑過遷移,否則器材借用無品項可選

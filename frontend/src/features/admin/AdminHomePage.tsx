@@ -20,7 +20,7 @@ const semesterLabel = (s: string): string => {
 
 // 卡片=側欄徽章的展開版:同一支查詢、同一組定義,不會出現「側欄 3 筆、卡片 5 筆」
 const STATS: Stat[] = [
-  { label: '待審活動申請', key: 'a-review', path: '/admin/review' },
+  { label: '待我簽核的活動申請', key: 'a-review', path: '/admin/review' },
   { label: '待審結案', key: 'a-close', path: '/admin/close-review' },
   { label: '待審固定借用', key: 'a-room', path: '/admin/rooms' },
   { label: '待審臨時借用', key: 'a-booking', path: '/admin/bookings' },

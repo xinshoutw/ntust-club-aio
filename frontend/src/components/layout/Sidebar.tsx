@@ -51,8 +51,8 @@ export default function Sidebar({ groups, onNavigate }: SidebarProps) {
               <Tooltip key={item.key} title={item.disabledHint} placement="right">
                 <span className="sidebar-item disabled" aria-disabled="true">
                   <span className="sidebar-item-icon" aria-hidden="true">
-                  {item.icon}
-                </span>
+                    {item.icon}
+                  </span>
                   <span className="sidebar-item-label">{item.label}</span>
                 </span>
               </Tooltip>

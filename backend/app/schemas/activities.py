@@ -183,6 +183,10 @@ class ReportOut(BaseModel):
     expense: int
     submitted_at: datetime
     reflections: list[ReflectionOut]
+    # 已落庫的繳交確認:遷移件帶的是舊系統的旗標,結案核准會整組覆寫
+    photos_confirmed: bool
+    report_confirmed: bool
+    reflections_confirmed: bool
 
 
 class ApprovalOut(BaseModel):
@@ -223,7 +227,7 @@ class ActivityOut(BaseModel):
     approved_total: int | None = None
     semester: str = ""
     close_locked: bool = False
-    close_deadline: date | None = None  # 結案期限=活動結束日+N 個月(推導不儲存)
+    close_deadline: date | None = None  # 結案期限=活動結束日+N 天(推導不儲存)
     can_close: bool = False
     has_close_draft: bool = False
     club_name: str = ""  # 行政端填(社團端看自己,免帶)

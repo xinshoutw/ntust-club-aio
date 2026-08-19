@@ -59,7 +59,7 @@ export interface AdminActivity extends ReviewItem {
   selfFundTotal: number
   approvedTotal?: number
   closeLocked: boolean
-  closeDeadline?: string // 結案期限=活動結束日+鎖定月數(推導)
+  closeDeadline?: string // 結案期限=活動結束日+鎖定天數(推導)
   semester: string
   /** 最近審核時間=申請/結案簽核紀錄的 max(created_at)YYYY/MM/DD HH:mm;無審核紀錄=undefined */
   reviewedAt?: string
@@ -89,6 +89,10 @@ export interface AdminCloseReport {
   expense: number
   submittedAt: string // YYYY/MM/DD HH:mm
   reflections: { name: string; dept: string; text: string }[]
+  // 已落庫的繳交確認(遷移件帶的是舊系統的旗標);結案核准會整組覆寫
+  photosConfirmed: boolean
+  reportConfirmed: boolean
+  reflectionsConfirmed: boolean
 }
 
 export interface AdminActivityDetail extends AdminActivity {
@@ -133,6 +137,9 @@ interface ReportOut {
   expense: number
   submitted_at: string
   reflections: { id: number; student_name: string; dept: string; body: string }[]
+  photos_confirmed: boolean
+  report_confirmed: boolean
+  reflections_confirmed: boolean
 }
 
 interface AdminActivityOut {
@@ -226,6 +233,9 @@ const toReport = (r: ReportOut): AdminCloseReport => ({
   expense: r.expense,
   submittedAt: slashDateTime(r.submitted_at),
   reflections: r.reflections.map((x) => ({ name: x.student_name, dept: x.dept, text: x.body })),
+  photosConfirmed: r.photos_confirmed,
+  reportConfirmed: r.report_confirmed,
+  reflectionsConfirmed: r.reflections_confirmed,
 })
 
 // 日期時間彙整:跨日附結束日,有填時間附 HH:mm–HH:mm

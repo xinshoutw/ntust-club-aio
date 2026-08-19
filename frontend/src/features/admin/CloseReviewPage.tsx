@@ -19,7 +19,9 @@ import {
 } from '../../api/adminActivities'
 import ActivityReviewModal from './ActivityReviewModal'
 import { clickableProps } from '../../lib/clickable'
+import { SUBMISSION_CHECKS, defaultConfirmations, type CheckKey } from './closeChecks'
 import { clampPage } from '../../lib/paging'
+import { MIN_PHOTOS } from '../eval/scoring'
 
 // 兩張表各自分頁:待審是逐件處理的佇列,逾期是追蹤用的清單
 const PENDING_PAGE_SIZE = 8
@@ -27,13 +29,6 @@ const OVERDUE_PAGE_SIZE = 10
 
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 
-// 繳交確認:承辦人逐項確認;未確認之項目評鑑以 0 分計(核准時隨 body 落庫)
-const SUBMISSION_CHECKS = [
-  { key: 'photos', label: '活動照片' },
-  { key: 'report', label: '成果報告表' },
-  { key: 'reflections', label: '學習心得' },
-] as const
-type CheckKey = (typeof SUBMISSION_CHECKS)[number]['key']
 
 // 結案審核彈窗:承辦人單關;完整結案資料(GET /admin/activities/{id})+繳交確認,
 // 核准或退回(退回原因必填)
@@ -55,7 +50,9 @@ function CloseReviewModal({
   const [rejectOpen, setRejectOpen] = useState(false)
   const [reason, setReason] = useState('')
   const approveRef = useModalAutoFocus(open)
-  const [checks, setChecks] = useState<Record<CheckKey, boolean>>({ photos: true, report: true, reflections: true })
+  // 只存承辦手動改過的項目,其餘跟著推導走:詳情是非同步載入的,
+  // 用 state 存預設值就得等 effect 補寫,中間那一刻的值會是錯的
+  const [override, setOverride] = useState<Partial<Record<CheckKey, boolean>>>({})
 
   const detail = detailQuery.data
   const report = detail?.report
@@ -63,6 +60,8 @@ function CloseReviewModal({
   // 手上還沒有詳情才算失敗:背景重抓失敗時 TanStack 保留既有 data,
   // 內容與按鈕都照舊(同 ActivityReviewModal)
   const detailFailed = detailQuery.isError && !detail
+  const autoChecks = defaultConfirmations(report, photos.length)
+  const checks = { ...autoChecks, ...override }
   const canReview = item.status === 'closing_pending_advisor' && canActOnClose(user)
 
   const closeReject_ = () => {
@@ -114,7 +113,7 @@ function CloseReviewModal({
   // 實際支出含自籌:與「自籌+核定補助」的總經費比較才可比(僅比核定補助幾乎必超)
   const totalBudget = item.selfFundTotal + (item.approvedTotal ?? 0)
   const overBudget = !!report && approvedKnown && report.expense > totalBudget
-  const photoShort = !!detail && photos.length < 5 && !report?.videoUrl
+  const photoShort = !!detail && !!report && photos.length < MIN_PHOTOS && !report.videoUrl
   const dateRange = item.endDate !== item.date ? `${item.date} – ${item.endDate}` : item.date
 
   return (
@@ -130,8 +129,8 @@ function CloseReviewModal({
         </div>
       }
       footer={
-        // 讀不到結案內容就不給簽核鈕:繳交確認三旗標本來就預設全勾,看不到照片與心得還能核准
-        // 等於整份 fail-open;退回也不該在讀不到內容時按
+        // 讀不到結案內容就不給簽核鈕:看不到照片與心得就沒有東西可核實,
+        // 繳交確認也只會是空詳情推導出來的值;退回也不該在讀不到內容時按
         detailFailed ? (
           <div style={{ fontSize: 12, color: 'var(--steel)' }}>
             詳細資訊載入失敗，請重試{canReview ? '後再審核' : ''}
@@ -273,11 +272,14 @@ function CloseReviewModal({
                   <Checkbox
                     key={c.key}
                     checked={checks[c.key]}
-                    onChange={(e) => setChecks((prev) => ({ ...prev, [c.key]: e.target.checked }))}
+                    onChange={(e) => setOverride((prev) => ({ ...prev, [c.key]: e.target.checked }))}
                   >
                     {c.label}
                   </Checkbox>
                 ))}
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 8 }}>
+                未達採計門檻者已自動取消勾選，核實無誤可自行勾回
               </div>
             </div>
           )}
@@ -335,7 +337,7 @@ export default function CloseReviewPage() {
     pageSize: PENDING_PAGE_SIZE,
   })
   // 逾期未結案:後端推導過濾,含已鎖定與已解鎖(overdue=true 不分鎖定與否);
-  // 活動日舊在前=逾期最久的先處理(期限=活動日+鎖定月數,單調)
+  // 活動日舊在前=逾期最久的先處理(期限=活動日+鎖定天數,單調)
   const overdueQuery = useAdminActivitiesPaged({
     overdue: true,
     sort: 'date',

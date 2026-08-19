@@ -36,7 +36,8 @@ export interface AdScore {
   note: string
 }
 
-const MIN_PHOTOS = 5
+/** ad2:每活動照片 ≥5 張或有影片連結才計分(結案頁與結案審核共用同一條) */
+export const MIN_PHOTOS = 5
 const LARGE_MULTIPLIER = 3
 export const LEADER_MEETING_POINTS = 1.25 // 負責人會議每場 1.25 分,全學年 4 場滿分 5
 export const AD_MAX: Record<AdKey, number> = {

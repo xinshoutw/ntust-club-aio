@@ -139,8 +139,12 @@ async def club_event(
     kind: str, title: str, description: str = "", club_webhook: str | None = None
 ) -> None:
     """社團相關事件:只推該社團自設的 webhook(管理項目);沒設就不推。"""
-    if club_webhook:
-        await discord_to(club_webhook, kind, title, description)
+    if not club_webhook:
+        # 遷入後各社的 webhook 都是空的,整社靜默是常態 —— 留一行才回答得了
+        # 「這則通知到底送了沒」,否則零投遞與零紀錄長得一模一樣
+        logger.info("club webhook unset, skipped: %s %s", kind, title)
+        return
+    await discord_to(club_webhook, kind, title, description)
 
 
 # ---- 公告通知 ----

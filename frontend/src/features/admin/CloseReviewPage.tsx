@@ -197,7 +197,7 @@ function CloseReviewModal({
               社員 <span className="num">{report.memberCount}</span> · 非社員{' '}
               <span className="num">{report.nonMemberCount}</span>
             </div>
-            <div style={detailLabel}>送件</div><div className="num">{report.submittedAt}</div>
+            <div style={detailLabel}>申請</div><div className="num">{report.submittedAt}</div>
             <div style={detailLabel}>經費</div>
             <div>
               {hasSubsidy && (
@@ -420,7 +420,7 @@ export default function CloseReviewPage() {
         }
       />
 
-      {/* 待審佇列:送件早的在前 */}
+      {/* 待審佇列:申請早的在前 */}
       <div className="card" style={{ marginTop: 20 }}>
         <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 6px' }}>待審結案</div>
         <LoadingBlock pending={pendingQuery.isPending}>
@@ -481,21 +481,21 @@ export default function CloseReviewPage() {
           <Pager page={pendingPage} pageSize={PENDING_PAGE_SIZE} total={pendingTotal} onChange={setPendingPage} />
       </div>
 
-      {/* 逾期未結案:已鎖定與已解鎖皆列出(狀態欄區分),整列可點開活動詳情。
+      {/* 逾期未結案:已鎖定與已解鎖皆列出,整列可點開活動詳情。整段都是逾期件,不另立狀態欄
+          ——「解鎖」鈕只出現在仍鎖定的列,已解鎖者因此是沒有動作的那幾列。
           整段只給看得到 approved 的帳號 —— 停用的查詢恆為 isPending,留著會永遠鋪 Skeleton */}
       {canSeeOverdue && (
       <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
         <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>逾期未結案</div>
         <LoadingBlock pending={overdueQuery.isPending}>
           <table className="tb dense fixed" style={{ minWidth: 640 }} aria-label="逾期未結案活動">
-            {/* 社團/名稱吃剩餘寬並截斷;期限/狀態/動作固定 px */}
-            <Cols widths={['26%', 'auto', 110, 96, 90]} />
+            {/* 社團/名稱吃剩餘寬並截斷;期限/動作固定 px */}
+            <Cols widths={['26%', 'auto', 110, 90]} />
             <thead>
               <tr>
                 <th scope="col">社團</th>
                 <th scope="col">活動名稱</th>
                 <th scope="col">結案期限</th>
-                <th scope="col">狀態</th>
                 <th scope="col" aria-label="動作" />
               </tr>
             </thead>
@@ -526,9 +526,6 @@ export default function CloseReviewPage() {
                   <td className="num" style={{ fontSize: 13, color: 'var(--steel)' }}>
                     {l.closeDeadline ?? '—'}
                   </td>
-                  <td>
-                    <StatusPill status={l.closeLocked ? 'locked' : 'unlocked'} />
-                  </td>
                   <td className="r">
                     {l.closeLocked && canUnlock && (
                       <Button
@@ -548,7 +545,7 @@ export default function CloseReviewPage() {
               ))}
               {overdueQuery.isError && (
                 <tr className="no-hover">
-                  <td colSpan={5}>
+                  <td colSpan={4}>
                     <QueryError
                       compact
                       title="逾期未結案載入失敗"
@@ -560,7 +557,7 @@ export default function CloseReviewPage() {
               )}
               {!overdueQuery.isPending && !overdueQuery.isError && overdue.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
+                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
                     沒有逾期的活動
                   </td>
                 </tr>

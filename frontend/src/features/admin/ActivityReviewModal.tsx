@@ -49,7 +49,7 @@ function stagesOf(item: ReviewItem): StampStage[] {
     item.status === 'rejected'
       ? STAGE_CHARS.findIndex(([stage]) => !stamps.some((x) => x.stage === stage))
       : -1
-  return STAGE_CHARS.map(([stage, char], i) => {
+  const all: StampStage[] = STAGE_CHARS.map(([stage, char], i) => {
     const stamp = stamps.find((x) => x.stage === stage)
     const state: StampState = stamp
       ? 'done'
@@ -67,6 +67,11 @@ function stagesOf(item: ReviewItem): StampStage[] {
       noteTitle: stamp?.atFull,
     }
   })
+  // 還在跑的單子畫滿三格(後面兩關真的還會發生);已終結的只畫到最後一格有動作的關卡 ——
+  // 核定 0 元即當場核准(D-16),後兩關永遠不會有人簽,標成「等待中」是等一件不會來的事
+  if (pending) return all
+  const last = all.map((x) => x.state !== 'todo').lastIndexOf(true)
+  return all.slice(0, last + 1)
 }
 
 /** 第一關核准送出的內容:經費來源、逐項核定金額、大型活動認可 */

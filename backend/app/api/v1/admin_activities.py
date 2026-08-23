@@ -474,11 +474,18 @@ async def approve(
     elif body.is_large_approved is False or stage == "advisor":
         activity.is_large_approved = False
 
-    if stage == "advisor" and requested_total > 0:
+    # 核定 0 元 = 這張單不動到學校的錢,後面的關卡沒有東西可審 → 當場核准(D-16)。
+    # 判準是**核定**不是擬請:社團有申請、承辦人決定不給,一樣不必再送組長與學務長。
+    # 任何一關都算 —— 舊系統 53 件提前核准裡有 11 件是組長把金額改成 0 的。
+    # 逐項加總才是權威值:遷移件的 school_approved 是 NULL(21 件待審全部),
+    # 拿聚合欄位判會把「還沒補寫聚合值」讀成「核定 0 元」而跳過後兩關
+    if sum(i.approved_subsidy or 0 for i in activity.budget_items) == 0:
+        activity.status = ActivityStatus.APPROVED
+    elif stage == "advisor":
         activity.status = ActivityStatus.PENDING_CHIEF
     elif stage == "chief":
         activity.status = ActivityStatus.PENDING_DEAN
-    else:  # advisor 無補助單關,或 dean 終關
+    else:  # dean 終關
         activity.status = ActivityStatus.APPROVED
 
     _record(db, activity, ApprovalSubject.ACTIVITY, stage, ApprovalDecision.APPROVE, user)

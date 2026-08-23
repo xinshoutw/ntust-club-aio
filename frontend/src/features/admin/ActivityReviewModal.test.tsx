@@ -117,17 +117,25 @@ describe('ActivityReviewModal 的簽核章軌', () => {
     expect(screen.getAllByText('等待中')).toHaveLength(2) // 組長、學務長還沒簽
   })
 
-  // 舊系統遷入的已核准活動只留了 1–2 位簽核者。狀態說「已核准」就把三顆章全點亮,
-  // 等於替沒有簽核紀錄的組長與學務長背書 —— 蓋不蓋章一律看 stamps
-  test('已核准但只有承辦人簽過時,另外兩關不得點亮', () => {
+  const stampChars = () =>
+    [...document.querySelectorAll('div')]
+      .filter((el) => ['承', '組', '長'].includes(el.textContent ?? ''))
+      .map((el) => el.textContent)
+
+  // 核定 0 元即當場核准(D-16),組長與學務長永遠不會簽這張單。
+  // 舊系統遷入的 53 件已核准活動就是這樣只留了 1–2 位簽核者 ——
+  // 狀態說「已核准」就把三顆章全點亮,等於替沒有簽核紀錄的人背書
+  test('已核准但只有承辦人簽過時,另外兩關整格不畫', () => {
     showTrail('approved', [advisorStamp])
 
     expect(screen.getByText('陳彥仁')).toBeTruthy()
-    expect(screen.getAllByText('等待中')).toHaveLength(2)
-    // 蓋好的章是實心的(--seal),未蓋的是虛線圈
-    const stamps = [...document.querySelectorAll('div')].filter(
-      (el) => el.textContent === '承' || el.textContent === '組' || el.textContent === '長',
-    )
-    expect(stamps.map((el) => el.style.borderStyle)).toEqual(['', 'dashed', 'dashed'])
+    expect(stampChars()).toEqual(['承'])
+    expect(screen.queryByText('等待中')).toBeNull()
+  })
+
+  test('還在跑的單子照畫三格,後面兩關是真的還會發生', () => {
+    showTrail('pending_chief', [advisorStamp])
+
+    expect(stampChars()).toEqual(['承', '組', '長'])
   })
 })

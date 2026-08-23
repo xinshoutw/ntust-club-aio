@@ -1166,3 +1166,53 @@ async def test_stamps_stay_on_their_own_stage_after_a_resubmit(client, db):
         ("advisor", "advisor"),
         ("chief", "chief"),
     ]
+
+
+async def test_zero_approval_finishes_the_case_at_that_stage(client, db):
+    """核定 0 元 = 不動到學校的錢,後面的關卡沒有東西可審 → 當場核准(D-16)。
+
+    判準是**核定**不是擬請:社團申請了、承辦人決定不給,一樣不必再送組長與學務長。
+    """
+    await seed(client, db)
+    aid = await submit_activity(client, db)  # 有擬請補助
+
+    await login(client, "advisor")
+    items = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]["budget_items"]
+    assert sum(i["requested_subsidy"] for i in items) > 0
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/approve",
+        json={
+            "fund_source": "本案不予補助",
+            "budget": [{"item_id": i["id"], "approved_subsidy": 0} for i in items],
+        },
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["status"] == "approved"
+
+    # 章軌只會有承辦人一格 —— 組長與學務長永遠不會簽這張單
+    stamps = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]["stamps"]
+    assert [s["stage"] for s in stamps] == ["advisor"]
+
+
+async def test_partial_zero_still_needs_the_remaining_stages(client, db):
+    """只有一項核定 0 不算數:總額還有錢就照走三關。"""
+    await seed(client, db)
+    aid = await submit_activity(client, db)
+
+    await login(client, "advisor")
+    items = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]["budget_items"]
+    assert len(items) > 1
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/approve",
+        json={
+            "fund_source": "學務處經費",
+            "budget": [
+                {"item_id": i["id"], "approved_subsidy": 0 if n else i["requested_subsidy"]}
+                for n, i in enumerate(items)
+            ],
+        },
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["status"] == "pending_chief"

@@ -1,6 +1,6 @@
 import { Cascader } from 'antd'
 import OptionsError from '../../components/ui/OptionsError'
-import { useClubOptions } from '../../api/adminClubs'
+import { clubFolder, groupClubsByFolder, useClubOptions } from '../../api/adminClubs'
 
 interface CascaderOption {
   value: string
@@ -32,14 +32,11 @@ export default function ClubCascader({
 }) {
   const { data: all = [], isError, error, refetch } = useClubOptions()
   const clubs = omit?.length ? all.filter((c) => !omit.includes(c.name)) : all
-  // 停社舊社團 attribute 為 null → 歸「未分類」資料夾
-  const attrOf = (c: { attribute: string | null }) => c.attribute ?? '未分類'
   const attr = (() => {
     const found = clubs.find((c) => c.name === value)
-    return found ? attrOf(found) : undefined
+    return found ? clubFolder(found) : undefined
   })()
-  // 依主檔出現順序分組(後端已按 性質 → 名稱 排序;null 排最前 → 未分類在頂)
-  const attrs = [...new Set(clubs.map(attrOf))]
+  const folders = groupClubsByFolder(clubs)
   // 選項載不到就整個換成失敗說明:空的 cascader 只會顯示「暫無資料」,而選不到社團的頁面
   // (社團總覽/成員列表/管理項目/行政分審核)`clubId` 一律 null,整頁是空的、一句錯誤都沒有
   if (isError) return <OptionsError what="社團清單" error={error} onRetry={() => void refetch()} />
@@ -64,10 +61,10 @@ export default function ClubCascader({
       showSearch={{
         filter: (input, path) => path.some((o) => String(o.label).includes(input)),
       }}
-      options={attrs.map((a) => ({
-        value: a,
-        label: a,
-        children: clubs.filter((c) => attrOf(c) === a).map((c) => ({ value: c.name, label: c.name })),
+      options={folders.map((f) => ({
+        value: f.label,
+        label: f.label,
+        children: f.options.map((name) => ({ value: name, label: name })),
       }))}
       // 社團數可破 60:預設彈窗一次只看得到 5 個社團,拉高與縮列距在 index.css 的 .club-cascader-popup
       classNames={{ popup: { root: 'club-cascader-popup' } }}

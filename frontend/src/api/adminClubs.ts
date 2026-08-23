@@ -136,6 +136,21 @@ export interface ClubOption {
   attribute: string | null // null 歸「未分類」
 }
 
+/** 社團的資料夾:停社舊社團的 attribute 為 null,一律歸「未分類」。
+ *  二級選單(ClubCascader)與社團漏斗(ClubFilterButton)共用這一份 —— 各寫一份的話,
+ *  同一個社團在兩個選單裡會落在不同資料夾 */
+export const clubFolder = (c: Pick<ClubOption, 'attribute'>): string => c.attribute ?? '未分類'
+
+/** 依主檔出現順序分成 資料夾 → 社團名(後端已按 性質 → 名稱 排序;null 排最前 → 未分類在頂) */
+export function groupClubsByFolder(
+  clubs: readonly ClubOption[],
+): { label: string; options: string[] }[] {
+  return [...new Set(clubs.map(clubFolder))].map((folder) => ({
+    label: folder,
+    options: clubs.filter((c) => clubFolder(c) === folder).map((c) => c.name),
+  }))
+}
+
 export function useClubOptions() {
   return useQuery({
     queryKey: adminClubKeys.options,

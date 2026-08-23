@@ -140,29 +140,55 @@ export function Pager({
   )
 }
 
+/** 分組選項:選項多到平鋪讀不完時(社團 159 個)改成二級選單,第一層是資料夾 */
+export interface FilterGroup {
+  label: string
+  options: readonly string[]
+}
+
+const isGrouped = (o: readonly string[] | readonly FilterGroup[]): o is readonly FilterGroup[] =>
+  o.length > 0 && typeof o[0] !== 'string'
+
 export function FilterButton({
   options,
   selected,
   onChange,
   label,
 }: {
-  options: string[]
+  /** 平鋪字串,或分組後的二級選單 */
+  options: readonly string[] | readonly FilterGroup[]
   selected: string[]
   onChange: (next: string[]) => void
   label: string
 }) {
+  const groups = isGrouped(options) ? options : []
+  const flat = isGrouped(options) ? [] : (options as readonly string[])
+  // 已選的值一律留在選單裡:選項來自另一支查詢,它失敗時 options 是空的,
+  // 少了這一行使用者連取消自己下的篩選都沒有入口(而篩選是 fail-closed 的空結果)。
+  // 分組時掛不進任何資料夾的已選值放在最上層,同樣取消得掉
+  const listed = new Set(groups.length ? groups.flatMap((g) => g.options) : flat)
+  const orphans = selected.filter((v) => !listed.has(v))
+  const items = [
+    ...orphans.map((o) => ({ key: o, label: o })),
+    ...(groups.length
+      ? groups.map((g) => ({
+          key: `group:${g.label}`,
+          label: g.label,
+          children: g.options.map((o) => ({ key: o, label: o })),
+        }))
+      : flat.map((o) => ({ key: o, label: o }))),
+  ]
   return (
     <Dropdown
       trigger={['click']}
       menu={{
-        // 已選的值一律留在選單裡:選項來自另一支查詢,它失敗時 options 是空的,
-        // 少了這一行使用者連取消自己下的篩選都沒有入口(而篩選是 fail-closed 的空結果)
-        items: [...new Set([...options, ...selected])].map((o) => ({ key: o, label: o })),
+        items,
         selectable: true,
         multiple: true,
         selectedKeys: selected,
-        onSelect: ({ selectedKeys }) => onChange(selectedKeys),
-        onDeselect: ({ selectedKeys }) => onChange(selectedKeys),
+        // 子選單的父項也會進 selectedKeys(AntD 的 SubMenu 本身不可選,但保險起見濾掉)
+        onSelect: ({ selectedKeys }) => onChange(selectedKeys.filter((k) => !k.startsWith('group:'))),
+        onDeselect: ({ selectedKeys }) => onChange(selectedKeys.filter((k) => !k.startsWith('group:'))),
       }}
     >
       <button type="button" className="link-btn" aria-label={label} style={{ padding: 0 }}>

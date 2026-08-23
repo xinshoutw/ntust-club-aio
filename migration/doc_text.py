@@ -57,11 +57,30 @@ def _to_pdf(src: Path, workdir: Path) -> Path | None:
     return out if out.exists() else None
 
 
+def _sniff(src: Path) -> str:
+    """副檔名不可信(舊系統存了一批沒有副檔名的檔),用內容判型。"""
+    mime = subprocess.run(
+        ["file", "-b", "--mime-type", str(src)], capture_output=True, text=True
+    ).stdout.strip()
+    if mime == "application/pdf":
+        return ".pdf"
+    if mime.startswith(("application/vnd.openxmlformats", "application/msword",
+                        "application/vnd.oasis", "application/vnd.ms-")):
+        return ".docx"  # 一律丟給 LibreOffice,它自己認得出實際格式
+    if mime.startswith("image/"):
+        return ".jpg"
+    if mime.startswith("text/"):
+        return ".txt"
+    return ""
+
+
 def extract(rel: str) -> str:
     src = MEDIA / rel
     if not src.is_file():
         return f"[MISSING] {rel}"
     ext = src.suffix.lower()
+    if ext not in IMAGE_EXT | OFFICE_EXT | {".pdf", ".txt"}:
+        ext = _sniff(src) or ext
     if ext in IMAGE_EXT:
         return f"[IMAGE] {rel} — 沒有文字層,請直接開圖判讀"
     if ext == ".txt":

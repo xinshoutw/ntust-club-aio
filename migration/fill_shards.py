@@ -56,8 +56,24 @@ def text_size(rel: str) -> int:
     return p.stat().st_size if p.exists() else 0
 
 
+def in_scope(row: dict) -> bool:
+    """要派工的列。
+
+    沒有結案文件 = 活動未結案,成果與心得在 import 端本來就會被跳過(沒有
+    ActivityReport 可寫),派出去也只是燒 token。這種列只剩活動內容要補,
+    而它多半已由 cms_import 從舊系統的活動描述預帶,只有真的空白才收進來。
+    """
+    return bool(row["結案文件"].strip()) or not row["填_活動內容"].strip()
+
+
 def split(budget: int) -> None:
-    rows, _ = load_rows()
+    all_rows, _ = load_rows()
+    rows = [r for r in all_rows if in_scope(r)]
+    skipped = len(all_rows) - len(rows)
+    print(
+        f"派工 {len(rows)} 列 / 全部 {len(all_rows)} 列"
+        f"(略過 {skipped} 列:未結案且活動內容已有值)"
+    )
     FILL.mkdir(parents=True, exist_ok=True)
     shards: list[list[dict]] = [[]]
     used = 0
@@ -84,7 +100,12 @@ def split(budget: int) -> None:
                     "活動名稱": e["row"]["活動名稱"],
                     "活動日期": e["row"]["活動日期"],
                     "狀態": e["row"]["狀態"],
-                    "既有_執行成效": e["row"]["填_成果_執行成效"],
+                    "既有_活動內容": e["row"]["填_活動內容"],
+                    "要填": (
+                        ["活動內容", "成果三欄", "心得"]
+                        if e["row"]["結案文件"].strip()
+                        else ["活動內容"]
+                    ),
                     "來源檔": [
                         {"role": role, "text": str((TEXT / (rel + ".txt")).resolve()), "orig": rel}
                         for role, rel in e["files"]

@@ -69,14 +69,16 @@ uv run python ../migration/cms_import.py --reset    # 3. 再清社團/活動/公
 
 | 舊 | 新 | 說明 |
 |---|---|---|
-| Club_club + clubcontent + clubproperty | clubs + users(club) | 性質=停社 → is_active=false、attribute=NULL;kind 依名稱結尾推導,特例見 `KIND_OVERRIDES`;「國際事務處」「testclub」「學務處就輔組」不遷 |
-| Club_student | club_members | Semester「104 1」→「104-1」;社長/會長→負責人、副社長/副會長→副負責人;Phone/Date→phone/updated_at;同學期同學號取 id 最大者 |
-| Club_teacher | clubs.advisor_* / advisor_out_* | 校內/校外各取最新一位 |
+| Club_club + clubcontent + clubproperty | clubs + users(club) | 性質=停社 → is_active=false、attribute=NULL;kind 依名稱結尾推導,特例見 `KIND_OVERRIDES`;`SKIP_CLUBS` 不遷(行政單位 2 個 + 測試社 `testclub`/`Test`/`testtesttest`,後兩者沒標停社,不排掉就是可登入的正式帳號) |
+| Club_student | club_members | Semester「104 1」→「104-1」;`Title` 是自由文字,`member_kind` 正規化後判正副負責人(「副社」「系會長」「第十三屆會長」「財務&副社長」都算;「社長組」「秘書」「榮譽社長」不算);Phone/Date→phone/updated_at;同(社團,學期,學號)取**身份較高**者、同高再取 id 大的。idempotent 同時看舊列 id 與自然鍵 —— 唯一鍵是自然鍵,只認舊 id 會在換新 dump 重跑時撞唯一鍵並回滾整個交易 |
+| Club_teacher | clubs.advisor_* / advisor_out_* | 校內/校外各取最新一位。舊欄位標籤是「職位」與「電話」,存的就是職稱(教授/教官)與完整號碼,新系統校內兩格已改名為「系所 / 職稱」與「電話」(`advisor_phone`,上限 30),原樣寫入不裁切 |
 | Club_activity(+fund/staff/meta) | activities(+budget_items/reports) | type:course/conference→社課或會議、extra→活動;status 對映見 `STATUS_MAP`;`Review`=申請表的「活動描述」→ `activities.content`(**不是**結案成果,超過 150 字截斷並列印舊 id);結案成果三欄舊制沒有,一律留空待 `text_fields.py` 轉錄 |
+| Club_activityfund | activity_budget_items | 科目名經 `BUDGET_CATEGORY_MAP` 對到現行目錄(`指導老師/教練費`→`指導老師、教練費`;目錄沒有的 `演講費/裁判費`→`其他`,原科目名接進說明)。對不到目錄的科目會列印出來 —— 社團一按儲存就 422 |
 | Club_news | announcements | 內容=原始連結(markdown) |
-| Club_staff | users | position admin→admin(權限鍵之後由承辦配)、observer→viewer |
+| Club_staff | users | position admin→admin(權限鍵之後由承辦配)、observer→viewer。`SKIP_STAFF` 不遷明確的測試登入名;`INACTIVE_STAFF`(`viewer`/`ntustclub`)遷入但 `is_active=False` —— 看不出是不是正式用途,而 observer 會拿到 `can_view_eval`,不擋就是上線第一天能對評鑑打分 |
 | Club_auditactivityrecord | approval_records | 舊表只有「誰、何時簽的」,沒有決議欄(退回不入表)—— 每列都是核准,同一活動第 1/2/3 列即 advisor/chief/dean,對應申請表的 初核/複核/決行 |
-| Club_auditactivity.Opinions | approval_records.reason(+ activities.fund_source) | 先去掉舊系統自動附的「※…結報提醒」(新系統由 `pdf._APPLY_NOTE` 自己產,照搬會印兩次);殘留只有 75 筆,非退回件且 ≤100 字者一併寫 `fund_source`,申請表的「意見回饋」才印得出來 |
+| Club_auditactivity.Opinions | approval_records.reason(+ activities.fund_source) | 先去掉舊系統自動附的結報提醒(「※」開頭或首行為「活動結報提醒」;新系統由 `pdf._APPLY_NOTE` 自己產,照搬會印兩次)。這一格每一關都被覆寫,留下的是**最後一位**簽核者寫的,所以掛最後一列。只有申請期(`FUND_SOURCE_LEGACY_STATUS`)的殘留才是經費認定會寫進 `fund_source`;已完成件那格早被結案審核覆寫過,只留 `reason` |
+| Club_activity.status=1(退回申請) | approval_records(`decision=reject`) | 舊系統退回**不寫**簽核列,理由只剩 Opinions 一格。不補這段的話 60 件退回活動一筆退件紀錄都沒有,社團看得到「已退回」卻讀不到理由。actor 用不能登入的 `_migration`(系統遷移)帳號,沒有理由的填「未提供更多說明」;對照鍵 `Club_activity:reject` 進 id-map,`--reset` 清得掉 |
 | Club_activityimages | files(`slot=report_photo`) | `media_import.py`;盤上落 `reports/{原始上傳年}/{月}/{uuid}`,`club_id`/`uploaded_by` 跟著活動走 |
 | Club_activity.PlanFile、Club_activityfiles | 只取文字,經 `text_fields.py` 的 CSV 人工轉錄 | 檔案實體不遷(MIG-13) |
 

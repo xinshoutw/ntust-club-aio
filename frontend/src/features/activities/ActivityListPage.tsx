@@ -10,8 +10,7 @@ import { Cols, FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } f
 import StatusPill from '../../components/ui/StatusPill'
 import LargeBadge from '../../components/ui/LargeBadge'
 import { semesterOptions } from '../../lib/semester'
-import type { EvalFile } from '../eval/types'
-import FilePreview from '../eval/FilePreview'
+import { useFilePreview } from '../eval/useFilePreview'
 import {
   ACTIVITY_PAGE_SIZE,
   useActivityDetail,
@@ -47,8 +46,7 @@ export default function ActivityListPage() {
   const [statusFilter, setStatusFilter] = useState<string[]>([])
   const [preview, setPreview] = useState<ClubActivity | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
-  const [filePreview, setFilePreview] = useState<EvalFile | null>(null)
-  const [filePreviewOpen, setFilePreviewOpen] = useState(false)
+  const filePreview = useFilePreview()
 
   // 學期下拉:資料既有學期 + 當前學期,預設最新
   const semestersQuery = useActivitySemesters()
@@ -348,17 +346,9 @@ export default function ActivityListPage() {
           setPreviewOpen(false)
           if (preview) navigate(`/activities/close?id=${preview.id}`)
         }}
-        onPreviewFile={(f) => {
-          setFilePreview(f)
-          setFilePreviewOpen(true)
-        }}
+        onPreviewFile={filePreview.preview}
       />
-      <FilePreview
-        file={filePreview}
-        open={filePreviewOpen}
-        onClose={() => setFilePreviewOpen(false)}
-        afterClose={() => setFilePreview(null)}
-      />
+      {filePreview.node}
     </div>
   )
 }

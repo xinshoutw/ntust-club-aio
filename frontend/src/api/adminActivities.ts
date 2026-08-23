@@ -13,6 +13,7 @@ import {
   type ActivityDetailOut,
   type ActivityOut,
 } from './activities'
+import { fileTypeOf, type EvalFile } from '../features/eval/types'
 import type { SessionUser } from './auth'
 import type { StatusKey } from '../lib/status'
 
@@ -201,6 +202,16 @@ const toAdminActivity = (o: AdminActivityOut): AdminActivity => ({
 })
 
 const toFileRef = (f: FileOut): AdminFileRef => ({ id: f.id, name: f.original_name, url: fileUrl(f.id) })
+
+/** AdminFileRef → EvalFile(FilePreview 直接吃);型別以副檔名推導、後端未附 mime 與上傳時間 */
+export const toEvalFile = (f: AdminFileRef): EvalFile => ({
+  id: f.id,
+  name: f.name,
+  type: fileTypeOf(f.name),
+  size: 0,
+  url: f.url,
+  uploadedAt: '',
+})
 
 const toReport = (r: ReportOut): AdminCloseReport => ({
   memberCount: r.member_count,

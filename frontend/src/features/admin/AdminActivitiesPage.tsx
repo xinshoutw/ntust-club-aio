@@ -12,8 +12,7 @@ import { countText } from '../../lib/counts'
 import { clampPage } from '../../lib/paging'
 import { useFitRows } from '../../lib/fitRows'
 import { semesterOptions } from '../../lib/semester'
-import FilePreview from '../eval/FilePreview'
-import type { EvalFile } from '../eval/types'
+import { useFilePreview } from '../eval/useFilePreview'
 import ActivityPreviewModal from '../activities/ActivityPreviewModal'
 import { LISTED_STATUS_LABELS, approvedText, fmtMoney, statusesForLabels } from '../activities/types'
 import type { ClubActivity } from '../../api/activities'
@@ -82,8 +81,7 @@ export default function AdminActivitiesPage() {
   // 完整檢視吃社團端型別;與 current 同一列、同一次查詢,兩份形狀一起收下
   const [currentClub, setCurrentClub] = useState<ClubActivity | null>(null)
   const [open, setOpen] = useState(false)
-  const [filePreview, setFilePreview] = useState<EvalFile | null>(null)
-  const [filePreviewOpen, setFilePreviewOpen] = useState(false)
+  const filePreview = useFilePreview()
 
   const semestersQuery = useAdminActivitySemesters()
   // 「全部學期」是必要的出口:逾期未結案與跨學期搜尋幾乎都落在舊學期
@@ -358,19 +356,11 @@ export default function AdminActivitiesPage() {
             setCurrent(null)
             setCurrentClub(null)
           }}
-          onPreviewFile={(f) => {
-            setFilePreview(f)
-            setFilePreviewOpen(true)
-          }}
+          onPreviewFile={filePreview.preview}
           pdfBase="admin"
         />
       )}
-      <FilePreview
-        file={filePreview}
-        open={filePreviewOpen}
-        onClose={() => setFilePreviewOpen(false)}
-        afterClose={() => setFilePreview(null)}
-      />
+      {filePreview.node}
     </div>
   )
 }

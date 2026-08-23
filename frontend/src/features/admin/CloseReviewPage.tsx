@@ -15,10 +15,12 @@ import {
   useAdminActivitiesPaged,
   useAdminActivityDetail,
   useAdminActivityMutations,
+  toEvalFile,
   type AdminActivity,
 } from '../../api/adminActivities'
 import ActivityReviewModal from './ActivityReviewModal'
 import DownloadMenu from '../activities/DownloadMenu'
+import { useFilePreview } from '../eval/useFilePreview'
 import { downloadEvalFile } from '../eval/files'
 import { activityApplyPdf } from '../../api/activities'
 import { clickableProps } from '../../lib/clickable'
@@ -53,6 +55,7 @@ function CloseReviewModal({
   const [rejectOpen, setRejectOpen] = useState(false)
   const [reason, setReason] = useState('')
   const approveRef = useModalAutoFocus(open)
+  const filePreview = useFilePreview()
   // 只存承辦手動改過的項目,其餘跟著推導走:詳情是非同步載入的,
   // 用 state 存預設值就得等 effect 補寫,中間那一刻的值會是錯的
   const [override, setOverride] = useState<Partial<Record<CheckKey, boolean>>>({})
@@ -255,13 +258,21 @@ function CloseReviewModal({
             )}
           </div>
 
-          {/* 照片縮圖:點擊開原圖(GET /files/{id}) */}
+          {/* 照片縮圖:點擊開站內預覽彈窗(與「所有活動」同一支 FilePreview) */}
           {photos.length > 0 && (
             <div>
               <SectionTitle>活動照片(<span className="num">{photos.length}</span> 張)</SectionTitle>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {photos.map((p) => (
-                  <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer" title={p.name}>
+                  <button
+                    key={p.id}
+                    type="button"
+                    className="link-btn"
+                    style={{ padding: 0 }}
+                    title={p.name}
+                    aria-label={`預覽 ${p.name}`}
+                    onClick={() => filePreview.preview(toEvalFile(p))}
+                  >
                     <img
                       src={p.url}
                       alt={p.name}
@@ -270,7 +281,7 @@ function CloseReviewModal({
                       height={72}
                       style={{ width: 96, height: 72, objectFit: 'cover', borderRadius: 6, display: 'block' }}
                     />
-                  </a>
+                  </button>
                 ))}
               </div>
             </div>
@@ -335,6 +346,7 @@ function CloseReviewModal({
           placeholder={`例：成果照片不足 ${MIN_PHOTOS} 張且未附影片連結`}
         />
       </Modal>
+      {filePreview.node}
     </Modal>
   )
 }

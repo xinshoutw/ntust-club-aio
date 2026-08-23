@@ -9,8 +9,7 @@ import StatusPill from '../../components/ui/StatusPill'
 import LargeBadge from '../../components/ui/LargeBadge'
 import { countText } from '../../lib/counts'
 import { semesterOptions } from '../../lib/semester'
-import FilePreview from '../eval/FilePreview'
-import type { EvalFile } from '../eval/types'
+import { useFilePreview } from '../eval/useFilePreview'
 import ActivityPreviewModal from '../activities/ActivityPreviewModal'
 import { LISTED_STATUS_LABELS, money, statusesForLabels } from '../activities/types'
 import { dateRangeText } from '../activities/utils'
@@ -44,8 +43,7 @@ export default function AdminClubActivitiesPage() {
   const [statusFilter, setStatusFilter] = useState<string[]>([])
   const [preview, setPreview] = useState<ClubActivity | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
-  const [filePreview, setFilePreview] = useState<EvalFile | null>(null)
-  const [filePreviewOpen, setFilePreviewOpen] = useState(false)
+  const filePreview = useFilePreview()
 
   // 換社團要回第一頁,學期也要放掉:上一社選的學期在新社可能一筆都沒有,
   // 留著就是一片空白卻沒有任何說明(比照 AdminMembersPage)
@@ -226,18 +224,10 @@ export default function AdminClubActivitiesPage() {
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
         afterClose={() => setPreview(null)}
-        onPreviewFile={(f) => {
-          setFilePreview(f)
-          setFilePreviewOpen(true)
-        }}
+        onPreviewFile={filePreview.preview}
         pdfBase="admin"
       />
-      <FilePreview
-        file={filePreview}
-        open={filePreviewOpen}
-        onClose={() => setFilePreviewOpen(false)}
-        afterClose={() => setFilePreview(null)}
-      />
+      {filePreview.node}
     </div>
   )
 }

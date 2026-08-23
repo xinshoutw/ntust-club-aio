@@ -9,11 +9,12 @@ import StampTrail, { type StampStage } from '../../components/ui/StampTrail'
 import { useModalAutoFocus } from '../../components/ui/useModalAutoFocus'
 import WorkTable from '../activities/WorkTable'
 import DownloadMenu from '../activities/DownloadMenu'
+import { useFilePreview } from '../eval/useFilePreview'
 import { downloadEvalFile } from '../eval/files'
 import { activityApplyPdf } from '../../api/activities'
 import { numColWidth, showsApproved } from '../activities/types'
 import { useAuth } from '../../app/auth'
-import { canActOn, stageOfStatus, type ReviewItem } from '../../api/adminActivities'
+import { canActOn, stageOfStatus, toEvalFile, type ReviewItem } from '../../api/adminActivities'
 
 // .tb.dense td 的左右內距(index.css);核定欄的 td 右內距歸零、改由 InputNumber 自己的
 // 內距與邊框佔掉,兩者分開算才不會少估而讓數字換行
@@ -106,6 +107,7 @@ export default function ActivityReviewModal({
   // item 到位才聚焦:骨架模式(item=null)開窗時核准鈕尚未 render,
   // 待詳情補齊、footer 換上按鈕後再聚焦,Enter 送出才有效
   const approveRef = useModalAutoFocus(open && !!item)
+  const filePreview = useFilePreview()
   // 大型活動:社團申請或管理員逕行核定;認可後行政分才享 ×3 加權。
   // 未處理的申請預設不勾(空心=待處理),認可須管理員明確勾選,避免順手核准即誤放 ×3
   const [largeApproved, setLargeApproved] = useState(item?.largeApproved ?? false)
@@ -332,9 +334,14 @@ export default function ActivityReviewModal({
                 ? files.map((f, i) => (
                     <span key={f.id}>
                       {i > 0 && ' · '}
-                      <a href={f.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--focus)' }}>
+                      <button
+                        type="button"
+                        className="link-btn"
+                        style={{ color: 'var(--focus)', padding: 0 }}
+                        onClick={() => filePreview.preview(toEvalFile(f))}
+                      >
                         {f.name}
-                      </a>
+                      </button>
                     </span>
                   ))
                 : d?.attachments.length
@@ -490,6 +497,7 @@ export default function ActivityReviewModal({
           placeholder="例:經費明細第 3 項未附估價單"
         />
       </Modal>
+      {filePreview.node}
     </Modal>
   )
 }

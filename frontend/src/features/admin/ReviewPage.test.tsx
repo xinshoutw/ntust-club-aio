@@ -8,8 +8,12 @@ vi.mock('../../app/auth', () => ({
   useAuth: () => ({ user: { role: 'admin', isSuper: true, permissions: ['areview'] } }),
 }))
 
-vi.mock('../../api/adminClubs', () => ({
-  useClubOptions: () => ({ data: [{ id: 7, name: '吉他社', kind: '社團' }], isError: false }),
+vi.mock('../../api/adminClubs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../api/adminClubs')>()),
+  useClubOptions: () => ({
+    data: [{ id: 7, name: '吉他社', kind: '社團', attribute: '藝術' }],
+    isError: false,
+  }),
 }))
 
 // 逾期鎖定的單:後端 status 仍是 approved,畫面顯示狀態是「已逾期」

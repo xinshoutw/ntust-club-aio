@@ -20,7 +20,7 @@ import {
   useAdminActivityMutations,
   type AdminActivity,
 } from '../../api/adminActivities'
-import { useClubOptions } from '../../api/adminClubs'
+import { groupClubsByFolder, useClubOptions } from '../../api/adminClubs'
 import ActivityReviewModal from './ActivityReviewModal'
 import { clickableProps } from '../../lib/clickable'
 
@@ -83,7 +83,7 @@ export default function ReviewPage() {
     [user],
   )
   const clubsQuery = useClubOptions()
-  const clubOptions = (clubsQuery.data ?? []).map((c) => c.name)
+  const clubFolders = groupClubsByFolder(clubsQuery.data ?? [])
   const statusOptions = [...new Set(othersStatuses.map((st) => STATUS[st].label))]
 
   const clubIdMatches = clubFilter.length
@@ -134,7 +134,7 @@ export default function ReviewPage() {
         }
       />
 
-      {/* 待審佇列:本關可簽核的單據,送件早的在前 */}
+      {/* 待審佇列:本關可簽核的單據,申請早的在前 */}
       <div className="card" style={{ marginTop: 20 }}>
         <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 6px' }}>待審佇列</div>
         <LoadingBlock pending={queueQuery.isLoading} rows={3}>
@@ -160,7 +160,7 @@ export default function ReviewPage() {
                   <LargeBadge applied={item.isLarge} approved={item.largeApproved} />
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 2 }}>
-                  {item.club} · {item.type} · 送件 <span className="num">{item.submittedAt}</span>
+                  {item.club} · {item.type} · 申請 <span className="num">{item.submittedAt}</span>
                 </div>
               </div>
               <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
@@ -209,15 +209,30 @@ export default function ReviewPage() {
         <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近審核</div>
         <LoadingBlock pending={listQuery.isPending} rows={6}>
           <table className="tb dense fixed" style={{ minWidth: 880 }} aria-label="最近審核的活動申請">
-            {/* 社團/名稱吃剩餘寬並截斷;類型允許換行(含大型徽章);日期/金額/狀態/審核時間固定 px */}
-            <Cols widths={['18%', 'auto', 130, 104, 90, 100, 140, 32]} />
+            {/* 社團/名稱吃剩餘寬並截斷;類型允許換行(含大型徽章);狀態/日期/金額/審核時間固定 px */}
+            <Cols widths={[96, '18%', 'auto', 130, 104, 90, 140, 32]} />
             <thead>
               <tr>
                 <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <MultiSortButton label="社團" sortKey="club" entries={entries} onToggle={toggleSort} />
+                    <MultiSortButton label="狀態" sortKey="status" entries={entries} onToggle={toggleSort} />
                     <FilterButton
-                      options={clubOptions}
+                      options={statusOptions}
+                      selected={statusFilter}
+                      onChange={(next) => {
+                        setStatusFilter(next)
+                        resetPage()
+                      }}
+                      label="篩選狀態"
+                    />
+                  </span>
+                </th>
+                <th scope="col">
+                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                    <MultiSortButton label="社團" sortKey="club" entries={entries} onToggle={toggleSort} />
+                    {/* 159 個社團平鋪讀不完:漏斗改二級選單,資料夾與 ClubCascader 同一份 */}
+                    <FilterButton
+                      options={clubFolders}
                       selected={clubFilter}
                       onChange={(next) => {
                         setClubFilter(next)
@@ -244,20 +259,6 @@ export default function ReviewPage() {
                 </th>
                 <th scope="col"><MultiSortButton label="活動日期" sortKey="date" entries={entries} onToggle={toggleSort} /></th>
                 <th scope="col" className="r">擬請補助</th>
-                <th scope="col">
-                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <MultiSortButton label="狀態" sortKey="status" entries={entries} onToggle={toggleSort} />
-                    <FilterButton
-                      options={statusOptions}
-                      selected={statusFilter}
-                      onChange={(next) => {
-                        setStatusFilter(next)
-                        resetPage()
-                      }}
-                      label="篩選狀態"
-                    />
-                  </span>
-                </th>
                 <th scope="col"><MultiSortButton label="審核時間" sortKey="reviewed_at" entries={entries} onToggle={toggleSort} /></th>
                 <th scope="col" aria-label="開啟" />
               </tr>
@@ -269,6 +270,7 @@ export default function ReviewPage() {
                   onClick={() => openItem(item)}
                   style={{ cursor: 'pointer', ...(current?.id === item.id && open ? { background: 'var(--seal-tint)' } : {}) }}
                 >
+                  <td><StatusPill status={item.status} /></td>
                   <td className="cell-clip" title={item.club}>{item.club}</td>
                   <td className="cell-clip" title={item.name} style={{ fontWeight: 500 }}>
                     <button
@@ -289,7 +291,6 @@ export default function ReviewPage() {
                   </td>
                   <td className="num">{item.date}</td>
                   <td className="r num">{fmtMoney(item.requested)}</td>
-                  <td><StatusPill status={item.status} /></td>
                   <td className="num">{item.reviewedAt ?? '—'}</td>
                   <td className="r"><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>
                 </tr>

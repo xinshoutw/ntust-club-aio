@@ -11,7 +11,7 @@
 | 區塊 | 端點 |
 |---|---|
 | 學期下拉 | `GET /admin/activities/semesters` |
-| 主列表 | `GET /admin/activities?semester=&q=&status=&club_id=&overdue=&sort=&page=`(伺服器端分頁,每頁 15) |
+| 主列表 | `GET /admin/activities?semester=&q=&status=&club_id=&overdue=&sort=&page=`(伺服器端分頁,每頁筆數依視窗高) |
 | 詳情(審核彈窗) | `GET /admin/activities/{id}` |
 | 詳情(完整檢視) | 同一支端點,改以社團端的對照轉型 |
 | 核准 / 退回 | `POST /admin/activities/{id}/approve`、`/reject` |
@@ -22,7 +22,7 @@
 
 頁首:標題 + 件數 + 「逾期未結案」勾選 + 活動名稱搜尋 + 學期下拉(含**全部學期**,預設最新學期)。
 
-表格七欄,依序:狀態、活動日期、社團、活動名稱、自籌 / 核定、申請時間、審核時間(每頁 15)。狀態與社團可多選篩選;除經費外皆可多鍵排序,預設 `-date`。**社團漏斗是二級選單**(第一層=性質資料夾),資料夾規則與 `ClubCascader` 共用 `api/adminClubs.groupClubsByFolder` —— 159 個社團平鋪讀不完。大型徽章跟著活動名稱,不另立類型欄。
+表格七欄,依序:狀態、活動日期、社團、活動名稱、自籌 / 核定、申請時間、審核時間。**每頁筆數不固定** —— `lib/fitRows.useFitRows` 依視窗高度算得下幾列(下限 5),畫面有多高就顯示多少列,整頁不長出垂直卷軸;縮放視窗會跟著重算。狀態與社團可多選篩選;除經費外皆可多鍵排序,預設 `-date`。**社團漏斗是二級選單**(第一層=性質資料夾,`groupClubsForFilter`)—— 159 個社團平鋪讀不完;**不列「未分類」**,那 67 個沒有性質的全是停社且零活動的遷移舊社。子選單封頂 60vh(`index.css`),否則 27 個社團的資料夾會往上翻出畫面外。大型徽章跟著活動名稱,不另立類型欄。
 
 **詳情彈窗依狀態切換**:
 

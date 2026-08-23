@@ -223,3 +223,28 @@ def _field_max_length(model, field: str) -> int:
     """獨立於 text_fields._max_len 的第二種讀法:兩邊算出同一個數才算數。"""
     metadata = model.model_fields[field].metadata
     return next(m.max_length for m in metadata if hasattr(m, "max_length"))
+
+
+def test_opinion_residual_drops_the_boilerplate_the_new_form_prints_itself():
+    """舊審核意見裡 1,387 / 1,518 筆的全部內容就是那段「※…結報提醒」,而新系統的
+    申請表由 `pdf._APPLY_NOTE` 自己產一份 —— 原文照搬會在「意見回饋」那格印兩次。
+    留下來的必須只有承辦人真正寫的那句。"""
+    assert cms_import.opinion_residual(None) == ""
+    assert cms_import.opinion_residual("※請於活動後2周內上傳結報。表格如網址：https://x") == ""
+    assert (
+        cms_import.opinion_residual("本案由企業捐贈款支應。\r\n\r\n※請於活動後2周內上傳結報。")
+        == "本案由企業捐贈款支應。"
+    )
+    # 多行提醒(換行在 ※ 之後)也要整段去掉
+    multiline = "活動重複申請\r\n※請於…\r\n1.活動照片 5 張"
+    assert cms_import.opinion_residual(multiline) == "活動重複申請"
+
+
+def test_apply_stages_match_the_review_flow():
+    """初核/複核/決行三格對的是 advisor/chief/dean 三關。這裡與行政端的
+    `_STAGE_BY_STATUS` 是同一份判定,對不上就會有一格印錯人。"""
+    from app.api.v1.admin_activities import _STAGE_BY_STATUS
+    from app.services.activity_service import APPLY_STAGES
+
+    assert set(APPLY_STAGES) == {stage for _, stage in _STAGE_BY_STATUS.values()}
+    assert len(APPLY_STAGES) == 3

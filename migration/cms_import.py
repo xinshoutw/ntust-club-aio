@@ -11,6 +11,7 @@ idempotent 機制:每寫入一列即記 legacy_id_map(cms, 舊表, 舊id → 新
 import asyncio
 import csv
 import os
+import re
 import sys
 from datetime import date, datetime, time
 from pathlib import Path
@@ -32,6 +33,7 @@ from app.models import (
     ActivityBudgetItem,
     ActivityReport,
     Announcement,
+    ApprovalRecord,
     Club,
     ClubMember,
     LegacyIdMap,
@@ -41,12 +43,16 @@ from app.models.enums import (
     ActivityStatus,
     ActivityType,
     AnnouncementTarget,
+    ApprovalDecision,
+    ApprovalSubject,
     ClubAttribute,
     ClubKind,
     LegacySystem,
     MemberKind,
     UserRole,
 )
+from app.schemas.admin import ApproveActivityIn
+from app.services.activity_service import APPLY_STAGES
 
 TAIPEI = ZoneInfo("Asia/Taipei")
 
@@ -99,6 +105,21 @@ TYPE_MAP = {
 }
 
 LEADER_TITLES = {"社長", "會長"}
+
+# 舊系統自動附在審核意見後面的結報提醒;新系統由 pdf._APPLY_NOTE 自己產一份,
+# 原文照搬會在申請表的「意見回饋」印兩次
+_OPINION_BOILERPLATE = re.compile(r"※.*", re.S)
+# 舊 status 1=退回申請、11=退回核銷:這兩種的意見殘留是退件理由,不是經費認定
+REJECTED_LEGACY_STATUS = frozenset({1, 11})
+FUND_SOURCE_MAX = next(
+    m.max_length for m in ApproveActivityIn.model_fields["fund_source"].metadata
+    if hasattr(m, "max_length")
+)
+
+
+def opinion_residual(raw: str | None) -> str:
+    """去掉自動附的結報提醒,留承辦人真正寫的那句(沒寫就是空字串)。"""
+    return _OPINION_BOILERPLATE.sub("", raw or "").strip()
 VICE_TITLES = {"副社長", "副會長"}
 
 
@@ -571,6 +592,117 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
     )
 
 
+async def import_approvals(legacy, db: AsyncSession, ids: IdMap) -> None:
+    """舊系統的簽核者 → approval_records:申請表要印 初核/複核/決行 三位的姓名。
+
+    舊 `Club_auditactivityrecord` 只有「誰、什麼時候簽的」,**沒有決議欄** —— 退回不入
+    這張表,所以每一列都是核准,同一活動的第 1/2/3 列即 承辦人/組長/學務長 三關
+    (`AuditActivity.AllowCode` 就是這張表的列數)。關卡由列序決定,不是由狀態推導。
+
+    `AuditActivity.Opinions` 先**去掉舊系統自動附的「※…結報提醒」**再處理:那段樣板
+    佔了 1,387 / 1,518 筆的全部內容,而新系統的申請表由 `pdf._APPLY_NOTE` 自己產一份,
+    原文照搬只會在「意見回饋」那格印兩次。剩下的殘留才是承辦人真正寫的那句:
+
+    - 退回件(舊 status 1/11)的殘留是退件理由 → 只寫 `reason`
+    - 其餘的殘留是經費認定(「本案由三校文化基金會補助經費支應一萬元。」)
+      → 同時寫 `activities.fund_source`,申請表的「意見回饋」才印得出來
+    - 殘留超過 `ApproveActivityIn.fund_source` 的上限(100 字)就只寫 `reason`:
+      塞進去等於承辦一開審核視窗按儲存就 422,而且自己改不掉
+    """
+    scope_start, scope_end = _scope_bounds()
+    rows = (
+        await legacy.execute(
+            sa.text(
+                'SELECT r.id, r."Staff_id" AS staff_id, r."AuditTime" AS audit_time,'
+                ' au."FK_Activity_id" AS aid, au."Opinions" AS opinions, a.status'
+                ' FROM "Club_auditactivityrecord" r'
+                ' JOIN "Club_auditactivity" au ON au.id = r."FK_AuditActivity_id"'
+                ' JOIN "Club_activity" a ON a.id = au."FK_Activity_id"'
+                ' WHERE a."StartTime" >= :start AND a."StartTime" < :end'
+                ' ORDER BY au."FK_Activity_id", r.id'
+            ),
+            {"start": scope_start, "end": scope_end},
+        )
+    ).all()
+
+    # 先算好每一列在該活動裡的關卡序:重跑時已遷入的列會被跳過,
+    # 邊跑邊數會讓補跑的那幾列關卡整個位移
+    stage_of: dict[int, int] = {}
+    counter: dict[int, int] = {}
+    for r in rows:
+        stage_of[r.id] = counter.get(r.aid, 0)
+        counter[r.aid] = stage_of[r.id] + 1
+
+    created = no_activity = no_actor = over_stages = 0
+    notes = sources = too_long = 0
+    for r in rows:
+        if ids.get("Club_auditactivityrecord", r.id) is not None:
+            continue
+        new_aid = ids.get("Club_activity", r.aid)
+        if new_aid is None:
+            no_activity += 1  # 不遷的社團或未知狀態
+            continue
+        actor = ids.get("Club_staff", r.staff_id)
+        if actor is None:
+            no_actor += 1  # 帳號名衝突而未遷入的 staff;actor_id 非空,補不出來
+            continue
+        nth = stage_of[r.id]
+        if nth >= len(APPLY_STAGES):
+            over_stages += 1  # 舊資料最多三關,超過的不知道該掛哪一格
+            continue
+        note = opinion_residual(r.opinions) if nth == 0 else ""
+        if note and r.status not in REJECTED_LEGACY_STATUS:
+            # 非退回件的殘留是經費認定,申請表「意見回饋」那格讀的就是 fund_source
+            if len(note) <= FUND_SOURCE_MAX:
+                await db.execute(
+                    sa.update(Activity)
+                    .where(Activity.id == int(new_aid))
+                    .values(fund_source=note)
+                )
+                sources += 1
+            else:
+                too_long += 1
+        record = ApprovalRecord(
+            subject_type=ApprovalSubject.ACTIVITY,
+            subject_id=int(new_aid),
+            stage=APPLY_STAGES[nth],
+            decision=ApprovalDecision.APPROVE,
+            actor_id=int(actor),
+            reason=note or None,
+            **({"created_at": local_dt(r.audit_time)} if r.audit_time else {}),
+        )
+        db.add(record)
+        await db.flush()
+        ids.record(db, "Club_auditactivityrecord", r.id, "approval_records", record.id)
+        created += 1
+        notes += bool(note)
+    # 一筆簽核都沒有的活動(全是沒人簽就退回的),意見掛不上任何一列 —— 明講,不要靜靜丟掉
+    orphan_notes = sum(
+        1
+        for (raw,) in await legacy.execute(
+            sa.text(
+                'SELECT au."Opinions" FROM "Club_auditactivity" au'
+                ' JOIN "Club_activity" a ON a.id = au."FK_Activity_id"'
+                ' WHERE a."StartTime" >= :start AND a."StartTime" < :end'
+                ' AND NOT EXISTS (SELECT 1 FROM "Club_auditactivityrecord" r'
+                '                 WHERE r."FK_AuditActivity_id" = au.id)'
+            ),
+            {"start": scope_start, "end": scope_end},
+        )
+        if opinion_residual(raw)
+    )
+    print(
+        f"approvals: 新增 {created} 筆簽核(去樣板後仍有審核意見 {notes} 筆,"
+        f"其中 {sources} 筆寫入 fund_source、{too_long} 筆超過 {FUND_SOURCE_MAX} 字只留 reason)"
+        f";活動未遷 {no_activity}、簽核者未遷 {no_actor}、超過三關 {over_stages}"
+    )
+    if orphan_notes:
+        print(
+            f"  另有 {orphan_notes} 筆退件理由掛不上簽核列(沒人簽就退回,舊表沒有 actor)"
+            f",未遷入"
+        )
+
+
 async def import_news(legacy, db: AsyncSession, ids: IdMap) -> None:
     # 公告不套 SCOPE_*:`create_date` 是 Django auto_now_add(貼出來的時刻),
     # 不是公告的有效期間。舊庫 8 則全在 2017–2023,套學期軸會 100% 濾光,
@@ -608,6 +740,7 @@ async def import_news(legacy, db: AsyncSession, ids: IdMap) -> None:
 # ---------------------------------------------------------------------------
 # id-map 的舊表名 → 要清掉的新表(reset 用;順序即刪除順序,子表在前)
 _RESET_ORDER = (
+    ("Club_auditactivityrecord", ApprovalRecord),
     ("Club_news", Announcement),
     ("Club_activity", Activity),
     ("Club_student", ClubMember),
@@ -677,6 +810,7 @@ async def main() -> None:
         await import_teachers(legacy, db, clubs)
         await import_members(legacy, db, ids, clubs)
         await import_activities(legacy, db, ids, clubs)
+        await import_approvals(legacy, db, ids)
         await import_news(legacy, db, ids)
         await db.commit()
 

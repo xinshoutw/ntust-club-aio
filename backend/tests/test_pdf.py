@@ -244,3 +244,58 @@ def test_apply_pdf_opinion_always_carries_the_close_report_notice():
     assert opinion_of(None) == _APPLY_NOTE
     assert opinion_of("   ") == _APPLY_NOTE
     assert opinion_of("由三校文化基金會支應") == f"由三校文化基金會支應\n{_APPLY_NOTE}"
+
+
+async def test_approver_names_fill_stages_not_the_first_three_approvals(client, db):
+    """退回是回到社團重送,重送後承辦人會再核一次 —— 核准列變成
+    承辦人/承辦人/組長/學務長。依序取前三筆會把第二次的承辦人印在「複核」、
+    組長印在「決行」,而那張紙是要送出去的。"""
+    from app.models import ApprovalRecord
+    from app.services.activity_service import approver_names
+
+    club = await make_club(db)
+    await make_user(db, username="club01", club_id=club.id)
+    await login(client, "club01")
+    activity_id = (await create_activity(client))["id"]
+
+    signed = [
+        ("初核甲", "advisor"), ("初核乙", "advisor"), ("組長", "chief"), ("學務長", "dean"),
+    ]
+    for i, (name, stage) in enumerate(signed):
+        user = await make_user(db, username=f"u{i}_{stage}", role="admin", name=name)
+        db.add(
+            ApprovalRecord(
+                subject_type="activity",
+                subject_id=activity_id,
+                stage=stage,
+                decision="approve",
+                actor_id=user.id,
+            )
+        )
+    await db.commit()
+
+    assert await approver_names(db, activity_id) == ["初核乙", "組長", "學務長"]
+
+
+async def test_approver_names_leave_unsigned_stages_blank(client, db):
+    """只簽到第一關的活動,複核/決行兩格要是空的,不能往前擠。"""
+    from app.models import ApprovalRecord
+    from app.services.activity_service import approver_names
+
+    club = await make_club(db)
+    await make_user(db, username="club01", club_id=club.id)
+    await login(client, "club01")
+    activity_id = (await create_activity(client))["id"]
+    admin = await make_user(db, username="adm", role="admin", name="承辦人")
+    db.add(
+        ApprovalRecord(
+            subject_type="activity",
+            subject_id=activity_id,
+            stage="advisor",
+            decision="approve",
+            actor_id=admin.id,
+        )
+    )
+    await db.commit()
+
+    assert await approver_names(db, activity_id) == ["承辦人", "", ""]

@@ -16,6 +16,10 @@ PHOTO_SUBJECT = "activity"
 PHOTO_SLOT = "report_photo"
 ATTACHMENT_SLOT = "proposal"
 
+# 申請簽核三關,順序即申請表的 初核 / 複核 / 決行 三格
+# (顯示詞是 承辦人 / 組長 / 學務長,見 admin_activities._STAGE_LABEL)
+APPLY_STAGES = ("advisor", "chief", "dean")
+
 
 def end_datetime(activity: Activity) -> datetime:
     """活動結束時刻(台北時區):end_date + end_time;未填時間以當日 23:59 計。"""
@@ -248,10 +252,15 @@ async def activity_files(db: AsyncSession, activity: Activity, slot: str) -> lis
 
 
 async def approver_names(db: AsyncSession, activity_id: int) -> list[str]:
-    """活動申請的簽核者姓名(依簽核順序);申請表的 初核/複核/決行 三格。"""
-    rows = await db.scalars(
-        sa.select(User.name)
-        .join(ApprovalRecord, ApprovalRecord.actor_id == User.id)
+    """申請表 初核/複核/決行 三格的簽核者姓名;該關沒簽到就留空字串。
+
+    **以關卡取,不是把核准列依序排**:退回是回到社團重送,重送後承辦人會再核一次,
+    核准列就變成 承辦人/承辦人/組長/學務長 —— 依序取會把第二次的承辦人印在「複核」、
+    組長印在「決行」,而那張紙是要送出去的。同一關多次核准取最後一次。
+    """
+    rows = await db.execute(
+        sa.select(ApprovalRecord.stage, User.name)
+        .join(User, ApprovalRecord.actor_id == User.id)
         .where(
             ApprovalRecord.subject_type == ApprovalSubject.ACTIVITY,
             ApprovalRecord.subject_id == activity_id,
@@ -259,4 +268,5 @@ async def approver_names(db: AsyncSession, activity_id: int) -> list[str]:
         )
         .order_by(ApprovalRecord.id)
     )
-    return list(rows)
+    latest = {stage: name for stage, name in rows}
+    return [latest.get(stage, "") for stage in APPLY_STAGES]

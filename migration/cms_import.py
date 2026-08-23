@@ -579,6 +579,8 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
             # 送審必填項在遷移件也要有值,否則退回件連暫存都會被 422 擋住
             staff_text="\n".join(staffs.get(a.id, [])) or "(未填)",
             status=status,
+            # 退回核銷 = 已在期限內送過結案,補件往返不該再被鎖(同 close_reject 的行為)
+            close_unlocked=(a.status == 11),
             created_by=user_id,
             **({"created_at": local_dt(a.SetupTime)} if a.SetupTime else {}),
         )
@@ -598,9 +600,10 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
                 )
             )
 
-        # 結案(核銷中/已完成):舊制僅有 實際人數/時間 + 單一檢討文字 + 繳交旗標,
-        # 寬鬆匯入 — 缺欄留空
-        if a.status in (5, 6):
+        # 結案(核銷中/已完成/退回核銷):舊制僅有 實際人數/時間 + 繳交旗標,寬鬆匯入 —
+        # 缺欄留空。11(退回核銷)舊系統只改 status、不清實際人數(legacy views.py:2396),
+        # 不建 report 會讓社團打開結案表單是一張白紙,已送出的資料整份消失
+        if a.status in (5, 6, 11):
             meta = metas.get(a.id, {})
             db.add(
                 ActivityReport(

@@ -18,6 +18,11 @@ from tests.conftest import csrf_headers, login, make_user
 PAGE_READS: list[tuple[str, str]] = [
     ("areview", "/api/v1/admin/activities?status=pending_advisor"),
     ("aclose", "/api/v1/admin/activities?status=closing_pending_advisor"),
+    ("aactivity", "/api/v1/admin/activities"),
+    ("aactivity", "/api/v1/admin/activities/semesters"),
+    ("aclubact", "/api/v1/admin/activities"),
+    ("aclubact", "/api/v1/admin/activities/semesters"),
+    ("aclubact", "/api/v1/admin/clubs/options"),
     ("asignup", "/api/v1/admin/signup-items"),
     ("aannounce", "/api/v1/admin/announcements"),
     ("aannounce", "/api/v1/admin/clubs/options"),

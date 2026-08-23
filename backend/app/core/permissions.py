@@ -40,6 +40,7 @@ _STAGES = tuple(k for k, _ in APPROVAL_STAGES)
 ADMIN_PAGES: tuple[AdminPage, ...] = (
     AdminPage("areview", "申請審核", ("/admin/review",), _STAGES),
     AdminPage("aclose", "結案審核", ("/admin/close-review",), ("approve_advisor",)),
+    AdminPage("aactivity", "所有活動", ("/admin/activities",)),
     # 報名管理的兩頁共用一把鍵:能看報名就能建報名活動(decisions.md D-01)
     AdminPage("asignup", "報名管理", ("/admin/signups", "/admin/signup-items")),
     AdminPage("aannounce", "發布系統公告", ("/admin/announcements",)),
@@ -49,6 +50,7 @@ ADMIN_PAGES: tuple[AdminPage, ...] = (
     AdminPage("arule", "場地不開放規則", ("/admin/venue-rules",)),
     AdminPage("aclub", "社團總覽", ("/admin/club-overview",)),
     AdminPage("amember", "成員列表", ("/admin/members",)),
+    AdminPage("aclubact", "社團活動列表", ("/admin/club-activities",)),
     AdminPage("aclubset", "社團管理項目", ("/admin/club-settings",)),
     AdminPage("aoverdue", "逾期追蹤與停權", ("/admin/overdue",)),
     AdminPage("aeval", "行政分審核", ("/admin/eval",)),
@@ -98,8 +100,8 @@ LOAN_READ_KEYS = ("abooking", "aoverdue")
 # 就回到 ISS-23 原本的問題(只持檔案管理權限的人拿得到郵局存簿影本這類個資)。
 # `subject_type` 不在表內的檔案一律只有 super 下載得到(fail-closed)。
 FILE_SUBJECT_KEYS: dict[str, tuple[str, ...]] = {
-    # 活動申請附件與結案照片:三個會實際審閱活動的頁面
-    "activity": ("areview", "aclose", "aeval", "aclub"),
+    # 活動申請附件與結案照片:會實際審閱或檢視活動的頁面
+    "activity": ("areview", "aclose", "aactivity", "aclubact", "aeval", "aclub"),
     "maintenance": ("amaint", "aclub"),
     "postal_change": ("apostal",),
     "eval_upload": ("aeval",),

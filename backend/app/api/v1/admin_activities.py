@@ -444,12 +444,16 @@ async def approve(
                 )
             item.approved_subsidy = approval.approved_subsidy
         if requested_total > 0:
-            # 有申請補助:經費來源必填、每個項目都要有核定金額,總額由後端加總
-            if not activity.fund_source:
-                raise validation_error("有申請補助的案件必須認定經費來源")
+            # 有申請補助:每一項都要有核定金額(0 也是核定,代表承辦人真的看過那一項)。
+            # 缺項先擋 —— 有 None 就算不出總額,分不清「不給」與「還沒填」
             missing = [i for i in activity.budget_items if i.approved_subsidy is None]
             if missing:
                 raise validation_error("尚有經費項目未核定金額")
+            # 經費來源只在**真的要動到錢**時必填(D-16):整單核定 0 元沒有來源可認定,
+            # 還逼承辦人填一句空話才存得下去
+            granted = sum(i.approved_subsidy for i in activity.budget_items)
+            if granted > 0 and not activity.fund_source:
+                raise validation_error("核定補助的案件必須認定經費來源")
         if requested_total == 0:
             # 逐項一併歸零:畫面的 approved_total 是逐項加總來的,只清聚合欄位
             # 會讓兩個金額來源對不起來(遷移資料就可能是擬請 0 元卻有核定值)

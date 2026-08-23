@@ -120,7 +120,7 @@ export default function ActivityReviewModal({
   // 大型活動:社團申請或管理員逕行核定;認可後行政分才享 ×3 加權。
   // 未處理的申請預設不勾(空心=待處理),認可須管理員明確勾選,避免順手核准即誤放 ×3
   const [largeApproved, setLargeApproved] = useState(item?.largeApproved ?? false)
-  // 經費來源:有申請補助的案件由第一關認定(後端必填)
+  // 經費來源:核定了補助的案件由第一關認定(後端在核定總額 >0 時必填)
   const [fundSource, setFundSource] = useState(item?.fundSource ?? '')
   const d = item?.detail
   // 失敗但手上已有詳情 = 背景重抓失敗(TanStack 的 error 態保留既有 data,而重開同一列
@@ -171,20 +171,24 @@ export default function ActivityReviewModal({
     if (!item) return
     const largeNote = isFirstStage && item.type === '活動' ? `(大型活動${largeApproved ? '已認可' : '未認可'})` : ''
     if (onApprove) {
-      if (isFirstStage && requestedTotal > 0 && !fundSource.trim()) {
-        message.error('有申請補助的案件必須認定經費來源')
+      // 核定不得超過擬請(後端同一條,擬請 0 的列帶非零核定整單 422)。輸入框有 max 擋著,
+      // 但預填值來自舊資料 —— 遷移列的核定可以大於擬請,沒有輸入框可改就會卡死送不出去
+      const budget = (d?.budget ?? []).map((b) => ({
+        itemId: b.id,
+        approvedSubsidy: Math.min(approvals[b.id] ?? 0, b.requested),
+      }))
+      // 必填與否看**送出去的**核定總額,不是畫面上的 approvedTotal —— 遷移列會被 min 夾掉,
+      // 兩者對不起來就會變成前端放行、後端 422,而承辦人看到的是一句他改不掉的錯誤(D-16)
+      const granted = budget.reduce((sum, b) => sum + b.approvedSubsidy, 0)
+      if (isFirstStage && granted > 0 && !fundSource.trim()) {
+        message.error('核定補助的案件必須認定經費來源')
         return
       }
       setSubmitting(true)
       try {
         await onApprove({
           fundSource: fundSource.trim(),
-          // 核定不得超過擬請(後端同一條,擬請 0 的列帶非零核定整單 422)。輸入框有 max 擋著,
-          // 但預填值來自舊資料 —— 遷移列的核定可以大於擬請,沒有輸入框可改就會卡死送不出去
-          budget: (d?.budget ?? []).map((b) => ({
-            itemId: b.id,
-            approvedSubsidy: Math.min(approvals[b.id] ?? 0, b.requested),
-          })),
+          budget,
           largeApproved,
         })
       } catch (e) {

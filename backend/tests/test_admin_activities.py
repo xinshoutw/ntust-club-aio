@@ -1216,3 +1216,50 @@ async def test_partial_zero_still_needs_the_remaining_stages(client, db):
     )
     assert resp.status_code == 200, resp.text
     assert resp.json()["data"]["status"] == "pending_chief"
+
+
+async def test_funding_source_is_only_required_when_money_is_granted(client, db):
+    """核定 0 元沒有經費來源可認定,不該逼承辦人填一句空話才存得下去(D-16)。
+
+    逐項核定仍然每一項都要填 —— 0 也是核定,None 是「還沒看」,兩者不能混。
+    """
+    await seed(client, db)
+    aid = await submit_activity(client, db)
+    await login(client, "advisor")
+    items = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]["budget_items"]
+
+    # 少填一項 → 擋下(這一條沒有放寬)
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/approve",
+        json={"budget": [{"item_id": items[0]["id"], "approved_subsidy": 0}]},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    assert "未核定金額" in resp.text
+
+    # 全部核定 0 元、經費來源留空 → 放行
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/approve",
+        json={"budget": [{"item_id": i["id"], "approved_subsidy": 0} for i in items]},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["status"] == "approved"
+
+
+async def test_funding_source_still_required_when_money_is_granted(client, db):
+    await seed(client, db)
+    aid = await submit_activity(client, db)
+    await login(client, "advisor")
+    items = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]["budget_items"]
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/approve",
+        json={
+            "budget": [
+                {"item_id": i["id"], "approved_subsidy": i["requested_subsidy"]} for i in items
+            ]
+        },
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    assert "經費來源" in resp.text

@@ -150,6 +150,10 @@ _OPINION_BOILERPLATE = re.compile(r"(?:※|活動結報提醒).*", re.S)
 # 舊系統的 withdraw 分支只改 status、完全沒碰 Opinions(legacy views.py:2396-2407),
 # 殘留仍是申請期的經費認定
 REJECTED_LEGACY_STATUS = frozenset({1})
+# 只有申請期的殘留才是經費認定。6(已完成)那格早被結案審核覆寫過
+# (legacy views.py:2380 的核銷核准分支寫同一格),裡面混著「活動時間請更正」這類
+# 結案意見,寫進 fund_source 會印在申請表的「意見回饋」上 —— 只留 reason
+FUND_SOURCE_LEGACY_STATUS = frozenset({0, 4, 5, 11})
 FUND_SOURCE_MAX = next(
     m.max_length for m in ApproveActivityIn.model_fields["fund_source"].metadata
     if hasattr(m, "max_length")
@@ -743,8 +747,8 @@ async def import_approvals(legacy, db: AsyncSession, ids: IdMap) -> None:
         # 簽核者寫的。舊庫只有一格文字還原不出各關,掛最後一列比掛承辦人接近事實
         last = min(counter[r.aid], len(APPLY_STAGES)) - 1
         note = opinion_residual(r.opinions) if nth == last else ""
-        if note and r.status not in REJECTED_LEGACY_STATUS:
-            # 非退回件的殘留是經費認定,申請表「意見回饋」那格讀的就是 fund_source
+        if note and r.status in FUND_SOURCE_LEGACY_STATUS:
+            # 申請期的殘留是經費認定,申請表「意見回饋」那格讀的就是 fund_source
             if len(note) <= FUND_SOURCE_MAX:
                 await db.execute(
                     sa.update(Activity)

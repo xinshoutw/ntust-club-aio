@@ -137,8 +137,10 @@ LEADER_TITLES = {"社長", "會長"}
 # 原文照搬會在申請表的「意見回饋」印兩次
 # 有 9 筆的提醒沒有 ※ 開頭,直接從標題起頭 —— 只認 ※ 會把整段樣板留成審核意見
 _OPINION_BOILERPLATE = re.compile(r"(?:※|活動結報提醒).*", re.S)
-# 舊 status 1=退回申請、11=退回核銷:這兩種的意見殘留是退件理由,不是經費認定
-REJECTED_LEGACY_STATUS = frozenset({1, 11})
+# 舊 status 1=退回申請:意見殘留是退件理由,不是經費認定。11(退回核銷)不算 ——
+# 舊系統的 withdraw 分支只改 status、完全沒碰 Opinions(legacy views.py:2396-2407),
+# 殘留仍是申請期的經費認定
+REJECTED_LEGACY_STATUS = frozenset({1})
 FUND_SOURCE_MAX = next(
     m.max_length for m in ApproveActivityIn.model_fields["fund_source"].metadata
     if hasattr(m, "max_length")

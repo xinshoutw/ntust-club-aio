@@ -710,7 +710,10 @@ async def import_approvals(legacy, db: AsyncSession, ids: IdMap) -> None:
         if nth >= len(APPLY_STAGES):
             over_stages += 1  # 舊資料最多三關,超過的不知道該掛哪一格
             continue
-        note = opinion_residual(r.opinions) if nth == 0 else ""
+        # Opinions 每一關都被覆寫(legacy views.py:2228/2266/2381),留下的是最後一位
+        # 簽核者寫的。舊庫只有一格文字還原不出各關,掛最後一列比掛承辦人接近事實
+        last = min(counter[r.aid], len(APPLY_STAGES)) - 1
+        note = opinion_residual(r.opinions) if nth == last else ""
         if note and r.status not in REJECTED_LEGACY_STATUS:
             # 非退回件的殘留是經費認定,申請表「意見回饋」那格讀的就是 fund_source
             if len(note) <= FUND_SOURCE_MAX:

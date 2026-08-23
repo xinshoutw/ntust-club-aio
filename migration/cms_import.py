@@ -69,6 +69,11 @@ def _max_len(model, field: str) -> int:
 # 標籤即為此),不是結案成果。對應新系統的 Activity.content
 CONTENT_MAX = _max_len(ActivityIn, "content")
 
+
+def _actual(n: int | None) -> int:
+    """結案回報的實際人數。0 是有效值,只有 NULL 才是沒填。"""
+    return 0 if n is None else n
+
 TAIPEI = ZoneInfo("Asia/Taipei")
 
 # 遷移範圍(decisions.md MIG-08):只有活動受這個區間限制;社員名單與公告全遷(MIG-11)。
@@ -580,8 +585,10 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
             db.add(
                 ActivityReport(
                     activity_id=activity.id,
-                    member_count=a.ActuallyMemberNumber or a.ExpectedMemberNumber or 0,
-                    non_member_count=a.ActuallyNotMemberNumber or a.ExpectedNotMemberNumber or 0,
+                    # 舊結案表單把空白明確存成 0(legacy views.py:976-982),所以 0 是社團
+                    # 真的回報的實際人數。用 `or` 串接會把它當沒填、拿申請期的預估頂替
+                    member_count=_actual(a.ActuallyMemberNumber),
+                    non_member_count=_actual(a.ActuallyNotMemberNumber),
                     actual_start=local_time(a.ActuallyStartTime)
                     or local_time(a.StartTime)
                     or time(0, 0),

@@ -11,7 +11,7 @@ import { Cols, FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } f
 import { clampPage } from '../../lib/paging'
 import { STATUS } from '../../lib/status'
 import { useAuth } from '../../app/auth'
-import { fmtMoney } from '../activities/types'
+import { LISTED_STATUSES, fmtMoney } from '../activities/types'
 import {
   canActOn,
   useAdminActivities,
@@ -19,7 +19,6 @@ import {
   useAdminActivityDetail,
   useAdminActivityMutations,
   type AdminActivity,
-  type AdminActivityStatus,
 } from '../../api/adminActivities'
 import { useClubOptions } from '../../api/adminClubs'
 import ActivityReviewModal from './ActivityReviewModal'
@@ -28,15 +27,11 @@ import { clickableProps } from '../../lib/clickable'
 // 待審佇列是整批撈回來的小結果集(僅本關可簽核者),分頁在前端切;最近審核走伺服器分頁
 const QUEUE_PAGE_SIZE = 8
 const RECENT_PAGE_SIZE = 10
-const ALL_STATUSES: AdminActivityStatus[] = [
-  'pending_advisor',
-  'pending_chief',
-  'pending_dean',
-  'approved',
-  'rejected',
-  'closing_pending_advisor',
-  'closed',
-]
+// 顯示狀態(含推導的 'locked'),與社團端活動列表同一份。
+// 少了 'locked' 這一項,逾期鎖定的單會從最近審核整批消失 —— 後端的 approved
+// 篩的是**畫面上的**已核准,不含顯示為「已逾期」的那些,而漏斗選項也是由這份推導的,
+// 承辦連把它們找回來的入口都沒有
+const ALL_STATUSES = LISTED_STATUSES
 
 // 類型篩選由後端推導(「大型活動」=類型活動且已認可或申請中未被否准);
 // 排序亦為伺服器端白名單(type 排序以原始類型為準,大型不獨立成一級)

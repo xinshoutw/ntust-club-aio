@@ -46,7 +46,7 @@ export interface ReviewItem {
   }
 }
 
-/** 後端實際儲存的活動狀態(locked 為前端推導顯示鍵,不可作查詢參數) */
+/** 後端實際儲存的活動狀態 */
 export type AdminActivityStatus =
   | 'pending_advisor'
   | 'pending_chief'
@@ -288,16 +288,20 @@ export const canActOnClose = (user: SessionUser | null): boolean =>
 
 // ---- 查詢 ----
 
+/** 清單 `status` 參數收的是**顯示狀態**:落庫的狀態,外加推導的 `locked`
+ *  (已核准且逾期鎖定,畫面顯示成「已逾期」;後端 `display_status_filter` 同一份判定)。
+ *  少了它,`approved` 篩出來的是「已核准且未逾期」,逾期件會從清單整批消失 */
+export type AdminDisplayStatus = AdminActivityStatus | 'locked'
+
 export interface AdminActivityListParams {
   /** 可帶多值(後端 status 多選) */
-  statuses?: AdminActivityStatus[]
+  statuses?: AdminDisplayStatus[]
   clubId?: number
 }
 
 /** 伺服器端分頁查詢(14k+ 筆禁止整批撈取) */
 export interface AdminActivityPageParams {
-  /** 後端收的是**顯示狀態**:另有推導的 'locked'(已核准且逾期鎖定,畫面顯示成已逾期) */
-  statuses?: (AdminActivityStatus | 'locked')[]
+  statuses?: AdminDisplayStatus[]
   clubIds?: number[]
   /** 學期(民國,如 115-1);後端以活動日期落在該學期區間篩 */
   semester?: string
@@ -309,7 +313,7 @@ export interface AdminActivityPageParams {
   locked?: boolean
   /** 全部逾期未結案(已核准+超過結案期限,不分鎖定與否;closeLocked 區分兩者) */
   overdue?: boolean
-  /** 排序白名單:club/name/type/date/status/created_at/reviewed_at;前綴 - 為降冪 */
+  /** 排序白名單:club/name/type/date/budget/status/created_at/reviewed_at;前綴 - 為降冪 */
   sort?: string
   page: number
   pageSize: number

@@ -33,9 +33,26 @@ const PAGE_SIZE = 15
 // 「自籌 + 擬請」合計,兩者不是同一件事 —— 該欄因此不給排序,不做名實不符的指示器
 type SortKey = 'club' | 'name' | 'date' | 'status' | 'created_at' | 'reviewed_at'
 
-// 金額欄寬:`$999,999` 共 8 字元(.num 是 tabular-nums,1ch=一個數字寬)。
-// 用 minWidth 不用 width —— 破六位數時讓它自己撐開,不會疊到隔壁
-const MONEY_COL: React.CSSProperties = { display: 'inline-block', minWidth: '8ch', textAlign: 'right' }
+// 金額欄:兩個數字各自靠右佔一個固定寬的盒子,中間夾一個固定寬的斜線 ——
+// 表頭與內容才對得起來(`.tb.dense` 的 th 是 12px、td 是 13px,`ch` 在兩邊不等寬,
+// 只能用 px)。68px 放得下 `$999,999`;用 minWidth 讓破六位數的自己撐開
+const MONEY_BOX: React.CSSProperties = { display: 'inline-block', minWidth: 68, textAlign: 'right' }
+const MONEY_SEP: React.CSSProperties = {
+  display: 'inline-block',
+  width: 14,
+  textAlign: 'center',
+  color: 'var(--steel)',
+}
+
+function MoneyPair({ left, right }: { left: React.ReactNode; right: React.ReactNode }) {
+  return (
+    <>
+      <span style={MONEY_BOX}>{left}</span>
+      <span style={MONEY_SEP}>/</span>
+      <span style={MONEY_BOX}>{right}</span>
+    </>
+  )
+}
 
 // 結案流程中與已結案:這兩種狀態的重點是結案成果(照片、心得、檢討會議),
 // 審核彈窗看不到那些,改開社團端那份完整檢視(唯讀)
@@ -182,7 +199,7 @@ export default function AdminActivitiesPage() {
             aria-busy={listQuery.isPlaceholderData}
             style={{ minWidth: 1080, opacity: listQuery.isPlaceholderData ? 0.55 : 1 }}
           >
-            <Cols widths={[96, 110, '18%', 'auto', 170, 130, 130, 32]} />
+            <Cols widths={[96, 110, 132, 'auto', 190, 130, 130, 32]} />
             <thead>
               <tr>
                 <th scope="col">
@@ -210,7 +227,9 @@ export default function AdminActivitiesPage() {
                   </span>
                 </th>
                 <th scope="col">{sortHeader('活動名稱', 'name')}</th>
-                <th scope="col" className="r">自籌 / 核定</th>
+                <th scope="col" className="r num">
+                  <MoneyPair left="自籌" right="核定" />
+                </th>
                 <th scope="col">{sortHeader('申請時間', 'created_at')}</th>
                 <th scope="col">{sortHeader('審核時間', 'reviewed_at')}</th>
                 <th scope="col" aria-label="開啟" />
@@ -242,12 +261,12 @@ export default function AdminActivitiesPage() {
                     {/* 類型欄拿掉了,大型徽章跟著活動名稱走(評鑑 ×3 加權看得出來) */}
                     <LargeBadge applied={a.isLarge} approved={a.largeApproved} />
                   </td>
-                  {/* 兩個金額各自靠右對齊、各佔六位數的寬,整欄才對得起來;
-                      核定為 null=承辦還沒核,不是核了 0 元 */}
+                  {/* 核定為 null=承辦還沒核,不是核了 0 元 */}
                   <td className="r num">
-                    <span style={MONEY_COL}>{fmtMoney(a.selfFundTotal)}</span>
-                    <span style={{ color: 'var(--steel)', padding: '0 5px' }}>/</span>
-                    <span style={MONEY_COL}>{approvedText(a.approvedTotal, fmtMoney)}</span>
+                    <MoneyPair
+                      left={fmtMoney(a.selfFundTotal)}
+                      right={approvedText(a.approvedTotal, fmtMoney)}
+                    />
                   </td>
                   <td className="num">{a.submittedAt}</td>
                   <td className="num">{a.reviewedAt ?? '—'}</td>

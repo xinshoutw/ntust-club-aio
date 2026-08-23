@@ -210,7 +210,7 @@ export default function ReviewPage() {
         <LoadingBlock pending={listQuery.isPending} rows={6}>
           <table className="tb dense fixed" style={{ minWidth: 880 }} aria-label="最近審核的活動申請">
             {/* 社團/名稱吃剩餘寬並截斷;類型允許換行(含大型徽章);狀態/日期/金額/審核時間固定 px */}
-            <Cols widths={[96, '18%', 'auto', 130, 104, 90, 140, 32]} />
+            <Cols widths={[96, 132, 'auto', 130, 104, 90, 140, 32]} />
             <thead>
               <tr>
                 <th scope="col">

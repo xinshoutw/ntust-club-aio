@@ -147,20 +147,6 @@ def _require_future_start(activity: Activity) -> None:
         raise validation_error("活動開始時間早於現在,請調整活動日期與時間")
 
 
-# 清單的 status 篩的是**畫面顯示的狀態**:已核准且逾期鎖定的列顯示成「已逾期」,
-# 所以 approved 不含它們,locked 是獨立的一種(推導,非 ActivityStatus 成員)
-_LOCKED = "locked"
-
-
-def _display_status_condition(key: str, lock_days: int) -> sa.ColumnElement[bool]:
-    locked = svc.close_locked_sql(lock_days)
-    if key == _LOCKED:
-        return locked
-    if key == ActivityStatus.APPROVED:
-        return sa.and_(Activity.status == ActivityStatus.APPROVED, sa.not_(locked))
-    return Activity.status == ActivityStatus(key)
-
-
 @router.get("")
 async def list_activities(
     user: ClubUser,
@@ -184,13 +170,7 @@ async def list_activities(
         query = query.where(Activity.date >= start, Activity.date <= end)
     lock_days = await get_setting(db, "close_lock_days")
     if status:
-        allowed = {s.value for s in ActivityStatus} | {_LOCKED}
-        unknown = [s for s in status if s not in allowed]
-        if unknown:
-            raise validation_error(f"未知的狀態:{','.join(unknown)}")
-        query = query.where(
-            sa.or_(*[_display_status_condition(s, lock_days) for s in status])
-        )
+        query = query.where(svc.display_status_filter(status, lock_days))
     if type:
         query = query.where(Activity.type.in_(type))
     if ended is not None:

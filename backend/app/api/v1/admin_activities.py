@@ -15,6 +15,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from app.api.pagination import NullsLast, Pagination, parse_sort
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, forbidden, not_found, validation_error
+from app.core.semesters import semester_of, semester_range
 from app.models import Activity, ActivityReport, ApprovalRecord, Club
 from app.models.enums import (
     ActivityStatus,
@@ -201,14 +202,18 @@ async def list_activities(
     user: Reviewer,
     db: DbDep,
     page: Pagination,
-    status: Annotated[list[ActivityStatus] | None, Query()] = None,
+    semester: str | None = Query(None, pattern=r"^\d{3}-[12]$"),
+    status: Annotated[list[str] | None, Query()] = None,
     club_id: Annotated[list[int] | None, Query()] = None,
     type_: Annotated[list[str] | None, Query(alias="type")] = None,
+    q: Annotated[str | None, Query(max_length=100)] = None,
     locked: bool = Query(False),
     overdue: bool = Query(False),
     sort: str | None = None,
 ) -> ApiResponse[list[ActivityOut]]:
-    # status/club_id/type 可重複帶多值;locked=true 僅回逾期鎖定(已核准+超過結案期限+未解鎖);
+    # status/club_id/type 可重複帶多值;status 收的是**顯示狀態**(另有推導的 locked,
+    # 與社團端同一份 svc.display_status_filter);q 以活動名稱模糊搜尋;
+    # locked=true 僅回逾期鎖定(已核准+超過結案期限+未解鎖);
     # overdue=true 回全部逾期未結案(不分是否已解鎖,結案審核頁逾期表);
     # sort 走白名單(預設 id 降冪)——清單一律伺服器端分頁
     query = (
@@ -220,8 +225,14 @@ async def list_activities(
     visible = svc.visible_statuses(user)
     if visible is not None:
         query = query.where(Activity.status.in_(visible))
+    lock_days = await get_setting(db, "close_lock_days")
     if status:
-        query = query.where(Activity.status.in_(status))
+        query = query.where(svc.display_status_filter(status, lock_days))
+    if semester:
+        start, end = semester_range(semester)
+        query = query.where(Activity.date >= start, Activity.date <= end)
+    if q and q.strip():
+        query = query.where(Activity.name.ilike(f"%{q.strip()}%"))
     if club_id:
         query = query.where(Activity.club_id.in_(club_id))
     if type_:
@@ -236,7 +247,6 @@ async def list_activities(
         if "大型活動" in type_:
             conds.append(_large_condition())
         query = query.where(sa.or_(*conds))
-    lock_days = await get_setting(db, "close_lock_days")
     may_see_approved = visible is None or ActivityStatus.APPROVED in visible
     if (locked or overdue) and not may_see_approved:
         # 逾期未結案全是 approved 狀態。看不到 approved 的帳號(例如只持 approve_advisor)
@@ -271,6 +281,30 @@ async def list_activities(
         out.reviewed_at = reviewed_at
         data.append(out)
     return ApiResponse(data=data, meta=page.meta(total or 0))
+
+
+# 必須宣告在 /{activity_id} 之前,否則 "semesters" 會被當成路徑參數吃掉(422)
+@router.get("/semesters")
+async def list_semesters(
+    user: Reviewer, db: DbDep, club_id: int | None = None
+) -> ApiResponse[list[str]]:
+    """有活動的學期(新到舊),供學期下拉;帶 club_id 則限該社。
+
+    界線與清單同一條:草稿不算,受限關卡帳號也只數得到自己看得到的狀態 ——
+    下拉列得出來的學期,清單就查得到東西。
+    """
+    query = (
+        sa.select(Activity.date)
+        .where(Activity.status != ActivityStatus.DRAFT, Activity.date.is_not(None))
+        .distinct()
+    )
+    visible = svc.visible_statuses(user)
+    if visible is not None:
+        query = query.where(Activity.status.in_(visible))
+    if club_id is not None:
+        query = query.where(Activity.club_id == club_id)
+    dates = await db.scalars(query)
+    return ApiResponse(data=sorted({semester_of(d) for d in dates}, reverse=True))
 
 
 @router.get("/{activity_id}")

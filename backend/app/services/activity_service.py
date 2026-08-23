@@ -6,7 +6,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.errors import not_found
+from app.core.errors import not_found, validation_error
 from app.core.semesters import TAIPEI, semester_of
 from app.models import Activity, ActivityBudgetItem, ActivityReport, File, User
 from app.models.enums import ActivityStatus
@@ -23,8 +23,9 @@ def end_datetime(activity: Activity) -> datetime:
     return datetime.combine(activity.end_date or activity.date, t, tzinfo=TAIPEI)
 
 
-# 只持簽核關卡鍵的帳號(如學務長)視野受限;持 areview 才看得到全部
-FULL_VIEW_KEYS = ("areview",)
+# 只持簽核關卡鍵的帳號(如學務長)視野受限;持這些頁面鍵才看得到全部狀態
+# (申請審核、所有活動、社團活動列表 —— 後兩頁的用途就是查閱全部狀態的活動)
+FULL_VIEW_KEYS = ("areview", "aactivity", "aclubact")
 
 
 def visible_statuses(user) -> set[ActivityStatus] | None:
@@ -104,6 +105,30 @@ def close_locked_sql(lock_days: int) -> sa.ColumnElement[bool]:
         Activity.close_unlocked.is_(False),
         close_overdue_sql(lock_days),
     )
+
+
+# 清單的 status 篩的是**畫面顯示的狀態**:已核准且逾期鎖定的列顯示成「已逾期」,
+# 所以 approved 不含它們,locked 是獨立的一種(推導,非 ActivityStatus 成員)。
+# 社團端與行政端清單共用這一份 —— 各寫一份的話同一個標籤在兩頁會篩出不同的集合
+LOCKED_STATUS = "locked"
+DISPLAY_STATUSES = frozenset({s.value for s in ActivityStatus} | {LOCKED_STATUS})
+
+
+def display_status_filter(values: list[str], lock_days: int) -> sa.ColumnElement[bool]:
+    """把顯示狀態標籤(含推導的 locked)轉成 WHERE 條件;未知值 422。"""
+    unknown = [s for s in values if s not in DISPLAY_STATUSES]
+    if unknown:
+        raise validation_error(f"未知的狀態:{','.join(unknown)}")
+    locked = close_locked_sql(lock_days)
+    conds = []
+    for key in values:
+        if key == LOCKED_STATUS:
+            conds.append(locked)
+        elif key == ActivityStatus.APPROVED:
+            conds.append(sa.and_(Activity.status == ActivityStatus.APPROVED, sa.not_(locked)))
+        else:
+            conds.append(Activity.status == ActivityStatus(key))
+    return sa.or_(*conds)
 
 
 def can_close_sql(lock_days: int) -> sa.ColumnElement[bool]:

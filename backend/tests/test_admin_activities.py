@@ -955,3 +955,90 @@ async def test_adjacent_stages_cannot_share_a_signer(client, db):
         f"/api/v1/admin/activities/{aid}/approve", json={}, headers=csrf_headers(client)
     )
     assert resp.json()["data"]["status"] == "pending_dean"
+
+
+async def test_semester_filter_and_semesters_endpoint(client, db):
+    """所有活動/社團活動列表的學期下拉:清單依學期篩,選項只列真的有活動的學期。"""
+    club = await seed(client, db)
+    other = await make_club(db, name="別社")
+    creator = await club_account(db)
+    db.add_all([
+        Activity(
+            club_id=club.id, name="上學期件", location="x", type="社課或會議",
+            date=date(2025, 10, 1), end_date=date(2025, 10, 1),
+            status="approved", created_by=creator.id,
+        ),
+        Activity(
+            club_id=club.id, name="下學期件", location="x", type="社課或會議",
+            date=date(2026, 3, 1), end_date=date(2026, 3, 1),
+            status="approved", created_by=creator.id,
+        ),
+        # 草稿不進審核視野:學期選項也不該因為它多出一個查不到東西的學期
+        Activity(
+            club_id=club.id, name="草稿件", location="x", type="社課或會議",
+            date=date(2020, 9, 1), end_date=date(2020, 9, 1),
+            status="draft", created_by=creator.id,
+        ),
+        Activity(
+            club_id=other.id, name="別社的件", location="x", type="社課或會議",
+            date=date(2024, 9, 1), end_date=date(2024, 9, 1),
+            status="approved", created_by=creator.id,
+        ),
+    ])
+    await db.commit()
+
+    await login(client, "advisor")
+    rows = (
+        await client.get("/api/v1/admin/activities", params={"semester": "114-1"})
+    ).json()["data"]
+    assert [r["name"] for r in rows] == ["上學期件"]
+
+    labels = (await client.get("/api/v1/admin/activities/semesters")).json()["data"]
+    assert labels == ["114-2", "114-1", "113-1"]  # 新到舊,不含草稿的 109-1
+
+    # club_id 限縮:社團活動列表的下拉只列該社有的學期
+    labels = (
+        await client.get("/api/v1/admin/activities/semesters", params={"club_id": club.id})
+    ).json()["data"]
+    assert labels == ["114-2", "114-1"]
+
+    assert (
+        await client.get("/api/v1/admin/activities", params={"semester": "亂填"})
+    ).status_code == 422
+
+
+async def test_name_search_and_locked_status_filter(client, db):
+    """所有活動的名稱搜尋,以及 status=locked(顯示狀態,與社團端同一份判定)。"""
+    club = await seed(client, db)
+    creator = await club_account(db)
+    old = date.today() - timedelta(days=200)
+    db.add_all([
+        Activity(
+            club_id=club.id, name="迎新宿營", location="x", type="社課或會議",
+            date=old, end_date=old, status="approved", created_by=creator.id,
+        ),
+        Activity(
+            club_id=club.id, name="期末成果發表", location="x", type="社課或會議",
+            date=date.today() + timedelta(days=3), end_date=date.today() + timedelta(days=3),
+            status="approved", created_by=creator.id,
+        ),
+    ])
+    await db.commit()
+
+    await login(client, "advisor")
+    rows = (await client.get("/api/v1/admin/activities", params={"q": "宿營"})).json()["data"]
+    assert [r["name"] for r in rows] == ["迎新宿營"]
+
+    # 已核准且逾期鎖定的列畫面顯示成「已逾期」:status=approved 不該再回它
+    rows = (
+        await client.get("/api/v1/admin/activities", params={"status": "locked"})
+    ).json()["data"]
+    assert [r["name"] for r in rows] == ["迎新宿營"]
+    rows = (
+        await client.get("/api/v1/admin/activities", params={"status": "approved"})
+    ).json()["data"]
+    assert [r["name"] for r in rows] == ["期末成果發表"]
+
+    assert (
+        await client.get("/api/v1/admin/activities", params={"status": "不存在"})
+    ).status_code == 422

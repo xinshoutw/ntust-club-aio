@@ -463,6 +463,19 @@ def member_kind(identity: str | None, title: str | None) -> tuple[MemberKind, st
     return MemberKind.MEMBER, (t if t and t != "社員" else None)
 
 
+# 身份高低:兩列衝突時保留身份較高的那列
+_KIND_RANK = {
+    MemberKind.PRESIDENT: 3,
+    MemberKind.VICE_PRESIDENT: 2,
+    MemberKind.OFFICER: 1,
+    MemberKind.MEMBER: 0,
+}
+
+
+def _kind_rank(row) -> int:
+    return _KIND_RANK[member_kind(row.Identity, row.Title)[0]]
+
+
 async def import_members(legacy, db: AsyncSession, ids: IdMap, clubs) -> None:
     rows = (
         await legacy.execute(
@@ -472,7 +485,9 @@ async def import_members(legacy, db: AsyncSession, ids: IdMap, clubs) -> None:
             )
         )
     ).all()
-    # 同(社團,學期,學號)取 id 最大者(最新);UNIQUE(club_id, student_id, semester)
+    # 同(社團,學期,學號)只能留一列(UNIQUE(club_id, student_id, semester))。
+    # 取「身份較高」的那列,同高再取 id 大的 —— 舊表沒有更新時間,「id 最大=最新」
+    # 只是猜測,而 38 組的勝出列剛好是社員、被丟掉的那列才是社長/副社長/財務長
     dedup: dict[tuple[int, str, str], object] = {}
     bad_semester = foreign = 0
     for row in rows:
@@ -483,7 +498,10 @@ async def import_members(legacy, db: AsyncSession, ids: IdMap, clubs) -> None:
         if semester is None or not row.StudentID:
             bad_semester += 1
             continue
-        dedup[(row.FK_Club_id, semester, row.StudentID.strip())] = row
+        key = (row.FK_Club_id, semester, row.StudentID.strip())
+        prev = dedup.get(key)
+        if prev is None or _kind_rank(row) >= _kind_rank(prev):
+            dedup[key] = row
 
     created = 0
     for (legacy_club_id, semester, student_id), row in dedup.items():

@@ -602,8 +602,10 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
         r.aid: r.n
         for r in await legacy.execute(
             sa.text(
-                'SELECT "FK_Activity_id" AS aid, count(*) AS n'
-                ' FROM "Club_auditactivityrecord" GROUP BY "FK_Activity_id"'
+                'SELECT au."FK_Activity_id" AS aid, count(*) AS n'
+                ' FROM "Club_auditactivityrecord" r'
+                ' JOIN "Club_auditactivity" au ON au.id = r."FK_AuditActivity_id"'
+                ' GROUP BY au."FK_Activity_id"'
             )
         )
     }

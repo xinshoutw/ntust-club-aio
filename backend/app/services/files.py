@@ -216,6 +216,23 @@ _SIGNATURES = {
 }
 
 
+def detect_mime(head: bytes, ext: str) -> str | None:
+    """以魔術位元組判定 MIME:先驗宣告的副檔名,不符再掃其餘簽章;認不出回 None。
+
+    上傳端要的是「符不符合宣告」(不符即 415,使用者重傳一次就好);**離線匯入沒有
+    使用者可以重傳**,要的是內容真正是什麼 —— 舊系統的 Django ImageField 只保證
+    「是一張圖」,不保證副檔名對得上(實測有 6 張 `.PNG` 其實是 JPEG)。
+    宣告優先是為了 zip 系格式:`.docx` 與 `.zip` 同一組簽章,只掃簽章會挑錯。
+    """
+    declared = _SIGNATURES.get(ext.lower())
+    if declared and declared[0](head):
+        return declared[1]
+    for sniff, mime in _SIGNATURES.values():
+        if sniff(head):
+            return mime
+    return None
+
+
 @dataclass(frozen=True)
 class UploadPolicy:
     name: str

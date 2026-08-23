@@ -9,6 +9,7 @@
 
 import csv
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -30,8 +31,16 @@ LIMITS = {
 REFLECTION_PARTS = ("姓名", "系級", "內容")
 
 
+FILLED_SUFFIX = "_filled"
+
+
 def latest_csv() -> Path:
-    return sorted(OUT.glob("activity_texts_*.csv"))[-1]
+    """母檔 = 最新的匯出 CSV。要排掉自己產生的 *_filled.csv ——
+    字典序會把它排在母檔後面,第二次 merge 就會拿自己的輸出當輸入。"""
+    cands = [p for p in OUT.glob("activity_texts_*.csv") if not p.stem.endswith(FILLED_SUFFIX)]
+    if not cands:
+        sys.exit(f"找不到待填 CSV:{OUT}/activity_texts_*.csv")
+    return sorted(cands)[-1]
 
 
 def load_rows() -> tuple[list[dict], list[str]]:
@@ -151,6 +160,18 @@ def _check(rec: dict) -> list[str]:
     return bad
 
 
+_COL_RE = re.compile(r"^填_心得(\d+)_(姓名|系級|內容)$")
+
+
+def _col_order(col: str) -> tuple[int, int]:
+    """心得欄依「篇號、姓名/系級/內容」排 —— 字典序會把心得10 排到心得4 前面,
+    而這份 CSV 是要給人開 Excel 對著改的。"""
+    m = _COL_RE.match(col)
+    if m:
+        return int(m.group(1)), REFLECTION_PARTS.index(m.group(2))
+    return 10**6, 0
+
+
 def merge() -> None:
     rows, header = load_rows()
     by_id = {r["legacy_id"]: r for r in rows}
@@ -183,8 +204,8 @@ def merge() -> None:
                 if k.startswith("填_") and k not in header and k not in extra_cols:
                     extra_cols.append(k)
 
-    out_header = header + sorted(extra_cols)
-    out_path = OUT / (latest_csv().stem + "_filled.csv")
+    out_header = header + sorted(extra_cols, key=_col_order)
+    out_path = OUT / (latest_csv().stem + FILLED_SUFFIX + ".csv")
     with out_path.open("w", newline="", encoding="utf-8-sig") as fh:
         w = csv.DictWriter(fh, fieldnames=out_header)
         w.writeheader()

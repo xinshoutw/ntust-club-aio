@@ -545,6 +545,7 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
 
     created = skipped = 0
     truncated: list[int] = []
+    no_duration: list[int] = []
     for a in acts:
         if a.FK_Club_id not in clubs or ids.get("Club_activity", a.id) is not None:
             skipped += 1
@@ -566,6 +567,12 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
         end_d = local_date(a.EndTime) or start_d
         if end_d < start_d:
             end_d = start_d
+        start_t, end_t = local_time(a.StartTime), local_time(a.EndTime)
+        if end_d == start_d and start_t is not None and end_t is not None and end_t <= start_t:
+            # 34 筆的結束時刻等於開始時刻 —— 舊表單沒擋,實際上是「沒記時長」。
+            # 照搬會過不了 end_time > start_time 的檢核,退回件連暫存都存不了
+            no_duration.append(a.id)
+            end_t = None
         activity = Activity(
             club_id=club_id,
             name=(a.Name or "").strip() or "(未命名)",
@@ -574,8 +581,8 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
             type=TYPE_MAP.get(a.Type, ActivityType.COURSE_MEETING),
             date=start_d,
             end_date=end_d,
-            start_time=local_time(a.StartTime),
-            end_time=local_time(a.EndTime),
+            start_time=start_t,
+            end_time=end_t,
             # 舊制即為 社員/非社員 人數,語彙已統一
             participants_in=a.ExpectedMemberNumber or 0,
             participants_out=a.ExpectedNotMemberNumber or 0,
@@ -641,6 +648,11 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
         if created % 500 == 0:
             await db.flush()
             print(f"  activities … {created}/{len(acts)}")
+    if no_duration:
+        print(
+            f"  結束時刻等於開始時刻已改為留空 {len(no_duration)} 筆(舊 id:"
+            f"{'、'.join(map(str, no_duration[:20]))}{' …' if len(no_duration) > 20 else ''})"
+        )
     if truncated:
         print(
             f"  活動內容超過 {CONTENT_MAX} 字已截斷 {len(truncated)} 筆(舊 id:"

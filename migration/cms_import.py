@@ -162,40 +162,6 @@ def opinion_residual(raw: str | None) -> str:
 VICE_TITLES = {"副社長", "副會長"}
 
 
-# 校內指導老師只有「分機」一格(校外才有完整電話),舊系統那格存的是完整號碼:
-# 「(02)2737-6135  2737-6277」這種 23 字會超過 advisor_ext 的 20 字上限,讓該社連
-# 改社團簡介都被 422 擋下,而且畫面會把整串號碼顯示成「分機 …」
-_EXT_RE = re.compile(r"(?:轉接|轉|分機|#|ext\.?)\s*(\d{2,10})", re.I)
-_BARE_EXT_RE = re.compile(r"^\d{3,5}$")
-
-
-# 舊系統那格的標籤是「職位」,新系統校內那格是「系所」。純職稱寫進去畫面會顯示
-# 「系所:教授」;校內沒有職稱欄位可以收留它,只能不遷
-_TITLE_ONLY = frozenset(
-    {
-        "教授", "副教授", "助理教授", "專技副教授", "講師", "兼任講師", "兼任教師",
-        "老師", "指導老師", "社團指導老師", "校內指導", "校外指導老師", "校外聘請老師",
-        "通識老師", "韓文老師", "僑輔老師", "教官", "中校教官", "教練", "助理教練",
-        "組長", "主任", "護理師", "諮商心理師", "行政組員", "學校教授",
-    }
-)
-
-
-def advisor_dept(position: str | None) -> str | None:
-    """只有看得出單位的才寫進「系所」;純職稱不遷(校內沒有職稱欄位)。"""
-    raw = (position or "").strip()
-    return None if not raw or raw in _TITLE_ONLY else raw
-
-
-def advisor_ext(phone: str | None) -> str | None:
-    """從完整電話抽分機碼;抽不出來就留空 —— 校內沒有欄位可放整串號碼。"""
-    raw = (phone or "").strip()
-    m = _EXT_RE.search(raw)
-    if m:
-        return m.group(1)
-    return raw if _BARE_EXT_RE.match(raw) else None
-
-
 def derive_club_kind(name: str) -> ClubKind:
     if name in KIND_OVERRIDES:
         return KIND_OVERRIDES[name]
@@ -430,9 +396,9 @@ async def import_teachers(legacy, db: AsyncSession, clubs: dict[int, tuple[int, 
             continue
         if identity == "school":
             club.advisor_name = row.Name
-            club.advisor_dept = advisor_dept(row.Position)
+            club.advisor_dept = row.Position or None
             club.advisor_email = row.Email or None
-            club.advisor_ext = advisor_ext(row.Phone)
+            club.advisor_ext = row.Phone or None
         else:
             club.advisor_out_name = row.Name
             club.advisor_out_dept = row.Position or None

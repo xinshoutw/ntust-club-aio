@@ -43,10 +43,10 @@ DEFAULTS: dict[str, Any] = {
     # 單檔上限(MB;magic-byte 型別驗證用的上界,管理員後台可調)
     "upload_limits": {"doc": 50, "img": 10, "zip": 100, "video": 200},
     # 各申請性質的附件加總上限(MB):
-    # 活動申請附件 15、空間報修佐證 100(含影片)、活動結案照片 10
-    "activity_attachment_total_mb": 15,
-    "maintenance_total_mb": 100,
-    "close_photo_total_mb": 10,
+    # 活動申請附件 50、空間報修佐證 250(含影片)、活動結案照片 50
+    "activity_attachment_total_mb": 50,
+    "maintenance_total_mb": 250,
+    "close_photo_total_mb": 50,
     # 儲存配額(GiB):系統總量取實際磁碟可用空間,此處只設單一社團未歸檔檔案上限
     "storage_limits": {"per_club_gib": 2},
     # 評鑑視窗(預設 116 年,2026/02/01–2027/01/31)

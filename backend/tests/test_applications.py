@@ -355,9 +355,9 @@ async def test_club_config(client, db):
     await setup_session(client, db)
     data = (await client.get("/api/v1/club/config")).json()["data"]
     ul = data["upload_limits"]
-    assert ul["activity_attachment_mb"] == 15
-    assert ul["maintenance_mb"] == 100
-    assert ul["close_photo_mb"] == 10
+    assert ul["activity_attachment_mb"] == 50
+    assert ul["maintenance_mb"] == 250
+    assert ul["close_photo_mb"] == 50
     assert ul["img_mb"] == 10 and ul["video_mb"] == 200
     cats = data["budget_categories"]
     assert {"name", "hint"} <= set(cats[0])

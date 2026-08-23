@@ -55,6 +55,7 @@
 | [admin/home.md](admin/home.md) | `/admin` | 全體管理員 |
 | [admin/review.md](admin/review.md) | `/admin/review` | `areview`/簽核鍵 |
 | [admin/close-review.md](admin/close-review.md) | `/admin/close-review` | `aclose`/`approve_advisor` |
+| [admin/activities.md](admin/activities.md) | `/admin/activities` | `aactivity` |
 | [admin/signups.md](admin/signups.md) | `/admin/signups` | `asignup` |
 | [admin/signup-builder.md](admin/signup-builder.md) | `/admin/signup-items/new` | `asignup` |
 | [admin/announcements.md](admin/announcements.md) | `/admin/announcements` | `aannounce` |
@@ -64,6 +65,7 @@
 | [admin/venue-rules.md](admin/venue-rules.md) | `/admin/venue-rules` | `arule` |
 | [admin/club-overview.md](admin/club-overview.md) | `/admin/club-overview` | `aclub` |
 | [admin/members.md](admin/members.md) | `/admin/members` | `amember` |
+| [admin/club-activities.md](admin/club-activities.md) | `/admin/club-activities` | `aclubact` |
 | [admin/club-settings.md](admin/club-settings.md) | `/admin/club-settings` | `aclubset` |
 | [admin/overdue.md](admin/overdue.md) | `/admin/overdue` | `aoverdue` |
 | [admin/eval.md](admin/eval.md) | `/admin/eval` | `aeval` |

@@ -286,8 +286,8 @@ export const toDetail = (o: ActivityDetailOut): ClubActivityDetail => {
   }
 }
 
-// 成果報告/心得 PDF:後端於下載時動態生成(inline),包成 EvalFile 供 FileChip 預覽/下載。
-// base 決定走哪一端的端點:社團端那兩支由 session 認社團,承辦讀別社時要走 admin 版
+// 申請表 PDF:後端於下載時動態生成(inline),包成 EvalFile 供下載。
+// base 決定走哪一端的端點:社團端那支由 session 認社團,承辦讀別社時要走 admin 版
 export type PdfBase = 'club' | 'admin'
 
 const pdfPath = (base: PdfBase, id: number | string, kind: string): string =>
@@ -304,32 +304,6 @@ export const activityApplyPdf = (
   size: 0,
   url: pdfPath(base, a.id, 'apply-pdf'),
   uploadedAt: '—',
-})
-
-export const activityReportPdf = (
-  a: Pick<ClubActivity, 'id' | 'name'>,
-  submittedAt?: string,
-  base: PdfBase = 'club',
-): EvalFile => ({
-  id: `report-pdf-${a.id}`,
-  name: `${a.name}_成果報告表.pdf`,
-  type: 'pdf',
-  size: 0,
-  url: pdfPath(base, a.id, 'report-pdf'),
-  uploadedAt: submittedAt ?? '—',
-})
-
-export const activityReflectionsPdf = (
-  a: Pick<ClubActivity, 'id' | 'name'>,
-  submittedAt?: string,
-  base: PdfBase = 'club',
-): EvalFile => ({
-  id: `reflections-pdf-${a.id}`,
-  name: `${a.name}_學習心得.pdf`,
-  type: 'pdf',
-  size: 0,
-  url: pdfPath(base, a.id, 'reflections-pdf'),
-  uploadedAt: submittedAt ?? '—',
 })
 
 // ---- 查詢 ----

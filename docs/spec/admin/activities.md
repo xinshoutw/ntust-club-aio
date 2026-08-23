@@ -15,7 +15,7 @@
 | 詳情(審核彈窗) | `GET /admin/activities/{id}` |
 | 詳情(完整檢視) | 同一支端點,改以社團端的對照轉型 |
 | 核准 / 退回 | `POST /admin/activities/{id}/approve`、`/reject` |
-| 結案文件 | `GET /admin/activities/{id}/report-pdf`、`/reflections-pdf` |
+| 文件下載 | `GET /admin/activities/{id}/apply-pdf` |
 | 社團選項 | `GET /admin/clubs/options` |
 
 ## 畫面

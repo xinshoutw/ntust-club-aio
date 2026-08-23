@@ -328,43 +328,9 @@ async def list_semesters(
     return ApiResponse(data=sorted({semester_of(d) for d in dates}, reverse=True))
 
 
-async def _report_of(db, user, activity_id: int) -> tuple[Activity, Club]:
-    """已送結案的活動 + 它的社團(PDF 生成用);視野與詳情同一條界線。"""
-    activity = await db.scalar(
-        sa.select(Activity)
-        .where(Activity.id == activity_id)
-        .options(sa.orm.selectinload(Activity.report).selectinload(ActivityReport.reflections))
-    )
-    if activity is None:
-        raise not_found("找不到活動")
-    _require_visible(user, activity)
-    if activity.report is None:
-        raise conflict("此活動尚未送出結案,無法產生文件")
-    return activity, await db.get(Club, activity.club_id)
-
-
-# 成果報告表/學習心得 PDF 的行政端版本:社團端那兩支綁 club_id,承辦讀不到 ——
-# 唯讀檢視(所有活動、社團活動列表)看得到結案成果,就要下載得了同一份文件
-@router.get("/{activity_id}/report-pdf")
-async def download_report_pdf(activity_id: int, user: Reviewer, db: DbDep) -> Response:
-    activity, club = await _report_of(db, user, activity_id)
-    # reportlab 為同步 CPU 工作,丟 threadpool 避免卡住 event loop
-    content = await run_in_threadpool(pdf.report_pdf, club, activity, activity.report)
-    return pdf.pdf_response(content, f"{club.name}_{activity.name}_成果報告表.pdf")
-
-
-@router.get("/{activity_id}/reflections-pdf")
-async def download_reflections_pdf(activity_id: int, user: Reviewer, db: DbDep) -> Response:
-    activity, club = await _report_of(db, user, activity_id)
-    content = await run_in_threadpool(
-        pdf.reflections_pdf, club, activity, activity.report.reflections
-    )
-    return pdf.pdf_response(content, f"{club.name}_{activity.name}_學習心得.pdf")
-
-
 @router.get("/{activity_id}/apply-pdf")
 async def download_apply_pdf(activity_id: int, user: Reviewer, db: DbDep) -> Response:
-    """社團活動申請表 PDF;與詳情同一條視野界線(未結案也產得出來,不走 _report_of)。"""
+    """社團活動申請表 PDF;與詳情同一條視野界線(草稿看不到,其餘不分狀態皆可)。"""
     activity = await db.scalar(
         sa.select(Activity)
         .where(Activity.id == activity_id)

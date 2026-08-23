@@ -1103,7 +1103,7 @@ async def test_admin_cannot_read_a_club_draft(client, db):
 
     await login(client, "advisor")
     assert (await client.get(f"/api/v1/admin/activities/{draft.id}")).status_code == 404
-    assert (await client.get(f"/api/v1/admin/activities/{draft.id}/report-pdf")).status_code == 404
+    assert (await client.get(f"/api/v1/admin/activities/{draft.id}/apply-pdf")).status_code == 404
     assert all(
         a["name"] != "還在寫" for a in (await client.get("/api/v1/admin/activities")).json()["data"]
     )

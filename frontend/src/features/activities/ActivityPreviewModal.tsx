@@ -8,8 +8,6 @@ import { downloadEvalFile, downloadPhotosZip } from '../eval/files'
 import type { EvalFile } from '../eval/types'
 import {
   activityApplyPdf,
-  activityReflectionsPdf,
-  activityReportPdf,
   type ClubActivity,
   type ClubActivityDetail,
 } from '../../api/activities'
@@ -69,7 +67,7 @@ export default function ActivityPreviewModal({ a, detail, loading, error, onRetr
   onEdit?: () => void
   onGoClose?: () => void
   onPreviewFile: (f: EvalFile) => void
-  /** 成果報告/心得 PDF 的端點前綴;行政端要用自己那兩支(社團端那兩支綁 club_id) */
+  /** 申請表 PDF 的端點前綴;行政端要用自己那支(社團端那支綁 club_id) */
   pdfBase?: 'club' | 'admin'
 }) {
   const { message } = App.useApp()
@@ -247,18 +245,12 @@ export default function ActivityPreviewModal({ a, detail, loading, error, onRetr
             </>
           )}
 
-          {rep && (
+          {rep?.videoLink && (
             <>
-              <SectionTitle>結案檔案</SectionTitle>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                <FileChip f={activityReportPdf(a, rep.submittedAt, pdfBase)} onPreview={onPreviewFile} />
-                <FileChip f={activityReflectionsPdf(a, rep.submittedAt, pdfBase)} onPreview={onPreviewFile} />
-                {rep.videoLink && (
-                  <span style={{ fontSize: 13 }}>
-                    <LinkOutlined style={{ color: 'var(--steel)', marginRight: 6 }} />
-                    <a href={rep.videoLink} target="_blank" rel="noopener noreferrer">{rep.videoLink}</a>
-                  </span>
-                )}
+              <SectionTitle>成果影片</SectionTitle>
+              <div style={{ fontSize: 13 }}>
+                <LinkOutlined style={{ color: 'var(--steel)', marginRight: 6 }} />
+                <a href={rep.videoLink} target="_blank" rel="noopener noreferrer">{rep.videoLink}</a>
               </div>
             </>
           )}

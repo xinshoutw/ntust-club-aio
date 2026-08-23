@@ -486,34 +486,6 @@ async def delete_attachment(
     return ApiResponse()
 
 
-async def _closed_activity_with_report(db, user, activity_id: int) -> Activity:
-    activity = await svc.get_own_activity(db, user, activity_id, with_detail=True)
-    if activity.report is None:
-        raise conflict("此活動尚未送出結案,無法產生文件")
-    return activity
-
-
-@router.get("/{activity_id}/report-pdf")
-async def download_report_pdf(activity_id: int, user: ClubUser, db: DbDep) -> Response:
-    """成果報告表 PDF(依需求方模板於下載時動態生成)。"""
-    activity = await _closed_activity_with_report(db, user, activity_id)
-    club = await _club_of(db, user)
-    # reportlab 為同步 CPU 工作,丟 threadpool 避免卡住 event loop
-    content = await run_in_threadpool(pdf.report_pdf, club, activity, activity.report)
-    return pdf.pdf_response(content, f"{club.name}_{activity.name}_成果報告表.pdf")
-
-
-@router.get("/{activity_id}/reflections-pdf")
-async def download_reflections_pdf(activity_id: int, user: ClubUser, db: DbDep) -> Response:
-    """學習心得 PDF(依需求方模板於下載時動態生成)。"""
-    activity = await _closed_activity_with_report(db, user, activity_id)
-    club = await _club_of(db, user)
-    content = await run_in_threadpool(
-        pdf.reflections_pdf, club, activity, activity.report.reflections
-    )
-    return pdf.pdf_response(content, f"{club.name}_{activity.name}_學習心得.pdf")
-
-
 @router.get("/{activity_id}/apply-pdf")
 async def download_apply_pdf(activity_id: int, user: ClubUser, db: DbDep) -> Response:
     """社團活動申請表 PDF(版面沿用舊系統)。"""

@@ -13,6 +13,7 @@ import csv
 import os
 import re
 import sys
+from collections import Counter
 from datetime import date, datetime, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -54,6 +55,7 @@ from app.models.enums import (
 from app.schemas.activities import ActivityIn
 from app.schemas.admin import ApproveActivityIn
 from app.services.activity_service import APPLY_STAGES
+from app.services.settings_service import DEFAULTS as SETTING_DEFAULTS
 
 
 def _max_len(model, field: str) -> int:
@@ -124,6 +126,14 @@ PENDING_BY_SIGNED = (
     ActivityStatus.PENDING_CHIEF,
     ActivityStatus.PENDING_DEAN,
 )
+
+# 舊科目名 → 新目錄。名稱對不到目錄的明細,社團一按儲存就 422
+# (activities._validate_categories 逐項比對名稱),不能原樣搬
+BUDGET_CATEGORY_MAP = {
+    "指導老師/教練費": "指導老師、教練費",  # 只差斜線與頓號
+    "演講費/裁判費": "其他",  # 新目錄沒有這一項;原科目名接進說明才不會遺失
+}
+BUDGET_CATEGORIES = {c["name"] for c in SETTING_DEFAULTS["budget_categories"]}
 
 TYPE_MAP = {
     "course": ActivityType.COURSE_MEETING,
@@ -561,6 +571,7 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
     created = skipped = 0
     truncated: list[int] = []
     no_duration: list[int] = []
+    off_catalog: Counter[str] = Counter()
     for a in acts:
         if a.FK_Club_id not in clubs or ids.get("Club_activity", a.id) is not None:
             skipped += 1
@@ -616,11 +627,19 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
         ids.record(db, "Club_activity", a.id, "activities", activity.id)
 
         for f in funds.get(a.id, []):
+            raw_cat = (f.Name or "").strip() or "其他"
+            category = BUDGET_CATEGORY_MAP.get(raw_cat, raw_cat)
+            desc = (f.Content or "").strip()
+            if category == "其他" and raw_cat != category:
+                # 「其他」的提示本來就是「請在下方註明細項內容」,原科目名放最前面
+                desc = f"{raw_cat}:{desc}" if desc else raw_cat
+            if category not in BUDGET_CATEGORIES:
+                off_catalog[raw_cat] += 1
             db.add(
                 ActivityBudgetItem(
                     activity_id=activity.id,
-                    category=(f.Name or "").strip() or "其他",
-                    description=(f.Content or "").strip(),
+                    category=category,
+                    description=desc,
                     self_fund=f.MatchingFund or 0,
                     requested_subsidy=f.Subsidy or 0,
                     approved_subsidy=f.ApprovedGrant,
@@ -667,6 +686,10 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
         if created % 500 == 0:
             await db.flush()
             print(f"  activities … {created}/{len(acts)}")
+    if off_catalog:
+        # 靜靜 fallback 等於把 422 留給社團自己撞,名單要印出來讓承辦決定併科目還是補目錄
+        listed = "、".join(f"{k}×{n}" for k, n in off_catalog.most_common())
+        print(f"  經費科目不在目錄裡(社團儲存會 422):{listed}")
     if no_duration:
         print(
             f"  結束時刻等於開始時刻已改為留空 {len(no_duration)} 筆(舊 id:"

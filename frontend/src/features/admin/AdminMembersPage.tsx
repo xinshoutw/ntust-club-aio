@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { App, Button, Select } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { DownloadOutlined } from '@ant-design/icons'
@@ -9,6 +9,8 @@ import { Cols, MultiSortButton, Pager, sortParam, useMultiSort } from '../../com
 import { downloadCsv } from '../../lib/csv'
 import { kindLabel } from '../../lib/roles'
 import { currentSemester, semesterOptions } from '../../lib/semester'
+import { clampPage } from '../../lib/paging'
+import { useFitRows } from '../../lib/fitRows'
 import { useMemberTimeColumns } from '../../lib/memberTable'
 import {
   fetchAllAdminMembers,
@@ -19,8 +21,6 @@ import {
 import ClubSelect from './ClubSelect'
 import { useAdminClub } from './clubContext'
 
-const PAGE_SIZE = 50
-
 // 伺服器端排序白名單(members 端點;kind=身份權重,負責人→副負責人→幹部→社員)
 type SortKey = 'name' | 'student_id' | 'kind' | 'title' | 'semester' | 'created_at' | 'updated_at'
 
@@ -28,6 +28,9 @@ type SortKey = 'name' | 'student_id' | 'kind' | 'title' | 'semester' | 'created_
 export default function AdminMembersPage() {
   const { club, clubId, clubKind } = useAdminClub()
   const { message } = App.useApp()
+  // 卡片撐到視窗底、列數依高度算;分頁列跟著卡片底邊,列數不足時位置也不變
+  const tableCard = useRef<HTMLDivElement>(null)
+  const { height: cardHeight, rows: pageSize } = useFitRows(tableCard)
   const [page, setPage] = useState(1)
   const [semester, setSemester] = useState<string>(currentSemester())
   // 名冊慣例的預設序(身份權重→學號)=後端預設:不點排序時不帶 sort
@@ -47,10 +50,16 @@ export default function AdminMembersPage() {
     semester: semester === 'all' ? undefined : semester,
     sort: sortParam(entries),
     page,
-    pageSize: PAGE_SIZE,
+    pageSize,
   })
   const members = listQuery.data?.members ?? []
   const total = listQuery.data?.total ?? 0
+
+  // 視窗變高會讓總頁數變少;停在末頁只會看到空表。失敗時 total 也是 0,只在成功後收斂
+  const listLoaded = listQuery.isSuccess
+  useEffect(() => {
+    if (listLoaded) setPage((p) => clampPage(p, total, pageSize))
+  }, [listLoaded, total, pageSize])
 
   const toggleSort = (key: SortKey) => {
     toggle(key)
@@ -108,7 +117,13 @@ export default function AdminMembersPage() {
         }
       />
 
-      <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+      <div
+        ref={tableCard}
+        className="card"
+        style={{ marginTop: 20, height: cardHeight, display: 'flex', flexDirection: 'column' }}
+      >
+        {/* 表格區吃掉剩餘高度;直向不捲(列數就是照這塊高度算的),橫向留給窄視窗 */}
+        <div style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden' }}>
         <LoadingBlock pending={clubId != null && listQuery.isPending}>
           <table className="tb fixed" style={{ minWidth: 960 }}>
             {/* 姓名放得下四字中文名、學號放得下 9 碼、電話放得下 10 碼不截斷,職稱固定為身份的 1.5 倍。
@@ -175,8 +190,10 @@ export default function AdminMembersPage() {
             </tbody>
           </table>
         </LoadingBlock>
+        </div>
+        {/* 分頁列改放卡片內:卡片高度固定,它才會永遠停在同一條線上(全站其餘表格同型) */}
+        <Pager page={page} pageSize={pageSize} total={total} onChange={setPage} />
       </div>
-      <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
     </div>
   )
 }

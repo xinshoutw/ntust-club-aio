@@ -8,13 +8,13 @@
 
 ## 資料來源
 
-`GET /admin/clubs/{club_id}/members?semester&sort&page&page_size`(每頁 50;參數與排序白名單和社團端 `/club/members` 共用同一份實作)
+`GET /admin/clubs/{club_id}/members?semester&sort&page&page_size`(每頁筆數依視窗高,見 `lib/fitRows`;參數與排序白名單和社團端 `/club/members` 共用同一份實作)
 
 學期下拉:`GET /admin/clubs/{club_id}/members/semesters`(該社名單實際有資料的學期,新到舊)
 
 ## 畫面
 
-頁首:學期下拉、匯出 CSV、選擇社團。表格:姓名、學號、身份、職稱、電話、學期、入社時間、更新時間。除電話外皆可多鍵排序(伺服器端)。
+頁首:學期下拉、匯出 CSV、選擇社團。表格:姓名、學號、身份、職稱、電話、學期、入社時間、更新時間。除電話外皆可多鍵排序(伺服器端)。卡片撐到視窗底、每頁筆數依高度算,分頁列貼著卡片底邊。
 
 ## 規則
 

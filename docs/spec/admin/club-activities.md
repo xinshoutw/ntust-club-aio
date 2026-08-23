@@ -13,7 +13,7 @@
 | 區塊 | 端點 |
 |---|---|
 | 學期下拉 | `GET /admin/activities/semesters?club_id=` |
-| 主列表 | `GET /admin/activities?club_id=&semester=&status=&type=&sort=&page=`(伺服器端分頁,每頁 20) |
+| 主列表 | `GET /admin/activities?club_id=&semester=&status=&type=&sort=&page=`(伺服器端分頁,每頁筆數依視窗高) |
 | 詳情 | `GET /admin/activities/{id}` |
 | 結案文件 | `GET /admin/activities/{id}/report-pdf`、`/reflections-pdf` |
 | 社團選項 | `GET /admin/clubs/options` |
@@ -24,7 +24,7 @@
 
 頁首:標題 + 件數 + 學期下拉 + 選擇社團。
 
-表格:名稱、類型(附大型徽章)、日期、經費(自籌/擬請)、狀態。類型與狀態欄可多選篩選,五欄皆可多鍵排序,預設 `-date`。**沒有動作欄**。
+表格:名稱、類型(附大型徽章)、日期、經費(自籌/擬請)、狀態。類型與狀態欄可多選篩選,五欄皆可多鍵排序,預設 `-date`。**沒有動作欄**。每頁筆數依視窗高(`lib/fitRows`),分頁列貼著卡片底邊。
 
 詳情彈窗:與社團端同一支元件,內容完全相同(基本資料、工作分配、經費三欄、退回原因、活動照片、結案成果全文與學習心得、右上角下載選單)。**底部沒有按鈕** —— 不傳 `onEdit` / `onGoClose`,「繼續編輯」與「前往結案」自然收掉。
 

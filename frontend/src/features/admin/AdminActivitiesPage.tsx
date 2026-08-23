@@ -27,13 +27,6 @@ import {
 import { groupClubsForFilter, useClubOptions } from '../../api/adminClubs'
 import ActivityReviewModal from './ActivityReviewModal'
 
-// 每頁筆數跟著視窗高度走(不固定筆數,避免整頁長出卷軸)。
-// 三個數字是量出來的版面常數,改表格樣式時要跟著調:
-// 一列 = 上下內距 12+12 + StatusPill 22 + 分隔線 1;
-// 表格以外要留給表頭(43)、分頁列(58)與 shell 的下緣留白(64)
-const ROW_HEIGHT = 47
-const RESERVED = 165
-const MIN_ROWS = 5
 
 // 排序鍵=後端 /admin/activities 白名單。經費欄顯示「自籌 / 核定」但排序鍵 budget 是
 // 「自籌 + 擬請」合計,兩者不是同一件事 —— 該欄因此不給排序,不做名實不符的指示器
@@ -66,8 +59,9 @@ const CLOSE_STAGE = new Set(['closing_pending_advisor', 'closed'])
 
 /** 全校活動的查閱頁:所有狀態、所有社團,學期在右上角 */
 export default function AdminActivitiesPage() {
+  // 卡片撐到視窗底、列數依高度算;分頁列跟著卡片底邊,列數不足時位置也不變
   const tableCard = useRef<HTMLDivElement>(null)
-  const pageSize = useFitRows(tableCard, { rowHeight: ROW_HEIGHT, reserved: RESERVED, min: MIN_ROWS })
+  const { height: cardHeight, rows: pageSize } = useFitRows(tableCard)
   const [page, setPage] = useState(1)
   const [semesterSel, setSemesterSel] = useState<string | null>(null)
   const { entries, toggle } = useMultiSort<SortKey>([{ key: 'date', dir: -1 }])
@@ -197,7 +191,13 @@ export default function AdminActivitiesPage() {
         }
       />
 
-      <div ref={tableCard} className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+      <div
+        ref={tableCard}
+        className="card"
+        style={{ marginTop: 20, height: cardHeight, display: 'flex', flexDirection: 'column' }}
+      >
+        {/* 表格區吃掉剩餘高度;直向不捲(列數就是照這塊高度算的),橫向留給窄視窗 */}
+        <div style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden' }}>
         {/* 沿用上一份時整表淡化,避免看起來像是新條件的結果 */}
         <LoadingBlock pending={listQuery.isPending} rows={8}>
           <table
@@ -312,6 +312,7 @@ export default function AdminActivitiesPage() {
             </tbody>
           </table>
         </LoadingBlock>
+        </div>
         <Pager page={page} pageSize={pageSize} total={total} onChange={setPage} />
       </div>
 

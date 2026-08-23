@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Select } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import OptionsError from '../../components/ui/OptionsError'
@@ -8,12 +8,14 @@ import { Cols, FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } f
 import StatusPill from '../../components/ui/StatusPill'
 import LargeBadge from '../../components/ui/LargeBadge'
 import { countText } from '../../lib/counts'
+import { clampPage } from '../../lib/paging'
 import { semesterOptions } from '../../lib/semester'
+import { useFitRows } from '../../lib/fitRows'
 import { useFilePreview } from '../eval/useFilePreview'
 import ActivityPreviewModal from '../activities/ActivityPreviewModal'
 import { LISTED_STATUS_LABELS, money, statusesForLabels } from '../activities/types'
 import { dateRangeText } from '../activities/utils'
-import { ACTIVITY_PAGE_SIZE, type ClubActivity } from '../../api/activities'
+import { type ClubActivity } from '../../api/activities'
 import {
   useAdminActivitySemesters,
   useAdminClubActivities,
@@ -36,6 +38,9 @@ const TYPE_OPTIONS = ['社課或會議', '活動', '大型活動']
 // 資料走 /admin/activities?club_id=,經社團端的對照轉成同一組型別。
 export default function AdminClubActivitiesPage() {
   const { club, clubId } = useAdminClub()
+  // 卡片撐到視窗底、列數依高度算;分頁列跟著卡片底邊,列數不足時位置也不變
+  const tableCard = useRef<HTMLDivElement>(null)
+  const { height: cardHeight, rows: pageSize } = useFitRows(tableCard)
   const [page, setPage] = useState(1)
   const [semesterSel, setSemesterSel] = useState<string | null>(null)
   const { entries, toggle } = useMultiSort<SortKey>([{ key: 'date', dir: -1 }])
@@ -65,11 +70,17 @@ export default function AdminClubActivitiesPage() {
     types: typeFilter.length ? typeFilter : undefined,
     sort: sortParam(entries),
     page,
-    pageSize: ACTIVITY_PAGE_SIZE,
+    pageSize,
   })
   const rows = listQuery.data?.rows ?? []
   const total = listQuery.data?.total ?? 0
   const detailQuery = useAdminClubActivityDetail(preview?.id)
+
+  // 視窗變高會讓總頁數變少;停在末頁只會看到空表。失敗時 total 也是 0,只在成功後收斂
+  const listLoaded = listQuery.isSuccess
+  useEffect(() => {
+    if (listLoaded) setPage((p) => clampPage(p, total, pageSize))
+  }, [listLoaded, total, pageSize])
 
   const toggleSort = (key: SortKey) => {
     toggle(key)
@@ -117,7 +128,13 @@ export default function AdminClubActivitiesPage() {
         }
       />
 
-      <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+      <div
+        ref={tableCard}
+        className="card"
+        style={{ marginTop: 20, height: cardHeight, display: 'flex', flexDirection: 'column' }}
+      >
+        {/* 表格區吃掉剩餘高度;直向不捲(列數就是照這塊高度算的),橫向留給窄視窗 */}
+        <div style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden' }}>
         {/* 沿用上一份時整表淡化,避免看起來像是新條件的結果(社團端同一條) */}
         <LoadingBlock pending={clubId != null && listQuery.isPending} rows={8}>
           <table
@@ -210,8 +227,10 @@ export default function AdminClubActivitiesPage() {
             </tbody>
           </table>
         </LoadingBlock>
+        </div>
+        {/* 分頁列改放卡片內:卡片高度固定,它才會永遠停在同一條線上(全站其餘表格同型) */}
+        <Pager page={page} pageSize={pageSize} total={total} onChange={setPage} />
       </div>
-      <Pager page={page} pageSize={ACTIVITY_PAGE_SIZE} total={total} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
 
       {/* 唯讀:不給 onEdit / onGoClose,footer 的編輯與前往結案自然收掉;
           結案 PDF 走行政端那兩支(社團端的綁 club_id,承辦讀別社會 404) */}

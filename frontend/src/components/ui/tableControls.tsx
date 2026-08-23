@@ -127,7 +127,8 @@ export function Pager({
   style?: CSSProperties
 }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 14px', ...style }}>
+    // data-pager:lib/fitRows 量它的高度,好把卡片撐到視窗底又不壓到分頁列
+    <div data-pager style={{ display: 'flex', justifyContent: 'center', padding: '12px 0 14px', ...style }}>
       <Pagination
         simple
         current={page}
@@ -184,7 +185,7 @@ export function FilterButton({
       menu={{
         items,
         // 資料夾多到超過視窗高時一樣要能捲(子選單的封頂在 index.css)
-        style: { maxHeight: '60vh', overflowY: 'auto' },
+        style: { maxHeight: '50vh', overflowY: 'auto' },
         selectable: true,
         multiple: true,
         selectedKeys: selected,

@@ -107,6 +107,39 @@ def close_locked_sql(lock_days: int) -> sa.ColumnElement[bool]:
     )
 
 
+# 經費欄顯示「自籌 / 擬請補助」,排序以兩者合計(逐項加總,無經費列為 0)
+BUDGET_TOTAL_SQL = (
+    sa.select(
+        sa.func.coalesce(
+            sa.func.sum(ActivityBudgetItem.self_fund + ActivityBudgetItem.requested_subsidy), 0
+        )
+    )
+    .where(ActivityBudgetItem.activity_id == Activity.id)
+    .correlate(Activity)
+    .scalar_subquery()
+)
+
+# 狀態排序照畫面的流程順序,不是列舉字面值(VARCHAR 排出來會是 approved→closed→…)。
+# 社團端與行政端清單共用:同一個「狀態」欄在兩頁點下去要排出同一個順序
+STATUS_ORDER_SQL = sa.case(
+    (Activity.status == ActivityStatus.DRAFT, 0),
+    (
+        Activity.status.in_(
+            [
+                ActivityStatus.PENDING_ADVISOR,
+                ActivityStatus.PENDING_CHIEF,
+                ActivityStatus.PENDING_DEAN,
+            ]
+        ),
+        1,
+    ),
+    (Activity.status == ActivityStatus.APPROVED, 2),
+    (Activity.status == ActivityStatus.CLOSING_PENDING_ADVISOR, 3),
+    (Activity.status == ActivityStatus.CLOSED, 4),
+    else_=5,  # rejected
+)
+
+
 # 清單的 status 篩的是**畫面顯示的狀態**:已核准且逾期鎖定的列顯示成「已逾期」,
 # 所以 approved 不含它們,locked 是獨立的一種(推導,非 ActivityStatus 成員)。
 # 社團端與行政端清單共用這一份 —— 各寫一份的話同一個標籤在兩頁會篩出不同的集合

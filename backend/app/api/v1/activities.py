@@ -20,7 +20,6 @@ from app.core.errors import AppError, conflict, not_found, validation_error
 from app.core.semesters import TAIPEI, semester_of, semester_range
 from app.models import (
     Activity,
-    ActivityBudgetItem,
     ActivityReflection,
     ActivityReport,
     ApprovalRecord,
@@ -47,43 +46,12 @@ router = APIRouter(prefix="/club/activities", tags=["activities"])
 
 _EDITABLE = {ActivityStatus.DRAFT, ActivityStatus.REJECTED}
 
-# 經費欄顯示「自籌 / 擬請補助」,排序以兩者合計(逐項加總,無經費列為 0)
-_BUDGET_TOTAL = (
-    sa.select(
-        sa.func.coalesce(
-            sa.func.sum(ActivityBudgetItem.self_fund + ActivityBudgetItem.requested_subsidy), 0
-        )
-    )
-    .where(ActivityBudgetItem.activity_id == Activity.id)
-    .correlate(Activity)
-    .scalar_subquery()
-)
-
-# 狀態排序照畫面的流程順序,不是列舉字面值(VARCHAR 排出來會是 approved→closed→…)
-_STATUS_ORDER = sa.case(
-    (Activity.status == ActivityStatus.DRAFT, 0),
-    (
-        Activity.status.in_(
-            [
-                ActivityStatus.PENDING_ADVISOR,
-                ActivityStatus.PENDING_CHIEF,
-                ActivityStatus.PENDING_DEAN,
-            ]
-        ),
-        1,
-    ),
-    (Activity.status == ActivityStatus.APPROVED, 2),
-    (Activity.status == ActivityStatus.CLOSING_PENDING_ADVISOR, 3),
-    (Activity.status == ActivityStatus.CLOSED, 4),
-    else_=5,  # rejected
-)
-
 _SORTABLE = {
     "name": Activity.name,
     "type": Activity.type,
     "date": Activity.date,
-    "budget": _BUDGET_TOTAL,
-    "status": _STATUS_ORDER,
+    "budget": svc.BUDGET_TOTAL_SQL,
+    "status": svc.STATUS_ORDER_SQL,
     "created_at": Activity.created_at,
 }
 

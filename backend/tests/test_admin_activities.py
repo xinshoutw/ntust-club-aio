@@ -1042,3 +1042,43 @@ async def test_name_search_and_locked_status_filter(client, db):
     assert (
         await client.get("/api/v1/admin/activities", params={"status": "不存在"})
     ).status_code == 422
+
+
+async def test_budget_and_status_sort_match_the_club_list(client, db):
+    """行政端唯讀檢視與社團端是同一張表:同一個欄名點下去要排出同一個順序。
+
+    狀態走流程序(申請中 → 已核准 → 結案中 → 已結案 → 已退回),不是列舉字面值;
+    經費走「自籌 + 擬請」合計 —— 行政端原本連 budget 這個排序鍵都沒有。
+    """
+    club = await seed(client, db)
+    creator = await club_account(db)
+    day = date.today() + timedelta(days=10)
+
+    def act(name, status, self_fund):
+        a = Activity(
+            club_id=club.id, name=name, location="x", type="社課或會議",
+            date=day, end_date=day, status=status, created_by=creator.id,
+        )
+        a.budget_items = [
+            ActivityBudgetItem(category="雜支", description="", self_fund=self_fund,
+                               requested_subsidy=0)
+        ]
+        return a
+
+    db.add_all([
+        act("已退回", "rejected", 300),
+        act("已結案", "closed", 100),
+        act("申請中", "pending_advisor", 200),
+    ])
+    await db.commit()
+
+    await login(client, "advisor")
+    rows = (
+        await client.get("/api/v1/admin/activities", params={"sort": "status"})
+    ).json()["data"]
+    assert [r["name"] for r in rows] == ["申請中", "已結案", "已退回"]
+
+    rows = (
+        await client.get("/api/v1/admin/activities", params={"sort": "budget"})
+    ).json()["data"]
+    assert [r["name"] for r in rows] == ["已結案", "申請中", "已退回"]

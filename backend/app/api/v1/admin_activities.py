@@ -180,7 +180,9 @@ _SORTABLE = {
     "name": Activity.name,
     "type": Activity.type,
     "date": Activity.date,
-    "status": Activity.status,
+    # 經費與狀態的排序運算式與社團端同一份:同一個欄名在兩頁要排出同一個順序
+    "budget": svc.BUDGET_TOTAL_SQL,
+    "status": svc.STATUS_ORDER_SQL,
     "created_at": Activity.created_at,
     "reviewed_at": NullsLast(_REVIEWED_AT),
 }

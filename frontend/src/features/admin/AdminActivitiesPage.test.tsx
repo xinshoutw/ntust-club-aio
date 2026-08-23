@@ -72,8 +72,12 @@ const fullDetail: ClubActivityDetail = {
   },
 }
 
-vi.mock('../../api/adminClubs', () => ({
-  useClubOptions: () => ({ data: [{ id: 7, name: '吉他社', kind: '社團' }], isError: false }),
+vi.mock('../../api/adminClubs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../api/adminClubs')>()),
+  useClubOptions: () => ({
+    data: [{ id: 7, name: '吉他社', kind: '社團', attribute: '藝術' }],
+    isError: false,
+  }),
 }))
 
 vi.mock('../../api/adminActivities', async (importOriginal) => ({

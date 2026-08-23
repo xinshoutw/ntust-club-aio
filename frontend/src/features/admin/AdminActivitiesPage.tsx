@@ -24,17 +24,18 @@ import {
   useAdminClubActivityDetail,
   type AdminActivity,
 } from '../../api/adminActivities'
-import { useClubOptions } from '../../api/adminClubs'
+import { groupClubsByFolder, useClubOptions } from '../../api/adminClubs'
 import ActivityReviewModal from './ActivityReviewModal'
 
-const PAGE_SIZE = 10
-
-// 類型篩選由後端推導(「大型活動」=類型活動且已認可或申請中未被否准)
-const TYPE_OPTIONS = ['社課或會議', '活動', '大型活動']
+const PAGE_SIZE = 15
 
 // 排序鍵=後端 /admin/activities 白名單。經費欄顯示「自籌 / 核定」但排序鍵 budget 是
 // 「自籌 + 擬請」合計,兩者不是同一件事 —— 該欄因此不給排序,不做名實不符的指示器
-type SortKey = 'club' | 'name' | 'type' | 'date' | 'status' | 'created_at' | 'reviewed_at'
+type SortKey = 'club' | 'name' | 'date' | 'status' | 'created_at' | 'reviewed_at'
+
+// 金額欄寬:`$999,999` 共 8 字元(.num 是 tabular-nums,1ch=一個數字寬)。
+// 用 minWidth 不用 width —— 破六位數時讓它自己撐開,不會疊到隔壁
+const MONEY_COL: React.CSSProperties = { display: 'inline-block', minWidth: '8ch', textAlign: 'right' }
 
 // 結案流程中與已結案:這兩種狀態的重點是結案成果(照片、心得、檢討會議),
 // 審核彈窗看不到那些,改開社團端那份完整檢視(唯讀)
@@ -46,7 +47,6 @@ export default function AdminActivitiesPage() {
   const [semesterSel, setSemesterSel] = useState<string | null>(null)
   const { entries, toggle } = useMultiSort<SortKey>([{ key: 'date', dir: -1 }])
   const [clubFilter, setClubFilter] = useState<string[]>([])
-  const [typeFilter, setTypeFilter] = useState<string[]>([])
   const [statusFilter, setStatusFilter] = useState<string[]>([])
   const [overdueOnly, setOverdueOnly] = useState(false)
   // 伺服器端搜尋:按下 Enter 或搜尋鈕才送出(邊打邊送等於對 14k 筆逐鍵掃一次)
@@ -68,7 +68,7 @@ export default function AdminActivitiesPage() {
 
   // 有選社團但主檔未載入/名稱失效 → 強制空集,不可 fail-open 回全部(同申請審核頁)
   const clubsQuery = useClubOptions()
-  const clubOptions = (clubsQuery.data ?? []).map((c) => c.name)
+  const clubFolders = groupClubsByFolder(clubsQuery.data ?? [])
   const clubIdMatches = clubFilter.length
     ? (clubsQuery.data ?? []).filter((c) => clubFilter.includes(c.name)).map((c) => c.id)
     : undefined
@@ -79,7 +79,6 @@ export default function AdminActivitiesPage() {
     q: query || undefined,
     statuses: statusesForLabels(statusFilter),
     clubIds,
-    types: typeFilter.length ? typeFilter : undefined,
     overdue: overdueOnly,
     sort: sortParam(entries),
     page,
@@ -183,34 +182,9 @@ export default function AdminActivitiesPage() {
             aria-busy={listQuery.isPlaceholderData}
             style={{ minWidth: 1080, opacity: listQuery.isPlaceholderData ? 0.55 : 1 }}
           >
-            <Cols widths={['16%', 'auto', 120, 104, 130, 90, 130, 130, 32]} />
+            <Cols widths={[96, 110, '18%', 'auto', 170, 130, 130, 32]} />
             <thead>
               <tr>
-                <th scope="col">
-                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    {sortHeader('社團', 'club')}
-                    <FilterButton
-                      options={clubOptions}
-                      selected={clubFilter}
-                      onChange={(next) => { setClubFilter(next); resetPage() }}
-                      label="篩選社團"
-                    />
-                  </span>
-                </th>
-                <th scope="col">{sortHeader('活動名稱', 'name')}</th>
-                <th scope="col">
-                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    {sortHeader('類型', 'type')}
-                    <FilterButton
-                      options={TYPE_OPTIONS}
-                      selected={typeFilter}
-                      onChange={(next) => { setTypeFilter(next); resetPage() }}
-                      label="篩選類型"
-                    />
-                  </span>
-                </th>
-                <th scope="col">{sortHeader('活動日期', 'date')}</th>
-                <th scope="col" className="r">經費（自籌／核定）</th>
                 <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     {sortHeader('狀態', 'status')}
@@ -222,7 +196,22 @@ export default function AdminActivitiesPage() {
                     />
                   </span>
                 </th>
-                <th scope="col">{sortHeader('送件時間', 'created_at')}</th>
+                <th scope="col">{sortHeader('活動日期', 'date')}</th>
+                <th scope="col">
+                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                    {sortHeader('社團', 'club')}
+                    {/* 159 個社團平鋪讀不完:漏斗改二級選單,資料夾與 ClubCascader 同一份 */}
+                    <FilterButton
+                      options={clubFolders}
+                      selected={clubFilter}
+                      onChange={(next) => { setClubFilter(next); resetPage() }}
+                      label="篩選社團"
+                    />
+                  </span>
+                </th>
+                <th scope="col">{sortHeader('活動名稱', 'name')}</th>
+                <th scope="col" className="r">自籌 / 核定</th>
+                <th scope="col">{sortHeader('申請時間', 'created_at')}</th>
                 <th scope="col">{sortHeader('審核時間', 'reviewed_at')}</th>
                 <th scope="col" aria-label="開啟" />
               </tr>
@@ -234,6 +223,8 @@ export default function AdminActivitiesPage() {
                   onClick={() => openRow(i)}
                   style={{ cursor: 'pointer', ...(current?.id === a.id && open ? { background: 'var(--seal-tint)' } : {}) }}
                 >
+                  <td><StatusPill status={a.status} /></td>
+                  <td className="num">{a.date}</td>
                   <td className="cell-clip" title={a.club}>{a.club}</td>
                   <td className="cell-clip" title={a.name} style={{ fontWeight: 500 }}>
                     {/* 鍵盤入口:與整列 onClick 同動作;stopPropagation 避免雙觸發 */}
@@ -248,17 +239,16 @@ export default function AdminActivitiesPage() {
                     >
                       {a.name || '(未命名)'}
                     </button>
-                  </td>
-                  <td>
-                    {a.type}
+                    {/* 類型欄拿掉了,大型徽章跟著活動名稱走(評鑑 ×3 加權看得出來) */}
                     <LargeBadge applied={a.isLarge} approved={a.largeApproved} />
                   </td>
-                  <td className="num">{a.date}</td>
-                  {/* 核定為 null=承辦還沒核,不是核了 0 元;`—` 是全站對「沒有值」的寫法 */}
+                  {/* 兩個金額各自靠右對齊、各佔六位數的寬,整欄才對得起來;
+                      核定為 null=承辦還沒核,不是核了 0 元 */}
                   <td className="r num">
-                    {fmtMoney(a.selfFundTotal)} / {approvedText(a.approvedTotal, fmtMoney)}
+                    <span style={MONEY_COL}>{fmtMoney(a.selfFundTotal)}</span>
+                    <span style={{ color: 'var(--steel)', padding: '0 5px' }}>/</span>
+                    <span style={MONEY_COL}>{approvedText(a.approvedTotal, fmtMoney)}</span>
                   </td>
-                  <td><StatusPill status={a.status} /></td>
                   <td className="num">{a.submittedAt}</td>
                   <td className="num">{a.reviewedAt ?? '—'}</td>
                   <td className="r"><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>
@@ -268,7 +258,7 @@ export default function AdminActivitiesPage() {
                   社團選項失敗則讓漏斗靜靜地空著 */}
               {(listQuery.isError || clubsQuery.isError) && (
                 <tr className="no-hover">
-                  <td colSpan={9}>
+                  <td colSpan={8}>
                     <QueryError
                       compact
                       title={listQuery.isError ? '活動列表載入失敗' : '篩選選項載入失敗'}
@@ -283,9 +273,9 @@ export default function AdminActivitiesPage() {
               )}
               {!listQuery.isFetching && !listQuery.isError && !clubsQuery.isError && rows.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={9} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 28 }}>
+                  <td colSpan={8} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 28 }}>
                     {/* 沒下條件時說「無符合條件」是在指責使用者的操作:新學期本來就一筆都沒有 */}
-                    {clubFilter.length || typeFilter.length || statusFilter.length || overdueOnly || query
+                    {clubFilter.length || statusFilter.length || overdueOnly || query
                       ? '無符合條件的活動'
                       : semester
                         ? '本學期尚無活動'

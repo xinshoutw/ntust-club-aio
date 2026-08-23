@@ -787,7 +787,8 @@ async def import_approvals(legacy, db: AsyncSession, ids: IdMap) -> None:
             stage=APPLY_STAGES[nth],
             decision=ApprovalDecision.APPROVE,
             actor_id=int(actor),
-            reason=note or None,
+            # 退件理由歸 REJECT 列(見 import_rejections),掛在核准列上是張冠李戴
+            reason=None if r.status in REJECTED_LEGACY_STATUS else (note or None),
             **({"created_at": local_dt(r.audit_time)} if r.audit_time else {}),
         )
         db.add(record)
@@ -795,31 +796,95 @@ async def import_approvals(legacy, db: AsyncSession, ids: IdMap) -> None:
         ids.record(db, "Club_auditactivityrecord", r.id, "approval_records", record.id)
         created += 1
         notes += bool(note)
-    # 一筆簽核都沒有的活動(全是沒人簽就退回的),意見掛不上任何一列 —— 明講,不要靜靜丟掉
-    orphan_notes = sum(
-        1
-        for (raw,) in await legacy.execute(
-            sa.text(
-                'SELECT au."Opinions" FROM "Club_auditactivity" au'
-                ' JOIN "Club_activity" a ON a.id = au."FK_Activity_id"'
-                ' WHERE a."StartTime" >= :start AND a."StartTime" < :end'
-                ' AND NOT EXISTS (SELECT 1 FROM "Club_auditactivityrecord" r'
-                '                 WHERE r."FK_AuditActivity_id" = au.id)'
-            ),
-            {"start": scope_start, "end": scope_end},
-        )
-        if opinion_residual(raw)
-    )
     print(
         f"approvals: 新增 {created} 筆簽核(去樣板後仍有審核意見 {notes} 筆,"
         f"其中 {sources} 筆寫入 fund_source、{too_long} 筆超過 {FUND_SOURCE_MAX} 字只留 reason)"
         f";活動未遷 {no_activity}、簽核者未遷 {no_actor}、超過三關 {over_stages}"
     )
-    if orphan_notes:
-        print(
-            f"  另有 {orphan_notes} 筆退件理由掛不上簽核列(沒人簽就退回,舊表沒有 actor)"
-            f",未遷入"
+
+
+MIGRATION_ACTOR_USERNAME = "_migration"
+# 舊系統的退回不是一列資料,對照鍵只能掛在活動上 —— 進 id-map 才清得掉
+REJECT_MAP_TABLE = "Club_activity:reject"
+NO_REASON_GIVEN = "未提供更多說明"
+
+
+async def migration_actor(db: AsyncSession) -> int:
+    """簽核紀錄的 actor_id 非空,但舊系統的退件沒有記是誰退的。
+
+    用一個不能登入的帳號承接:`password_hash=None` + `is_active=False`,列在稽核
+    軌跡上一眼看得出「這筆是遷移補的」,而不是冒用某位承辦人的名字。
+    """
+    user = await db.scalar(sa.select(User).where(User.username == MIGRATION_ACTOR_USERNAME))
+    if user is None:
+        user = User(
+            role=UserRole.ADMIN,
+            username=MIGRATION_ACTOR_USERNAME,
+            password_hash=None,
+            name="系統遷移",
+            permissions=[],
+            must_change_password=False,
+            is_active=False,
         )
+        db.add(user)
+        await db.flush()
+    return user.id
+
+
+async def import_rejections(legacy, db: AsyncSession, ids: IdMap) -> None:
+    """退回申請 → approval_records(decision=REJECT)。
+
+    舊系統退回不寫 `Club_auditactivityrecord`(legacy views.py:2251-2268 只改 status
+    與 Opinions),理由只剩 `AuditActivity.Opinions` 一格。不補這一段的話,60 件退回
+    活動在新系統一筆退件紀錄都沒有 —— 社團看到「已退回」卻讀不到任何理由,是舊系統
+    看得到、新系統看不到的功能倒退。
+    """
+    scope_start, scope_end = _scope_bounds()
+    rows = (
+        await legacy.execute(
+            sa.text(
+                'SELECT a.id AS aid, au."Opinions" AS opinions,'
+                ' (SELECT count(*) FROM "Club_auditactivityrecord" r'
+                '  WHERE r."FK_AuditActivity_id" = au.id) AS signed'
+                ' FROM "Club_activity" a'
+                ' LEFT JOIN "Club_auditactivity" au ON au."FK_Activity_id" = a.id'
+                ' WHERE a."StartTime" >= :start AND a."StartTime" < :end AND a.status = 1'
+                ' ORDER BY a.id'
+            ),
+            {"start": scope_start, "end": scope_end},
+        )
+    ).all()
+    if not rows:
+        return
+    actor_id = await migration_actor(db)
+    created = with_reason = no_activity = 0
+    for r in rows:
+        new_aid = ids.get("Club_activity", r.aid)
+        if new_aid is None:
+            no_activity += 1
+            continue
+        if ids.get(REJECT_MAP_TABLE, r.aid) is not None:
+            continue  # 重跑不要越補越多
+        reason = opinion_residual(r.opinions)
+        with_reason += bool(reason)
+        record = ApprovalRecord(
+            subject_type=ApprovalSubject.ACTIVITY,
+            subject_id=int(new_aid),
+            # 退回發生在下一個還沒簽的關卡;沒人簽過就是承辦人那關
+            stage=APPLY_STAGES[min(r.signed or 0, len(APPLY_STAGES) - 1)],
+            decision=ApprovalDecision.REJECT,
+            actor_id=actor_id,
+            reason=reason or NO_REASON_GIVEN,
+        )
+        db.add(record)
+        await db.flush()
+        ids.record(db, REJECT_MAP_TABLE, r.aid, "approval_records", record.id)
+        created += 1
+    print(
+        f"rejections: 補 {created} 筆退件紀錄(其中 {with_reason} 筆有舊系統留下的理由,"
+        f"其餘填「{NO_REASON_GIVEN}」);活動未遷 {no_activity}"
+        f"\n  actor 是不能登入的 {MIGRATION_ACTOR_USERNAME}(系統遷移)帳號"
+    )
 
 
 async def import_news(legacy, db: AsyncSession, ids: IdMap) -> None:
@@ -860,6 +925,7 @@ async def import_news(legacy, db: AsyncSession, ids: IdMap) -> None:
 # id-map 的舊表名 → 要清掉的新表(reset 用;順序即刪除順序,子表在前)
 _RESET_ORDER = (
     ("Club_auditactivityrecord", ApprovalRecord),
+    (REJECT_MAP_TABLE, ApprovalRecord),
     ("Club_news", Announcement),
     ("Club_activity", Activity),
     ("Club_student", ClubMember),
@@ -906,6 +972,7 @@ async def reset(db: AsyncSession) -> None:
             continue
         await db.execute(sa.delete(model).where(model.id.in_(target)))
         print(f"  清除 {table}: {len(target)} 列")
+    await db.execute(sa.delete(User).where(User.username == MIGRATION_ACTOR_USERNAME))
     await db.execute(sa.delete(LegacyIdMap).where(LegacyIdMap.legacy_system == LegacySystem.CMS))
     await db.commit()
     print("已清除 CMS 匯入結果;指導老師欄位不還原(非 id-map 型,重跑會覆寫)")
@@ -930,6 +997,7 @@ async def main() -> None:
         await import_members(legacy, db, ids, clubs)
         await import_activities(legacy, db, ids, clubs)
         await import_approvals(legacy, db, ids)
+        await import_rejections(legacy, db, ids)
         await import_news(legacy, db, ids)
         await db.commit()
 

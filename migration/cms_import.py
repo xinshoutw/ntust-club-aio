@@ -51,8 +51,23 @@ from app.models.enums import (
     MemberKind,
     UserRole,
 )
+from app.schemas.activities import ActivityIn
 from app.schemas.admin import ApproveActivityIn
 from app.services.activity_service import APPLY_STAGES
+
+
+def _max_len(model, field: str) -> int:
+    """從 Pydantic schema 讀長度上限 —— 不要在遷移腳本裡再寫死第二份數字。"""
+    for meta in model.model_fields[field].metadata:
+        limit = getattr(meta, "max_length", None)
+        if limit is not None:
+            return limit
+    raise RuntimeError(f"{model.__name__}.{field} 讀不到 max_length,schema 改過了")
+
+
+# 舊 Club_activity.Review = 申請表的「活動描述」(templates/viewer/activity_activity_detail.html
+# 標籤即為此),不是結案成果。對應新系統的 Activity.content
+CONTENT_MAX = _max_len(ActivityIn, "content")
 
 TAIPEI = ZoneInfo("Asia/Taipei")
 
@@ -504,6 +519,7 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
         metas.setdefault(r.aid, {})[r.key] = r.value == "True"
 
     created = skipped = 0
+    truncated: list[int] = []
     for a in acts:
         if a.FK_Club_id not in clubs or ids.get("Club_activity", a.id) is not None:
             skipped += 1
@@ -513,6 +529,11 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
         if status is None:  # 未知狀態(不在舊 choices):跳過並記數
             skipped += 1
             continue
+        # Review 是申請表的「活動描述」;超過 schema 上限就截斷,否則社團一按儲存就 422
+        content = (a.Review or "").strip()
+        if len(content) > CONTENT_MAX:
+            truncated.append(a.id)
+            content = content[:CONTENT_MAX]
         start_d = local_date(a.StartTime) or local_date(a.SetupTime) or date(1970, 1, 1)
         end_d = local_date(a.EndTime) or start_d
         if end_d < start_d:
@@ -520,7 +541,7 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
         activity = Activity(
             club_id=club_id,
             name=(a.Name or "").strip() or "(未命名)",
-            content="",
+            content=content,
             location=(a.Location or "").strip() or "(未填)",
             type=TYPE_MAP.get(a.Type, ActivityType.COURSE_MEETING),
             date=start_d,
@@ -568,7 +589,9 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
                     or local_time(a.EndTime)
                     or time(0, 0),
                     actual_location=(a.Location or "").strip() or "(未填)",
-                    highlights=(a.Review or "").strip(),
+                    # 舊制沒有成果三欄(Review 是申請期的活動描述,已寫進 Activity.content),
+                    # 留空待 text_fields.py 的人工轉錄 CSV 補
+                    highlights="",
                     goals="",
                     others="",
                     review_meeting=False,
@@ -585,6 +608,12 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
         if created % 500 == 0:
             await db.flush()
             print(f"  activities … {created}/{len(acts)}")
+    if truncated:
+        print(
+            f"  活動內容超過 {CONTENT_MAX} 字已截斷 {len(truncated)} 筆(舊 id:"
+            f"{'、'.join(map(str, truncated[:20]))}{' …' if len(truncated) > 20 else ''});"
+            "全文仍在舊庫 Club_activity.Review"
+        )
     print(
         f"activities: 新增 {created}、跳過 {skipped}(已遷/不遷社團/未知狀態)"
         f";範圍外未讀取 {(total or 0) - len(acts)}"

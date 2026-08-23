@@ -11,8 +11,9 @@ CSV 規則:
 - `legacy_id` 是唯一的對照鍵(舊系統 activity id),**不要改動、不要有重複列**;
   其餘無 `填_` 前綴的欄位都是唯讀參考(社團、活動名稱、日期、來源檔案路徑)
 - `填_` 開頭的欄位才會寫入。**留白 = 不動**(不會清掉既有值),有值 = 覆寫
-- `填_成果_執行成效` 預先帶入舊系統的單一檢討文字(遷移時已寫進 highlights),
-  照著改即可,不必重打
+- `填_活動內容` 預先帶入舊系統的「活動描述」(`Club_activity.Review`,遷移時已寫進
+  `Activity.content`),照著改即可;企劃書寫得更完整就以企劃書為準。**成果三欄舊制
+  完全沒有**,只能從結案附件轉錄
 - 心得欄位以 `填_心得N_姓名 / _系級 / _內容` 三件一組;要多寫幾篇就自己往後加
   `填_心得4_*` 欄,匯入端依欄名自動辨識。**同一活動只要有任一篇填了,就整批取代**
   該活動既有的心得(避免重跑時越加越多);但只要該列的心得有任何一組不完整或超長,
@@ -40,8 +41,7 @@ sys.path.insert(0, str(BACKEND_DIR))
 sys.path.insert(0, str(MIGRATION_DIR))
 
 import sqlalchemy as sa
-from cms_import import _scope_bounds, local_date
-from pydantic import BaseModel
+from cms_import import _max_len, _scope_bounds, local_date
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.core.config import settings
@@ -72,15 +72,6 @@ _REFLECTION_RE = re.compile(r"^填_心得(\d+)_(姓名|系級|內容)$")
 _REFLECTION_ATTRS = {"姓名": "student_name", "系級": "dept", "內容": "body"}
 
 READONLY_HEADER = ["legacy_id", "社團", "活動名稱", "活動日期", "狀態", "企劃書", "結案文件"]
-
-
-def _max_len(model: type[BaseModel], field: str) -> int:
-    """從 schema 讀長度上限 —— 不要在遷移腳本裡再寫死第二份數字。"""
-    for meta in model.model_fields[field].metadata:
-        limit = getattr(meta, "max_length", None)
-        if limit is not None:
-            return limit
-    raise RuntimeError(f"{model.__name__}.{field} 讀不到 max_length,schema 改過了")
 
 
 CONTENT_MAX = _max_len(ActivityIn, "content")
@@ -160,7 +151,9 @@ async def export(legacy, db: AsyncSession) -> Path:
             if not plan and not attachments:
                 no_source += 1  # 沒有來源檔可轉錄,列出來只是徒增空白列
                 continue
-            prefill = {"填_成果_執行成效": (a.Review or "").strip()}
+            # Review = 申請表的「活動描述」,cms_import 已寫進 Activity.content;
+            # 這裡帶出來只是讓轉錄者對照企劃書時知道舊系統原本寫了什麼
+            prefill = {CONTENT_FIELD: (a.Review or "").strip()}
             writer.writerow(
                 [
                     a.id,
@@ -170,9 +163,10 @@ async def export(legacy, db: AsyncSession) -> Path:
                     STATUS_LABELS.get(a.status, str(a.status)),
                     plan,
                     ";".join(attachments),
-                    "",  # 填_活動內容:來源是企劃書
-                    # 預帶舊系統的單一檢討文字(遷移時已寫進 highlights),其餘留白
-                    *[prefill.get(col, "") for col in REPORT_FIELDS],
+                    # 預帶舊系統的「活動描述」(遷移時已寫進 Activity.content);
+                    # 企劃書有更完整的敘述就照企劃書改寫
+                    prefill.get(CONTENT_FIELD, ""),
+                    *["" for _col in REPORT_FIELDS],  # 成果三欄舊制沒有,全靠轉錄
                     *[""] * (REFLECTION_SLOTS * len(_REFLECTION_ATTRS)),
                 ]
             )

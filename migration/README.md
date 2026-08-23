@@ -72,7 +72,7 @@ uv run python ../migration/cms_import.py --reset    # 3. 再清社團/活動/公
 | Club_club + clubcontent + clubproperty | clubs + users(club) | 性質=停社 → is_active=false、attribute=NULL;kind 依名稱結尾推導,特例見 `KIND_OVERRIDES`;「國際事務處」「testclub」「學務處就輔組」不遷 |
 | Club_student | club_members | Semester「104 1」→「104-1」;社長/會長→負責人、副社長/副會長→副負責人;Phone/Date→phone/updated_at;同學期同學號取 id 最大者 |
 | Club_teacher | clubs.advisor_* / advisor_out_* | 校內/校外各取最新一位 |
-| Club_activity(+fund/staff/meta) | activities(+budget_items/reports) | type:course/conference→社課或會議、extra→活動;status 對映見 `STATUS_MAP`;結案資料寬鬆匯入(缺欄留空) |
+| Club_activity(+fund/staff/meta) | activities(+budget_items/reports) | type:course/conference→社課或會議、extra→活動;status 對映見 `STATUS_MAP`;`Review`=申請表的「活動描述」→ `activities.content`(**不是**結案成果,超過 150 字截斷並列印舊 id);結案成果三欄舊制沒有,一律留空待 `text_fields.py` 轉錄 |
 | Club_news | announcements | 內容=原始連結(markdown) |
 | Club_staff | users | position admin→admin(權限鍵之後由承辦配)、observer→viewer |
 | Club_auditactivityrecord | approval_records | 舊表只有「誰、何時簽的」,沒有決議欄(退回不入表)—— 每列都是核准,同一活動第 1/2/3 列即 advisor/chief/dean,對應申請表的 初核/複核/決行 |
@@ -144,7 +144,9 @@ uv run python ../migration/text_fields.py --import <填好的 CSV>          # �
 
 - 匯出 **1,185 列**(範圍內、已遷入、且至少有一個來源檔的活動;347 個沒有來源檔的略過)
 - `legacy_id` 是對照鍵不可改;`填_` 開頭的欄位才會寫入,**留白=不動、有值=覆寫**
-- `填_成果_執行成效` 預帶舊系統的單一檢討文字(遷移時已寫進 `highlights`)
+- `填_活動內容` 預帶舊系統的「活動描述」(`Club_activity.Review`,遷移時已寫進
+  `Activity.content`);企劃書寫得更完整就以企劃書為準。**成果三欄舊制完全沒有**,
+  只能從結案附件轉錄
 - 心得以 `填_心得N_姓名 / _系級 / _內容` 三件一組,要多寫就往後加欄;
   同一活動只要有任一篇填了就**整批取代**該活動既有心得(重跑不會越加越多)
 - 匯入可重跑;有問題的列逐列列出並跳過,其餘照常寫入

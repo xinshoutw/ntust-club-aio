@@ -160,6 +160,24 @@ _EXT_RE = re.compile(r"(?:轉接|轉|分機|#|ext\.?)\s*(\d{2,10})", re.I)
 _BARE_EXT_RE = re.compile(r"^\d{3,5}$")
 
 
+# 舊系統那格的標籤是「職位」,新系統校內那格是「系所」。純職稱寫進去畫面會顯示
+# 「系所:教授」;校內沒有職稱欄位可以收留它,只能不遷
+_TITLE_ONLY = frozenset(
+    {
+        "教授", "副教授", "助理教授", "專技副教授", "講師", "兼任講師", "兼任教師",
+        "老師", "指導老師", "社團指導老師", "校內指導", "校外指導老師", "校外聘請老師",
+        "通識老師", "韓文老師", "僑輔老師", "教官", "中校教官", "教練", "助理教練",
+        "組長", "主任", "護理師", "諮商心理師", "行政組員", "學校教授",
+    }
+)
+
+
+def advisor_dept(position: str | None) -> str | None:
+    """只有看得出單位的才寫進「系所」;純職稱不遷(校內沒有職稱欄位)。"""
+    raw = (position or "").strip()
+    return None if not raw or raw in _TITLE_ONLY else raw
+
+
 def advisor_ext(phone: str | None) -> str | None:
     """從完整電話抽分機碼;抽不出來就留空 —— 校內沒有欄位可放整串號碼。"""
     raw = (phone or "").strip()
@@ -403,7 +421,7 @@ async def import_teachers(legacy, db: AsyncSession, clubs: dict[int, tuple[int, 
             continue
         if identity == "school":
             club.advisor_name = row.Name
-            club.advisor_dept = row.Position or None
+            club.advisor_dept = advisor_dept(row.Position)
             club.advisor_email = row.Email or None
             club.advisor_ext = advisor_ext(row.Phone)
         else:

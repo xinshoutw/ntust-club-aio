@@ -1082,3 +1082,24 @@ async def test_budget_and_status_sort_match_the_club_list(client, db):
         await client.get("/api/v1/admin/activities", params={"sort": "budget"})
     ).json()["data"]
     assert [r["name"] for r in rows] == ["已結案", "申請中", "已退回"]
+
+
+async def test_admin_cannot_read_a_club_draft(client, db):
+    """草稿不進行政視野:清單擋了,直接打詳情/PDF 也要擋 —— 否則社團還沒送出的
+    企劃內容、經費明細與附件清單,承辦一個 id 就讀得到。"""
+    club = await seed(client, db)
+    creator = await club_account(db)
+    draft = Activity(
+        club_id=club.id, name="還在寫", location="x", type="社課或會議",
+        date=date.today() + timedelta(days=30), end_date=date.today() + timedelta(days=30),
+        status="draft", created_by=creator.id,
+    )
+    db.add(draft)
+    await db.commit()
+
+    await login(client, "advisor")
+    assert (await client.get(f"/api/v1/admin/activities/{draft.id}")).status_code == 404
+    assert (await client.get(f"/api/v1/admin/activities/{draft.id}/report-pdf")).status_code == 404
+    assert all(
+        a["name"] != "還在寫" for a in (await client.get("/api/v1/admin/activities")).json()["data"]
+    )

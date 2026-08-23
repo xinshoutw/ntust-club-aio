@@ -116,6 +116,19 @@ async def _require_different_actor(db, activity: Activity, stage: str, user) -> 
         )
 
 
+def _require_visible(user, activity: Activity) -> None:
+    """詳情與 PDF 的視野界線,與清單同一條(一律 404,避免探測)。
+
+    **草稿也在這條界線內**:社團還沒送出的東西承辦看不到,清單的
+    `status != DRAFT` 若只擋清單,直接打 `/admin/activities/{id}` 就繞過去了。
+    """
+    if activity.status == ActivityStatus.DRAFT:
+        raise not_found("找不到活動")
+    visible = svc.visible_statuses(user)
+    if visible is not None and activity.status not in visible:
+        raise not_found("找不到活動")
+
+
 async def _get_activity(db, activity_id: int, *, for_update: bool = False) -> Activity:
     query = (
         sa.select(Activity)
@@ -319,9 +332,7 @@ async def _report_of(db, user, activity_id: int) -> tuple[Activity, Club]:
     )
     if activity is None:
         raise not_found("找不到活動")
-    visible = svc.visible_statuses(user)
-    if visible is not None and activity.status not in visible:
-        raise not_found("找不到活動")  # 受限關卡帳號視同不存在,避免探測
+    _require_visible(user, activity)
     if activity.report is None:
         raise conflict("此活動尚未送出結案,無法產生文件")
     return activity, await db.get(Club, activity.club_id)
@@ -363,9 +374,7 @@ async def get_activity(
     )
     if activity is None:
         raise not_found("找不到活動")
-    visible = svc.visible_statuses(user)
-    if visible is not None and activity.status not in visible:
-        raise not_found("找不到活動")  # 受限關卡帳號視同不存在,避免探測
+    _require_visible(user, activity)
     lock_days = await get_setting(db, "close_lock_days")
     out = ActivityDetailOut.model_validate(activity)
     svc.decorate(out, activity, lock_days)

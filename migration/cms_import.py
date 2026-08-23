@@ -858,8 +858,6 @@ async def import_approvals(legacy, db: AsyncSession, ids: IdMap) -> None:
 
 
 MIGRATION_ACTOR_USERNAME = "_migration"
-# 舊系統的退回不是一列資料,對照鍵只能掛在活動上 —— 進 id-map 才清得掉
-REJECT_MAP_TABLE = "Club_activity:reject"
 NO_REASON_GIVEN = "未提供更多說明"
 
 
@@ -917,7 +915,7 @@ async def import_rejections(legacy, db: AsyncSession, ids: IdMap) -> None:
         if new_aid is None:
             no_activity += 1
             continue
-        if ids.get(REJECT_MAP_TABLE, r.aid) is not None:
+        if ids.get("Club_activity:reject", r.aid) is not None:
             continue  # 重跑不要越補越多
         reason = opinion_residual(r.opinions)
         with_reason += bool(reason)
@@ -932,7 +930,7 @@ async def import_rejections(legacy, db: AsyncSession, ids: IdMap) -> None:
         )
         db.add(record)
         await db.flush()
-        ids.record(db, REJECT_MAP_TABLE, r.aid, "approval_records", record.id)
+        ids.record(db, "Club_activity:reject", r.aid, "approval_records", record.id)
         created += 1
     print(
         f"rejections: 補 {created} 筆退件紀錄(其中 {with_reason} 筆有舊系統留下的理由,"
@@ -979,7 +977,8 @@ async def import_news(legacy, db: AsyncSession, ids: IdMap) -> None:
 # id-map 的舊表名 → 要清掉的新表(reset 用;順序即刪除順序,子表在前)
 _RESET_ORDER = (
     ("Club_auditactivityrecord", ApprovalRecord),
-    (REJECT_MAP_TABLE, ApprovalRecord),
+    # 舊系統的退回不是一列資料,對照鍵只能掛在活動上 —— 進 id-map 才清得掉
+    ("Club_activity:reject", ApprovalRecord),
     ("Club_news", Announcement),
     ("Club_activity", Activity),
     ("Club_student", ClubMember),

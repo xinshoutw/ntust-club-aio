@@ -304,7 +304,10 @@ export default function AdminActivitiesPage() {
           onRetryDetail={() => void reviewDetail.refetch()}
           open={open}
           onClose={() => setOpen(false)}
-          afterClose={() => setCurrent(null)}
+          afterClose={() => {
+            setCurrent(null)
+            setCurrentClub(null)
+          }}
           onApprove={(p) =>
             approve.mutateAsync({
               id: current.activityId,

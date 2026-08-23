@@ -1263,3 +1263,30 @@ async def test_funding_source_still_required_when_money_is_granted(client, db):
     )
     assert resp.status_code == 422
     assert "經費來源" in resp.text
+
+
+async def test_undecided_items_do_not_count_as_a_zero_grant(client, db):
+    """遷移件在組長關卡時逐項核定可能是 NULL(`ApprovedGrant` 可為空)。
+
+    `or 0` 會把「還沒核定」讀成「核定 0 元」,組長一按就跳過學務長直接核准 ——
+    缺項的守衛只擋得住第一關,後兩關沒有東西擋。
+    """
+    await seed(client, db)
+    aid = await submit_activity(client, db)
+    # 直接落到組長關卡且逐項未核定 —— 模擬遷移件,不經過承辦人那一關
+    await db.execute(
+        sa.update(Activity).where(Activity.id == aid).values(status="pending_chief")
+    )
+    await db.execute(
+        sa.update(ActivityBudgetItem)
+        .where(ActivityBudgetItem.activity_id == aid)
+        .values(approved_subsidy=None)
+    )
+    await db.commit()
+
+    await login(client, "chief")
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/approve", json={}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["status"] == "pending_dean"

@@ -482,8 +482,11 @@ async def approve(
     # 判準是**核定**不是擬請:社團有申請、承辦人決定不給,一樣不必再送組長與學務長。
     # 任何一關都算 —— 舊系統 53 件提前核准裡有 11 件是組長把金額改成 0 的。
     # 逐項加總才是權威值:遷移件的 school_approved 是 NULL(21 件待審全部),
-    # 拿聚合欄位判會把「還沒補寫聚合值」讀成「核定 0 元」而跳過後兩關
-    if sum(i.approved_subsidy or 0 for i in activity.budget_items) == 0:
+    # 拿聚合欄位判會把「還沒補寫聚合值」讀成「核定 0 元」而跳過後兩關。
+    # 逐項的 None 同理 —— `or 0` 會把它讀成「不給」。缺項只有第一關擋得住
+    #(那裡不是全部歸零就是必填),組長/學務長關拿到 NULL 的遷移件會直接跳過學務長
+    decided = [i.approved_subsidy for i in activity.budget_items]
+    if all(v is not None for v in decided) and sum(decided) == 0:
         activity.status = ActivityStatus.APPROVED
     elif stage == "advisor":
         activity.status = ActivityStatus.PENDING_CHIEF

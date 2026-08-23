@@ -131,6 +131,15 @@ TYPE_MAP = {
     "extra": ActivityType.EVENT,
 }
 
+# 舊 Title 是自由文字。只認四個字串會把 239 位正副社長降級成幹部 ——「副社」56 筆、
+# 「系會長」39 筆、還有「第十三屆會長」「財務&副社長」「關懷組組長兼任副社長」…
+# 後果不只名單難看:66 個(社團,學期)沒有負責人 → 幹部證明被擋、公告 Email 寄 0 人。
+# 「副」要先判,因為「副社長」本身也含「社長」
+_VICE_TITLE_RE = re.compile(r"副(?:社長|會長|社|會)")
+_LEADER_TITLE_RE = re.compile(r"(?<!副)(?:社長|會長)")
+# 帶了「社長」但本人不是社長:社長組的組員、社長的秘書、榮譽社長
+_NOT_LEADER_RE = re.compile(r"社長組|秘書|榮譽")
+
 LEADER_TITLES = {"社長", "會長"}
 
 # 舊系統自動附在審核意見後面的結報提醒;新系統由 pdf._APPLY_NOTE 自己產一份,
@@ -447,10 +456,12 @@ def staff_line(item: str | None, owner: str | None) -> str:
 def member_kind(identity: str | None, title: str | None) -> tuple[MemberKind, str | None]:
     """舊 Identity+Title → 新標準身份;職稱各身份皆保留(幹部缺職稱補「幹部」)。"""
     t = (title or "").strip()
-    if t in LEADER_TITLES:
-        return MemberKind.PRESIDENT, None
-    if t in VICE_TITLES:
-        return MemberKind.VICE_PRESIDENT, None
+    if not _NOT_LEADER_RE.search(t):
+        # 非標準寫法保留原職稱(「第十三屆會長」比空白有資訊),標準四字才留空
+        if _VICE_TITLE_RE.search(t):
+            return MemberKind.VICE_PRESIDENT, (None if t in VICE_TITLES else t)
+        if _LEADER_TITLE_RE.search(t):
+            return MemberKind.PRESIDENT, (None if t in LEADER_TITLES else t)
     if identity == "幹部":
         return MemberKind.OFFICER, (t or "幹部")
     return MemberKind.MEMBER, (t if t and t != "社員" else None)

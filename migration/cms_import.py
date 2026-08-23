@@ -95,7 +95,13 @@ def _scope_bounds() -> tuple[datetime, datetime]:
 
 # 不遷移的舊社團(行政單位/測試帳號)
 # 學務處就輔組:帳號「800」與 staff 侍筱鳳同名,此偽社團不遷
-SKIP_CLUBS = {"國際事務處", "testclub", "學務處就輔組"}
+SKIP_CLUBS = {"國際事務處", "testclub", "學務處就輔組", "Test", "testtesttest"}
+
+# 舊 Club_staff 混著測試帳號。不遷 = 一開始就沒有這個登入名
+SKIP_STAFF = {"test", "apitest", "admintest1", "admintest2", "admintest3", "00000"}
+# 看不出是不是正式用途的:遷入但停用,由承辦逐一開通。observer 會拿到 can_view_eval,
+# 上線第一天就能對社團評鑑打分,密碼還印在一次性密碼發放 CSV 裡
+INACTIVE_STAFF = {"viewer", "ntustclub"}
 
 # 名稱結尾推導不到時的手動指定;未列出者預設 社團
 KIND_OVERRIDES = {
@@ -356,10 +362,14 @@ async def import_staff(
     existing = set((await db.scalars(sa.select(User.username))).all())
     result: dict[int, int] = {}
     skipped: list[str] = []
+    test_accounts: list[str] = []
     for row in rows:
         mapped = ids.get("Club_staff", row.id)
         if mapped is not None:
             result[row.id] = int(mapped)
+            continue
+        if row.Username in SKIP_STAFF:
+            test_accounts.append(row.Username)
             continue
         if row.Username in existing:
             skipped.append(row.Username)
@@ -374,6 +384,7 @@ async def import_staff(
             email=row.Email or None,
             can_view_eval=is_viewer,  # 舊 observer=評鑑委員
             must_change_password=True,
+            is_active=row.Username not in INACTIVE_STAFF,
         )
         db.add(user)
         await db.flush()
@@ -381,7 +392,12 @@ async def import_staff(
         passwords.append((user.role.value, row.Username, password))
         existing.add(row.Username)
         result[row.id] = user.id
-    print(f"staff: {len(result)} 帳號;帳號名衝突跳過 {skipped or '無'}")
+    inactive = sorted(INACTIVE_STAFF & {r.Username for r in rows})
+    print(
+        f"staff: {len(result)} 帳號;帳號名衝突跳過 {skipped or '無'}"
+        f";測試帳號不遷 {test_accounts or '無'}"
+        f";遷入但停用(待承辦開通){inactive or '無'}"
+    )
     return result
 
 

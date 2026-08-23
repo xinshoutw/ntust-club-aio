@@ -117,10 +117,11 @@ describe('ActivityReviewModal 的簽核章軌', () => {
     expect(screen.getAllByText('等待中')).toHaveLength(2) // 組長、學務長還沒簽
   })
 
-  const stampChars = () =>
-    [...document.querySelectorAll('div')]
-      .filter((el) => ['承', '組', '長'].includes(el.textContent ?? ''))
-      .map((el) => el.textContent)
+  // 章軌的每一格是 width:88 的 div,子節點依序是 關卡字 / 姓名或狀態 / 簽核時間
+  const stampNodes = () =>
+    [...document.querySelectorAll<HTMLElement>('div')].filter((el) => el.style.width === '88px')
+  const stampChars = () => stampNodes().map((el) => el.children[0]?.textContent)
+  const stampLabels = () => stampNodes().map((el) => el.children[1]?.textContent)
 
   // 核定 0 元即當場核准(D-16),組長與學務長永遠不會簽這張單。
   // 舊系統遷入的 53 件已核准活動就是這樣只留了 1–2 位簽核者 ——
@@ -137,5 +138,14 @@ describe('ActivityReviewModal 的簽核章軌', () => {
     showTrail('pending_chief', [advisorStamp])
 
     expect(stampChars()).toEqual(['承', '組', '長'])
+  })
+
+  // 退回的那一關不是在等,是已經有結論了 —— 退回件按定義不會有核准章,
+  // 「還沒簽到就寫等待中」那條規則套過來剛好在唯一不成立的地方說錯話
+  test('被退回的那一關寫已退回,不是等待中', () => {
+    showTrail('rejected', [advisorStamp]) // 承辦人簽過、組長退回
+
+    expect(stampChars()).toEqual(['承', '組']) // 學務長永遠不會簽這張單
+    expect(stampLabels()).toEqual(['陳彥仁', '已退回'])
   })
 })

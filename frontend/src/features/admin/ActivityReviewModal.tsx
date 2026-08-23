@@ -60,8 +60,9 @@ function stagesOf(item: ReviewItem): StampStage[] {
           : 'todo'
     return {
       char,
-      // 還沒簽到的關卡不印關卡名 —— 那一格是留給簽核者的
-      label: stamp?.name || '等待中',
+      // 還沒簽到的關卡不印關卡名 —— 那一格是留給簽核者的。
+      // 退回的那一關不是在等,是已經有結論了(退回件按定義不會有核准章)
+      label: state === 'rejected' ? '已退回' : stamp?.name || '等待中',
       state,
       note: stamp?.at,
       noteTitle: stamp?.atFull,

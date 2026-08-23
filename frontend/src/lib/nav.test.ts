@@ -60,10 +60,14 @@ describe('側欄徽章', () => {
   })
 })
 
-describe('行政端活動列表', () => {
+describe('行政端活動查閱的兩頁', () => {
   /** 分組內的位置:需求方指定了「插在哪兩項之間」,列表順序本身就是規格 */
   const keysOf = (groups: NavGroup[], label: string) =>
     groups.find((g) => g.label === label)?.items.map((i) => i.key)
+
+  test('所有活動排在活動審核分組最後', () => {
+    expect(keysOf(buildAdminNav(superUser), '活動審核')).toEqual(['a-review', 'a-close', 'a-activities'])
+  })
 
   test('活動列表夾在成員列表與管理項目之間', () => {
     expect(keysOf(buildAdminNav(superUser), '社團管理')).toEqual([
@@ -73,5 +77,20 @@ describe('行政端活動列表', () => {
       'a-club-settings',
       'a-overdue',
     ])
+  })
+
+  test('受限管理員只看得到自己那把鍵的那一頁', () => {
+    const holder: SessionUser = {
+      ...superUser,
+      isSuper: false,
+      permissions: ['aclubact'],
+      adminPages: [
+        { key: 'aactivity', label: '所有活動', paths: ['/admin/activities'], also: [] },
+        { key: 'aclubact', label: '社團活動列表', paths: ['/admin/club-activities'], also: [] },
+      ],
+    }
+    const nav = buildAdminNav(holder)
+    expect(findItem(nav, 'a-club-activities')).toBeDefined()
+    expect(findItem(nav, 'a-activities')).toBeUndefined()
   })
 })

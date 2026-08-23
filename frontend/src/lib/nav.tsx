@@ -160,6 +160,8 @@ export function buildAdminNav(user: SessionUser | null, badges: Badges = {}): Na
         path: '/admin/close-review',
         icon: <FileDoneOutlined />,
       },
+      // 查閱用:全校、全狀態、依學期(審核動作仍在上面兩頁)
+      { key: 'a-activities', label: '所有活動', path: '/admin/activities', icon: <UnorderedListOutlined /> },
     ],
   },
   {

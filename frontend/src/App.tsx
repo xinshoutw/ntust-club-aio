@@ -18,6 +18,7 @@ import ActivityClosePage from './features/activities/ActivityClosePage'
 import SignupListPage from './features/signup/SignupListPage'
 import SignupFormPage from './features/signup/SignupFormPage'
 import ReviewPage from './features/admin/ReviewPage'
+import AdminActivitiesPage from './features/admin/AdminActivitiesPage'
 import ClubOverviewPage from './features/admin/ClubOverviewPage'
 import AdminClubSettingsPage from './features/admin/AdminClubSettingsPage'
 import { AdminClubProvider } from './features/admin/clubContext'
@@ -213,6 +214,7 @@ export default function App() {
           <Route index element={<AdminHomePage />} />
           <Route path="review" element={<ReviewPage />} />
           <Route path="close-review" element={<CloseReviewPage />} />
+          <Route path="activities" element={<AdminActivitiesPage />} />
           <Route path="signups" element={<SignupManagePage />} />
           <Route path="signup-items/new" element={<SignupBuilderPage />} />
           <Route path="announcements" element={<AnnouncementsPage />} />

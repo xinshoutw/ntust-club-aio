@@ -60,8 +60,11 @@ export default function AdminActivitiesPage() {
   const [filePreviewOpen, setFilePreviewOpen] = useState(false)
 
   const semestersQuery = useAdminActivitySemesters()
-  const semOptions = semesterOptions(semestersQuery.data ?? [])
-  const semester = semesterSel ?? semOptions[0].value
+  // 「全部學期」是必要的出口:逾期未結案與跨學期搜尋幾乎都落在舊學期
+  // (issues.md ISS-95 記過同一個坑),夾在單一學期裡看到的「無符合條件」是騙人的
+  const semOptions = semesterOptions(semestersQuery.data ?? [], true)
+  const semesterSelected = semesterSel ?? semOptions[1].value
+  const semester = semesterSelected === 'all' ? undefined : semesterSelected
 
   // 有選社團但主檔未載入/名稱失效 → 強制空集,不可 fail-open 回全部(同申請審核頁)
   const clubsQuery = useClubOptions()
@@ -135,7 +138,7 @@ export default function AdminActivitiesPage() {
                 resetPage()
               }}
             >
-              只看逾期未結案
+              逾期未結案
             </Checkbox>
             <Input.Search
               allowClear
@@ -158,12 +161,12 @@ export default function AdminActivitiesPage() {
               />
             )}
             <Select
-              value={semester}
+              value={semesterSelected}
               onChange={(v) => {
                 setSemesterSel(v)
                 resetPage()
               }}
-              style={{ width: 110 }}
+              style={{ width: 120 }}
               options={semOptions}
               loading={semestersQuery.isPending}
             />
@@ -284,7 +287,9 @@ export default function AdminActivitiesPage() {
                     {/* 沒下條件時說「無符合條件」是在指責使用者的操作:新學期本來就一筆都沒有 */}
                     {clubFilter.length || typeFilter.length || statusFilter.length || overdueOnly || query
                       ? '無符合條件的活動'
-                      : '本學期尚無活動'}
+                      : semester
+                        ? '本學期尚無活動'
+                        : '尚無活動'}
                   </td>
                 </tr>
               )}
@@ -323,6 +328,7 @@ export default function AdminActivitiesPage() {
       )}
       {closeStage && (
         <ActivityPreviewModal
+          key={current.id}
           a={fullDetail.data ?? currentClub}
           detail={fullDetail.data}
           loading={fullDetail.isPending}

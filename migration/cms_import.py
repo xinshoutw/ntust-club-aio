@@ -153,6 +153,22 @@ def opinion_residual(raw: str | None) -> str:
 VICE_TITLES = {"副社長", "副會長"}
 
 
+# 校內指導老師只有「分機」一格(校外才有完整電話),舊系統那格存的是完整號碼:
+# 「(02)2737-6135  2737-6277」這種 23 字會超過 advisor_ext 的 20 字上限,讓該社連
+# 改社團簡介都被 422 擋下,而且畫面會把整串號碼顯示成「分機 …」
+_EXT_RE = re.compile(r"(?:轉接|轉|分機|#|ext\.?)\s*(\d{2,10})", re.I)
+_BARE_EXT_RE = re.compile(r"^\d{3,5}$")
+
+
+def advisor_ext(phone: str | None) -> str | None:
+    """從完整電話抽分機碼;抽不出來就留空 —— 校內沒有欄位可放整串號碼。"""
+    raw = (phone or "").strip()
+    m = _EXT_RE.search(raw)
+    if m:
+        return m.group(1)
+    return raw if _BARE_EXT_RE.match(raw) else None
+
+
 def derive_club_kind(name: str) -> ClubKind:
     if name in KIND_OVERRIDES:
         return KIND_OVERRIDES[name]
@@ -389,7 +405,7 @@ async def import_teachers(legacy, db: AsyncSession, clubs: dict[int, tuple[int, 
             club.advisor_name = row.Name
             club.advisor_dept = row.Position or None
             club.advisor_email = row.Email or None
-            club.advisor_ext = row.Phone or None
+            club.advisor_ext = advisor_ext(row.Phone)
         else:
             club.advisor_out_name = row.Name
             club.advisor_out_dept = row.Position or None

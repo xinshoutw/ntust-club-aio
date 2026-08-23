@@ -20,6 +20,7 @@ PAGE_READS: list[tuple[str, str]] = [
     ("aclose", "/api/v1/admin/activities?status=closing_pending_advisor"),
     ("aactivity", "/api/v1/admin/activities"),
     ("aactivity", "/api/v1/admin/activities/semesters"),
+    ("aactivity", "/api/v1/admin/clubs/options"),
     ("aclubact", "/api/v1/admin/activities"),
     ("aclubact", "/api/v1/admin/activities/semesters"),
     ("aclubact", "/api/v1/admin/clubs/options"),

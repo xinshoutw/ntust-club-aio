@@ -169,6 +169,9 @@ def _record(
 # 類型篩選標籤(前端 FilterButton;「大型活動」=類型活動且已認可或申請中未被否准)
 _TYPE_LABELS = ("社課或會議", "活動", "大型活動")
 
+# 名稱搜尋的 LIKE 跳脫表(escape 字元為反斜線)
+_LIKE_ESCAPE = str.maketrans({"\\": "\\\\", "%": "\\%", "_": "\\_"})
+
 # 最近審核時間:該活動申請/結案簽核紀錄的 max(created_at)。
 # 彙總子查詢一次算完再 outerjoin(相關子查詢當 ORDER BY 會對過濾集逐列執行,
 # 「最近審核」預設排序整個歷史集都吃,抵銷伺服器分頁的效益)
@@ -248,7 +251,9 @@ async def list_activities(
         start, end = semester_range(semester)
         query = query.where(Activity.date >= start, Activity.date <= end)
     if q and q.strip():
-        query = query.where(Activity.name.ilike(f"%{q.strip()}%"))
+        # 跳脫 LIKE 的萬用字元:搜「100%」是字面的百分號,不是「100 開頭的任何字」
+        needle = q.strip().translate(_LIKE_ESCAPE)
+        query = query.where(Activity.name.ilike(f"%{needle}%", escape="\\"))
     if club_id:
         query = query.where(Activity.club_id.in_(club_id))
     if type_:

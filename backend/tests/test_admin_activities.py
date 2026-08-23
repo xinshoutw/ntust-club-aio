@@ -1029,6 +1029,10 @@ async def test_name_search_and_locked_status_filter(client, db):
     rows = (await client.get("/api/v1/admin/activities", params={"q": "宿營"})).json()["data"]
     assert [r["name"] for r in rows] == ["迎新宿營"]
 
+    # LIKE 萬用字元要當字面值:搜「%」不是搜「任何字」
+    rows = (await client.get("/api/v1/admin/activities", params={"q": "%"})).json()["data"]
+    assert rows == []
+
     # 已核准且逾期鎖定的列畫面顯示成「已逾期」:status=approved 不該再回它
     rows = (
         await client.get("/api/v1/admin/activities", params={"status": "locked"})

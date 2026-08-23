@@ -72,3 +72,35 @@ describe('ActivityReviewModal 的核定欄', () => {
     expect(document.querySelectorAll('tbody input')).toHaveLength(1)
   })
 })
+
+// 章下方那格是給簽核者的,不是關卡名 —— 只有承辦人簽了的單子,
+// 章軌若把「組長」「學務長」印在還沒簽的兩格,看起來就像三關都有人經手
+describe('ActivityReviewModal 的簽核章軌', () => {
+  const showTrail = (stamps: NonNullable<ReviewItem['detail']>['stamps']) =>
+    render(
+      <App>
+        <ActivityReviewModal
+          item={{ ...item([budgetRow(1, 5000)]), status: 'pending_chief', detail: { attachments: [], budget: [budgetRow(1, 5000)], stamps } }}
+          open
+          onClose={() => {}}
+          afterClose={() => {}}
+        />
+      </App>,
+    )
+
+  test('沒人簽的關卡顯示 -,不顯示關卡名', () => {
+    showTrail([])
+
+    expect(screen.getAllByText('-')).toHaveLength(3)
+    expect(screen.queryByText('承辦人')).toBeNull()
+    expect(screen.queryByText('學務長')).toBeNull()
+  })
+
+  test('簽過的關卡顯示簽核者姓名與簽核時間', () => {
+    showTrail([{ stage: 'advisor', name: '陳彥仁', at: '08/23 19:23', atFull: '2026/08/23 19:23:01' }])
+
+    expect(screen.getByText('陳彥仁')).toBeTruthy()
+    expect(screen.getByText('08/23 19:23')).toBeTruthy()
+    expect(screen.getAllByText('-')).toHaveLength(2) // 組長、學務長還沒簽
+  })
+})

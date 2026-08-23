@@ -1,10 +1,15 @@
+import { Tooltip } from 'antd'
+
 export type StampState = 'done' | 'current' | 'todo' | 'rejected'
 
 export interface StampStage {
   char: string
+  /** 章下方那行:簽核者姓名,還沒簽到的關卡是 `-`(關卡本身由 char 表示) */
   label: string
   state: StampState
+  /** 簽核時間(短)。hover 顯示 noteTitle 的完整時刻 */
   note?: string
+  noteTitle?: string
 }
 
 // 關卡色相與 pill 一致(承=琥珀、組=藍、長=紫)
@@ -59,7 +64,13 @@ function StampNode({ stage }: { stage: StampStage }) {
       <div style={{ fontSize: 12, color: labelColor, fontWeight: stage.state === 'current' ? 500 : undefined }}>
         {stage.label}
       </div>
-      {stage.note && <div style={{ fontSize: 11, color: 'var(--steel)' }}>{stage.note}</div>}
+      {stage.note && (
+        <Tooltip mouseEnterDelay={0} title={stage.noteTitle && <span className="num" style={{ fontSize: 13 }}>{stage.noteTitle}</span>}>
+          <div className="num" style={{ fontSize: 11, color: 'var(--steel)', cursor: stage.noteTitle ? 'help' : undefined }}>
+            {stage.note}
+          </div>
+        </Tooltip>
+      )}
     </div>
   )
 }
@@ -73,7 +84,7 @@ export default function StampTrail({ stages, width = 400 }: StampTrailProps) {
   return (
     <div style={{ display: 'flex', alignItems: 'flex-start', width, maxWidth: '100%' }}>
       {stages.map((stage, i) => (
-        <div key={stage.label} style={{ display: 'contents' }}>
+        <div key={stage.char} style={{ display: 'contents' }}>
           {i > 0 && (
             <div
               style={{

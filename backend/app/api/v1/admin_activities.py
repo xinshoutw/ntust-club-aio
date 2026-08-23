@@ -353,7 +353,7 @@ async def get_activity(
     activity_id: int, user: Reviewer, db: DbDep
 ) -> ApiResponse[ActivityDetailOut]:
     from app.models import ActivityReport
-    from app.schemas.activities import ApprovalOut, FileOut
+    from app.schemas.activities import ApprovalOut, FileOut, StampOut
 
     activity = await db.scalar(
         sa.select(Activity)
@@ -392,6 +392,13 @@ async def get_activity(
     ).all()
     out.approvals = [ApprovalOut.model_validate(r) for r in approvals]
     out.reviewed_at = max((r.created_at for r in approvals), default=None)
+    # 簽核章軌:每一關印誰、什麼時候簽的(推導規則在 services,前端不再自己數一次)
+    stamped = await svc.apply_approvals(db, activity.id)
+    out.stamps = [
+        StampOut(stage=stage, actor_name=stamped[stage][0], at=stamped[stage][1])
+        for stage in svc.APPLY_STAGES
+        if stage in stamped
+    ]
     return ApiResponse(data=out)
 
 

@@ -5,7 +5,7 @@ import StatusPill from '../../components/ui/StatusPill'
 import SectionTitle from '../../components/ui/SectionTitle'
 import LargeBadge from '../../components/ui/LargeBadge'
 import { Cols } from '../../components/ui/tableControls'
-import StampTrail, { type StampStage } from '../../components/ui/StampTrail'
+import StampTrail, { type StampStage, type StampState } from '../../components/ui/StampTrail'
 import { useModalAutoFocus } from '../../components/ui/useModalAutoFocus'
 import WorkTable from '../activities/WorkTable'
 import DownloadMenu from '../activities/DownloadMenu'
@@ -14,7 +14,13 @@ import { downloadEvalFile } from '../eval/files'
 import { activityApplyPdf } from '../../api/activities'
 import { numColWidth, showsApproved } from '../activities/types'
 import { useAuth } from '../../app/auth'
-import { canActOn, stageOfStatus, toEvalFile, type ReviewItem } from '../../api/adminActivities'
+import {
+  canActOn,
+  stageOfStatus,
+  toEvalFile,
+  type ReviewItem,
+  type ReviewStage,
+} from '../../api/adminActivities'
 
 // .tb.dense td 的左右內距(index.css);核定欄的 td 右內距歸零、改由 InputNumber 自己的
 // 內距與邊框佔掉,兩者分開算才不會少估而讓數字換行
@@ -23,15 +29,30 @@ const INPUT_CHROME = 18
 
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 
-// 章軌由單據狀態推導;僅三關(有申請補助)畫章軌——
-// 無補助=承辦人單關即核准(後端規則),單關不畫章軌
-function stagesOf(status: ReviewItem['status']): StampStage[] {
-  const mk = (advisor: StampStage['state'], chief: StampStage['state'], dean: StampStage['state']): StampStage[] => [
-    { char: '承', label: '承辦人', state: advisor, note: noteOf(advisor) },
-    { char: '組', label: '組長', state: chief, note: noteOf(chief) },
-    { char: '長', label: '學務長', state: dean, note: noteOf(dean) },
-  ]
-  switch (status) {
+// 章面的關卡字 —— 章下方那行留給簽核者姓名,關卡名(承辦人/組長/學務長)由這個字表示
+const STAGE_CHARS: [ReviewStage, string][] = [
+  ['advisor', '承'],
+  ['chief', '組'],
+  ['dean', '長'],
+]
+
+// 章軌:狀態決定章的樣子,姓名與時間取後端算好的 stamps(該關最後一次核准)。
+// 僅三關(有申請補助)畫章軌 —— 無補助=承辦人單關即核准(後端規則),單關不畫
+function stagesOf(item: ReviewItem): StampStage[] {
+  const stamps = item.detail?.stamps ?? []
+  const mk = (...states: StampState[]): StampStage[] =>
+    STAGE_CHARS.map(([stage, char], i) => {
+      const stamp = stamps.find((x) => x.stage === stage)
+      return {
+        char,
+        // 還沒簽到就是 `-`:那一格是留給簽核者的,不拿關卡名充數
+        label: stamp?.name || '-',
+        state: states[i],
+        note: stamp?.at,
+        noteTitle: stamp?.atFull,
+      }
+    })
+  switch (item.status) {
     case 'pending_advisor':
       return mk('current', 'todo', 'todo')
     case 'pending_chief':
@@ -49,19 +70,6 @@ function stagesOf(status: ReviewItem['status']): StampStage[] {
       return mk('rejected', 'todo', 'todo')
     default:
       return mk('todo', 'todo', 'todo')
-  }
-}
-
-function noteOf(state: StampStage['state']): string | undefined {
-  switch (state) {
-    case 'current':
-      return '審核中'
-    case 'todo':
-      return '等待中'
-    case 'done':
-      return '已審核'
-    case 'rejected':
-      return '已退回'
   }
 }
 
@@ -233,7 +241,7 @@ export default function ActivityReviewModal({
           )}
           <span style={{ flex: 1 }} />
           {/* 單關(無補助)不畫章軌:只有一顆章沒有資訊量,徒佔標題列空間 */}
-          {item && !singleStage && <StampTrail stages={stagesOf(item.status)} />}
+          {item && !singleStage && <StampTrail stages={stagesOf(item)} />}
           {item && (
             <DownloadMenu
               items={[{ key: 'apply', label: '下載社團活動申請表' }]}

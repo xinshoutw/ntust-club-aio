@@ -236,6 +236,14 @@ class ActivityOut(BaseModel):
     reviewed_at: datetime | None = None
 
 
+class StampOut(BaseModel):
+    """簽核章軌的一格:該關最後一次核准的人與時間(services.apply_approvals)。"""
+
+    stage: str
+    actor_name: str
+    at: datetime
+
+
 class ActivityDetailOut(ActivityOut):
     budget_items: list[BudgetItemOut] = []
     close_draft: dict[str, Any] | None = None
@@ -243,6 +251,8 @@ class ActivityDetailOut(ActivityOut):
     photos: list[FileOut] = []
     attachments: list[FileOut] = []
     approvals: list[ApprovalOut] = []
+    # 僅行政端詳情填寫(社團端不需要承辦人姓名)
+    stamps: list[StampOut] = []
 
 
 class CloseDraftIn(BaseModel):

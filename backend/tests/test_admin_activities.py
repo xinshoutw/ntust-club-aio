@@ -1107,3 +1107,62 @@ async def test_admin_cannot_read_a_club_draft(client, db):
     assert all(
         a["name"] != "還在寫" for a in (await client.get("/api/v1/admin/activities")).json()["data"]
     )
+
+
+async def test_stamps_stay_on_their_own_stage_after_a_resubmit(client, db):
+    """章軌與申請表的三格都讀 stamps:退回重送後承辦人會再核一次。
+
+    把核准列依序排的話,順序是 承辦人 / 承辦人 / 組長,第二次的承辦人就會落在「複核」、
+    組長落在「決行」—— 而那三格是要印在送出去的紙上的。
+    """
+    await seed(client, db)
+    aid = await submit_activity(client, db)
+
+    async def approve_first_stage():
+        await login(client, "advisor")
+        items = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]["budget_items"]
+        resp = await client.post(
+            f"/api/v1/admin/activities/{aid}/approve",
+            json={
+                "fund_source": "學務處經費",
+                "budget": [
+                    {"item_id": i["id"], "approved_subsidy": i["requested_subsidy"]} for i in items
+                ],
+            },
+            headers=csrf_headers(client),
+        )
+        assert resp.status_code == 200, resp.text
+
+    await approve_first_stage()
+    await login(client, "chief")
+    assert (
+        await client.post(
+            f"/api/v1/admin/activities/{aid}/reject",
+            json={"reason": "經費明細不清"},
+            headers=csrf_headers(client),
+        )
+    ).status_code == 200
+
+    await login(client, "club01")
+    assert (
+        await client.post(f"/api/v1/club/activities/{aid}/submit", headers=csrf_headers(client))
+    ).status_code == 200
+    await approve_first_stage()  # 承辦人第二次核准
+
+    await login(client, "advisor")
+    stamps = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]["stamps"]
+    assert [s["stage"] for s in stamps] == ["advisor"]
+    assert stamps[0]["actor_name"] == "advisor"
+
+    await login(client, "chief")
+    assert (
+        await client.post(
+            f"/api/v1/admin/activities/{aid}/approve", json={}, headers=csrf_headers(client)
+        )
+    ).status_code == 200
+    await login(client, "advisor")
+    stamps = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]["stamps"]
+    assert [(s["stage"], s["actor_name"]) for s in stamps] == [
+        ("advisor", "advisor"),
+        ("chief", "chief"),
+    ]

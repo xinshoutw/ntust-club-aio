@@ -251,15 +251,19 @@ async def activity_files(db: AsyncSession, activity: Activity, slot: str) -> lis
     return list(rows)
 
 
-async def approver_names(db: AsyncSession, activity_id: int) -> list[str]:
-    """申請表 初核/複核/決行 三格的簽核者姓名;該關沒簽到就留空字串。
+async def apply_approvals(
+    db: AsyncSession, activity_id: int
+) -> dict[str, tuple[str, datetime]]:
+    """申請簽核各關最後一次核准的 (簽核者姓名, 時間);沒簽到的關卡不在字典裡。
 
     **以關卡取,不是把核准列依序排**:退回是回到社團重送,重送後承辦人會再核一次,
     核准列就變成 承辦人/承辦人/組長/學務長 —— 依序取會把第二次的承辦人印在「複核」、
     組長印在「決行」,而那張紙是要送出去的。同一關多次核准取最後一次。
+
+    申請表的三格與審核彈窗的簽核章軌都讀這一份 —— 兩邊各推一次就會各錯一種。
     """
     rows = await db.execute(
-        sa.select(ApprovalRecord.stage, User.name)
+        sa.select(ApprovalRecord.stage, User.name, ApprovalRecord.created_at)
         .join(User, ApprovalRecord.actor_id == User.id)
         .where(
             ApprovalRecord.subject_type == ApprovalSubject.ACTIVITY,
@@ -268,5 +272,10 @@ async def approver_names(db: AsyncSession, activity_id: int) -> list[str]:
         )
         .order_by(ApprovalRecord.id)
     )
-    latest = {stage: name for stage, name in rows}
-    return [latest.get(stage, "") for stage in APPLY_STAGES]
+    return {stage: (name, at) for stage, name, at in rows}
+
+
+async def approver_names(db: AsyncSession, activity_id: int) -> list[str]:
+    """申請表 初核/複核/決行 三格的簽核者姓名;該關沒簽到就留空字串。"""
+    latest = await apply_approvals(db, activity_id)
+    return [latest[stage][0] if stage in latest else "" for stage in APPLY_STAGES]

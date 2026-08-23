@@ -34,6 +34,8 @@ export interface ReviewItem {
   // 行政端社團總覽以社團端活動資料組出唯讀檢視,部分欄位可能缺漏(彈窗以 — 呈現)
   detail?: {
     timeRange?: string
+    /** 簽核章軌:該關最後一次核准的人與時間(僅行政端詳情帶) */
+    stamps?: ReviewStamp[]
     location?: string
     participantsIn?: number
     participantsOut?: number
@@ -45,6 +47,14 @@ export interface ReviewItem {
     attachmentFiles?: { id: string; name: string; url: string }[]
     budget: { id: number; category: string; description: string; selfFund: number; requested: number; approved: number }[]
   }
+}
+
+/** 章軌的一格;推導在後端 `services.apply_approvals`,前端不再自己數一次核准列 */
+export interface ReviewStamp {
+  stage: ReviewStage
+  name: string
+  at: string // MM/DD HH:mm
+  atFull: string // YYYY/MM/DD HH:mm:ss
 }
 
 /** 後端實際儲存的活動狀態 */
@@ -161,11 +171,18 @@ interface AdminActivityOut extends Omit<ActivityOut, 'date' | 'end_date'> {
   reviewed_at: string | null
 }
 
+interface StampOut {
+  stage: string
+  actor_name: string
+  at: string
+}
+
 interface AdminActivityDetailOut extends AdminActivityOut {
   budget_items: BudgetItemOut[]
   report: ReportOut | null
   photos: FileOut[]
   attachments: FileOut[]
+  stamps: StampOut[]
 }
 
 // ---- 轉換 ----
@@ -213,6 +230,13 @@ export const toEvalFile = (f: AdminFileRef): EvalFile => ({
   uploadedAt: '',
 })
 
+const toStamp = (s: StampOut): ReviewStamp => ({
+  stage: s.stage as ReviewStage,
+  name: s.actor_name,
+  at: dayjs(s.at).format('MM/DD HH:mm'),
+  atFull: dayjs(s.at).format('YYYY/MM/DD HH:mm:ss'),
+})
+
 const toReport = (r: ReportOut): AdminCloseReport => ({
   memberCount: r.member_count,
   nonMemberCount: r.non_member_count,
@@ -247,6 +271,7 @@ const toAdminDetail = (o: AdminActivityDetailOut): AdminActivityDetail => ({
   ...toAdminActivity(o),
   detail: {
     timeRange: timeRangeOf(o),
+    stamps: o.stamps.map(toStamp),
     location: o.location,
     participantsIn: o.participants_in,
     participantsOut: o.participants_out,

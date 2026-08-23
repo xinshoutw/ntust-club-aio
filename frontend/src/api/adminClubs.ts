@@ -30,7 +30,7 @@ export interface AdminClubDetail extends AdminClub {
   advisorName: string | null
   advisorDept: string | null
   advisorEmail: string | null
-  advisorExt: string | null
+  advisorPhone: string | null
   advisorOutName: string | null
   advisorOutDept: string | null
   advisorOutEmail: string | null
@@ -57,7 +57,7 @@ interface AdminClubDetailOut extends AdminClubOut {
   advisor_name: string | null
   advisor_dept: string | null
   advisor_email: string | null
-  advisor_ext: string | null
+  advisor_phone: string | null
   advisor_out_name: string | null
   advisor_out_dept: string | null
   advisor_out_email: string | null
@@ -85,7 +85,7 @@ const toDetail = (c: AdminClubDetailOut): AdminClubDetail => ({
   advisorName: c.advisor_name,
   advisorDept: c.advisor_dept,
   advisorEmail: c.advisor_email,
-  advisorExt: c.advisor_ext,
+  advisorPhone: c.advisor_phone,
   advisorOutName: c.advisor_out_name,
   advisorOutDept: c.advisor_out_dept,
   advisorOutEmail: c.advisor_out_email,

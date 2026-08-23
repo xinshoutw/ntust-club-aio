@@ -19,7 +19,7 @@ export interface ClubProfile {
   advisorName: string
   advisorDept: string
   advisorEmail: string
-  advisorExt: string
+  advisorPhone: string
   advisorOutName: string
   advisorOutDept: string
   advisorOutEmail: string
@@ -42,7 +42,7 @@ interface ClubProfileOut {
   advisor_name: string | null
   advisor_dept: string | null
   advisor_email: string | null
-  advisor_ext: string | null
+  advisor_phone: string | null
   advisor_out_name: string | null
   advisor_out_dept: string | null
   advisor_out_email: string | null
@@ -62,7 +62,7 @@ const toProfile = (c: ClubProfileOut): ClubProfile => ({
   advisorName: c.advisor_name ?? '',
   advisorDept: c.advisor_dept ?? '',
   advisorEmail: c.advisor_email ?? '',
-  advisorExt: c.advisor_ext ?? '',
+  advisorPhone: c.advisor_phone ?? '',
   advisorOutName: c.advisor_out_name ?? '',
   advisorOutDept: c.advisor_out_dept ?? '',
   advisorOutEmail: c.advisor_out_email ?? '',
@@ -113,7 +113,7 @@ export interface ClubProfileInput {
   advisorName: string
   advisorDept: string
   advisorEmail: string
-  advisorExt: string
+  advisorPhone: string
   advisorOutName: string
   advisorOutDept: string
   advisorOutEmail: string
@@ -136,7 +136,7 @@ export function useUpdateClubProfile() {
           advisor_name: b.advisorName.trim() || null,
           advisor_dept: b.advisorDept.trim() || null,
           advisor_email: b.advisorEmail.trim() || null,
-          advisor_ext: b.advisorExt.trim() || null,
+          advisor_phone: b.advisorPhone.trim() || null,
           advisor_out_name: b.advisorOutName.trim() || null,
           advisor_out_dept: b.advisorOutDept.trim() || null,
           advisor_out_email: b.advisorOutEmail.trim() || null,

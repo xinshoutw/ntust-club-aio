@@ -26,7 +26,7 @@ const deriveKind = (name: string): string | null =>
 
 const advisorText = (d: AdminClubDetail | undefined): string => {
   if (!d?.advisorName) return '—'
-  return [d.advisorName, d.advisorDept, d.advisorExt ? `分機 ${d.advisorExt}` : null]
+  return [d.advisorName, d.advisorDept, d.advisorPhone]
     .filter(Boolean)
     .join(' · ')
 }

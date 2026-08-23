@@ -265,7 +265,7 @@ class AdminClubDetailOut(AdminClubOut):
     advisor_name: str | None
     advisor_dept: str | None
     advisor_email: str | None
-    advisor_ext: str | None
+    advisor_phone: str | None
     advisor_out_name: str | None
     advisor_out_dept: str | None
     advisor_out_email: str | None

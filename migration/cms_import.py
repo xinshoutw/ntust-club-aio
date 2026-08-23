@@ -398,7 +398,7 @@ async def import_teachers(legacy, db: AsyncSession, clubs: dict[int, tuple[int, 
             club.advisor_name = row.Name
             club.advisor_dept = row.Position or None
             club.advisor_email = row.Email or None
-            club.advisor_ext = row.Phone or None
+            club.advisor_phone = row.Phone or None
         else:
             club.advisor_out_name = row.Name
             club.advisor_out_dept = row.Position or None

@@ -16,7 +16,7 @@ interface SettingsValues {
   advisorName: string
   advisorDept?: string
   advisorEmail?: string
-  advisorExt?: string
+  advisorPhone?: string
   advisorOutName?: string
   advisorOutDept?: string
   advisorOutEmail?: string
@@ -38,7 +38,7 @@ const PROFILE_KEYS = [
   'advisorName',
   'advisorDept',
   'advisorEmail',
-  'advisorExt',
+  'advisorPhone',
   'advisorOutName',
   'advisorOutDept',
   'advisorOutEmail',
@@ -57,7 +57,7 @@ const fromProfile = (p: ClubProfile): SettingsValues => ({
   advisorName: p.advisorName,
   advisorDept: p.advisorDept,
   advisorEmail: p.advisorEmail,
-  advisorExt: p.advisorExt,
+  advisorPhone: p.advisorPhone,
   advisorOutName: p.advisorOutName,
   advisorOutDept: p.advisorOutDept,
   advisorOutEmail: p.advisorOutEmail,
@@ -137,7 +137,7 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
           advisorName: v.advisorName,
           advisorDept: v.advisorDept ?? '',
           advisorEmail: v.advisorEmail ?? '',
-          advisorExt: v.advisorExt ?? '',
+          advisorPhone: v.advisorPhone ?? '',
           advisorOutName: v.advisorOutName ?? '',
           advisorOutDept: v.advisorOutDept ?? '',
           advisorOutEmail: v.advisorOutEmail ?? '',
@@ -195,7 +195,7 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
               >
                 <Input />
               </Form.Item>
-              <Form.Item name="advisorDept" label="系所" className={itemClass('advisorDept')} style={{ marginBottom: 0 }}>
+              <Form.Item name="advisorDept" label="系所 / 職稱" className={itemClass('advisorDept')} style={{ marginBottom: 0 }}>
                 <Input />
               </Form.Item>
               <Form.Item
@@ -207,8 +207,8 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
               >
                 <Input />
               </Form.Item>
-              <Form.Item name="advisorExt" label="分機" className={itemClass('advisorExt')} style={{ marginBottom: 0 }}>
-                <Input className="num" />
+              <Form.Item name="advisorPhone" label="電話" className={itemClass('advisorPhone')} style={{ marginBottom: 0 }}>
+                <Input placeholder="02-12345678" />
               </Form.Item>
             </div>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--steel)', margin: '16px 0 8px' }}>校外(選填)</div>

@@ -198,6 +198,17 @@ def _grid(rows: list[list[tuple[int, Paragraph]]]) -> tuple[list[list], list]:
     return data, spans
 
 
+def works_text(staff_text: str) -> str:
+    """工作分配一行一項,舊版申請表的寫法是「項目 > 負責人;」。
+
+    項目/負責人以**最後一個**冒號分界(同前端 `types.staffTextToWorks`)——
+    舊系統的項目本身常是「職稱:工作內容」,從第一個冒號拆會把項目切一半。
+    """
+    return "; ".join(
+        " > ".join(line.rsplit(":", 1)) for line in staff_text.splitlines() if line.strip()
+    )
+
+
 def _moment(day, clock) -> str:
     """申請表的時間欄:缺日期就整格留白(半個時間比空白更難讀)。"""
     if day is None:
@@ -217,9 +228,7 @@ def apply_pdf(club: Club, activity: Activity, approvers: list[str]) -> bytes:
     end = _moment(
         activity.end_date or activity.date, report.actual_end if report else activity.end_time
     )
-    works = "; ".join(
-        line.replace(":", " > ", 1) for line in activity.staff_text.splitlines() if line.strip()
-    )
+    works = works_text(activity.staff_text)
     items = activity.budget_items
     audit = (approvers + ["", "", ""])[:3]
 

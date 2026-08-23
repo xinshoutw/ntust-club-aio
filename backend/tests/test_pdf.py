@@ -4,7 +4,7 @@ from datetime import UTC, date, datetime, timedelta
 import sqlalchemy as sa
 
 from app.models import Activity, ActivityBudgetItem, ActivityReflection, Club
-from app.services.pdf import apply_pdf, reflections_pdf
+from app.services.pdf import apply_pdf, reflections_pdf, works_text
 from tests.conftest import csrf_headers, login, make_club, make_user
 from tests.test_activities import close_payload, create_activity, upload_photo
 
@@ -198,3 +198,11 @@ def test_apply_pdf_renders_every_budget_row():
     )
     out = apply_pdf(club, activity, ["承辦", "組長", "學務長"])
     assert out.startswith(b"%PDF")
+
+
+def test_works_text_splits_on_the_last_colon():
+    """舊系統的項目本身常是「職稱:工作內容」;從第一個冒號拆會把項目切一半。"""
+    assert (
+        works_text("總務組長:場地與器材:王小明\n沒有負責人\n\n美宣:李小美")
+        == "總務組長:場地與器材 > 王小明; 沒有負責人; 美宣 > 李小美"
+    )

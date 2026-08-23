@@ -163,3 +163,18 @@ def test_holiday_calendar_parsing():
         (date(2027, 1, 1), "開國紀念日"),
         (date(2027, 2, 9), "例假日"),
     ]
+
+
+def test_photo_reset_must_run_before_the_cms_reset():
+    """`cms_import.reset()` 收尾會刪光 system=cms 的所有 id-map,照片對照也在裡面 ——
+    先跑它,4,000 列 files 與盤上 4.9 GB 就再也沒有腳本找得到。防呆比對的表名必須
+    真的等於 media_import 記的那張,不然改個常數就靜靜失效。"""
+    import media_import
+
+    assert media_import.LEGACY_TABLE not in {t for t, _ in cms_import._RESET_ORDER}, (
+        "照片由 media_import 自己清(要連盤上檔案),不該進 cms_import 的刪除順序"
+    )
+    guard = Path(cms_import.__file__).read_text()
+    assert f'== "{media_import.LEGACY_TABLE}"' in guard, (
+        "cms_import.reset() 沒有擋照片對照,或表名與 media_import.LEGACY_TABLE 不一致"
+    )

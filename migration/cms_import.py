@@ -622,8 +622,26 @@ async def reset(db: AsyncSession) -> None:
     (decisions.md MIG-04)。
 
     只刪自己 id-map 記過的列 —— 新系統上線後自己產生的社團、活動與公告不受影響。
-    先跑 `cc_import.py --reset`(借用單掛在活動與社團上),再跑這支。
+    先跑 `media_import.py --reset`(照片)與 `cc_import.py --reset`(借用單掛在活動
+    與社團上),再跑這支。
     """
+    # 收尾那一刀是「刪光 system=cms 的所有 id-map」,media_import 的照片對照也在裡面。
+    # 先跑這支的話,4,000 列 files 與盤上 4.9 GB 就再也沒有腳本找得到 —— 擋下來。
+    photos = await db.scalar(
+        sa.select(sa.func.count())
+        .select_from(LegacyIdMap)
+        .where(
+            LegacyIdMap.legacy_system == LegacySystem.CMS,
+            LegacyIdMap.legacy_table == "Club_activityimages",
+        )
+    )
+    if photos:
+        sys.exit(
+            f"拒絕執行:legacy_id_map 還有 {photos} 列照片對照。\n"
+            "本腳本的 reset 會刪光 system=cms 的所有對照,照片就變成清不掉的孤兒。\n"
+            "請先跑:uv run python ../migration/media_import.py --reset"
+        )
+
     ids = IdMap()
     await ids.load(db)
     for table, model in _RESET_ORDER:

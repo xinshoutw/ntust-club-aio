@@ -151,6 +151,17 @@ export function groupClubsByFolder(
   }))
 }
 
+/** 篩選漏斗用的資料夾:略過沒有性質的社團。
+ *
+ * 正式資料裡那 67 個 attribute 為 null 的全是**停社且零活動**的遷移舊社,
+ * 為它們立一個「未分類」資料夾只是雜訊。**`ClubCascader` 不共用這一版** ——
+ * 社團總覽/成員列表/管理項目/行政分審核仍要查得到停社社團的名單與歷史。
+ * 代價:新建但還沒填性質的社團不會出現在漏斗裡(建檔時性質是必填欄)。
+ */
+export const groupClubsForFilter = (
+  clubs: readonly ClubOption[],
+): { label: string; options: string[] }[] => groupClubsByFolder(clubs.filter((c) => c.attribute))
+
 export function useClubOptions() {
   return useQuery({
     queryKey: adminClubKeys.options,

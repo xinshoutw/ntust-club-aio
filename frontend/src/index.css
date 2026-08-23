@@ -283,3 +283,11 @@ body {
 .club-cascader-popup .ant-cascader-menu-item {
   padding-block: 2px;
 }
+
+/* 表頭漏斗的二級選單(FilterButton 的分組模式):一個性質底下可能有 27 個社團,
+   不封頂的話子選單比視窗還高,AntD 會把它往上翻、翻出畫面外。
+   子選單彈窗不是掛在父層 dropdown 底下,只能用它自己的類名 */
+.ant-dropdown-menu-submenu-popup .ant-dropdown-menu {
+  max-height: 60vh;
+  overflow-y: auto;
+}

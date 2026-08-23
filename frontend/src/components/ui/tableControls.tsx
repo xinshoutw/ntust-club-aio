@@ -183,6 +183,8 @@ export function FilterButton({
       trigger={['click']}
       menu={{
         items,
+        // 資料夾多到超過視窗高時一樣要能捲(子選單的封頂在 index.css)
+        style: { maxHeight: '60vh', overflowY: 'auto' },
         selectable: true,
         multiple: true,
         selectedKeys: selected,

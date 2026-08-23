@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Checkbox, Input, Select } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import OptionsError from '../../components/ui/OptionsError'
@@ -10,6 +10,7 @@ import { RightOutlined } from '@ant-design/icons'
 import { Cols, FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
 import { countText } from '../../lib/counts'
 import { clampPage } from '../../lib/paging'
+import { useFitRows } from '../../lib/fitRows'
 import { semesterOptions } from '../../lib/semester'
 import FilePreview from '../eval/FilePreview'
 import type { EvalFile } from '../eval/types'
@@ -24,10 +25,16 @@ import {
   useAdminClubActivityDetail,
   type AdminActivity,
 } from '../../api/adminActivities'
-import { groupClubsByFolder, useClubOptions } from '../../api/adminClubs'
+import { groupClubsForFilter, useClubOptions } from '../../api/adminClubs'
 import ActivityReviewModal from './ActivityReviewModal'
 
-const PAGE_SIZE = 15
+// 每頁筆數跟著視窗高度走(不固定筆數,避免整頁長出卷軸)。
+// 三個數字是量出來的版面常數,改表格樣式時要跟著調:
+// 一列 = 上下內距 12+12 + StatusPill 22 + 分隔線 1;
+// 表格以外要留給表頭(43)、分頁列(58)與 shell 的下緣留白(64)
+const ROW_HEIGHT = 47
+const RESERVED = 165
+const MIN_ROWS = 5
 
 // 排序鍵=後端 /admin/activities 白名單。經費欄顯示「自籌 / 核定」但排序鍵 budget 是
 // 「自籌 + 擬請」合計,兩者不是同一件事 —— 該欄因此不給排序,不做名實不符的指示器
@@ -60,6 +67,8 @@ const CLOSE_STAGE = new Set(['closing_pending_advisor', 'closed'])
 
 /** 全校活動的查閱頁:所有狀態、所有社團,學期在右上角 */
 export default function AdminActivitiesPage() {
+  const tableCard = useRef<HTMLDivElement>(null)
+  const pageSize = useFitRows(tableCard, { rowHeight: ROW_HEIGHT, reserved: RESERVED, min: MIN_ROWS })
   const [page, setPage] = useState(1)
   const [semesterSel, setSemesterSel] = useState<string | null>(null)
   const { entries, toggle } = useMultiSort<SortKey>([{ key: 'date', dir: -1 }])
@@ -85,7 +94,7 @@ export default function AdminActivitiesPage() {
 
   // 有選社團但主檔未載入/名稱失效 → 強制空集,不可 fail-open 回全部(同申請審核頁)
   const clubsQuery = useClubOptions()
-  const clubFolders = groupClubsByFolder(clubsQuery.data ?? [])
+  const clubFolders = groupClubsForFilter(clubsQuery.data ?? [])
   const clubIdMatches = clubFilter.length
     ? (clubsQuery.data ?? []).filter((c) => clubFilter.includes(c.name)).map((c) => c.id)
     : undefined
@@ -99,7 +108,7 @@ export default function AdminActivitiesPage() {
     overdue: overdueOnly,
     sort: sortParam(entries),
     page,
-    pageSize: PAGE_SIZE,
+    pageSize,
   })
   const rows = listQuery.data?.rows ?? []
   const clubRows = listQuery.data?.clubRows ?? []
@@ -109,8 +118,8 @@ export default function AdminActivitiesPage() {
   // 失敗時 total 也是 0,一起 clamp 會把錯誤說明洗掉,所以只在成功後收斂
   const listLoaded = listQuery.isSuccess
   useEffect(() => {
-    if (listLoaded) setPage((p) => clampPage(p, total, PAGE_SIZE))
-  }, [listLoaded, total])
+    if (listLoaded) setPage((p) => clampPage(p, total, pageSize))
+  }, [listLoaded, total, pageSize])
 
   const closeStage = current != null && CLOSE_STAGE.has(current.status)
   // 兩個彈窗吃不同型別,詳情只發需要的那一支
@@ -190,7 +199,7 @@ export default function AdminActivitiesPage() {
         }
       />
 
-      <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+      <div ref={tableCard} className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         {/* 沿用上一份時整表淡化,避免看起來像是新條件的結果 */}
         <LoadingBlock pending={listQuery.isPending} rows={8}>
           <table
@@ -305,7 +314,7 @@ export default function AdminActivitiesPage() {
             </tbody>
           </table>
         </LoadingBlock>
-        <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} />
+        <Pager page={page} pageSize={pageSize} total={total} onChange={setPage} />
       </div>
 
       {/* 結案相關狀態開完整唯讀檢視(結案成果、照片、心得);其餘開審核彈窗 ——

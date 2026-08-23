@@ -118,6 +118,13 @@ STATUS_MAP = {
     6: ActivityStatus.CLOSED,
 }
 
+# 已簽關數 → 下一關(與 APPLY_STAGES 的 advisor/chief/dean 同一組順序)
+PENDING_BY_SIGNED = (
+    ActivityStatus.PENDING_ADVISOR,
+    ActivityStatus.PENDING_CHIEF,
+    ActivityStatus.PENDING_DEAN,
+)
+
 TYPE_MAP = {
     "course": ActivityType.COURSE_MEETING,
     "conference": ActivityType.COURSE_MEETING,
@@ -510,6 +517,16 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
             sa.text('SELECT "FK_Activity_id" AS aid, key, value FROM "Club_activitymeta"')
         )
     ).all()
+    # 舊 status 只說「還在審」,說不出停在哪一關 —— 關卡看已簽的列數
+    signed = {
+        r.aid: r.n
+        for r in await legacy.execute(
+            sa.text(
+                'SELECT "FK_Activity_id" AS aid, count(*) AS n'
+                ' FROM "Club_auditactivityrecord" GROUP BY "FK_Activity_id"'
+            )
+        )
+    }
 
     funds: dict[int, list] = {}
     for r in funds_rows:
@@ -534,6 +551,9 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
         if status is None:  # 未知狀態(不在舊 choices):跳過並記數
             skipped += 1
             continue
+        if status is ActivityStatus.PENDING_ADVISOR:
+            # 承辦人簽過了才會停在下一關;只看 status 會叫他把同一件再簽一次
+            status = PENDING_BY_SIGNED[min(signed.get(a.id, 0), len(PENDING_BY_SIGNED) - 1)]
         # Review 是申請表的「活動描述」;超過 schema 上限就截斷,否則社團一按儲存就 422
         content = (a.Review or "").strip()
         if len(content) > CONTENT_MAX:

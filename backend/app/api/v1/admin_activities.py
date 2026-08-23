@@ -362,6 +362,26 @@ async def download_reflections_pdf(activity_id: int, user: Reviewer, db: DbDep) 
     return pdf.pdf_response(content, f"{club.name}_{activity.name}_學習心得.pdf")
 
 
+@router.get("/{activity_id}/apply-pdf")
+async def download_apply_pdf(activity_id: int, user: Reviewer, db: DbDep) -> Response:
+    """社團活動申請表 PDF;與詳情同一條視野界線(未結案也產得出來,不走 _report_of)。"""
+    activity = await db.scalar(
+        sa.select(Activity)
+        .where(Activity.id == activity_id)
+        .options(
+            sa.orm.selectinload(Activity.budget_items),
+            sa.orm.selectinload(Activity.report),
+        )
+    )
+    if activity is None:
+        raise not_found("找不到活動")
+    _require_visible(user, activity)
+    club = await db.get(Club, activity.club_id)
+    approvers = await svc.approver_names(db, activity.id)
+    content = await run_in_threadpool(pdf.apply_pdf, club, activity, approvers)
+    return pdf.pdf_response(content, f"{club.name}_{activity.name}_社團活動申請表.pdf")
+
+
 @router.get("/{activity_id}")
 async def get_activity(
     activity_id: int, user: Reviewer, db: DbDep

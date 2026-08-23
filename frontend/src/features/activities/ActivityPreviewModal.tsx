@@ -1,5 +1,5 @@
-import { App, Button, Dropdown, Modal, Tooltip } from 'antd'
-import { DownloadOutlined, EllipsisOutlined, FileTextOutlined, LinkOutlined } from '@ant-design/icons'
+import { App, Button, Modal, Tooltip } from 'antd'
+import { DownloadOutlined, FileTextOutlined, LinkOutlined } from '@ant-design/icons'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import QueryError from '../../components/ui/QueryError'
 import SectionTitle from '../../components/ui/SectionTitle'
@@ -7,12 +7,14 @@ import StatusPill from '../../components/ui/StatusPill'
 import { downloadEvalFile, downloadPhotosZip } from '../eval/files'
 import type { EvalFile } from '../eval/types'
 import {
+  activityApplyPdf,
   activityReflectionsPdf,
   activityReportPdf,
   type ClubActivity,
   type ClubActivityDetail,
 } from '../../api/activities'
 import { approvedText, fmtMoney, money, showsApproved } from './types'
+import DownloadMenu from './DownloadMenu'
 import WorkTable from './WorkTable'
 import { TIME_RANGE_SEP, dateRangeText } from './utils'
 
@@ -90,19 +92,16 @@ export default function ActivityPreviewModal({ a, detail, loading, error, onRetr
 
   const downloadItems = [
     { key: 'photos', label: '下載照片檔', disabled: photos.length === 0 },
-    { key: 'feedback', label: '下載學習心得檔案', disabled: !rep },
-    { key: 'report', label: '下載活動成果報告', disabled: !rep },
+    { key: 'apply', label: '下載社團活動申請表' },
   ]
   const onDownload = ({ key }: { key: string }) => {
-    // 照片打包成 zip(僅 archive);成果報告與心得的 PDF 由後端依 docs/模板_*.docx
-    // 於下載時動態生成,版面不可自由設計
+    // 照片打包成 zip(僅 archive);申請表 PDF 由後端於下載時動態生成
     if (key === 'photos') {
       downloadPhotosZip(`${a.name}_照片`, photos).catch((e: unknown) =>
         message.error(e instanceof Error ? e.message : '照片下載失敗'),
       )
     }
-    if (key === 'feedback' && rep) downloadEvalFile(activityReflectionsPdf(a, rep.submittedAt, pdfBase))
-    if (key === 'report' && rep) downloadEvalFile(activityReportPdf(a, rep.submittedAt, pdfBase))
+    if (key === 'apply') downloadEvalFile(activityApplyPdf(a, pdfBase))
   }
 
   return (
@@ -115,16 +114,7 @@ export default function ActivityPreviewModal({ a, detail, loading, error, onRetr
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 26 }}>
           {a.name} <StatusPill status={a.status} />
           <span style={{ flex: 1 }} />
-          <Dropdown trigger={['click']} menu={{ items: downloadItems, onClick: onDownload }}>
-            <button
-              type="button"
-              className="link-btn"
-              aria-label="下載選單"
-              style={{ padding: 0, width: 24, height: 24, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
-            >
-              <EllipsisOutlined style={{ fontSize: 18, color: 'var(--steel)' }} />
-            </button>
-          </Dropdown>
+          <DownloadMenu items={downloadItems} onClick={onDownload} />
         </div>
       }
       footer={

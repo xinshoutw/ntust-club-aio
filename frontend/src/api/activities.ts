@@ -290,8 +290,21 @@ export const toDetail = (o: ActivityDetailOut): ClubActivityDetail => {
 // base 決定走哪一端的端點:社團端那兩支由 session 認社團,承辦讀別社時要走 admin 版
 export type PdfBase = 'club' | 'admin'
 
-const pdfPath = (base: PdfBase, id: number, kind: string): string =>
+const pdfPath = (base: PdfBase, id: number | string, kind: string): string =>
   `${API_BASE}/${base === 'admin' ? 'admin' : 'club'}/activities/${id}/${kind}`
+
+// 社團活動申請表:版面沿用舊系統,任何狀態(含草稿)都產得出來 —— 不必等結案
+export const activityApplyPdf = (
+  a: { id: number | string; name: string },
+  base: PdfBase = 'club',
+): EvalFile => ({
+  id: `apply-pdf-${a.id}`,
+  name: `${a.name}_社團活動申請表.pdf`,
+  type: 'pdf',
+  size: 0,
+  url: pdfPath(base, a.id, 'apply-pdf'),
+  uploadedAt: '—',
+})
 
 export const activityReportPdf = (
   a: Pick<ClubActivity, 'id' | 'name'>,

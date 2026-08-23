@@ -514,6 +514,16 @@ async def download_reflections_pdf(activity_id: int, user: ClubUser, db: DbDep) 
     return pdf.pdf_response(content, f"{club.name}_{activity.name}_學習心得.pdf")
 
 
+@router.get("/{activity_id}/apply-pdf")
+async def download_apply_pdf(activity_id: int, user: ClubUser, db: DbDep) -> Response:
+    """社團活動申請表 PDF(版面沿用舊系統)。"""
+    activity = await svc.get_own_activity(db, user, activity_id, with_detail=True)
+    club = await _club_of(db, user)
+    approvers = await svc.approver_names(db, activity.id)
+    content = await run_in_threadpool(pdf.apply_pdf, club, activity, approvers)
+    return pdf.pdf_response(content, f"{club.name}_{activity.name}_社團活動申請表.pdf")
+
+
 @router.post("/{activity_id}/close")
 async def submit_close(
     activity_id: int,

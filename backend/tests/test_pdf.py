@@ -1,10 +1,10 @@
 import time
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import sqlalchemy as sa
 
-from app.models import Activity, ActivityReflection, Club
-from app.services.pdf import reflections_pdf
+from app.models import Activity, ActivityBudgetItem, ActivityReflection, Club
+from app.services.pdf import apply_pdf, reflections_pdf
 from tests.conftest import csrf_headers, login, make_club, make_user
 from tests.test_activities import close_payload, create_activity, upload_photo
 
@@ -132,3 +132,69 @@ def test_reflections_pdf_stays_linear_at_the_legal_maximum():
     out = reflections_pdf(club, activity, reflections)
     assert out.startswith(b"%PDF")
     assert time.perf_counter() - started < 30
+
+
+async def test_apply_pdf_does_not_wait_for_close(client, db):
+    """申請表在草稿階段就要產得出來 —— 這正是它與另兩支 PDF 的差別。"""
+    club = await make_club(db)
+    await make_user(db, username="club01", club_id=club.id)
+    await login(client, "club01")
+    data = await create_activity(client)
+    resp = await client.get(f"/api/v1/club/activities/{data['id']}/apply-pdf")
+    assert resp.status_code == 200, resp.text
+    assert resp.content.startswith(b"%PDF")
+    assert len(resp.content) > 1500
+
+    other = await make_club(db, name="吉他社")
+    await make_user(db, username="club02", club_id=other.id)
+    await login(client, "club02")
+    assert (
+        await client.get(f"/api/v1/club/activities/{data['id']}/apply-pdf")
+    ).status_code == 404
+
+
+async def test_admin_apply_pdf_follows_detail_visibility(client, db):
+    """行政端申請表與詳情同一條界線:社團沒送出的草稿承辦看不到。"""
+    club = await make_club(db)
+    await make_user(db, username="club01", club_id=club.id)
+    await login(client, "club01")
+    data = await create_activity(client)
+    await make_user(db, username="viewer", role="admin", permissions=["aactivity"])
+    await login(client, "viewer")
+    assert (await client.get(f"/api/v1/admin/activities/{data['id']}/apply-pdf")).status_code == 404
+
+    await db.execute(
+        sa.update(Activity).where(Activity.id == data["id"]).values(status="pending_advisor")
+    )
+    await db.commit()
+    resp = await client.get(f"/api/v1/admin/activities/{data['id']}/apply-pdf")
+    assert resp.status_code == 200, resp.text
+    assert resp.content.startswith(b"%PDF")
+
+
+def test_apply_pdf_renders_every_budget_row():
+    """經費逐項是唯一會成長的區塊;跨頁不得掉列,也不得 500。"""
+    club = Club(name="測試社")
+    activity = Activity(
+        name="活動",
+        content="內" * 2000,
+        location="場地",
+        date=date(2026, 3, 1),
+        end_date=date(2026, 3, 1),
+        participants_in=20,
+        participants_out=5,
+        staff_text="總務:甲\n美宣:乙",
+        created_at=datetime(2026, 2, 1, 9, 30, tzinfo=UTC),
+        budget_items=[
+            ActivityBudgetItem(
+                category="雜支",
+                description="說" * 200,
+                self_fund=i,
+                requested_subsidy=i * 2,
+                approved_subsidy=i,
+            )
+            for i in range(60)
+        ],
+    )
+    out = apply_pdf(club, activity, ["承辦", "組長", "學務長"])
+    assert out.startswith(b"%PDF")

@@ -154,3 +154,172 @@ def pdf_response(content: bytes, filename: str) -> Response:
         media_type="application/pdf",
         headers={"Content-Disposition": f"inline; filename*=UTF-8''{quote(filename)}"},
     )
+
+
+# ---- 社團活動申請表 ----
+# 版面沿用舊系統的 LaTeX 版(Club/GeneratePDF/activity_apply.tex):12 欄基準格線,
+# 各列以 span 組出欄位。欄寬比例取自舊版產出的實測值,結構與欄位順序不得更動
+
+_APPLY_TITLE = ParagraphStyle("apply_title", fontName=_FONT, fontSize=17, leading=26, alignment=1)
+_C = ParagraphStyle("cell", fontName=_FONT, fontSize=10.5, leading=17)
+_CC = ParagraphStyle("cell_center", parent=_C, alignment=1)
+_CR = ParagraphStyle("cell_right", parent=_C, alignment=2)
+_FOOT = ParagraphStyle("foot", fontName=_FONT, fontSize=9, leading=13, alignment=2)
+
+_APPLY_COLS = [
+    w * 174 * mm / 720
+    for w in (60, 45, 75, 52, 61.5, 61.5, 55, 55, 63.75, 63.75, 63.75, 63.75)
+]
+
+_APPLY_STYLE = [
+    ("GRID", (0, 0), (-1, -1), 0.8, colors.black),
+    ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ("LEFTPADDING", (0, 0), (-1, -1), 5),
+    ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+    ("TOPPADDING", (0, 0), (-1, -1), 6),
+    ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+]
+
+
+def _grid(rows: list[list[tuple[int, Paragraph]]]) -> tuple[list[list], list]:
+    """(跨欄數, 內容) 序列展開成 12 欄資料 + SPAN 指令。"""
+    data: list[list] = []
+    spans: list = []
+    for r, row in enumerate(rows):
+        line: list = []
+        col = 0
+        for span, cell in row:
+            line.append(cell)
+            line.extend([""] * (span - 1))
+            if span > 1:
+                spans.append(("SPAN", (col, r), (col + span - 1, r)))
+            col += span
+        data.append(line)
+    return data, spans
+
+
+def _moment(day, clock) -> str:
+    """申請表的時間欄:缺日期就整格留白(半個時間比空白更難讀)。"""
+    if day is None:
+        return ""
+    return f"{day} {clock:%H:%M}" if clock is not None else f"{day}"
+
+
+def apply_pdf(club: Club, activity: Activity, approvers: list[str]) -> bytes:
+    """社團活動申請表;approvers 依簽核順序對應 初核/複核/決行。"""
+    year, sem = semester_of(activity.date).split("-") if activity.date else ("", "")
+    report = activity.report
+    # 舊版:預計人數為 0 才退回實際人數;校外人數舊版一律 0
+    people = activity.participants_in + activity.participants_out
+    if people == 0 and report is not None:
+        people = report.member_count + report.non_member_count
+    start = _moment(activity.date, report.actual_start if report else activity.start_time)
+    end = _moment(
+        activity.end_date or activity.date, report.actual_end if report else activity.end_time
+    )
+    works = "; ".join(
+        line.replace(":", " > ", 1) for line in activity.staff_text.splitlines() if line.strip()
+    )
+    items = activity.budget_items
+    audit = (approvers + ["", "", ""])[:3]
+
+    rows: list[list[tuple[int, Paragraph]]] = [
+        [
+            (2, _para("社團名稱：", _CC)),
+            (4, _para(f"{club.attribute}—{club.name}" if club.attribute else club.name, _CC)),
+            (2, _para("參加人數：", _CC)),
+            # 值都是整數,直接寫 Paragraph 才留得住 nbsp(_para 會把 & 逸出)
+            (4, Paragraph(f"校內：{people} 人&nbsp;&nbsp;&nbsp;&nbsp;校外：0 人", _CC)),
+        ],
+        [
+            (2, _para("活動名稱：", _CC)),
+            (4, _para(activity.name)),
+            (2, _para("地點：", _CC)),
+            (4, _para(activity.location)),
+        ],
+        [(2, _para("時間：", _CC)), (10, _para(f"{start} 至 {end}", _CC))],
+        [(2, _para("活動內容：", _CC)), (10, _para(activity.content))],
+        [(2, _para("工作分配：", _CC)), (10, _para(works))],
+    ]
+    if items:
+        rows.append(
+            [
+                (1, _para("項次", _CC)),
+                (2, _para("摘要", _CC)),
+                (1, _para("自籌", _CC)),
+                (2, _para("擬請學校補助", _CC)),
+                (2, _para("學校核定", _CC)),
+                (4, _para("使用經費說明", _CC)),
+            ]
+        )
+        rows.extend(
+            [
+                (1, _para(str(i), _CC)),
+                (2, _para(b.category, _CC)),
+                (1, _para(str(b.self_fund), _CR)),
+                (2, _para(str(b.requested_subsidy), _CR)),
+                (2, _para(str(b.approved_subsidy or 0), _CR)),
+                (4, _para(b.description)),
+            ]
+            for i, b in enumerate(items, 1)
+        )
+    rows += [
+        [
+            (4, _para("支出總預算", _CC)),
+            (4, _para("社團自籌", _CC)),
+            (4, _para("學校核定", _CC)),
+        ],
+        [
+            (4, _para(str(sum(b.self_fund + b.requested_subsidy for b in items)), _CC)),
+            (4, _para(str(sum(b.self_fund for b in items)), _CC)),
+            (4, _para(str(sum(b.approved_subsidy or 0 for b in items)), _CC)),
+        ],
+        [(2, _para("意見回饋：", _CC)), (10, _para(activity.fund_source or ""))],
+        [
+            (1, _para("初\n核", _CC)),
+            (3, _para(audit[0], _CC)),
+            (1, _para("複\n核", _CC)),
+            (3, _para(audit[1], _CC)),
+            (1, _para("決\n行", _CC)),
+            (3, _para(audit[2], _CC)),
+        ],
+    ]
+
+    data, spans = _grid(rows)
+    sign = len(data) - 1
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf,
+        pagesize=A4,
+        topMargin=15 * mm,
+        bottomMargin=15 * mm,
+        leftMargin=18 * mm,
+        rightMargin=18 * mm,
+        title=f"{club.name}_{activity.name}_社團活動申請表",
+    )
+    doc.build(
+        [
+            Paragraph(
+                f"國立臺灣科技大學<br/>{year} 學年度第 {sem} 學期社團活動申請表", _APPLY_TITLE
+            ),
+            Spacer(1, 3 * mm),
+            Table(
+                data,
+                colWidths=_APPLY_COLS,
+                style=TableStyle(
+                    [
+                        *_APPLY_STYLE,
+                        *spans,
+                        # 簽核列留章的高度(舊版以三個空白子列撐開)
+                        ("TOPPADDING", (0, sign), (-1, sign), 16),
+                        ("BOTTOMPADDING", (0, sign), (-1, sign), 16),
+                    ]
+                ),
+                splitByRow=1,
+                splitInRow=1,
+            ),
+            Spacer(1, 2 * mm),
+            _para(f"(上網申請時間:{activity.created_at:%Y/%m/%d %H:%M:%S})", _FOOT),
+        ]
+    )
+    return buf.getvalue()

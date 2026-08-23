@@ -8,6 +8,9 @@ import { Cols } from '../../components/ui/tableControls'
 import StampTrail, { type StampStage } from '../../components/ui/StampTrail'
 import { useModalAutoFocus } from '../../components/ui/useModalAutoFocus'
 import WorkTable from '../activities/WorkTable'
+import DownloadMenu from '../activities/DownloadMenu'
+import { downloadEvalFile } from '../eval/files'
+import { activityApplyPdf } from '../../api/activities'
 import { numColWidth, showsApproved } from '../activities/types'
 import { useAuth } from '../../app/auth'
 import { canActOn, stageOfStatus, type ReviewItem } from '../../api/adminActivities'
@@ -229,6 +232,12 @@ export default function ActivityReviewModal({
           <span style={{ flex: 1 }} />
           {/* 單關(無補助)不畫章軌:只有一顆章沒有資訊量,徒佔標題列空間 */}
           {item && !singleStage && <StampTrail stages={stagesOf(item.status)} />}
+          {item && (
+            <DownloadMenu
+              items={[{ key: 'apply', label: '下載社團活動申請表' }]}
+              onClick={() => downloadEvalFile(activityApplyPdf(item, 'admin'))}
+            />
+          )}
         </div>
       }
       footer={

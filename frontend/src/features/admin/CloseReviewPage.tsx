@@ -18,6 +18,9 @@ import {
   type AdminActivity,
 } from '../../api/adminActivities'
 import ActivityReviewModal from './ActivityReviewModal'
+import DownloadMenu from '../activities/DownloadMenu'
+import { downloadEvalFile } from '../eval/files'
+import { activityApplyPdf } from '../../api/activities'
 import { clickableProps } from '../../lib/clickable'
 import { SUBMISSION_CHECKS, defaultConfirmations, type CheckKey } from './closeChecks'
 import { clampPage } from '../../lib/paging'
@@ -129,6 +132,11 @@ function CloseReviewModal({
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 26 }}>
           <span style={{ fontSize: 16, fontWeight: 600 }}>{item.name}</span>
           <StatusPill status={item.status} />
+          <span style={{ flex: 1 }} />
+          <DownloadMenu
+            items={[{ key: 'apply', label: '下載社團活動申請表' }]}
+            onClick={() => downloadEvalFile(activityApplyPdf(item, 'admin'))}
+          />
         </div>
       }
       footer={

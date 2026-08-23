@@ -8,8 +8,8 @@ from sqlalchemy.orm import selectinload
 
 from app.core.errors import not_found, validation_error
 from app.core.semesters import TAIPEI, semester_of
-from app.models import Activity, ActivityBudgetItem, ActivityReport, File, User
-from app.models.enums import ActivityStatus
+from app.models import Activity, ActivityBudgetItem, ActivityReport, ApprovalRecord, File, User
+from app.models.enums import ActivityStatus, ApprovalDecision, ApprovalSubject
 
 # 結案照片與申請附件在 files 表的定位
 PHOTO_SUBJECT = "activity"
@@ -243,5 +243,20 @@ async def activity_files(db: AsyncSession, activity: Activity, slot: str) -> lis
             File.archived_at.is_(None),
         )
         .order_by(File.created_at)
+    )
+    return list(rows)
+
+
+async def approver_names(db: AsyncSession, activity_id: int) -> list[str]:
+    """活動申請的簽核者姓名(依簽核順序);申請表的 初核/複核/決行 三格。"""
+    rows = await db.scalars(
+        sa.select(User.name)
+        .join(ApprovalRecord, ApprovalRecord.actor_id == User.id)
+        .where(
+            ApprovalRecord.subject_type == ApprovalSubject.ACTIVITY,
+            ApprovalRecord.subject_id == activity_id,
+            ApprovalRecord.decision == ApprovalDecision.APPROVE,
+        )
+        .order_by(ApprovalRecord.id)
     )
     return list(rows)

@@ -178,3 +178,48 @@ def test_photo_reset_must_run_before_the_cms_reset():
     assert f'== "{media_import.LEGACY_TABLE}"' in guard, (
         "cms_import.reset() 沒有擋照片對照,或表名與 media_import.LEGACY_TABLE 不一致"
     )
+
+
+def test_reflection_slots_need_all_three_columns():
+    """心得三欄一組。只填一半就整組不算 —— 而且呼叫端會據此整列不動,
+    否則承辦誤刪一格,既有的三篇會被砍成兩篇。"""
+    import text_fields
+
+    header = text_fields._reflection_header()
+    good = dict.fromkeys(header, "")
+    good.update({"填_心得1_姓名": "王小明", "填_心得1_系級": "資工四", "填_心得1_內容": "很好玩"})
+    parsed, problems = text_fields.parse_reflections(good, header)
+    assert not problems
+    assert parsed == [{"student_name": "王小明", "dept": "資工四", "body": "很好玩"}]
+
+    half = dict(good)
+    half["填_心得1_內容"] = ""
+    parsed, problems = text_fields.parse_reflections(half, header)
+    assert parsed == [] and problems, "缺一欄必須報問題,不能當成沒填而放行"
+
+
+def test_reflection_lengths_come_from_the_schema():
+    """超長的值寫進去,退回件的社團一按儲存就 422 而且自己改不掉。
+    上限一律取自 schema,遷移腳本不得自己寫死第二份數字。"""
+    import text_fields
+
+    from app.schemas.activities import ActivityIn
+
+    assert text_fields.CONTENT_MAX == _field_max_length(ActivityIn, "content")
+    header = text_fields._reflection_header()
+    row = dict.fromkeys(header, "")
+    row.update(
+        {
+            "填_心得1_姓名": "王小明",
+            "填_心得1_系級": "資工四",
+            "填_心得1_內容": "x" * (text_fields.REFLECTION_MAX["body"] + 1),
+        }
+    )
+    parsed, problems = text_fields.parse_reflections(row, header)
+    assert parsed == [] and problems
+
+
+def _field_max_length(model, field: str) -> int:
+    """獨立於 text_fields._max_len 的第二種讀法:兩邊算出同一個數才算數。"""
+    metadata = model.model_fields[field].metadata
+    return next(m.max_length for m in metadata if hasattr(m, "max_length"))

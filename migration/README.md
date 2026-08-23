@@ -13,33 +13,48 @@ idempotent:以 `legacy_id_map`(system=cms)記錄舊 id → 新 id,重跑跳過�
    docker exec -i club-aio-db-1 pg_restore -U club -d legacy_clubs --no-owner --no-privileges < ntust_clubs_YYYY-MM-DD.dump
    ```
 
-2. 目標庫已 `uv run python scripts/reset_db.py --yes`(schema head + 基礎 seed + superadmin)。
+2. clubclass 的 MySQL dump 還原到本機拋棄式容器(起法見 `cc_import.py` docstring)。
+
+3. 舊機 media 目錄整包抓到 `<workspace>/legacy/club_media`(照片遷移用,見 MIG-12):
+
+   ```bash
+   rsync -a --info=progress2 prod:ClubManagementSystem/club_media/ legacy/club_media/
+   ```
+
+4. 目標庫已 `uv run python scripts/reset_db.py --yes`(schema head + 基礎 seed + superadmin)。
 
 ## 執行
 
+四支腳本有先後:社團/活動 → 借用 → 照片 → 文字。後三支都要靠 `legacy_id_map`
+把舊 id 接回新 id,`cms_import` 沒跑完就全都接不上。
+
 ```bash
 cd backend
-uv run python ../migration/cms_import.py           # 全部匯入
+uv run python ../migration/cms_import.py            # 1. 社團/成員/活動/公告
+uv run python ../migration/cc_import.py             # 2. 場地與器材借用
+uv run python ../migration/media_import.py          # 3. 活動照片(MIG-12)
+uv run python ../migration/text_fields.py --export  # 4. 產生待人工轉錄的 CSV(MIG-13)
 LEGACY_DB=legacy_clubs uv run python ../migration/cms_import.py  # 指定舊庫名
-uv run python ../migration/cms_import.py --reset   # 清掉上次匯入的結果(換新 dump 前)
 ```
 
 **換一份新 dump 重跑前先清乾淨**(decisions.md MIG-04):`--reset` 只刪自己
 `legacy_id_map` 記過的列,新系統上線後自己產生的資料不受影響。**`--reset` 只清不匯**,
-四步要分開跑,而且清除順序與匯入順序相反(借用單掛在活動與社團上,外鍵是 NO ACTION):
+清除順序與匯入順序相反(借用單掛在活動與社團上,外鍵是 NO ACTION;照片對活動是
+`subject_id` 弱關聯,沒有外鍵擋著,先清才不會留下指向已刪活動的孤兒列):
 
 ```bash
-uv run python ../migration/cc_import.py --reset    # 1. 先清借用
-uv run python ../migration/cms_import.py --reset   # 2. 再清社團/活動/公告
-uv run python ../migration/cms_import.py           # 3. 匯入社團/活動/公告
-uv run python ../migration/cc_import.py            # 4. 匯入借用
+uv run python ../migration/media_import.py --reset  # 1. 先清照片(含盤上檔案)
+uv run python ../migration/cc_import.py --reset     # 2. 再清借用
+uv run python ../migration/cms_import.py --reset    # 3. 再清社團/活動/公告
+# 之後照上面的 1→4 重跑
 ```
 
 指導老師欄位不還原(非 id-map 型,重跑本來就會覆寫)。
 
 - 一次性密碼輸出到 `migration/out/one_time_passwords_*.csv`(**含明碼,不入版控**,
   交承辦發放後銷毀);所有帳號 `must_change_password=True`
-- 檔案實體(企劃書/活動照片/附件)**不遷**(decisions.md MIG-08)
+- **活動照片遷**(MIG-12,`media_import.py`);**企劃書與結案附件的檔案實體不遷**,
+  裡面的文字走 `text_fields.py` 的人工轉錄 CSV(MIG-13)
 
 ## 範圍與對映(2026-07-21 需求方拍板)
 
@@ -60,21 +75,66 @@ uv run python ../migration/cc_import.py            # 4. 匯入借用
 | Club_activity(+fund/staff/meta) | activities(+budget_items/reports) | type:course/conference→社課或會議、extra→活動;status 對映見 `STATUS_MAP`;結案資料寬鬆匯入(缺欄留空) |
 | Club_news | announcements | 內容=原始連結(markdown) |
 | Club_staff | users | position admin→admin(權限鍵之後由承辦配)、observer→viewer |
+| Club_activityimages | files(`slot=report_photo`) | `media_import.py`;盤上落 `reports/{原始上傳年}/{月}/{uuid}`,`club_id`/`uploaded_by` 跟著活動走 |
+| Club_activity.PlanFile、Club_activityfiles | 只取文字,經 `text_fields.py` 的 CSV 人工轉錄 | 檔案實體不遷(MIG-13) |
 
 **不遷**(dump 留檔備查):club token/session、密碼歷史、Django 內建表、
 稽核 staffactivitylog、審核歷程 auditactivityrecord、行事曆、歷年評鑑期間、
 社團評鑑檔案庫 clubfiles(MIG-08 定案不遷)、行政歷史文件 clubrecordfromstaff(待決,見 MIG-10)。
 
-## clubclass(cc_import.py,2026-07-21)
+## 活動照片(media_import.py,2026-08-24)
+
+前置:`cms_import` 已跑完,且 `legacy/club_media` 已備妥(可用 `CLUB_MEDIA` 指定別的路徑)。
+來源只取 `Club_activityimages`(結案照片),範圍同三學期。以 2026-08-24 dump 實跑:
+
+| 項目 | 數 |
+|---|---|
+| 範圍內照片 | 4,098 張 |
+| 實際寫入 | **4,000 張、4.9 GB**(884 個活動) |
+| 同社團 sha256 重複而跳過 | 98 張 |
+| 盤上缺檔 / 活動未遷 / 副檔名不收 | 0 / 0 / 0 |
+
+- **同社團內不得有兩張相同 sha256 的結案照片**(`uq_files_club_report_photo_sha`),
+  這是線上上傳本來就有的規則(重複回 409);遷移在寫入前先比對,撞到就跳過
+- 55 張超過 `IMAGE` 政策的 10MB 上限,**照樣寫入** —— 那是上傳閘的限制(後台可調),
+  不是庫裡的不變式;擋掉等於平白丟掉舊資料
+- **167 個已結案活動的照片加總超過 `close_photo_total_mb`(10MB)**。結案中的活動不能
+  上傳,所以現在不影響任何人;但這些活動**一旦結案被退回**(狀態回 `approved`),
+  社團就再也加不了照片,只能用既有的重送。要放寬就調 system_settings 的該鍵
+- 同社團 sha256 重複的照片一律跳過(與線上上傳同一條規則),**其中有 10 個活動因此
+  一張都沒進**;腳本會單獨列出這些舊 activity id,並把完整跳過清單寫到
+  `migration/out/photos_skipped_*.csv`
+- MIME 以**實際內容**判定而非副檔名(`files.detect_mime`):這份 dump 有 6 張 `.PNG`
+  其實是 JPEG,照副檔名存會讓下載時送出錯的 Content-Type
+- `Club_activityfiles` 裡 90 個影像副檔名的檔案不遷(MIG-12:分不出簽到表與活動照)
+- 檔名維持社團上傳時的原樣,見 `docs/gaps.md` GAP-20
+
+## 企劃書與結案文字(text_fields.py,2026-08-24)
+
+舊系統只有檔案沒有欄位,靠人工轉錄中轉(MIG-13):
+
+```bash
+uv run python ../migration/text_fields.py --export                      # 產生待填 CSV
+uv run python ../migration/text_fields.py --import <填好的 CSV>          # 寫回
+```
+
+- 匯出 **1,185 列**(範圍內、已遷入、且至少有一個來源檔的活動;347 個沒有來源檔的略過)
+- `legacy_id` 是對照鍵不可改;`填_` 開頭的欄位才會寫入,**留白=不動、有值=覆寫**
+- `填_成果_執行成效` 預帶舊系統的單一檢討文字(遷移時已寫進 `highlights`)
+- 心得以 `填_心得N_姓名 / _系級 / _內容` 三件一組,要多寫就往後加欄;
+  同一活動只要有任一篇填了就**整批取代**該活動既有心得(重跑不會越加越多)
+- 匯入可重跑;有問題的列逐列列出並跳過,其餘照常寫入
+
+## clubclass(cc_import.py,2026-08-24)
 
 前置:cms_import 已跑完(club=CMS Username、activity 走 legacy_id_map 對照)。
 來源=本機拋棄式 MySQL(起法見 cc_import.py docstring)。
 
 | 舊 | 新 | 說明 |
 |---|---|---|
-| Classroom(22) | venues 對照表 `VENUE_MAP` | 一舍 B2 一律拆 樓梯+白板 兩筆;新版已無的 4 處建 inactive 承接 |
+| Classroom(23) | venues 對照表 `VENUE_MAP` | 一舍 B2 在 2026-08-24 那份 dump **由舊系統自己拆成兩間**(22 白板側、23 樓梯側),對照改回一對一;新版已無的 4 處建 inactive 承接 |
 | Device(25) | equipment(含 max_lease_count) | 名稱正規化 `DEVICE_RENAME`;停用 8 項建 inactive |
-| Apply(15,021) | venue_bookings | status 0/1/4/2→pending/approved/rejected/cancelled;phone 保留、其餘申請人明細丟棄 |
+| Apply(15,211) | venue_bookings | status 0/1/4/2→pending/approved/rejected/cancelled;phone 保留、其餘申請人明細丟棄 |
 | DeviceApply+DeviceLog | equipment_loans(一品項一筆) | 已核准且區間已過→returned;活動已刪或不在遷移範圍內→activity_id NULL |
 | 認不出借用單位的單(空字串 / admin / 8 開頭偽帳號 / 未知) | club_id NULL(顯示「學務處」) | 舊系統有 960 筆 `club_id` 是空字串,**不丟掉**(decisions.md MIG-03);帳號認得出形狀的那一桶另以 `--unknown-clubs` 導出清單交承辦辨識(MIG-06);欄位空白與 admin 不列入(看不出是誰)|
 | ClassroomRule(2,848)、Admin、Notice | 不遷 | 場地封鎖=新 Rule Page 功能;未過期封鎖上線時人工重建 |
@@ -83,6 +143,12 @@ uv run python ../migration/cc_import.py            # 4. 匯入借用
 
 - `import_teachers` 非 id-map 型:每次重跑**覆寫** clubs 的指導老師欄位。
   正式切換後若社團已在新系統改過指導老師,勿再重跑遷移。
+- **`seed_mock.py` 會 `rmtree` 整個 UPLOAD_DIR**:開發庫已是正式資料 snapshot,
+  手滑跑一次就要重跑 4.9 GB 的照片遷移。要灌 mock 請另開一個庫
+- **換新 dump 時要重看主檔有沒有變**:2026-08-24 這份就多了一間教室(一舍 B2 拆成兩間)。
+  `VENUE_MAP` / `DEVICE_RENAME` 沒跟上的話,新的 id 會被當成「未知場地」整批跳過,
+  而舊的一拆二規則會憑空生出 734 筆歷史借用 —— 兩種都不會報錯,只會靜靜地數字不對。
+  對法:`SELECT id,name FROM Classroom` 與 `Device` 各掃一次,比對兩個常數的鍵
 
 ## TODO
 

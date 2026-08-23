@@ -69,32 +69,43 @@ DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— �
 - 新測試逐一做過 mutation 驗證(把修法改回舊寫法會紅)。**clamp 的 `isSuccess` 守衛沒有測試接得住** ——
   拿掉它前後端測試全綠,要測得出來得先有能模擬查詢失敗的真實 query client
 
-## 開發庫(正式資料 snapshot)
+## 開發庫(正式資料 snapshot,2026-08-24 dump)
 
-`legacy_clubs`(pg 容器內)與 `legacy/clubclass/cc_2026-07-21.sql` 都在本機,重建流程:
+`legacy_clubs`(pg 容器內)、`legacy/clubclass/cc_2026-08-24.sql` 與
+`legacy/club_media/`(17 GB,照片來源)都在本機,重建流程:
 
 ```bash
 cd backend
 uv run python scripts/reset_db.py --yes
-uv run python ../migration/cms_import.py          # 159 社、30,477 成員、1,495 活動、8 公告
+uv run python ../migration/cms_import.py          # 159 社、30,570 成員、1,532 活動、8 公告
 docker run -d --name cc-legacy -p 127.0.0.1:3307:3306 \
     -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=cc mysql:8.0
-docker exec -i cc-legacy mysql -uroot -proot cc < ../../legacy/clubclass/cc_2026-07-21.sql
-uv run python ../migration/cc_import.py           # 15,635 場地借用、8,135 器材借用、25 器材
+docker exec -i cc-legacy mysql --default-character-set=utf8mb4 -uroot -proot cc \
+    < ../../legacy/clubclass/cc_2026-08-24.sql
+uv run python ../migration/cc_import.py           # 15,108 場地借用、8,140 器材借用、25 器材
+uv run python ../migration/media_import.py        # 4,000 張結案照片、4.9 GB
+uv run python ../migration/text_fields.py --export  # 1,185 列待人工轉錄的 CSV
 ```
+
+**照片會佔 `backend/data/uploads/` 4.9 GB**;`media_import.py --reset` 會連盤上檔案一起清,
+而且**必須跑在 `cms_import.py --reset` 之前**(cms 那支會刪光 system=cms 的 id-map,
+先跑它照片就變成清不掉的孤兒;cms_import 已加防呆擋下)。
+**別在這個庫跑 `seed_mock.py`** —— 它會 `rmtree` 整個 UPLOAD_DIR。
 
 查舊 MySQL 一律加 `--default-character-set=utf8mb4`,否則中文顯示成 `????`(資料是好的)。
 
-匯入帳號一律 `must_change_password=True`,明碼在 `migration/out/one_time_passwords_*.csv`
-(不入版控)。目前庫裡另設了 demo 用帳號:`super`、`502`(絃韻吉他社)、`702`(熱門舞蹈研習社)、
-`pt_demo`(工讀生),密碼皆 `Demo@12345`;其餘 156 個社團帳號是掃描用的 `SWEEP@12345`。
+遷移產出的一次性密碼在 `migration/out/one_time_passwords_*.csv`(不入版控)。
+**2026-08-24 重跑後已把全部 177 個帳號改成 `Demo@12345` 並關掉首登強制改密**
+(`scripts/set_passwords.py --all --password 'Demo@12345' --no-change-required --yes`),
+先前 `SWEEP@12345` 那套不再適用。要換回一次性密碼就重跑遷移,
+或用同一支腳本挑角色/帳號分批設。
 
 ## 其他待處理
 
-- **D-14 會讓遷移件的 ad2 與 ad4 往上跳**:評鑑視窗(2026-02-01～2027-01-31)內有 147 筆已結案的遷移活動,
-  其中 143 筆的照片確認、130 筆的心得確認是 true(來自舊系統),而新庫裡一個照片檔與心得列都沒有 ——
-  改判定前這兩項一律 0 分,改後照舊系統的紀錄計分。**ad3 不受影響**:遷移件每一筆都有 `activity_reports`,
-  129 筆確認為 true 的在改判定前就已經在計分。學年末跑評鑑前,承辦要知道這批分數的來源是舊系統的旗標
+- **D-14 會讓遷移件的 ad2 與 ad4 往上跳**:評鑑視窗內已結案的遷移活動,照片確認與心得確認多數是
+  true(來自舊系統)。照片已於 2026-08-24 補遷(MIG-12,4,000 張),**心得列仍是 0** ——
+  要等 `text_fields.py` 的人工轉錄 CSV 填完匯入(MIG-13)。學年末跑評鑑前,
+  承辦要知道 ad4 這批分數的來源是舊系統的旗標,不是庫裡真的有心得
 
 - **`MAIL_FROM_ADDRESS` 目前是開發者個人信箱**(`.env`,僅供測試)。正式環境要換成不綁個人的位址,
   且**必須與 `SMTP_USERNAME` 同網域**,否則校方 relay 拒收

@@ -19,7 +19,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from app.core.semesters import semester_of
+from app.core.semesters import TAIPEI, semester_of
 from app.models import Activity, Club
 
 _ASSETS = Path(__file__).resolve().parents[1] / "assets"
@@ -128,6 +128,31 @@ def _apply_opinion(activity: Activity) -> str:
     return f"{source}\n{_APPLY_NOTE}" if source else _APPLY_NOTE
 
 
+def _apply_footnote(activity: Activity) -> str:
+    """頁尾的上網申請時間。
+
+    `created_at` 是 TIMESTAMPTZ,asyncpg 回 UTC-aware —— 直接格式化會印成 UTC,
+    早上 8 點前送的單子連日期都退一天,而這張紙是要送出去的。
+    """
+    return f"(上網申請時間:{activity.created_at.astimezone(TAIPEI):%Y/%m/%d %H:%M:%S})"
+
+
+def _approved_text(approved: int | None) -> str:
+    """學校核定欄:未核定印 `—`,不是 0。
+
+    申請表在待審階段就下載得出來(草稿也行),而核定 0 元現在是「承辦人決定不給、當場核准」
+    的意思(D-16)——把還沒核定的欄位印成 0,這張紙就說了一件沒發生的事。
+    """
+    return "—" if approved is None else str(approved)
+
+
+def _approved_total_text(items) -> str:
+    """學校核定合計:只要還有一項沒核定,合計就是未知。"""
+    if any(i.approved_subsidy is None for i in items):
+        return "—"
+    return str(sum(i.approved_subsidy for i in items))
+
+
 def _moment(day, clock) -> str:
     """申請表的時間欄:缺日期就整格留白(半個時間比空白更難讀)。"""
     if day is None:
@@ -186,7 +211,7 @@ def apply_pdf(club: Club, activity: Activity, approvers: list[str]) -> bytes:
                 (2, _kai(b.category, _CC)),
                 (1, _kai(str(b.self_fund), _CR)),
                 (2, _kai(str(b.requested_subsidy), _CR)),
-                (2, _kai(str(b.approved_subsidy or 0), _CR)),
+                (2, _kai(_approved_text(b.approved_subsidy), _CR)),
                 (4, _kai(b.description)),
             ]
             for i, b in enumerate(items, 1)
@@ -200,7 +225,7 @@ def apply_pdf(club: Club, activity: Activity, approvers: list[str]) -> bytes:
         [
             (4, _kai(str(sum(b.self_fund + b.requested_subsidy for b in items)), _CC)),
             (4, _kai(str(sum(b.self_fund for b in items)), _CC)),
-            (4, _kai(str(sum(b.approved_subsidy or 0 for b in items)), _CC)),
+            (4, _kai(_approved_total_text(items), _CC)),
         ],
         [(2, _kai("意見回饋", _CC)), (10, _kai(_apply_opinion(activity)))],
         [
@@ -247,7 +272,7 @@ def apply_pdf(club: Club, activity: Activity, approvers: list[str]) -> bytes:
                 splitInRow=1,
             ),
             Spacer(1, 2 * mm),
-            _kai(f"(上網申請時間:{activity.created_at:%Y/%m/%d %H:%M:%S})", _FOOT),
+            _kai(_apply_footnote(activity), _FOOT),
         ]
     )
     return buf.getvalue()

@@ -5,7 +5,10 @@ import sqlalchemy as sa
 from app.models import Activity, ActivityBudgetItem, Club
 from app.services.pdf import (
     _APPLY_NOTE,
+    _apply_footnote,
     _apply_opinion,
+    _approved_text,
+    _approved_total_text,
     _kai_markup,
     apply_pdf,
     works_text,
@@ -172,3 +175,42 @@ async def test_approver_names_leave_unsigned_stages_blank(client, db):
     await db.commit()
 
     assert await approver_names(db, activity_id) == ["承辦人", "", ""]
+
+
+def test_apply_pdf_prints_the_submit_time_in_taipei():
+    """created_at 是 TIMESTAMPTZ(asyncpg 回 UTC-aware);直接格式化會印成 UTC。
+
+    早上 8 點前送的單子連日期都會退一天,而這張紙是要送出去的。
+    """
+    activity = Activity(
+        name="活動",
+        content="",
+        location="場地",
+        date=date(2026, 3, 1),
+        end_date=date(2026, 3, 1),
+        participants_in=1,
+        participants_out=0,
+        staff_text="",
+        # 台北 2026/03/01 07:30 = UTC 2026/02/28 23:30
+        created_at=datetime(2026, 2, 28, 23, 30, tzinfo=UTC),
+        budget_items=[],
+    )
+    assert _apply_footnote(activity) == "(上網申請時間:2026/03/01 07:30:00)"
+
+
+def test_apply_pdf_does_not_print_undecided_grants_as_zero():
+    """申請表在待審階段就下載得出來;把還沒核定的欄位印成 0,這張紙就說了沒發生的事。
+
+    核定 0 元現在的意思是「承辦人決定不給、當場核准」(D-16),兩者不能長一樣。
+    """
+    assert _approved_text(None) == "—"
+    assert _approved_text(0) == "0"
+    assert _approved_text(9000) == "9000"
+
+    def item(v):
+        return ActivityBudgetItem(
+            category="雜支", self_fund=0, requested_subsidy=1, approved_subsidy=v
+        )
+
+    assert _approved_total_text([item(None), item(500)]) == "—"  # 一項未核定 → 合計未知
+    assert _approved_total_text([item(0), item(500)]) == "500"

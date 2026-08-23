@@ -577,6 +577,8 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
             club_id=club_id,
             name=(a.Name or "").strip() or "(未命名)",
             content=content,
+            # 舊系統結案送出時把申請地點覆寫成實際地點(legacy views.py:1163),所以已結案
+            # 的 956 件這裡拿到的其實是實際地點,申請時填的原值舊庫已不存在、無從還原
             location=(a.Location or "").strip() or "(未填)",
             type=TYPE_MAP.get(a.Type, ActivityType.COURSE_MEETING),
             date=start_d,
@@ -639,9 +641,11 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
                     submitted_at=local_dt(a.FinishTime)
                     or local_dt(a.EndTime)
                     or datetime.now(TAIPEI),
-                    photos_confirmed=meta.get("photo", True),
-                    report_confirmed=meta.get("performance_report", True),
-                    reflections_confirmed=meta.get("experience_feedback", True),
+                    # 缺 meta = 沒有「已繳交」的證據。預設 True 是白送競賽行政分,
+                    # 模型註解本來就寫「未確認之項目評鑑以 0 分計」
+                    photos_confirmed=meta.get("photo", False),
+                    report_confirmed=meta.get("performance_report", False),
+                    reflections_confirmed=meta.get("experience_feedback", False),
                 )
             )
         created += 1

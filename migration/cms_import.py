@@ -503,9 +503,25 @@ async def import_members(legacy, db: AsyncSession, ids: IdMap, clubs) -> None:
         if prev is None or _kind_rank(row) >= _kind_rank(prev):
             dedup[key] = row
 
-    created = 0
+    # idempotent 判定不能只看舊列 id:唯一鍵是自然鍵。舊系統會對同一個
+    # (社團,學期,學號)重複新增列,換一份較新的 dump 重跑就會撞唯一鍵,
+    # 而整支腳本只有一次 commit —— 活動與公告會跟著一起回滾
+    existing_keys = {
+        (club_id, student_id, semester): member_id
+        for member_id, club_id, student_id, semester in await db.execute(
+            sa.select(
+                ClubMember.id, ClubMember.club_id, ClubMember.student_id, ClubMember.semester
+            )
+        )
+    }
+    created = remapped = 0
     for (legacy_club_id, semester, student_id), row in dedup.items():
         if ids.get("Club_student", row.id) is not None:
+            continue
+        seen = existing_keys.get((clubs[legacy_club_id][0], student_id, semester))
+        if seen is not None:
+            ids.record(db, "Club_student", row.id, "club_members", seen)
+            remapped += 1
             continue
         kind, title = member_kind(row.Identity, row.Title)
         joined = row.Date  # 入社日期 → created_at(列表的「入社時間」)與 updated_at
@@ -539,7 +555,9 @@ async def import_members(legacy, db: AsyncSession, ids: IdMap, clubs) -> None:
     dropped = len(rows) - len(dedup) - bad_semester - foreign
     print(
         f"members: 新增 {created}(重複學期學號覆蓋 {dropped}、"
-        f"學期不合格式 {bad_semester}、不遷社團 {foreign})"
+        f"學期不合格式 {bad_semester}、不遷社團 {foreign}"
+        + (f"、新 dump 的重複列接回既有成員 {remapped}" if remapped else "")
+        + ")"
     )
 
 

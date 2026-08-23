@@ -77,7 +77,7 @@ DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— �
 ```bash
 cd backend
 uv run python scripts/reset_db.py --yes
-uv run python ../migration/cms_import.py          # 159 社、30,570 成員、1,532 活動、8 公告
+uv run python ../migration/cms_import.py          # 159 社、30,570 成員、1,532 活動、2,228 簽核、8 公告
 docker run -d --name cc-legacy -p 127.0.0.1:3307:3306 \
     -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=cc mysql:8.0
 docker exec -i cc-legacy mysql --default-character-set=utf8mb4 -uroot -proot cc \

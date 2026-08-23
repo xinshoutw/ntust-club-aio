@@ -75,6 +75,8 @@ uv run python ../migration/cms_import.py --reset    # 3. 再清社團/活動/公
 | Club_activity(+fund/staff/meta) | activities(+budget_items/reports) | type:course/conference→社課或會議、extra→活動;status 對映見 `STATUS_MAP`;結案資料寬鬆匯入(缺欄留空) |
 | Club_news | announcements | 內容=原始連結(markdown) |
 | Club_staff | users | position admin→admin(權限鍵之後由承辦配)、observer→viewer |
+| Club_auditactivityrecord | approval_records | 舊表只有「誰、何時簽的」,沒有決議欄(退回不入表)—— 每列都是核准,同一活動第 1/2/3 列即 advisor/chief/dean,對應申請表的 初核/複核/決行 |
+| Club_auditactivity.Opinions | approval_records.reason(+ activities.fund_source) | 先去掉舊系統自動附的「※…結報提醒」(新系統由 `pdf._APPLY_NOTE` 自己產,照搬會印兩次);殘留只有 75 筆,非退回件且 ≤100 字者一併寫 `fund_source`,申請表的「意見回饋」才印得出來 |
 | Club_activityimages | files(`slot=report_photo`) | `media_import.py`;盤上落 `reports/{原始上傳年}/{月}/{uuid}`,`club_id`/`uploaded_by` 跟著活動走 |
 | Club_activity.PlanFile、Club_activityfiles | 只取文字,經 `text_fields.py` 的 CSV 人工轉錄 | 檔案實體不遷(MIG-13) |
 
@@ -108,6 +110,28 @@ uv run python ../migration/cms_import.py --reset    # 3. 再清社團/活動/公
   其實是 JPEG,照副檔名存會讓下載時送出錯的 Content-Type
 - `Club_activityfiles` 裡 90 個影像副檔名的檔案不遷(MIG-12:分不出簽到表與活動照)
 - 檔名維持社團上傳時的原樣,見 `docs/gaps.md` GAP-20
+
+## 簽核者與審核意見(cms_import.import_approvals,2026-08-24)
+
+申請表要印 初核/複核/決行 三位的姓名,資料來源是舊系統的 `Club_auditactivityrecord`。
+以 2026-08-24 dump 實跑:
+
+| 項目 | 數 |
+|---|---|
+| 簽核列 | **2,228**(advisor 1,461 / chief 389 / dean 378) |
+| 去樣板後仍有審核意見 | 75 筆 |
+| 其中寫入 `fund_source` | 61 筆(非退回件且 ≤100 字) |
+| 超過 100 字只留 `reason` | 11 筆 |
+| 掛不上簽核列而未遷入的退件理由 | 52 筆(沒人簽就退回,舊表沒有 actor) |
+
+- **關卡由列序決定,不是由狀態推導**:`AuditActivity.AllowCode` 就是這張表的列數
+- **`Opinions` 不可原文寫進 `fund_source`**:那一欄在行政端是「經費來源」
+  (`ApproveActivityIn` 限 100 字),範圍內 1,384 / 1,518 筆原文超過 100 字 ——
+  承辦一開審核視窗按儲存就 422 而且自己改不掉。而且其中 1,387 筆的全部內容就是
+  「※…結報提醒」那段樣板,新系統本來就會自己產一份
+- **7 筆舊 status=0 但已簽過初核的活動,新狀態仍是 `pending_advisor`**
+  (`STATUS_MAP` 只看 status,不看 AllowCode)。承辦會多簽一次初核 ——
+  同關多次核准取最後一次,印在紙上的名字仍然正確
 
 ## 企劃書與結案文字(text_fields.py,2026-08-24)
 

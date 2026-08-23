@@ -36,41 +36,37 @@ const STAGE_CHARS: [ReviewStage, string][] = [
   ['dean', '長'],
 ]
 
-// 章軌:狀態決定章的樣子,姓名與時間取後端算好的 stamps(該關最後一次核准)。
+// 章軌:**蓋不蓋章看 stamps,不看單據狀態**。
+// 兩者曾各推一次 —— 狀態說「已核准」就把三顆全點亮,而姓名取自簽核紀錄,
+// 舊系統遷入的 53 件只留了 1–2 位簽核者,組長與學務長那兩格就是亮的、卻沒有人名。
+// status 在這裡只回答一件事:現在輪到誰(pending_* / rejected)。
 // 僅三關(有申請補助)畫章軌 —— 無補助=承辦人單關即核准(後端規則),單關不畫
 function stagesOf(item: ReviewItem): StampStage[] {
   const stamps = item.detail?.stamps ?? []
-  const mk = (...states: StampState[]): StampStage[] =>
-    STAGE_CHARS.map(([stage, char], i) => {
-      const stamp = stamps.find((x) => x.stage === stage)
-      return {
-        char,
-        // 還沒簽到就是 `-`:那一格是留給簽核者的,不拿關卡名充數
-        label: stamp?.name || '-',
-        state: states[i],
-        note: stamp?.at,
-        noteTitle: stamp?.atFull,
-      }
-    })
-  switch (item.status) {
-    case 'pending_advisor':
-      return mk('current', 'todo', 'todo')
-    case 'pending_chief':
-      return mk('done', 'current', 'todo')
-    case 'pending_dean':
-      return mk('done', 'done', 'current')
-    case 'approved':
-    case 'closed':
-    // 結案流程中/待結案/逾期未結案皆為三關已核後的狀態(行政端社團總覽以唯讀開啟)
-    case 'closing_pending_advisor':
-    case 'closing_due':
-    case 'locked':
-      return mk('done', 'done', 'done')
-    case 'rejected':
-      return mk('rejected', 'todo', 'todo')
-    default:
-      return mk('todo', 'todo', 'todo')
-  }
+  const pending = stageOfStatus(item.status)
+  // 退回件:第一個沒簽到的關就是被退回的那一關(組長退回時,承辦人那關已經簽過了)
+  const rejectedAt =
+    item.status === 'rejected'
+      ? STAGE_CHARS.findIndex(([stage]) => !stamps.some((x) => x.stage === stage))
+      : -1
+  return STAGE_CHARS.map(([stage, char], i) => {
+    const stamp = stamps.find((x) => x.stage === stage)
+    const state: StampState = stamp
+      ? 'done'
+      : i === rejectedAt
+        ? 'rejected'
+        : pending === stage
+          ? 'current'
+          : 'todo'
+    return {
+      char,
+      // 還沒簽到的關卡不印關卡名 —— 那一格是留給簽核者的
+      label: stamp?.name || '等待中',
+      state,
+      note: stamp?.at,
+      noteTitle: stamp?.atFull,
+    }
+  })
 }
 
 /** 第一關核准送出的內容:經費來源、逐項核定金額、大型活動認可 */

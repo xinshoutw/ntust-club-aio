@@ -55,7 +55,9 @@ function StampNode({ stage }: { stage: StampStage }) {
       labelColor = '#C13B34'
       break
     default:
+      // 未蓋章的圈是灰的,但「等待中」三個字給關卡色 —— 灰字疊在虛線圈上會讀成停用
       style = { ...base, background: 'transparent', border: '2px dashed #C8CDD5', color: 'var(--muted)' }
+      labelColor = hue.color
   }
 
   return (

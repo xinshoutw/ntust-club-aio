@@ -76,11 +76,17 @@ describe('ActivityReviewModal 的核定欄', () => {
 // 章下方那格是給簽核者的,不是關卡名 —— 只有承辦人簽了的單子,
 // 章軌若把「組長」「學務長」印在還沒簽的兩格,看起來就像三關都有人經手
 describe('ActivityReviewModal 的簽核章軌', () => {
-  const showTrail = (stamps: NonNullable<ReviewItem['detail']>['stamps']) =>
+  type Stamps = NonNullable<ReviewItem['detail']>['stamps']
+
+  const showTrail = (status: ReviewItem['status'], stamps: Stamps) =>
     render(
       <App>
         <ActivityReviewModal
-          item={{ ...item([budgetRow(1, 5000)]), status: 'pending_chief', detail: { attachments: [], budget: [budgetRow(1, 5000)], stamps } }}
+          item={{
+            ...item([budgetRow(1, 5000)]),
+            status,
+            detail: { attachments: [], budget: [budgetRow(1, 5000)], stamps },
+          }}
           open
           onClose={() => {}}
           afterClose={() => {}}
@@ -88,19 +94,40 @@ describe('ActivityReviewModal 的簽核章軌', () => {
       </App>,
     )
 
-  test('沒人簽的關卡顯示 -,不顯示關卡名', () => {
-    showTrail([])
+  const advisorStamp = {
+    stage: 'advisor' as const,
+    name: '陳彥仁',
+    at: '08/23 19:23',
+    atFull: '2026/08/23 19:23:01',
+  }
 
-    expect(screen.getAllByText('-')).toHaveLength(3)
+  test('沒人簽的關卡顯示等待中,不顯示關卡名', () => {
+    showTrail('pending_advisor', [])
+
+    expect(screen.getAllByText('等待中')).toHaveLength(3)
     expect(screen.queryByText('承辦人')).toBeNull()
     expect(screen.queryByText('學務長')).toBeNull()
   })
 
   test('簽過的關卡顯示簽核者姓名與簽核時間', () => {
-    showTrail([{ stage: 'advisor', name: '陳彥仁', at: '08/23 19:23', atFull: '2026/08/23 19:23:01' }])
+    showTrail('pending_chief', [advisorStamp])
 
     expect(screen.getByText('陳彥仁')).toBeTruthy()
     expect(screen.getByText('08/23 19:23')).toBeTruthy()
-    expect(screen.getAllByText('-')).toHaveLength(2) // 組長、學務長還沒簽
+    expect(screen.getAllByText('等待中')).toHaveLength(2) // 組長、學務長還沒簽
+  })
+
+  // 舊系統遷入的已核准活動只留了 1–2 位簽核者。狀態說「已核准」就把三顆章全點亮,
+  // 等於替沒有簽核紀錄的組長與學務長背書 —— 蓋不蓋章一律看 stamps
+  test('已核准但只有承辦人簽過時,另外兩關不得點亮', () => {
+    showTrail('approved', [advisorStamp])
+
+    expect(screen.getByText('陳彥仁')).toBeTruthy()
+    expect(screen.getAllByText('等待中')).toHaveLength(2)
+    // 蓋好的章是實心的(--seal),未蓋的是虛線圈
+    const stamps = [...document.querySelectorAll('div')].filter(
+      (el) => el.textContent === '承' || el.textContent === '組' || el.textContent === '長',
+    )
+    expect(stamps.map((el) => el.style.borderStyle)).toEqual(['', 'dashed', 'dashed'])
   })
 })

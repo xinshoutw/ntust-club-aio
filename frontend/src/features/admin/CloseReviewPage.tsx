@@ -527,18 +527,24 @@ export default function CloseReviewPage() {
                     {l.closeDeadline ?? '—'}
                   </td>
                   <td className="r">
-                    {l.closeLocked && canUnlock && (
-                      <Button
-                        size="small"
-                        style={{ height: 28 }}
-                        loading={unlock.isPending && unlock.variables === l.activityId}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          doUnlock(l)
-                        }}
-                      >
-                        解鎖
-                      </Button>
+                    {l.closeLocked ? (
+                      canUnlock && (
+                        <Button
+                          size="small"
+                          style={{ height: 28 }}
+                          loading={unlock.isPending && unlock.variables === l.activityId}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            doUnlock(l)
+                          }}
+                        >
+                          解鎖
+                        </Button>
+                      )
+                    ) : (
+                      // 沒有狀態欄之後,空白的動作欄有兩種意思(已解鎖 / 鎖定中但無權解鎖),
+                      // 已解鎖的那一種要說出來 —— 期限已過卻不再擋社團,是這張表裡的例外
+                      <span style={{ fontSize: 12, color: 'var(--steel)' }}>已解鎖</span>
                     )}
                   </td>
                 </tr>

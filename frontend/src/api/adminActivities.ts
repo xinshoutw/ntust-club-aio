@@ -6,7 +6,13 @@ import { api, apiPaged, qs } from './client'
 import { useInvalidateBadges } from './badges'
 import { fetchAllPages } from './fetchAll'
 import { staffTextToWorks, type WorkItem } from '../features/activities/types'
-import { fileUrl } from './activities'
+import {
+  fileUrl,
+  toActivity,
+  toDetail,
+  type ActivityDetailOut,
+  type ActivityOut,
+} from './activities'
 import type { SessionUser } from './auth'
 import type { StatusKey } from '../lib/status'
 
@@ -142,34 +148,15 @@ interface ReportOut {
   reflections_confirmed: boolean
 }
 
-interface AdminActivityOut {
-  id: number
-  club_id: number
+// 與社團端 /club/activities 同一份 schema(backend ActivityOut),行政端多帶社團名與
+// 最近審核時間。**不再各寫一份**:上一版漏了 has_close_draft,同一個回應在兩處長不一樣
+interface AdminActivityOut extends Omit<ActivityOut, 'date' | 'end_date'> {
   club_name: string
-  name: string
-  type: ReviewItem['type']
-  is_large: boolean
-  is_large_approved: boolean | null
-  date: string
+  date: string // 草稿不進行政視野,日期必然齊備
   end_date: string
-  start_time: string | null
-  end_time: string | null
-  location: string
-  content: string
-  staff_text: string
-  participants_in: number
-  participants_out: number
   fund_source: string | null
   school_approved: number | null
-  status: string
-  created_at: string
-  self_fund_total: number
-  requested_total: number
-  approved_total: number | null
-  semester: string
-  close_locked: boolean
   close_deadline: string | null
-  can_close: boolean
   reviewed_at: string | null
 }
 
@@ -309,8 +296,13 @@ export interface AdminActivityListParams {
 
 /** 伺服器端分頁查詢(14k+ 筆禁止整批撈取) */
 export interface AdminActivityPageParams {
-  statuses?: AdminActivityStatus[]
+  /** 後端收的是**顯示狀態**:另有推導的 'locked'(已核准且逾期鎖定,畫面顯示成已逾期) */
+  statuses?: (AdminActivityStatus | 'locked')[]
   clubIds?: number[]
+  /** 學期(民國,如 115-1);後端以活動日期落在該學期區間篩 */
+  semester?: string
+  /** 活動名稱模糊搜尋 */
+  q?: string
   /** 類型標籤(社課或會議/活動/大型活動;大型為後端推導型別) */
   types?: string[]
   /** 僅逾期鎖定(已核准+超過結案期限+未解鎖;後端推導) */
@@ -330,6 +322,9 @@ const keys = {
   list: (p: AdminActivityListParams) => ['adminActivities', 'list', p] as const,
   paged: (p: AdminActivityPageParams) => ['adminActivities', 'paged', p] as const,
   detail: (id: number) => ['adminActivities', 'detail', id] as const,
+  semesters: (clubId?: number) => ['adminActivities', 'semesters', clubId ?? null] as const,
+  clubList: (p: AdminClubActivityParams) => ['adminActivities', 'clubList', p] as const,
+  clubDetail: (id: number) => ['adminActivities', 'clubDetail', id] as const,
 }
 
 export const adminActivityKeys = keys
@@ -366,6 +361,8 @@ export function useAdminActivitiesPaged(p: AdminActivityPageParams) {
         `/admin/activities${qs({
           status: p.statuses,
           club_id: p.clubIds?.map(String),
+          semester: p.semester,
+          q: p.q,
           type: p.types,
           locked: p.locked ? true : undefined,
           overdue: p.overdue ? true : undefined,
@@ -373,7 +370,12 @@ export function useAdminActivitiesPaged(p: AdminActivityPageParams) {
           page: p.page,
           page_size: p.pageSize,
         })}`,
-      ).then(({ data, total }) => ({ rows: data.map(toAdminActivity), total })),
+      ).then(({ data, total }) => ({
+        rows: data.map(toAdminActivity),
+        // 同一份 payload 的社團端形狀:所有活動頁的完整唯讀檢視吃這個型別
+        clubRows: data.map(toActivity),
+        total,
+      })),
     placeholderData: keepPreviousData,
   })
 }
@@ -383,6 +385,60 @@ export function useAdminActivityDetail(id: number | undefined) {
     queryKey: keys.detail(id ?? -1),
     enabled: id != null,
     queryFn: () => api<AdminActivityDetailOut>(`/admin/activities/${id}`).then(toAdminDetail),
+  })
+}
+
+/** 有活動的學期(新到舊),供學期下拉;帶 clubId 則限該社 */
+export function useAdminActivitySemesters(clubId?: number | null, enabled = true) {
+  return useQuery({
+    queryKey: keys.semesters(clubId ?? undefined),
+    enabled,
+    queryFn: () =>
+      api<string[]>(`/admin/activities/semesters${qs({ club_id: clubId ?? undefined })}`),
+  })
+}
+
+// ---- 行政端唯讀檢視:以社團端的形狀讀行政端端點 ----
+//
+// 兩支端點回的是同一份 schema(ActivityOut / ActivityDetailOut),差別只在行政端多帶
+// club_name 與 reviewed_at。所以不再刻一套對照,直接沿用社團端的 toActivity/toDetail ——
+// 「介面與社團端相同」的頁面若連資料形狀都不同,共用元件就得改成兩種型別各走一條路
+
+export interface AdminClubActivityParams {
+  clubId: number | null
+  semester?: string
+  statuses?: string[]
+  types?: string[]
+  sort?: string
+  page: number
+  pageSize: number
+}
+
+export function useAdminClubActivities(p: AdminClubActivityParams) {
+  return useQuery({
+    queryKey: keys.clubList(p),
+    enabled: p.clubId != null,
+    queryFn: () =>
+      apiPaged<ActivityOut[]>(
+        `/admin/activities${qs({
+          club_id: p.clubId ?? undefined,
+          semester: p.semester,
+          status: p.statuses,
+          type: p.types,
+          sort: p.sort,
+          page: p.page,
+          page_size: p.pageSize,
+        })}`,
+      ).then(({ data, total }) => ({ rows: data.map(toActivity), total })),
+    placeholderData: keepPreviousData,
+  })
+}
+
+export function useAdminClubActivityDetail(id: number | undefined) {
+  return useQuery({
+    queryKey: keys.clubDetail(id ?? -1),
+    enabled: id != null,
+    queryFn: () => api<ActivityDetailOut>(`/admin/activities/${id}`).then(toDetail),
   })
 }
 

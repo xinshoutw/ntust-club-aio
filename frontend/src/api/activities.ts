@@ -107,6 +107,8 @@ interface ApprovalOut {
 
 export interface ActivityOut {
   id: number
+  club_id: number
+  created_at: string
   name: string
   type: ActivityType
   is_large: boolean

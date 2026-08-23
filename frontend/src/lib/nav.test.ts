@@ -59,3 +59,19 @@ describe('側欄徽章', () => {
     expect(findItem(buildViewerNav({ 'v-my': 1 }), 'v-my')?.badge).toBe(1)
   })
 })
+
+describe('行政端活動列表', () => {
+  /** 分組內的位置:需求方指定了「插在哪兩項之間」,列表順序本身就是規格 */
+  const keysOf = (groups: NavGroup[], label: string) =>
+    groups.find((g) => g.label === label)?.items.map((i) => i.key)
+
+  test('活動列表夾在成員列表與管理項目之間', () => {
+    expect(keysOf(buildAdminNav(superUser), '社團管理')).toEqual([
+      'a-club-overview',
+      'a-members',
+      'a-club-activities',
+      'a-club-settings',
+      'a-overdue',
+    ])
+  })
+})

@@ -191,6 +191,7 @@ export function buildAdminNav(user: SessionUser | null, badges: Badges = {}): Na
     items: [
       { key: 'a-club-overview', label: '社團總覽', path: '/admin/club-overview', icon: <HomeOutlined /> },
       { key: 'a-members', label: '成員列表', path: '/admin/members', icon: <TeamOutlined /> },
+      { key: 'a-club-activities', label: '活動列表', path: '/admin/club-activities', icon: <UnorderedListOutlined /> },
       { key: 'a-club-settings', label: '管理項目', path: '/admin/club-settings', icon: <SettingOutlined /> },
       { key: 'a-overdue', label: '逾期追蹤與停權', path: '/admin/overdue', icon: <StopOutlined /> },
     ],

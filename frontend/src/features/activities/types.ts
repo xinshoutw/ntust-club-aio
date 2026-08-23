@@ -176,8 +176,10 @@ export const LISTED_STATUSES = [
 
 export const LISTED_STATUS_LABELS = [...new Set(LISTED_STATUSES.map((s) => STATUS[s].label))]
 
+export type ListedStatus = (typeof LISTED_STATUSES)[number]
+
 /** 顯示標籤 → 要送給後端的狀態集合;沒選(或標籤對不到)一律退回全部 */
-export const statusesForLabels = (labels: readonly string[]): string[] => {
+export const statusesForLabels = (labels: readonly string[]): ListedStatus[] => {
   const picked = LISTED_STATUSES.filter((s) => labels.includes(STATUS[s].label))
   return picked.length ? [...picked] : [...LISTED_STATUSES]
 }

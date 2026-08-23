@@ -41,6 +41,7 @@ import AnnouncementsPage from './features/admin/AnnouncementsPage'
 import AdminBookingsPage from './features/admin/AdminBookingsPage'
 import AdminRoomsPage from './features/admin/AdminRoomsPage'
 import AdminMembersPage from './features/admin/AdminMembersPage'
+import AdminClubActivitiesPage from './features/admin/AdminClubActivitiesPage'
 import OverduePage from './features/admin/OverduePage'
 import AdminEvalPage from './features/admin/AdminEvalPage'
 import AccountsPage from './features/admin/AccountsPage'
@@ -221,6 +222,7 @@ export default function App() {
           <Route path="venue-rules" element={<VenueRulesPage />} />
           <Route path="club-overview" element={<ClubOverviewPage />} />
           <Route path="members" element={<AdminMembersPage />} />
+          <Route path="club-activities" element={<AdminClubActivitiesPage />} />
           <Route path="club-settings" element={<AdminClubSettingsPage />} />
           <Route path="overdue" element={<OverduePage />} />
           <Route path="eval" element={<AdminEvalPage />} />

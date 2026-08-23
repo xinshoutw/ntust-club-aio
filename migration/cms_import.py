@@ -135,7 +135,8 @@ LEADER_TITLES = {"社長", "會長"}
 
 # 舊系統自動附在審核意見後面的結報提醒;新系統由 pdf._APPLY_NOTE 自己產一份,
 # 原文照搬會在申請表的「意見回饋」印兩次
-_OPINION_BOILERPLATE = re.compile(r"※.*", re.S)
+# 有 9 筆的提醒沒有 ※ 開頭,直接從標題起頭 —— 只認 ※ 會把整段樣板留成審核意見
+_OPINION_BOILERPLATE = re.compile(r"(?:※|活動結報提醒).*", re.S)
 # 舊 status 1=退回申請、11=退回核銷:這兩種的意見殘留是退件理由,不是經費認定
 REJECTED_LEGACY_STATUS = frozenset({1, 11})
 FUND_SOURCE_MAX = next(

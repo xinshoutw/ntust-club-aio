@@ -1,6 +1,6 @@
 import dayjs from 'dayjs'
 import { semesterOf } from '../../lib/semester'
-import type { StatusKey } from '../../lib/status'
+import { STATUS, type StatusKey } from '../../lib/status'
 import type { EvalFile } from '../eval/types'
 
 export interface BudgetItem {
@@ -105,6 +105,12 @@ export function budgetTotals(items: BudgetItem[]): { self: number; requested: nu
 
 export const fmtMoney = (n: number): string => `$${n.toLocaleString('en-US')}`
 
+/** 活動列表與詳情的經費欄:自籌 / 擬請;兩者皆 0 時不佔一格數字 */
+export const money = (a: { selfFundTotal: number; requestedTotal: number }): string =>
+  a.selfFundTotal === 0 && a.requestedTotal === 0
+    ? '–'
+    : `${fmtMoney(a.selfFundTotal)} / ${fmtMoney(a.requestedTotal)}`
+
 /** 工作分配的項目欄對齊寬度(全形字數≈em)。
  *
  * 以「非離群」的最長項目為準:與最短相差超過 3 字的項目不參與對齊。舊系統的項目是
@@ -152,3 +158,26 @@ export const approvedText = (
  */
 export const showsApproved = (requested: number, approved: number | null | undefined): boolean =>
   requested > 0 || (approved ?? 0) > 0
+
+// 活動列表狀態漏斗的顯示狀態(社團端與行政端唯讀版同一份)。
+// 三個申請關卡共用「申請待審核」標籤,選一個標籤要送出對應的全部狀態;
+// 'locked'(已逾期)是後端也認得的推導狀態 —— 已核准且逾期鎖定的列顯示成「已逾期」,
+// 兩者在後端就分得開,清單才不會把逾期件混進「已核准」
+export const LISTED_STATUSES = [
+  'pending_advisor',
+  'pending_chief',
+  'pending_dean',
+  'approved',
+  'locked',
+  'rejected',
+  'closing_pending_advisor',
+  'closed',
+] as const satisfies readonly StatusKey[]
+
+export const LISTED_STATUS_LABELS = [...new Set(LISTED_STATUSES.map((s) => STATUS[s].label))]
+
+/** 顯示標籤 → 要送給後端的狀態集合;沒選(或標籤對不到)一律退回全部 */
+export const statusesForLabels = (labels: readonly string[]): string[] => {
+  const picked = LISTED_STATUSES.filter((s) => labels.includes(STATUS[s].label))
+  return picked.length ? [...picked] : [...LISTED_STATUSES]
+}

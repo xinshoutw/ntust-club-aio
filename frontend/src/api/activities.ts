@@ -105,7 +105,7 @@ interface ApprovalOut {
   created_at: string
 }
 
-interface ActivityOut {
+export interface ActivityOut {
   id: number
   name: string
   type: ActivityType
@@ -130,7 +130,7 @@ interface ActivityOut {
   has_close_draft: boolean
 }
 
-interface ActivityDetailOut extends ActivityOut {
+export interface ActivityDetailOut extends ActivityOut {
   budget_items: BudgetItemOut[]
   close_draft: Record<string, unknown> | null
   report: ReportOut | null
@@ -154,7 +154,7 @@ const worksToStaffText = (works: WorkItem[]): string =>
 const toStatusKey = (o: ActivityOut): StatusKey =>
   o.status === 'approved' && o.close_locked ? 'locked' : (o.status as StatusKey)
 
-const toActivity = (o: ActivityOut): ClubActivity => ({
+export const toActivity = (o: ActivityOut): ClubActivity => ({
   id: o.id,
   name: o.name,
   type: o.type,
@@ -257,7 +257,7 @@ const STAGE_LABEL: Record<string, string> = {
   dean: '學務長',
 }
 
-const toDetail = (o: ActivityDetailOut): ClubActivityDetail => {
+export const toDetail = (o: ActivityDetailOut): ClubActivityDetail => {
   const lastReject = [...o.approvals].reverse().find((x) => x.decision === 'reject')
   return {
     ...toActivity(o),
@@ -284,22 +284,36 @@ const toDetail = (o: ActivityDetailOut): ClubActivityDetail => {
   }
 }
 
-// 成果報告/心得 PDF:後端於下載時動態生成(inline),包成 EvalFile 供 FileChip 預覽/下載
-export const activityReportPdf = (a: Pick<ClubActivity, 'id' | 'name'>, submittedAt?: string): EvalFile => ({
+// 成果報告/心得 PDF:後端於下載時動態生成(inline),包成 EvalFile 供 FileChip 預覽/下載。
+// base 決定走哪一端的端點:社團端那兩支由 session 認社團,承辦讀別社時要走 admin 版
+export type PdfBase = 'club' | 'admin'
+
+const pdfPath = (base: PdfBase, id: number, kind: string): string =>
+  `${API_BASE}/${base === 'admin' ? 'admin' : 'club'}/activities/${id}/${kind}`
+
+export const activityReportPdf = (
+  a: Pick<ClubActivity, 'id' | 'name'>,
+  submittedAt?: string,
+  base: PdfBase = 'club',
+): EvalFile => ({
   id: `report-pdf-${a.id}`,
   name: `${a.name}_成果報告表.pdf`,
   type: 'pdf',
   size: 0,
-  url: `${API_BASE}/club/activities/${a.id}/report-pdf`,
+  url: pdfPath(base, a.id, 'report-pdf'),
   uploadedAt: submittedAt ?? '—',
 })
 
-export const activityReflectionsPdf = (a: Pick<ClubActivity, 'id' | 'name'>, submittedAt?: string): EvalFile => ({
+export const activityReflectionsPdf = (
+  a: Pick<ClubActivity, 'id' | 'name'>,
+  submittedAt?: string,
+  base: PdfBase = 'club',
+): EvalFile => ({
   id: `reflections-pdf-${a.id}`,
   name: `${a.name}_學習心得.pdf`,
   type: 'pdf',
   size: 0,
-  url: `${API_BASE}/club/activities/${a.id}/reflections-pdf`,
+  url: pdfPath(base, a.id, 'reflections-pdf'),
   uploadedAt: submittedAt ?? '—',
 })
 

@@ -4,7 +4,14 @@ from datetime import UTC, date, datetime, timedelta
 import sqlalchemy as sa
 
 from app.models import Activity, ActivityBudgetItem, ActivityReflection, Club
-from app.services.pdf import apply_pdf, reflections_pdf, works_text
+from app.services.pdf import (
+    _APPLY_NOTE,
+    _apply_opinion,
+    _kai_markup,
+    apply_pdf,
+    reflections_pdf,
+    works_text,
+)
 from tests.conftest import csrf_headers, login, make_club, make_user
 from tests.test_activities import close_payload, create_activity, upload_photo
 
@@ -206,3 +213,34 @@ def test_works_text_splits_on_the_last_colon():
         works_text("總務組長:場地與器材:王小明\n沒有負責人\n\n美宣:李小美")
         == "總務組長:場地與器材 > 王小明; 沒有負責人; 美宣 > 李小美"
     )
+
+
+def test_apply_pdf_falls_back_for_glyphs_kai_lacks():
+    """標楷體只有 14k 字:中點「・」與拉丁重音字母沒有,整格不能因此變豆腐。"""
+    markup = _kai_markup("拾穗・十歲 café")
+    assert '<font name="NotoSansTC">・</font>' in markup
+    assert '<font name="NotoSansTC">é</font>' in markup
+    assert "拾穗" in markup and "十歲" in markup
+
+
+def test_apply_pdf_opinion_always_carries_the_close_report_notice():
+    """經費來源可能是空的(沒申請經費);結報提醒不論如何都要在意見回饋裡。"""
+    def opinion_of(fund_source: str | None) -> str:
+        activity = Activity(
+            name="活動",
+            content="",
+            location="場地",
+            date=date(2026, 3, 1),
+            end_date=date(2026, 3, 1),
+            participants_in=1,
+            participants_out=0,
+            staff_text="",
+            fund_source=fund_source,
+            created_at=datetime(2026, 2, 1, 9, 30, tzinfo=UTC),
+            budget_items=[],
+        )
+        return _apply_opinion(activity)
+
+    assert opinion_of(None) == _APPLY_NOTE
+    assert opinion_of("   ") == _APPLY_NOTE
+    assert opinion_of("由三校文化基金會支應") == f"由三校文化基金會支應\n{_APPLY_NOTE}"

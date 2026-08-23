@@ -7,6 +7,7 @@
 """
 
 import io
+from itertools import groupby
 from pathlib import Path
 from urllib.parse import quote
 
@@ -22,9 +23,12 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 from app.core.semesters import semester_of
 from app.models import Activity, ActivityReflection, ActivityReport, Club
 
+_ASSETS = Path(__file__).resolve().parents[1] / "assets"
 _FONT = "NotoSansTC"
-_FONT_PATH = Path(__file__).resolve().parents[1] / "assets" / "NotoSansTC-Regular.ttf"
-pdfmetrics.registerFont(TTFont(_FONT, str(_FONT_PATH)))
+pdfmetrics.registerFont(TTFont(_FONT, str(_ASSETS / "NotoSansTC-Regular.ttf")))
+# 標楷體(教育部標準楷書 edukai 5.1,face name TW-MOE-Std-Kai):公文用字型,申請表用它
+_KAI = "EduKai"
+pdfmetrics.registerFont(TTFont(_KAI, str(_ASSETS / "edukai-5.1_20251208.ttf")))
 
 _TITLE = ParagraphStyle(
     "title", fontName=_FONT, fontSize=16, leading=22, alignment=1, spaceAfter=6 * mm
@@ -160,11 +164,17 @@ def pdf_response(content: bytes, filename: str) -> Response:
 # 版面沿用舊系統的 LaTeX 版(Club/GeneratePDF/activity_apply.tex):12 欄基準格線,
 # 各列以 span 組出欄位。欄寬比例取自舊版產出的實測值,結構與欄位順序不得更動
 
-_APPLY_TITLE = ParagraphStyle("apply_title", fontName=_FONT, fontSize=17, leading=26, alignment=1)
-_C = ParagraphStyle("cell", fontName=_FONT, fontSize=10.5, leading=17)
+_APPLY_TITLE = ParagraphStyle("apply_title", fontName=_KAI, fontSize=17, leading=26, alignment=1)
+_C = ParagraphStyle("cell", fontName=_KAI, fontSize=10.5, leading=17)
 _CC = ParagraphStyle("cell_center", parent=_C, alignment=1)
 _CR = ParagraphStyle("cell_right", parent=_C, alignment=2)
-_FOOT = ParagraphStyle("foot", fontName=_FONT, fontSize=9, leading=13, alignment=2)
+_FOOT = ParagraphStyle("foot", fontName=_KAI, fontSize=9, leading=13, alignment=2)
+
+# 意見回饋固定收尾的結報提醒:承辦人填的經費來源可能是空的(沒申請經費時),這段一律都在
+_APPLY_NOTE = (
+    "※ 請於活動結束後兩週內完成並上傳結報。結報內容應包含："
+    "1. 活動照片 5 張；2. 3 位同學的心得；3. 活動成果報告"
+)
 
 _APPLY_COLS = [
     w * 174 * mm / 720
@@ -209,6 +219,34 @@ def works_text(staff_text: str) -> str:
     )
 
 
+# 標楷體只有 14k 字,收不到中點「・」與拉丁重音字母 —— 活動名稱裡兩者都出現得了
+_KAI_COVERS = frozenset(pdfmetrics.getFont(_KAI).face.charToGlyph)
+
+
+def _kai_markup(text: str) -> str:
+    """標楷體排不出來的字改由 Noto 接手,避免整格變成豆腐。"""
+    out = []
+    # 先分段再逸出:反過來的話 <br/>、&lt; 這些標記可能被 <font> 攔腰切開
+    for missing, run in groupby(text, key=lambda c: ord(c) not in _KAI_COVERS):
+        chunk = _escape("".join(run))
+        out.append(f'<font name="{_FONT}">{chunk}</font>' if missing else chunk)
+    return "".join(out)
+
+
+def _kai(text: str, style=_C) -> Paragraph:
+    """申請表的儲存格:預設走標楷體本文樣式(_para 的預設是另兩份 PDF 的 Noto)。"""
+    return Paragraph(_kai_markup(text), style)
+
+
+def _apply_opinion(activity: Activity) -> str:
+    """意見回饋 = 承辦人核准時填的經費來源 + 固定的結報提醒。
+
+    經費來源可能是空的(沒申請經費的活動不需要認定來源),提醒則一律都在。
+    """
+    source = (activity.fund_source or "").strip()
+    return f"{source}\n{_APPLY_NOTE}" if source else _APPLY_NOTE
+
+
 def _moment(day, clock) -> str:
     """申請表的時間欄:缺日期就整格留白(半個時間比空白更難讀)。"""
     if day is None:
@@ -217,7 +255,7 @@ def _moment(day, clock) -> str:
 
 
 def apply_pdf(club: Club, activity: Activity, approvers: list[str]) -> bytes:
-    """社團活動申請表;approvers 依簽核順序對應 初核/複核/決行。"""
+    """社團活動申請表;approvers 依**關卡**順序對應 初核/複核/決行(見 approver_names)。"""
     year, sem = semester_of(activity.date).split("-") if activity.date else ("", "")
     report = activity.report
     # 舊版:預計人數為 0 才退回實際人數;校外人數舊版一律 0
@@ -234,63 +272,63 @@ def apply_pdf(club: Club, activity: Activity, approvers: list[str]) -> bytes:
 
     rows: list[list[tuple[int, Paragraph]]] = [
         [
-            (2, _para("社團名稱：", _CC)),
-            (4, _para(f"{club.attribute}—{club.name}" if club.attribute else club.name, _CC)),
-            (2, _para("參加人數：", _CC)),
+            (2, _kai("社團名稱", _CC)),
+            (4, _kai(f"{club.attribute} — {club.name}" if club.attribute else club.name, _CC)),
+            (2, _kai("參加人數", _CC)),
             # 值都是整數,直接寫 Paragraph 才留得住 nbsp(_para 會把 & 逸出)
             (4, Paragraph(f"校內：{people} 人&nbsp;&nbsp;&nbsp;&nbsp;校外：0 人", _CC)),
         ],
         [
-            (2, _para("活動名稱：", _CC)),
-            (4, _para(activity.name)),
-            (2, _para("地點：", _CC)),
-            (4, _para(activity.location)),
+            (2, _kai("活動名稱", _CC)),
+            (4, _kai(activity.name)),
+            (2, _kai("地點", _CC)),
+            (4, _kai(activity.location)),
         ],
-        [(2, _para("時間：", _CC)), (10, _para(f"{start} 至 {end}", _CC))],
-        [(2, _para("活動內容：", _CC)), (10, _para(activity.content))],
-        [(2, _para("工作分配：", _CC)), (10, _para(works))],
+        [(2, _kai("時間", _CC)), (10, _kai(f"{start} 至 {end}", _CC))],
+        [(2, _kai("活動內容", _CC)), (10, _kai(activity.content))],
+        [(2, _kai("工作分配", _CC)), (10, _kai(works))],
     ]
     if items:
         rows.append(
             [
-                (1, _para("項次", _CC)),
-                (2, _para("摘要", _CC)),
-                (1, _para("自籌", _CC)),
-                (2, _para("擬請學校補助", _CC)),
-                (2, _para("學校核定", _CC)),
-                (4, _para("使用經費說明", _CC)),
+                (1, _kai("項次", _CC)),
+                (2, _kai("摘要", _CC)),
+                (1, _kai("自籌", _CC)),
+                (2, _kai("擬請學校補助", _CC)),
+                (2, _kai("學校核定", _CC)),
+                (4, _kai("使用經費說明", _CC)),
             ]
         )
         rows.extend(
             [
-                (1, _para(str(i), _CC)),
-                (2, _para(b.category, _CC)),
-                (1, _para(str(b.self_fund), _CR)),
-                (2, _para(str(b.requested_subsidy), _CR)),
-                (2, _para(str(b.approved_subsidy or 0), _CR)),
-                (4, _para(b.description)),
+                (1, _kai(str(i), _CC)),
+                (2, _kai(b.category, _CC)),
+                (1, _kai(str(b.self_fund), _CR)),
+                (2, _kai(str(b.requested_subsidy), _CR)),
+                (2, _kai(str(b.approved_subsidy or 0), _CR)),
+                (4, _kai(b.description)),
             ]
             for i, b in enumerate(items, 1)
         )
     rows += [
         [
-            (4, _para("支出總預算", _CC)),
-            (4, _para("社團自籌", _CC)),
-            (4, _para("學校核定", _CC)),
+            (4, _kai("支出總預算", _CC)),
+            (4, _kai("社團自籌", _CC)),
+            (4, _kai("學校核定", _CC)),
         ],
         [
-            (4, _para(str(sum(b.self_fund + b.requested_subsidy for b in items)), _CC)),
-            (4, _para(str(sum(b.self_fund for b in items)), _CC)),
-            (4, _para(str(sum(b.approved_subsidy or 0 for b in items)), _CC)),
+            (4, _kai(str(sum(b.self_fund + b.requested_subsidy for b in items)), _CC)),
+            (4, _kai(str(sum(b.self_fund for b in items)), _CC)),
+            (4, _kai(str(sum(b.approved_subsidy or 0 for b in items)), _CC)),
         ],
-        [(2, _para("意見回饋：", _CC)), (10, _para(activity.fund_source or ""))],
+        [(2, _kai("意見回饋", _CC)), (10, _kai(_apply_opinion(activity)))],
         [
-            (1, _para("初\n核", _CC)),
-            (3, _para(audit[0], _CC)),
-            (1, _para("複\n核", _CC)),
-            (3, _para(audit[1], _CC)),
-            (1, _para("決\n行", _CC)),
-            (3, _para(audit[2], _CC)),
+            (1, _kai("初\n核", _CC)),
+            (3, _kai(audit[0], _CC)),
+            (1, _kai("複\n核", _CC)),
+            (3, _kai(audit[1], _CC)),
+            (1, _kai("決\n行", _CC)),
+            (3, _kai(audit[2], _CC)),
         ],
     ]
 
@@ -328,7 +366,7 @@ def apply_pdf(club: Club, activity: Activity, approvers: list[str]) -> bytes:
                 splitInRow=1,
             ),
             Spacer(1, 2 * mm),
-            _para(f"(上網申請時間:{activity.created_at:%Y/%m/%d %H:%M:%S})", _FOOT),
+            _kai(f"(上網申請時間:{activity.created_at:%Y/%m/%d %H:%M:%S})", _FOOT),
         ]
     )
     return buf.getvalue()

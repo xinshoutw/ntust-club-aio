@@ -40,5 +40,5 @@
 - 狀態篩選以**顯示標籤**比對,三個審核關卡在社團端都顯示「待審核」,選單不出現重複項
 - `approved` 且 `close_locked` 在前端映射為顯示狀態 `locked`
 - 成果報告與學習心得 PDF 由後端依 `docs/模板_*.docx` 於下載時動態生成,不落檔(入口在「結案檔案」那一區);這兩支由 session 認社團,行政端讀別社時走 `/admin/activities/{id}/…` 的同名端點
-- **社團活動申請表 PDF**(`GET …/activities/{id}/apply-pdf`)版面沿用舊系統的 LaTeX 版(`legacy/ClubManagementSystem/Club/GeneratePDF/activity_apply.tex`):12 欄基準格線、各列以跨欄組出欄位,結構與欄位順序不得更動。**不等結案**,草稿階段就產得出來;「初核 / 複核 / 決行」取 `approval_records` 的核准者姓名(依簽核順序),「意見回饋」取承辦人第一關認定的 `fund_source`
+- **社團活動申請表 PDF**(`GET …/activities/{id}/apply-pdf`)版面沿用舊系統的 LaTeX 版(`legacy/ClubManagementSystem/Club/GeneratePDF/activity_apply.tex`):12 欄基準格線、各列以跨欄組出欄位,結構與欄位順序不得更動。**不等結案**,草稿階段就產得出來;字型用**標楷體**(`app/assets/edukai-5.1_20251208.ttf`,教育部標準楷書),它收不到的字(中點「・」、拉丁重音字母)逐段回退 Noto Sans TC,不讓整格變豆腐。「初核 / 複核 / 決行」**依關卡取**(`APPLY_STAGES`,同一關多次核准取最後一次)—— 退回重送後承辦人會再核一次,依序排會把第二次的承辦人印在「複核」。「意見回饋」= 承辦人第一關認定的 `fund_source`(沒申請經費時為空)+ 固定的結報提醒,提醒一律都在
 - 每列有隱形的鍵盤入口按鈕,不是只綁 `onClick`

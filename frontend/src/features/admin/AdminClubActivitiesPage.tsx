@@ -144,7 +144,7 @@ export default function AdminClubActivitiesPage() {
                   </span>
                 </th>
                 <th scope="col">{sortHeader('日期', 'date')}</th>
-                <th scope="col" className="r">{sortHeader('經費（自籌/擬請）', 'budget')}</th>
+                <th scope="col" className="r">{sortHeader('自籌 / 擬請', 'budget')}</th>
                 <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     {sortHeader('狀態', 'status')}

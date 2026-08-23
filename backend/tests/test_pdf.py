@@ -100,6 +100,22 @@ async def test_pdf_scoped_to_own_club(client, db):
     assert resp.status_code == 404
 
 
+async def test_admin_can_download_the_same_two_pdfs(client, db):
+    """行政端唯讀檢視的結案檔案:社團端那兩支綁 club_id,承辦要有自己的入口。"""
+    aid = await _closed_activity(client, db)
+    await make_user(db, username="viewer", role="admin", permissions=["aactivity"])
+    await login(client, "viewer")
+    for path in ("report-pdf", "reflections-pdf"):
+        resp = await client.get(f"/api/v1/admin/activities/{aid}/{path}")
+        assert resp.status_code == 200, resp.text
+        assert resp.content.startswith(b"%PDF")
+
+    # 沒有活動視野的管理員一樣進不來(路由的 Reviewer 閘門)
+    await make_user(db, username="stranger", role="admin", permissions=["aviol"])
+    await login(client, "stranger")
+    assert (await client.get(f"/api/v1/admin/activities/{aid}/report-pdf")).status_code == 403
+
+
 def test_reflections_pdf_stays_linear_at_the_legal_maximum():
     """100 篇 × 5000 字是 schema 容許的上限。
 

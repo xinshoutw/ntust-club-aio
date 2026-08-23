@@ -8,7 +8,9 @@
 
 import io
 from pathlib import Path
+from urllib.parse import quote
 
+from fastapi import Response
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
@@ -143,3 +145,12 @@ def reflections_pdf(
         extra.append(Spacer(1, 3 * mm))
         extra.append(_para(f"參與同學姓名/系級:{r.student_name} / {r.dept}\n{r.body}"))
     return _build(f"國立台灣科技大學{year}學年第{sem}學期 社團活動學習心得", rows, extra)
+
+
+def pdf_response(content: bytes, filename: str) -> Response:
+    """inline PDF 回應;社團端與行政端下載共用一份(檔名一律 RFC 5987 編碼)。"""
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename*=UTF-8''{quote(filename)}"},
+    )

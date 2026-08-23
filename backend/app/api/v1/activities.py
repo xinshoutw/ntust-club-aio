@@ -9,7 +9,6 @@ approved →(活動結束後)close → closing_pending_advisor → closed;退回
 
 from datetime import UTC, datetime, time
 from typing import Annotated
-from urllib.parse import quote
 
 import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Query, Request, Response, UploadFile
@@ -519,15 +518,6 @@ async def delete_attachment(
     return ApiResponse()
 
 
-def _pdf_response(content: bytes, filename: str) -> Response:
-    quoted = quote(filename)
-    return Response(
-        content=content,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"inline; filename*=UTF-8''{quoted}"},
-    )
-
-
 async def _closed_activity_with_report(db, user, activity_id: int) -> Activity:
     activity = await svc.get_own_activity(db, user, activity_id, with_detail=True)
     if activity.report is None:
@@ -542,7 +532,7 @@ async def download_report_pdf(activity_id: int, user: ClubUser, db: DbDep) -> Re
     club = await _club_of(db, user)
     # reportlab 為同步 CPU 工作,丟 threadpool 避免卡住 event loop
     content = await run_in_threadpool(pdf.report_pdf, club, activity, activity.report)
-    return _pdf_response(content, f"{club.name}_{activity.name}_成果報告表.pdf")
+    return pdf.pdf_response(content, f"{club.name}_{activity.name}_成果報告表.pdf")
 
 
 @router.get("/{activity_id}/reflections-pdf")
@@ -553,7 +543,7 @@ async def download_reflections_pdf(activity_id: int, user: ClubUser, db: DbDep) 
     content = await run_in_threadpool(
         pdf.reflections_pdf, club, activity, activity.report.reflections
     )
-    return _pdf_response(content, f"{club.name}_{activity.name}_學習心得.pdf")
+    return pdf.pdf_response(content, f"{club.name}_{activity.name}_學習心得.pdf")
 
 
 @router.post("/{activity_id}/close")

@@ -45,7 +45,10 @@ from app.models.enums import (
 TAIPEI = ZoneInfo("Asia/Taipei")
 PERIOD_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "A", "B", "C", "D"]
 
-# 舊 Classroom.id → 新場地名稱(seed 19 處);一舍 B2 一律拆成 樓梯+白板 兩筆
+# 舊 Classroom.id → 新場地名稱(seed 19 處)。
+# 一舍 B2 在 2026-08-24 那份 dump 之前是**一間**(id 22「一舍 B2」),當時一律拆成
+# 樓梯+白板 兩筆;舊系統後來自己拆成 22 白板側 / 23 樓梯側,改回一對一 ——
+# 兩邊都分得出來還複製一份,等於在樓梯側憑空多出 734 筆歷史借用
 VENUE_MAP: dict[int, list[str]] = {
     1: ["S301"],
     2: ["S302/S303"],
@@ -64,7 +67,8 @@ VENUE_MAP: dict[int, list[str]] = {
     18: ["S209"],
     19: ["S207"],
     20: ["T4 舞蹈區"],
-    22: ["一宿 B2 樓梯", "一宿 B2 白板"],
+    22: ["一宿 B2 白板"],
+    23: ["一宿 B2 樓梯"],
 }
 # 新版已無的舊場地:建 is_active=false 承接歷史申請(名稱沿用舊系統)
 LEGACY_VENUES: dict[int, tuple[str, VenueCategory]] = {

@@ -27,6 +27,11 @@ import { useAdminClub } from './clubContext'
 // 排序鍵=後端 /admin/activities 白名單中社團端也有的那幾個(budget=自籌+擬請合計)
 type SortKey = 'name' | 'type' | 'date' | 'budget' | 'status'
 
+// 類型漏斗**不能照抄社團端的兩個選項**:社團端篩的是 Activity.type(「活動」含大型),
+// 行政端的「活動」是 EVENT 且非大型、大型另成一項。只放兩個的話,承辦選「活動」
+// 會讓該社的大型活動整批消失,而列上還畫著大型徽章
+const TYPE_OPTIONS = ['社課或會議', '活動', '大型活動']
+
 // 社團端活動列表的行政唯讀版:同一張表、同一個詳情彈窗(features/activities/ActivityPreviewModal),
 // 差別只有三處 —— 沒有動作欄、沒有草稿區(草稿不進行政視野)、詳情沒有編輯/結案按鈕。
 // 資料走 /admin/activities?club_id=,經社團端的對照轉成同一組型別。
@@ -131,7 +136,7 @@ export default function AdminClubActivitiesPage() {
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     {sortHeader('類型', 'type')}
                     <FilterButton
-                      options={['社課或會議', '活動']}
+                      options={TYPE_OPTIONS}
                       selected={typeFilter}
                       onChange={(next) => { setTypeFilter(next); setPage(1) }}
                       label="篩選類型"
@@ -139,7 +144,7 @@ export default function AdminClubActivitiesPage() {
                   </span>
                 </th>
                 <th scope="col">{sortHeader('日期', 'date')}</th>
-                <th scope="col" className="r">{sortHeader('經費(自籌/擬請)', 'budget')}</th>
+                <th scope="col" className="r">{sortHeader('經費（自籌/擬請）', 'budget')}</th>
                 <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
                     {sortHeader('狀態', 'status')}

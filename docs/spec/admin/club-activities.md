@@ -30,10 +30,12 @@
 
 ## 規則
 
-- **看不到草稿**:草稿不進行政視野(`/admin/activities` 一律 `status != draft`),所以社團端那張「草稿卡」在這頁不存在。社團還沒送出的東西,承辦看不到
+- **看不到草稿**:草稿不進行政視野 —— 清單、詳情與 PDF 三支都擋(`_require_visible`),所以社團端那張「草稿卡」在這頁不存在。社團還沒送出的東西,承辦看不到
+- **類型漏斗是三個標籤,不是社團端的兩個**:社團端篩的是 `Activity.type`(「活動」含大型),行政端的「活動」是 EVENT 且非大型、「大型活動」另成一項(`_large_condition`)。照抄兩個選項的話,選「活動」會讓該社的大型活動整批消失,而列上還畫著大型徽章
 - 學期下拉 = 該社**有活動**的學期 ∪ 當前學期(`lib/semester.semesterOptions`);查詢失敗時只是歷史學期全不見、畫面看不出異常,故下拉旁顯示 `OptionsError`
 - 換社團同時重設頁碼與學期(回到當前學期)—— 上一社選的學期在新社可能一筆都沒有,留著就是沒有任何說明的空白
 - `clubId` 為 `null` 有兩種原因:還沒選,或社團選項載不到。後者不能叫人「請先選擇社團」,那是做不到的指示
 - 狀態、排序的判定與社團端**同一份**:顯示狀態(含推導的 `locked`)走 `activity_service.display_status_filter`,經費與狀態排序走 `BUDGET_TOTAL_SQL` / `STATUS_ORDER_SQL`。同一個欄名在兩頁點下去要排出同一個順序
 - **結案 PDF 走行政端那兩支**:社團端的 `/club/activities/{id}/report-pdf` 由 session 認社團,承辦讀別社會 404。彈窗以 `pdfBase="admin"` 切換
+- 排序鍵 `budget` 走相關子查詢(與社團端同一份)。本頁一律帶 `club_id`,過濾集是單一社團單一學期,成本可接受;`/admin/activities` 不帶社團時排這個鍵會對整個過濾集逐列求值,那頁因此不開這顆鈕
 - 附件與結案照片的下載權限由 `permissions.FILE_SUBJECT_KEYS["activity"]` 涵蓋 `aclubact`(看得到那一頁 = 下載得了那一頁的檔案,decisions.md D-02)

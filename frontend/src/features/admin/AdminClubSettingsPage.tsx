@@ -6,7 +6,12 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { suspendedNow } from '../../lib/status'
 import { useUnsavedGuard } from '../../app/unsaved'
-import { useAdminClubDetail, useAdminClubMutations, type AdminClubDetail } from '../../api/adminClubs'
+import {
+  CLUB_ATTRIBUTES,
+  useAdminClubDetail,
+  useAdminClubMutations,
+  type AdminClubDetail,
+} from '../../api/adminClubs'
 import ClubSelect from './ClubSelect'
 import OneTimePasswordModal from './OneTimePasswordModal'
 import { useAdminClub } from './clubContext'
@@ -16,6 +21,7 @@ const label: React.CSSProperties = { color: 'var(--steel)' }
 interface FormState {
   name: string
   kind: string // 社團/學會;名稱結尾可推導時自動同步,推導不到時手動指定
+  attribute: string // 社團性質;沒有性質的社團不會出現在社團漏斗,選錯了要改得回來
   account: string
   active: boolean
 }
@@ -57,6 +63,7 @@ export default function AdminClubSettingsPage() {
     !!saved &&
     (form.name !== saved.name ||
       form.kind !== saved.kind ||
+      form.attribute !== saved.attribute ||
       form.account !== saved.account ||
       form.active !== saved.active)
   // 未儲存離開警告:側欄/頂欄導航由 shell 攔截,關閉分頁由 beforeunload 攔截
@@ -94,6 +101,8 @@ export default function AdminClubSettingsPage() {
       const base = {
         name: detail.name,
         kind: detail.kind,
+        // 停社遷入舊社的性質不可考(null):空字串=沒填,選了才送出去
+        attribute: detail.attribute ?? '',
         account: detail.username ?? '',
         active: detail.isActive,
       }
@@ -117,6 +126,7 @@ export default function AdminClubSettingsPage() {
           // 僅送有變更的欄位(undefined 不會進 JSON body)
           name: name !== saved.name ? name : undefined,
           kind: form.kind !== saved.kind ? form.kind : undefined,
+          attribute: form.attribute !== saved.attribute ? form.attribute : undefined,
           username: form.account.trim() !== saved.account ? form.account.trim() : undefined,
           isActive: form.active !== saved.active ? form.active : undefined,
         },
@@ -125,6 +135,7 @@ export default function AdminClubSettingsPage() {
             const base = {
               name: res.name,
               kind: res.kind,
+              attribute: res.attribute ?? '',
               account: res.username ?? '',
               active: res.isActive,
             }
@@ -252,6 +263,18 @@ export default function AdminClubSettingsPage() {
                   ]}
                   disabled={deriveKind(form.name.trim()) != null}
                   onChange={(v) => setForm({ ...form, kind: v })}
+                />
+              </div>
+              <div className={form.attribute !== saved.attribute ? 'field-dirty' : undefined}>
+                <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>性質</div>
+                {/* 沒有性質的社團不會出現在社團漏斗;既有的空值(停社遷入舊社)不強迫補,
+                    但選了就不給再清成空白 */}
+                <Select
+                  value={form.attribute || undefined}
+                  style={{ width: 140 }}
+                  placeholder="未分類"
+                  options={CLUB_ATTRIBUTES.map((a) => ({ value: a, label: a }))}
+                  onChange={(v) => setForm({ ...form, attribute: v })}
                 />
               </div>
               <div className={form.account !== saved.account ? 'field-dirty' : undefined}>

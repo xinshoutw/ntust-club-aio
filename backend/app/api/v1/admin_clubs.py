@@ -214,6 +214,11 @@ async def update_club(
         changes.append(f"kind:{club.kind.value}→{fields['kind'].value}")
         club.kind = fields["kind"]
 
+    if "attribute" in fields and fields["attribute"] != club.attribute:
+        before = club.attribute.value if club.attribute else "—"
+        changes.append(f"attribute:{before}→{fields['attribute'].value}")
+        club.attribute = fields["attribute"]
+
     if "en_name" in fields and fields["en_name"] != club.en_name:
         changes.append("en_name")
         club.en_name = fields["en_name"]

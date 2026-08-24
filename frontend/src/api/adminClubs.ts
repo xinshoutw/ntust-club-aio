@@ -264,6 +264,7 @@ export interface AdminClubPatch {
   id: number
   name?: string
   kind?: string // 社團/學會;改名推導不到時手動指定
+  attribute?: string // 社團性質;建檔時必填,選錯了要改得回來
   enName?: string
   username?: string
   isActive?: boolean
@@ -273,11 +274,11 @@ export function useAdminClubMutations() {
   const qc = useQueryClient()
   const invalidate = () => void qc.invalidateQueries({ queryKey: adminClubKeys.all })
   const update = useMutation({
-    mutationFn: ({ id, name, kind, enName, username, isActive }: AdminClubPatch) =>
+    mutationFn: ({ id, name, kind, attribute, enName, username, isActive }: AdminClubPatch) =>
       api<AdminClubDetailOut>(`/admin/clubs/${id}`, {
         method: 'PATCH',
         // JSON.stringify 會略過 undefined 欄位 → 未變更欄位不送(後端 exclude_unset)
-        body: JSON.stringify({ name, kind, en_name: enName, username, is_active: isActive }),
+        body: JSON.stringify({ name, kind, attribute, en_name: enName, username, is_active: isActive }),
       }).then(toDetail),
     onSuccess: invalidate,
   })

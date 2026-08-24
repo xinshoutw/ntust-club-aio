@@ -115,6 +115,30 @@ async def test_create_club(client, db):
     assert len(audits) == 2
 
 
+async def test_patch_attribute(client, db):
+    """性質改得動:建檔時必填,選錯了不必動 DB;既有的 null 不強迫補值。"""
+    club, _, _ = await seed(client, db)
+
+    resp = await client.patch(
+        f"{URL}/{club.id}", json={"attribute": "體育性"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["attribute"] == "體育性"
+
+    # 不送 attribute 的 PATCH 不得把既有值清掉(exclude_unset)
+    resp = await client.patch(
+        f"{URL}/{club.id}", json={"name": club.name}, headers=csrf_headers(client)
+    )
+    assert resp.json()["data"]["attribute"] == "體育性"
+
+    audits = (
+        await db.scalars(
+            sa.select(AuditLog).where(AuditLog.action == "club_updated")
+        )
+    ).all()
+    assert any("attribute:" in (a.detail or "") for a in audits)
+
+
 async def test_club_options_open_to_any_admin(client, db):
     """最小選項端點:非 amember 的管理員也可讀,但只回 id/name/attribute。"""
     club, _, _ = await seed(client, db)

@@ -296,7 +296,7 @@ class AdminClubCreate(BaseModel):
 
 
 class AdminClubUpdate(BaseModel):
-    """行政可改:社團名稱 / 社團或學會 / 英文名 / 帳號 username / 啟停用。
+    """行政可改:社團名稱 / 社團或學會 / 性質 / 英文名 / 帳號 username / 啟停用。
 
     改名時結尾「社」→社團、「會」→學會自動推導 kind;推導不到時沿用原值,
     可另帶 kind 手動指定(2026-07-21,取代原「名稱強制社/會結尾」規則)。
@@ -304,6 +304,9 @@ class AdminClubUpdate(BaseModel):
 
     name: str | None = Field(None, min_length=1, max_length=100)
     kind: ClubKind | None = None
+    # 建檔時必填(AdminClubCreate),之後改得動:選錯性質的社團會整個從社團漏斗消失,
+    # 沒有這條就只剩下手動改 DB 一途。既有的 null(停社遷入舊社)不因此被迫補值
+    attribute: ClubAttribute | None = None
     en_name: str | None = Field(None, max_length=200)
     username: str | None = None
     is_active: bool | None = None

@@ -89,7 +89,7 @@ export default function ActivityClosePage() {
             value={activity?.id}
             onChange={(id) => setParams({ id: String(id) }, { replace: true })}
             loading={approvedQuery.isPending}
-            options={closable.map((a) => ({ value: a.id, label: `${a.name}(${dateRangeText(a)})` }))}
+            options={closable.map((a) => ({ value: a.id, label: `${a.name} (${dateRangeText(a)})` }))}
             notFoundContent={notFoundText(approvedQuery, '無可結案的活動', '活動清單')}
           />
         }
@@ -776,10 +776,6 @@ function CloseForm({
                   {fmtMB(existing.reduce((s, f) => s + f.size, 0) + photos.reduce((s, p) => s + p.file.size, 0))}/
                   {Math.round(closePhotoBytes / 1024 / 1024)} MB
                 </span>
-              </div>
-              {/* 照片只在送出時才上傳(:448):不講的話中途離開會以為草稿存住了 */}
-              <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 6 }}>
-                送出結案時才上傳,不隨草稿保存
               </div>
             </div>
             <div className="form-grid-2" style={{ marginTop: 12 }}>

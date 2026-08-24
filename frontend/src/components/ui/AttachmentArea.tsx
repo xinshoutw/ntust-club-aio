@@ -84,7 +84,7 @@ export default function AttachmentArea({
         }
         commit([...valueRef.current, { key: `bag${++bagSeq}`, file: f, hash }])
       } catch (e) {
-        message.error(`檔案處理失敗:${e instanceof Error ? e.message : String(e)}`)
+        message.error(`檔案處理失敗：${e instanceof Error ? e.message : String(e)}`)
       }
     })
   }
@@ -115,7 +115,7 @@ export default function AttachmentArea({
           已使用{' '}
           <span className="num">
             {fmtMB(totalBytes)}
-            {maxTotalBytes != null ? `/${Math.round(maxTotalBytes / 1024 / 1024)}` : ''}
+            {maxTotalBytes != null ? ` / ${Math.round(maxTotalBytes / 1024 / 1024)}` : ''}
           </span>{' '}
           MB
         </p>

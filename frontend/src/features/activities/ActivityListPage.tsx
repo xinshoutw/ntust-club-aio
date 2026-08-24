@@ -158,7 +158,13 @@ export default function ActivityListPage() {
       <td className="r num" style={{ fontSize: 13 }}>
         <MoneyPair left={fmtMoney(a.selfFundTotal)} right={approvedText(a.approvedTotal, fmtMoney)} />
       </td>
-      <td className="r" style={{ whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>{actions}</td>
+      <td
+        className="r"
+        style={{ whiteSpace: 'nowrap', paddingLeft: 0 }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {actions}
+      </td>
     </tr>
   )
 
@@ -204,7 +210,7 @@ export default function ActivityListPage() {
               草稿 <span className="num" style={{ fontSize: 12, background: '#EEF0F3', color: 'var(--steel)', borderRadius: 999, padding: '1px 8px' }}>{drafts.length}</span>
             </div>
             <table className="tb fixed" style={{ minWidth: 820 }} aria-label="草稿活動">
-              <Cols widths={[110, 'auto', 120, 180, 190, 140]} />
+              <Cols widths={[110, 'auto', 120, 180, 190, 124]} />
               <thead>
                 <tr>
                   <th scope="col">狀態</th>
@@ -214,7 +220,7 @@ export default function ActivityListPage() {
                   <th scope="col" className="r num">
                     <MoneyPair left="自籌" right="核定" />
                   </th>
-                  <th scope="col" className="r">動作</th>
+                  <th scope="col" className="r" style={{ paddingLeft: 0 }}>動作</th>
                 </tr>
               </thead>
               <tbody>
@@ -266,7 +272,7 @@ export default function ActivityListPage() {
             aria-busy={listQuery.isPlaceholderData}
             style={{ minWidth: 820, opacity: listQuery.isPlaceholderData ? 0.55 : 1 }}
           >
-            <Cols widths={[110, 'auto', 120, 180, 190, 100]} />
+            <Cols widths={[110, 'auto', 120, 180, 190, 104]} />
             <thead>
               <tr>
                 <th scope="col">
@@ -298,7 +304,7 @@ export default function ActivityListPage() {
                 <th scope="col" className="r num">
                   <MoneyPair left="自籌" right="核定" />
                 </th>
-                <th scope="col" className="r">動作</th>
+                <th scope="col" className="r" style={{ paddingLeft: 0 }}>動作</th>
               </tr>
             </thead>
             <tbody>

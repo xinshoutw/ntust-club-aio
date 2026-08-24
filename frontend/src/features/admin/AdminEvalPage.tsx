@@ -97,9 +97,8 @@ export default function AdminEvalPage() {
         sub={detail && <>{detail.year} 年社團競賽</>}
         extra={
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {/* 這支端點對停用社團一律 404(選了整頁會換成錯誤畫面),下拉因此只列啟用中社團 ——
-                「未分類」那疊全是停社舊社,會一併消失 */}
-            <ClubSelect width={190} activeOnly />
+            {/* 這支端點對停用社團一律 404(選了整頁會換成錯誤畫面);全站選擇器都只列啟用中社團 */}
+            <ClubSelect width={190} />
             <div style={{ textAlign: 'right', height: 40, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <div style={{ fontSize: 12, color: 'var(--steel)', lineHeight: 1.1 }}>採用總分</div>
               <div style={{ lineHeight: 1.1 }}>

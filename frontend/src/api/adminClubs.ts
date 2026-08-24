@@ -152,20 +152,21 @@ export function groupClubsByFolder(
   }))
 }
 
-/** 篩選漏斗用的資料夾:略過沒有性質的社團。
+/** 選單用的資料夾:只列啟用中社團。
  *
- * 正式資料裡那 67 個 attribute 為 null 的全是**停社且零活動**的遷移舊社,
- * 為它們立一個「未分類」資料夾只是雜訊。用這一版的只有兩個社團漏斗:活動申請審核、所有活動。
+ * 全站的社團選擇器(ClubCascader 的每一頁、兩個社團漏斗、工讀生的違規勸導填寫)一律走這一版 ——
+ * 停用社團在任何一個「要選一個社團來做事」的地方都不該是選項。
  *
- * **`ClubCascader` 不共用這一版**:社團總覽/成員列表/管理項目要查得到停社社團的名單與
- * 歷史;行政分審核篩的則是 `is_active`(`activeOnly`)—— 那頁的界線是「端點收不收」,
- * 與「有沒有性質」不是同一條。
- * 代價:沒填性質的社團不會出現在漏斗裡 —— `POST /admin/clubs` 的性質是必填欄,
- * 但遷移匯入(`migration/cms_import.py`)遇到認不得的性質會留 null 且 is_active=true。
+ * **判的是 `is_active`,不是「有沒有性質」**:正式資料裡 67 個 attribute 為 null 的確實全是停社
+ * 舊社,但反過來不成立(有性質卻停用的也有),而遷移匯入認不得性質時會留下啟用中卻沒有性質的社團 ——
+ * 那些是還在跑的社團,不該藏。
+ *
+ * 收掉的只是**選項**:已經選中的社團(跨頁帶著舊選擇過來、或用名稱對回 id)仍照常顯示與查詢,
+ * 否則社團總覽/成員列表打開會是一個空的選擇器與一頁空白。
  */
-export const groupClubsForFilter = (
+export const groupActiveClubs = (
   clubs: readonly ClubOption[],
-): { label: string; options: string[] }[] => groupClubsByFolder(clubs.filter((c) => c.attribute))
+): { label: string; options: string[] }[] => groupClubsByFolder(clubs.filter((c) => c.isActive))
 
 interface ClubOptionOut {
   id: number

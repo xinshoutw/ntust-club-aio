@@ -13,7 +13,7 @@ interface FormValues {
   other?: string
 }
 
-// 違規勸導填寫:社團與違規項目目錄來自後端(停用社團也列出,歷史違規對象可能已停社);
+// 違規勸導填寫:社團與違規項目目錄來自後端(只列啟用中社團,與行政端選擇器同一條規則);
 // 填寫人=登入工讀生(後端取 session),發生日不可未來
 export default function PtViolationFormPage() {
   const { message } = App.useApp()
@@ -71,10 +71,9 @@ export default function PtViolationFormPage() {
                 showSearch
                 placeholder="選擇社團"
                 optionFilterProp="label"
-                options={(clubsQuery.data ?? []).map((c) => ({
-                  value: c.id,
-                  label: c.isActive ? c.name : `${c.name}(已停用)`,
-                }))}
+                options={(clubsQuery.data ?? [])
+                  .filter((c) => c.isActive)
+                  .map((c) => ({ value: c.id, label: c.name }))}
               />
             </Form.Item>
             <Form.Item name="date" label="發生日期" rules={[{ required: true, message: '請選擇日期' }]}>

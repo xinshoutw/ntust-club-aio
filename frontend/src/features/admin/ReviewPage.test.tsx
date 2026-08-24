@@ -11,7 +11,7 @@ vi.mock('../../app/auth', () => ({
 vi.mock('../../api/adminClubs', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/adminClubs')>()),
   useClubOptions: () => ({
-    data: [{ id: 7, name: '吉他社', kind: '社團', attribute: '藝術' }],
+    data: [{ id: 7, name: '吉他社', kind: '社團', attribute: '藝術', isActive: true }],
     isError: false,
   }),
 }))

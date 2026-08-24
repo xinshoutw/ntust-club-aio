@@ -20,7 +20,7 @@ import {
   useAdminActivityMutations,
   type AdminActivity,
 } from '../../api/adminActivities'
-import { groupClubsForFilter, useClubOptions } from '../../api/adminClubs'
+import { groupActiveClubs, useClubOptions } from '../../api/adminClubs'
 import ActivityReviewModal from './ActivityReviewModal'
 import { clickableProps } from '../../lib/clickable'
 
@@ -83,7 +83,7 @@ export default function ReviewPage() {
     [user],
   )
   const clubsQuery = useClubOptions()
-  const clubFolders = groupClubsForFilter(clubsQuery.data ?? [])
+  const clubFolders = groupActiveClubs(clubsQuery.data ?? [])
   const statusOptions = [...new Set(othersStatuses.map((st) => STATUS[st].label))]
 
   const clubIdMatches = clubFilter.length

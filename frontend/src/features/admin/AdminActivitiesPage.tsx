@@ -25,7 +25,7 @@ import {
   useAdminClubActivityDetail,
   type AdminActivity,
 } from '../../api/adminActivities'
-import { groupClubsForFilter, useClubOptions } from '../../api/adminClubs'
+import { groupActiveClubs, useClubOptions } from '../../api/adminClubs'
 import ActivityReviewModal from './ActivityReviewModal'
 
 
@@ -66,7 +66,7 @@ export default function AdminActivitiesPage() {
 
   // 有選社團但主檔未載入/名稱失效 → 強制空集,不可 fail-open 回全部(同申請審核頁)
   const clubsQuery = useClubOptions()
-  const clubFolders = groupClubsForFilter(clubsQuery.data ?? [])
+  const clubFolders = groupActiveClubs(clubsQuery.data ?? [])
   const clubIdMatches = clubFilter.length
     ? (clubsQuery.data ?? []).filter((c) => clubFilter.includes(c.name)).map((c) => c.id)
     : undefined

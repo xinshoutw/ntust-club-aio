@@ -194,7 +194,7 @@ export interface ApprovalOut {
   reason: string | null
   created_at: string
   subject_type: string // activity / activity_close
-  actor_name: string
+  actor_name: string | null // 僅行政端詳情帶;社團端一律 null(不是空白姓名)
 }
 
 interface AdminActivityDetailOut extends AdminActivityOut {
@@ -266,7 +266,7 @@ export const dropAutoUnlock = (rows: readonly ApprovalOut[]): ApprovalOut[] =>
   })
 
 const toApproval = (a: ApprovalOut): ReviewApproval => ({
-  actor: a.actor_name,
+  actor: a.actor_name ?? '—',
   at: slashDateTime(a.created_at),
   decision: a.decision as ReviewApproval['decision'],
   isClose: a.subject_type === 'activity_close',

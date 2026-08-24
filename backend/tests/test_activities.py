@@ -346,7 +346,7 @@ async def test_club_detail_never_carries_the_approver_name(client, db):
     assert resp.status_code == 200, resp.text
     approvals = resp.json()["data"]["approvals"]
     assert len(approvals) == 1
-    assert approvals[0]["actor_name"] == ""
+    assert approvals[0]["actor_name"] is None  # None=這一端不提供,不是「姓名是空白」
     assert "承辦人張三" not in resp.text
     assert club.id == activity["club_id"]
 

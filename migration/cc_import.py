@@ -393,7 +393,11 @@ async def import_rejections(
         created += 1
 
     for r in applies:
+        # SQL 的 > '' 濾不掉純空白(MySQL utf8mb4_0900_ai_ci 是 NO PAD),
+        # strip 後仍是空的就跳過 —— 補一列空理由等於把空白換個講法
         reason = (r["reason"] or "").strip()
+        if not reason:
+            continue
         ts = epoch_dt(r["updated_at"])  # 舊系統沒有審核時刻,最後更新時間是最接近的
         # 一舍 B2 拆成兩筆借用時,兩筆各自要有自己的退件紀錄(與 import_applies 同一套鍵)
         for seq in range(len(venue_ids.get(r["classroom_id"], []))):
@@ -408,6 +412,8 @@ async def import_rejections(
 
     for head in headers:
         reason = (head["reason"] or "").strip()
+        if not reason:
+            continue
         ts = epoch_dt(head["updated_at"])
         # 一張申請單含多項器材,新系統一項一列借用,理由逐列複製
         for log_id in logs_by_header.get(head["id"], []):

@@ -211,12 +211,12 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
                 <Input placeholder="02-12345678" />
               </Form.Item>
             </div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--steel)', margin: '16px 0 8px' }}>校外(選填)</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--steel)', margin: '16px 0 8px' }}>校外（選填）</div>
             <div className="form-grid-2">
               <Form.Item name="advisorOutName" label="姓名" className={itemClass('advisorOutName')} style={{ marginBottom: 0 }}>
                 <Input />
               </Form.Item>
-              <Form.Item name="advisorOutDept" label="單位/職稱" className={itemClass('advisorOutDept')} style={{ marginBottom: 0 }}>
+              <Form.Item name="advisorOutDept" label="單位 / 職稱" className={itemClass('advisorOutDept')} style={{ marginBottom: 0 }}>
                 <Input />
               </Form.Item>
               <Form.Item

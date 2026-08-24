@@ -209,8 +209,8 @@ export default function ActivityListPage() {
             <div style={{ fontSize: 15, fontWeight: 600, padding: '14px 20px 6px' }}>
               草稿 <span className="num" style={{ fontSize: 12, background: '#EEF0F3', color: 'var(--steel)', borderRadius: 999, padding: '1px 8px' }}>{drafts.length}</span>
             </div>
-            <table className="tb fixed" style={{ minWidth: 820 }} aria-label="草稿活動">
-              <Cols widths={[110, 'auto', 120, 180, 190, 124]} />
+            <table className="tb fixed" style={{ minWidth: 830 }} aria-label="草稿活動">
+              <Cols widths={[110, 'auto', 120, 190, 190, 124]} />
               <thead>
                 <tr>
                   <th scope="col">狀態</th>
@@ -270,9 +270,9 @@ export default function ActivityListPage() {
             className="tb fixed"
             aria-label="活動列表"
             aria-busy={listQuery.isPlaceholderData}
-            style={{ minWidth: 820, opacity: listQuery.isPlaceholderData ? 0.55 : 1 }}
+            style={{ minWidth: 830, opacity: listQuery.isPlaceholderData ? 0.55 : 1 }}
           >
-            <Cols widths={[110, 'auto', 120, 180, 190, 104]} />
+            <Cols widths={[110, 'auto', 120, 190, 190, 104]} />
             <thead>
               <tr>
                 <th scope="col">

@@ -145,9 +145,9 @@ export default function AdminClubActivitiesPage() {
             className="tb fixed"
             aria-label="活動列表"
             aria-busy={listQuery.isPlaceholderData}
-            style={{ minWidth: 800, opacity: listQuery.isPlaceholderData ? 0.55 : 1 }}
+            style={{ minWidth: 810, opacity: listQuery.isPlaceholderData ? 0.55 : 1 }}
           >
-            <Cols widths={[110, 'auto', 120, 180, 190]} />
+            <Cols widths={[110, 'auto', 120, 190, 190]} />
             <thead>
               <tr>
                 <th scope="col">

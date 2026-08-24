@@ -704,9 +704,10 @@ export default function AccountsPage() {
               options={CLUB_ATTRIBUTES.map((a) => ({ value: a, label: a }))}
             />
           </div>
-          <Tooltip title="社團或學會由名稱結尾自動判定，可於「管理項目」修改">
-            <span style={{ fontSize: 12, color: 'var(--steel)' }}>建立後於列上「建立帳號」開通登入</span>
-          </Tooltip>
+          <div style={{ fontSize: 12, color: 'var(--steel)', lineHeight: 1.8 }}>
+            <div>建立後於列上「建立帳號」開通登入</div>
+            <div>社團或學會由名稱結尾自動判定，可於「管理項目」修改</div>
+          </div>
         </div>
       </Modal>
 

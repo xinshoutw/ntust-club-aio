@@ -5,6 +5,7 @@ import OptionsError from '../../components/ui/OptionsError'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
+import MoneyPair from '../../components/ui/MoneyPair'
 import LargeBadge from '../../components/ui/LargeBadge'
 import { RightOutlined } from '@ant-design/icons'
 import { Cols, FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
@@ -31,27 +32,6 @@ import ActivityReviewModal from './ActivityReviewModal'
 // 排序鍵=後端 /admin/activities 白名單。經費欄顯示「自籌 / 核定」但排序鍵 budget 是
 // 「自籌 + 擬請」合計,兩者不是同一件事 —— 該欄因此不給排序,不做名實不符的指示器
 type SortKey = 'club' | 'name' | 'date' | 'status' | 'created_at' | 'reviewed_at'
-
-// 金額欄:兩個數字各自靠右佔一個固定寬的盒子,中間夾一個固定寬的斜線 ——
-// 表頭與內容才對得起來(`.tb.dense` 的 th 是 12px、td 是 13px,`ch` 在兩邊不等寬,
-// 只能用 px)。68px 放得下 `$999,999`;用 minWidth 讓破六位數的自己撐開
-const MONEY_BOX: React.CSSProperties = { display: 'inline-block', minWidth: 68, textAlign: 'right' }
-const MONEY_SEP: React.CSSProperties = {
-  display: 'inline-block',
-  width: 14,
-  textAlign: 'center',
-  color: 'var(--steel)',
-}
-
-function MoneyPair({ left, right }: { left: React.ReactNode; right: React.ReactNode }) {
-  return (
-    <>
-      <span style={MONEY_BOX}>{left}</span>
-      <span style={MONEY_SEP}>/</span>
-      <span style={MONEY_BOX}>{right}</span>
-    </>
-  )
-}
 
 // 結案流程中與已結案:這兩種狀態的重點是結案成果(照片、心得、檢討會議),
 // 審核彈窗看不到那些,改開社團端那份完整檢視(唯讀)

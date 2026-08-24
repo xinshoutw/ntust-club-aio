@@ -8,6 +8,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { Cols, FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
 import StatusPill from '../../components/ui/StatusPill'
+import MoneyPair from '../../components/ui/MoneyPair'
 import LargeBadge from '../../components/ui/LargeBadge'
 import { semesterOptions } from '../../lib/semester'
 import { useFilePreview } from '../eval/useFilePreview'
@@ -20,13 +21,14 @@ import {
   useActivitySemesters,
   type ClubActivity,
 } from '../../api/activities'
-import { LISTED_STATUS_LABELS, money, statusesForLabels } from './types'
+import { LISTED_STATUS_LABELS, approvedText, fmtMoney, statusesForLabels } from './types'
 import ActivityPreviewModal from './ActivityPreviewModal'
 import { dateRangeText } from './utils'
 
-// 排序鍵=後端 /club/activities 白名單(budget=自籌+擬請補助合計;同值的 id 降冪
-// tiebreak 由後端固定,前端不必也不能送 id)
-type SortKey = 'name' | 'type' | 'date' | 'budget' | 'status'
+// 排序鍵=後端 /club/activities 白名單(同值的 id 降冪 tiebreak 由後端固定,
+// 前端不必也不能送 id)。白名單裡的 budget 是「自籌+擬請」合計,與經費欄顯示的
+// 「自籌 / 核定」不是同一件事,故不接出去
+type SortKey = 'name' | 'type' | 'date' | 'status'
 
 export default function ActivityListPage() {
   const navigate = useNavigate()
@@ -131,6 +133,7 @@ export default function ActivityListPage() {
 
   const row = (a: ClubActivity, actions: React.ReactNode) => (
     <tr key={a.id} onClick={() => onRowClick(a)} style={{ cursor: 'pointer' }}>
+      <td><StatusPill status={a.status} /></td>
       <td className="cell-clip" style={{ fontWeight: 500 }} title={a.name || undefined}>
         {/* 鍵盤入口:與整列 onClick 同動作;stopPropagation 避免雙觸發 */}
         <button
@@ -149,9 +152,12 @@ export default function ActivityListPage() {
         {a.type}
         <LargeBadge applied={a.isLarge} approved={a.largeApproved} />
       </td>
-      <td className="num" style={{ fontSize: 13 }}>{dateRangeText(a)}</td>
-      <td className="r num" style={{ fontSize: 13 }}>{money(a)}</td>
-      <td><StatusPill status={a.status} /></td>
+      {/* 起訖日折成兩行讀起來像兩筆日期 */}
+      <td className="num" style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{dateRangeText(a)}</td>
+      {/* 核定為 null=承辦還沒核,不是核了 0 元 */}
+      <td className="r num" style={{ fontSize: 13 }}>
+        <MoneyPair left={fmtMoney(a.selfFundTotal)} right={approvedText(a.approvedTotal, fmtMoney)} />
+      </td>
       <td className="r" style={{ whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>{actions}</td>
     </tr>
   )
@@ -198,14 +204,16 @@ export default function ActivityListPage() {
               草稿 <span className="num" style={{ fontSize: 12, background: '#EEF0F3', color: 'var(--steel)', borderRadius: 999, padding: '1px 8px' }}>{drafts.length}</span>
             </div>
             <table className="tb fixed" style={{ minWidth: 820 }} aria-label="草稿活動">
-              <Cols widths={['auto', 120, 180, 160, 110, 140]} />
+              <Cols widths={[110, 'auto', 120, 180, 190, 140]} />
               <thead>
                 <tr>
+                  <th scope="col">狀態</th>
                   <th scope="col">名稱</th>
                   <th scope="col">類型</th>
                   <th scope="col">日期</th>
-                  <th scope="col" className="r">經費(自籌/擬請)</th>
-                  <th scope="col">狀態</th>
+                  <th scope="col" className="r num">
+                    <MoneyPair left="自籌" right="核定" />
+                  </th>
                   <th scope="col" className="r">動作</th>
                 </tr>
               </thead>
@@ -258,9 +266,20 @@ export default function ActivityListPage() {
             aria-busy={listQuery.isPlaceholderData}
             style={{ minWidth: 820, opacity: listQuery.isPlaceholderData ? 0.55 : 1 }}
           >
-            <Cols widths={['auto', 120, 180, 160, 110, 120]} />
+            <Cols widths={[110, 'auto', 120, 180, 190, 100]} />
             <thead>
               <tr>
+                <th scope="col">
+                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                    {sortHeader('狀態', 'status')}
+                    <FilterButton
+                      options={LISTED_STATUS_LABELS}
+                      selected={statusFilter}
+                      onChange={(next) => { setStatusFilter(next); setPage(1) }}
+                      label="篩選狀態"
+                    />
+                  </span>
+                </th>
                 <th scope="col">{sortHeader('名稱', 'name')}</th>
                 <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
@@ -274,17 +293,10 @@ export default function ActivityListPage() {
                   </span>
                 </th>
                 <th scope="col">{sortHeader('日期', 'date')}</th>
-                <th scope="col" className="r">{sortHeader('經費(自籌/擬請)', 'budget')}</th>
-                <th scope="col">
-                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    {sortHeader('狀態', 'status')}
-                    <FilterButton
-                      options={LISTED_STATUS_LABELS}
-                      selected={statusFilter}
-                      onChange={(next) => { setStatusFilter(next); setPage(1) }}
-                      label="篩選狀態"
-                    />
-                  </span>
+                {/* 排序鍵 budget 是「自籌+擬請」合計,與顯示的「自籌 / 核定」不是同一件事 ——
+                    該欄因此不給排序,不做名實不符的指示器(同 /admin/activities) */}
+                <th scope="col" className="r num">
+                  <MoneyPair left="自籌" right="核定" />
                 </th>
                 <th scope="col" className="r">動作</th>
               </tr>

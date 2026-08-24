@@ -330,7 +330,7 @@ export default function AdminFilesPage() {
             }}
             style={{ minWidth: 140 }}
             options={[
-              { value: 'all', label: '全部模組' },
+              { value: 'all', label: '全部' },
               ...otherModules.map((m) => ({ value: m.key as Exclude<ModuleKey, 'repair'>, label: m.label })),
             ]}
           />

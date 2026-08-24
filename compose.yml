@@ -53,8 +53,13 @@ services:
     build: ./frontend
     image: ${WEB_IMAGE:-club-aio-web:local}
     ports:
-      # 上線切換:edge upstream 必須指到 <VM 內網 IP>:${WEB_PORT}(edge 預設打 80,別漏掉埠號)
-      - "${WEB_PORT:-8080}:80"
+      # 內層 nginx 只發布給 edge proxy,不對外。綁 0.0.0.0 等於把它直接曝在網路上:
+      # `set_real_ip_from` 信任所有 RFC1918,任何人都能偽造 X-Real-IP 繞過登入限流、投毒稽核 IP
+      # WEB_BIND 決定誰打得到(edge upstream 必須帶埠號,漏掉會打到 80 而 502):
+      #   同機 Docker 上的 edge(Nginx Proxy Manager)→ 172.17.0.1
+      #   同機宿主上的 edge                          → 127.0.0.1(預設)
+      #   另一台機器上的 edge                        → 本機內網網卡 IP
+      - "${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8080}:80"
     depends_on:
       - backend
     restart: unless-stopped

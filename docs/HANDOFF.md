@@ -100,6 +100,27 @@ uv run python ../migration/text_fields.py --export  # 1,185 列待人工轉錄�
 先前 `SWEEP@12345` 那套不再適用。要換回一次性密碼就重跑遷移,
 或用同一支腳本挑角色/帳號分批設。
 
+## 本機開發庫落後遷移腳本(2026-08-24,刻意不重建)
+
+`club_aio` 這個庫是在 `1ca95a8`～`eb0b273` 那批 `fix(migration)` **之前**建的,
+之後只補跑過 `text_fields --import`。填好的 CSV 匯進去是對的(心得 2,299 篇 / 726 個活動,
+與下方端到端驗證值一致),但**底層資料對不上**:
+
+| | 這個庫 | 端到端驗證值 |
+|---|---|---|
+| `activities.content` 有值 | 1,171 | 1,511 |
+| `activity_reports` | 956 | 961 |
+| `approval_records` 退件列 | 0 | 應有(73ff25b) |
+
+差異全部來自沒套用的遷移修正,不是 CSV 的問題:`content` 少的 340 筆是新版 `cms_import`
+會從舊系統活動描述預帶的;`reports` 少的 5 筆是舊 `status=11`(退回核銷)——
+`(5, 6, 11)` 已修,但 `import_activities` 是 idempotent,重跑不補既有列。
+
+**要拿正確數字就整個重建**(`reset_db` → `cms_import` → `cc_import` → `media_import`
+→ `text_fields --import` → `set_passwords`,約 15 分鐘)。在那之前,這個庫只適合看畫面,
+不適合拿來對數字。CSV 匯入前的 `activities.content` 與 `activity_reports` 三欄快照留在
+`_bak_before_textimport_activities` / `_bak_before_textimport_reports`(重建時一併消失)。
+
 ## MIG-13 人工轉錄:轉錄完成(2026-08-24)
 
 **成品**:`migration/out/activity_texts_2026-08-24_filled.csv`,**924/924 列全填**

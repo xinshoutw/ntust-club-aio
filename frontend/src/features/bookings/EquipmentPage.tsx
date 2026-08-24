@@ -19,7 +19,7 @@ import {
   RECENT_PAGE,
 } from '../../api/bookings'
 import { useApprovedActivities } from '../../api/activities'
-import { useRejectReason } from './RejectReasonModal'
+import { useDecisionReason } from './DecisionReasonModal'
 
 export default function EquipmentPage() {
   const { message, modal } = App.useApp()
@@ -45,7 +45,7 @@ export default function EquipmentPage() {
   const recentQuery = useRecentEquipmentLoans({ page: recentPage, pageSize: RECENT_PAGE })
   const recent = recentQuery.data?.rows ?? []
   const recentTotal = recentQuery.data?.total ?? 0
-  const reject = useRejectReason()
+  const decision = useDecisionReason()
   const { createEquipmentLoan, cancelEquipmentLoan } = useBookingMutations()
   const todayStart = dayjs().startOf('day')
 
@@ -345,8 +345,8 @@ export default function EquipmentPage() {
             </thead>
             <tbody>
               {recent.map((l) => {
-                // 退回件可點開原因(舊資料沒留理由時彈窗會說明);其餘狀態沒有可看的內容
-                const row = reject.rowProps(`${l.equipmentName} ×${l.qty}`, l.status, l.reject)
+                // 退回件與承辦撤銷的取消件可點開原因(舊資料沒留理由時彈窗會說明)
+                const row = decision.rowProps(`${l.equipmentName} ×${l.qty}`, l.status, l.decision)
                 return (
                   <tr key={l.id} {...row.tr}>
                     <td style={{ fontWeight: 500 }}>
@@ -382,7 +382,7 @@ export default function EquipmentPage() {
         <Pager page={recentPage} pageSize={RECENT_PAGE} total={recentTotal} onChange={setRecentPage} style={{ padding: '10px 0 14px' }} />
       </div>
 
-      {reject.node}
+      {decision.node}
     </div>
   )
 }

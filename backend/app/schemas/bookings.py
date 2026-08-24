@@ -131,9 +131,10 @@ class RoomBookingOut(BaseModel):
     status: BookingStatus
     created_at: datetime
     slots: list[RoomSlotOut] = []
-    # 退回原因與退回時間(approval_records 最後一筆 REJECT);非退回件為 None
-    reject_reason: str | None = None
-    rejected_at: datetime | None = None
+    # 承辦退回或撤銷時填的原因與時間(approval_records 最後一筆 REJECT/REVOKE)。
+    # 社團自行取消不寫簽核紀錄,那種取消件為 None —— 兩種「已取消」由此分辨
+    decision_reason: str | None = None
+    decided_at: datetime | None = None
 
 
 class FixedWindowOut(BaseModel):
@@ -217,9 +218,10 @@ class VenueBookingOut(BaseModel):
     phone: str | None = None
     status: BookingStatus
     created_at: datetime
-    # 退回原因與退回時間(approval_records 最後一筆 REJECT);非退回件為 None
-    reject_reason: str | None = None
-    rejected_at: datetime | None = None
+    # 承辦退回或撤銷時填的原因與時間(approval_records 最後一筆 REJECT/REVOKE)。
+    # 社團自行取消不寫簽核紀錄,那種取消件為 None —— 兩種「已取消」由此分辨
+    decision_reason: str | None = None
+    decided_at: datetime | None = None
 
 
 class EquipmentLoanIn(BaseModel):
@@ -254,9 +256,10 @@ class EquipmentLoanOut(BaseModel):
     checkin_note: str | None
     created_at: datetime
     overdue: bool = False  # 推導
-    # 退回原因與退回時間(approval_records 最後一筆 REJECT);非退回件為 None
-    reject_reason: str | None = None
-    rejected_at: datetime | None = None
+    # 承辦退回或撤銷時填的原因與時間(approval_records 最後一筆 REJECT/REVOKE)。
+    # 社團自行取消不寫簽核紀錄,那種取消件為 None —— 兩種「已取消」由此分辨
+    decision_reason: str | None = None
+    decided_at: datetime | None = None
 
 
 # ---- 行政手動借用 / 場地不開放規則 ----

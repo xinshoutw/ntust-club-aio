@@ -63,13 +63,17 @@ async def _notify_cancel(background: BackgroundTasks, db, user, title: str, desc
     background.add_task(notify.club_event, "reject", title, desc, club.discord_webhook_url)
 
 
-async def _attach_reject_reasons(db, subject: ApprovalSubject, rows: list) -> None:
-    """把退回原因補進本頁的輸出列(社團端看自己的單,不帶簽核者姓名)。
+async def _attach_decision_reasons(db, subject: ApprovalSubject, rows: list) -> None:
+    """把承辦的退回/撤銷原因補進本頁的輸出列(社團端看自己的單,不帶簽核者姓名)。
 
-    退回是終局狀態(要重申請就是新的一張單),所以每張單至多一筆 REJECT;
-    仍以 id 序取最後一筆,不靠「只會有一筆」這個假設。
+    退回與撤銷都由承辦填原因,最終狀態不同(rejected / cancelled),前端據狀態分辨
+    「退回原因」與「撤銷原因」;社團自行取消沒有紀錄,那種取消件維持 None。
+    退回是終局狀態(要重申請就是新的一張單),每張單至多一筆;仍以 id 序取最後一筆,
+    不靠「只會有一筆」這個假設。
     """
-    ids = [r.id for r in rows]
+    # 只有終局的兩個狀態可能帶紀錄。三種借用是兩個不同的 enum,但這兩個值的字面值
+    # 相同 —— 比字串而不是放進 set:Enum 的 hash 依名稱,跨 enum 的集合查詢會落空
+    ids = [r.id for r in rows if r.status in ("rejected", "cancelled")]
     if not ids:
         return
     records = await db.scalars(
@@ -77,7 +81,7 @@ async def _attach_reject_reasons(db, subject: ApprovalSubject, rows: list) -> No
         .where(
             ApprovalRecord.subject_type == subject,
             ApprovalRecord.subject_id.in_(ids),
-            ApprovalRecord.decision == ApprovalDecision.REJECT,
+            ApprovalRecord.decision.in_([ApprovalDecision.REJECT, ApprovalDecision.REVOKE]),
         )
         .order_by(ApprovalRecord.id)
     )
@@ -85,8 +89,9 @@ async def _attach_reject_reasons(db, subject: ApprovalSubject, rows: list) -> No
     for out in rows:
         record = by_subject.get(out.id)
         if record is not None:
-            out.reject_reason = record.reason
-            out.rejected_at = record.created_at
+            out.decision_reason = record.reason
+            out.decided_at = record.created_at
+
 
 async def _ensure_not_suspended(db, user) -> None:
     """停權中的社團不得申請借用(器材逾期停權管理的執行點)。"""
@@ -284,7 +289,7 @@ async def list_room_bookings(
         out = RoomBookingOut.model_validate(request_row)
         out.venue_name = venue_name
         data.append(out)
-    await _attach_reject_reasons(db, ApprovalSubject.ROOM_BOOKING, data)
+    await _attach_decision_reasons(db, ApprovalSubject.ROOM_BOOKING, data)
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 
@@ -392,7 +397,7 @@ async def list_venue_bookings(
         out.venue_name = venue_name
         out.activity_name = activity_name
         data.append(out)
-    await _attach_reject_reasons(db, ApprovalSubject.VENUE_BOOKING, data)
+    await _attach_decision_reasons(db, ApprovalSubject.VENUE_BOOKING, data)
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 
@@ -504,7 +509,7 @@ async def list_equipment_loans(
         out.activity_name = activity_name
         out.overdue = svc.is_overdue_in(loan, return_time, holidays)
         data.append(out)
-    await _attach_reject_reasons(db, ApprovalSubject.EQUIPMENT_LOAN, data)
+    await _attach_decision_reasons(db, ApprovalSubject.EQUIPMENT_LOAN, data)
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 

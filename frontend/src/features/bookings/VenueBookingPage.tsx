@@ -23,7 +23,7 @@ import {
 } from '../../api/bookings'
 import { useApprovedActivities } from '../../api/activities'
 import PeriodPicker from './PeriodPicker'
-import { useRejectReason } from './RejectReasonModal'
+import { useDecisionReason } from './DecisionReasonModal'
 
 export default function VenueBookingPage() {
   const { message, modal } = App.useApp()
@@ -62,7 +62,7 @@ export default function VenueBookingPage() {
   const recentQuery = useRecentVenueBookings({ page: recentPage, pageSize: RECENT_PAGE })
   const recent = recentQuery.data?.rows ?? []
   const recentTotal = recentQuery.data?.total ?? 0
-  const reject = useRejectReason()
+  const decision = useDecisionReason()
   const { createVenueBooking, cancelVenueBooking } = useBookingMutations()
   const todayStart = dayjs().startOf('day')
 
@@ -278,8 +278,8 @@ export default function VenueBookingPage() {
             </thead>
             <tbody>
               {recent.map((v) => {
-                // 退回件可點開原因(舊資料沒留理由時彈窗會說明);其餘狀態沒有可看的內容
-                const row = reject.rowProps(`${v.venueName}（${v.date}）`, v.status, v.reject)
+                // 退回件與承辦撤銷的取消件可點開原因(舊資料沒留理由時彈窗會說明)
+                const row = decision.rowProps(`${v.venueName}（${v.date}）`, v.status, v.decision)
                 return (
                   <tr key={v.id} {...row.tr}>
                     <td style={{ fontWeight: 500 }}>{row.wrap(v.venueName)}</td>
@@ -307,7 +307,7 @@ export default function VenueBookingPage() {
         <Pager page={recentPage} pageSize={RECENT_PAGE} total={recentTotal} onChange={setRecentPage} style={{ padding: '10px 0 14px' }} />
       </div>
 
-      {reject.node}
+      {decision.node}
     </div>
   )
 }

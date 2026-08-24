@@ -12,6 +12,8 @@ describe('toRoomBooking', () => {
       end_date: '2027-01-31',
       status: 'pending',
       created_at: '2026-07-01T12:00:00',
+      decision_reason: null,
+      decided_at: null,
       slots: [
         { weekday: 4, period: 'A' },
         { weekday: 2, period: '4' },
@@ -50,6 +52,8 @@ describe('toEquipmentLoan', () => {
     borrower_name: '陳予恩',
     returner_name: null,
     overdue: false,
+    decision_reason: null,
+    decided_at: null,
   } as const
 
   it('日期轉顯示格式;借用人/歸還人為選填', () => {

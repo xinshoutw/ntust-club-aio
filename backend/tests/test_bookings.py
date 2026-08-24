@@ -1044,9 +1044,9 @@ async def test_backdated_manual_loan_ignores_todays_checked_out(client, db):
     )
 
 
-async def test_club_lists_carry_the_rejection_reason(client, db):
-    """退回原因只寫在 approval_records:三支社團端清單都要撈出來,否則社團看得到
-    「已退回」卻永遠問不到為什麼。三種借用各一份判定,漏一支就等於沒改。"""
+async def test_club_lists_carry_the_decision_reason(client, db):
+    """退回/撤銷原因只寫在 approval_records:三支社團端清單都要撈出來,否則社團看得到
+    「已退回」「已取消」卻永遠問不到為什麼。三種借用各一份判定,漏一支就等於沒改。"""
     from app.models import ApprovalRecord, User, VenueBooking
     from app.models.enums import ApprovalDecision, ApprovalSubject, BookingStatus
 
@@ -1064,6 +1064,18 @@ async def test_club_lists_carry_the_rejection_reason(client, db):
         club_id=club.id, venue_id=venue.id, activity_id=activity.id, date=day,
         periods=["3"], purpose="擺攤", status=BookingStatus.REJECTED,
     )
+    revoked = VenueBooking(
+        club_id=club.id, venue_id=venue.id, activity_id=activity.id,
+        date=day + timedelta(days=2), periods=["3"], purpose="擺攤",
+        status=BookingStatus.CANCELLED,
+    )
+    # 社團自己按取消的單:承辦只留過核准意見,那不是「撤銷原因」,不得吐給社團
+    self_cancelled = VenueBooking(
+        club_id=club.id, venue_id=venue.id, activity_id=activity.id,
+        date=day + timedelta(days=3), periods=["3"], purpose="擺攤",
+        status=BookingStatus.CANCELLED,
+    )
+    # 已核准件也有簽核紀錄(APPROVE),不得被當成處置原因吐出去
     kept = VenueBooking(
         club_id=club.id, venue_id=venue.id, activity_id=activity.id,
         date=day + timedelta(days=1), periods=["3"], purpose="擺攤",
@@ -1074,37 +1086,79 @@ async def test_club_lists_carry_the_rejection_reason(client, db):
         start_date=day, end_date=day + timedelta(days=1), purpose="x",
         status=LoanStatus.REJECTED,
     )
-    db.add_all([room, booking, kept, loan])
+    db.add_all([room, booking, revoked, self_cancelled, kept, loan])
     await db.commit()
 
     admin = await db.scalar(sa.select(User.id).order_by(User.id).limit(1))
+    reject = ApprovalDecision.REJECT
+    room_subject, venue_subject = ApprovalSubject.ROOM_BOOKING, ApprovalSubject.VENUE_BOOKING
     db.add_all([
         ApprovalRecord(
             subject_type=subject, subject_id=row.id, stage="single",
-            decision=ApprovalDecision.REJECT, actor_id=admin, reason=reason,
+            decision=decision, actor_id=admin, reason=reason,
         )
-        for subject, row, reason in (
-            (ApprovalSubject.ROOM_BOOKING, room, "本學期此教室已排滿"),
-            (ApprovalSubject.VENUE_BOOKING, booking, "場地當日已有校方活動"),
-            (ApprovalSubject.EQUIPMENT_LOAN, loan, "帳篷同期已借出"),
+        for subject, row, decision, reason in (
+            (room_subject, room, reject, "本學期此教室已排滿"),
+            (venue_subject, booking, reject, "場地當日已有校方活動"),
+            (venue_subject, revoked, ApprovalDecision.REVOKE, "改由校方活動使用"),
+            (venue_subject, self_cancelled, ApprovalDecision.APPROVE, "核准通過"),
+            (venue_subject, kept, ApprovalDecision.APPROVE, "核准通過"),
+            (ApprovalSubject.EQUIPMENT_LOAN, loan, reject, "帳篷同期已借出"),
         )
     ])
     await db.commit()
 
-    async def reasons(path):
-        rows = (await client.get(f"/api/v1/club/{path}", params={"active": False})).json()["data"]
-        return {r["id"]: (r["reject_reason"], r["rejected_at"]) for r in rows}
+    async def reasons(path, active=False):
+        rows = (
+            await client.get(f"/api/v1/club/{path}", params={"active": active})
+        ).json()["data"]
+        return {r["id"]: (r["decision_reason"], r["decided_at"]) for r in rows}
 
     rooms = await reasons("room-bookings")
     assert rooms[room.id][0] == "本學期此教室已排滿"
     assert rooms[room.id][1] is not None
     venues = await reasons("venue-bookings")
     assert venues[booking.id][0] == "場地當日已有校方活動"
+    # 承辦撤銷的「已取消」也要說得出原因,否則與社團自己按取消長得一模一樣
+    assert venues[revoked.id][0] == "改由校方活動使用"
+    # 反過來,社團自己取消的那張不得掛上承辦的核准意見
+    assert venues[self_cancelled.id] == (None, None)
     loans = await reasons("equipment-loans")
     assert loans[loan.id][0] == "帳篷同期已借出"
 
-    # 沒被退回的單不得憑空長出原因(active=true 那份同樣經過補值)
-    active = (
-        await client.get("/api/v1/club/venue-bookings", params={"active": True})
-    ).json()["data"]
-    assert [(r["id"], r["reject_reason"]) for r in active] == [(kept.id, None)]
+    # 核准列的簽核意見不是處置原因;active=true 那份同樣經過補值
+    assert await reasons("venue-bookings", active=True) == {kept.id: (None, None)}
+
+
+async def test_decision_lookup_skipped_when_no_row_can_carry_one(client, db):
+    """審核中/已核准的清單不可能有處置紀錄:那一趟 approval_records 查詢不該發出去。
+
+    總覽頁三類各自逐頁抓齊,少了這個守衛等於每頁都多打一次保證空回的查詢。"""
+    from app.core.db import engine
+    from app.models import VenueBooking
+
+    club = await setup_session(client, db)
+    activity = await make_activity(db, club)
+    venue = await make_venue(db, name="精誠廣場", allow_fixed=False, allow_temp=True)
+    db.add(
+        VenueBooking(
+            club_id=club.id, venue_id=venue.id, activity_id=activity.id,
+            date=date.today() + timedelta(days=14), periods=["3"], purpose="擺攤",
+            status="approved",
+        )
+    )
+    await db.commit()
+
+    seen: list[str] = []
+
+    def record(conn, cursor, statement, *args):
+        seen.append(" ".join(statement.split()))
+
+    sa.event.listen(engine.sync_engine, "before_cursor_execute", record)
+    try:
+        resp = await client.get("/api/v1/club/venue-bookings", params={"active": True})
+    finally:
+        sa.event.remove(engine.sync_engine, "before_cursor_execute", record)
+    assert resp.status_code == 200
+    assert len(resp.json()["data"]) == 1
+    assert not [s for s in seen if "FROM approval_records" in s]

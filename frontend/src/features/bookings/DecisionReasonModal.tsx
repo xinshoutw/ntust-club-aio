@@ -1,8 +1,8 @@
-// 借用被退回的原因與時間:三張「最近申請 / 最近借用」表共用同一個彈窗。
+// 承辦退回或撤銷借用時填的原因與時間:四張「最近申請 / 最近借用」表共用同一個彈窗。
 // 只讀,不帶簽核者姓名(社團端看自己的單);Modal 常駐 + afterClose 才留得住退場動畫。
 import { useState, type ReactNode } from 'react'
 import { Modal } from 'antd'
-import type { RejectInfo } from '../../api/bookings'
+import type { DecisionInfo } from '../../api/bookings'
 import type { StatusKey } from '../../lib/status'
 
 // 舊系統遷入的退回件多半沒留理由(clubclass 的 reject_info 多數是空的)。
@@ -10,23 +10,28 @@ import type { StatusKey } from '../../lib/status'
 const NO_REASON = '系統未留下退回原因'
 
 interface Shown {
+  title: string
   subject: string
-  info?: RejectInfo
+  info?: DecisionInfo
 }
 
 /**
- * 退回件才可點:`rowProps(subject, status, reject)` 給 `<tr>` 展開,`wrap()` 包主要欄位。
- * 可不可點看**狀態**,不看有沒有理由 —— 沒理由的退回件一樣要點得動。
+ * `rowProps(subject, status, decision)` 給 `<tr>` 展開,`wrap()` 包主要欄位。
+ *
+ * 可不可點看**狀態**:退回件一律可點(沒理由的彈窗會說明);「已取消」只有承辦撤銷的
+ * 那種可點 —— 社團自己按的取消沒有紀錄,也沒有可解釋的事。
  * 整列 onClick 只服務滑鼠,鍵盤入口是名稱欄裡的 `.row-open-btn`(design-guide §6)。
  */
-export function useRejectReason() {
+export function useDecisionReason() {
   const [shown, setShown] = useState<Shown | null>(null)
   const [open, setOpen] = useState(false)
 
-  const rowProps = (subject: string, status: StatusKey, info: RejectInfo | undefined) => {
-    if (status !== 'rejected') return { tr: {}, wrap: (label: ReactNode) => label }
+  const rowProps = (subject: string, status: StatusKey, info: DecisionInfo | undefined) => {
+    const title =
+      status === 'rejected' ? '退回原因' : status === 'cancelled' && info ? '撤銷原因' : null
+    if (title === null) return { tr: {}, wrap: (label: ReactNode) => label }
     const show = () => {
-      setShown({ subject, info })
+      setShown({ title, subject, info })
       setOpen(true)
     }
     return {
@@ -35,7 +40,7 @@ export function useRejectReason() {
         <button
           type="button"
           className="row-open-btn"
-          aria-label={`檢視「${subject}」的退回原因`}
+          aria-label={`檢視「${subject}」的${title}`}
           onClick={(e) => {
             e.stopPropagation()
             show()
@@ -50,7 +55,7 @@ export function useRejectReason() {
   const node = (
     <Modal
       open={open}
-      title="退回原因"
+      title={shown?.title}
       footer={null}
       onCancel={() => setOpen(false)}
       afterClose={() => setShown(null)}

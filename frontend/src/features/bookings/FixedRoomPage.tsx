@@ -12,7 +12,7 @@ import { Cols, Pager } from '../../components/ui/tableControls'
 import SuspensionNote from '../../components/ui/SuspensionNote'
 import { useClubSuspension } from '../../api/clubProfile'
 import { useDragSelect } from './useDragSelect'
-import { useRejectReason } from './RejectReasonModal'
+import { useDecisionReason } from './DecisionReasonModal'
 import { periodKeys, usePeriods } from '../../lib/periods'
 import { UNAVAILABLE_BG } from './cells'
 import {
@@ -119,7 +119,7 @@ export default function FixedRoomPage() {
   const recentQuery = useRecentRoomBookings({ page: recentPage, pageSize: RECENT_PAGE })
   const recent = recentQuery.data?.rows ?? []
   const recentTotal = recentQuery.data?.total ?? 0
-  const reject = useRejectReason()
+  const decision = useDecisionReason()
   const { createRoomBooking, cancelRoomBooking } = useBookingMutations()
   const todayStart = dayjs().startOf('day')
 
@@ -404,8 +404,8 @@ export default function FixedRoomPage() {
             </thead>
             <tbody>
               {recent.map((r) => {
-                // 退回件可點開原因(舊資料沒留理由時彈窗會說明);其餘狀態沒有可看的內容
-                const row = reject.rowProps(r.venueName, r.status, r.reject)
+                // 退回件與承辦撤銷的取消件可點開原因(舊資料沒留理由時彈窗會說明)
+                const row = decision.rowProps(r.venueName, r.status, r.decision)
                 return (
                   <tr key={r.id} {...row.tr}>
                     <td style={{ fontWeight: 500 }}>{row.wrap(r.venueName)}</td>
@@ -434,7 +434,7 @@ export default function FixedRoomPage() {
         <Pager page={recentPage} pageSize={RECENT_PAGE} total={recentTotal} onChange={setRecentPage} style={{ padding: '10px 0 14px' }} />
       </div>
 
-      {reject.node}
+      {decision.node}
     </div>
   )
 }

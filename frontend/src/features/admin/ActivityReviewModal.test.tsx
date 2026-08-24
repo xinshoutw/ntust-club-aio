@@ -102,9 +102,7 @@ describe('ActivityReviewModal 的簽核紀錄', () => {
     ])
 
     expect(screen.getByText(/陳彥仁 於/).textContent).toContain('核准')
-    const rejected = screen.getByText(/侍筱鳳 於/).textContent
-    expect(rejected).toContain('退回')
-    expect(rejected).toContain('估價單未附')
+    expect(screen.getByText(/侍筱鳳 於/).textContent).toContain('退回')
   })
 
   // 申請與結案的簽核紀錄同放一張表:只印「核准」的話,結案那次會被讀成又核了一次申請

@@ -58,7 +58,6 @@ export interface ReviewApproval {
   at: string // YYYY/MM/DD HH:mm
   decision: 'approve' | 'reject' | 'unlock' | 'revoke'
   isClose: boolean
-  reason?: string
 }
 
 /** 章軌的一格;推導在後端 `services.apply_approvals`,前端不再自己數一次核准列 */
@@ -189,7 +188,7 @@ interface StampOut {
   at: string
 }
 
-interface ApprovalOut {
+export interface ApprovalOut {
   stage: string
   decision: string
   reason: string | null
@@ -252,12 +251,25 @@ export const toEvalFile = (f: AdminFileRef): EvalFile => ({
   uploadedAt: '',
 })
 
+/** 結案退回會連寫兩筆(先 UNLOCK 再 REJECT,同一個承辦人、同一次操作;
+ *  後端 `close_reject` 的 D-05 自動解鎖)。承辦人按的是「退回」—— 把那筆自動解鎖
+ *  單獨列一行,讀起來會像另外有人解鎖過這張單。手動解鎖(逾期解鎖)後面不接退回,留著。 */
+export const dropAutoUnlock = (rows: readonly ApprovalOut[]): ApprovalOut[] =>
+  rows.filter((r, i) => {
+    if (r.decision !== 'unlock') return true
+    const next = rows[i + 1]
+    return !(
+      next?.decision === 'reject' &&
+      next.subject_type === r.subject_type &&
+      next.actor_name === r.actor_name
+    )
+  })
+
 const toApproval = (a: ApprovalOut): ReviewApproval => ({
   actor: a.actor_name,
   at: slashDateTime(a.created_at),
   decision: a.decision as ReviewApproval['decision'],
   isClose: a.subject_type === 'activity_close',
-  reason: a.reason ?? undefined,
 })
 
 const toStamp = (s: StampOut): ReviewStamp => ({
@@ -302,7 +314,7 @@ const toAdminDetail = (o: AdminActivityDetailOut): AdminActivityDetail => ({
   detail: {
     timeRange: timeRangeOf(o),
     stamps: o.stamps.map(toStamp),
-    approvals: o.approvals.map(toApproval),
+    approvals: dropAutoUnlock(o.approvals).map(toApproval),
     location: o.location,
     participantsIn: o.participants_in,
     participantsOut: o.participants_out,

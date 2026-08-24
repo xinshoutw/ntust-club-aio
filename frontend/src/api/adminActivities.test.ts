@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canActOn, canActOnClose, stageOfStatus } from './adminActivities'
+import { canActOn, canActOnClose, dropAutoUnlock, stageOfStatus, type ApprovalOut } from './adminActivities'
 import type { SessionUser } from './auth'
 
 const admin = (over: Partial<SessionUser> = {}): SessionUser => ({
@@ -56,5 +56,41 @@ describe('stageOfStatus', () => {
     expect(stageOfStatus('pending_dean')).toBe('dean')
     expect(stageOfStatus('approved')).toBeUndefined()
     expect(stageOfStatus('locked')).toBeUndefined()
+  })
+})
+
+const rec = (decision: string, over: Partial<ApprovalOut> = {}): ApprovalOut => ({
+  stage: 'advisor',
+  decision,
+  reason: null,
+  created_at: '2026-08-19T09:02:00+08:00',
+  subject_type: 'activity_close',
+  actor_name: '侍筱鳳',
+  ...over,
+})
+
+// 後端 close_reject 為了 D-05 連寫兩筆(先 UNLOCK 再 REJECT,同一個承辦人、同一次操作)。
+// 承辦人按的是「退回」—— 把那筆自動解鎖單獨列一行,讀起來像另外有人解鎖過這張單,
+// 而簽核紀錄那個區塊的用途正是查「這張單被卡在哪」
+describe('dropAutoUnlock', () => {
+  it('退回前面那筆自動解鎖不留下', () => {
+    expect(dropAutoUnlock([rec('unlock'), rec('reject')]).map((r) => r.decision)).toEqual(['reject'])
+  })
+
+  it('後面沒接退回的解鎖是承辦人真的按過的,留著', () => {
+    expect(dropAutoUnlock([rec('unlock'), rec('approve')]).map((r) => r.decision)).toEqual([
+      'unlock',
+      'approve',
+    ])
+  })
+
+  it('別人做的退回不會吃掉我的解鎖', () => {
+    const rows = [rec('unlock'), rec('reject', { actor_name: '陳彥仁' })]
+    expect(dropAutoUnlock(rows).map((r) => r.decision)).toEqual(['unlock', 'reject'])
+  })
+
+  it('申請退回不會吃掉結案解鎖', () => {
+    const rows = [rec('unlock'), rec('reject', { subject_type: 'activity' })]
+    expect(dropAutoUnlock(rows).map((r) => r.decision)).toEqual(['unlock', 'reject'])
   })
 })

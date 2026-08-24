@@ -115,7 +115,7 @@ export default function PostalPage() {
             </Form.Item>
           </div>
           <Form.Item
-            label="原存簿影本/新開戶申請表"
+            label="原存簿影本 / 新開戶申請表"
             required
             style={{ margin: '16px 0 0' }}
             extra={
@@ -165,7 +165,7 @@ export default function PostalPage() {
                 <tr key={r.id}>
                   <td style={{ fontWeight: 500 }}>{r.reasons.join('、')}</td>
                   <td style={{ color: 'var(--steel)', fontSize: 13 }}>
-                    戶名:{r.accountName || '—'} · 帳號:<span className="num">{r.accountNumber || '—'}</span>
+                    戶名：{r.accountName || '—'} · 帳號：<span className="num">{r.accountNumber || '—'}</span>
                   </td>
                   <td className="num" style={{ fontSize: 13 }}>{r.date}</td>
                   <td><StatusPill status={r.status} /></td>
@@ -215,7 +215,7 @@ export default function PostalPage() {
                 <tr key={r.id}>
                   <td style={{ fontWeight: 500 }}>{r.reasons.join('、')}</td>
                   <td style={{ color: 'var(--steel)', fontSize: 13 }}>
-                    戶名:{r.accountName || '—'} · 帳號:<span className="num">{r.accountNumber || '—'}</span>
+                    戶名：{r.accountName || '—'} · 帳號：<span className="num">{r.accountNumber || '—'}</span>
                   </td>
                   <td className="num" style={{ fontSize: 13 }}>{r.date}</td>
                   <td><StatusPill status={r.status} /></td>

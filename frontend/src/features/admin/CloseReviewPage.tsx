@@ -233,9 +233,6 @@ function CloseReviewModal({
                 ' · 無影片連結'
               )}
               {' '}· 心得 <span className="num">{report.reflections.length}</span> 人
-              {photoShort && (
-                <div style={{ color: '#C13B34', fontSize: 12 }}>照片未達 {MIN_PHOTOS} 張且無影片</div>
-              )}
             </div>
             <div style={detailLabel}>活動重點</div><div style={{ lineHeight: 1.7 }}>{report.highlights}</div>
             <div style={detailLabel}>達成目標</div><div style={{ lineHeight: 1.7 }}>{report.goals}</div>

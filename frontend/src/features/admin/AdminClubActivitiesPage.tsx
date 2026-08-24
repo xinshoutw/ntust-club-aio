@@ -6,6 +6,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { Cols, FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
 import StatusPill from '../../components/ui/StatusPill'
+import MoneyPair from '../../components/ui/MoneyPair'
 import LargeBadge from '../../components/ui/LargeBadge'
 import { countText } from '../../lib/counts'
 import { clampPage } from '../../lib/paging'
@@ -13,7 +14,7 @@ import { semesterOptions } from '../../lib/semester'
 import { useFitRows } from '../../lib/fitRows'
 import { useFilePreview } from '../eval/useFilePreview'
 import ActivityPreviewModal from '../activities/ActivityPreviewModal'
-import { LISTED_STATUS_LABELS, money, statusesForLabels } from '../activities/types'
+import { LISTED_STATUS_LABELS, approvedText, fmtMoney, statusesForLabels } from '../activities/types'
 import { dateRangeText } from '../activities/utils'
 import { type ClubActivity } from '../../api/activities'
 import {
@@ -25,8 +26,9 @@ import { useClubOptions } from '../../api/adminClubs'
 import ClubSelect from './ClubSelect'
 import { useAdminClub } from './clubContext'
 
-// 排序鍵=後端 /admin/activities 白名單中社團端也有的那幾個(budget=自籌+擬請合計)
-type SortKey = 'name' | 'type' | 'date' | 'budget' | 'status'
+// 排序鍵=後端 /admin/activities 白名單中社團端也有的那幾個。白名單裡的 budget 是
+// 「自籌+擬請」合計,與經費欄顯示的「自籌 / 核定」不是同一件事,故不接出去(同社團端)
+type SortKey = 'name' | 'type' | 'date' | 'status'
 
 // 類型漏斗**不能照抄社團端的兩個選項**:社團端篩的是 Activity.type(「活動」含大型),
 // 行政端的「活動」是 EVENT 且非大型、大型另成一項。只放兩個的話,承辦選「活動」
@@ -35,6 +37,8 @@ const TYPE_OPTIONS = ['社課或會議', '活動', '大型活動']
 
 // 社團端活動列表的行政唯讀版:同一張表、同一個詳情彈窗(features/activities/ActivityPreviewModal),
 // 差別只有三處 —— 沒有動作欄、沒有草稿區(草稿不進行政視野)、詳情沒有編輯/結案按鈕。
+// 欄序、欄寬與經費欄的 MoneyPair 都跟著社團端走:兩頁刻意長一樣,改一頁沒改另一頁
+// 就是同一張表在兩個地方長不一樣(類型漏斗是唯一例外,見上)。
 // 資料走 /admin/activities?club_id=,經社團端的對照轉成同一組型別。
 export default function AdminClubActivitiesPage() {
   const { club, clubId } = useAdminClub()
@@ -141,11 +145,22 @@ export default function AdminClubActivitiesPage() {
             className="tb fixed"
             aria-label="活動列表"
             aria-busy={listQuery.isPlaceholderData}
-            style={{ minWidth: 760, opacity: listQuery.isPlaceholderData ? 0.55 : 1 }}
+            style={{ minWidth: 800, opacity: listQuery.isPlaceholderData ? 0.55 : 1 }}
           >
-            <Cols widths={['auto', 120, 180, 160, 110]} />
+            <Cols widths={[110, 'auto', 120, 180, 190]} />
             <thead>
               <tr>
+                <th scope="col">
+                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                    {sortHeader('狀態', 'status')}
+                    <FilterButton
+                      options={LISTED_STATUS_LABELS}
+                      selected={statusFilter}
+                      onChange={(next) => { setStatusFilter(next); setPage(1) }}
+                      label="篩選狀態"
+                    />
+                  </span>
+                </th>
                 <th scope="col">{sortHeader('名稱', 'name')}</th>
                 <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
@@ -159,23 +174,15 @@ export default function AdminClubActivitiesPage() {
                   </span>
                 </th>
                 <th scope="col">{sortHeader('日期', 'date')}</th>
-                <th scope="col" className="r">{sortHeader('自籌 / 擬請', 'budget')}</th>
-                <th scope="col">
-                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    {sortHeader('狀態', 'status')}
-                    <FilterButton
-                      options={LISTED_STATUS_LABELS}
-                      selected={statusFilter}
-                      onChange={(next) => { setStatusFilter(next); setPage(1) }}
-                      label="篩選狀態"
-                    />
-                  </span>
+                <th scope="col" className="r num">
+                  <MoneyPair left="自籌" right="核定" />
                 </th>
               </tr>
             </thead>
             <tbody>
               {rows.map((a) => (
                 <tr key={a.id} onClick={() => openRow(a)} style={{ cursor: 'pointer' }}>
+                  <td><StatusPill status={a.status} /></td>
                   <td className="cell-clip" style={{ fontWeight: 500 }} title={a.name || undefined}>
                     {/* 鍵盤入口:與整列 onClick 同動作;stopPropagation 避免雙觸發 */}
                     <button
@@ -194,9 +201,12 @@ export default function AdminClubActivitiesPage() {
                     {a.type}
                     <LargeBadge applied={a.isLarge} approved={a.largeApproved} />
                   </td>
-                  <td className="num" style={{ fontSize: 13 }}>{dateRangeText(a)}</td>
-                  <td className="r num" style={{ fontSize: 13 }}>{money(a)}</td>
-                  <td><StatusPill status={a.status} /></td>
+                  {/* 起訖日折成兩行讀起來像兩筆日期 */}
+                  <td className="num" style={{ fontSize: 13, whiteSpace: 'nowrap' }}>{dateRangeText(a)}</td>
+                  {/* 核定為 null=承辦還沒核,不是核了 0 元 */}
+                  <td className="r num" style={{ fontSize: 13 }}>
+                    <MoneyPair left={fmtMoney(a.selfFundTotal)} right={approvedText(a.approvedTotal, fmtMoney)} />
+                  </td>
                 </tr>
               ))}
               {listQuery.isError && (

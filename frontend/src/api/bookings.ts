@@ -14,6 +14,23 @@ const DATE_FMT = 'YYYY/MM/DD'
 const toIso = (d: Dayjs): string => d.format('YYYY-MM-DD')
 const fromIso = (s: string): string => dayjs(s).format(DATE_FMT)
 
+/** 退回原因與退回時間(後端由 approval_records 補;非退回件為 undefined) */
+export interface RejectInfo {
+  reason: string
+  at: string // YYYY/MM/DD HH:mm
+}
+
+/** 三種借用的輸出共用同一組欄位(後端一律帶,非退回件為 null) */
+interface RejectOut {
+  reject_reason?: string | null
+  rejected_at?: string | null
+}
+
+const toReject = (o: RejectOut): RejectInfo | undefined =>
+  o.reject_reason && o.rejected_at
+    ? { reason: o.reject_reason, at: dayjs(o.rejected_at).format('YYYY/MM/DD HH:mm') }
+    : undefined
+
 export interface PageParams {
   page: number
   pageSize: number
@@ -150,11 +167,12 @@ export interface RoomBooking {
   startDate: string
   status: StatusKey
   entries: RoomEntry[]
+  reject?: RejectInfo
 }
 
 type BookingStatusOut = 'pending' | 'approved' | 'rejected' | 'cancelled'
 
-interface RoomBookingOut {
+interface RoomBookingOut extends RejectOut {
   id: number
   venue_id: number
   venue_name: string
@@ -187,6 +205,7 @@ export const toRoomBooking = (r: RoomBookingOut): RoomBooking => {
     startDate: fromIso(r.start_date),
     status: r.status,
     entries,
+    reject: toReject(r),
   }
 }
 
@@ -201,9 +220,10 @@ export interface VenueBookingRecord {
   periods: string[]
   purpose: string
   status: StatusKey
+  reject?: RejectInfo
 }
 
-interface VenueBookingOut {
+interface VenueBookingOut extends RejectOut {
   id: number
   venue_id: number
   venue_name: string
@@ -225,6 +245,7 @@ const toVenueBooking = (v: VenueBookingOut): VenueBookingRecord => ({
   periods: v.periods,
   purpose: v.purpose,
   status: v.status,
+  reject: toReject(v),
 })
 
 // ---- 器材借用 ----
@@ -241,11 +262,12 @@ export interface EquipmentLoanRecord {
   status: StatusKey
   borrower?: string
   returnedBy?: string
+  reject?: RejectInfo
 }
 
 type LoanStatusOut = BookingStatusOut | 'checked_out' | 'returned'
 
-interface EquipmentLoanOut {
+interface EquipmentLoanOut extends RejectOut {
   id: number
   equipment_id: number
   equipment_name: string
@@ -274,6 +296,7 @@ export const toEquipmentLoan = (l: EquipmentLoanOut): EquipmentLoanRecord => ({
   status: l.overdue ? 'overdue' : l.status,
   borrower: l.borrower_name ?? undefined,
   returnedBy: l.returner_name ?? undefined,
+  reject: toReject(l),
 })
 
 // ---- 查詢鍵 ----

@@ -131,6 +131,9 @@ class RoomBookingOut(BaseModel):
     status: BookingStatus
     created_at: datetime
     slots: list[RoomSlotOut] = []
+    # 退回原因與退回時間(approval_records 最後一筆 REJECT);非退回件為 None
+    reject_reason: str | None = None
+    rejected_at: datetime | None = None
 
 
 class FixedWindowOut(BaseModel):
@@ -214,6 +217,9 @@ class VenueBookingOut(BaseModel):
     phone: str | None = None
     status: BookingStatus
     created_at: datetime
+    # 退回原因與退回時間(approval_records 最後一筆 REJECT);非退回件為 None
+    reject_reason: str | None = None
+    rejected_at: datetime | None = None
 
 
 class EquipmentLoanIn(BaseModel):
@@ -248,6 +254,9 @@ class EquipmentLoanOut(BaseModel):
     checkin_note: str | None
     created_at: datetime
     overdue: bool = False  # 推導
+    # 退回原因與退回時間(approval_records 最後一筆 REJECT);非退回件為 None
+    reject_reason: str | None = None
+    rejected_at: datetime | None = None
 
 
 # ---- 行政手動借用 / 場地不開放規則 ----

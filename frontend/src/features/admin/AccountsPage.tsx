@@ -140,8 +140,8 @@ export default function AccountsPage() {
   const toggleActive = (a: Account) => {
     if (a.active) {
       confirmDialog(modal, {
-        title: `停權 ${a.name}`,
-        content: '停權後無法登入，可隨時恢復',
+        title: `停用 ${a.name}`,
+        content: '停用後無法登入，可隨時恢復',
         okText: '確認',
         okButtonProps: { danger: true },
         cancelText: '取消',
@@ -149,7 +149,7 @@ export default function AccountsPage() {
           setActive.mutate(
             { id: a.id, active: false },
             {
-              onSuccess: () => message.success(`已停權 ${a.name}`),
+              onSuccess: () => message.success(`已停用 ${a.name}`),
               onError: (e) => message.error(e.message),
             },
           )
@@ -203,7 +203,7 @@ export default function AccountsPage() {
           setNewName('')
           setNewAccount('')
           // 建立後直接顯示帳號與一次性密碼
-          showPassword(`已建立${roleLabel}帳號 — ${account.name}`, account.username, password)
+          showPassword(`已建立 ${roleLabel} 帳號 — ${account.name}`, account.username, password)
         },
         onError: (e) => message.error(e.message),
       },
@@ -231,7 +231,7 @@ export default function AccountsPage() {
     if (c.isActive) {
       confirmDialog(modal, {
         title: `停用 ${c.name}`,
-        content: '社團停權後無法登入，隨時可以恢復',
+        content: '社團停用後無法登入，隨時可以恢復',
         okText: '確認停用',
         okButtonProps: { danger: true },
         cancelText: '取消',
@@ -239,7 +239,7 @@ export default function AccountsPage() {
           clubMutations.update.mutate(
             { id: c.id, isActive: false },
             {
-              onSuccess: () => message.success(`已停權 ${c.name}`),
+              onSuccess: () => message.success(`已停用 ${c.name}`),
               onError: (e) => message.error(e.message),
             },
           )
@@ -332,7 +332,7 @@ export default function AccountsPage() {
         重設密碼
       </button>
       <button type="button" className="link-btn" onClick={() => toggleActive(a)}>
-        {a.active ? '停權' : '恢復'}
+        {a.active ? '停用' : '恢復'}
       </button>
       <button type="button" className="link-btn danger" onClick={() => confirmDelete(a)}>
         刪除

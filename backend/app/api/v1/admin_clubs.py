@@ -138,10 +138,12 @@ async def create_club(
     """新增社團主檔(帳號管理「社團」分頁);登入用的帳號另走 `POST /{id}/account`。"""
     if await db.scalar(sa.select(Club.id).where(Club.name == body.name)):
         raise conflict("此社團名稱已存在")
-    # 名稱結尾推不出社/會就先當社團:kind 只決定負責人顯示詞,管理項目改得動
+    # 名稱結尾推不出社/會就先當社團:kind 只決定負責人顯示詞,管理項目改得動。
+    # 判 `is None` 不用 `or` —— 後者靠的是 ClubKind 成員值剛好都 truthy
+    derived = derive_kind(body.name)
     club = Club(
         name=body.name,
-        kind=derive_kind(body.name) or ClubKind.CLUB,
+        kind=ClubKind.CLUB if derived is None else derived,
         attribute=body.attribute,
     )
     db.add(club)

@@ -392,17 +392,13 @@ async def get_activity(
             .order_by(ApprovalRecord.id)
         )
     ).all()
-    out.approvals = [
-        ApprovalOut(
-            stage=r.stage,
-            decision=r.decision,
-            reason=r.reason,
-            created_at=r.created_at,
-            subject_type=r.subject_type,
-            actor_name=actor_name,
-        )
-        for r, actor_name in approvals
-    ]
+    # 用 model_validate 而非逐欄手建:社團端(activities.py)也是這樣組,
+    # 兩邊各寫一份的話 ApprovalOut 之後加欄位只有一邊會跟上,而 default 不會報錯
+    out.approvals = []
+    for record, actor_name in approvals:
+        item = ApprovalOut.model_validate(record)
+        item.actor_name = actor_name
+        out.approvals.append(item)
     out.reviewed_at = max((r.created_at for r, _ in approvals), default=None)
     # 簽核章軌:每一關印誰、什麼時候簽的(推導規則在 services,前端不再自己數一次)
     stamped = await svc.apply_approvals(db, activity.id)

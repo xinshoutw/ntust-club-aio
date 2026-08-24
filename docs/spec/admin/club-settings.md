@@ -10,6 +10,7 @@
 
 | 動作 | 端點 |
 |---|---|
+| 新增社團 | `POST /admin/clubs`(入口在帳號管理的社團分頁,權限鍵仍是本頁的 `aclubset`) |
 | 詳情 | `GET /admin/clubs/{id}` |
 | 更新 | `PATCH /admin/clubs/{id}` |
 | 重設密碼 | `POST /admin/clubs/{id}/reset-password` |

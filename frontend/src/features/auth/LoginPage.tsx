@@ -16,26 +16,26 @@ const maintainerInfo = (
   <div style={{ fontSize: 13, lineHeight: 2.2 }}>
     <div>網頁維護：資訊工程系 黃宥維</div>
     <div>
-      快速聯絡：Discord{' '}
-      <a
-        href="https://discord.com/users/810822763601461318"
-        target="_blank"
-        rel="noopener noreferrer"
-        style={{
-          background: 'var(--paper)',
-          border: '1px solid var(--line)',
-          borderRadius: 4,
-          padding: '1px 6px',
-        }}
-      >
-        xinshoutw
-      </a>
-    </div>
-    <div>
       聯絡信箱：
       <a className="num" href="mailto:B11315009@mail.ntust.edu.tw">
         B11315009@mail.ntust.edu.tw
       </a>
+    </div>
+    <div>
+          訊息聯絡：Discord{' '}
+          <a
+              href="https://discord.com/users/810822763601461318"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                  background: 'var(--paper)',
+                  border: '1px solid var(--line)',
+                  borderRadius: 4,
+                  padding: '1px 6px',
+              }}
+          >
+              xinshoutw
+          </a>
     </div>
   </div>
 )

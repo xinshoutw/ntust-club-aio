@@ -157,7 +157,11 @@ async def create_club(
         db,
         action="club_created",
         user=user,
-        detail=f"club={club.id};name={club.name};attribute={club.attribute.value}",
+        # kind 一併記:它是這支端點唯一用猜的欄位,事後查「為什麼是社團不是學會」要看得到
+        detail=(
+            f"club={club.id};name={club.name}"
+            f";kind={club.kind.value};attribute={club.attribute.value}"
+        ),
         ip=client_ip(request),
     )
     await db.commit()

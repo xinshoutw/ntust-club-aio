@@ -6,7 +6,10 @@
 
 ## A. 阻擋項(其餘段落內也有標記為**阻擋**的列,以標記為準)
 
-- [ ] **備份排程**:`backend/scripts/backup_db.sh` 已就緒(每日 `pg_dump` 自訂格式 + 保留 14 天輪替,**存在同一台機器**,decisions.md OPS-01 明定不做異地),**cron 尚未掛上**(cron 行見該檔頂部)。上傳目錄由 compose 的 `db-backup` 服務備份 volume,另以 GCE 磁碟快照兜底;部署前另手動 dump 一次
+- [ ] **備份排程**:`backend/scripts/backup_db.sh` 已就緒(每日 `pg_dump` 自訂格式 + 保留 14 天輪替,**存在同一台機器**,decisions.md OPS-01 明定不做異地),**cron 尚未掛上**(cron 行見該檔頂部)。部署前另手動 dump 一次
+- [ ] **上傳目錄目前沒有任何備份**:`backup_db.sh` 只 dump 資料庫,`compose.yml` 也沒有備份服務
+  (先前文件寫的 `db-backup` 服務並不存在)。GCE 那條路徑靠磁碟快照兜底,自架 VPS 什麼都沒有 ——
+  4.8 GB 的結案照片刪掉就沒了。上線前要嘛掛一支 `rsync`/`tar` 的 cron,要嘛明確接受這個風險
 - [ ] **器材主檔的建立順序**:`scripts/seed.py` 只建 5 獎項 + 19 場地 + superadmin,**器材主檔由 `migration/cc_import.py` 從舊 `Device` 表帶入**(品名、數量、單次上限、啟用與否)。正式流程必須 seed 之後跑過遷移,否則器材借用無品項可選
 - [ ] **帳號開通**:遷移進來的 15 個行政帳號**權限鍵全空**(只有 `super` 看得到頁面),分工由承辦決定後於帳號管理逐一授出;舊系統沒有工讀生角色,`role=staff` 是 0 筆,上線前要開。所有遷移帳號 `must_change_password=True`,明碼在 `migration/out/one_time_passwords_*.csv`,交承辦發放後銷毀
 - [ ] **政府行事曆假日**:`holidays` 表未 seed。匯入腳本已就緒(`scripts/import_holidays.py --year <民國年> --yes`,資料源見 decisions.md GAP-06),**每年上線年度都要跑一次**;未匯入的年度 `booking_service.add_workdays` 會退化成只排除週六日,逢國定假日的逾期判定偏一天
@@ -25,6 +28,10 @@
   **`MAIL_FROM_ADDRESS` 需與認證帳號同網域**,否則 relay 會拒收
 - [ ] 應辦 `BACKEND_IMAGE` / `WEB_IMAGE` = GHCR 映像路徑。CI 對 main 的每次 push 同時打 `latest` 與 commit sha 兩個 tag:**正式環境釘 sha**,要回滾就換成上一版的 sha,不必等重新建置
 - [ ] 應辦 `SITE_URL` = `https://clubs.ntust.edu.tw` —— 通知信正文與 Discord 頭像的連結來源,漏填會指向 localhost
+- [ ] **阻擋** `WEB_BIND` —— web 容器發布到哪個位址,**預設是 `127.0.0.1`**。edge 在另一台 VM 上時
+  必須填本機內網網卡 IP,漏設等於只聽 loopback、edge 一律 502。反過來綁非 loopback 位址的機器,
+  該位址消失(換網卡、DHCP 變動)時容器會以 `cannot assign requested address` 起不來 —— 綁 `0.0.0.0` 沒有這個問題,
+  但也就沒有了這道邊界(見 `compose.yml` 的說明)
 - [ ] 應辦 `WEB_PORT`(預設 8080)—— edge upstream 要帶埠號
 - [ ] 應辦 `UPTIME_PUSH_BACKEND_URL` / `UPTIME_PUSH_FRONTEND_URL`(見 D;`WEB_HEALTH_URL` 有可用預設)
 
@@ -57,6 +64,7 @@
 
 檔案 `../nginx/ntust-sites/clubs.ntust.edu.tw.conf`。現況:`upstream clubs { server 10.140.0.2 }`(舊 Django VM,無埠號=預設 80)、XFF 用 `$proxy_add_x_forwarded_for`(追加,客戶端可偽造)、未送 XFP、此 vhost 無 `client_max_body_size`(繼承全域 3072M)。
 
+- [ ] 阻擋 app VM 的 `.env` 設 `WEB_BIND=<app VM 內網 IP>`,edge 才連得到(預設 `127.0.0.1` 只聽本機)
 - [ ] 阻擋 upstream 改指 `<新 VM 內網 IP>:8080`,漏埠號會 502
 - [ ] 阻擋 加 `client_max_body_size 256m`(內層為預設 1m + 上傳路徑白名單 256m,edge 太小會先 413)
 - [ ] 應辦 加 `proxy_request_buffering off`
@@ -73,7 +81,12 @@
 **`.env`(與 B 段同表,以下是這條路徑額外要注意的值)**
 
 - [ ] 阻擋 `WEB_BIND=172.17.0.1` —— NPM 跑在同機 Docker 裡,連得到 docker0 閘道但網際網路連不到。
-  NPM 與 web 同在宿主上才填 `127.0.0.1`(預設值)
+  NPM 與 web 同在宿主上才填 `127.0.0.1`(預設值)。兩個坑:`172.17.0.1` 只是 docker0 的**預設**
+  位址(`/etc/docker/daemon.json` 的 `bip` 會改掉,先 `ip -4 addr show docker0` 確認);
+  容器打宿主 IP 走的是 host 的 INPUT 鏈,`ufw` 預設 deny incoming 會直接 DROP(打 loopback 不會)
+- [ ] **更穩的做法是不開宿主埠**:`docker network connect club-aio_default <npm 容器>`,
+  Proxy Host 的 Forward Hostname 填 `web`、Port 填 `80`,並把 compose 的 `web.ports:` 整段拿掉。
+  沒有發布埠就沒有綁錯位址與防火牆的問題
 - [ ] 阻擋 `SITE_URL` = 該站台的實際網域;漏填指向 localhost,通知信與 Discord 的連結全壞
 - [ ] `FORWARDED_ALLOW_IPS` **不必**加 NPM 的 IP:backend 只收得到 compose 子網內 web 容器的連線,
   預設 `172.28.0.0/24` 已足夠。要加的是內層 nginx 的 `set_real_ip_from`(已涵蓋全部 RFC1918)
@@ -82,15 +95,18 @@
 
 - [ ] Forward Hostname/IP = `WEB_BIND` 的值、Port = `WEB_PORT`(預設 8080)。**Scheme 是 `http`**,
   TLS 只在 NPM 那一層;內層 cookie 的 `Secure` 由 `ENV=prod` 給,瀏覽器看到的是 https,不受影響
-- [ ] 阻擋 Advanced 分頁填入:
+- [ ] 應辦 Advanced 分頁填入:
   ```
   client_max_body_size 256m;
   proxy_request_buffering off;
   proxy_read_timeout 300s;
   proxy_send_timeout 300s;
   ```
-  NPM 預設的 body 上限與 60 秒逾時會讓維修影片(200MB)先在 edge 被擋掉或中斷;
-  內層是預設 1m + 上傳路徑白名單 256m,edge 給小了就先吃 413
+  NPM 預設是 `client_max_body_size 2000m` 與 90 秒的 `proxy_connect/send/read_timeout`
+  (`docker/rootfs/etc/nginx/nginx.conf`),所以 200MB 的維修影片**不會**被擋掉 —— 這四行是收緊
+  而非解除阻擋:`256m` 對齊內層的上傳白名單(內層預設 1m,edge 給小了才會先吃 413);
+  `proxy_request_buffering off` 才是真正必要的一行,NPM 預設會把整包 body 先緩衝到自己容器的
+  `/tmp/nginx/body`;300s 是留給慢速上行的裕度
 - [ ] NPM 預設已送 `X-Real-IP` 與 `X-Forwarded-Proto`,內層 `real_ip_header X-Real-IP` 直接接得上,不必另外設定
 - [ ] 確認 `curl -sI https://<網域>/api/v1/health` 200,且 `docker compose logs backend` 裡的 client IP
   是真實來源而非 NPM 的容器 IP —— 塌縮的話限流會變全域一桶
@@ -98,13 +114,23 @@
 **上傳目錄**
 
 - [ ] `UPLOADS_PATH=/srv/club-aio/uploads` —— bind mount,舊照片 sftp 送得進去、備份直接讀得到
+- [ ] **從具名 volume 切過來的機器要先搬檔**,否則容器掛到空目錄、`files` 每一列都還指著舊檔,
+  全站附件靜默 404 而且不會有任何錯誤:
+  ```bash
+  docker compose down
+  docker run --rm -v club-aio_uploads:/from -v /srv/club-aio/uploads:/to alpine cp -a /from/. /to/
+  ```
+  全新機器沒有舊 volume,直接 rsync 進去即可
+- [ ] `migration/*.py` 寫的是**宿主端**的 `UPLOAD_DIR`(預設 `./data/uploads`,且必須在 `backend/` 下跑)。
+  要在這台機器重跑遷移,`UPLOAD_DIR` 得指到同一個 `/srv/club-aio/uploads`,佈局維持 `{模組}/{年}/{月}/{uuid}`
 - [ ] 容器以 root 執行,寫進去的檔案是 `root:root`。sftp 先送到自己的家目錄再 `sudo rsync -a` 進去,
   不要 sftp 直接對著掛載點寫
 
 **映像**
 
 VPS 上直接 `docker compose up -d --build`(`BACKEND_IMAGE`/`WEB_IMAGE` 留空即 `:local`)。
-CI 只在 `main` 推 GHCR 映像,`dev` 分支沒有可 pull 的映像。前端 build 吃記憶體,
+CI 只在 `main` 推 GHCR 映像,`dev` 分支沒有可 pull 的映像 —— **`compose.yml` 檔頭「VM 上永不 build」
+指的是正式站,自架站台是例外**。前端 build 吃記憶體,
 1GB 的機器會 OOM,不足就先在本機 `docker save` 再送上去。
 
 ## F. 待決清單

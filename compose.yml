@@ -1,7 +1,7 @@
 # club-aio 服務組成
 # 開發:docker compose up -d db(前後端在本機熱重載)
 # 正式:設定 BACKEND_IMAGE/WEB_IMAGE 後 docker compose pull && docker compose up -d --no-build
-#       (映像由 CI 產出,VM 上永不 build)
+#       (映像由 CI 產出,VM 上永不 build;CI 只在 main 推映像,自架站台跑 dev 分支是例外)
 name: club-aio
 
 services:

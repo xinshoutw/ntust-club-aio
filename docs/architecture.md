@@ -113,7 +113,7 @@ REST JSON,前綴 `/api/v1`。回應信封:
 
 ```
 club-aio/
-├── compose.yml                 # db + backend + web + db-backup
+├── compose.yml                 # db + backend + web
 ├── backend/
 │   ├── app/{core,models,schemas,api/v1,services,assets}
 │   ├── alembic/  scripts/  tests/
@@ -146,7 +146,7 @@ Internet ──▶ [既有 edge proxy VM]  nginx:443
 ### 6.2 備份
 
 - 每日 `pg_dump`(自訂格式)+ 14 天輪替,**存放於同一環境**(`scripts/backup_db.sh`;decisions.md OPS-01 明定不做異地備份)
-- 上傳目錄不在腳本範圍:由 compose 的 `db-backup` 服務備份 volume,另以 GCE 磁碟快照兜底
+- 上傳目錄不在腳本範圍,而且**目前沒有任何備份機制**:compose 沒有備份服務,GCE 那條路徑只靠磁碟快照兜底,自架站台則完全沒有(DEPLOY_CHECKLIST A 段列為阻擋)
 - 部署前手動加跑一次 dump
 
 單機即單點故障,校內系統可接受短暫維護窗口,但資料不可失。
@@ -166,7 +166,7 @@ GitHub Actions:backend job 跑 `ruff check` + `pytest`(起 postgres service),fro
 
 切換 = 改 `clubs.ntust.edu.tw` 的 vhost,回滾 = 改回舊值:
 
-1. upstream 指到 `<新 VM 內網 IP>:8080` —— edge 現行 upstream 沒寫埠號(預設 80),漏掉會 502
+1. upstream 指到 `<新 VM 內網 IP>:8080` —— edge 現行 upstream 沒寫埠號(預設 80),漏掉會 502;app VM 的 `.env` 同時要設 `WEB_BIND=<app VM 內網 IP>`,否則 web 容器只聽 loopback
 2. 該 vhost 的 `client_max_body_size` 從全域 3072M 收斂為 `256m`(內層最大的那個上傳端點就是這個值;其餘上傳端點在內層各自收到 64m)
 3. 該 vhost 加 `proxy_request_buffering off`,上傳串流直通不在 edge 暫存整包
 4. proxy header 改覆寫式:`proxy_set_header X-Forwarded-For $remote_addr;` 並補 `X-Forwarded-Proto $scheme`(現行 `$proxy_add_x_forwarded_for` 會保留客戶端偽造的 XFF,且沒送 XFP)

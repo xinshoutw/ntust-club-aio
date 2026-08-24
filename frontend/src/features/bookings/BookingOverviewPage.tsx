@@ -548,7 +548,7 @@ export default function BookingOverviewPage() {
             </thead>
             <tbody>
               {recentRooms.map((r) => {
-                const row = reject.rowProps(r.venueName, r.reject)
+                const row = reject.rowProps(r.venueName, r.status, r.reject)
                 return (
                   <tr key={`room-${r.id}`} {...row.tr}>
                     <td style={{ color: 'var(--steel)', fontSize: 13 }}>固定場地</td>
@@ -561,7 +561,7 @@ export default function BookingOverviewPage() {
                 )
               })}
               {recentVenues.map((v) => {
-                const row = reject.rowProps(`${v.venueName}（${v.date}）`, v.reject)
+                const row = reject.rowProps(`${v.venueName}（${v.date}）`, v.status, v.reject)
                 return (
                   <tr key={`venue-${v.id}`} {...row.tr}>
                     <td style={{ color: 'var(--steel)', fontSize: 13 }}>臨時場地</td>
@@ -574,7 +574,7 @@ export default function BookingOverviewPage() {
                 )
               })}
               {recentLoans.map((l) => {
-                const row = reject.rowProps(`${l.equipmentName} ×${l.qty}`, l.reject)
+                const row = reject.rowProps(`${l.equipmentName} ×${l.qty}`, l.status, l.reject)
                 return (
                   <tr key={`loan-${l.id}`} {...row.tr}>
                     <td style={{ color: 'var(--steel)', fontSize: 13 }}>器材</td>

@@ -275,8 +275,8 @@ export default function VenueBookingPage() {
             </thead>
             <tbody>
               {recent.map((v) => {
-                // 退回件可點開原因;其餘(已結束、已取消)沒有可看的內容
-                const row = reject.rowProps(`${v.venueName}（${v.date}）`, v.reject)
+                // 退回件可點開原因(舊資料沒留理由時彈窗會說明);其餘狀態沒有可看的內容
+                const row = reject.rowProps(`${v.venueName}（${v.date}）`, v.status, v.reject)
                 return (
                   <tr key={v.id} {...row.tr}>
                     <td style={{ fontWeight: 500 }}>{row.wrap(v.venueName)}</td>

@@ -401,8 +401,8 @@ export default function FixedRoomPage() {
             </thead>
             <tbody>
               {recent.map((r) => {
-                // 退回件可點開原因;其餘(學期已過、已取消)沒有可看的內容
-                const row = reject.rowProps(r.venueName, r.reject)
+                // 退回件可點開原因(舊資料沒留理由時彈窗會說明);其餘狀態沒有可看的內容
+                const row = reject.rowProps(r.venueName, r.status, r.reject)
                 return (
                   <tr key={r.id} {...row.tr}>
                     <td style={{ fontWeight: 500 }}>{row.wrap(r.venueName)}</td>

@@ -3,22 +3,28 @@
 import { useState, type ReactNode } from 'react'
 import { Modal } from 'antd'
 import type { RejectInfo } from '../../api/bookings'
+import type { StatusKey } from '../../lib/status'
+
+// 舊系統遷入的退回件多半沒留理由(clubclass 的 reject_info 多數是空的)。
+// 那也是一個答案 —— 讓整列點得動並說清楚,比點了沒反應好
+const NO_REASON = '系統未留下退回原因'
 
 interface Shown {
   subject: string
-  info: RejectInfo
+  info?: RejectInfo
 }
 
 /**
- * 退回件才可點:`rowProps(subject, reject)` 給 `<tr>` 展開,`wrap()` 包主要欄位。
+ * 退回件才可點:`rowProps(subject, status, reject)` 給 `<tr>` 展開,`wrap()` 包主要欄位。
+ * 可不可點看**狀態**,不看有沒有理由 —— 沒理由的退回件一樣要點得動。
  * 整列 onClick 只服務滑鼠,鍵盤入口是名稱欄裡的 `.row-open-btn`(design-guide §6)。
  */
 export function useRejectReason() {
   const [shown, setShown] = useState<Shown | null>(null)
   const [open, setOpen] = useState(false)
 
-  const rowProps = (subject: string, info: RejectInfo | undefined) => {
-    if (!info) return { tr: {}, wrap: (label: ReactNode) => label }
+  const rowProps = (subject: string, status: StatusKey, info: RejectInfo | undefined) => {
+    if (status !== 'rejected') return { tr: {}, wrap: (label: ReactNode) => label }
     const show = () => {
       setShown({ subject, info })
       setOpen(true)
@@ -52,9 +58,17 @@ export function useRejectReason() {
     >
       <div style={{ fontWeight: 500, marginBottom: 2 }}>{shown?.subject}</div>
       <div className="num" style={{ fontSize: 12, color: 'var(--steel)', marginBottom: 12 }}>
-        {shown?.info.at}
+        {shown?.info?.at ?? '—'}
       </div>
-      <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{shown?.info.reason}</div>
+      <div
+        style={{
+          whiteSpace: 'pre-wrap',
+          wordBreak: 'break-word',
+          color: shown?.info ? undefined : 'var(--steel)',
+        }}
+      >
+        {shown?.info?.reason ?? NO_REASON}
+      </div>
     </Modal>
   )
 

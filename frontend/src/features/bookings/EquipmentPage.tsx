@@ -342,8 +342,8 @@ export default function EquipmentPage() {
             </thead>
             <tbody>
               {recent.map((l) => {
-                // 退回件可點開原因;其餘(已歸還、已取消)沒有可看的內容
-                const row = reject.rowProps(`${l.equipmentName} ×${l.qty}`, l.reject)
+                // 退回件可點開原因(舊資料沒留理由時彈窗會說明);其餘狀態沒有可看的內容
+                const row = reject.rowProps(`${l.equipmentName} ×${l.qty}`, l.status, l.reject)
                 return (
                   <tr key={l.id} {...row.tr}>
                     <td style={{ fontWeight: 500 }}>

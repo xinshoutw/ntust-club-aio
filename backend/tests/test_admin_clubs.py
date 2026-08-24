@@ -5,7 +5,7 @@ from datetime import date
 import sqlalchemy as sa
 
 from app.core.security import validate_password_strength
-from app.models import AuditLog, Club, ClubMember, Session, User, Violation
+from app.models import Activity, AuditLog, Club, ClubMember, Session, User, Violation
 from app.models.enums import MemberKind, UserRole
 from tests.conftest import csrf_headers, login, make_club, make_user
 
@@ -361,6 +361,23 @@ async def test_delete_club(client, db):
     assert "1 筆" in resp.json()["error"]  # 確認框要講得出一併刪掉的是多少人
     assert await db.scalar(sa.select(Club.id).where(Club.id == club.id)) is not None
     assert await db.scalar(sa.select(User.id).where(User.id == account.id)) is not None
+
+    # 社團帳號自己開過的活動也擋得住:那筆 FK 指向 users.created_by,
+    # 在帳號的 DELETE 就會炸(不是 clubs 那道),漏接就是 500 不是 409
+    db.add(
+        Activity(
+            club_id=club.id, name="迎新", location="活動中心", type="社課或會議",
+            date=date(2026, 3, 1), end_date=date(2026, 3, 1), created_by=account.id,
+        )
+    )
+    await db.commit()
+    resp = await client.delete(
+        f"{URL}/{club.id}?purge_members=true", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 409, resp.text
+    assert await db.scalar(sa.select(User.id).where(User.id == account.id)) is not None
+    await db.execute(sa.delete(Activity).where(Activity.club_id == club.id))
+    await db.commit()
 
     # 留著名單、再加一筆違規紀錄:名單擋得掉,違規紀錄擋不掉(FK,只能停用)
     filler = await db.scalar(sa.select(User).where(User.username == "clubadmin"))

@@ -292,13 +292,16 @@ async def delete_club(
     detail = f"club={club.id};name={club.name};members_purged={members or 0}"
     if account is not None:
         detail += f";username={account.username}"
-        await db.delete(account)
-        # 先送出帳號的 DELETE:ORM 的刪除排序看的是 relationship,User 與 Club 之間沒有,
-        # 不自己 flush 的話 clubs 會先被刪,撞 fk_users_club_id_clubs
-        await db.flush()
     audit.record(db, action="club_deleted", user=user, detail=detail, ip=client_ip(request))
-    await db.delete(club)
+    # flush 與 commit 都在 try 裡:社團帳號自己也擋得住(它開過的活動指向 users.created_by),
+    # 只包 commit 的話那一種會在 flush 當場丟出去,變成 500
     try:
+        if account is not None:
+            await db.delete(account)
+            # 先送出帳號的 DELETE:ORM 的刪除排序看的是 relationship,User 與 Club 之間沒有,
+            # 不自己 flush 的話 clubs 會先被刪,撞 fk_users_club_id_clubs
+            await db.flush()
+        await db.delete(club)
         await db.commit()
     except IntegrityError:
         await db.rollback()

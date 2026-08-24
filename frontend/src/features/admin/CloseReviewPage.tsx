@@ -332,7 +332,7 @@ function CloseReviewModal({
         onCancel={closeReject_}
       >
         <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 8 }}>
-          退回原因
+          原因
         </div>
         <Input.TextArea
           autoFocus
@@ -372,10 +372,10 @@ export default function CloseReviewPage() {
     pageSize: PENDING_PAGE_SIZE,
   })
   // 逾期未結案:後端推導過濾,含已鎖定與已解鎖(overdue=true 不分鎖定與否);
-  // 活動日舊在前=逾期最久的先處理(期限=活動日+鎖定天數,單調)
+  // 活動日新在前=剛逾期的先追,追得回來的就是這些(拖了兩年的舊案排在後面)
   const overdueQuery = useAdminActivitiesPaged({
     overdue: true,
-    sort: 'date',
+    sort: '-date',
     page: overduePage,
     pageSize: OVERDUE_PAGE_SIZE,
     // 逾期清單全是 approved:看不到該狀態的帳號送出去只會拿 403,
@@ -414,7 +414,7 @@ export default function CloseReviewPage() {
 
   const doUnlock = (l: AdminActivity) => {
     unlock.mutate(l.activityId, {
-      onSuccess: () => message.success(`已解鎖「${l.name}」,社團可補送結案`),
+      onSuccess: () => message.success(`已解鎖「${l.name}」`),
       onError: (e) => message.error(e.message),
     })
   }

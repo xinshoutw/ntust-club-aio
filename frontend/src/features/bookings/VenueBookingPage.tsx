@@ -22,6 +22,7 @@ import {
 } from '../../api/bookings'
 import { useApprovedActivities } from '../../api/activities'
 import PeriodPicker from './PeriodPicker'
+import { useRejectReason } from './RejectReasonModal'
 
 export default function VenueBookingPage() {
   const { message, modal } = App.useApp()
@@ -58,6 +59,7 @@ export default function VenueBookingPage() {
   const activeRows = activeQuery.data ?? []
   const recentQuery = useRecentVenueBookings()
   const recent = recentQuery.data ?? []
+  const reject = useRejectReason()
   const { createVenueBooking, cancelVenueBooking } = useBookingMutations()
   const todayStart = dayjs().startOf('day')
 
@@ -272,14 +274,18 @@ export default function VenueBookingPage() {
               </tr>
             </thead>
             <tbody>
-              {recent.map((v) => (
-                <tr key={v.id}>
-                  <td style={{ fontWeight: 500 }}>{v.venueName}</td>
-                  <td className="num" style={{ fontSize: 13 }}>{v.date}</td>
-                  <td style={{ color: 'var(--steel)', fontSize: 13 }}>第 {v.periods.join('、')} 節</td>
-                  <td><StatusPill status={v.status} /></td>
-                </tr>
-              ))}
+              {recent.map((v) => {
+                // 退回件可點開原因;其餘(已結束、已取消)沒有可看的內容
+                const row = reject.rowProps(`${v.venueName}（${v.date}）`, v.reject)
+                return (
+                  <tr key={v.id} {...row.tr}>
+                    <td style={{ fontWeight: 500 }}>{row.wrap(v.venueName)}</td>
+                    <td className="num" style={{ fontSize: 13 }}>{v.date}</td>
+                    <td style={{ color: 'var(--steel)', fontSize: 13 }}>第 {v.periods.join('、')} 節</td>
+                    <td><StatusPill status={v.status} /></td>
+                  </tr>
+                )
+              })}
               {recentQuery.isError && (
                 <tr className="no-hover">
                   <td colSpan={4}>
@@ -296,6 +302,8 @@ export default function VenueBookingPage() {
           </table>
         </LoadingBlock>
       </div>
+
+      {reject.node}
     </div>
   )
 }

@@ -18,6 +18,7 @@ import {
   useRecentEquipmentLoans,
 } from '../../api/bookings'
 import { useApprovedActivities } from '../../api/activities'
+import { useRejectReason } from './RejectReasonModal'
 
 export default function EquipmentPage() {
   const { message, modal } = App.useApp()
@@ -41,6 +42,7 @@ export default function EquipmentPage() {
   const activeRows = activeQuery.data ?? []
   const recentQuery = useRecentEquipmentLoans()
   const recent = recentQuery.data ?? []
+  const reject = useRejectReason()
   const { createEquipmentLoan, cancelEquipmentLoan } = useBookingMutations()
   const todayStart = dayjs().startOf('day')
 
@@ -339,22 +341,26 @@ export default function EquipmentPage() {
               </tr>
             </thead>
             <tbody>
-              {recent.map((l) => (
-                <tr key={l.id}>
-                  <td style={{ fontWeight: 500 }}>
-                    {l.equipmentName} <span className="num">×{l.qty}</span>
-                  </td>
-                  <td className="num" style={{ fontSize: 13 }}>{l.startDate} – {l.endDate}</td>
-                  <td style={{ color: 'var(--steel)', fontSize: 13 }}>{l.activityName ?? l.purpose}</td>
-                  <td style={{ color: 'var(--steel)', fontSize: 13 }}>
-                    {l.borrower && <>借用 {l.borrower}</>}
-                    {l.borrower && l.returnedBy && ' · '}
-                    {l.returnedBy && <>歸還 {l.returnedBy}</>}
-                    {!l.borrower && !l.returnedBy && '—'}
-                  </td>
-                  <td><StatusPill status={l.status} /></td>
-                </tr>
-              ))}
+              {recent.map((l) => {
+                // 退回件可點開原因;其餘(已歸還、已取消)沒有可看的內容
+                const row = reject.rowProps(`${l.equipmentName} ×${l.qty}`, l.reject)
+                return (
+                  <tr key={l.id} {...row.tr}>
+                    <td style={{ fontWeight: 500 }}>
+                      {row.wrap(<>{l.equipmentName} <span className="num">×{l.qty}</span></>)}
+                    </td>
+                    <td className="num" style={{ fontSize: 13 }}>{l.startDate} – {l.endDate}</td>
+                    <td style={{ color: 'var(--steel)', fontSize: 13 }}>{l.activityName ?? l.purpose}</td>
+                    <td style={{ color: 'var(--steel)', fontSize: 13 }}>
+                      {l.borrower && <>借用 {l.borrower}</>}
+                      {l.borrower && l.returnedBy && ' · '}
+                      {l.returnedBy && <>歸還 {l.returnedBy}</>}
+                      {!l.borrower && !l.returnedBy && '—'}
+                    </td>
+                    <td><StatusPill status={l.status} /></td>
+                  </tr>
+                )
+              })}
               {recentQuery.isError && (
                 <tr className="no-hover">
                   <td colSpan={5}>
@@ -371,6 +377,8 @@ export default function EquipmentPage() {
           </table>
         </LoadingBlock>
       </div>
+
+      {reject.node}
     </div>
   )
 }

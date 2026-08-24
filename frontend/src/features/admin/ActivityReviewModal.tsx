@@ -413,14 +413,17 @@ export default function ActivityReviewModal({
           {/* 簽核紀錄:每一次核准/退回逐列印出。章軌只印每一關**最後一次**核准 ——
               退回、退回後重送再核的那幾次都不在軌上,而那正是要查「這張單被卡在哪」時要看的 */}
           {!!d?.approvals?.length && (
-            <div style={{ marginTop: 14, fontSize: 12, color: 'var(--steel)', lineHeight: 1.9 }}>
-              {d.approvals.map((r, i) => (
-                <div key={i}>
-                  {r.actor} 於 <span className="num">{r.at}</span>{' '}
-                  {r.isClose ? '結案' : ''}
-                  {DECISION_LABEL[r.decision] ?? r.decision}
-                </div>
-              ))}
+            <div style={{ marginTop: 14 }}>
+              <SectionTitle>簽核紀錄</SectionTitle>
+              <div style={{ fontSize: 12, color: 'var(--steel)', lineHeight: 1.9 }}>
+                {d.approvals.map((r, i) => (
+                  <div key={i}>
+                    {r.actor} 於 <span className="num">{r.at}</span>{' '}
+                    {r.isClose ? '結案' : ''}
+                    {DECISION_LABEL[r.decision] ?? r.decision}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

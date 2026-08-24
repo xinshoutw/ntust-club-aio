@@ -154,9 +154,14 @@ export function groupClubsByFolder(
 /** 篩選漏斗用的資料夾:略過沒有性質的社團。
  *
  * 正式資料裡那 67 個 attribute 為 null 的全是**停社且零活動**的遷移舊社,
- * 為它們立一個「未分類」資料夾只是雜訊。**`ClubCascader` 不共用這一版** ——
- * 社團總覽/成員列表/管理項目/行政分審核仍要查得到停社社團的名單與歷史。
- * 代價:新建但還沒填性質的社團不會出現在漏斗裡(建檔時性質是必填欄)。
+ * 為它們立一個「未分類」資料夾只是雜訊。用這一版的是:活動申請審核與所有活動的社團漏斗,
+ * 以及行政分審核的社團下拉(`ClubCascader` 的 `hideUnclassified` —— 該頁下方清單只列
+ * 啟用中社團,選單多出來的那疊選了會 404)。
+ *
+ * **`ClubCascader` 的預設路徑不共用這一版**:社團總覽/成員列表/管理項目仍要查得到
+ * 停社社團的名單與歷史。
+ * 代價:沒填性質的社團不會出現在漏斗裡 —— `POST /admin/clubs` 的性質是必填欄,
+ * 但遷移匯入(`migration/cms_import.py`)遇到認不得的性質會留 null 且 is_active=true。
  */
 export const groupClubsForFilter = (
   clubs: readonly ClubOption[],

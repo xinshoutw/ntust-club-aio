@@ -84,8 +84,9 @@ interface StampTrailProps {
 
 export default function StampTrail({ stages, width = 400 }: StampTrailProps) {
   return (
-    // 關卡數不固定:核定 0 元即當場核准(D-16)只畫一格,退回件兩格。連接線若是 flex:1,
-    // 少畫的那幾格會被撐成一條長虛線、章跟著黏在盒子左緣;改成固定長度後居中對齊
+    // 關卡數不固定:退回件與 D-16 當場核准的單子只畫到最後一格有動作的關卡(兩格),
+    // 三關跑完才是三格。連接線若是 flex:1,少畫的那幾格會被撐成一條長虛線、
+    // 章跟著黏在固定寬盒子的左緣;改成固定長度後整條軌居中
     <div
       style={{
         display: 'flex',

@@ -574,7 +574,7 @@ export default function AccountsPage() {
               </td>
             </tr>
           )}
-          {!clubsQuery.isPending && !clubsQuery.isError && filteredClubs.length === 0 && (
+          {!clubsQuery.isFetching && !clubsQuery.isError && filteredClubs.length === 0 && (
             <tr className="no-hover">
               <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
                 {clubKeyword ? '沒有符合搜尋的社團' : '尚無社團資料'}

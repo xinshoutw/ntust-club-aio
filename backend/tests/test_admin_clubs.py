@@ -333,10 +333,10 @@ async def test_reset_password(client, db):
 
 
 async def test_delete_club(client, db):
-    """刪除:名單可經二次確認(purge_members)連帶刪除,其餘紀錄一律 409;帳號隨社團一起刪。"""
+    """刪除:社團底下有資料就先擋(訊息列出筆數),force=true 才照 FK 圖一路刪掉。"""
     club, account, no_account = await seed(client, db)
 
-    # 沒有帳號、沒有資料 → 刪得掉
+    # 沒有帳號、沒有資料 → 直接刪得掉
     resp = await client.delete(f"{URL}/{no_account.id}", headers=csrf_headers(client))
     assert resp.status_code == 200, resp.text
     assert await db.scalar(sa.select(Club.id).where(Club.id == no_account.id)) is None
@@ -344,7 +344,8 @@ async def test_delete_club(client, db):
     assert audit_row is not None
     assert "吉他社" in audit_row.detail
 
-    # 有社員名單 → 409(club_members 是 CASCADE,靠 FK 擋不住)
+    # 社員名單、活動(由社團帳號開立)、違規紀錄三種擋法:
+    # 名單是 CASCADE(FK 擋不住)、活動擋在帳號的 created_by、違規擋在社團本身
     db.add(
         ClubMember(
             club_id=club.id,
@@ -354,67 +355,97 @@ async def test_delete_club(client, db):
             semester="114-1",
         )
     )
-    await db.commit()
-    resp = await client.delete(f"{URL}/{club.id}", headers=csrf_headers(client))
-    assert resp.status_code == 409
-    assert resp.json()["meta"]["code"] == "CLUB_HAS_MEMBERS"  # 二次確認靠這個碼分辨
-    assert "1 筆" in resp.json()["error"]  # 確認框要講得出一併刪掉的是多少人
-    assert await db.scalar(sa.select(Club.id).where(Club.id == club.id)) is not None
-    assert await db.scalar(sa.select(User.id).where(User.id == account.id)) is not None
-
-    # 社團帳號自己開過的活動也擋得住:那筆 FK 指向 users.created_by,
-    # 在帳號的 DELETE 就會炸(不是 clubs 那道),漏接就是 500 不是 409
     db.add(
         Activity(
             club_id=club.id, name="迎新", location="活動中心", type="社課或會議",
             date=date(2026, 3, 1), end_date=date(2026, 3, 1), created_by=account.id,
         )
     )
-    await db.commit()
-    resp = await client.delete(
-        f"{URL}/{club.id}?purge_members=true", headers=csrf_headers(client)
-    )
-    assert resp.status_code == 409, resp.text
-    assert await db.scalar(sa.select(User.id).where(User.id == account.id)) is not None
-    await db.execute(sa.delete(Activity).where(Activity.club_id == club.id))
-    await db.commit()
-
-    # 留著名單、再加一筆違規紀錄:名單擋得掉,違規紀錄擋不掉(FK,只能停用)
     filler = await db.scalar(sa.select(User).where(User.username == "clubadmin"))
-    violation = Violation(
-        club_id=club.id, occurred_on=date(2026, 1, 1), location="活動中心", items=["噪音"],
-        filler_id=filler.id,
+    db.add(
+        Violation(
+            club_id=club.id, occurred_on=date(2026, 1, 1), location="活動中心", items=["噪音"],
+            filler_id=filler.id,
+        )
     )
-    db.add(violation)
     await db.commit()
-    resp = await client.delete(
-        f"{URL}/{club.id}?purge_members=true", headers=csrf_headers(client)
-    )
-    assert resp.status_code == 409
-    assert resp.json()["meta"]["code"] == "CONFLICT"  # 不是名單擋的,再確認一次也沒用
-    assert await db.scalar(sa.select(ClubMember.id).where(ClubMember.club_id == club.id))
 
-    # 違規紀錄清掉後,帶 purge_members 才刪得動 —— 名單連帶消失
-    await db.delete(violation)
-    await db.commit()
-    resp = await client.delete(
-        f"{URL}/{club.id}?purge_members=true", headers=csrf_headers(client)
-    )
+    resp = await client.delete(f"{URL}/{club.id}", headers=csrf_headers(client))
+    assert resp.status_code == 409
+    assert resp.json()["meta"]["code"] == "CLUB_HAS_DATA"  # 二次確認靠這個碼分辨
+    error = resp.json()["error"]
+    # 確認框要講得出一併刪掉的是什麼、多少筆;社團帳號一律隨社團刪,不列進擋刪清單
+    assert "社員名單 1" in error and "活動 1" in error and "違規勸導 1" in error
+    assert "users" not in error
+    assert await db.scalar(sa.select(Club.id).where(Club.id == club.id)) is not None
+
+    # force=true:社團、帳號與底下三類資料一起消失
+    resp = await client.delete(f"{URL}/{club.id}?force=true", headers=csrf_headers(client))
     assert resp.status_code == 200, resp.text
     assert await db.scalar(sa.select(Club.id).where(Club.id == club.id)) is None
     assert await db.scalar(sa.select(User.id).where(User.id == account.id)) is None
+    assert await db.scalar(sa.select(Activity.id).where(Activity.club_id == club.id)) is None
+    assert await db.scalar(sa.select(Violation.id).where(Violation.club_id == club.id)) is None
     assert await db.scalar(sa.select(ClubMember.id).where(ClubMember.club_id == club.id)) is None
     purged = await db.scalar(
         sa.select(AuditLog).where(AuditLog.action == "club_deleted").order_by(AuditLog.id.desc())
     )
-    assert "members_purged=1" in purged.detail  # 刪掉幾個人要查得到
+    # 刪了哪幾類、各幾列要查得到(帳號本身也算一列)
+    assert "activities=1" in purged.detail
+    assert "club_members=1" in purged.detail
+    assert "violations=1" in purged.detail
+    assert "users=1" in purged.detail
+    assert "force=True" in purged.detail
 
     assert (await client.delete(f"{URL}/99999", headers=csrf_headers(client))).status_code == 404
     # 寫入權限歸 aclubset:只有帳號管理鍵刪不動
     await login(client, "accountonly")
     other = await make_club(db, name="桌球社")
-    resp = await client.delete(f"{URL}/{other.id}", headers=csrf_headers(client))
+    resp = await client.delete(f"{URL}/{other.id}?force=true", headers=csrf_headers(client))
     assert resp.status_code == 403
+
+
+async def test_delete_club_never_touches_other_clubs(client, db):
+    """強制刪除只清自己那一支:追到別社的列就整個回 409,不是順手刪掉別人的資料。
+
+    走 FK 圖到社團帳號時,追到的是「這個帳號碰過的東西」—— 那不等於「這個社團的東西」。
+    """
+    club, account, other = await seed(client, db)
+    keeper = await db.scalar(sa.select(User).where(User.username == "clubadmin"))
+    db.add_all([
+        Activity(
+            club_id=club.id, name="要刪的", location="x", type="社課或會議",
+            date=date(2026, 3, 1), end_date=date(2026, 3, 1), created_by=account.id,
+        ),
+        # 別社的活動,卻是這個帳號開的(正常操作做不出來,但資料上擋不住)
+        Activity(
+            club_id=other.id, name="別動我", location="x", type="社課或會議",
+            date=date(2026, 3, 1), end_date=date(2026, 3, 1), created_by=account.id,
+        ),
+    ])
+    await db.commit()
+
+    resp = await client.delete(f"{URL}/{club.id}?force=true", headers=csrf_headers(client))
+    assert resp.status_code == 409, resp.text
+    # 交易整個回滾:本社的活動、社團、帳號一列都沒少
+    assert await db.scalar(sa.select(Activity.id).where(Activity.name == "別動我")) is not None
+    assert await db.scalar(sa.select(Activity.id).where(Activity.name == "要刪的")) is not None
+    assert await db.scalar(sa.select(Club.id).where(Club.id == club.id)) is not None
+    assert await db.scalar(sa.select(User.id).where(User.id == account.id)) is not None
+    assert await db.scalar(sa.select(User.id).where(User.id == keeper.id)) is not None
+
+
+async def test_delete_club_keeps_the_audit_trail(client, db):
+    """稽核軌跡不隨社團帳號消失(`audit_logs.user_id` 是 SET NULL,刻意保留)。"""
+    club, account, _ = await seed(client, db)
+    db.add(AuditLog(action="club_login", user_id=account.id, detail=f"club={club.id}"))
+    await db.commit()
+
+    resp = await client.delete(f"{URL}/{club.id}?force=true", headers=csrf_headers(client))
+    assert resp.status_code == 200, resp.text
+    row = await db.scalar(sa.select(AuditLog).where(AuditLog.action == "club_login"))
+    assert row is not None
+    assert row.user_id is None  # 人被刪了,做過什麼還在
 
 
 async def test_create_club_account(client, db):

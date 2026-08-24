@@ -548,6 +548,12 @@ async def delete_file(db: AsyncSession, file: File) -> Path:
     return disk
 
 
+def unlink_all(paths: Sequence[str]) -> None:
+    """清理性刪多檔(`File.path` 的相對路徑);同 `unlink_quiet`,失敗只記 log。"""
+    for path in paths:
+        unlink_quiet(Path(settings.upload_dir) / path)
+
+
 def enforce_upload_rate(user_id: int) -> None:
     """上傳限流(30 次/分/使用者):防重複上傳大檔耗盡磁碟(2026-07-16 資安審查)。"""
     if not upload_limiter.allow(f"user:{user_id}"):

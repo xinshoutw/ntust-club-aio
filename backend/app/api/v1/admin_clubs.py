@@ -12,6 +12,7 @@
 - 成員名單唯讀,參數比照社團端 /club/members
 """
 
+from collections import Counter
 from typing import Annotated
 
 import sqlalchemy as sa
@@ -25,7 +26,7 @@ from app.core import permissions
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission, require_role
 from app.core.errors import conflict, not_found
 from app.core.security import generate_password, hash_password_async
-from app.models import Club, ClubMember, PasswordHistory, Session, User
+from app.models import Club, ClubMember, File, PasswordHistory, Session, User
 from app.models.enums import ClubKind, MemberKind, UserRole
 from app.schemas.accounts import PasswordResetOut
 from app.schemas.admin import (
@@ -40,6 +41,7 @@ from app.schemas.admin import (
 from app.schemas.clubs import MemberOut
 from app.schemas.common import ApiResponse
 from app.services import audit
+from app.services import files as file_service
 
 router = APIRouter(prefix="/admin/clubs", tags=["admin"])
 
@@ -80,6 +82,105 @@ async def _club_account(db, club_id: int) -> User | None:
         .order_by(User.id)
         .limit(1)
     )
+
+
+# ---- 強制刪除:照 FK 圖把社團底下的資料一路刪掉 ----
+
+# 顯示詞(確認框與 409 訊息);沒列到的印表名 —— 會過期,但過期只是少一個中文詞,不會說錯
+_TABLE_LABELS = {
+    "activities": "活動",
+    "announcements": "公告",
+    "club_members": "社員名單",
+    "equipment_loans": "器材借用",
+    "eval_adjustments": "評鑑調整",
+    "eval_group_clubs": "評鑑分組",
+    "eval_uploads": "評鑑上傳",
+    "files": "檔案",
+    "maintenance_requests": "空間報修",
+    "officer_certificates": "幹部證明",
+    "postal_account_changes": "郵局帳戶異動",
+    "review_scores": "評審評分",
+    "room_booking_requests": "固定場地借用",
+    "session_attendance": "報名簽到",
+    "signup_drafts": "報名草稿",
+    "signups": "線上報名",
+    "venue_bookings": "臨時場地借用",
+    "violations": "違規勸導",
+}
+# 不列進擋刪清單的直接子表:
+# - users:社團帳號一律隨社團刪除(建錯了刪掉時不該因為「有帳號」就要求強制)
+# - announcement_dismissals:蓋板公告的「不再顯示」勾選,是個人偏好不是社團的資料
+_NOT_LISTED = frozenset({"users", "announcement_dismissals"})
+_MAX_DEPTH = 8  # FK 圖的深度上限(現況最深 3:clubs → activities → venue_bookings);防自我參照打轉
+
+
+def _label(table: str) -> str:
+    return _TABLE_LABELS.get(table, table)
+
+
+async def _fk_children(
+    db, table: str, kinds: tuple[str, ...] = ("a", "r")
+) -> list[tuple[str, str, str]]:
+    """`table` 的子表:(子表, 子表欄, 被指到的欄)。單欄 FK 才算。
+
+    `kinds` 是 `confdeltype`:預設只取 NO ACTION/RESTRICT —— **擋得下 DELETE 的就是這些**,
+    要一路刪的也只有這些。數「會一起消失的資料」時另外加上 CASCADE(`c`):那些列 DB 會自己
+    刪掉,不數就會無聲消失。SET NULL(`n`)兩種場合都不取 —— 那種列會留著,只是指標被清空。
+    (現況 `clubs` 底下沒有 SET NULL 的 FK,唯一一個是 `audit_logs.user_id`,而帳號那棵樹
+    本來就不走 —— 見 `delete_club`。)
+    """
+    rows = await db.execute(
+        sa.text("""
+            SELECT c.conrelid::regclass::text, a.attname, af.attname
+            FROM pg_constraint c
+            JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = c.conkey[1]
+            JOIN pg_attribute af ON af.attrelid = c.confrelid AND af.attnum = c.confkey[1]
+            WHERE c.contype = 'f'
+              AND c.confrelid = CAST(:t AS regclass)
+              AND c.confdeltype::text = ANY(:kinds)
+              AND array_length(c.conkey, 1) = 1
+            ORDER BY 1
+        """),
+        {"t": table, "kinds": list(kinds)},
+    )
+    return [(child, col, ref) for child, col, ref in rows]
+
+
+async def _club_data_counts(db, club_id: int) -> dict[str, int]:
+    """社團**直接**掛著的資料筆數(擋刪清單)。
+
+    只數第一層:巢狀的子列(結案報告、借用時段…)隨父列一起消失,分開報只會讓確認框變長。
+    也因為只數一層,同一批列不會從兩條路徑被數到兩次(器材借用同時掛社團與活動)。
+    """
+    counts: dict[str, int] = {}
+    # 加上 CASCADE:社員名單那種 DB 自己會刪的列,不數就會無聲消失
+    for child, col, _ref in await _fk_children(db, "clubs", ("a", "r", "c")):
+        if child in _NOT_LISTED:
+            continue
+        n = await db.scalar(
+            sa.text(f"SELECT count(*) FROM {child} WHERE {col} = :v"), {"v": club_id}
+        )
+        if n:
+            counts[child] = n
+    return counts
+
+
+async def _cascade_delete(db, table: str, where: str, params: dict, depth: int = 0) -> Counter:
+    """深度優先刪掉 `table WHERE where` 及其底下所有擋著的子列;回傳各表刪除筆數。
+
+    識別字全部來自 pg_catalog,不是使用者輸入。
+    """
+    if depth > _MAX_DEPTH:
+        raise RuntimeError(f"FK 圖超過 {_MAX_DEPTH} 層(疑似自我參照):{table}")
+    deleted: Counter = Counter()
+    for child, col, ref in await _fk_children(db, table):
+        deleted += await _cascade_delete(
+            db, child, f"{col} IN (SELECT {ref} FROM {table} WHERE {where})", params, depth + 1
+        )
+    result = await db.execute(sa.text(f"DELETE FROM {table} WHERE {where}"), params)
+    if result.rowcount:
+        deleted[table] += result.rowcount
+    return deleted
 
 
 def _detail_out(club: Club, account: User | None) -> AdminClubDetailOut:
@@ -272,40 +373,72 @@ async def delete_club(
     user: ClubSettingAdmin,
     db: DbDep,
     request: Request,
-    purge_members: bool = Query(False),
+    force: bool = Query(False),
 ) -> ApiResponse[None]:
     """刪除社團主檔(連同社團帳號)。
 
-    活動、借用、申請等任何一筆紀錄都會被 FK 擋下 → 409,那些社團只能停用。
-    社員名單是唯一可以連帶刪除的:`club_members` 是 ON DELETE CASCADE,FK 擋不住,
-    所以先數出來回 `CLUB_HAS_MEMBERS`,由呼叫端二次確認後帶 `purge_members=true` 再送。
+    社團底下還有資料就先回 `CLUB_HAS_DATA`(訊息列出各類筆數),由呼叫端二次確認後帶
+    `force=true` 再送;強制刪除會照 FK 圖把那些資料一路刪掉(檔案連同磁碟上的實體檔),
+    **不可復原**。稽核 `club_deleted` 記下每一類刪了幾列。
+
+    留下來的是刻意的:`audit_logs`(SET NULL)與 `approval_records`(靠 subject_id 對應、
+    沒有 FK)—— 誰做過什麼、誰簽過什麼不隨對象消失。
     """
     club = await _club_or_404(db, club_id)
-    members = await db.scalar(
-        sa.select(sa.func.count()).select_from(ClubMember).where(ClubMember.club_id == club_id)
-    )
-    if members and not purge_members:
-        # 訊息帶筆數:確認框要講得出「一併刪掉的是多少人」,不然沒人知道自己按掉了什麼
-        raise conflict(f"此社團仍有 {members} 筆社員名單", code="CLUB_HAS_MEMBERS")
+    counts = await _club_data_counts(db, club_id)
+    if counts and not force:
+        # 訊息帶筆數:確認框要講得出「一併刪掉的是什麼、多少筆」,不然沒人知道自己按掉了什麼
+        listed = "、".join(f"{_label(t)} {n}" for t, n in counts.items())
+        raise conflict(f"此社團仍有 {listed}", code="CLUB_HAS_DATA")
 
     account = await _club_account(db, club_id)
-    detail = f"club={club.id};name={club.name};members_purged={members or 0}"
+    # 檔案的實體檔在 commit 成功後才刪(反過來 rollback 會留下「DB 有列、磁碟無檔」)
+    paths = list(
+        await db.scalars(
+            sa.select(File.path).where(
+                File.club_id == club_id
+                if account is None
+                else sa.or_(File.club_id == club_id, File.uploaded_by == account.id)
+            )
+        )
+    )
+    params = {"club_id": club_id}
+    try:
+        deleted: Counter = Counter()
+        for child, col, ref in await _fk_children(db, "clubs"):
+            if child in _NOT_LISTED:
+                continue
+            deleted += await _cascade_delete(
+                db, child, f"{col} IN (SELECT {ref} FROM clubs WHERE id = :club_id)", params
+            )
+        # 帳號自己不走 FK 圖:從帳號往下追到的是「這個人碰過的東西」,那不等於「這個社團的
+        # 東西」—— 真有跨社團的列就讓它撞 FK(回 409),不要順手刪掉別人的資料。
+        # 社團自己的資料已在上面清掉,正常情況這一刀不會有東西擋
+        for table, col in (("users", "club_id"), ("clubs", "id")):
+            result = await db.execute(
+                sa.text(f"DELETE FROM {table} WHERE {col} = :club_id"), params
+            )
+            if result.rowcount:
+                deleted[table] += result.rowcount
+    except IntegrityError:
+        # 走漏的 FK(多欄、指到非主鍵的欄、或跨社團的列)——刪不掉就照實說,不留下刪一半的社團
+        await db.rollback()
+        raise conflict("此社團有無法一併刪除的資料，請改用停用") from None
+
+    detail = f"club={club.id};name={club.name};force={force}"
     if account is not None:
         detail += f";username={account.username}"
+    # DB 自己 CASCADE 掉的列(社員名單)不進 rowcount,拿刪除前數到的補上 —— 稽核要記的是
+    # 「這次刪掉了什麼」,不是「哪幾刀是我們自己下的」
+    summary = dict(deleted)
+    for table, n in counts.items():
+        summary.setdefault(table, n)
+    rows = ";".join(f"{t}={n}" for t, n in sorted(summary.items()) if t != "clubs")
+    if rows:
+        detail += ";" + rows
     audit.record(db, action="club_deleted", user=user, detail=detail, ip=client_ip(request))
-    # flush 與 commit 都在 try 裡:社團帳號自己也擋得住(它開過的活動指向 users.created_by),
-    # 只包 commit 的話那一種會在 flush 當場丟出去,變成 500
-    try:
-        if account is not None:
-            await db.delete(account)
-            # 先送出帳號的 DELETE:ORM 的刪除排序看的是 relationship,User 與 Club 之間沒有,
-            # 不自己 flush 的話 clubs 會先被刪,撞 fk_users_club_id_clubs
-            await db.flush()
-        await db.delete(club)
-        await db.commit()
-    except IntegrityError:
-        await db.rollback()
-        raise conflict("此社團已有活動或借用等紀錄，無法刪除。請改用停用") from None
+    await db.commit()
+    file_service.unlink_all(paths)  # commit 成功後才動磁碟
     return ApiResponse()
 
 

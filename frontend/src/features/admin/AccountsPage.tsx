@@ -257,20 +257,20 @@ export default function AccountsPage() {
     }
   }
 
-  // 刪除社團:活動/借用等紀錄由後端的 FK 擋(只能停用),名單則是二次確認後連帶刪除。
+  // 刪除社團:社團底下還有資料時後端會列出各類筆數(CLUB_HAS_DATA),二次確認後強制刪除。
   // 按鈕不預先反灰 —— 前端沒有那些筆數,擋不準就交給後端說明白
-  const deleteClub = (c: AdminClub, purgeMembers?: boolean) =>
+  const deleteClub = (c: AdminClub, force?: boolean) =>
     clubMutations.remove.mutate(
-      { id: c.id, purgeMembers },
+      { id: c.id, force },
       {
         onSuccess: () => message.success(`已刪除 ${c.name}`),
         onError: (e) => {
-          // 只有「還有社員名單」這一種擋法問得下去;其餘 409(活動/借用/違規)再問也是同樣的答案
-          if (e instanceof ApiError && e.code === 'CLUB_HAS_MEMBERS') {
+          // 只有「底下還有資料」這一種擋法問得下去;其餘 409 再問也是同樣的答案
+          if (e instanceof ApiError && e.code === 'CLUB_HAS_DATA') {
             confirmDialog(modal, {
-              title: `連同名單刪除 ${c.name}`,
+              title: `連同資料刪除 ${c.name}`,
               content: `${e.message}，一併刪除後無法復原`,
-              okText: '連同名單刪除',
+              okText: '一併刪除',
               okButtonProps: { danger: true },
               cancelText: '取消',
               onOk: () => deleteClub(c, true),
@@ -285,7 +285,7 @@ export default function AccountsPage() {
   const confirmDeleteClub = (c: AdminClub) =>
     confirmDialog(modal, {
       title: `刪除 ${c.name}`,
-      content: '連同社團帳號一併刪除，確認後無法復原；已有活動或借用紀錄的社團請改用停用',
+      content: '連同社團帳號一併刪除，確認後無法復原',
       okText: '確認刪除',
       okButtonProps: { danger: true },
       cancelText: '取消',

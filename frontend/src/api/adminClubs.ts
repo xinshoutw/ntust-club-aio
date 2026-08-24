@@ -321,13 +321,11 @@ export function useAdminClubMutations() {
       }),
     onSuccess: invalidate,
   })
-  // 刪除社團主檔(連同帳號):有社員名單時後端回 CLUB_HAS_MEMBERS,
-  // 二次確認後帶 purgeMembers 再送一次(名單隨社團一起刪);其餘紀錄一律 409,只能停用
+  // 刪除社團主檔(連同帳號):社團底下還有資料時後端回 CLUB_HAS_DATA(訊息列出各類筆數),
+  // 二次確認後帶 force 再送一次,那些資料會一起刪掉
   const remove = useMutation({
-    mutationFn: ({ id, purgeMembers }: { id: number; purgeMembers?: boolean }) =>
-      api<null>(`/admin/clubs/${id}${purgeMembers ? '?purge_members=true' : ''}`, {
-        method: 'DELETE',
-      }),
+    mutationFn: ({ id, force }: { id: number; force?: boolean }) =>
+      api<null>(`/admin/clubs/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
     onSuccess: invalidate,
   })
   return { create, update, resetPassword, createAccount, remove }

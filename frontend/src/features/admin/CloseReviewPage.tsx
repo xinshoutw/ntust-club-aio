@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { countText } from '../../lib/counts'
-import { App, Button, Checkbox, Input, Modal, Skeleton } from 'antd'
+import { App, Button, Checkbox, Input, Modal, Skeleton, Tooltip } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
@@ -223,7 +223,18 @@ function CloseReviewModal({
             </div>
             <div style={detailLabel}>成果</div>
             <div>
-              照片 <span className="num" style={photoShort ? { color: '#C13B34' } : undefined}>{photos.length}</span> 張
+              {/* 紅字沒有說明就只剩顏色在傳達異常,而承辦看到的是「活動照片」被自動取消勾選
+                  卻不知道為什麼 —— 說明收進 Tooltip(design-guide §UI 文字精簡) */}
+              照片{' '}
+              <Tooltip title={photoShort ? `未達 ${MIN_PHOTOS} 張且無影片連結` : undefined}>
+                <span
+                  className="num"
+                  style={photoShort ? { color: '#C13B34', cursor: 'help' } : undefined}
+                >
+                  {photos.length}
+                </span>
+              </Tooltip>{' '}
+              張
               {report.videoUrl ? (
                 <>
                   {' '}·{' '}

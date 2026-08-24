@@ -53,7 +53,7 @@
 - [ ] 應辦 **Uptime Kuma**:建 backend / frontend 兩個 push monitor,URL 填入 `.env`;`WEB_HEALTH_URL` 走 compose 內網 `http://web/`(容器內 nginx 聽 80,`WEB_PORT` 是宿主機發布埠)。後端每 30 秒推一次,只在 `ENV=prod` 送出
 - [ ] 應辦 **容量告警**:host cron 08:20 呼叫 `scripts/check_disk.py`(80% 警示、90% 告警推 Discord;90% 時上傳前置閘已關閉,沒有告警的話社團會傳不上東西一整天)
 
-## E. Edge proxy 切換
+## E. Edge proxy 切換(校方 edge,clubs.ntust.edu.tw)
 
 檔案 `../nginx/ntust-sites/clubs.ntust.edu.tw.conf`。現況:`upstream clubs { server 10.140.0.2 }`(舊 Django VM,無埠號=預設 80)、XFF 用 `$proxy_add_x_forwarded_for`(追加,客戶端可偽造)、未送 XFP、此 vhost 無 `client_max_body_size`(繼承全域 3072M)。
 
@@ -64,6 +64,42 @@
 - [ ] 待決 台灣 IP 白名單與 `$should_drop` 封鎖 map 沿用現有
 - [ ] 待決 `clubclass.ntust.edu.tw` 是否 307 導向
 - [ ] 上線前演練切換與回滾(回滾 = upstream 改回 `10.140.0.2`)各一次
+
+## E-2. 自架 VPS + Nginx Proxy Manager(先行站台)
+
+正式站切換前的自架環境。edge 換成同機 Docker 上的 Nginx Proxy Manager,TLS 由它處理,
+內層 web 容器不變 —— 拓樸與 E 相同,只是 edge 換了一套實作。
+
+**`.env`(與 B 段同表,以下是這條路徑額外要注意的值)**
+
+- [ ] 阻擋 `WEB_BIND=172.17.0.1` —— NPM 跑在同機 Docker 裡,連得到 docker0 閘道但網際網路連不到。
+  NPM 與 web 同在宿主上才填 `127.0.0.1`(預設值)
+- [ ] 阻擋 `SITE_URL` = 該站台的實際網域;漏填指向 localhost,通知信與 Discord 的連結全壞
+- [ ] `FORWARDED_ALLOW_IPS` **不必**加 NPM 的 IP:backend 只收得到 compose 子網內 web 容器的連線,
+  預設 `172.28.0.0/24` 已足夠。要加的是內層 nginx 的 `set_real_ip_from`(已涵蓋全部 RFC1918)
+
+**NPM 的 Proxy Host**
+
+- [ ] Forward Hostname/IP = `WEB_BIND` 的值、Port = `WEB_PORT`(預設 8080)。**Scheme 是 `http`**,
+  TLS 只在 NPM 那一層;內層 cookie 的 `Secure` 由 `ENV=prod` 給,瀏覽器看到的是 https,不受影響
+- [ ] 阻擋 Advanced 分頁填入:
+  ```
+  client_max_body_size 256m;
+  proxy_request_buffering off;
+  proxy_read_timeout 300s;
+  proxy_send_timeout 300s;
+  ```
+  NPM 預設的 body 上限與 60 秒逾時會讓維修影片(200MB)先在 edge 被擋掉或中斷;
+  內層是預設 1m + 上傳路徑白名單 256m,edge 給小了就先吃 413
+- [ ] NPM 預設已送 `X-Real-IP` 與 `X-Forwarded-Proto`,內層 `real_ip_header X-Real-IP` 直接接得上,不必另外設定
+- [ ] 確認 `curl -sI https://<網域>/api/v1/health` 200,且 `docker compose logs backend` 裡的 client IP
+  是真實來源而非 NPM 的容器 IP —— 塌縮的話限流會變全域一桶
+
+**映像**
+
+VPS 上直接 `docker compose up -d --build`(`BACKEND_IMAGE`/`WEB_IMAGE` 留空即 `:local`)。
+CI 只在 `main` 推 GHCR 映像,`dev` 分支沒有可 pull 的映像。前端 build 吃記憶體,
+1GB 的機器會 OOM,不足就先在本機 `docker save` 再送上去。
 
 ## F. 待決清單
 

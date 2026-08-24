@@ -38,6 +38,7 @@ export const ACTION_LABELS: Record<string, string> = {
   announcement_takeover_updated: '調整公告蓋板',
   club_created: '新增社團',
   club_updated: '更新社團主檔',
+  club_deleted: '刪除社團',
   club_profile_updated: '更新社團資料',
   club_password_reset: '重設社團密碼',
   club_suspended: '停權社團',

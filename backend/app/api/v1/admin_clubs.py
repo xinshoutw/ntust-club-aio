@@ -8,6 +8,7 @@
 - 行政可改:社團名稱/社團或學會(kind)/英文名/帳號 username/啟停用
 - 建立社團帳號(一社一帳號)與重設密碼:一次性密碼(比照 /admin/accounts:
   明碼僅該次回傳、argon2、首登強制改密);入口=帳號管理「社團」分頁與管理項目
+- 刪除社團:只給建錯了用 —— 有社員名單或任何一筆紀錄就擋下(409),其餘改用停用
 - 成員名單唯讀,參數比照社團端 /club/members
 """
 
@@ -263,6 +264,38 @@ async def update_club(
         )
     await db.commit()
     return ApiResponse(data=_detail_out(club, account))
+
+
+@router.delete("/{club_id}")
+async def delete_club(
+    club_id: int, user: ClubSettingAdmin, db: DbDep, request: Request
+) -> ApiResponse[None]:
+    """刪除社團主檔(連同尚未動用過的社團帳號)。
+
+    只給「建錯了」用:活動、借用、申請等任何一筆紀錄都會被 FK 擋下 → 409,
+    有資料的社團一律改用停用。
+    """
+    club = await _club_or_404(db, club_id)
+    # club_members 是 ON DELETE CASCADE,FK 擋不住 —— 不先擋的話整份名單會無聲消失
+    if await db.scalar(sa.select(ClubMember.id).where(ClubMember.club_id == club_id).limit(1)):
+        raise conflict("此社團已有社員名單,無法刪除;請改用停用")
+
+    account = await _club_account(db, club_id)
+    detail = f"club={club.id};name={club.name}"
+    if account is not None:
+        detail += f";username={account.username}"
+        await db.delete(account)
+        # 先送出帳號的 DELETE:ORM 的刪除排序看的是 relationship,User 與 Club 之間沒有,
+        # 不自己 flush 的話 clubs 會先被刪,撞 fk_users_club_id_clubs
+        await db.flush()
+    audit.record(db, action="club_deleted", user=user, detail=detail, ip=client_ip(request))
+    await db.delete(club)
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise conflict("此社團已有活動或借用等紀錄,無法刪除;請改用停用") from None
+    return ApiResponse()
 
 
 @router.post("/{club_id}/account", status_code=201)

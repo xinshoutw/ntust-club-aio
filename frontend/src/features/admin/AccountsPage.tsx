@@ -256,6 +256,23 @@ export default function AccountsPage() {
     }
   }
 
+  // 刪除社團:後端只放行沒有任何資料的社團(有社員名單/活動/借用一律 409),
+  // 所以按鈕不預先反灰 —— 前端沒有那些筆數,擋不準;擋不準就交給後端說明白
+  const confirmDeleteClub = (c: AdminClub) =>
+    confirmDialog(modal, {
+      title: `刪除 ${c.name}`,
+      content: '連同社團帳號一併刪除，確認後無法復原；已有社員名單或任何紀錄的社團請改用停用',
+      okText: '確認刪除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: () => {
+        clubMutations.remove.mutate(c.id, {
+          onSuccess: () => message.success(`已刪除 ${c.name}`),
+          onError: (e) => message.error(e.message),
+        })
+      },
+    })
+
   const openClubAccountModal = (c: AdminClub) => {
     setClubAccountTarget(c)
     setClubUsername('')
@@ -497,8 +514,8 @@ export default function AccountsPage() {
         />
       </div>
       <LoadingBlock pending={clubsQuery.isPending} rows={6}>
-      <table className="tb fixed" style={{ minWidth: 760 }}>
-        <Cols widths={['auto', 110, '20%', 140, 160]} />
+      <table className="tb fixed" style={{ minWidth: 820 }}>
+        <Cols widths={['auto', 110, '20%', 140, 220]} />
         <thead>
           <tr><th scope="col">社團名稱</th><th scope="col">性質</th><th scope="col">帳號</th><th scope="col">狀態</th><th scope="col" className="r">動作</th></tr>
         </thead>
@@ -555,7 +572,15 @@ export default function AccountsPage() {
                       disabled={!canClubSettings}
                       onClick={() => toggleClubActive(c)}
                     >
-                      {c.isActive ? '停權' : '恢復'}
+                      {c.isActive ? '停用' : '恢復'}
+                    </button>
+                    <button
+                      type="button"
+                      className="link-btn danger"
+                      disabled={!canClubSettings}
+                      onClick={() => confirmDeleteClub(c)}
+                    >
+                      刪除
                     </button>
                   </span>
                 </Tooltip>

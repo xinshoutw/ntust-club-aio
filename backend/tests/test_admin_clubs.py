@@ -1,9 +1,11 @@
 """社團主檔管理(/admin/clubs,權限鍵 amember):列表/詳情/修改/建帳號/重設密碼/成員名單。"""
 
+from datetime import date
+
 import sqlalchemy as sa
 
 from app.core.security import validate_password_strength
-from app.models import AuditLog, Club, ClubMember, Session, User
+from app.models import AuditLog, Club, ClubMember, Session, User, Violation
 from app.models.enums import MemberKind, UserRole
 from tests.conftest import csrf_headers, login, make_club, make_user
 
@@ -328,6 +330,61 @@ async def test_reset_password(client, db):
     )
     assert audit_row is not None
     assert password not in audit_row.detail  # 明碼絕不落稽核
+
+
+async def test_delete_club(client, db):
+    """刪除只放行沒有資料的社團:有社員名單或紀錄一律 409,帳號隨社團一起刪。"""
+    club, account, no_account = await seed(client, db)
+
+    # 沒有帳號、沒有資料 → 刪得掉
+    resp = await client.delete(f"{URL}/{no_account.id}", headers=csrf_headers(client))
+    assert resp.status_code == 200, resp.text
+    assert await db.scalar(sa.select(Club.id).where(Club.id == no_account.id)) is None
+    audit_row = await db.scalar(sa.select(AuditLog).where(AuditLog.action == "club_deleted"))
+    assert audit_row is not None
+    assert "吉他社" in audit_row.detail
+
+    # 有社員名單 → 409(club_members 是 CASCADE,靠 FK 擋不住)
+    db.add(
+        ClubMember(
+            club_id=club.id,
+            name="王小明",
+            student_id="B11000000",
+            kind=MemberKind.MEMBER,
+            semester="114-1",
+        )
+    )
+    await db.commit()
+    resp = await client.delete(f"{URL}/{club.id}", headers=csrf_headers(client))
+    assert resp.status_code == 409
+    assert await db.scalar(sa.select(Club.id).where(Club.id == club.id)) is not None
+    assert await db.scalar(sa.select(User.id).where(User.id == account.id)) is not None
+
+    # 名單清掉但留下一筆違規紀錄 → 換 FK 擋(其餘資料同理)
+    await db.execute(sa.delete(ClubMember).where(ClubMember.club_id == club.id))
+    filler = await db.scalar(sa.select(User).where(User.username == "clubadmin"))
+    violation = Violation(
+        club_id=club.id, occurred_on=date(2026, 1, 1), location="活動中心", items=["噪音"],
+        filler_id=filler.id,
+    )
+    db.add(violation)
+    await db.commit()
+    resp = await client.delete(f"{URL}/{club.id}", headers=csrf_headers(client))
+    assert resp.status_code == 409
+
+    await db.delete(violation)
+    await db.commit()
+    resp = await client.delete(f"{URL}/{club.id}", headers=csrf_headers(client))
+    assert resp.status_code == 200, resp.text
+    assert await db.scalar(sa.select(Club.id).where(Club.id == club.id)) is None
+    assert await db.scalar(sa.select(User.id).where(User.id == account.id)) is None
+
+    assert (await client.delete(f"{URL}/99999", headers=csrf_headers(client))).status_code == 404
+    # 寫入權限歸 aclubset:只有帳號管理鍵刪不動
+    await login(client, "accountonly")
+    other = await make_club(db, name="桌球社")
+    resp = await client.delete(f"{URL}/{other.id}", headers=csrf_headers(client))
+    assert resp.status_code == 403
 
 
 async def test_create_club_account(client, db):

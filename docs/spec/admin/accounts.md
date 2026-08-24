@@ -13,7 +13,7 @@
 | 權限目錄 | `GET /auth/me`(`ADMIN_PAGES` + `APPROVAL_STAGES`,權限彈窗的清單來源) |
 | 管理員/工讀生/評審清單 | `GET /admin/accounts?role=…`(伺服器端分頁,每頁 20;一次一類) |
 | 建立 / 刪除 / 啟停 / 重設密碼 / 權限 | `POST /admin/accounts`、`DELETE`、`PUT /{id}/active`、`POST /{id}/reset-password`、`PUT /{id}/permissions` |
-| 社團分頁 | `GET /admin/clubs`、`POST /admin/clubs`、`POST /admin/clubs/{id}/account`、`POST /admin/clubs/{id}/reset-password`、`PATCH /admin/clubs/{id}` |
+| 社團分頁 | `GET /admin/clubs`、`POST /admin/clubs`、`POST /admin/clubs/{id}/account`、`POST /admin/clubs/{id}/reset-password`、`PATCH /admin/clubs/{id}`、`DELETE /admin/clubs/{id}` |
 
 ## 畫面
 
@@ -38,4 +38,5 @@
 - **新增社團只建主檔,不建帳號**:登入用的帳號仍走列上的「建立帳號」(僅無帳號社團出現),兩者是兩個動作 —— 新社團在開通登入前就要先掛得上成員與活動資料
 - **新增社團的權限鍵是 `aclubset`(社團管理項目),不是 `aaccount`**:寫入 `/admin/clubs` 一律歸管理項目那把鍵,只持帳號管理的人看不到這顆鈕
 - 新增社團的 `kind`(社團/學會)由名稱結尾推導(`derive_kind`,與改名同一條規則),**推不出來先當社團** —— 它只決定負責人的顯示詞,管理項目改得動;`attribute`(性質)則是**必填**,沒有性質的社團不會出現在社團漏斗(`groupClubsForFilter` 略過),建好卻篩不到比擋下來更難查;選錯了到「管理項目」改得回來
+- **刪除社團只給「建錯了」用**:連同社團帳號一併刪除,但**有社員名單就先擋下**(`club_members` 是 ON DELETE CASCADE,靠 FK 擋不住,不先擋會讓整份名單無聲消失),活動/借用/違規等其餘資料由 FK 擋 → 409「請改用停用」。按鈕不預先反灰:前端手上沒有那些筆數,擋不準就交給後端說明白
 - **一社一帳號由 DB 唯一索引保證**(`uq_users_club_id`,revision `a1c7f42d9b30`):應用層檢查擋的是友善錯誤訊息,遷移腳本這種繞過應用層的路徑由索引兜底

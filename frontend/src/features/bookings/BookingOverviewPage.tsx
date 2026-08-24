@@ -22,6 +22,7 @@ import {
   useActiveEquipmentLoans,
   useActiveRoomBookings,
   useActiveVenueBookings,
+  RECENT_PAGE,
   useRecentEquipmentLoans,
   useRecentRoomBookings,
   useRecentVenueBookings,
@@ -140,14 +141,15 @@ export default function BookingOverviewPage() {
   }
 
   // 最近申請:三類各取近 5 筆(與各借用頁同一份查詢),退回件可點開原因
-  const recentRoomsQuery = useRecentRoomBookings()
-  const recentVenuesQuery = useRecentVenueBookings()
-  const recentLoansQuery = useRecentEquipmentLoans()
+  const firstPage = { page: 1, pageSize: RECENT_PAGE }
+  const recentRoomsQuery = useRecentRoomBookings(firstPage)
+  const recentVenuesQuery = useRecentVenueBookings(firstPage)
+  const recentLoansQuery = useRecentEquipmentLoans(firstPage)
   const reject = useRejectReason()
-  const recentRooms = recentRoomsQuery.data ?? []
-  const recentVenues = recentVenuesQuery.data ?? []
+  const recentRooms = recentRoomsQuery.data?.rows ?? []
+  const recentVenues = recentVenuesQuery.data?.rows ?? []
   // 已歸還的器材在上面那張卡,這裡只留退回與取消,不把同一列印兩次
-  const recentLoans = (recentLoansQuery.data ?? []).filter((l) => l.status !== 'returned')
+  const recentLoans = (recentLoansQuery.data?.rows ?? []).filter((l) => l.status !== 'returned')
   const recentQueries = [recentRoomsQuery, recentVenuesQuery, recentLoansQuery]
   const recentPending = recentQueries.some((q) => q.isPending)
   const recentErrored = recentQueries.filter((q) => q.isError)

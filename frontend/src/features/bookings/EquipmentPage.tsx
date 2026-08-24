@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 import { App, Button, Form, Input, InputNumber, Select } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
@@ -8,7 +8,7 @@ import { confirmDialog } from '../../lib/confirm'
 import { notFoundText } from '../../lib/selectOptions'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
-import { Cols } from '../../components/ui/tableControls'
+import { Cols, Pager } from '../../components/ui/tableControls'
 import SuspensionNote from '../../components/ui/SuspensionNote'
 import { useClubSuspension } from '../../api/clubProfile'
 import {
@@ -16,6 +16,7 @@ import {
   useEquipmentList,
   useActiveEquipmentLoans,
   useRecentEquipmentLoans,
+  RECENT_PAGE,
 } from '../../api/bookings'
 import { useApprovedActivities } from '../../api/activities'
 import { useRejectReason } from './RejectReasonModal'
@@ -40,8 +41,10 @@ export default function EquipmentPage() {
   // 正在借用=進行中全部(不限長度、可取消);最近借用=歸還/退回/取消 近 5 筆
   const activeQuery = useActiveEquipmentLoans()
   const activeRows = activeQuery.data ?? []
-  const recentQuery = useRecentEquipmentLoans()
-  const recent = recentQuery.data ?? []
+  const [recentPage, setRecentPage] = useState(1)
+  const recentQuery = useRecentEquipmentLoans({ page: recentPage, pageSize: RECENT_PAGE })
+  const recent = recentQuery.data?.rows ?? []
+  const recentTotal = recentQuery.data?.total ?? 0
   const reject = useRejectReason()
   const { createEquipmentLoan, cancelEquipmentLoan } = useBookingMutations()
   const todayStart = dayjs().startOf('day')
@@ -376,6 +379,7 @@ export default function EquipmentPage() {
             </tbody>
           </table>
         </LoadingBlock>
+        <Pager page={recentPage} pageSize={RECENT_PAGE} total={recentTotal} onChange={setRecentPage} style={{ padding: '10px 0 14px' }} />
       </div>
 
       {reject.node}

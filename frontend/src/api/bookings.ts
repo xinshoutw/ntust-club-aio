@@ -479,34 +479,45 @@ export function useReturnedEquipmentLoans(p: PageParams) {
   })
 }
 
-// 最近借用(近 5 筆,僅已結束/退回/取消/歸還;active=false)
-export function useRecentRoomBookings() {
+// 最近借用(已結束/退回/取消/歸還;active=false)。
+// 伺服器端分頁:退回件排在借用日之後,不翻頁就永遠看不到自己被退回的原因
+export const RECENT_PAGE = 5
+
+export interface RecentPage<T> {
+  rows: T[]
+  total: number
+}
+
+export function useRecentRoomBookings(p: PageParams) {
   return useQuery({
-    queryKey: keys.rooms({ page: 1, pageSize: 5 }),
-    queryFn: () =>
+    queryKey: keys.rooms(p),
+    queryFn: (): Promise<RecentPage<RoomBooking>> =>
       apiPaged<RoomBookingOut[]>(
-        `/club/room-bookings${qs({ active: false, page: 1, page_size: 5 })}`,
-      ).then(({ data }) => data.map(toRoomBooking)),
+        `/club/room-bookings${qs({ active: false, page: p.page, page_size: p.pageSize })}`,
+      ).then(({ data, total }) => ({ rows: data.map(toRoomBooking), total })),
+    placeholderData: keepPreviousData,
   })
 }
 
-export function useRecentVenueBookings() {
+export function useRecentVenueBookings(p: PageParams) {
   return useQuery({
-    queryKey: keys.venueBookings({ page: 1, pageSize: 5 }),
-    queryFn: () =>
+    queryKey: keys.venueBookings(p),
+    queryFn: (): Promise<RecentPage<VenueBookingRecord>> =>
       apiPaged<VenueBookingOut[]>(
-        `/club/venue-bookings${qs({ active: false, page: 1, page_size: 5 })}`,
-      ).then(({ data }) => data.map(toVenueBooking)),
+        `/club/venue-bookings${qs({ active: false, page: p.page, page_size: p.pageSize })}`,
+      ).then(({ data, total }) => ({ rows: data.map(toVenueBooking), total })),
+    placeholderData: keepPreviousData,
   })
 }
 
-export function useRecentEquipmentLoans() {
+export function useRecentEquipmentLoans(p: PageParams) {
   return useQuery({
-    queryKey: keys.loans({ page: 1, pageSize: 5 }),
-    queryFn: () =>
+    queryKey: keys.loans(p),
+    queryFn: (): Promise<RecentPage<EquipmentLoanRecord>> =>
       apiPaged<EquipmentLoanOut[]>(
-        `/club/equipment-loans${qs({ active: false, page: 1, page_size: 5 })}`,
-      ).then(({ data }) => data.map(toEquipmentLoan)),
+        `/club/equipment-loans${qs({ active: false, page: p.page, page_size: p.pageSize })}`,
+      ).then(({ data, total }) => ({ rows: data.map(toEquipmentLoan), total })),
+    placeholderData: keepPreviousData,
   })
 }
 

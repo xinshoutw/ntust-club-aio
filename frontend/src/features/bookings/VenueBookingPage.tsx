@@ -10,12 +10,13 @@ import { bookingStarted, periodKeys, startedPeriods, usePeriods } from '../../li
 import { notFoundText } from '../../lib/selectOptions'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
-import { Cols } from '../../components/ui/tableControls'
+import { Cols, Pager } from '../../components/ui/tableControls'
 import SuspensionNote from '../../components/ui/SuspensionNote'
 import { useClubSuspension } from '../../api/clubProfile'
 import {
   useBookingMutations,
   useActiveVenueBookings,
+  RECENT_PAGE,
   useRecentVenueBookings,
   useVenues,
   venueLabel,
@@ -57,8 +58,10 @@ export default function VenueBookingPage() {
   // 正在申請=進行中全部(不限長度、可取消);最近申請=已結束/退回/取消 近 5 筆
   const activeQuery = useActiveVenueBookings()
   const activeRows = activeQuery.data ?? []
-  const recentQuery = useRecentVenueBookings()
-  const recent = recentQuery.data ?? []
+  const [recentPage, setRecentPage] = useState(1)
+  const recentQuery = useRecentVenueBookings({ page: recentPage, pageSize: RECENT_PAGE })
+  const recent = recentQuery.data?.rows ?? []
+  const recentTotal = recentQuery.data?.total ?? 0
   const reject = useRejectReason()
   const { createVenueBooking, cancelVenueBooking } = useBookingMutations()
   const todayStart = dayjs().startOf('day')
@@ -301,6 +304,7 @@ export default function VenueBookingPage() {
             </tbody>
           </table>
         </LoadingBlock>
+        <Pager page={recentPage} pageSize={RECENT_PAGE} total={recentTotal} onChange={setRecentPage} style={{ padding: '10px 0 14px' }} />
       </div>
 
       {reject.node}

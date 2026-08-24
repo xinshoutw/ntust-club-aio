@@ -90,9 +90,11 @@ async def test_create_club(client, db):
     assert resp.status_code == 201, resp.text
     body = resp.json()["data"]
     assert (body["name"], body["kind"], body["attribute"]) == ("攝影研究會", "學會", "學藝性")
-    # 帳號另走 /{id}/account:剛建好的社團還登不進來
-    assert body["username"] is None
     assert body["is_active"] is True
+    # 帳號另走 /{id}/account:剛建好的社團還登不進來。查 GET 不查建立回應 ——
+    # 後者的 username 是 _detail_out(club, None) 寫死的參數,庫裡有沒有帳號都是 None
+    fetched = await client.get(f"{URL}/{body['id']}")
+    assert fetched.json()["data"]["username"] is None
 
     # 結尾推不出社/會的先當社團(管理項目改得動),不是擋下來
     resp = await client.post(

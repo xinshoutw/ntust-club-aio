@@ -51,6 +51,9 @@ async def test_club_pages_have_separate_keys(client, db):
         await client.post(
             f"{URL}/{club.id}/account", json={"username": "x1"}, headers=csrf_headers(client)
         ),
+        await client.post(
+            URL, json={"name": "新社", "attribute": "藝術性"}, headers=csrf_headers(client)
+        ),
     ):
         assert resp.status_code == 403, resp.text
 
@@ -71,6 +74,45 @@ async def test_permission_gate(client, db):
         f"{URL}/{club.id}/account", json={"username": "newclub"}, headers=csrf_headers(client)
     )
     assert resp.status_code == 403
+    resp = await client.post(
+        URL, json={"name": "新社", "attribute": "藝術性"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 403
+
+
+async def test_create_club(client, db):
+    """新增社團:kind 由名稱結尾推導,性質必填,名稱不得重複。"""
+    club, _, _ = await seed(client, db)
+
+    resp = await client.post(
+        URL, json={"name": "攝影研究會", "attribute": "學藝性"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()["data"]
+    assert (body["name"], body["kind"], body["attribute"]) == ("攝影研究會", "學會", "學藝性")
+    # 帳號另走 /{id}/account:剛建好的社團還登不進來
+    assert body["username"] is None
+    assert body["is_active"] is True
+
+    # 結尾推不出社/會的先當社團(管理項目改得動),不是擋下來
+    resp = await client.post(
+        URL, json={"name": "臺科大電競", "attribute": "體育性"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["data"]["kind"] == "社團"
+
+    # 名稱唯一;性質必填(沒有性質的社團不會出現在社團漏斗)
+    resp = await client.post(
+        URL, json={"name": club.name, "attribute": "藝術性"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 409, resp.text
+    resp = await client.post(URL, json={"name": "無性質社"}, headers=csrf_headers(client))
+    assert resp.status_code == 422, resp.text
+
+    audits = (
+        await db.scalars(sa.select(AuditLog).where(AuditLog.action == "club_created"))
+    ).all()
+    assert len(audits) == 2
 
 
 async def test_club_options_open_to_any_admin(client, db):

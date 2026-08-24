@@ -28,6 +28,7 @@ from app.models import Club, ClubMember, PasswordHistory, Session, User
 from app.models.enums import ClubKind, MemberKind, UserRole
 from app.schemas.accounts import PasswordResetOut
 from app.schemas.admin import (
+    AdminClubCreate,
     AdminClubDetailOut,
     AdminClubOut,
     AdminClubUpdate,
@@ -128,6 +129,37 @@ async def list_clubs(user: ClubLister, db: DbDep) -> ApiResponse[list[AdminClubO
         for club, username in rows
     ]
     return ApiResponse(data=data)
+
+
+@router.post("", status_code=201)
+async def create_club(
+    body: AdminClubCreate, user: ClubSettingAdmin, db: DbDep, request: Request
+) -> ApiResponse[AdminClubDetailOut]:
+    """新增社團主檔(帳號管理「社團」分頁);登入用的帳號另走 `POST /{id}/account`。"""
+    if await db.scalar(sa.select(Club.id).where(Club.name == body.name)):
+        raise conflict("此社團名稱已存在")
+    # 名稱結尾推不出社/會就先當社團:kind 只決定負責人顯示詞,管理項目改得動
+    club = Club(
+        name=body.name,
+        kind=derive_kind(body.name) or ClubKind.CLUB,
+        attribute=body.attribute,
+    )
+    db.add(club)
+    try:
+        await db.flush()
+    except IntegrityError:
+        # 唯一檢查與 INSERT 之間的並發窗口:撞 clubs.name 唯一索引 → 409
+        await db.rollback()
+        raise conflict("此社團名稱已存在") from None
+    audit.record(
+        db,
+        action="club_created",
+        user=user,
+        detail=f"club={club.id};name={club.name};attribute={club.attribute.value}",
+        ip=client_ip(request),
+    )
+    await db.commit()
+    return ApiResponse(data=_detail_out(club, None))
 
 
 @router.get("/options")

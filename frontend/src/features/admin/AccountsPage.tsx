@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { App, Button, Checkbox, Input, Modal, Tabs, Tooltip } from 'antd'
+import { App, Button, Checkbox, Input, Modal, Select, Tabs, Tooltip } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { confirmDialog } from '../../lib/confirm'
 import { suspendedNow } from '../../lib/status'
@@ -16,7 +16,7 @@ import {
   type Account,
   type ManagedRole,
 } from '../../api/adminAccounts'
-import { useAdminClubMutations, useAdminClubs, type AdminClub } from '../../api/adminClubs'
+import { CLUB_ATTRIBUTES, useAdminClubMutations, useAdminClubs, type AdminClub } from '../../api/adminClubs'
 import { useAuth } from '../../app/auth'
 import { canAccessAdminPath } from '../../lib/permissions'
 
@@ -80,6 +80,10 @@ export default function AccountsPage() {
   const [clubAccountTarget, setClubAccountTarget] = useState<AdminClub | null>(null)
   const [clubAccountOpen, setClubAccountOpen] = useState(false)
   const [clubUsername, setClubUsername] = useState('')
+  // 新增社團彈窗:只建主檔,帳號仍走列上的「建立帳號」(建社團與建帳號是兩個動作)
+  const [newClubOpen, setNewClubOpen] = useState(false)
+  const [newClubName, setNewClubName] = useState('')
+  const [newClubAttribute, setNewClubAttribute] = useState<string | undefined>()
 
   // 一次性密碼彈窗:密碼由後端於建立/重設當次回傳,關閉後不再顯示
   const [pwTarget, setPwTarget] = useState<{ title: string; account: string; password: string } | null>(null)
@@ -273,6 +277,39 @@ export default function AccountsPage() {
         onSuccess: ({ username: account, password }) => {
           setClubAccountOpen(false)
           showPassword(`已建立社團帳號 — ${clubAccountTarget.name}`, account, password)
+        },
+        onError: (e) => message.error(e.message),
+      },
+    )
+  }
+
+  const closeNewClub = () => {
+    setNewClubOpen(false)
+    setNewClubName('')
+    setNewClubAttribute(undefined)
+  }
+
+  const submitNewClub = () => {
+    // Enter 走 onPressEnter 直接進來,confirmLoading 攔不到(同 submitClubAccount)
+    if (clubMutations.create.isPending) return
+    const name = newClubName.trim()
+    if (!name) {
+      message.error('社團名稱為必填')
+      return
+    }
+    if (!newClubAttribute) {
+      message.error('社團性質為必填')
+      return
+    }
+    clubMutations.create.mutate(
+      { name, attribute: newClubAttribute },
+      {
+        onSuccess: (c) => {
+          closeNewClub()
+          // 主檔建好了但還登不進來:不講的話會以為社團已經可以用了
+          message.success(`已新增 ${c.name}，請於列上「建立帳號」開通登入`)
+          setClubSearch(c.name)
+          setClubPage(1)
         },
         onError: (e) => message.error(e.message),
       },
@@ -561,8 +598,14 @@ export default function AccountsPage() {
       <PageHeader
         title="帳號管理"
         extra={
-          // 社團 tab 不提供「+ 新增」:建立帳號走列上動作(僅無帳號社團)
-          tab !== 'clubs' && (
+          // 社團 tab 建的是主檔,帳號仍走列上動作(僅無帳號社團);寫入歸「社團管理項目」
+          tab === 'clubs' ? (
+            canClubSettings && (
+              <Button type="primary" onClick={() => setNewClubOpen(true)}>
+                + 新增社團
+              </Button>
+            )
+          ) : (
             <Button type="primary" onClick={() => setCreateOpen(true)}>
               + 新增{roleLabel}
             </Button>
@@ -616,6 +659,48 @@ export default function AccountsPage() {
             </div>
             <Input className="num" value={newAccount} onChange={(e) => setNewAccount(e.target.value)} placeholder={USERNAME_HINT} />
           </div>
+        </div>
+      </Modal>
+
+      {/* 新增社團:只建主檔(kind 由後端依名稱結尾推導),登入用的帳號另走列上「建立帳號」 */}
+      <Modal
+        open={newClubOpen}
+        title="新增社團"
+        okText="建立"
+        cancelText="取消"
+        destroyOnHidden
+        confirmLoading={clubMutations.create.isPending}
+        onOk={submitNewClub}
+        onCancel={closeNewClub}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
+              <span style={{ color: '#C13B34' }}>*</span> 社團名稱
+            </div>
+            <Input
+              autoFocus
+              value={newClubName}
+              onChange={(e) => setNewClubName(e.target.value)}
+              onPressEnter={submitNewClub}
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
+              <span style={{ color: '#C13B34' }}>*</span> 社團性質
+            </div>
+            {/* 必填:沒有性質的社團不會出現在社團漏斗,建好卻篩不到比擋下來更難查 */}
+            <Select
+              style={{ width: '100%' }}
+              value={newClubAttribute}
+              onChange={setNewClubAttribute}
+              placeholder="請選擇"
+              options={CLUB_ATTRIBUTES.map((a) => ({ value: a, label: a }))}
+            />
+          </div>
+          <Tooltip title="社團或學會由名稱結尾自動判定，可於「管理項目」修改">
+            <span style={{ fontSize: 12, color: 'var(--steel)' }}>建立後於列上「建立帳號」開通登入</span>
+          </Tooltip>
         </div>
       </Modal>
 

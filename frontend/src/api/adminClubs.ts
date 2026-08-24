@@ -276,6 +276,16 @@ export function useAdminClubMutations() {
       }).then(toDetail),
     onSuccess: invalidate,
   })
+  // 新增社團主檔:kind 由後端依名稱結尾推導,性質必填(沒有性質的社團不會出現在社團漏斗);
+  // 登入用的帳號另走 createAccount —— 建社團與建帳號是兩個動作
+  const create = useMutation({
+    mutationFn: ({ name, attribute }: { name: string; attribute: string }) =>
+      api<AdminClubDetailOut>('/admin/clubs', {
+        method: 'POST',
+        body: JSON.stringify({ name, attribute }),
+      }).then(toDetail),
+    onSuccess: invalidate,
+  })
   // 一次性明碼僅此回應可見;呼叫端接 OneTimePasswordModal 顯示
   const resetPassword = useMutation({
     mutationFn: (id: number) =>
@@ -293,5 +303,5 @@ export function useAdminClubMutations() {
       }),
     onSuccess: invalidate,
   })
-  return { update, resetPassword, createAccount }
+  return { create, update, resetPassword, createAccount }
 }

@@ -8,6 +8,7 @@ from app.models.enums import (
     ApplicationStatus,
     BookingStatus,
     CertPosition,
+    ClubAttribute,
     ClubKind,
     LoanStatus,
     MaintenanceStatus,
@@ -271,6 +272,27 @@ class AdminClubDetailOut(AdminClubOut):
     advisor_out_email: str | None
     advisor_out_phone: str | None
     suspend_reason: str | None
+
+
+class AdminClubCreate(BaseModel):
+    """新增社團主檔;帳號另走 `POST /admin/clubs/{id}/account`(建了才登得進來)。
+
+    `kind` 不收:一律由名稱結尾推導(`derive_kind`,與改名同一條規則),推不出來時
+    先當社團 —— 它只決定負責人的顯示詞(社長/會長),管理項目改得動。
+    `attribute` 必填:沒有性質的社團不會出現在社團漏斗(`groupClubsForFilter` 略過),
+    建好卻在篩選裡找不到比擋下來更難查。
+    """
+
+    name: str = Field(min_length=1, max_length=100)
+    attribute: ClubAttribute
+
+    @field_validator("name")
+    @classmethod
+    def _strip_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("社團名稱不得為空白")
+        return v
 
 
 class AdminClubUpdate(BaseModel):

@@ -598,13 +598,19 @@ export default function AccountsPage() {
       <PageHeader
         title="帳號管理"
         extra={
-          // 社團 tab 建的是主檔,帳號仍走列上動作(僅無帳號社團);寫入歸「社團管理項目」
+          // 社團 tab 建的是主檔,帳號仍走列上動作(僅無帳號社團);寫入歸「社團管理項目」。
+          // 沒權限是反灰不是隱藏 —— 與同頁列上三個動作同一條規則,鈕整顆不見會被讀成
+          // 「這頁不提供新增」而不是「我缺權限」
           tab === 'clubs' ? (
-            canClubSettings && (
-              <Button type="primary" onClick={() => setNewClubOpen(true)}>
+            <Tooltip title={canClubSettings ? undefined : '需要「社團管理項目」權限'}>
+              <Button
+                type="primary"
+                disabled={!canClubSettings}
+                onClick={() => setNewClubOpen(true)}
+              >
                 + 新增社團
               </Button>
-            )
+            </Tooltip>
           ) : (
             <Button type="primary" onClick={() => setCreateOpen(true)}>
               + 新增{roleLabel}

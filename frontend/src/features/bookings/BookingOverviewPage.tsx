@@ -38,7 +38,7 @@ import {
   type Venue,
 } from '../../api/bookings'
 import { CELL, emptyCellState, type CellState } from './cells'
-import { useRejectReason } from './RejectReasonModal'
+import { useDecisionReason } from './DecisionReasonModal'
 
 const RETURNED_PAGE = 10
 const VENUE_DAYS = 15 // 單一場地檢視:選擇日 −7 ~ +7 共 15 天
@@ -145,11 +145,12 @@ export default function BookingOverviewPage() {
   const recentRoomsQuery = useRecentRoomBookings(firstPage)
   const recentVenuesQuery = useRecentVenueBookings(firstPage)
   const recentLoansQuery = useRecentEquipmentLoans(firstPage)
-  const reject = useRejectReason()
+  const decision = useDecisionReason()
   const recentRooms = recentRoomsQuery.data?.rows ?? []
   const recentVenues = recentVenuesQuery.data?.rows ?? []
-  // 已歸還的器材在上面那張卡,這裡只留退回與取消,不把同一列印兩次
-  const recentLoans = (recentLoansQuery.data?.rows ?? []).filter((l) => l.status !== 'returned')
+  // 不濾掉已歸還的:這裡拿到的就是後端給的最新 5 筆,濾完可能一列不剩,
+  // 空表再配上「尚無申請紀錄」就成了假話。與上面那張卡重疊幾列是可以接受的代價
+  const recentLoans = recentLoansQuery.data?.rows ?? []
   const recentQueries = [recentRoomsQuery, recentVenuesQuery, recentLoansQuery]
   const recentPending = recentQueries.some((q) => q.isPending)
   const recentErrored = recentQueries.filter((q) => q.isError)
@@ -550,7 +551,7 @@ export default function BookingOverviewPage() {
             </thead>
             <tbody>
               {recentRooms.map((r) => {
-                const row = reject.rowProps(r.venueName, r.status, r.reject)
+                const row = decision.rowProps(r.venueName, r.status, r.decision)
                 return (
                   <tr key={`room-${r.id}`} {...row.tr}>
                     <td style={{ color: 'var(--steel)', fontSize: 13 }}>固定場地</td>
@@ -563,7 +564,7 @@ export default function BookingOverviewPage() {
                 )
               })}
               {recentVenues.map((v) => {
-                const row = reject.rowProps(`${v.venueName}（${v.date}）`, v.status, v.reject)
+                const row = decision.rowProps(`${v.venueName}（${v.date}）`, v.status, v.decision)
                 return (
                   <tr key={`venue-${v.id}`} {...row.tr}>
                     <td style={{ color: 'var(--steel)', fontSize: 13 }}>臨時場地</td>
@@ -576,7 +577,7 @@ export default function BookingOverviewPage() {
                 )
               })}
               {recentLoans.map((l) => {
-                const row = reject.rowProps(`${l.equipmentName} ×${l.qty}`, l.status, l.reject)
+                const row = decision.rowProps(`${l.equipmentName} ×${l.qty}`, l.status, l.decision)
                 return (
                   <tr key={`loan-${l.id}`} {...row.tr}>
                     <td style={{ color: 'var(--steel)', fontSize: 13 }}>器材</td>
@@ -605,7 +606,7 @@ export default function BookingOverviewPage() {
         </LoadingBlock>
       </div>
 
-      {reject.node}
+      {decision.node}
     </div>
   )
 }

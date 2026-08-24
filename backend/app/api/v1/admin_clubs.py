@@ -182,6 +182,7 @@ async def club_options(user: AnyAdmin, db: DbDep) -> ApiResponse[list[ClubOption
                 name=c.name,
                 kind=c.kind.value,
                 attribute=c.attribute.value if c.attribute else None,
+                is_active=c.is_active,
             )
             for c in rows
         ]

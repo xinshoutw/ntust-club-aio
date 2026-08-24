@@ -105,6 +105,18 @@ async def test_create_club(client, db):
     assert resp.status_code == 201, resp.text
     assert resp.json()["data"]["kind"] == "社團"
 
+    # 名稱前後空白要 trim:不 trim 的話 derive_kind 的 endswith 對不上(kind 落到
+    # fallback)、重名檢查也繞得過去,而全空白會建出一個沒有名字的社團
+    resp = await client.post(
+        URL, json={"name": "  書法社  ", "attribute": "藝術性"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 201, resp.text
+    assert (resp.json()["data"]["name"], resp.json()["data"]["kind"]) == ("書法社", "社團")
+    resp = await client.post(
+        URL, json={"name": "   ", "attribute": "藝術性"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 422, resp.text
+
     # 名稱唯一;性質必填(沒有性質的社團不會出現在社團漏斗)
     resp = await client.post(
         URL, json={"name": club.name, "attribute": "藝術性"}, headers=csrf_headers(client)
@@ -116,7 +128,7 @@ async def test_create_club(client, db):
     audits = (
         await db.scalars(sa.select(AuditLog).where(AuditLog.action == "club_created"))
     ).all()
-    assert len(audits) == 2
+    assert len(audits) == 3
 
 
 async def test_create_club_needs_the_club_settings_key(client, db):
@@ -166,7 +178,9 @@ async def test_club_options_open_to_any_admin(client, db):
     data = resp.json()["data"]
     assert {c["name"] for c in data} == {"熱舞社", "吉他社"}
     row = next(c for c in data if c["id"] == club.id)
-    assert set(row) == {"id", "name", "kind", "attribute"}  # 不含帳號/停權等敏感欄位
+    # is_active 是啟停用旗標(行政分下拉靠它濾掉會 404 的停用社團),不是敏感欄位;
+    # 帳號名與停權日仍只在需要 aclub 的完整主檔
+    assert set(row) == {"id", "name", "kind", "attribute", "is_active"}
 
     # 非 admin 不可讀
     await login(client, "club01")

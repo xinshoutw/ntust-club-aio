@@ -134,6 +134,7 @@ export interface ClubOption {
   name: string
   kind: string // 社團/學會(負責人顯示詞推導)
   attribute: string | null // null 歸「未分類」
+  isActive: boolean
 }
 
 /** 社團的資料夾:停社舊社團的 attribute 為 null,一律歸「未分類」。
@@ -154,12 +155,11 @@ export function groupClubsByFolder(
 /** 篩選漏斗用的資料夾:略過沒有性質的社團。
  *
  * 正式資料裡那 67 個 attribute 為 null 的全是**停社且零活動**的遷移舊社,
- * 為它們立一個「未分類」資料夾只是雜訊。用這一版的是:活動申請審核與所有活動的社團漏斗,
- * 以及行政分審核的社團下拉(`ClubCascader` 的 `hideUnclassified` —— 該頁下方清單只列
- * 啟用中社團,選單多出來的那疊選了會 404)。
+ * 為它們立一個「未分類」資料夾只是雜訊。用這一版的只有兩個社團漏斗:活動申請審核、所有活動。
  *
- * **`ClubCascader` 的預設路徑不共用這一版**:社團總覽/成員列表/管理項目仍要查得到
- * 停社社團的名單與歷史。
+ * **`ClubCascader` 不共用這一版**:社團總覽/成員列表/管理項目要查得到停社社團的名單與
+ * 歷史;行政分審核篩的則是 `is_active`(`activeOnly`)—— 那頁的界線是「端點收不收」,
+ * 與「有沒有性質」不是同一條。
  * 代價:沒填性質的社團不會出現在漏斗裡 —— `POST /admin/clubs` 的性質是必填欄,
  * 但遷移匯入(`migration/cms_import.py`)遇到認不得的性質會留 null 且 is_active=true。
  */
@@ -167,10 +167,21 @@ export const groupClubsForFilter = (
   clubs: readonly ClubOption[],
 ): { label: string; options: string[] }[] => groupClubsByFolder(clubs.filter((c) => c.attribute))
 
+interface ClubOptionOut {
+  id: number
+  name: string
+  kind: string
+  attribute: string | null
+  is_active: boolean
+}
+
 export function useClubOptions() {
   return useQuery({
     queryKey: adminClubKeys.options,
-    queryFn: () => api<ClubOption[]>('/admin/clubs/options'),
+    queryFn: () =>
+      api<ClubOptionOut[]>('/admin/clubs/options').then((rows) =>
+        rows.map((c) => ({ ...c, isActive: c.is_active })),
+      ),
     staleTime: 5 * 60_000, // 同上;主檔 mutation invalidate 整域時一併更新
   })
 }
@@ -309,5 +320,10 @@ export function useAdminClubMutations() {
       }),
     onSuccess: invalidate,
   })
-  return { create, update, resetPassword, createAccount }
+  // 刪除社團主檔(連同帳號):後端只放行沒有任何資料的社團,其餘回 409
+  const remove = useMutation({
+    mutationFn: (id: number) => api<null>(`/admin/clubs/${id}`, { method: 'DELETE' }),
+    onSuccess: invalidate,
+  })
+  return { create, update, resetPassword, createAccount, remove }
 }

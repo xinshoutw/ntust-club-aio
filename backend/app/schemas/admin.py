@@ -250,6 +250,9 @@ class ClubOptionOut(BaseModel):
     name: str
     kind: str  # 社團/學會(負責人顯示詞推導)
     attribute: str | None  # ClubCascader 第一層=性質資料夾;None 歸「未分類」
+    # 行政分審核的下拉只列得出啟用中社團(該頁的端點對停用社團一律 404)。
+    # 停權日等敏感欄位仍留在需要 aclub 的完整主檔,這裡只回啟停用旗標
+    is_active: bool
 
 
 class AdminClubDetailOut(AdminClubOut):

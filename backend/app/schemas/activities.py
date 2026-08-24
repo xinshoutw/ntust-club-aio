@@ -196,6 +196,10 @@ class ApprovalOut(BaseModel):
     decision: str
     reason: str | None
     created_at: datetime
+    # 申請與結案的簽核紀錄同放一張表:不帶這欄的話「核准」印出來分不出是核了哪一件
+    subject_type: str = ""
+    # 僅行政端詳情填(社團端看自己的單,不需要簽核者姓名)
+    actor_name: str = ""
 
 
 class ActivityOut(BaseModel):

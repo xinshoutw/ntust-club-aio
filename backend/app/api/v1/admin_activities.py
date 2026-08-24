@@ -17,7 +17,7 @@ from app.api.pagination import NullsLast, Pagination, parse_sort
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, forbidden, not_found, validation_error
 from app.core.semesters import semester_of, semester_range
-from app.models import Activity, ActivityReport, ApprovalRecord, Club
+from app.models import Activity, ActivityReport, ApprovalRecord, Club, User
 from app.models.enums import (
     ActivityStatus,
     ActivityType,
@@ -378,9 +378,11 @@ async def get_activity(
         FileOut.model_validate(f)
         for f in await svc.activity_files(db, activity, svc.ATTACHMENT_SLOT)
     ]
+    # 帶簽核者姓名:審核彈窗要逐列印「誰於何時核准/退回」,章軌只印每一關最後一次核准
     approvals = (
-        await db.scalars(
-            sa.select(ApprovalRecord)
+        await db.execute(
+            sa.select(ApprovalRecord, User.name)
+            .join(User, ApprovalRecord.actor_id == User.id)
             .where(
                 ApprovalRecord.subject_type.in_(
                     [ApprovalSubject.ACTIVITY, ApprovalSubject.ACTIVITY_CLOSE]
@@ -390,8 +392,18 @@ async def get_activity(
             .order_by(ApprovalRecord.id)
         )
     ).all()
-    out.approvals = [ApprovalOut.model_validate(r) for r in approvals]
-    out.reviewed_at = max((r.created_at for r in approvals), default=None)
+    out.approvals = [
+        ApprovalOut(
+            stage=r.stage,
+            decision=r.decision,
+            reason=r.reason,
+            created_at=r.created_at,
+            subject_type=r.subject_type,
+            actor_name=actor_name,
+        )
+        for r, actor_name in approvals
+    ]
+    out.reviewed_at = max((r.created_at for r, _ in approvals), default=None)
     # 簽核章軌:每一關印誰、什麼時候簽的(推導規則在 services,前端不再自己數一次)
     stamped = await svc.apply_approvals(db, activity.id)
     out.stamps = [

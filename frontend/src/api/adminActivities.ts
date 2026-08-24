@@ -36,6 +36,8 @@ export interface ReviewItem {
     timeRange?: string
     /** 簽核章軌:該關最後一次核准的人與時間(僅行政端詳情帶) */
     stamps?: ReviewStamp[]
+    /** 完整簽核紀錄(誰於何時核准/退回);章軌只印每一關最後一次核准,退回不入軌 */
+    approvals?: ReviewApproval[]
     location?: string
     participantsIn?: number
     participantsOut?: number
@@ -47,6 +49,16 @@ export interface ReviewItem {
     attachmentFiles?: { id: string; name: string; url: string }[]
     budget: { id: number; category: string; description: string; selfFund: number; requested: number; approved: number }[]
   }
+}
+
+/** 簽核紀錄的一列(approval_records)。
+ *  `isClose` 分開申請與結案 —— 兩者同放一張表,只印「核准」會分不出核的是哪一件 */
+export interface ReviewApproval {
+  actor: string
+  at: string // YYYY/MM/DD HH:mm
+  decision: 'approve' | 'reject' | 'unlock' | 'revoke'
+  isClose: boolean
+  reason?: string
 }
 
 /** 章軌的一格;推導在後端 `services.apply_approvals`,前端不再自己數一次核准列 */
@@ -177,12 +189,22 @@ interface StampOut {
   at: string
 }
 
+interface ApprovalOut {
+  stage: string
+  decision: string
+  reason: string | null
+  created_at: string
+  subject_type: string // activity / activity_close
+  actor_name: string
+}
+
 interface AdminActivityDetailOut extends AdminActivityOut {
   budget_items: BudgetItemOut[]
   report: ReportOut | null
   photos: FileOut[]
   attachments: FileOut[]
   stamps: StampOut[]
+  approvals: ApprovalOut[]
 }
 
 // ---- 轉換 ----
@@ -230,6 +252,14 @@ export const toEvalFile = (f: AdminFileRef): EvalFile => ({
   uploadedAt: '',
 })
 
+const toApproval = (a: ApprovalOut): ReviewApproval => ({
+  actor: a.actor_name,
+  at: slashDateTime(a.created_at),
+  decision: a.decision as ReviewApproval['decision'],
+  isClose: a.subject_type === 'activity_close',
+  reason: a.reason ?? undefined,
+})
+
 const toStamp = (s: StampOut): ReviewStamp => ({
   stage: s.stage as ReviewStage,
   name: s.actor_name,
@@ -272,6 +302,7 @@ const toAdminDetail = (o: AdminActivityDetailOut): AdminActivityDetail => ({
   detail: {
     timeRange: timeRangeOf(o),
     stamps: o.stamps.map(toStamp),
+    approvals: o.approvals.map(toApproval),
     location: o.location,
     participantsIn: o.participants_in,
     participantsOut: o.participants_out,

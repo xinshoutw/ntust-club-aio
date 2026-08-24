@@ -45,11 +45,14 @@ const show = (budget: ReturnType<typeof budgetRow>[]) =>
 // 擬請 0 的列核不出金額(後端 max=擬請,整單擬請 0 時任何非零核定回 422)。
 // 給一個永遠只能是 0 的輸入框,是把「看得到」與「動得了」混成一個判定。
 describe('ActivityReviewModal 的核定欄', () => {
-  test('整單都沒申請補助時,核定欄與經費來源都不出現', () => {
+  // 「能不能改」與「看不看得到」是兩個判定:沒申請補助就核不出金額,也沒有來源要認定,
+  // 但承辦人先前認定過的來源(遷移資料有)照樣得印出來
+  test('整單都沒申請補助時,核定欄不出現、經費來源轉唯讀', () => {
     show([budgetRow(1, 0), budgetRow(2, 0)])
 
     expect(screen.queryByRole('columnheader', { name: '核定' })).toBeNull()
     expect(screen.queryByPlaceholderText('xxx補助')).toBeNull()
+    expect(screen.getByText('經費來源')).toBeTruthy()
     expect(screen.getByRole('columnheader', { name: '擬請' })).toBeTruthy()
   })
 
@@ -70,6 +73,45 @@ describe('ActivityReviewModal 的核定欄', () => {
     expect(screen.getByPlaceholderText('xxx補助')).toBeTruthy()
     // Modal 是 portal,不在 render 的 container 底下
     expect(document.querySelectorAll('tbody input')).toHaveLength(1)
+  })
+})
+
+// 章軌只印每一關**最後一次**核准:退回、以及退回重送後再核的那幾次都不在軌上,
+// 而「這張單被卡在哪」要看的正是那幾列
+describe('ActivityReviewModal 的簽核紀錄', () => {
+  const showApprovals = (approvals: NonNullable<ReviewItem['detail']>['approvals']) =>
+    render(
+      <App>
+        <ActivityReviewModal
+          item={{
+            ...item([budgetRow(1, 5000)]),
+            status: 'pending_chief',
+            detail: { attachments: [], budget: [budgetRow(1, 5000)], approvals },
+          }}
+          open
+          onClose={() => {}}
+          afterClose={() => {}}
+        />
+      </App>,
+    )
+
+  test('逐列印出簽核者、時間與決議', () => {
+    showApprovals([
+      { actor: '陳彥仁', at: '2026/08/18 16:17', decision: 'approve', isClose: false },
+      { actor: '侍筱鳳', at: '2026/08/19 09:02', decision: 'reject', isClose: false, reason: '估價單未附' },
+    ])
+
+    expect(screen.getByText(/陳彥仁 於/).textContent).toContain('核准')
+    const rejected = screen.getByText(/侍筱鳳 於/).textContent
+    expect(rejected).toContain('退回')
+    expect(rejected).toContain('估價單未附')
+  })
+
+  // 申請與結案的簽核紀錄同放一張表:只印「核准」的話,結案那次會被讀成又核了一次申請
+  test('結案的那幾列標明是結案', () => {
+    showApprovals([{ actor: '陳彥仁', at: '2026/08/18 16:17', decision: 'approve', isClose: true }])
+
+    expect(screen.getByText(/陳彥仁 於/).textContent).toContain('結案核准')
   })
 })
 

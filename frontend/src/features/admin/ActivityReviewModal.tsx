@@ -29,6 +29,14 @@ const INPUT_CHROME = 18
 
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 
+// 簽核紀錄的決議顯示詞(approval_records.decision;對外不得漏出英文鍵)
+const DECISION_LABEL: Record<string, string> = {
+  approve: '核准',
+  reject: '退回',
+  unlock: '解鎖',
+  revoke: '撤銷',
+}
+
 // 章面的關卡字 —— 章下方那行留給簽核者姓名,關卡名(承辦人/組長/學務長)由這個字表示
 const STAGE_CHARS: [ReviewStage, string][] = [
   ['advisor', '承'],
@@ -330,6 +338,22 @@ export default function ActivityReviewModal({
               <span className="num">{d?.submittedAt ?? '—'}</span>
               {d?.submittedBy ? ` · ${d.submittedBy}` : ''}
             </div>
+            {/* 經費來源:有申請補助時第一關必填認定(submitApprove 同一條判定)。
+                只有「能不能改」看 hasSubsidy —— 認定過的來源不論有沒有經費明細都印出來,
+                掛在經費明細下的話沒申請補助的單子連承辦人寫了什麼都看不到 */}
+            <div style={detailLabel}>經費來源</div>
+            <div>
+              {canEdit && hasSubsidy ? (
+                <Input
+                  size="small"
+                  value={fundSource}
+                  onChange={(e) => setFundSource(e.target.value)}
+                  placeholder="xxx補助"
+                />
+              ) : (
+                item.fundSource || '—'
+              )}
+            </div>
             {d?.content && (
               <>
                 <div style={detailLabel}>內容</div>
@@ -385,27 +409,26 @@ export default function ActivityReviewModal({
               )}
             </div>
           )}
+
+          {/* 簽核紀錄:每一次核准/退回逐列印出。章軌只印每一關**最後一次**核准 ——
+              退回、退回後重送再核的那幾次都不在軌上,而那正是要查「這張單被卡在哪」時要看的 */}
+          {!!d?.approvals?.length && (
+            <div style={{ marginTop: 14, fontSize: 12, color: 'var(--steel)', lineHeight: 1.9 }}>
+              {d.approvals.map((r, i) => (
+                <div key={i}>
+                  {r.actor} 於 <span className="num">{r.at}</span>{' '}
+                  {r.isClose ? '結案' : ''}
+                  {DECISION_LABEL[r.decision] ?? r.decision}
+                  {r.reason ? `:${r.reason}` : ''}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {hasBudget && (
           <div>
             <SectionTitle first>經費明細</SectionTitle>
-            {/* 經費來源:有申請補助時第一關必填認定(submitApprove 同一條判定) */}
-            {hasSubsidy && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, fontSize: 13 }}>
-              <span style={{ color: 'var(--steel)', whiteSpace: 'nowrap' }}>經費來源</span>
-              {canEdit ? (
-                <Input
-                  size="small"
-                  value={fundSource}
-                  onChange={(e) => setFundSource(e.target.value)}
-                  placeholder="xxx補助"
-                />
-              ) : (
-                <span>{item.fundSource || '—'}</span>
-              )}
-            </div>
-            )}
             <table className="tb dense fixed">
               {/* table-layout: fixed 要有明確寬度,但寬度由資料決定:自籌/擬請各看自己的最大值,
                   核定跟擬請同寬(核定 ≤ 擬請)再加輸入框的內距與邊框。合計依定義 ≥ 任一明細,

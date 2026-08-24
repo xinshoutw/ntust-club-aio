@@ -84,13 +84,24 @@ interface StampTrailProps {
 
 export default function StampTrail({ stages, width = 400 }: StampTrailProps) {
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', width, maxWidth: '100%' }}>
+    // 關卡數不固定:核定 0 元即當場核准(D-16)只畫一格,退回件兩格。連接線若是 flex:1,
+    // 少畫的那幾格會被撐成一條長虛線、章跟著黏在盒子左緣;改成固定長度後居中對齊
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        justifyContent: 'center',
+        width,
+        maxWidth: '100%',
+      }}
+    >
       {stages.map((stage, i) => (
         <div key={stage.char} style={{ display: 'contents' }}>
           {i > 0 && (
             <div
               style={{
-                flex: 1,
+                // 不長只縮:窄視窗仍讓得出空間,寬的時候不把兩顆章推到兩端
+                flex: '0 1 56px',
                 marginTop: 15,
                 borderTop: stages[i - 1].state === 'done' ? 'none' : '2px dashed #C8CDD5',
                 height: stages[i - 1].state === 'done' ? 2 : 0,

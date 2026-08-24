@@ -97,7 +97,8 @@ export default function AdminEvalPage() {
         sub={detail && <>{detail.year} 年社團競賽</>}
         extra={
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <ClubSelect width={190} />
+            {/* 未分類=停社零活動的遷入舊社;下方清單只列啟用中社團,選單多出來的那疊選了也沒分數 */}
+            <ClubSelect width={190} hideUnclassified />
             <div style={{ textAlign: 'right', height: 40, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <div style={{ fontSize: 12, color: 'var(--steel)', lineHeight: 1.1 }}>採用總分</div>
               <div style={{ lineHeight: 1.1 }}>

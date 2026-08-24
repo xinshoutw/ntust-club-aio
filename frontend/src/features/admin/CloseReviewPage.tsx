@@ -336,7 +336,7 @@ function CloseReviewModal({
           rows={3}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder={`例：成果照片不足 ${MIN_PHOTOS} 張且未附影片連結`}
+          placeholder={'心得太隨便'}
         />
       </Modal>
       {filePreview.node}

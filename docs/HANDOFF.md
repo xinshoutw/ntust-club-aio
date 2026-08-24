@@ -100,51 +100,57 @@ uv run python ../migration/text_fields.py --export  # 1,185 列待人工轉錄�
 先前 `SWEEP@12345` 那套不再適用。要換回一次性密碼就重跑遷移,
 或用同一支腳本挑角色/帳號分批設。
 
-## MIG-13 人工轉錄:進行中(2026-08-24)
+## MIG-13 人工轉錄:轉錄完成(2026-08-24)
 
-**做到哪**:`migration/out/fill/` 底下 32 個 shard,**841/924 列已填**(91%)。
-合併後的成品 `migration/out/activity_texts_2026-08-24_filled.csv` 已實測匯入成功
-(活動內容 1,167、成果 772、心得 2,104 篇;4 列因活動未結案沒有 report 可寫而跳過,屬預期)。
+**成品**:`migration/out/activity_texts_2026-08-24_filled.csv`,**924/924 列全填**
+(另 261 列刻意不派工 —— 活動未結案,成果與心得在 import 端本來就會被跳過,活動內容則已由
+`cms_import` 從舊系統的活動描述預帶)。
 
-**還要做的三件事**
+全新庫端到端實跑(`reset_db` → `cms_import` → `text_fields --import`)的結果:
 
-1. **補完 83 列**:`shard-24`(0/38)、`shard-25`(0/43)、`shard-30`(27/29)。
-   開 sonnet agent,prompt 只需要:讀 `migration/out/fill/INSTRUCTIONS.md`,做 `shard-NN.json`,
-   只寫自己的 `shard-NN.jsonl`。shard-30 是續作,要指明補哪幾個 legacy_id、用 append 不要重寫。
+| | 筆數 |
+|---|---|
+| `activities.content` 有值 | 1,511 / 1,532 |
+| `activity_reports` | 961(執行成效 838、目標達成 790、其他 491) |
+| `activity_reflections` | 2,299 篇,分佈在 726 個活動 |
 
-2. **補匿名回饋(86 列待複查)**:`shard-01`~`shard-11` 與 `shard-32` 是在指令補上
-   「匿名回饋、滿意度統計 → `填_成果_目標達成`」**之前**跑的,那批 agent 遇到「像心得但沒署名」
-   的段落一律整組丟掉。已確認的實例:`14856`(10 篇無署名新生心得約 1,000 字整批消失)、
-   `15020`。待複查清單 = 這些 shard 裡所有沒輸出心得的列,用這段程式重算:
+4 列因活動未結案(沒有 report)被跳過,屬預期。最長心得 1,138 字、最長成果欄 1,723 字,
+都在 schema 上限內。
 
-   ```python
-   # 在 migration/out/fill/ 下跑
-   import json, os
-   for n in ['shard-%02d' % i for i in [1,2,3,4,5,6,7,8,9,10,11,32]]:
-       for l in open(n + '.jsonl'):
-           d = json.loads(l)
-           if not any(k.startswith('填_心得') for k in d):
-               print(n, d['legacy_id'])
-   ```
-
-   複查 agent **不要動既有的 `shard-NN.jsonl`**,另寫 `shard-NN-fix.jsonl`,一行只放
-   `legacy_id` + 要改的那幾欄。merge 端是欄位級疊加,不會把整列蓋掉。
-
-3. **全量交叉抽查**:已抽 30 列(兩批各 15),batch A 全乾淨、batch B 13 乾淨 2 列踩到上面第 2 點。
-   補完後再抽一輪,重點看捏造、心得姓名系級對調、檢討內容有沒有漏進成果三欄。
-
-**指令**
+**做法留檔**(要重跑或補資料時看這裡)
 
 ```bash
-python3 migration/fill_shards.py split --budget 200000   # 重切(母 CSV 換了才需要)
+python3 migration/doc_text.py --all                      # 附件 → 純文字(2,676 檔,有快取)
+python3 migration/fill_shards.py split --budget 200000   # 依文字量切工作包
 python3 migration/fill_shards.py merge                   # *.jsonl → *_filled.csv + 問題報告
 uv run python ../migration/text_fields.py --import migration/out/activity_texts_2026-08-24_filled.csv
 ```
 
-`migration/doc_text.py --all` 已把 2,676 個附件抽成純文字放在 `migration/out/text/`,有快取,不用重跑。
+agent 的轉錄規則在 `migration/out/fill/INSTRUCTIONS.md`。merge 是**欄位級疊加**,要補某一欄
+只需另寫 `shard-NN-fix.jsonl`,一行放 `legacy_id` + 那幾欄,不必重打整列。
 
-**已知且不打算處理**:來源寫「其他執行狀況與成果:無」時,有的列照抄「無」、有的留空 ——
-兩種讀法都成立,不值得為此再跑一輪。
+**已知未處理**
+
+- **匿名回饋可能漏抄**:「無署名的參與者回饋 / 滿意度統計 → `填_成果_目標達成`」這條規則是
+  第一波 agent 派出**之後**才補進 INSTRUCTIONS.md 的,所以 `shard-01`~`shard-11` 與 `shard-32`
+  那批遇到「像心得但沒署名」的段落會整組丟掉。抽查確認的實例:`14856`(10 篇無署名新生心得
+  約 1,000 字整批消失)、`15020`。待複查的列 = 這些 shard 裡所有沒輸出心得的**86 列**,重算:
+
+  ```python
+  # 在 migration/out/fill/ 下跑
+  import json
+  for n in ['shard-%02d' % i for i in [1,2,3,4,5,6,7,8,9,10,11,32]]:
+      for l in open(n + '.jsonl'):
+          d = json.loads(l)
+          if not any(k.startswith('填_心得') for k in d):
+              print(n, d['legacy_id'])
+  ```
+
+  2026-08-24 當下決定**不做**,因為漏掉的是補充性質的回饋,成果三欄與具名心得都沒受影響。
+- 「其他執行狀況與成果:無」有的列照抄「無」、有的留空 —— 兩種讀法都成立,不打算統一。
+
+**抽查結果**:兩批各 15 列對回原始 PDF/DOCX,batch A 全乾淨,batch B 13 乾淨、2 列踩到上面的
+匿名回饋問題。沒有捏造、沒有心得姓名系級對調、沒有檢討內容漏進成果三欄。
 
 ## 其他待處理
 

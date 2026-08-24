@@ -298,7 +298,7 @@ export default function ActivityPreviewModal({ a, detail, loading, error, onRetr
                 )}
               </>
             )}
-            <SectionTitle>學習心得(<span className="num">{rep.reflections.length}</span> 人)</SectionTitle>
+            <SectionTitle>學習心得（<span className="num">{rep.reflections.length}</span> 人）</SectionTitle>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {rep.reflections.map((x) => (
                 <div key={`${x.name}-${x.dept}`} style={{ background: 'var(--paper)', borderRadius: 6, padding: '10px 12px' }}>

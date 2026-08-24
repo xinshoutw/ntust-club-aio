@@ -195,7 +195,7 @@ def test_apply_pdf_prints_the_submit_time_in_taipei():
         created_at=datetime(2026, 2, 28, 23, 30, tzinfo=UTC),
         budget_items=[],
     )
-    assert _apply_footnote(activity) == "(上網申請時間:2026/03/01 07:30:00)"
+    assert _apply_footnote(activity) == "（上網申請時間：2026/03/01 07:30:00）"
 
 
 def test_apply_pdf_does_not_print_undecided_grants_as_zero():

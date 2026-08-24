@@ -134,7 +134,7 @@ def _apply_footnote(activity: Activity) -> str:
     `created_at` 是 TIMESTAMPTZ,asyncpg 回 UTC-aware —— 直接格式化會印成 UTC,
     早上 8 點前送的單子連日期都退一天,而這張紙是要送出去的。
     """
-    return f"(上網申請時間:{activity.created_at.astimezone(TAIPEI):%Y/%m/%d %H:%M:%S})"
+    return f"（上網申請時間：{activity.created_at.astimezone(TAIPEI):%Y/%m/%d %H:%M:%S}）"
 
 
 def _approved_text(approved: int | None) -> str:

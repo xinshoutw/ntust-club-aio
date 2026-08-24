@@ -250,8 +250,8 @@ function CloseReviewModal({
                 <div style={{ lineHeight: 1.7 }}>
                   <span className="num">{report.reviewDate}</span> · 與會{' '}
                   <span className="num">{report.reviewAttendees}</span> 人
-                  <div style={{ fontSize: 12, color: 'var(--steel)' }}>討論:{report.reviewTopics}</div>
-                  <div style={{ fontSize: 12, color: 'var(--steel)' }}>決議:{report.reviewConclusion}</div>
+                  <div style={{ fontSize: 12, color: 'var(--steel)' }}>討論：{report.reviewTopics}</div>
+                  <div style={{ fontSize: 12, color: 'var(--steel)' }}>決議：{report.reviewConclusion}</div>
                 </div>
               </>
             )}
@@ -260,7 +260,7 @@ function CloseReviewModal({
           {/* 照片縮圖:點擊開站內預覽彈窗(與「所有活動」同一支 FilePreview) */}
           {photos.length > 0 && (
             <div>
-              <SectionTitle>活動照片(<span className="num">{photos.length}</span> 張)</SectionTitle>
+              <SectionTitle>活動照片（<span className="num">{photos.length}</span> 張）</SectionTitle>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {photos.map((p) => (
                   <button
@@ -288,12 +288,12 @@ function CloseReviewModal({
 
           {/* 學習心得全文:審核者須核實內容 */}
           <div>
-            <SectionTitle>學習心得(<span className="num">{report.reflections.length}</span> 人)</SectionTitle>
+            <SectionTitle>學習心得（<span className="num">{report.reflections.length}</span> 人）</SectionTitle>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto' }}>
               {report.reflections.map((r, i) => (
                 <div key={i} style={{ padding: '8px 12px', background: 'var(--paper)', borderRadius: 6, fontSize: 13 }}>
                   <span style={{ fontWeight: 500 }}>{r.name}</span>
-                  <span style={{ color: 'var(--steel)', fontSize: 12 }}>({r.dept})</span>
+                  <span style={{ color: 'var(--steel)', fontSize: 12 }}>（{r.dept}）</span>
                   <div style={{ lineHeight: 1.7, marginTop: 2 }}>{r.text}</div>
                 </div>
               ))}

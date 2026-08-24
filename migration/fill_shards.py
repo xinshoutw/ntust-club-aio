@@ -193,13 +193,20 @@ def merge() -> None:
             if lid not in by_id:
                 problems.append(f"{path.name}:{lineno} legacy_id={lid!r} 不在母 CSV")
                 continue
-            if lid in filled:
-                problems.append(f"{path.name}:{lineno} legacy_id={lid} 重複,後者覆蓋前者")
             bad = _check(rec)
             if bad:
                 problems.append(f"{path.name}:{lineno} legacy_id={lid}:{'、'.join(bad)}")
                 continue
-            filled[lid] = rec
+            # 同一個 legacy_id 出現第二次時以「欄位」為單位疊上去,不整筆取代 ——
+            # 補跑漏掉的某一欄時只要寫那一欄,不必把整列重打一次(重打才是弄丟資料的來源)
+            base = filled.setdefault(lid, {"legacy_id": lid})
+            for k, v in rec.items():
+                if not k.startswith("填_"):
+                    continue
+                v = (v or "").strip()
+                if k in base and base[k] != v:
+                    problems.append(f"{path.name}:{lineno} legacy_id={lid}:{k} 覆蓋了先前的值")
+                base[k] = v
             for k in rec:
                 if k.startswith("填_") and k not in header and k not in extra_cols:
                     extra_cols.append(k)

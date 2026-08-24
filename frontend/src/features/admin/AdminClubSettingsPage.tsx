@@ -161,7 +161,7 @@ export default function AdminClubSettingsPage() {
     if (clubId == null) return
     confirmDialog(modal, {
       title: `重設 ${club} 的密碼`,
-      content: '將產生一次性密碼並登出該帳號所有裝置;社團下次登入須立即更改密碼',
+      content: '產生一次性密碼並登出所有裝置，下次登入須立即更改密碼',
       okText: '確認重設',
       cancelText: '取消',
       onOk: () => {

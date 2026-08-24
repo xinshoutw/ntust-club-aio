@@ -96,10 +96,13 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
  *  不必依賴「UNAUTHORIZED_EVENT 是同步派發的」這種隱性時序前提 */
 export class ApiError extends Error {
   status: number
-  constructor(message: string, status: number) {
+  /** 信封的 meta.code(如 CLUB_HAS_MEMBERS);非 JSON 信封的錯誤沒有,為 undefined */
+  code?: string
+  constructor(message: string, status: number, code?: string) {
     super(message)
     this.name = 'ApiError'
     this.status = status
+    this.code = code
   }
 }
 
@@ -152,7 +155,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResp
   if (!res.ok || !body.success) {
     const error = body.error ?? `HTTP ${res.status}`
     const detail = validationDetail((body.meta as { detail?: unknown } | null)?.detail)
-    throw new ApiError(detail ? `${error}:${detail}` : error, res.status)
+    const code = (body.meta as { code?: string } | null)?.code
+    throw new ApiError(detail ? `${error}:${detail}` : error, res.status, code)
   }
   return body
 }

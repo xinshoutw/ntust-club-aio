@@ -17,6 +17,7 @@ import {
   type ManagedRole,
 } from '../../api/adminAccounts'
 import { CLUB_ATTRIBUTES, useAdminClubMutations, useAdminClubs, type AdminClub } from '../../api/adminClubs'
+import { ApiError } from '../../api/client'
 import { useAuth } from '../../app/auth'
 import { canAccessAdminPath } from '../../lib/permissions'
 
@@ -256,21 +257,39 @@ export default function AccountsPage() {
     }
   }
 
-  // 刪除社團:後端只放行沒有任何資料的社團(有社員名單/活動/借用一律 409),
-  // 所以按鈕不預先反灰 —— 前端沒有那些筆數,擋不準;擋不準就交給後端說明白
+  // 刪除社團:活動/借用等紀錄由後端的 FK 擋(只能停用),名單則是二次確認後連帶刪除。
+  // 按鈕不預先反灰 —— 前端沒有那些筆數,擋不準就交給後端說明白
+  const deleteClub = (c: AdminClub, purgeMembers?: boolean) =>
+    clubMutations.remove.mutate(
+      { id: c.id, purgeMembers },
+      {
+        onSuccess: () => message.success(`已刪除 ${c.name}`),
+        onError: (e) => {
+          // 只有「還有社員名單」這一種擋法問得下去;其餘 409(活動/借用/違規)再問也是同樣的答案
+          if (e instanceof ApiError && e.code === 'CLUB_HAS_MEMBERS') {
+            confirmDialog(modal, {
+              title: `連同名單刪除 ${c.name}`,
+              content: `${e.message}，一併刪除後無法復原`,
+              okText: '連同名單刪除',
+              okButtonProps: { danger: true },
+              cancelText: '取消',
+              onOk: () => deleteClub(c, true),
+            })
+            return
+          }
+          message.error(e.message)
+        },
+      },
+    )
+
   const confirmDeleteClub = (c: AdminClub) =>
     confirmDialog(modal, {
       title: `刪除 ${c.name}`,
-      content: '連同社團帳號一併刪除，確認後無法復原；已有社員名單或任何紀錄的社團請改用停用',
+      content: '連同社團帳號一併刪除，確認後無法復原；已有活動或借用紀錄的社團請改用停用',
       okText: '確認刪除',
       okButtonProps: { danger: true },
       cancelText: '取消',
-      onOk: () => {
-        clubMutations.remove.mutate(c.id, {
-          onSuccess: () => message.success(`已刪除 ${c.name}`),
-          onError: (e) => message.error(e.message),
-        })
-      },
+      onOk: () => deleteClub(c),
     })
 
   const openClubAccountModal = (c: AdminClub) => {

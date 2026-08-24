@@ -320,9 +320,13 @@ export function useAdminClubMutations() {
       }),
     onSuccess: invalidate,
   })
-  // 刪除社團主檔(連同帳號):後端只放行沒有任何資料的社團,其餘回 409
+  // 刪除社團主檔(連同帳號):有社員名單時後端回 CLUB_HAS_MEMBERS,
+  // 二次確認後帶 purgeMembers 再送一次(名單隨社團一起刪);其餘紀錄一律 409,只能停用
   const remove = useMutation({
-    mutationFn: (id: number) => api<null>(`/admin/clubs/${id}`, { method: 'DELETE' }),
+    mutationFn: ({ id, purgeMembers }: { id: number; purgeMembers?: boolean }) =>
+      api<null>(`/admin/clubs/${id}${purgeMembers ? '?purge_members=true' : ''}`, {
+        method: 'DELETE',
+      }),
     onSuccess: invalidate,
   })
   return { create, update, resetPassword, createAccount, remove }

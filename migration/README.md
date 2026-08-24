@@ -165,6 +165,7 @@ uv run python ../migration/text_fields.py --import <填好的 CSV>          # �
 | Apply(15,211) | venue_bookings | status 0/1/4/2→pending/approved/rejected/cancelled;phone 保留、其餘申請人明細丟棄 |
 | DeviceApply+DeviceLog | equipment_loans(一品項一筆) | 已核准且區間已過→returned;活動已刪或不在遷移範圍內→activity_id NULL |
 | 認不出借用單位的單(空字串 / admin / 8 開頭偽帳號 / 未知) | club_id NULL(顯示「學務處」) | 舊系統有 960 筆 `club_id` 是空字串,**不丟掉**(decisions.md MIG-03);帳號認得出形狀的那一桶另以 `--unknown-clubs` 導出清單交承辦辨識(MIG-06);欄位空白與 admin 不列入(看不出是誰)|
+| `Apply`/`DeviceApply` 的 `reject_info_zh-TW` | approval_records(REJECT) | 只補**真的留了理由**的單(場地 151、器材 236 張申請單→677 列);actor=不能登入的 `_migration`,退回時間取舊系統的 `updated_at`;英譯欄 `reject_info_en-us` 不遷 |
 | ClassroomRule(2,848)、Admin、Notice | 不遷 | 場地封鎖=新 Rule Page 功能;未過期封鎖上線時人工重建 |
 
 ## 注意

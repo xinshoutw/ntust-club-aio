@@ -22,6 +22,9 @@ import {
   useActiveEquipmentLoans,
   useActiveRoomBookings,
   useActiveVenueBookings,
+  useRecentEquipmentLoans,
+  useRecentRoomBookings,
+  useRecentVenueBookings,
   useReturnedEquipmentLoans,
   useAvailability,
   useAvailabilityDays,
@@ -34,6 +37,7 @@ import {
   type Venue,
 } from '../../api/bookings'
 import { CELL, emptyCellState, type CellState } from './cells'
+import { useRejectReason } from './RejectReasonModal'
 
 const RETURNED_PAGE = 10
 const VENUE_DAYS = 15 // 單一場地檢視:選擇日 −7 ~ +7 共 15 天
@@ -133,6 +137,22 @@ export default function BookingOverviewPage() {
   const listsErrored = [roomsQuery, venueBookingsQuery, loansQuery].filter((q) => q.isError)
   const retryLists = () => {
     for (const q of listsErrored) void q.refetch()
+  }
+
+  // 最近申請:三類各取近 5 筆(與各借用頁同一份查詢),退回件可點開原因
+  const recentRoomsQuery = useRecentRoomBookings()
+  const recentVenuesQuery = useRecentVenueBookings()
+  const recentLoansQuery = useRecentEquipmentLoans()
+  const reject = useRejectReason()
+  const recentRooms = recentRoomsQuery.data ?? []
+  const recentVenues = recentVenuesQuery.data ?? []
+  // 已歸還的器材在上面那張卡,這裡只留退回與取消,不把同一列印兩次
+  const recentLoans = (recentLoansQuery.data ?? []).filter((l) => l.status !== 'returned')
+  const recentQueries = [recentRoomsQuery, recentVenuesQuery, recentLoansQuery]
+  const recentPending = recentQueries.some((q) => q.isPending)
+  const recentErrored = recentQueries.filter((q) => q.isError)
+  const retryRecent = () => {
+    for (const q of recentErrored) void q.refetch()
   }
 
   // 取消:審核中隨時可取消;已核准僅開始日前可取消(後端亦驗)
@@ -511,6 +531,79 @@ export default function BookingOverviewPage() {
         </LoadingBlock>
           <Pager page={returnedPage} pageSize={RETURNED_PAGE} total={returnedTotal} onChange={setReturnedPage} style={{ padding: '10px 0 14px' }} />
       </div>
+
+      {/* 最近申請:已結束/退回/取消的近況,單卡整併三類(與「正在借用」同一份欄位) */}
+      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
+        <LoadingBlock pending={recentPending}>
+          <table className="tb fixed" aria-label="最近申請" style={{ minWidth: 680 }}>
+            <Cols widths={[90, 'auto', 240, 110]} />
+            <thead>
+              <tr>
+                <th scope="col">類別</th>
+                <th scope="col">內容</th>
+                <th scope="col">時間</th>
+                <th scope="col">狀態</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentRooms.map((r) => {
+                const row = reject.rowProps(r.venueName, r.reject)
+                return (
+                  <tr key={`room-${r.id}`} {...row.tr}>
+                    <td style={{ color: 'var(--steel)', fontSize: 13 }}>固定場地</td>
+                    <td style={{ fontWeight: 500 }}>{row.wrap(r.venueName)}</td>
+                    <td style={{ color: 'var(--steel)', fontSize: 13 }}>
+                      每週 {r.entries.map(roomEntryText).join('、')}
+                    </td>
+                    <td><StatusPill status={r.status} /></td>
+                  </tr>
+                )
+              })}
+              {recentVenues.map((v) => {
+                const row = reject.rowProps(`${v.venueName}（${v.date}）`, v.reject)
+                return (
+                  <tr key={`venue-${v.id}`} {...row.tr}>
+                    <td style={{ color: 'var(--steel)', fontSize: 13 }}>臨時場地</td>
+                    <td style={{ fontWeight: 500 }}>
+                      {row.wrap(<>{v.venueName}<span style={{ color: 'var(--steel)', fontWeight: 400, fontSize: 13 }}> · {v.purpose}</span></>)}
+                    </td>
+                    <td className="num" style={{ color: 'var(--steel)', fontSize: 13 }}>{v.date} 第 {v.periods.join('、')} 節</td>
+                    <td><StatusPill status={v.status} /></td>
+                  </tr>
+                )
+              })}
+              {recentLoans.map((l) => {
+                const row = reject.rowProps(`${l.equipmentName} ×${l.qty}`, l.reject)
+                return (
+                  <tr key={`loan-${l.id}`} {...row.tr}>
+                    <td style={{ color: 'var(--steel)', fontSize: 13 }}>器材</td>
+                    <td style={{ fontWeight: 500 }}>
+                      {row.wrap(<>{l.equipmentName} <span className="num">×{l.qty}</span></>)}
+                    </td>
+                    <td className="num" style={{ color: 'var(--steel)', fontSize: 13 }}>{l.startDate} – {l.endDate}</td>
+                    <td><StatusPill status={l.status} /></td>
+                  </tr>
+                )
+              })}
+              {recentErrored.length > 0 && (
+                <tr className="no-hover">
+                  <td colSpan={4}>
+                    <QueryError compact title="申請紀錄載入失敗" error={recentErrored[0]?.error} onRetry={retryRecent} />
+                  </td>
+                </tr>
+              )}
+              {recentErrored.length === 0 && !recentPending && recentRooms.length === 0 && recentVenues.length === 0 && recentLoans.length === 0 && (
+                <tr className="no-hover">
+                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無申請紀錄</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </LoadingBlock>
+      </div>
+
+      {reject.node}
     </div>
   )
 }

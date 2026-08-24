@@ -12,6 +12,7 @@ import { Cols } from '../../components/ui/tableControls'
 import SuspensionNote from '../../components/ui/SuspensionNote'
 import { useClubSuspension } from '../../api/clubProfile'
 import { useDragSelect } from './useDragSelect'
+import { useRejectReason } from './RejectReasonModal'
 import { periodKeys, usePeriods } from '../../lib/periods'
 import { UNAVAILABLE_BG } from './cells'
 import {
@@ -115,6 +116,7 @@ export default function FixedRoomPage() {
   const activeRows = activeQuery.data ?? []
   const recentQuery = useRecentRoomBookings()
   const recent = recentQuery.data ?? []
+  const reject = useRejectReason()
   const { createRoomBooking, cancelRoomBooking } = useBookingMutations()
   const todayStart = dayjs().startOf('day')
 
@@ -398,15 +400,19 @@ export default function FixedRoomPage() {
               </tr>
             </thead>
             <tbody>
-              {recent.map((r) => (
-                <tr key={r.id}>
-                  <td style={{ fontWeight: 500 }}>{r.venueName}</td>
-                  <td style={{ color: 'var(--steel)', fontSize: 13 }}>
-                    {r.entries.map(roomEntryText).join('、')}
-                  </td>
-                  <td><StatusPill status={r.status} /></td>
-                </tr>
-              ))}
+              {recent.map((r) => {
+                // 退回件可點開原因;其餘(學期已過、已取消)沒有可看的內容
+                const row = reject.rowProps(r.venueName, r.reject)
+                return (
+                  <tr key={r.id} {...row.tr}>
+                    <td style={{ fontWeight: 500 }}>{row.wrap(r.venueName)}</td>
+                    <td style={{ color: 'var(--steel)', fontSize: 13 }}>
+                      {r.entries.map(roomEntryText).join('、')}
+                    </td>
+                    <td><StatusPill status={r.status} /></td>
+                  </tr>
+                )
+              })}
               {recentQuery.isError && (
                 <tr className="no-hover">
                   <td colSpan={3}>
@@ -423,6 +429,8 @@ export default function FixedRoomPage() {
           </table>
         </LoadingBlock>
       </div>
+
+      {reject.node}
     </div>
   )
 }

@@ -4,7 +4,7 @@ from datetime import date, timedelta
 import sqlalchemy as sa
 
 from app.core.config import settings
-from app.models import Activity, AuditLog, SystemSetting
+from app.models import Activity, ApprovalRecord, AuditLog, SystemSetting
 from tests.conftest import csrf_headers, login, make_club, make_user
 
 JPG = b"\xff\xd8\xff\xe0" + b"\x00" * 64
@@ -319,6 +319,36 @@ async def test_rejected_activity_cannot_be_moved_further_into_the_past(client, d
         f"/api/v1/club/activities/{aid}", json=payload(date=future), headers=csrf_headers(client)
     )
     assert ahead.status_code == 200
+
+
+async def test_club_detail_never_carries_the_approver_name(client, db):
+    """簽核者姓名是行政端詳情才填的(ApprovalOut.actor_name 預設空字串)。
+
+    社團端與行政端共用同一個 schema,而「填不進去」目前只是因為 ApprovalRecord
+    沒有 actor_name 屬性 —— 哪天有人加上 actor relationship 或改成 join,就直接漏。
+    社團看得到自己被誰退回沒有意義,而承辦人姓名是個資。
+    """
+    club = await setup_session(client, db)
+    activity = await create_activity(client)
+    admin = await make_user(db, username="reviewer", role="admin", name="承辦人張三")
+    db.add(
+        ApprovalRecord(
+            subject_type="activity",
+            subject_id=activity["id"],
+            stage="advisor",
+            decision="approve",
+            actor_id=admin.id,
+        )
+    )
+    await db.commit()
+
+    resp = await client.get(f"/api/v1/club/activities/{activity['id']}")
+    assert resp.status_code == 200, resp.text
+    approvals = resp.json()["data"]["approvals"]
+    assert len(approvals) == 1
+    assert approvals[0]["actor_name"] == ""
+    assert "承辦人張三" not in resp.text
+    assert club.id == activity["club_id"]
 
 
 async def test_club_scoping(client, db):

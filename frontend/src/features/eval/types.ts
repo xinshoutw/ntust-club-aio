@@ -23,15 +23,15 @@ export const AWARD_BRIEFS: Record<string, string> = {
 }
 
 export const AD_LABELS: Record<AdKey, { group: string; name: string }> = {
-  ad1: { group: '(一) 活動及社課申請 15%', name: '活動申請' },
-  ad2: { group: '(二) 活動/社課成果 60%', name: '照片/影片' },
-  ad3: { group: '(二) 活動/社課成果 60%', name: '成果單' },
-  ad4: { group: '(二) 活動/社課成果 60%', name: '心得回饋' },
-  ad5: { group: '(三) 社團資料更新狀況 15%', name: '社員、幹部名單更新' },
-  ad6: { group: '(三) 社團資料更新狀況 15%', name: '社團網頁經營' },
-  ad7: { group: '(四) 參與會議與活動 10%', name: '負責人會議' },
-  ad8: { group: '(四) 參與會議與活動 10%', name: '幹訓' },
-  adj: { group: '(五) 加減分', name: '表現優良/違規記點' },
+  ad1: { group: '活動及社課申請', name: '活動與課程申請' },
+  ad2: { group: '活動 / 社課成果', name: '結案照片 / 影片' },
+  ad3: { group: '活動 / 社課成果', name: '結案成果' },
+  ad4: { group: '活動 / 社課成果', name: '結案心得' },
+  ad5: { group: '社團資料更新狀況', name: '社員、幹部名單更新' },
+  ad6: { group: '社團資料更新狀況', name: '社團媒體經營' },
+  ad7: { group: '參與會議與活動', name: '負責人會議' },
+  ad8: { group: '參與會議與活動', name: '幹訓參與' },
+  adj: { group: '加減分', name: '表現優良 / 違規記點' },
 }
 
 const EXT_TYPE: Record<string, EvalFileType> = {

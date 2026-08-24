@@ -72,7 +72,7 @@ export default function AwardDetailPage() {
 
   const addFile = async (item: AwardRubricItem, f: File) => {
     if (f.size > MAX_FILE_BYTES) {
-      message.error(`「${f.name}」超過單檔 50 MB 上限`)
+      message.error(`「${f.name}」超過單個檔案 50 MB 上限`)
       return
     }
     // 宣稱是圖片的檔案驗魔術位元組(其餘型別由後端重驗)
@@ -164,8 +164,8 @@ export default function AwardDetailPage() {
                 )}
                 {item.uploads.length > 0 && (
                   <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 6 }}>
-                    已使用 <span className="num">{fmtMB(item.uploads.reduce((s, f) => s + f.size, 0))}</span> MB(單檔上限{' '}
-                    <span className="num">50</span> MB)
+                    已使用 <span className="num">{fmtMB(item.uploads.reduce((s, f) => s + f.size, 0))}</span> MB（單個檔案上限{' '}
+                    <span className="num">50</span> MB）
                   </div>
                 )}
                 {item.uploads.length > 0 && (

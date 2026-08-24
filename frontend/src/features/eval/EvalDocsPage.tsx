@@ -113,7 +113,7 @@ export default function EvalDocsPage() {
             </div>
             <div style={{ fontSize: 12, marginTop: 10 }}>
               已上傳 <span className="num" style={{ fontWeight: 600 }}>{award.filled}</span>
-              <span className="num" style={{ color: 'var(--steel)' }}>/{award.total}</span> 項
+              <span className="num" style={{ color: 'var(--steel)' }}> / {award.total}</span> 項
             </div>
           </div>
         ))}

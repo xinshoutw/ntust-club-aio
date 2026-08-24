@@ -5,11 +5,10 @@ import { LeftOutlined, UploadOutlined } from '@ant-design/icons'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
-import { useAuth } from '../../app/auth'
 import { fmtMB, isImageFile, sha256 } from '../../lib/uploads'
 import { useAwardDetail, useEvalUploadMutations, type AwardRubricItem, type AwardUploadFile } from '../../api/eval'
 import { fetchFile } from '../../api/client'
-import { fileTypeOf, AWARD_BRIEFS, type EvalFile } from './types'
+import { fileTypeOf, type EvalFile } from './types'
 import FilePreview from './FilePreview'
 
 // 對齊後端 EVAL_POLICY:pdf/doc/docx/jpg/jpeg/png/zip,單檔 50MB
@@ -28,7 +27,6 @@ function BackLink() {
 // 獎項詳細頁:評分細項(後端逐年 rubric)→ 上傳槽位(狀態、即時預覽)
 export default function AwardDetailPage() {
   const { award: awardKey } = useParams()
-  const { user } = useAuth()
   const { message } = App.useApp()
   const { data: award, isError, error, refetch } = useAwardDetail(awardKey)
   const { upload, remove } = useEvalUploadMutations(awardKey ?? '')
@@ -127,11 +125,6 @@ export default function AwardDetailPage() {
       <div style={{ marginTop: 12 }}>
         <PageHeader
           title={award.name}
-          sub={
-            <>
-              {user?.club} · {AWARD_BRIEFS[award.id] ?? ''}
-            </>
-          }
           extra={
             <div style={{ textAlign: 'right', height: 40, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <div style={{ fontSize: 12, color: 'var(--steel)', lineHeight: 1.1 }}>上傳進度</div>

@@ -129,7 +129,7 @@ export default function AdminEvalPage() {
             下方的社團清單不在此範圍內:它由 clubsQuery 驅動,換社團時不該連同分頁器一起消失 */}
         <LoadingBlock pending={clubId != null && detailQuery.isPending} rows={8}>
         <table className="tb fixed" style={{ minWidth: 780 }} aria-label="行政分評分項目">
-          {/* 評分項目吃剩餘寬(兩行說明允許換行);分數/動作固定 px */}
+          {/* 評分項目吃剩餘寬;分數/動作固定 px */}
           <Cols widths={['auto', 110, 130, 300]} />
           <thead>
             <tr>
@@ -144,9 +144,6 @@ export default function AdminEvalPage() {
               <tr key={s.key} className="no-hover">
                 <td>
                   <div style={{ fontWeight: 500 }}>{AD_LABELS[s.key].name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 2 }}>
-                    {AD_LABELS[s.key].group} · {s.note}
-                  </div>
                 </td>
                 <td className="r num" style={{ fontSize: 13, color: 'var(--steel)' }}>
                   {s.auto} / {s.key === 'adj' ? '+5' : s.max}
@@ -186,9 +183,6 @@ export default function AdminEvalPage() {
               <tr className="no-hover">
                 <td>
                   <div style={{ fontWeight: 500 }}>表現優良加分</div>
-                  <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 2 }}>
-                    義務協助學校活動或校外性活動得獎。計入(五)加減分，最多 +5
-                  </div>
                 </td>
                 <td className="r num" style={{ fontSize: 13, color: 'var(--steel)' }}>—</td>
                 <td className="r num" style={{ fontSize: 15, fontWeight: 600 }}>+{detail.merit}</td>

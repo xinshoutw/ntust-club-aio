@@ -419,7 +419,6 @@ export default function ActivityReviewModal({
                   {r.actor} 於 <span className="num">{r.at}</span>{' '}
                   {r.isClose ? '結案' : ''}
                   {DECISION_LABEL[r.decision] ?? r.decision}
-                  {r.reason ? `:${r.reason}` : ''}
                 </div>
               ))}
             </div>

@@ -146,7 +146,10 @@ export default function AdminEvalPage() {
                   <div style={{ fontWeight: 500 }}>{AD_LABELS[s.key].name}</div>
                 </td>
                 <td className="r num" style={{ fontSize: 13, color: 'var(--steel)' }}>
-                  {s.auto} / {s.key === 'adj' ? '+5' : s.max}
+                  {/* note 是自動計算的依據(例:結案幾件、名單幾人 → 幾分);承辦調分前要看得到 */}
+                  <Tooltip title={s.note}>
+                    <span>{s.auto} / {s.key === 'adj' ? '+5' : s.max}</span>
+                  </Tooltip>
                 </td>
                 <td className="r">
                   <span className="num" style={{ fontSize: 15, fontWeight: 600 }}>{s.final}</span>

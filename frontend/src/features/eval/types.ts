@@ -13,25 +13,16 @@ export interface EvalFile {
   raw?: File // 本次 session 上傳的原始檔(docx 預覽用)
 }
 
-// 獎項簡述(前端文案;獎項主檔與評分細項在後端,鍵=awards.id slug)
-export const AWARD_BRIEFS: Record<string, string> = {
-  club: '行政資料 40% + 社團營運 60%',
-  finance: '制度、預算、帳目憑證與公開徵信',
-  activity: '單一活動的企劃、執行與結案',
-  result: '成果的影響力、執行與學習成長',
-  leader: '個人獎:自我介紹、社團經歷與事蹟',
-}
-
-export const AD_LABELS: Record<AdKey, { group: string; name: string }> = {
-  ad1: { group: '活動及社課申請', name: '活動與課程申請' },
-  ad2: { group: '活動 / 社課成果', name: '結案照片 / 影片' },
-  ad3: { group: '活動 / 社課成果', name: '結案成果' },
-  ad4: { group: '活動 / 社課成果', name: '結案心得' },
-  ad5: { group: '社團資料更新狀況', name: '社員、幹部名單更新' },
-  ad6: { group: '社團資料更新狀況', name: '社團媒體經營' },
-  ad7: { group: '參與會議與活動', name: '負責人會議' },
-  ad8: { group: '參與會議與活動', name: '幹訓參與' },
-  adj: { group: '加減分', name: '表現優良 / 違規記點' },
+export const AD_LABELS: Record<AdKey, { name: string }> = {
+  ad1: { name: '活動與課程申請' },
+  ad2: { name: '結案照片 / 影片' },
+  ad3: { name: '結案成果' },
+  ad4: { name: '結案心得' },
+  ad5: { name: '社員、幹部名單更新' },
+  ad6: { name: '社團媒體經營' },
+  ad7: { name: '負責人會議' },
+  ad8: { name: '幹訓參與' },
+  adj: { name: '表現優良 / 違規記點' },
 }
 
 const EXT_TYPE: Record<string, EvalFileType> = {

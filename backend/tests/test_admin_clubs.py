@@ -23,6 +23,8 @@ async def seed(client, db):
     )
     # 只讀得到名單、改不了設定的帳號(社團三頁各自一把鍵)
     await make_user(db, username="memberonly", role="admin", permissions=["amember"])
+    # 帳號管理頁本身:社團分頁看得到,但 /admin/clubs 的寫入一律歸 aclubset
+    await make_user(db, username="accountonly", role="admin", permissions=["aaccount"])
     await make_user(db, username="other", role="admin", permissions=["aviol"])
     await login(client, "clubadmin")
     return club, account, no_account
@@ -115,6 +117,19 @@ async def test_create_club(client, db):
         await db.scalars(sa.select(AuditLog).where(AuditLog.action == "club_created"))
     ).all()
     assert len(audits) == 2
+
+
+async def test_create_club_needs_the_club_settings_key(client, db):
+    """建社團歸 aclubset(社團管理項目),不是 aaccount —— 入口雖然在帳號管理頁上。"""
+    await seed(client, db)
+    await login(client, "accountonly")
+
+    # 帳號管理頁的社團分頁讀得到清單
+    assert (await client.get(URL)).status_code == 200
+    resp = await client.post(
+        URL, json={"name": "攝影社", "attribute": "藝術性"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 403, resp.text
 
 
 async def test_patch_attribute(client, db):

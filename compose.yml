@@ -43,7 +43,9 @@ services:
       # uvicorn 由右往左跳過信任跳點取真實 client IP(限流與稽核依賴它)
       FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-172.28.0.0/24}
     volumes:
-      - uploads:/srv/uploads
+      # 預設具名 volume;UPLOADS_PATH 給絕對路徑即改成 bind mount
+      # (sftp 直接送檔、備份工具直接讀得到,自架站台走這條)
+      - ${UPLOADS_PATH:-uploads}:/srv/uploads
     depends_on:
       db:
         condition: service_healthy

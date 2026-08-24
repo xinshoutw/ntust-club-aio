@@ -95,6 +95,12 @@
 - [ ] 確認 `curl -sI https://<網域>/api/v1/health` 200,且 `docker compose logs backend` 裡的 client IP
   是真實來源而非 NPM 的容器 IP —— 塌縮的話限流會變全域一桶
 
+**上傳目錄**
+
+- [ ] `UPLOADS_PATH=/srv/club-aio/uploads` —— bind mount,舊照片 sftp 送得進去、備份直接讀得到
+- [ ] 容器以 root 執行,寫進去的檔案是 `root:root`。sftp 先送到自己的家目錄再 `sudo rsync -a` 進去,
+  不要 sftp 直接對著掛載點寫
+
 **映像**
 
 VPS 上直接 `docker compose up -d --build`(`BACKEND_IMAGE`/`WEB_IMAGE` 留空即 `:local`)。
@@ -104,7 +110,7 @@ CI 只在 `main` 推 GHCR 映像,`dev` 分支沒有可 pull 的映像。前端 b
 ## F. 待決清單
 
 1. ~~SMTP relay 最終方案~~ —— 已定案為校方 relay,實測可寄
-3. 上傳檔案儲存位置:`compose.yml` 現用具名 volume `uploads`,`architecture.md §3.2` 規劃 bind mount `/srv/club-aio/uploads` 以便備份工具直接同步。二者影響備份做法,擇一並對齊
+3. 上傳檔案儲存位置:`compose.yml` 由 `UPLOADS_PATH` 二選一 —— 留空=具名 volume(預設),給絕對路徑=bind mount。備份做法隨之不同,正式站要挑定一種並與備份腳本對齊
 4. 備份保留天數(腳本預設 14 天,`KEEP_DAYS` 可覆寫)與備份目錄位置(預設 `./backups`)
 5. GCE 實體磁碟大小(`df` 驗證)與 VM 規格(e2-medium + 2GB swap 是否夠)
 6. `.env` 的保管與輪替方式

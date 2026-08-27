@@ -7,6 +7,7 @@ approved →(活動結束後)close → closing_pending_advisor → closed;退回
 逾期鎖定=推導(活動結束日+N 天未送結案),管理員可解鎖(close_unlocked)。
 """
 
+import uuid
 from datetime import UTC, datetime, time
 from typing import Annotated
 
@@ -401,7 +402,7 @@ def _audit_file_deleted(
 
 @router.delete("/{activity_id}/photos/{file_id}")
 async def delete_photo(
-    activity_id: int, file_id: str, user: ClubUser, db: DbDep, request: Request
+    activity_id: int, file_id: uuid.UUID, user: ClubUser, db: DbDep, request: Request
 ) -> ApiResponse[None]:
     activity = await svc.get_own_activity(db, user, activity_id)
     # 鎖活動列並重讀狀態:submit_close 先 commit 時,這裡看到 closing → 409,
@@ -465,7 +466,7 @@ async def upload_attachment(
 
 @router.delete("/{activity_id}/attachments/{file_id}")
 async def delete_attachment(
-    activity_id: int, file_id: str, user: ClubUser, db: DbDep, request: Request
+    activity_id: int, file_id: uuid.UUID, user: ClubUser, db: DbDep, request: Request
 ) -> ApiResponse[None]:
     activity = await svc.get_own_activity(db, user, activity_id)
     await db.refresh(activity, attribute_names=["status"], with_for_update=True)

@@ -893,3 +893,15 @@ async def test_close_actual_times_overnight_rules(client, db):
         headers=csrf_headers(client),
     )
     assert resp.status_code == 200, resp.text
+
+
+async def test_delete_file_rejects_non_uuid_path_param(client, db):
+    """非 UUID 的 file_id 由 FastAPI 擋成 422 —— 宣告成 str 會原樣送進 asyncpg 而 500。"""
+    await setup_session(client, db)
+    data = await create_activity(client, date=(date.today() - timedelta(days=3)).isoformat())
+    for kind in ("photos", "attachments"):
+        resp = await client.delete(
+            f"/api/v1/club/activities/{data['id']}/{kind}/not-a-uuid",
+            headers=csrf_headers(client),
+        )
+        assert resp.status_code == 422, (kind, resp.status_code, resp.text)

@@ -2,7 +2,7 @@ from datetime import UTC, date, datetime
 
 import sqlalchemy as sa
 
-from app.models import Announcement, MaintenanceRequest, OfficerCertificate, Violation
+from app.models import Announcement, File, MaintenanceRequest, OfficerCertificate, Violation
 from app.models.enums import CertPosition
 from tests.conftest import csrf_headers, login, make_club, make_user
 
@@ -562,3 +562,37 @@ async def test_postal_rows_report_whether_the_passbook_arrived(client, db):
     )
     assert late.status_code == 422
     assert "已完成" in late.json()["error"]
+
+
+async def test_passbook_upload_one_per_application_under_concurrency(client, db):
+    """「一張申請一份」要靠列鎖:先查後寫沒鎖住,兩個並發請求會各存一份個資檔。"""
+    import asyncio
+    import io
+
+    await setup_session(client, db)
+    resp = await client.post(
+        "/api/v1/club/postal-changes",
+        json={"reasons": ["印鑑變更"], "account_name": "熱舞社", "account_number": "0001234567890"},
+        headers=csrf_headers(client),
+    )
+    change_id = resp.json()["data"]["id"]
+
+    jpg = b"\xff\xd8\xff\xe0" + b"\x00" * 64
+
+    async def upload(tag: int):
+        return await client.post(
+            f"/api/v1/club/postal-changes/{change_id}/passbook",
+            # 內容不同:才不會被 sha256 去重擋掉而測不到鎖
+            files={"file": (f"存簿{tag}.jpg", io.BytesIO(jpg + bytes([tag])), "image/jpeg")},
+            headers=csrf_headers(client),
+        )
+
+    codes = sorted(r.status_code for r in await asyncio.gather(upload(1), upload(2)))
+    assert codes == [201, 422], codes
+
+    stored = await db.scalar(
+        sa.select(sa.func.count())
+        .select_from(File)
+        .where(File.subject_type == "postal_change", File.subject_id == change_id)
+    )
+    assert stored == 1

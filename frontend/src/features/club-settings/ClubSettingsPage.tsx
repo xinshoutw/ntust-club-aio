@@ -8,68 +8,10 @@ import { useAuth } from '../../app/auth'
 import { useUnsavedGuard } from '../../app/unsaved'
 import { changePasswordApi } from '../../api/auth'
 import { useClubProfile, useUpdateClubProfile, type ClubProfile } from '../../api/clubProfile'
+import { fromProfile, profileChanged, type SettingsValues } from './fields'
 
 // 密碼政策(與後端一致):≥10 碼且含大小寫、數字、特殊符號
 const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,}$/
-
-interface SettingsValues {
-  advisorName: string
-  advisorDept?: string
-  advisorEmail?: string
-  advisorPhone?: string
-  advisorOutName?: string
-  advisorOutDept?: string
-  advisorOutEmail?: string
-  advisorOutPhone?: string
-  url?: string
-  intro?: string
-  email1: string
-  email2?: string
-  email3?: string
-  discordWebhook?: string
-  pwCurrent?: string
-  pwNew?: string
-  pwConfirm?: string
-}
-
-// PATCH /club/profile 涵蓋的欄位(密碼另走 /auth/change-password)
-const PROFILE_KEYS = [
-  'advisorName',
-  'advisorDept',
-  'advisorEmail',
-  'advisorPhone',
-  'advisorOutName',
-  'advisorOutDept',
-  'advisorOutEmail',
-  'advisorOutPhone',
-  'url',
-  'intro',
-  'email1',
-  'email2',
-  'email3',
-  'discordWebhook',
-] as const satisfies readonly (keyof SettingsValues)[]
-
-// dirty 基準=最後載入/儲存的 server 值;密碼欄基準恆為空
-const fromProfile = (p: ClubProfile): SettingsValues => ({
-  advisorName: p.advisorName,
-  advisorDept: p.advisorDept,
-  advisorEmail: p.advisorEmail,
-  advisorPhone: p.advisorPhone,
-  advisorOutName: p.advisorOutName,
-  advisorOutDept: p.advisorOutDept,
-  advisorOutEmail: p.advisorOutEmail,
-  advisorOutPhone: p.advisorOutPhone,
-  url: p.url,
-  intro: p.intro,
-  email1: p.emails[0],
-  email2: p.emails[1],
-  email3: p.emails[2],
-  discordWebhook: p.discordWebhook,
-  pwCurrent: '',
-  pwNew: '',
-  pwConfirm: '',
-})
 
 const sectionTitle: React.CSSProperties = { fontSize: 16, fontWeight: 600, marginBottom: 16 }
 
@@ -119,13 +61,24 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
 
   const itemClass = (k: keyof SettingsValues) => (dirty.has(k) ? 'field-dirty' : undefined)
 
+  // 網頁連結與簡介必填(D-19),但只在**這次真的要存 profile** 時擋:
+  // 密碼是同一張表單裡的另一支 API,而遷入的社團有一批簡介是空字串、網頁連結是 NULL
+  // (`migration/cms_import.py`)—— 讓那些社團連改個密碼都送不出去,不是這條必填要做的事。
+  // 一旦動到 profile 的任何一欄,這兩欄就得補齊
+  const requiredOnProfileSave = (msg: string) => ({
+    validator: (_: unknown, v: string | undefined) => {
+      const cur = form.getFieldsValue(true) as SettingsValues
+      return profileChanged(cur, saved) && !v?.trim() ? Promise.reject(new Error(msg)) : Promise.resolve()
+    },
+  })
+
   const onFinish = async (v: SettingsValues) => {
     const changingPw = !!(v.pwCurrent || v.pwNew || v.pwConfirm)
-    const profileChanged = PROFILE_KEYS.some((k) => (v[k] ?? '') !== (saved[k] ?? ''))
+    const changingProfile = profileChanged(v, saved)
     let baseline = saved
     setSaving(true)
     try {
-      if (profileChanged) {
+      if (changingProfile) {
         const next = await update.mutateAsync({
           intro: v.intro ?? '',
           url: v.url ?? '',
@@ -243,8 +196,9 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
               name="url"
               label="社團網頁連結"
               className={itemClass('url')}
+              required // 必填的星號:規則是自訂 validator,AntD 推導不出來
               rules={[
-                { required: true, message: '請填寫社團網頁連結' },
+                requiredOnProfileSave('請填寫社團網頁連結'),
                 { type: 'url', message: '網址格式不正確' },
               ]}
             >
@@ -254,7 +208,8 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
               name="intro"
               label="簡介"
               className={itemClass('intro')}
-              rules={[{ required: true, message: '請填寫社團簡介' }]}
+              required
+              rules={[requiredOnProfileSave('請填寫社團簡介')]}
               style={{ marginBottom: 0 }}
             >
               <Input.TextArea rows={3} placeholder="社團宗旨、特色" />

@@ -129,8 +129,9 @@ export default function AdminMembersPage() {
           <table className="tb fixed" style={{ minWidth: 960 }}>
             {/* 姓名放得下四字中文名、學號放得下 9 碼,時間欄 156px 放得下 `YYYY/MM/DD HH:mm`
                 (16 字 + 左右內距 32px);時間欄依 showJoined/showUpdated 增減。
-                **每一欄都給 px、沒有 auto**:餘裕按比例攤回每一欄,寬螢幕各寬一點、窄螢幕一起縮。
-                與社團端同一份版面 */}
+                **每一欄都給 px、沒有 auto**:寬螢幕的餘裕按比例攤回每一欄,窄到放不下時
+                表格維持欄寬總和、由外層橫捲,時間欄不會被壓到截斷。版面同社團端
+                (欄寬另計:這頁密一級,且沒有動作欄)*/}
             <Cols widths={[100, 130, 92, 138, 80, ...(showJoined ? [156] : []), ...(showUpdated ? [156] : [])]} />
             <thead>
               <tr>

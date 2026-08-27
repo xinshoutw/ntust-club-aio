@@ -1,4 +1,4 @@
-// 行政端線上申請管理 API 層(權限鍵 aapply):幹部證明/郵局帳戶異動。
+// 行政端線上申請管理 API 層(幹部證明 acert / 郵局帳戶異動 apostal,各一把鍵)。
 // 兩張表各自伺服器端分頁(排序由後端固定);狀態流轉走後端狀態機:
 // 只能往前(審核中→處理中→已完成)但可跳過處理中,UI 開放的正是往前的那幾個。
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'

@@ -223,7 +223,7 @@ class AdminPostalChangeOut(BaseModel):
 
 
 class ApplicationStatusIn(BaseModel):
-    """狀態機:審核中 → 處理中 → 已完成(僅允許單步前進,比照維修管理)。"""
+    """狀態機:審核中 → 處理中 → 已完成(只能往前,可跳過處理中;D-25)。"""
 
     status: ApplicationStatus
 

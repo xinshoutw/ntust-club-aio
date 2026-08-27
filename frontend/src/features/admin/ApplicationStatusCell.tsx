@@ -2,7 +2,7 @@
 import { App, Select } from 'antd'
 import StatusPill from '../../components/ui/StatusPill'
 import {
-  NEXT_STATUS,
+  ALLOWED_NEXT,
   useApplicationStatusMutation,
   type ApplicationKind,
   type ApplicationStatus,
@@ -14,7 +14,7 @@ const STATUS_LABELS: Record<ApplicationStatus, string> = {
   completed: '已完成',
 }
 
-// 狀態機僅允許單步前進(審核中→處理中→已完成):下拉只開放下一步選項
+// 狀態機只能往前、但可跳過處理中(D-25):下拉開放的是往前走得到的那幾個
 export function StatusCell({
   kind,
   id,
@@ -47,7 +47,7 @@ export function StatusCell({
       options={(Object.keys(STATUS_LABELS) as ApplicationStatus[]).map((s) => ({
         value: s,
         label: STATUS_LABELS[s],
-        disabled: s !== status && NEXT_STATUS[status] !== s,
+        disabled: s !== status && !ALLOWED_NEXT[status]?.includes(s),
       }))}
     />
   )

@@ -51,16 +51,7 @@ async def test_officer_cert_status_flow(client, db):
     assert data[0]["club_name"] == club.name
     assert data[0]["applicant_name"] == "王小明"
 
-    # 跳關 pending → completed 擋下
-    resp = await client.post(
-        f"{CERT_URL}/{cert.id}/status",
-        json={"status": "completed"},
-        headers=csrf_headers(client),
-    )
-    assert resp.status_code == 409
-    assert resp.json()["meta"]["code"] == "INVALID_STATUS_TRANSITION"
-
-    # 單步前進:審核中 → 處理中 → 已完成
+    # 只能往前:審核中 → 處理中 → 已完成
     resp = await client.post(
         f"{CERT_URL}/{cert.id}/status",
         json={"status": "processing"},
@@ -75,6 +66,15 @@ async def test_officer_cert_status_flow(client, db):
     )
     assert resp.status_code == 200
 
+    # 回退擋下:已完成的單不能退回處理中
+    resp = await client.post(
+        f"{CERT_URL}/{cert.id}/status",
+        json={"status": "processing"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 409
+    assert resp.json()["meta"]["code"] == "INVALID_STATUS_TRANSITION"
+
     # 社團端看得到新狀態
     await login(client, "clubuser")
     listing = (await client.get("/api/v1/club/officer-certificates")).json()["data"]
@@ -82,6 +82,30 @@ async def test_officer_cert_status_flow(client, db):
 
     actions = set(await db.scalars(sa.select(AuditLog.action)))
     assert "officer_cert_status_updated" in actions
+
+
+async def test_status_can_skip_processing(client, db):
+    """審核中可直接跳到已完成(D-25):承辦當場開完證明就結案,不必先點一次處理中。
+
+    「處理中」在這裡只是承辦的工作註記,跳過它不會漏掉任何一次真實動作。
+    """
+    _, cert, postal = await seed(client, db)
+
+    resp = await client.post(
+        f"{CERT_URL}/{cert.id}/status",
+        json={"status": "completed"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["status"] == "completed"
+
+    # 郵局異動共用同一條狀態機
+    resp = await client.post(
+        f"{POSTAL_URL}/{postal.id}/status",
+        json={"status": "completed"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
 
 
 async def test_postal_change_carries_the_passbook(client, db):

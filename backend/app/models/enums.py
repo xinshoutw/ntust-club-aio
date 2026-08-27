@@ -128,7 +128,7 @@ class MaintenanceStatus(StrEnum):
 
 class ApplicationStatus(StrEnum):
     """幹部證明/郵局帳戶異動:
-    審核中 → 處理中 → 已完成;無退回,學務處線下溝通後直接處理。"""
+    審核中 → 處理中 → 已完成(只能往前,可跳過);無退回,學務處線下溝通後直接處理。"""
 
     PENDING = "pending"
     PROCESSING = "processing"

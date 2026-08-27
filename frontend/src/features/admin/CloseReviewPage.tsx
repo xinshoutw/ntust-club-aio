@@ -6,7 +6,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
-import { approvedText, fmtMoney, showsApproved } from '../activities/types'
+import { approvedText, fmtMoney, highlightsLabel, showsApproved } from '../activities/types'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import { useModalAutoFocus } from '../../components/ui/useModalAutoFocus'
 import SectionTitle from '../../components/ui/SectionTitle'
@@ -245,7 +245,7 @@ function CloseReviewModal({
               )}
               {' '}· 心得 <span className="num">{report.reflections.length}</span> 人
             </div>
-            <div style={detailLabel}>活動重點</div><div style={{ lineHeight: 1.7 }}>{report.highlights}</div>
+            <div style={detailLabel}>{highlightsLabel(item.type)}</div><div style={{ lineHeight: 1.7 }}>{report.highlights}</div>
             <div style={detailLabel}>達成目標</div><div style={{ lineHeight: 1.7 }}>{report.goals}</div>
             {report.others && (
               <>

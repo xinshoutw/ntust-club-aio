@@ -103,6 +103,11 @@ export function budgetTotals(items: BudgetItem[]): { self: number; requested: nu
   )
 }
 
+/** 結案成果第一欄的顯示詞:社課或會議叫「課程重點」、活動叫「活動重點」。
+ *  型別給 string 是為了行政端的 AdminActivity —— 同一個欄位、同一組值,不必再轉一次。 */
+export const highlightsLabel = (type?: string): string =>
+  type === '社課或會議' ? '課程重點' : '活動重點'
+
 export const fmtMoney = (n: number): string => `$${n.toLocaleString('en-US')}`
 
 /** 活動列表與詳情的經費欄:自籌 / 擬請;兩者皆 0 時不佔一格數字 */

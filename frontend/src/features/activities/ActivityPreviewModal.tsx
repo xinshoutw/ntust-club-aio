@@ -11,7 +11,7 @@ import {
   type ClubActivity,
   type ClubActivityDetail,
 } from '../../api/activities'
-import { approvedText, fmtMoney, money, showsApproved } from './types'
+import { approvedText, fmtMoney, highlightsLabel, money, showsApproved } from './types'
 import DownloadMenu from './DownloadMenu'
 import WorkTable from './WorkTable'
 import { TIME_RANGE_SEP, dateRangeText } from './utils'
@@ -273,7 +273,7 @@ export default function ActivityPreviewModal({ a, detail, loading, error, onRetr
                 </span>
               )}
             </SectionTitle>
-            {([['活動重點', rep.highlights], ['達成目標', rep.goals], ['其他成果', rep.others]] as const).map(([lab, text]) => (
+            {([[highlightsLabel(a?.type), rep.highlights], ['達成目標', rep.goals], ['其他成果', rep.others]] as const).map(([lab, text]) => (
               <div key={lab} style={{ marginBottom: 14 }}>
                 <div style={{ fontSize: 12, color: 'var(--steel)', marginBottom: 3 }}>{lab}</div>
                 <div style={{ fontSize: 13, lineHeight: 1.8, whiteSpace: 'pre-wrap' }}>{text}</div>

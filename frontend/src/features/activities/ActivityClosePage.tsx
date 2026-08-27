@@ -24,7 +24,7 @@ import {
 } from '../../api/activities'
 import { useClubConfig } from '../../api/clubConfig'
 import type { EvalFile } from '../eval/types'
-import { MIN_PHOTOS, MIN_REFLECTIONS, activityPath } from './types'
+import { MIN_PHOTOS, MIN_REFLECTIONS, activityPath, highlightsLabel } from './types'
 import type { Reflection } from './types'
 import { TIME_RANGE_SEP, dateRangeText } from './utils'
 import './actform.css'
@@ -380,7 +380,7 @@ function CloseForm({
     if (!actualStart) missing.push(['actualStart', '請填寫「實際開始時間」'])
     if (!actualEnd) missing.push(['actualEnd', '請填寫「實際結束時間」'])
     if (!actualLocation.trim()) missing.push(['actualLocation', '請填寫「實際地點」'])
-    if (!highlights.trim()) missing.push(['highlights', '請填寫「活動重點」'])
+    if (!highlights.trim()) missing.push(['highlights', `請填寫「${highlightsLabel(activity.type)}」`])
     if (!goals.trim()) missing.push(['goals', '請填寫「如何達成活動目標」'])
     if (!others.trim()) missing.push(['others', '請填寫「其他執行狀況與成果」'])
     if (reviewMeeting) {
@@ -556,7 +556,7 @@ function CloseForm({
             />
           </div>
           <div style={{ marginTop: 12 }}>
-            <div style={label}>活動重點{requiredMark}</div>
+            <div style={label}>{highlightsLabel(activity.type)}{requiredMark}</div>
             <Input.TextArea
               rows={4}
               status={err('highlights')}
@@ -565,7 +565,7 @@ function CloseForm({
                 clearErr('highlights')
                 setHighlights(e.target.value)
               }}
-              placeholder="本次活動重點"
+              placeholder={`本次${highlightsLabel(activity.type)}`}
             />
           </div>
           <div style={{ marginTop: 12 }}>

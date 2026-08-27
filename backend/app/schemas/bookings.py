@@ -182,8 +182,10 @@ def _validate_phone(v: str | None) -> str | None:
 
 
 def _validate_phone_required(v: str) -> str:
-    """社團端借用申請:10 碼電話或 4 碼校內分機(2026-08-27 需求方拍板)。
+    """社團端借用申請:09 開頭的 10 碼手機,或 4 碼校內分機(2026-08-27 需求方拍板)。
 
+    只看去掉 `-` 之後的位數與開頭,不管 `-` 打在哪 —— 前端 `lib/form.normalizePhone`
+    送的是 `0912-345-678`,但 API 也收得下沒有 `-` 的同一支號碼。
     行政手動借用不走這一條(`Manual*In` 用寬鬆的 `_validate_phone`)—— 那是補登舊件,
     紙本上寫什麼就是什麼。
     """
@@ -191,8 +193,11 @@ def _validate_phone_required(v: str) -> str:
     if not out:
         raise ValueError("請輸入聯絡電話")
     digits = out.replace("-", "")
-    if not digits.isdigit() or len(digits) not in (4, 10):
-        raise ValueError("聯絡電話須為 10 碼電話或 4 碼校內分機")
+    ok = digits.isdigit() and (
+        len(digits) == 4 or (len(digits) == 10 and digits.startswith("09"))
+    )
+    if not ok:
+        raise ValueError("聯絡電話須為 09 開頭的 10 碼手機或 4 碼校內分機")
     return out
 
 

@@ -274,7 +274,7 @@ export default function EquipmentPage() {
               rules={[{ required: true, message: '請輸入聯絡電話' }, PHONE_RULE]}
             >
               {/* 不設 maxLength:DOM 的 maxlength 在 normalize 之前就把貼上的內容截掉 */}
-              <Input className="num" placeholder="0912-345678 或 4 碼分機" />
+              <Input className="num" placeholder="0912-345-678 或 4 碼分機" />
             </Form.Item>
 
             <Button type="primary" htmlType="submit" block loading={createEquipmentLoan.isPending} disabled={createEquipmentLoan.isPending || suspended}>

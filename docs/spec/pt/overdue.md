@@ -1,6 +1,6 @@
 # 逾期追蹤(工讀生)
 
-`/pt/overdue` · `staff` · `features/pt/PtOverduePage.tsx`
+`/pt/overdue`(行政端 `/admin/pt/overdue`,鍵 `astaff`) · `staff` · `features/pt/PtOverduePage.tsx`
 
 ## 用途
 

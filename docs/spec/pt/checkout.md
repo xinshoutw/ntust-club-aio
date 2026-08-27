@@ -1,6 +1,6 @@
 # 器材借出點交
 
-`/pt/checkout` · `staff` · `features/pt/PtCheckoutPage.tsx`
+`/pt/checkout`(行政端 `/admin/pt/checkout`,鍵 `astaff`) · `staff` · `features/pt/PtCheckoutPage.tsx`
 
 ## 用途
 

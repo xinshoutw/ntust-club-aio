@@ -1,6 +1,6 @@
 # 違規勸導填寫
 
-`/pt/violations/new` · `staff` · `features/pt/PtViolationFormPage.tsx`
+`/pt/violations/new`(行政端 `/admin/pt/violations/new`,鍵 `astaff`) · `staff` · `features/pt/PtViolationFormPage.tsx`
 
 > `/pt` 的 index 直接轉導到本頁,工讀生登入後第一眼就是這裡。
 

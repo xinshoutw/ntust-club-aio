@@ -1,6 +1,6 @@
 # 器材歸還點交
 
-`/pt/checkin` · `staff` · `features/pt/PtCheckinPage.tsx`
+`/pt/checkin`(行政端 `/admin/pt/checkin`,鍵 `astaff`) · `staff` · `features/pt/PtCheckinPage.tsx`
 
 ## 用途
 

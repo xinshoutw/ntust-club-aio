@@ -17,7 +17,7 @@
 | 編號 | 嚴重度 | 問題 |
 |---|---|---|
 | ISS-92 | 中 | **持 `aaccount` 與兩個簽核鍵的人可自建分身繞過「相鄰關卡不得由同一人簽核」**:建帳號時可授出自己持有的鍵(D-01),回應直接帶明文一次性密碼,登入即可簽下一關;**重設位階不高於自己的同儕密碼**也是同一條路。稽核留有紀錄可事後追,事前沒有控制 |
-| ISS-93 | 中 | **器材「待借出」的判定有三份,只有徽章那兩份有日期軸**:`badges.py` 的 `booking-overview` 與 `pt-checkout` 算的是 `approved 且 end_date >= today`,而工讀生待借出清單(`staff.py` 的 `status=approved`)與「借用中」卡(`booking_service.equipment_loan_ongoing_expr`)只篩狀態 —— 側欄說 0 筆、點進去列得出來。根因是**區間過了沒有任何轉移**:`pending`/`approved` 不會自己走掉,逾期只認 `checked_out`,所以核准後沒去領的單永遠留在社團「正在借用」與行政「借用中」,社團取消不了(開始日已過)、逾期追蹤也抓不到。要收得先定「核准後未領取」的規則 |
+| ISS-93 | 中 | **器材「待借出」的判定有三份,只有徽章那兩份有日期軸**:`badges.py` 的 `booking-overview` 與 `pt-checkout` 算的是 `approved 且 end_date >= today`,而工讀生待借出清單(`staff.py` 的 `status=approved`)與「借用中」卡(`booking_service.equipment_loan_ongoing_expr`)只篩狀態 —— 側欄說 0 筆、點進去列得出來。根因是**區間過了沒有任何轉移**:`pending`/`approved` 不會自己走掉,逾期只認 `checked_out`,所以核准後沒去領的單永遠留在社團「正在借用」與行政「借用中」,社團取消不了(開始日已過)、逾期追蹤也抓不到。要收得先定「核准後未領取」的規則。行政端鏡射的工讀生作業(D-26)撞的是同一份落差 |
 | ISS-95 | 中 | **側欄徽章與評鑑卡導向的頁面看不到它們數的東西**:「活動列表」徽章數的是全學期的退回件(57 筆有 56 筆在舊學期),連過去的 `/activities` 落在最新學期;評鑑資料總覽五張卡同理。要修得先讓 `/club/activities` 收「全部學期」(現行 `semester` 的 pattern 是 `^\d{3}-[12]$`),或讓徽章帶出目標學期。另外 `MembersPage` 的學期硬寫 `currentSemester()`、不讀網址,ad5 那張卡連過去一樣看不到舊學期名單 |
 | ISS-96 | 中 | **評鑑資料總覽的 ad2/ad3/ad4 連到只列未結案活動的頁面**:那三項評的是**已結案**活動,`/activities/close` 只列 `closable=true`,依建構方式一筆都不會出現 |
 | ISS-101 | 中 | **承辦看不到自己退回或撤銷的理由**:`AdminVenueBookingOut`/`AdminEquipmentLoanOut`/`AdminRoomBookingOut` 都沒有原因欄,審核頁上的退回件與撤銷件只顯示狀態,要查理由只能去稽核軌跡翻。社團端已於 `_attach_decision_reasons` 補上(`api/v1/bookings.py`),行政端是同一個洞的另一半 |

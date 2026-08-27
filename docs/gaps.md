@@ -9,7 +9,7 @@
 
 | 編號 | 功能 | 現況 | 影響 |
 |---|---|---|---|
-| GAP-01 | 分組與評審指派 | `eval_groups` / `eval_group_clubs` / `eval_group_reviewers` 三張表存在,**沒有任何寫入 API,行政端也沒有頁面**。只能直接操作 DB | 評審端三頁在正式環境永遠是「尚未被指派評分」 |
+| GAP-01 | 分組與評審指派 | `eval_groups` / `eval_group_clubs` / `eval_group_reviewers` 三張表存在,**沒有任何寫入 API,行政端也沒有頁面**。只能直接操作 DB | 評審端三頁在正式環境永遠是「尚未被指派評分」(行政端鏡射的那組同樣)。**做指派 UI 前先決定管理員算不算候選人** —— `eval_group_reviewers` 沒有角色限制,把持 `aviewer` 的承辦列進去,他的分數就會以評審身分計入(含匿名的評審A/B 代號);連帶決定 `aviewer` 要不要開回 `eval_upload` 的下載(D-26 目前不給) |
 | GAP-02 | 評審代號 A/B | `eval_group_reviewers.sort` 有欄位,匿名映射未實作;`sort` 也無唯一性保證 | 社團看評語時無從區分評審,代號會漂移 |
 | GAP-03 | 競賽成績總表 | 跨評審平均、最佳社團獎 40%/60% 加權、名次全部沒有實作。`services/evaluation.py` 只有行政分自動計算 | 評鑑跑完也算不出成績 |
 | GAP-04 | 評鑑結果頁 | 頁面、路由與側欄入口皆已移除(原本硬編假分數);設計意圖留在 [spec/club/eval-result.md](spec/club/eval-result.md) | 社團看不到自己的成績與評語 |

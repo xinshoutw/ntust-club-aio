@@ -1,6 +1,6 @@
 # 已完成評分
 
-`/viewer/done` · `viewer` · `features/viewer/ViewerDonePage.tsx`
+`/viewer/done`(行政端 `/admin/viewer/done`,鍵 `aviewer`) · `viewer` · `features/viewer/ViewerDonePage.tsx`
 
 ## 用途
 

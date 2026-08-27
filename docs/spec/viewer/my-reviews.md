@@ -1,6 +1,6 @@
 # 我負責的評分
 
-`/viewer` · `viewer` · `features/viewer/MyReviewsPage.tsx`
+`/viewer`(行政端 `/admin/viewer`,鍵 `aviewer`) · `viewer` · `features/viewer/MyReviewsPage.tsx`
 
 ## 用途
 
@@ -26,3 +26,5 @@
 ## 未完成 / 問題
 
 - **分組與評審指派沒有任何寫入 API**,只能直接操作 DB;正式環境本頁必定是「尚未被指派評分」
+- 行政端(`aviewer`)看到的同樣是**自己**被指派的分組 —— 管理員沒被指派就是空的,
+  這頁不會因為換成管理員就變成全校總表。要看全部評分進度是另一頁([`../../gaps.md`](../../gaps.md) GAP-03)

@@ -36,7 +36,8 @@ export default function AdminMembersPage() {
   // 名冊慣例的預設序(身份權重→學號)=後端預設:不點排序時不帶 sort
   const { entries, toggle } = useMultiSort<SortKey>()
   const { showJoined, showUpdated } = useMemberTimeColumns(entries.map((e) => e.key))
-  const colCount = 6 + Number(showJoined) + Number(showUpdated)
+  // 姓名/學號/身份/職稱/學期 + 兩個時間欄;這頁沒有動作欄(社團端才有,那邊是 6)
+  const colCount = 5 + Number(showJoined) + Number(showUpdated)
   const [exporting, setExporting] = useState(false)
   useEffect(() => setPage(1), [clubId, semester])
   // 換社團要一併回到當前學期:上一社選的學期在新社可能根本不存在,列表與匯出都會是誤導性的空

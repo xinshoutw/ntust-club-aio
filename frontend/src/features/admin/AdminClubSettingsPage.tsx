@@ -43,7 +43,8 @@ const advisorOutText = (d: AdminClubDetail | undefined): string => {
   return [d.advisorOutName, d.advisorOutDept, d.advisorOutPhone].filter(Boolean).join(' · ')
 }
 
-// 行政端管理項目:社團自行維護的內容唯讀;可改名稱/帳號、重設密碼、啟停用
+// 行政端管理項目:社團自行維護的內容唯讀;可改名稱/英文名稱/帳號、重設密碼、啟停用
+// (英文名稱在社團端是唯讀的,只有這裡改得動 —— decisions.md D-19)
 export default function AdminClubSettingsPage() {
   const { club, clubId, setClub } = useAdminClub()
   const { message, modal } = App.useApp()
@@ -200,7 +201,7 @@ export default function AdminClubSettingsPage() {
         <div className="card" style={{ padding: 24 }}>
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>社團資料</div>
           <LoadingBlock pending={clubId != null && detailQuery.isPending}>
-            {/* 手上還沒有資料就只顯示錯誤:八個欄位全是 `—` 看起來像「這社什麼都沒填」(同社團總覽) */}
+            {/* 手上還沒有資料就只顯示錯誤:整排 `—` 看起來像「這社什麼都沒填」(同社團總覽) */}
             {detailQuery.isError && !detail ? (
               <QueryError
                 compact

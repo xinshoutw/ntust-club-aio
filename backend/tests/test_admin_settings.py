@@ -28,7 +28,7 @@ async def test_get_defaults(client, db):
     # 舊鍵(開放月份+手動加開)已移除,固定借用改日期區間
     assert data["fixed_booking_window"] == {"open_from": None, "open_until": None}
     assert data["equipment_workday_buffer"] == {"before": 2, "after": 1}
-    assert data["close_lock_days"] == 30
+    assert data["close_lock_days"] == 21  # DEFAULTS;DB 沒有這一列時的值
     assert data["upload_limits"] == {"doc": 50, "img": 10, "zip": 100, "video": 200}
     # 各申請性質的加總上限(2026-07-17 改依性質給總量)
     assert data["activity_attachment_total_mb"] == 50
@@ -153,7 +153,7 @@ async def test_audit_records_before_and_after_values(client, db):
 
     await put({"close_lock_days": 45})
     logged = sa.select(AuditLog.detail).where(AuditLog.action == "settings_updated")
-    assert list(await db.scalars(logged)) == ["close_lock_days=30→45"]
+    assert list(await db.scalars(logged)) == ["close_lock_days=21→45"]
 
     # 送出但值沒變:沒有變更就不該留下稽核紀錄
     await put({"close_lock_days": 45})

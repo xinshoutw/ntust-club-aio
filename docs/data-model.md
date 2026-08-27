@@ -396,7 +396,7 @@ approved 且 end_date + N 天已過且未送結案 → 逾期鎖定(推導,非�
 |---|---|
 | `budget_categories` | 經費科目九項,`[{name, hint}]`,hint 於社團選到該科目時顯示 |
 | `violation_items` | 違規勸導項目目錄 |
-| `close_lock_days` | 結案鎖定天數(預設 30;可設 1–366) |
+| `close_lock_days` | 結案鎖定天數(預設 21;可設 1–366) |
 | `equipment_return_time` | 器材歸還時限時刻(預設 10:30) |
 | `equipment_workday_buffer` | `{before, after}` 工作天(預設 2/1) |
 | `fixed_booking_window` | `{open_from, open_until}`;未設定=不開放 |

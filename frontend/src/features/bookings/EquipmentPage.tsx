@@ -4,6 +4,7 @@ import { App, Button, Form, Input, InputNumber, Select } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
+import { PHONE_RULE, normalizePhone } from '../../lib/form'
 import { confirmDialog } from '../../lib/confirm'
 import { notFoundText } from '../../lib/selectOptions'
 import QueryError from '../../components/ui/QueryError'
@@ -266,8 +267,13 @@ export default function EquipmentPage() {
             >
               <Input placeholder="簡述說明" />
             </Form.Item>
-            <Form.Item name="phone" label="聯絡電話" rules={[{ required: true, message: '請輸入聯絡電話' }, { pattern: /^[0-9\-()*#]+$/, message: '僅能輸入數字與 - ( ) * #' }]}>
-              <Input className="num" placeholder="申請聯絡人電話" maxLength={30} />
+            <Form.Item
+              name="phone"
+              label="聯絡電話"
+              normalize={normalizePhone}
+              rules={[{ required: true, message: '請輸入聯絡電話' }, PHONE_RULE]}
+            >
+              <Input className="num" placeholder="0912-345678 或 4 碼分機" maxLength={11} />
             </Form.Item>
 
             <Button type="primary" htmlType="submit" block loading={createEquipmentLoan.isPending} disabled={createEquipmentLoan.isPending || suspended}>

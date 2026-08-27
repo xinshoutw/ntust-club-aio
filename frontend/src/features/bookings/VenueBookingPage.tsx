@@ -5,6 +5,7 @@ import { App, Button, DatePicker, Form, Input, Select } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
+import { PHONE_RULE, normalizePhone } from '../../lib/form'
 import { confirmDialog } from '../../lib/confirm'
 import { bookingStarted, periodKeys, startedPeriods, usePeriods } from '../../lib/periods'
 import { notFoundText } from '../../lib/selectOptions'
@@ -175,10 +176,11 @@ export default function VenueBookingPage() {
             <Form.Item
               name="phone"
               label="聯絡電話"
-              rules={[{ required: true, message: '請輸入聯絡電話' }, { pattern: /^[0-9\-()*#]+$/, message: '僅能輸入數字與 - ( ) * #' }]}
+              normalize={normalizePhone}
+              rules={[{ required: true, message: '請輸入聯絡電話' }, PHONE_RULE]}
               style={{ marginBottom: 0 }}
             >
-              <Input className="num" placeholder="申請聯絡人電話" maxLength={30} />
+              <Input className="num" placeholder="0912-345678 或 4 碼分機" maxLength={11} />
             </Form.Item>
           </div>
           <div style={{ fontSize: 13, fontWeight: 500, margin: '18px 0 8px' }}>

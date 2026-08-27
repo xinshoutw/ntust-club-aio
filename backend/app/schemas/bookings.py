@@ -182,9 +182,17 @@ def _validate_phone(v: str | None) -> str | None:
 
 
 def _validate_phone_required(v: str) -> str:
+    """社團端借用申請:10 碼電話或 4 碼校內分機(2026-08-27 需求方拍板)。
+
+    行政手動借用不走這一條(`Manual*In` 用寬鬆的 `_validate_phone`)—— 那是補登舊件,
+    紙本上寫什麼就是什麼。
+    """
     out = _validate_phone(v)
     if not out:
         raise ValueError("請輸入聯絡電話")
+    digits = out.replace("-", "")
+    if not digits.isdigit() or len(digits) not in (4, 10):
+        raise ValueError("聯絡電話須為 10 碼電話或 4 碼校內分機")
     return out
 
 

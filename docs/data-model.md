@@ -278,7 +278,7 @@ approved 且 end_date + N 天已過且未送結案 → 逾期鎖定(推導,非�
 
 **maintenance_requests**(id, club_id, location, items, status enum(pending,in_progress,done), handle_note NULL)— 佐證照片/影片走 files(slot=`evidence`)。
 
-幹部證明與郵局異動共用 **ApplicationStatus**:`pending`(審核中)→ `processing`(處理中)→ `completed`(請洽學務處)。**無退回**,學務處線下溝通後直接處理。
+幹部證明與郵局異動共用 **ApplicationStatus**:`pending`(審核中)→ `processing`(處理中)→ `completed`(已完成)。**無退回**,學務處線下溝通後直接處理。
 
 三者欄位、驗證、狀態機都不同,故用三張窄表而非 applications + JSONB。「待審申請彙整」頁目前由前端合併幹部證明與郵局異動兩個端點的結果,報修另有專頁。
 

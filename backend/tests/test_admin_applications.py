@@ -60,7 +60,7 @@ async def test_officer_cert_status_flow(client, db):
     assert resp.status_code == 409
     assert resp.json()["meta"]["code"] == "INVALID_STATUS_TRANSITION"
 
-    # 單步前進:審核中 → 處理中 → 請洽學務處
+    # 單步前進:審核中 → 處理中 → 已完成
     resp = await client.post(
         f"{CERT_URL}/{cert.id}/status",
         json={"status": "processing"},

@@ -1,6 +1,6 @@
 """行政端:線上申請管理(幹部證明/郵局帳戶異動,權限鍵 aapply)。
 
-2026-07-17 需求方拍板的最小審核:狀態=審核中 → 處理中 → 請洽學務處(完成),
+2026-07-17 需求方拍板的最小審核:狀態=審核中 → 處理中 → 已完成,
 單步前進、無退回(比照維修管理的狀態機模式);audit + notify 社團。
 """
 
@@ -26,7 +26,7 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 CertAdmin = Annotated[CurrentUser, Depends(require_permission("acert"))]
 PostalAdmin = Annotated[CurrentUser, Depends(require_permission("apostal"))]
 
-# 狀態機:審核中 → 處理中 → 請洽學務處(僅允許單步前進,不可回退/跳關)
+# 狀態機:審核中 → 處理中 → 已完成(僅允許單步前進,不可回退/跳關)
 _NEXT_STATUS = {
     ApplicationStatus.PENDING: ApplicationStatus.PROCESSING,
     ApplicationStatus.PROCESSING: ApplicationStatus.COMPLETED,
@@ -35,7 +35,7 @@ _NEXT_STATUS = {
 _STATUS_LABELS = {
     ApplicationStatus.PENDING: "審核中",
     ApplicationStatus.PROCESSING: "處理中",
-    ApplicationStatus.COMPLETED: "請洽學務處",
+    ApplicationStatus.COMPLETED: "已完成",
 }
 
 

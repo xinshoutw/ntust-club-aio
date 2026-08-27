@@ -53,9 +53,9 @@ export const STATUS: Record<StatusKey, StatusStyle> = {
   // 逾期未結案但管理員已解鎖(結案審核頁逾期表):社團可補送結案,行政待其行動
   unlocked: { label: '已解鎖', fg: '#1D5A9E', bg: '#E8F0FB' },
   in_progress: { label: '處理中', fg: '#1D5A9E', bg: '#E8F0FB' },
-  // 幹部證明/郵局帳戶異動:審核中 → 處理中 → 請洽學務處
+  // 幹部證明/郵局帳戶異動:審核中 → 處理中 → 已完成
   processing: { label: '處理中', fg: '#1D5A9E', bg: '#E8F0FB' },
-  completed: { label: '請洽學務處', fg: '#1F6B45', bg: '#E3F2E9', border: 'rgba(31,107,69,.4)' },
+  completed: { label: '已完成', fg: '#1F6B45', bg: '#E3F2E9', border: 'rgba(31,107,69,.4)' },
   open: { label: '開放中', fg: '#1F6B45', bg: '#E3F2E9', border: 'rgba(31,107,69,.4)' },
   ended: { label: '已截止', fg: '#3A3F4A', bg: '#E8EAEE' },
   registered: { label: '已報名', fg: '#1D5A9E', bg: '#E8F0FB' },

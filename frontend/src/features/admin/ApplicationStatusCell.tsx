@@ -11,10 +11,10 @@ import {
 const STATUS_LABELS: Record<ApplicationStatus, string> = {
   pending: '審核中',
   processing: '處理中',
-  completed: '請洽學務處',
+  completed: '已完成',
 }
 
-// 狀態機僅允許單步前進(審核中→處理中→請洽學務處):下拉只開放下一步選項
+// 狀態機僅允許單步前進(審核中→處理中→已完成):下拉只開放下一步選項
 export function StatusCell({
   kind,
   id,

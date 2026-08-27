@@ -20,7 +20,7 @@
 
 ## 規則
 
-- 狀態機:`pending`(審核中)→ `processing`(處理中)→ `completed`(請洽學務處);**只能單步前進,不可回退也不可跳關**(違反回 409 `INVALID_STATUS_TRANSITION`),**沒有退回**
+- 狀態機:`pending`(審核中)→ `processing`(處理中)→ `completed`(已完成);**只能單步前進,不可回退也不可跳關**(違反回 409 `INVALID_STATUS_TRANSITION`),**沒有退回**
 - 排序由後端固定:審核中 → 處理中 → 完成,各組內申請日升冪
 - 每次推進寫 `audit_logs` 並推 Discord 給該社
 - 狀態下拉與郵局帳戶管理共用 `features/admin/ApplicationStatusCell.tsx`(同一組狀態機)

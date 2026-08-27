@@ -1,6 +1,6 @@
 // 行政端線上申請管理 API 層(權限鍵 aapply):幹部證明/郵局帳戶異動。
 // 兩張表各自伺服器端分頁(排序由後端固定);狀態流轉走後端狀態機:
-// 僅允許單步前進(審核中→處理中→請洽學務處),UI 也只開放下一步選項。
+// 僅允許單步前進(審核中→處理中→已完成),UI 也只開放下一步選項。
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api, apiPaged, qs } from './client'

@@ -127,12 +127,11 @@ export default function AdminMembersPage() {
         <div style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden' }}>
         <LoadingBlock pending={clubId != null && listQuery.isPending}>
           <table className="tb fixed" style={{ minWidth: 960 }}>
-            {/* 姓名放得下四字中文名、學號放得下 9 碼,兩個時間欄放得下
-                `YYYY/MM/DD HH:mm` 不截斷(16 字 + 左右內距 32px);時間欄依 showJoined/showUpdated 增減。
-                **餘裕給姓名**(唯一 auto 的欄;table-layout:fixed 下沒有 auto 的話,
-                瀏覽器會把餘裕按比例攤回每一欄)—— 學期與兩個時間欄貼著右緣,職稱固定為身份的 1.5 倍。
+            {/* 姓名放得下四字中文名、學號放得下 9 碼,時間欄 156px 放得下 `YYYY/MM/DD HH:mm`
+                (16 字 + 左右內距 32px);時間欄依 showJoined/showUpdated 增減。
+                **每一欄都給 px、沒有 auto**:餘裕按比例攤回每一欄,寬螢幕各寬一點、窄螢幕一起縮。
                 與社團端同一份版面 */}
-            <Cols widths={['auto', 130, 92, 138, 80, ...(showJoined ? [156] : []), ...(showUpdated ? [156] : [])]} />
+            <Cols widths={[100, 130, 92, 138, 80, ...(showJoined ? [156] : []), ...(showUpdated ? [156] : [])]} />
             <thead>
               <tr>
                 <th scope="col"><MultiSortButton label="姓名" sortKey="name" entries={entries} onToggle={toggleSort} /></th>

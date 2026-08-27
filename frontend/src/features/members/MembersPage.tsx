@@ -210,13 +210,13 @@ export default function MembersPage() {
         <LoadingBlock pending={listQuery.isPending}>
           <table className="tb fixed" style={{ minWidth: 860 }}>
             {/* 兩個時間欄依 showJoined/showUpdated 增減,colgroup 要跟著長短。
-                姓名放得下四字中文名、學號放得下 9 碼,兩個時間欄放得下
-                `YYYY/MM/DD HH:mm` 不截斷(16 字 + 左右內距 32px)。
-                **餘裕給姓名**(唯一 auto 的欄;table-layout:fixed 下沒有 auto 的話會按比例攤回每一欄)。
-                餘裕總得放在某一欄:放動作欄的話更新時間與「移除」之間會空出一大條、放職稱的話職稱過寬,
-                最左的姓名是唯一放了也不奇怪的一欄。職稱固定為身份的 1.5 倍、動作欄 88px =
-                小尺寸「移除」鈕 + 左右內距 */}
-            <Cols widths={['auto', 130, 120, 180, 80, ...(showJoined ? [156] : []), ...(showUpdated ? [156] : []), 88]} />
+                姓名放得下四字中文名、學號放得下 9 碼。
+                **每一欄都給 px、沒有 auto**:table-layout:fixed 下餘裕會按比例攤回每一欄,
+                寬螢幕時每欄各寬一點、窄螢幕時一起縮 —— 餘裕集中在單一 auto 欄的話,
+                那一欄會胖到不像話(放動作欄則更新時間與「移除」之間空一大條),而且它一欄吃掉全部彈性,
+                其餘欄位在畫面變窄時完全不動。職稱固定為身份的 1.5 倍;動作欄 88px =
+                小尺寸「移除」鈕 + 左右內距;時間欄 156px 放得下 `YYYY/MM/DD HH:mm` */}
+            <Cols widths={[100, 130, 120, 180, 80, ...(showJoined ? [156] : []), ...(showUpdated ? [156] : []), 88]} />
             <thead>
               <tr>
                 <th scope="col">{sortHeader('姓名', 'name')}</th>

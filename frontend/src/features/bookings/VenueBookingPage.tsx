@@ -180,7 +180,8 @@ export default function VenueBookingPage() {
               rules={[{ required: true, message: '請輸入聯絡電話' }, PHONE_RULE]}
               style={{ marginBottom: 0 }}
             >
-              <Input className="num" placeholder="0912-345678 或 4 碼分機" maxLength={11} />
+              {/* 不設 maxLength:DOM 的 maxlength 在 normalize 之前就把貼上的內容截掉 */}
+              <Input className="num" placeholder="0912-345678 或 4 碼分機" />
             </Form.Item>
           </div>
           <div style={{ fontSize: 13, fontWeight: 500, margin: '18px 0 8px' }}>

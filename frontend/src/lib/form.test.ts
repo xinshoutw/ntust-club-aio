@@ -20,8 +20,10 @@ describe('normalizePhone', () => {
     expect(normalizePhone('(02)2733-3141')).toBe('02-27333141')
   })
 
-  it('超過 10 碼的部分丟掉,不讓輸入框無限長', () => {
-    expect(normalizePhone('09123456789999')).toBe('0912-345678')
+  // 截斷會把這支校內電話(spec 裡真實出現過的寫法)悄悄換成另一支合法號碼
+  it('超過 10 碼不截斷,整串留著讓規則擋下來', () => {
+    expect(normalizePhone('2733-3141#7604')).toBe('273331417604')
+    expect(PHONE_RULE.pattern.test(normalizePhone('2733-3141#7604'))).toBe(false)
   })
 })
 

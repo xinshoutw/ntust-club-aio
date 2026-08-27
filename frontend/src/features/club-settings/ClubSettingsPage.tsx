@@ -150,7 +150,8 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
                 label="Email"
                 className={itemClass('advisorEmail')}
                 rules={[{ type: 'email', message: 'Email 格式不正確' }]}
-                style={{ marginBottom: 0 }}
+                // 電話移除後這一欄落單:讓 Email 跨滿一列(位址本來就長)
+                style={{ marginBottom: 0, gridColumn: '1 / -1' }}
               >
                 <Input />
               </Form.Item>
@@ -168,7 +169,7 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
                 label="Email"
                 className={itemClass('advisorOutEmail')}
                 rules={[{ type: 'email', message: 'Email 格式不正確' }]}
-                style={{ marginBottom: 0 }}
+                style={{ marginBottom: 0, gridColumn: '1 / -1' }}
               >
                 <Input />
               </Form.Item>

@@ -42,6 +42,7 @@ from app.models.enums import (
     ViolationStatus,
 )
 from app.services import booking_service as svc
+from app.services import signup_service
 from app.services.activity_service import actionable_statuses, can_close_sql
 from app.services.evaluation import get_eval_window
 from app.services.settings_service import get_setting
@@ -82,7 +83,6 @@ async def _overdue_loan_filter(db: AsyncSession) -> sa.ColumnElement[bool]:
 
 async def _club(db: AsyncSession, club_id: int, lock_days: int) -> dict[str, int]:
     today = datetime.now(TAIPEI).date()
-    now = datetime.now(TAIPEI)
     mine = Activity.club_id == club_id
 
     columns = {
@@ -102,11 +102,9 @@ async def _club(db: AsyncSession, club_id: int, lock_days: int) -> dict[str, int
             ),
             of=EquipmentLoan,
         ),
-        # 線上報名:受理中且本社還沒報名
+        # 線上報名:報名窗開著且本社還沒報名(窗的判定只有 signup_service 一份)
         "signup": _count(
-            SignupItem.is_open.is_(True),
-            SignupItem.signup_start <= now,
-            sa.or_(SignupItem.signup_end.is_(None), SignupItem.signup_end >= now),
+            signup_service.window_open_sql(),
             sa.not_(
                 sa.exists().where(Signup.item_id == SignupItem.id, Signup.club_id == club_id)
             ),

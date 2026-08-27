@@ -1,6 +1,6 @@
 """側欄徽章:各角色的待辦筆數,以及受限管理員看不到的頁面不給數字。"""
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from app.models import (
     Activity,
@@ -8,6 +8,8 @@ from app.models import (
     EquipmentLoan,
     MaintenanceRequest,
     PostalAccountChange,
+    Signup,
+    SignupItem,
     Violation,
 )
 from tests.conftest import login, make_club, make_user
@@ -219,3 +221,33 @@ async def test_admin_with_the_mirrored_staff_key_gets_the_staff_badges(client, d
     # 借來的是那一組的鍵,不是行政端逾期追蹤那一頁
     assert "a-overdue" not in badges
     assert "v-my" not in badges
+
+
+async def test_club_signup_badge_follows_the_signup_window(client, db):
+    """報名徽章 = 報名窗開著且本社還沒報名;窗的判定只有 signup_service 一份。"""
+    club = await make_club(db)
+    creator = await make_user(db, username="club01", role="club", club_id=club.id)
+    now = datetime.now(UTC)
+
+    open_item = SignupItem(name="受理中", max_participants=5, created_by=creator.id,
+                           signup_start=now - timedelta(days=1))
+    signed = SignupItem(name="已報名", max_participants=5, created_by=creator.id,
+                        signup_start=now - timedelta(days=1))
+    db.add_all([
+        open_item,
+        signed,
+        # 提前關閉 / 窗還沒開 / 窗已過 → 都不算
+        SignupItem(name="已關閉", max_participants=5, created_by=creator.id,
+                   is_open=False, signup_start=now - timedelta(days=1)),
+        SignupItem(name="尚未開始", max_participants=5, created_by=creator.id,
+                   signup_start=now + timedelta(days=1)),
+        SignupItem(name="已截止", max_participants=5, created_by=creator.id,
+                   signup_start=now - timedelta(days=5), signup_end=now - timedelta(days=1)),
+    ])
+    await db.commit()
+    await db.refresh(signed)
+    db.add(Signup(item_id=signed.id, club_id=club.id))
+    await db.commit()
+
+    await login(client, "club01")
+    assert (await _badges(client))["signup"] == 1

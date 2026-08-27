@@ -240,9 +240,7 @@ export default function OverviewPage() {
             </div>
           )}
           {!activitiesQuery.isError && todos.length === 0 && <EmptyRow text="無待辦事項" />}
-          {todos.length > TODO_PAGE_SIZE && (
-            <Pager page={todoPageNow} pageSize={TODO_PAGE_SIZE} total={todos.length} onChange={setTodoPage} />
-          )}
+          <Pager page={todoPageNow} pageSize={TODO_PAGE_SIZE} total={todos.length} onChange={setTodoPage} />
           </LoadingBlock>
         </div>
 
@@ -280,14 +278,12 @@ export default function OverviewPage() {
               </div>
             )}
             {!announcementsQuery.isError && announcements.length === 0 && <EmptyRow text="無公告" />}
-            {announcementTotal > ANNOUNCEMENT_PAGE_SIZE && (
-              <Pager
-                page={announcementPage}
-                pageSize={ANNOUNCEMENT_PAGE_SIZE}
-                total={announcementTotal}
-                onChange={setAnnouncementPage}
-              />
-            )}
+            <Pager
+              page={announcementPage}
+              pageSize={ANNOUNCEMENT_PAGE_SIZE}
+              total={announcementTotal}
+              onChange={setAnnouncementPage}
+            />
             </LoadingBlock>
           </div>
 
@@ -327,14 +323,12 @@ export default function OverviewPage() {
                 </Fragment>
               ))}
             {trackedErrored.length === 0 && tracked.length === 0 && <EmptyRow text="無進行中的申請" />}
-            {tracked.length > CARD_PAGE_SIZE && (
-              <Pager
-                page={trackedPageNow}
-                pageSize={CARD_PAGE_SIZE}
-                total={tracked.length}
-                onChange={setTrackedPage}
-              />
-            )}
+            <Pager
+              page={trackedPageNow}
+              pageSize={CARD_PAGE_SIZE}
+              total={tracked.length}
+              onChange={setTrackedPage}
+            />
             </LoadingBlock>
           </div>
         </div>

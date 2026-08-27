@@ -78,7 +78,6 @@
 
 | 編號 | 嚴重度 | 問題 |
 |---|---|---|
-| ISS-100 | 低 | **社團端總覽三張卡的分頁列只有一頁時不畫**(`OverviewPage`),`design-guide.md` §6 定的是一律顯示;行政端四個 Pager 都是無條件顯示 |
 | ISS-97 | 低 | **工讀生端違規勸導表單的社團選擇仍是平鋪下拉**(60+ 社一條直列),全站其餘都改用二級選單 `ClubCascader`。它吃 `/staff/clubs`,回傳沒有 `attribute`,共用前要先讓該端點回性質,或把選項來源改成 prop |
 | ISS-90 | 中 | 高風險測試類型整片缺席:真實併發、權限矩陣、月底/閏年/時區邊界、檔案系統故障;另有兩個測試本身有問題(假併發、名實不符) |
 | ISS-111 | 低 | **借用取消鈕的判定前端三份,其中一份靠別處的過濾才對**:後端 `_ensure_cancellable` / `_ensure_venue_cancellable` 是唯一權威(`api/v1/bookings.py`)。`VenueBookingPage` 與 `EquipmentPage` 都寫成「pending,或 approved 且尚未開始」,`FixedRoomPage` 寫的是 `status === 'pending' \|\| 開始日在今天之後` —— 少了 `approved &&`,現在結果一樣只因為那張表只餵得到 pending/approved |

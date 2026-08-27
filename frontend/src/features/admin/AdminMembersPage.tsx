@@ -129,10 +129,10 @@ export default function AdminMembersPage() {
           <table className="tb fixed" style={{ minWidth: 960 }}>
             {/* 姓名放得下四字中文名、學號放得下 9 碼,兩個時間欄放得下
                 `YYYY/MM/DD HH:mm` 不截斷(16 字 + 左右內距 32px);時間欄依 showJoined/showUpdated 增減。
-                **餘裕給職稱**(唯一 auto 的欄;table-layout:fixed 下沒有 auto 的話,
-                瀏覽器會把餘裕按比例攤回每一欄)—— 學期與兩個時間欄是一組貼著右緣的欄位,
+                **餘裕給姓名**(唯一 auto 的欄;table-layout:fixed 下沒有 auto 的話,
+                瀏覽器會把餘裕按比例攤回每一欄)—— 學期與兩個時間欄貼著右緣,職稱固定為身份的 1.5 倍。
                 與社團端同一份版面 */}
-            <Cols widths={[100, 130, 92, 'auto', 80, ...(showJoined ? [156] : []), ...(showUpdated ? [156] : [])]} />
+            <Cols widths={['auto', 130, 92, 138, 80, ...(showJoined ? [156] : []), ...(showUpdated ? [156] : [])]} />
             <thead>
               <tr>
                 <th scope="col"><MultiSortButton label="姓名" sortKey="name" entries={entries} onToggle={toggleSort} /></th>

@@ -2,8 +2,15 @@ from datetime import UTC, date, datetime
 
 import sqlalchemy as sa
 
-from app.models import Announcement, File, MaintenanceRequest, OfficerCertificate, Violation
-from app.models.enums import CertPosition
+from app.models import (
+    Announcement,
+    File,
+    MaintenanceRequest,
+    OfficerCertificate,
+    PostalAccountChange,
+    Violation,
+)
+from app.models.enums import ApplicationStatus, CertPosition
 from tests.conftest import csrf_headers, login, make_club, make_user
 
 
@@ -596,3 +603,48 @@ async def test_passbook_upload_one_per_application_under_concurrency(client, db)
         .where(File.subject_type == "postal_change", File.subject_id == change_id)
     )
     assert stored == 1
+
+
+async def test_passbook_upload_rechecks_status_after_taking_the_lock(client, db):
+    """承辦在上傳等鎖期間結案:狀態要在鎖內重讀,個資檔不該落在已完成的申請上。"""
+    import asyncio
+    import io
+
+    from app.core.db import async_session_factory
+
+    await setup_session(client, db)
+    resp = await client.post(
+        "/api/v1/club/postal-changes",
+        json={"reasons": ["印鑑變更"], "account_name": "熱舞社", "account_number": "0001234567890"},
+        headers=csrf_headers(client),
+    )
+    change_id = resp.json()["data"]["id"]
+    jpg = b"\xff\xd8\xff\xe0" + b"\x00" * 64
+
+    async with async_session_factory() as blocker:
+        # 另一個交易先鎖住該列並改成已完成,但不 commit —— 上傳會卡在列鎖上
+        await blocker.execute(
+            sa.update(PostalAccountChange)
+            .where(PostalAccountChange.id == change_id)
+            .values(status=ApplicationStatus.COMPLETED)
+        )
+        upload = asyncio.create_task(
+            client.post(
+                f"/api/v1/club/postal-changes/{change_id}/passbook",
+                files={"file": ("存簿.jpg", io.BytesIO(jpg), "image/jpeg")},
+                headers=csrf_headers(client),
+            )
+        )
+        await asyncio.sleep(0.3)  # 讓上傳跑到搶鎖那一步(同進程 ASGI,毫秒級)
+        await blocker.commit()
+
+    resp = await upload
+    assert resp.status_code == 422, resp.text
+    assert "已完成" in resp.json()["error"]
+
+    stored = await db.scalar(
+        sa.select(sa.func.count())
+        .select_from(File)
+        .where(File.subject_type == "postal_change", File.subject_id == change_id)
+    )
+    assert stored == 0

@@ -212,14 +212,11 @@ async def upload_passbook(
     row = await db.get(PostalAccountChange, change_id)
     if row is None or row.club_id != user.club_id:
         raise not_found("找不到申請")
+    # 鎖申請列並在鎖內重讀狀態:同單並發上傳序列化,「一張一份」不被雙寫繞過;
+    # 承辦同時結案時看到的也是結案後的狀態,不會把個資檔落在已完成的申請上
+    await db.refresh(row, attribute_names=["status"], with_for_update=True)
     if row.status == ApplicationStatus.COMPLETED:
         raise validation_error("此申請已完成,不可再上傳存簿影本")
-    # 鎖申請列:同單並發上傳序列化,「一張一份」不被雙寫繞過(與 upload_evidence 同一條)
-    await db.execute(
-        sa.select(PostalAccountChange.id)
-        .where(PostalAccountChange.id == row.id)
-        .with_for_update()
-    )
     # 一張申請一份存簿影本(前端 maxCount=1);沒有上限的話,任何一張舊單都能被
     # 無限追加 50MB 的個資檔
     existing = await db.scalar(
@@ -302,14 +299,11 @@ async def upload_evidence(
     row = await db.get(MaintenanceRequest, request_id)
     if row is None or row.club_id != user.club_id:
         raise not_found("找不到報修單")
+    # 鎖報修列並在鎖內重讀狀態:同單並發上傳序列化,加總上限不被雙寫繞過;
+    # 承辦同時結案時看到的也是結案後的狀態
+    await db.refresh(row, attribute_names=["status"], with_for_update=True)
     if row.status == MaintenanceStatus.DONE:
         raise validation_error("此報修單已完成,不可再上傳佐證")
-    # 鎖報修列:同單並發上傳序列化,加總上限不被雙寫繞過
-    await db.execute(
-        sa.select(MaintenanceRequest.id)
-        .where(MaintenanceRequest.id == row.id)
-        .with_for_update()
-    )
     existing_count = await db.scalar(
         sa.select(sa.func.count())
         .select_from(File)

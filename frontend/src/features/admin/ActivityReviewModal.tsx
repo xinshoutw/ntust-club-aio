@@ -137,6 +137,8 @@ export default function ActivityReviewModal({
   const [largeApproved, setLargeApproved] = useState(item?.largeApproved ?? false)
   // 經費來源:核定了補助的案件由第一關認定(後端在核定總額 >0 時必填)
   const [fundSource, setFundSource] = useState(() => seedFundSource(item))
+  // 預填值與承辦人自己打的字要分得開:核定 0 元的單只送後者(見 submitApprove)
+  const [fundTouched, setFundTouched] = useState(false)
   const d = item?.detail
   // 失敗但手上已有詳情 = 背景重抓失敗(TanStack 的 error 態保留既有 data,而重開同一列
   // staleTime 0 就會重抓):內容照舊、按鈕照舊,否則等於把讀得到的單變成不能簽,
@@ -199,10 +201,14 @@ export default function ActivityReviewModal({
         message.error('核定補助的案件必須認定經費來源')
         return
       }
+      // 核定 0 元 = 這張單不動到學校的錢(D-16):承辦人沒動過那一格就送原值,
+      // 不要把預填的「學務處補助」寫進去 —— 它會原樣印進申請表的意見回饋。
+      // 擬請 >0 但整單核成 0 的單走的正是這條(遷移資料 1,073 件是這樣核准的)
+      const source = granted > 0 || fundTouched ? fundSource.trim() : (item.fundSource ?? '')
       setSubmitting(true)
       try {
         await onApprove({
-          fundSource: fundSource.trim(),
+          fundSource: source,
           budget,
           largeApproved,
         })
@@ -353,7 +359,10 @@ export default function ActivityReviewModal({
                 <Input
                   size="small"
                   value={fundSource}
-                  onChange={(e) => setFundSource(e.target.value)}
+                  onChange={(e) => {
+                    setFundTouched(true)
+                    setFundSource(e.target.value)
+                  }}
                   placeholder={DEFAULT_FUND_SOURCE}
                 />
               ) : (

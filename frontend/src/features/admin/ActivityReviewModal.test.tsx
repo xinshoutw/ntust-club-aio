@@ -91,6 +91,28 @@ describe('ActivityReviewModal 的核定欄', () => {
     expect(onApprove.mock.calls[0][0]).toMatchObject({ fundSource: '' })
   })
 
+  // D-16:核定 0 元即當場核准。預填不是認定 —— 承辦人沒動過那一格就不該替他寫一句
+  // 會印上申請表意見回饋的話,而擬請 >0、整單核成 0 的單正是最常見的那一種
+  test('有申請補助但核定 0 元、來源沒改過:送出空字串而非預填值', async () => {
+    const onApprove = vi.fn(async (_p: unknown) => {})
+    show([budgetRow(1, 5000)], { fundSource: undefined }, onApprove)
+
+    expect(screen.getByPlaceholderText<HTMLInputElement>('學務處補助').value).toBe('學務處補助')
+    fireEvent.click(screen.getByRole('button', { name: /核\s*准/ }))
+    await waitFor(() => expect(onApprove).toHaveBeenCalled())
+    expect(onApprove.mock.calls[0][0]).toMatchObject({ fundSource: '' })
+  })
+
+  test('核定 0 元但承辦人自己打了來源:照他打的送出', async () => {
+    const onApprove = vi.fn(async (_p: unknown) => {})
+    show([budgetRow(1, 5000)], { fundSource: undefined }, onApprove)
+
+    fireEvent.change(screen.getByPlaceholderText('學務處補助'), { target: { value: '系友會贊助' } })
+    fireEvent.click(screen.getByRole('button', { name: /核\s*准/ }))
+    await waitFor(() => expect(onApprove).toHaveBeenCalled())
+    expect(onApprove.mock.calls[0][0]).toMatchObject({ fundSource: '系友會贊助' })
+  })
+
   test('有申請補助時核定欄出現,但擬請 0 的那一列不給輸入框', () => {
     show([budgetRow(1, 5000), budgetRow(2, 0)])
 

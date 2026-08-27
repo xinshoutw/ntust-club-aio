@@ -328,9 +328,13 @@ async def update_club(
         changes.append(f"attribute:{before}→{fields['attribute'].value}")
         club.attribute = fields["attribute"]
 
-    if "en_name" in fields and fields["en_name"] != club.en_name:
-        changes.append("en_name")
-        club.en_name = fields["en_name"]
+    if "en_name" in fields:
+        # 空白=沒填,存 NULL:同一欄不要同時存在 NULL 與 ''(遷移進來的是 NULL,
+        # 而首頁導覽那類「有英文名的社團」查詢會以 IS NOT NULL 篩)
+        en_name = fields["en_name"].strip() or None
+        if en_name != club.en_name:
+            changes.append("en_name")
+            club.en_name = en_name
 
     if "username" in fields:
         username = fields["username"]

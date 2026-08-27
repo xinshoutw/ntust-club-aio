@@ -170,6 +170,25 @@ async def test_patch_attribute(client, db):
     assert any("attribute:" in (a.detail or "") for a in audits)
 
 
+async def test_patch_en_name(client, db):
+    """英文名稱由學務處維護(社團端唯讀);清空存 NULL,不留空字串。"""
+    club, _, _ = await seed(client, db)
+
+    resp = await client.patch(
+        f"{URL}/{club.id}", json={"en_name": " Dance Club "}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["en_name"] == "Dance Club"
+
+    resp = await client.patch(
+        f"{URL}/{club.id}", json={"en_name": "   "}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["en_name"] is None
+    await db.refresh(club)
+    assert club.en_name is None
+
+
 async def test_club_options_open_to_any_admin(client, db):
     """最小選項端點:非 amember 的管理員也可讀,但只回 id/name/attribute。"""
     club, _, _ = await seed(client, db)

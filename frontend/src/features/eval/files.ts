@@ -1,5 +1,6 @@
 // 檔案工具(無其他 feature 依賴,避免循環匯入)
 import { isPdfFile } from '../../lib/uploads'
+import { downloadBlob } from '../../lib/download'
 import { fetchFile } from '../../api/client'
 import { fileTypeOf, type EvalFile } from './types'
 
@@ -108,10 +109,5 @@ export async function downloadPhotosZip(zipName: string, files: EvalFile[]): Pro
       }
     }),
   )
-  const url = URL.createObjectURL(zipStore(entries))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${zipName}.zip`
-  a.click()
-  URL.revokeObjectURL(url)
+  downloadBlob(`${zipName}.zip`, zipStore(entries))
 }

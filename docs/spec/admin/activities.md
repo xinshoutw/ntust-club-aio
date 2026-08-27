@@ -28,7 +28,7 @@
 
 | 狀態 | 開什麼 |
 |---|---|
-| 結案審核中、已結案 | `features/activities/ActivityPreviewModal`(社團端那份完整檢視,唯讀):結案成果全文、活動照片、學習心得、檢討會議 |
+| 結案審核中、已結案 | `features/activities/ActivityPreviewModal`(社團端那份完整檢視,唯讀):結案成果全文(第一欄依活動類型顯示「課程重點」或「活動重點」)、活動照片、學習心得、檢討會議 |
 | 其餘 | `ActivityReviewModal`(與申請審核頁同一支):待本關者可就地核准/退回,非本關自動唯讀 |
 
 ## 規則

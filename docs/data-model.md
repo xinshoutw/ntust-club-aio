@@ -110,8 +110,8 @@ erDiagram
 | intro / website_url | text / text NULL | `website_url` 是行政分 ad6 的依據 |
 | contact_emails | text[] | 至多 3 組、第 1 組必填;公告通知寄送對象 |
 | discord_webhook_url | text NULL | 社團自設;該社事件只推這裡,NULL 即不推 |
-| advisor_name / dept / email / ext | text NULL | 校內指導老師 |
-| advisor_out_name / dept / email / phone | text NULL | 校外指導老師(校內外各至多一位) |
+| advisor_name / dept / email | text NULL | 校內指導老師(**不記錄電話**,D-22)|
+| advisor_out_name / dept / email | text NULL | 校外指導老師(校內外各至多一位;同樣不記錄電話)|
 | suspended_until / suspend_reason | date NULL / text NULL | NULL=未停權 |
 | is_active | bool | 退社/未立案=停用 |
 | announcements_read_at | timestamptz NULL | 公告已讀水位線:`created_at` 晚於此者為未讀。一社一帳號故掛在 club |

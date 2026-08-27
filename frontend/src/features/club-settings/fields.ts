@@ -6,11 +6,9 @@ export interface SettingsValues {
   advisorName: string
   advisorDept?: string
   advisorEmail?: string
-  advisorPhone?: string
   advisorOutName?: string
   advisorOutDept?: string
   advisorOutEmail?: string
-  advisorOutPhone?: string
   url?: string
   intro?: string
   email1: string
@@ -27,11 +25,9 @@ export const PROFILE_KEYS = [
   'advisorName',
   'advisorDept',
   'advisorEmail',
-  'advisorPhone',
   'advisorOutName',
   'advisorOutDept',
   'advisorOutEmail',
-  'advisorOutPhone',
   'url',
   'intro',
   'email1',
@@ -45,11 +41,9 @@ export const fromProfile = (p: ClubProfile): SettingsValues => ({
   advisorName: p.advisorName,
   advisorDept: p.advisorDept,
   advisorEmail: p.advisorEmail,
-  advisorPhone: p.advisorPhone,
   advisorOutName: p.advisorOutName,
   advisorOutDept: p.advisorOutDept,
   advisorOutEmail: p.advisorOutEmail,
-  advisorOutPhone: p.advisorOutPhone,
   url: p.url,
   intro: p.intro,
   email1: p.emails[0],

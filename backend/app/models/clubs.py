@@ -33,11 +33,9 @@ class Club(Base, TimestampMixin):
     advisor_name: Mapped[str | None] = mapped_column(sa.Text)  # 校內
     advisor_dept: Mapped[str | None] = mapped_column(sa.Text)  # 系所/職稱
     advisor_email: Mapped[str | None] = mapped_column(sa.Text)
-    advisor_phone: Mapped[str | None] = mapped_column(sa.Text)  # 電話(非僅分機)
     advisor_out_name: Mapped[str | None] = mapped_column(sa.Text)  # 校外
     advisor_out_dept: Mapped[str | None] = mapped_column(sa.Text)  # 單位/職稱
     advisor_out_email: Mapped[str | None] = mapped_column(sa.Text)
-    advisor_out_phone: Mapped[str | None] = mapped_column(sa.Text)
     suspended_until: Mapped[date | None] = mapped_column(sa.Date)  # NULL=未停權
     suspend_reason: Mapped[str | None] = mapped_column(sa.Text)
     is_active: Mapped[bool] = mapped_column(default=True)

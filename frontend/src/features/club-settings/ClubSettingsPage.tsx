@@ -87,11 +87,9 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
           advisorName: v.advisorName,
           advisorDept: v.advisorDept ?? '',
           advisorEmail: v.advisorEmail ?? '',
-          advisorPhone: v.advisorPhone ?? '',
           advisorOutName: v.advisorOutName ?? '',
           advisorOutDept: v.advisorOutDept ?? '',
           advisorOutEmail: v.advisorOutEmail ?? '',
-          advisorOutPhone: v.advisorOutPhone ?? '',
         })
         baseline = fromProfile(next)
         setSaved(baseline)
@@ -156,9 +154,6 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
               >
                 <Input />
               </Form.Item>
-              <Form.Item name="advisorPhone" label="電話" className={itemClass('advisorPhone')} style={{ marginBottom: 0 }}>
-                <Input placeholder="02-12345678" />
-              </Form.Item>
             </div>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--steel)', margin: '16px 0 8px' }}>校外（選填）</div>
             <div className="form-grid-2">
@@ -176,9 +171,6 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
                 style={{ marginBottom: 0 }}
               >
                 <Input />
-              </Form.Item>
-              <Form.Item name="advisorOutPhone" label="電話" className={itemClass('advisorOutPhone')} style={{ marginBottom: 0 }}>
-                <Input className="num" />
               </Form.Item>
             </div>
           </div>

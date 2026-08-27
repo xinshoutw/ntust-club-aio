@@ -200,11 +200,9 @@ def _detail_out(club: Club, account: User | None) -> AdminClubDetailOut:
         advisor_name=club.advisor_name,
         advisor_dept=club.advisor_dept,
         advisor_email=club.advisor_email,
-        advisor_phone=club.advisor_phone,
         advisor_out_name=club.advisor_out_name,
         advisor_out_dept=club.advisor_out_dept,
         advisor_out_email=club.advisor_out_email,
-        advisor_out_phone=club.advisor_out_phone,
         suspend_reason=club.suspend_reason,
     )
 

@@ -33,14 +33,12 @@ const deriveKind = (name: string): string | null =>
 
 const advisorText = (d: AdminClubDetail | undefined): string => {
   if (!d?.advisorName) return '—'
-  return [d.advisorName, d.advisorDept, d.advisorPhone]
-    .filter(Boolean)
-    .join(' · ')
+  return [d.advisorName, d.advisorDept].filter(Boolean).join(' · ')
 }
 
 const advisorOutText = (d: AdminClubDetail | undefined): string => {
   if (!d?.advisorOutName) return '—'
-  return [d.advisorOutName, d.advisorOutDept, d.advisorOutPhone].filter(Boolean).join(' · ')
+  return [d.advisorOutName, d.advisorOutDept].filter(Boolean).join(' · ')
 }
 
 // 行政端管理項目:社團自行維護的內容唯讀;可改名稱/英文名稱/帳號、重設密碼、啟停用

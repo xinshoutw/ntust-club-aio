@@ -14,11 +14,9 @@ const migrated: ClubProfile = {
   advisorName: '王老師',
   advisorDept: '',
   advisorEmail: '',
-  advisorPhone: '',
   advisorOutName: '',
   advisorOutDept: '',
   advisorOutEmail: '',
-  advisorOutPhone: '',
   suspendedUntil: null,
   suspendReason: '',
 }

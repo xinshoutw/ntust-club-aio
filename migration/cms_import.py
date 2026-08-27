@@ -405,11 +405,12 @@ async def import_teachers(legacy, db: AsyncSession, clubs: dict[int, tuple[int, 
     """指導老師:校內(school)/校外(extra)各取最新一位寫入 clubs 欄位。
 
     非 id map 型:直接覆寫社團欄位(重跑結果相同,仍 idempotent)。
+    舊系統的 `Phone` **不讀**:新系統不記錄指導老師電話(2026-08-27 拍板)。
     """
     rows = (
         await legacy.execute(
             sa.text(
-                'SELECT id, "Name", "Position", "Email", "Phone", "Identity",'
+                'SELECT id, "Name", "Position", "Email", "Identity",'
                 ' "FK_Club_id" FROM "Club_teacher" ORDER BY id'
             )
         )
@@ -428,12 +429,10 @@ async def import_teachers(legacy, db: AsyncSession, clubs: dict[int, tuple[int, 
             club.advisor_name = row.Name
             club.advisor_dept = row.Position or None
             club.advisor_email = row.Email or None
-            club.advisor_phone = row.Phone or None
         else:
             club.advisor_out_name = row.Name
             club.advisor_out_dept = row.Position or None
             club.advisor_out_email = row.Email or None
-            club.advisor_out_phone = row.Phone or None
         count += 1
     print(f"teachers: 寫入 {count} 位(校內/校外各取最新)")
 

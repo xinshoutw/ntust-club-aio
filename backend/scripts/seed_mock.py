@@ -304,7 +304,6 @@ async def _create_clubs_and_users(db: AsyncSession) -> tuple[dict[str, Club], di
     csie.advisor_name = "張明哲"
     csie.advisor_dept = "資訊工程系"
     csie.advisor_email = "mjchang@mail.ntust.edu.tw"
-    csie.advisor_phone = "3271"
     await db.flush()  # 取得 club id
 
     users: dict[str, User] = {}

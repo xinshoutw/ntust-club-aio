@@ -26,11 +26,9 @@ class ClubProfileOut(BaseModel):
     advisor_name: str | None  # 校內指導老師
     advisor_dept: str | None
     advisor_email: str | None
-    advisor_phone: str | None
     advisor_out_name: str | None  # 校外指導老師
     advisor_out_dept: str | None
     advisor_out_email: str | None
-    advisor_out_phone: str | None
     suspended_until: date | None
     suspend_reason: str | None
 
@@ -47,11 +45,9 @@ class ClubProfileUpdate(BaseModel):
     advisor_name: str | None = Field(None, max_length=50)
     advisor_dept: str | None = Field(None, max_length=50)
     advisor_email: str | None = Field(None, max_length=100)
-    advisor_phone: str | None = Field(None, max_length=30)
     advisor_out_name: str | None = Field(None, max_length=50)
     advisor_out_dept: str | None = Field(None, max_length=50)
     advisor_out_email: str | None = Field(None, max_length=100)
-    advisor_out_phone: str | None = Field(None, max_length=30)
 
     @field_validator("intro")
     @classmethod

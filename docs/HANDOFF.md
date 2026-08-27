@@ -53,6 +53,19 @@ DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— �
 
 ## 本批已完成
 
+### 〇、工讀生與評審頁面鏡射到行政端(2026-08-27,決策見 `decisions.md` D-26)
+
+| 項目 | 內容 |
+|---|---|
+| **兩組頁面整組再掛一次** | `/admin/pt/*`(5 頁)與 `/admin/viewer/*`(3 頁)共用同一批元件與同一批端點,只換路徑前綴;側欄項目 key 不變,徽章沿用後端出的 `pt-*` / `v-*`,不必為行政端另備一份 |
+| **一組一把鍵** | `astaff`(工讀生作業)、`aviewer`(評審評分)—— 是 D-01「一頁一鍵」的唯二例外,理由同 `asignup`。權限彈窗與白名單全由 `core/permissions.ADMIN_PAGES` 推導,沒有第二份要同步 |
+| **後端閘門** | `require_staff` / `require_viewer` 放行持該鍵的管理員(super 全通);admin 走 `aviewer` **不吃 `can_view_eval`** —— 那是評審帳號的開關,管理員身上一律是預設值 |
+| **不附帶檔案權** | 兩把鍵都不對上任何檔案類型。`aviewer` 特別要守住 —— admin 分支的下載不做指派範圍檢查,給了 `eval_upload` 就是讓一把「只多三頁」的鍵拿到全校全年度的佐證檔 |
+| **空狀態說得出原因** | 管理員沒有評審指派,那一組必定是空的;「我負責的評分」在 `/admin/` 前綴下改說「此帳號尚未被指派為評審」,不然承辦分不出是權限沒生效還是系統壞了 |
+
+**已知並接受**:行政端的「我負責的評分」看到的仍是**自己**被指派的分組,管理員沒被指派就是空的。
+要看全校評分進度是另一頁(GAP-03),這次沒有把它改成總表。
+
 ### 一、demo 回饋四項(2026-08-27,決策見 `decisions.md` D-17～D-20)
 
 | 項目 | 內容 |
@@ -81,12 +94,13 @@ DEC-01 已定案:這學年評鑑在新系統跑,但**學年末才用** —— �
 
 ## 驗證現況
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **509 passed**;`ruff check .` 全綠
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **522 passed**;`ruff check .` 全綠
 - 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm run lint` 8 個既有的 fast-refresh warning
-- 前端 `pnpm test` → **190 passed**(41 檔)
+- 前端 `pnpm test` → **200 passed**(42 檔)
 - 新測試逐一做過 mutation 驗證(把修法改回舊寫法會紅):經費來源預填的三條路徑、
   簡介/網頁連結必填、社團端 `en_name` 被忽略、借用電話格式與不截斷、`profileChanged`、
-  清空英文名稱存 NULL、狀態跳關與回退兩個方向
+  清空英文名稱存 NULL、狀態跳關與回退兩個方向;鏡射這批另做了 staff/viewer 閘門、
+  行政端徽章併表、`MyReviewsPage` 前綴導向與空狀態、側欄鏡射五處
 
 ## 開發庫(正式資料 snapshot,2026-08-24 dump)
 

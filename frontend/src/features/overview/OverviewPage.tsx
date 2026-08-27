@@ -240,8 +240,8 @@ export default function OverviewPage() {
             </div>
           )}
           {!activitiesQuery.isError && todos.length === 0 && <EmptyRow text="無待辦事項" />}
-          <Pager page={todoPageNow} pageSize={TODO_PAGE_SIZE} total={todos.length} onChange={setTodoPage} />
           </LoadingBlock>
+          <Pager page={todoPageNow} pageSize={TODO_PAGE_SIZE} total={todos.length} onChange={setTodoPage} />
         </div>
 
         <div className="overview-grid">
@@ -278,13 +278,13 @@ export default function OverviewPage() {
               </div>
             )}
             {!announcementsQuery.isError && announcements.length === 0 && <EmptyRow text="無公告" />}
+            </LoadingBlock>
             <Pager
               page={announcementPage}
               pageSize={ANNOUNCEMENT_PAGE_SIZE}
               total={announcementTotal}
               onChange={setAnnouncementPage}
             />
-            </LoadingBlock>
           </div>
 
           <div className="card">
@@ -323,13 +323,13 @@ export default function OverviewPage() {
                 </Fragment>
               ))}
             {trackedErrored.length === 0 && tracked.length === 0 && <EmptyRow text="無進行中的申請" />}
+            </LoadingBlock>
             <Pager
               page={trackedPageNow}
               pageSize={CARD_PAGE_SIZE}
               total={tracked.length}
               onChange={setTrackedPage}
             />
-            </LoadingBlock>
           </div>
         </div>
 

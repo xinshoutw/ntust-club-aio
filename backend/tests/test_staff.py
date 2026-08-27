@@ -72,10 +72,12 @@ def _mute_club_event(monkeypatch):
 async def test_staff_endpoints_forbidden_for_other_roles(client, db):
     club = await make_club(db)
     await make_user(db, username="club01", role="club", club_id=club.id)
-    await make_user(db, username="root", role="admin", is_super=True)
+    # 工讀生那組頁面在行政端也掛得到(astaff),所以「不是工讀生」不再等於進不去:
+    # 擋的是**沒有那把鍵**的管理員(super 一律全通,與其他頁面權限鍵同一條規則)
+    await make_user(db, username="adm01", role="admin", permissions=["aviol"])
     await make_user(db, username="viewer01", role="viewer")
 
-    for username in ("club01", "root", "viewer01"):
+    for username in ("club01", "adm01", "viewer01"):
         await login(client, username)
         assert (await client.get("/api/v1/staff/clubs")).status_code == 403
         assert (await client.get("/api/v1/staff/violation-items")).status_code == 403

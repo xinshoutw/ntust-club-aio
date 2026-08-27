@@ -139,6 +139,7 @@ async def _admin(db: AsyncSession, user: User) -> dict[str, int]:
     """受限管理員只拿得到自己看得到的頁面 —— 徽章也是資料量,不對無權限者揭露。"""
     # 徽章=待審佇列的筆數,不是「看得到幾件」:只持 areview 的帳號看得到全部卻一件也簽不了,
     # 那個差額正是它無權過問的件數(services/activity_service.actionable_statuses)
+    overdue = await _overdue_loan_filter(db)
     columns = {
         "a-review": _count(Activity.status.in_(actionable_statuses(user)), of=Activity),
         "a-close": _count(
@@ -148,7 +149,7 @@ async def _admin(db: AsyncSession, user: User) -> dict[str, int]:
         "a-room": _count(
             RoomBookingRequest.status == BookingStatus.PENDING, of=RoomBookingRequest
         ),
-        "a-overdue": _count(await _overdue_loan_filter(db), of=EquipmentLoan),
+        "a-overdue": _count(overdue, of=EquipmentLoan),
         "a-certificates": _count(
             OfficerCertificate.status == ApplicationStatus.PENDING, of=OfficerCertificate
         ),
@@ -160,6 +161,11 @@ async def _admin(db: AsyncSession, user: User) -> dict[str, int]:
         ),
         "a-violations": _count(Violation.status == ViolationStatus.OPEN, of=Violation),
     }
+    # 工讀生端與評審端的頁面在行政端整組再掛了一次(core.permissions 的 astaff/aviewer),
+    # 徽章沿用同一份定義併進同一次 SELECT。評審那組要先查評鑑年度,沒那把鍵就不查
+    columns |= _staff_columns(overdue)
+    if _may_see(user, "v-my"):
+        columns |= await _viewer_columns(db, user)
     # 器材待審與臨時場地待審共用同一個側欄項目
     loans_pending = _count(EquipmentLoan.status == LoanStatus.PENDING, of=EquipmentLoan)
     allowed = {k: v for k, v in columns.items() if _may_see(user, k)}
@@ -180,6 +186,11 @@ _ADMIN_KEYS = {
     "a-postal": ("apostal",),
     "a-maintenance": ("amaint",),
     "a-violations": ("aviol",),
+    "pt-checkout": ("astaff",),
+    "pt-checkin": ("astaff",),
+    "pt-overdue": ("astaff",),
+    "v-my": ("aviewer",),
+    "v-score": ("aviewer",),
 }
 
 
@@ -187,9 +198,10 @@ def _may_see(user: User, key: str) -> bool:
     return user.is_super or any(k in user.permissions for k in _ADMIN_KEYS[key])
 
 
-async def _staff(db: AsyncSession) -> dict[str, int]:
+def _staff_columns(overdue: sa.ColumnElement[bool]) -> dict[str, sa.ScalarSelect[int]]:
+    """門檻日由呼叫端傳入:行政端已為 a-overdue 算過一次,不重算(那是兩次 DB 往返)。"""
     today = datetime.now(TAIPEI).date()
-    columns = {
+    return {
         # 借出點交:已核准、區間還沒過去
         "pt-checkout": _count(
             EquipmentLoan.status == LoanStatus.APPROVED,
@@ -197,12 +209,15 @@ async def _staff(db: AsyncSession) -> dict[str, int]:
             of=EquipmentLoan,
         ),
         "pt-checkin": _count(EquipmentLoan.status == LoanStatus.CHECKED_OUT, of=EquipmentLoan),
-        "pt-overdue": _count(await _overdue_loan_filter(db), of=EquipmentLoan),
+        "pt-overdue": _count(overdue, of=EquipmentLoan),
     }
-    return await _run(db, columns)
 
 
-async def _viewer(db: AsyncSession, user: User) -> dict[str, int]:
+async def _staff(db: AsyncSession) -> dict[str, int]:
+    return await _run(db, _staff_columns(await _overdue_loan_filter(db)))
+
+
+async def _viewer_columns(db: AsyncSession, user: User) -> dict[str, sa.ScalarSelect[int]]:
     """待評分:被指派的(分組 × 獎項 × 社團)還沒有我的分數。"""
     window = await get_eval_window(db)
     assigned = (
@@ -224,7 +239,11 @@ async def _viewer(db: AsyncSession, user: User) -> dict[str, int]:
         )
         .scalar_subquery()
     )
-    return await _run(db, {"v-my": assigned, "v-score": assigned})
+    return {"v-my": assigned, "v-score": assigned}
+
+
+async def _viewer(db: AsyncSession, user: User) -> dict[str, int]:
+    return await _run(db, await _viewer_columns(db, user))
 
 
 async def _run(db: AsyncSession, columns: dict[str, sa.ScalarSelect[int]]) -> dict[str, int]:

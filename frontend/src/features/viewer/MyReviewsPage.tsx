@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
@@ -10,6 +10,10 @@ const itemsMax = (a: ViewerAssignment): number => a.items.reduce((s, i) => s + i
 // 我負責的評分:被指派的獎項分組與進度,點卡進入該獎項評分
 export default function MyReviewsPage() {
   const navigate = useNavigate()
+  // 這三頁在行政端以 /admin/viewer 前綴整組再掛了一次(權限鍵 aviewer);
+  // 寫死 /viewer/score 會把管理員彈出行政端外殼,再被角色守衛導回 /admin
+  const isAdmin = useLocation().pathname.startsWith('/admin/')
+  const base = isAdmin ? '/admin/viewer' : '/viewer'
   const query = useViewerAssignments()
   const assignments = query.data ?? []
 
@@ -25,7 +29,7 @@ export default function MyReviewsPage() {
         <LoadingBlock pending={query.isPending}>
           {!query.isPending && assignments.length === 0 ? (
             <div className="card" style={{ marginTop: 20, padding: '40px 24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
-              尚未被指派評分
+              {isAdmin ? '此帳號尚未被指派為評審，因此沒有可評分的項目' : '尚未被指派評分'}
             </div>
           ) : (
             <div
@@ -45,7 +49,7 @@ export default function MyReviewsPage() {
                     key={a.groupId}
                     className="card click-tint"
                     style={{ padding: 20, cursor: 'pointer' }}
-                    {...clickableProps(() => navigate(`/viewer/score?group=${a.groupId}`))}
+                    {...clickableProps(() => navigate(`${base}/score?group=${a.groupId}`))}
                   >
                     <div style={{ fontSize: 16, fontWeight: 600 }}>{a.awardName}</div>
                     <div style={{ marginTop: 4, fontSize: 12, color: 'var(--steel)' }}>{a.groupName}</div>

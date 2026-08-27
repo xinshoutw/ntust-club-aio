@@ -236,6 +236,17 @@ export default function App() {
           <Route path="files" element={<AdminFilesPage />} />
           <Route path="settings" element={<AdminSettingsPage />} />
           <Route path="audit" element={<AuditPage />} />
+          {/* 工讀生端與評審端的頁面整組再掛一次(權限鍵 astaff / aviewer):
+              同一批元件、同一批端點,只是包在行政端外殼裡 */}
+          <Route path="pt" element={<Navigate to="/admin/pt/violations/new" replace />} />
+          <Route path="pt/violations/new" element={<PtViolationFormPage />} />
+          <Route path="pt/violations" element={<PtViolationsPage />} />
+          <Route path="pt/checkout" element={<PtCheckoutPage />} />
+          <Route path="pt/checkin" element={<PtCheckinPage />} />
+          <Route path="pt/overdue" element={<PtOverduePage />} />
+          <Route path="viewer" element={<MyReviewsPage />} />
+          <Route path="viewer/score" element={<ViewerScorePage />} />
+          <Route path="viewer/done" element={<ViewerDonePage />} />
         </Route>
       </Route>
 

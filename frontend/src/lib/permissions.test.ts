@@ -67,3 +67,26 @@ describe('canAccessAdminPath', () => {
     expect(canAccessAdminPath(admin(['aaudit']), '/admin/unknown-page')).toBe(false)
   })
 })
+
+// 工讀生端與評審端的頁面在行政端整組再掛一次:一把鍵配一個前綴,底下子頁全涵蓋
+describe('鏡射頁的整組前綴', () => {
+  const mirrored = (permissions: string[]): SessionUser =>
+    admin(permissions, {
+      adminPages: [
+        ...PAGES,
+        { key: 'astaff', label: '工讀生作業', paths: ['/admin/pt'], also: [] },
+        { key: 'aviewer', label: '評審評分', paths: ['/admin/viewer'], also: [] },
+      ],
+    })
+
+  test('前綴底下的子頁一次涵蓋', () => {
+    const u = mirrored(['astaff'])
+    expect(canAccessAdminPath(u, '/admin/pt/checkout')).toBe(true)
+    expect(canAccessAdminPath(u, '/admin/pt/violations/new')).toBe(true)
+  })
+
+  test('兩組互不相通', () => {
+    expect(canAccessAdminPath(mirrored(['astaff']), '/admin/viewer/score')).toBe(false)
+    expect(canAccessAdminPath(mirrored(['aviewer']), '/admin/pt/checkin')).toBe(false)
+  })
+})

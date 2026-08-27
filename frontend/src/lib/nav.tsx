@@ -130,6 +130,14 @@ export function buildClubNav(
   ], badges)
 }
 
+// 工讀生端與評審端的頁面在行政端整組再掛一次(權限鍵 astaff / aviewer):
+// 承辦要頂得了櫃台、也要看得到評審那三頁。只換路徑前綴,**項目 key 照舊** ——
+// 徽章因此不必為行政端另備一份(後端 badges 出的就是 pt-* / v-* 這幾把)
+const mirrored = (label: string, groups: NavGroup[]): NavGroup => ({
+  label,
+  items: groups.flatMap((g) => g.items).map((i) => ({ ...i, path: `/admin${i.path}` })),
+})
+
 const ADMIN_ROOM_ITEM: NavItem = {
   key: 'a-room',
   label: '固定場地借用',
@@ -222,6 +230,8 @@ export function buildAdminNav(user: SessionUser | null, badges: Badges = {}): Na
       { key: 'a-files', label: '檔案管理', path: '/admin/files', icon: <FolderOpenOutlined /> },
     ],
   },
+  mirrored('工讀生作業', PT_GROUPS),
+  mirrored('評審評分', VIEWER_GROUPS),
   ]
   return withBadges(
     groups
@@ -232,8 +242,7 @@ export function buildAdminNav(user: SessionUser | null, badges: Badges = {}): Na
 }
 
 // 工讀生端(URL 前綴 /pt;登入角色鍵維持 staff)
-export function buildPtNav(badges: Badges = {}): NavGroup[] {
-  return withBadges([
+const PT_GROUPS: NavGroup[] = [
     {
       label: '違規勸導',
       items: [
@@ -249,12 +258,14 @@ export function buildPtNav(badges: Badges = {}): NavGroup[] {
         { key: 'pt-overdue', label: '逾期追蹤', path: '/pt/overdue', icon: <StopOutlined /> },
       ],
     },
-  ], badges)
+]
+
+export function buildPtNav(badges: Badges = {}): NavGroup[] {
+  return withBadges(PT_GROUPS, badges)
 }
 
 // 評審端
-export function buildViewerNav(badges: Badges = {}): NavGroup[] {
-  return withBadges([
+const VIEWER_GROUPS: NavGroup[] = [
     {
       items: [
         { key: 'v-my', label: '我負責的評分', path: '/viewer', icon: <HomeOutlined /> },
@@ -262,5 +273,8 @@ export function buildViewerNav(badges: Badges = {}): NavGroup[] {
         { key: 'v-done', label: '已完成評分', path: '/viewer/done', icon: <FileDoneOutlined /> },
       ],
     },
-  ], badges)
+]
+
+export function buildViewerNav(badges: Badges = {}): NavGroup[] {
+  return withBadges(VIEWER_GROUPS, badges)
 }

@@ -60,6 +60,12 @@ ADMIN_PAGES: tuple[AdminPage, ...] = (
     AdminPage("amaint", "維修管理", ("/admin/maintenance",)),
     AdminPage("aviol", "違規管理", ("/admin/violations",)),
     AdminPage("afiles", "檔案管理", ("/admin/files",)),
+    # 工讀生端與評審端的頁面在行政端整組再掛一次(前綴 /admin/pt、/admin/viewer,
+    # 共用同一批元件與同一批端點)。**一組一把鍵,不是一頁一把** —— 那兩組各自是
+    # 「一個人一份工作」,沒有只給借出不給歸還、或只給評分不給回顧的分法(同 asignup)。
+    # 一把鍵配一個路徑前綴,底下所有子頁一次涵蓋
+    AdminPage("astaff", "工讀生作業", ("/admin/pt",)),
+    AdminPage("aviewer", "評審評分", ("/admin/viewer",)),
     AdminPage("asetting", "系統設定與主檔", ("/admin/settings",)),
     AdminPage("aaudit", "稽核軌跡", ("/admin/audit",)),
 )
@@ -104,6 +110,10 @@ FILE_SUBJECT_KEYS: dict[str, tuple[str, ...]] = {
     "activity": ("areview", "aclose", "aactivity", "aclubact", "aeval", "aclub"),
     "maintenance": ("amaint", "aclub"),
     "postal_change": ("apostal",),
+    # **`aviewer` 刻意不在這裡**:admin 分支的下載不做指派範圍檢查(services/files.can_access),
+    # 給了就等於讓一把「只多三頁」的鍵拿到全校全年度的佐證檔,繞過 2026-07-21 對評審收緊的
+    # 那條分組 × 獎項 × 年度。而且管理員身上沒有評審指派(GAP-01 沒有寫入 API),
+    # 那頁一個檔案都列不出來 —— 要開回來,得連同 can_access 的範圍檢查一起做
     "eval_upload": ("aeval",),
     "violation": ("aviol",),
 }

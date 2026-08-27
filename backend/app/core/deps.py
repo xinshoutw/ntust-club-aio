@@ -137,17 +137,32 @@ def require_permission(*keys: str):
     return dep
 
 
+def _admin_with(key: str, user: User) -> bool:
+    """持該頁面權限鍵的管理員(super 全通)。
+
+    工讀生端與評審端的頁面在行政端整組再掛了一次(core/permissions 的 astaff/aviewer),
+    共用同一批端點 —— 承辦要頂得了櫃台、也要看得到評審那三頁。
+    """
+    return user.role == UserRole.ADMIN and (user.is_super or key in user.permissions)
+
+
 async def require_staff(user: CurrentUser) -> User:
-    if user.role != UserRole.STAFF:
+    if user.role != UserRole.STAFF and not _admin_with("astaff", user):
         raise forbidden()
     return user
 
 
 async def require_viewer(user: CurrentUser) -> User:
-    """評審帳號(競賽評分);can_view_eval 由帳號管理建立時給定,停用即全面擋下。"""
-    if user.role != UserRole.VIEWER or not user.can_view_eval:
-        raise forbidden()
-    return user
+    """評審帳號(競賽評分);can_view_eval 由帳號管理建立時給定,停用即全面擋下。
+
+    管理員走 `aviewer`,不吃 can_view_eval —— 那個旗標是評審帳號的開關,
+    管理員身上一律是預設值,拿它當條件等於這把鍵永遠開不了。
+    """
+    if user.role == UserRole.VIEWER and user.can_view_eval:
+        return user
+    if _admin_with("aviewer", user):
+        return user
+    raise forbidden()
 
 
 ViewerUser = Annotated[User, Depends(require_viewer)]

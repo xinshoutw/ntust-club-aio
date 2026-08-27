@@ -334,7 +334,8 @@ async def _create_clubs_and_users(db: AsyncSession) -> tuple[dict[str, Club], di
         username="admin_chen",
         password_hash=admin_hash,
         name="陳承辦",
-        permissions=["abooking", "aroom", "amaint", "aviol", "amember"],
+        # astaff:櫃台沒有工讀生的時候承辦要頂得上(D-26 鏡射的那一組)
+        permissions=["abooking", "aroom", "amaint", "aviol", "amember", "astaff"],
         must_change_password=False,
     )
     # 學務長=受限帳號僅簽核:學務長關卡即使 super 也必須明確持有 approve_dean
@@ -1290,7 +1291,7 @@ def _print_accounts(super_username: str, super_password: str) -> None:
     rows: list[tuple[str, str, str, str]] = [
         ("admin", super_username, super_password, "superadmin(最高權限)"),
         ("admin", "admin_lee", ADMIN_PASSWORD, "權限:areview/aclose/asignup"),
-        ("admin", "admin_chen", ADMIN_PASSWORD, "權限:abooking/aroom/amaint/aviol/amember"),
+        ("admin", "admin_chen", ADMIN_PASSWORD, "權限:abooking/aroom/amaint/aviol/amember/astaff"),
         ("admin", "dean", ADMIN_PASSWORD, "學務長(僅 approve_dean 簽核)"),
         ("staff", "staff_lee", STAFF_PASSWORD, "工讀生"),
         ("viewer", "viewer01", VIEWER_PASSWORD, "評審(財務獎+活動獎兩組,含已送出示例)"),

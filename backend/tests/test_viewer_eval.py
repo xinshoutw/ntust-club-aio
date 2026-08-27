@@ -359,7 +359,9 @@ async def test_done_pagination_and_sort(client, db):
 async def test_other_roles_forbidden(client, db):
     club = await make_club(db)
     await make_user(db, username="club01", club_id=club.id)
-    await make_user(db, username="admin01", role="admin", is_super=True)
+    # 評審那組頁面在行政端也掛得到(aviewer),所以擋的是**沒有那把鍵**的管理員
+    # (super 一律全通,與其他頁面權限鍵同一條規則)
+    await make_user(db, username="admin01", role="admin", permissions=["aeval"])
 
     await login(client, "club01")
     assert (await client.get("/api/v1/viewer/assignments")).status_code == 403

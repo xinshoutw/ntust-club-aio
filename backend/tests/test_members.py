@@ -23,8 +23,8 @@ async def test_profile_get_and_update(client, db):
     resp = await client.patch(
         "/api/v1/club/profile",
         json={
-            "intro": "我們是熱舞社",
-            "website_url": "https://dance.example.com",
+            "intro": "  我們是熱舞社  ",  # 前後空白存進去前修掉
+            "website_url": " https://dance.example.com ",
             "discord_webhook_url": "https://discord.com/api/webhooks/123456/abc-DEF_ghi",
             "advisor_name": "王老師",
         },
@@ -33,6 +33,7 @@ async def test_profile_get_and_update(client, db):
     assert resp.status_code == 200
     data = resp.json()["data"]
     assert data["intro"] == "我們是熱舞社"
+    assert data["website_url"] == "https://dance.example.com"
     assert data["advisor_name"] == "王老師"
 
 

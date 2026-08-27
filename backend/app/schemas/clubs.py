@@ -58,13 +58,13 @@ class ClubProfileUpdate(BaseModel):
     def _require_intro(cls, v: str | None) -> str | None:
         if not v or not v.strip():
             raise ValueError("請填寫社團簡介")
-        return v
+        return v.strip()
 
     @field_validator("website_url")
     @classmethod
     def _valid_url(cls, v: str | None) -> str | None:
         # 送 null 也是在清空 —— 驗證器只在欄位有帶時執行,沒帶的欄位本來就不會動到
-        if not v or not v.strip():
+        if not v or not (v := v.strip()):
             raise ValueError("請填寫社團網頁連結")
         if not v.startswith(("http://", "https://")):
             raise ValueError("網頁連結須為 http(s) 網址")

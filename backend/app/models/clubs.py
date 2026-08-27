@@ -57,5 +57,4 @@ class ClubMember(Base, TimestampMixin):
     kind: Mapped[MemberKind] = mapped_column(db_enum(MemberKind, "member_kind"))
     # 幹部必填,其他身份選填
     title: Mapped[str | None] = mapped_column(sa.Text)
-    phone: Mapped[str | None] = mapped_column(sa.Text)  # 舊系統遷入
     semester: Mapped[str] = mapped_column(sa.Text, index=True)  # 如 114-2

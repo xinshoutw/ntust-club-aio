@@ -42,11 +42,11 @@ export default function MembersPage() {
   // 預設排序=後端預設(身份權重→學號,準則 4 名冊慣例):未點排序時不送 sort 參數
   const { entries, toggle } = useMultiSort<MemberSortKey>()
   const { showJoined, showUpdated } = useMemberTimeColumns(entries.map((e) => e.key))
-  // 姓名/學號/身份/職稱/電話/學期 + 兩個時間欄 + 動作
-  const colCount = 7 + Number(showJoined) + Number(showUpdated)
+  // 姓名/學號/身份/職稱/學期 + 兩個時間欄 + 動作
+  const colCount = 6 + Number(showJoined) + Number(showUpdated)
   // 篩選值為顯示詞(社長/會長依社團名稱推導),查詢時轉回標準身份
   const [kindFilter, setKindFilter] = useState<string[]>([])
-  const [editing, setEditing] = useState<{ id: number; field: 'kind' | 'title' | 'phone' } | null>(null)
+  const [editing, setEditing] = useState<{ id: number; field: 'kind' | 'title' } | null>(null)
   const [form] = Form.useForm()
   const kind = Form.useWatch('kind', form)
 
@@ -73,7 +73,7 @@ export default function MembersPage() {
   // 頁面目前顯示的學期(「全部學期」時退回當前學期),作為各對話框的預設
   const pageSemester = semester === 'all' ? currentSemester() : semester
 
-  const onAdd = (values: { name: string; studentId: string; kind: MemberKind; title?: string; phone?: string; semester: string }) => {
+  const onAdd = (values: { name: string; studentId: string; kind: MemberKind; title?: string; semester: string }) => {
     // 表單無 submit 鈕,Enter 會直接送 form;confirmLoading 只擋 OK 鈕,攔不到
     if (create.isPending) return
     create.mutate(values, {
@@ -88,7 +88,7 @@ export default function MembersPage() {
 
   const doImport = () => {
     if (!csvText.trim()) {
-      message.error('請先選擇檔案或貼上內容。格式：姓名,學號,身份[,職稱[,電話]]')
+      message.error('請先選擇檔案或貼上內容。格式：姓名,學號,身份[,職稱]')
       return
     }
     importCsv.mutate(
@@ -122,7 +122,7 @@ export default function MembersPage() {
       // 職稱補空字串讓各列欄數一致
       downloadCsv(
         `成員名單_${csvSemester}.csv`,
-        rows.map((m) => [m.name, m.studentId, label(m.kind), m.title ?? '', m.phone ?? '']),
+        rows.map((m) => [m.name, m.studentId, label(m.kind), m.title ?? '']),
       )
       setExportOpen(false)
       message.success(`已匯出 ${rows.length} 名成員(${csvSemester})`)
@@ -133,7 +133,7 @@ export default function MembersPage() {
     }
   }
 
-  const patchMember = (id: number, patch: { kind?: MemberKind; title?: string | null; phone?: string | null }) => {
+  const patchMember = (id: number, patch: { kind?: MemberKind; title?: string | null }) => {
     update.mutate(
       { id, ...patch },
       {
@@ -210,9 +210,9 @@ export default function MembersPage() {
         <LoadingBlock pending={listQuery.isPending}>
           <table className="tb fixed" style={{ minWidth: 860 }}>
             {/* 兩個時間欄依 showJoined/showUpdated 增減,colgroup 要跟著長短。
-                姓名放得下四字中文名、學號放得下 9 碼、電話放得下 10 碼不截斷,職稱固定為身份的 1.5 倍;
+                姓名放得下四字中文名、學號放得下 9 碼,職稱固定為身份的 1.5 倍;
                 餘裕由靠右的動作欄吸收(給 auto 的欄才不會被 table-layout:fixed 按比例攤回去) */}
-            <Cols widths={[100, 130, 120, 180, 140, 80, ...(showJoined ? [134] : []), ...(showUpdated ? [134] : []), 'auto']} />
+            <Cols widths={[100, 130, 120, 180, 80, ...(showJoined ? [134] : []), ...(showUpdated ? [134] : []), 'auto']} />
             <thead>
               <tr>
                 <th scope="col">{sortHeader('姓名', 'name')}</th>
@@ -232,7 +232,6 @@ export default function MembersPage() {
                   </span>
                 </th>
                 <th scope="col">{sortHeader('職稱', 'title')}</th>
-                <th scope="col">電話</th>
                 <th scope="col">{sortHeader('學期', 'semester')}</th>
                 {showJoined && <th scope="col">{sortHeader('入社時間', 'created_at')}</th>}
                 {showUpdated && <th scope="col">{sortHeader('更新時間', 'updated_at')}</th>}
@@ -285,29 +284,6 @@ export default function MembersPage() {
                     ) : (
                       <button type="button" className="link-btn" style={{ padding: 0, color: 'var(--ink)' }} onClick={() => setEditing({ id: m.id, field: 'title' })}>
                         {m.title ?? (m.kind === '幹部' ? '(未填)' : '—')} <EditOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />
-                      </button>
-                    )}
-                  </td>
-                  <td className="cell-clip">
-                    {editing?.id === m.id && editing.field === 'phone' ? (
-                      <Input
-                        size="small"
-                        autoFocus
-                        defaultValue={m.phone}
-                        className="num"
-                        style={{ width: '100%' }}
-                        onBlur={(e) => {
-                          patchMember(m.id, { phone: e.target.value.trim() || null })
-                          setEditing(null)
-                        }}
-                        onPressEnter={(e) => {
-                          patchMember(m.id, { phone: (e.target as HTMLInputElement).value.trim() || null })
-                          setEditing(null)
-                        }}
-                      />
-                    ) : (
-                      <button type="button" className="link-btn num" style={{ padding: 0, color: 'var(--ink)' }} onClick={() => setEditing({ id: m.id, field: 'phone' })}>
-                        {m.phone ?? '—'} <EditOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />
                       </button>
                     )}
                   </td>
@@ -383,9 +359,6 @@ export default function MembersPage() {
           >
             <Input placeholder={kind === '幹部' ? '例:總務、活動' : '選填'} />
           </Form.Item>
-          <Form.Item name="phone" label="電話">
-            <Input className="num" placeholder="選填" />
-          </Form.Item>
         </Form>
       </Modal>
 
@@ -416,7 +389,7 @@ export default function MembersPage() {
           rows={6}
           value={csvText}
           onChange={(e) => setCsvText(e.target.value)}
-          placeholder={'王小明,B11100001,幹部,活動,0912345678\n林大同,B11100002,社員'}
+          placeholder={'王小明,B11100001,幹部,活動\n林大同,B11100002,社員'}
         />
       </Modal>
 

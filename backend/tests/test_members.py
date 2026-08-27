@@ -362,12 +362,12 @@ async def test_csv_import_undoes_formula_neutralizing_quote(client, db):
     await setup_club_session(client, db)
     resp = await client.post(
         "/api/v1/club/members/import",
-        json={"semester": "114-2", "csv_text": "陳大文,B11109001,社員,,'+886912345678"},
+        json={"semester": "114-2", "csv_text": "陳大文,B11109001,幹部,'-總務"},
         headers=csrf_headers(client),
     )
     assert resp.json()["data"]["created"] == 1
-    phone = await db.scalar(sa.select(ClubMember.phone))
-    assert phone == "+886912345678"
+    title = await db.scalar(sa.select(ClubMember.title))
+    assert title == "-總務"
 
     # 本來就以 ' 開頭的值沒被中和過,不能跟著被吃掉一個字元
     resp = await client.post(
@@ -395,28 +395,24 @@ async def test_csv_import_strips_bom(client, db):
     assert listing["data"][0]["name"] == "陳大文"
 
 
-async def test_member_phone_and_optional_titles(client, db):
-    """2026-07-21:phone 欄位 CRUD + CSV 第 5 欄;非幹部職稱選填可保留。"""
+async def test_optional_titles_and_csv_reimport(client, db):
+    """非幹部職稱選填可保留;重匯同一份 CSV 是 no-op。
+
+    2026-08-27:名單不再記錄電話,`phone` 連同 CSV 第 5 欄一併移除(D-21)。
+    """
     await setup_club_session(client, db)
     resp = await client.post(
         "/api/v1/club/members",
         json={"name": "陳大文", "student_id": "B11109001", "kind": "社員",
-              "title": "顧問", "phone": "0912345678", "semester": "114-2"},
+              "title": "顧問", "semester": "114-2"},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 201
     data = resp.json()["data"]
-    assert (data["title"], data["phone"]) == ("顧問", "0912345678")  # 社員可有職稱
+    assert data["title"] == "顧問"  # 社員可有職稱
+    assert "phone" not in data  # 名單不再帶電話
 
-    member_id = data["id"]
-    resp = await client.patch(
-        f"/api/v1/club/members/{member_id}",
-        json={"phone": "0987654321"},
-        headers=csrf_headers(client),
-    )
-    assert resp.json()["data"]["phone"] == "0987654321"
-
-    # CSV 第 5 欄=電話;重匯同內容為 no-op(含 phone 比對)
+    # 帶第 5 欄的舊格式仍收得下(多的欄位忽略),但不會存下任何電話
     csv_text = "李小明,B11109002,幹部,總務,0911222333"
     resp = await client.post(
         "/api/v1/club/members/import",
@@ -425,7 +421,7 @@ async def test_member_phone_and_optional_titles(client, db):
     )
     assert resp.json()["data"]["created"] == 1
     resp = await client.get("/api/v1/club/members", params={"kind": "幹部"})
-    assert resp.json()["data"][0]["phone"] == "0911222333"
+    assert resp.json()["data"][0]["title"] == "總務"
     resp = await client.post(
         "/api/v1/club/members/import",
         json={"csv_text": csv_text, "semester": "114-2"},
@@ -462,7 +458,7 @@ async def test_member_list_exposes_join_time_and_sorts_by_it(client, db):
     # 改了值會蓋掉 updated_at,入社時間不受影響
     await client.patch(
         f"/api/v1/club/members/{rows[0]['id']}",
-        json={"phone": "0912345678"},
+        json={"title": "顧問"},
         headers=csrf_headers(client),
     )
     after = (await client.get("/api/v1/club/members", params={"sort": "created_at"})).json()["data"]

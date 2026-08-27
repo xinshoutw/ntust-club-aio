@@ -12,7 +12,6 @@ export interface Member {
   studentId: string
   kind: MemberKind
   title?: string
-  phone?: string
   semester: string
   joinedAt: string
   updatedAt: string
@@ -24,7 +23,6 @@ interface MemberOut {
   student_id: string
   kind: MemberKind
   title: string | null
-  phone: string | null
   semester: string
   created_at: string
   updated_at: string
@@ -36,7 +34,6 @@ const toMember = (m: MemberOut): Member => ({
   studentId: m.student_id,
   kind: m.kind,
   title: m.title ?? undefined,
-  phone: m.phone ?? undefined,
   semester: m.semester,
   joinedAt: dayjs(m.created_at).format('YYYY/MM/DD HH:mm'),
   updatedAt: dayjs(m.updated_at).format('YYYY/MM/DD HH:mm'),
@@ -79,7 +76,6 @@ export interface MemberInput {
   studentId: string
   kind: MemberKind
   title?: string
-  phone?: string
   semester: string
 }
 
@@ -101,14 +97,13 @@ export function useMemberMutations() {
           student_id: b.studentId,
           kind: b.kind,
           title: b.title,
-          phone: b.phone,
           semester: b.semester,
         }),
       }),
     onSuccess: invalidate,
   })
   const update = useMutation({
-    mutationFn: ({ id, ...patch }: { id: number; kind?: MemberKind; title?: string | null; phone?: string | null }) =>
+    mutationFn: ({ id, ...patch }: { id: number; kind?: MemberKind; title?: string | null }) =>
       api<MemberOut>(`/club/members/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
     onSuccess: invalidate,
   })

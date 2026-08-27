@@ -113,7 +113,6 @@ class MemberOut(BaseModel):
     student_id: str
     kind: MemberKind
     title: str | None  # 幹部必填,其他身份選填
-    phone: str | None
     semester: str
     # 入社時間:遷移把舊系統的入社日期寫進 created_at,行內編輯只動 updated_at,
     # 這一欄是那份日期唯一的可見副本
@@ -126,7 +125,6 @@ class MemberIn(BaseModel):
     student_id: str = Field(min_length=1, max_length=20)
     kind: MemberKind
     title: str | None = Field(None, max_length=30)
-    phone: str | None = Field(None, max_length=30)
     semester: str = Field(pattern=r"^\d{3}-[12]$")
 
 
@@ -135,13 +133,12 @@ class MemberUpdate(BaseModel):
     student_id: str | None = Field(None, min_length=1, max_length=20)
     kind: MemberKind | None = None
     title: str | None = Field(None, max_length=30)
-    phone: str | None = Field(None, max_length=30)
 
 
 class MemberImportRequest(BaseModel):
     """CSV 匯入(貼上文字;檔案上傳由前端讀成文字後同端點),整批寫入指定學期。
 
-    格式:姓名,學號,身份[,職稱[,電話]];身份=社員/幹部/負責人/副負責人
+    格式:姓名,學號,身份[,職稱];身份=社員/幹部/負責人/副負責人
     (也接受顯示詞 社長/會長/副社長/副會長)
     """
 

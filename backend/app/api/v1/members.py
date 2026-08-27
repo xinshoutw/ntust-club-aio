@@ -146,7 +146,6 @@ async def create_member(
         student_id=body.student_id,
         kind=body.kind,
         title=title,
-        phone=body.phone or None,
         semester=body.semester,
     )
     db.add(member)
@@ -232,7 +231,7 @@ async def import_members(
     # str.strip() 不會移除 U+FEFF,首列第一欄姓名會被污染成帶 BOM 前綴的值
     csv_text = body.csv_text.lstrip("﻿")
     for line_no, row in enumerate(csv.reader(io.StringIO(csv_text)), start=1):
-        # 匯出端為了中和 Excel 公式,會在 = + - @ 開頭的值前面補一個單引號(電話 +886… 就會中);
+        # 匯出端為了中和 Excel 公式,會在 = + - @ 開頭的值前面補一個單引號;
         # 原樣貼回來時要脫掉,否則每往返一次多一個。只脫真的被中和過的,不動以 ' 開頭的名字
         cells = [_unneutralize(c.strip()) for c in row]
         if not any(cells):
@@ -242,7 +241,6 @@ async def import_members(
             continue
         name, student_id, identity = cells[0], cells[1], cells[2]
         title = cells[3].strip() if len(cells) > 3 and cells[3].strip() else None
-        phone = cells[4].strip() if len(cells) > 4 and cells[4].strip() else None
         if not name or not student_id:
             errors.append(f"第 {line_no} 列:姓名與學號必填")
             continue
@@ -250,7 +248,6 @@ async def import_members(
             len(name) > 50
             or len(student_id) > 20
             or (title and len(title) > 30)
-            or (phone and len(phone) > 30)
         ):
             errors.append(f"第 {line_no} 列:欄位長度超過上限")
             continue
@@ -276,20 +273,19 @@ async def import_members(
                     student_id=student_id,
                     kind=kind,
                     title=title,
-                    phone=phone,
                     semester=body.semester,
                 )
             )
             created += 1
             touched.add(student_id)
-        elif (member.name, member.kind, member.title, member.phone) != (name, kind, title, phone):
+        elif (member.name, member.kind, member.title) != (name, kind, title):
             # 值沒變不計入 updated:重匯同一份名單要回報 0 筆更新,不能謊報整份都動過
-            member.name, member.kind, member.title, member.phone = name, kind, title, phone
+            member.name, member.kind, member.title = name, kind, title
             updated += 1
             touched.add(student_id)
 
     if touched:
-        # 匯入是 upsert,會覆寫既有成員的姓名/身份/職稱/電話 —— 只記數量查不出改了誰
+        # 匯入是 upsert,會覆寫既有成員的姓名/身份/職稱 —— 只記數量查不出改了誰
         shown = ",".join(sorted(touched)[:_AUDIT_ID_LIMIT])
         more = f"…等 {len(touched)} 人" if len(touched) > _AUDIT_ID_LIMIT else ""
         audit.record(

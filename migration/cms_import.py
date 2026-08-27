@@ -476,10 +476,11 @@ def _kind_rank(row) -> int:
 
 
 async def import_members(legacy, db: AsyncSession, ids: IdMap, clubs) -> None:
+    """社員名單。舊系統的 `Phone` **不讀**:新系統不記錄社員電話(2026-08-27 拍板)。"""
     rows = (
         await legacy.execute(
             sa.text(
-                'SELECT id, "Name", "StudentID", "Phone", "Title", "Date", "Semester",'
+                'SELECT id, "Name", "StudentID", "Title", "Date", "Semester",'
                 ' "FK_Club_id", "Identity" FROM "Club_student" ORDER BY id'
             )
         )
@@ -531,7 +532,6 @@ async def import_members(legacy, db: AsyncSession, ids: IdMap, clubs) -> None:
             student_id=student_id,
             kind=kind,
             title=title,
-            phone=(row.Phone or "").strip() or None,
             semester=semester,
             **({"created_at": stamp, "updated_at": stamp} if stamp else {}),
         )

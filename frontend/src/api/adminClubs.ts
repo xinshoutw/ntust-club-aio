@@ -197,7 +197,6 @@ export interface AdminMember {
   studentId: string
   kind: MemberKind
   title?: string
-  phone?: string
   semester: string
   joinedAt: string
   updatedAt: string
@@ -209,7 +208,6 @@ interface MemberOut {
   student_id: string
   kind: MemberKind
   title: string | null
-  phone: string | null
   semester: string
   created_at: string
   updated_at: string
@@ -221,7 +219,6 @@ const toMember = (m: MemberOut): AdminMember => ({
   studentId: m.student_id,
   kind: m.kind,
   title: m.title ?? undefined,
-  phone: m.phone ?? undefined,
   semester: m.semester,
   joinedAt: dayjs(m.created_at).format('YYYY/MM/DD HH:mm'),
   updatedAt: dayjs(m.updated_at).format('YYYY/MM/DD HH:mm'),

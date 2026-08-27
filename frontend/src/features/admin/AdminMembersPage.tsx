@@ -78,7 +78,7 @@ export default function AdminMembersPage() {
       // 與社團端匯入格式相容(無標題列;後端 csv.reader 支援引號跳脫);身份以顯示詞輸出;職稱補空字串讓各列欄數一致
       downloadCsv(
         `成員名單_${club}_${semester === 'all' ? '全部學期' : semester}.csv`,
-        rows.map((m) => [m.name, m.studentId, kindLabel(m.kind, clubKind), m.title ?? '', m.phone ?? '']),
+        rows.map((m) => [m.name, m.studentId, kindLabel(m.kind, clubKind), m.title ?? '']),
       )
       message.success(`已匯出 ${rows.length} 名成員`)
     } catch (e) {
@@ -126,12 +126,12 @@ export default function AdminMembersPage() {
         <div style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden' }}>
         <LoadingBlock pending={clubId != null && listQuery.isPending}>
           <table className="tb fixed" style={{ minWidth: 960 }}>
-            {/* 姓名放得下四字中文名、學號放得下 9 碼、電話放得下 10 碼不截斷,職稱固定為身份的 1.5 倍。
+            {/* 姓名放得下四字中文名、學號放得下 9 碼,職稱固定為身份的 1.5 倍。
                 兩個時間欄依 showJoined/showUpdated 增減;餘裕一律丟給最後一欄吸收 ——
                 table-layout:fixed 下若每欄都給 px,瀏覽器會把餘裕按比例攤回每一欄,姓名與職稱又會被撐開 */}
             <Cols
               widths={[
-                ...[100, 130, 92, 138, 140, 80, ...(showJoined ? [140] : []), ...(showUpdated ? [140] : [])].slice(0, -1),
+                ...[100, 130, 92, 138, 80, ...(showJoined ? [140] : []), ...(showUpdated ? [140] : [])].slice(0, -1),
                 'auto',
               ]}
             />
@@ -141,7 +141,6 @@ export default function AdminMembersPage() {
                 <th scope="col"><MultiSortButton label="學號" sortKey="student_id" entries={entries} onToggle={toggleSort} /></th>
                 <th scope="col"><MultiSortButton label="身份" sortKey="kind" entries={entries} onToggle={toggleSort} /></th>
                 <th scope="col"><MultiSortButton label="職稱" sortKey="title" entries={entries} onToggle={toggleSort} /></th>
-                <th scope="col">電話</th>
                 <th scope="col"><MultiSortButton label="學期" sortKey="semester" entries={entries} onToggle={toggleSort} /></th>
                 {showJoined && <th scope="col"><MultiSortButton label="入社時間" sortKey="created_at" entries={entries} onToggle={toggleSort} /></th>}
                 {showUpdated && <th scope="col"><MultiSortButton label="更新時間" sortKey="updated_at" entries={entries} onToggle={toggleSort} /></th>}
@@ -154,7 +153,6 @@ export default function AdminMembersPage() {
                   <td className="num cell-clip" style={{ color: 'var(--steel)' }}>{m.studentId}</td>
                   <td>{kindLabel(m.kind, clubKind)}</td>
                   <td className="cell-clip" title={m.title ?? undefined}>{m.title ?? '—'}</td>
-                  <td className="num cell-clip">{m.phone ?? '—'}</td>
                   <td className="num cell-clip" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.semester}</td>
                   {showJoined && <td className="num cell-clip" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.joinedAt}</td>}
                   {showUpdated && <td className="num cell-clip" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.updatedAt}</td>}

@@ -36,8 +36,10 @@ class ClubProfileOut(BaseModel):
 
 
 class ClubProfileUpdate(BaseModel):
+    """社團自行維護的欄位。英文名稱不在此 —— 由學務處於行政端管理項目維護。"""
+
+    # 簡介與網頁連結為必填(2026-08-27 需求方拍板):社團導覽頁要靠這兩欄
     intro: str | None = Field(None, max_length=2000)
-    en_name: str | None = Field(None, max_length=200)
     website_url: str | None = Field(None, max_length=500)
     # 聯絡 Email:至多 3 組、第 1 組必填(公告通知寄送對象)
     contact_emails: list[str] | None = Field(None, min_length=1, max_length=MAX_CONTACT_EMAILS)
@@ -51,12 +53,22 @@ class ClubProfileUpdate(BaseModel):
     advisor_out_email: str | None = Field(None, max_length=100)
     advisor_out_phone: str | None = Field(None, max_length=30)
 
+    @field_validator("intro")
+    @classmethod
+    def _require_intro(cls, v: str | None) -> str | None:
+        if not v or not v.strip():
+            raise ValueError("請填寫社團簡介")
+        return v
+
     @field_validator("website_url")
     @classmethod
     def _valid_url(cls, v: str | None) -> str | None:
-        if v and not v.startswith(("http://", "https://")):
+        # 送 null 也是在清空 —— 驗證器只在欄位有帶時執行,沒帶的欄位本來就不會動到
+        if not v or not v.strip():
+            raise ValueError("請填寫社團網頁連結")
+        if not v.startswith(("http://", "https://")):
             raise ValueError("網頁連結須為 http(s) 網址")
-        return v or None
+        return v
 
     @field_validator("discord_webhook_url")
     @classmethod

@@ -21,7 +21,6 @@ interface SettingsValues {
   advisorOutDept?: string
   advisorOutEmail?: string
   advisorOutPhone?: string
-  enName?: string
   url?: string
   intro?: string
   email1: string
@@ -43,7 +42,6 @@ const PROFILE_KEYS = [
   'advisorOutDept',
   'advisorOutEmail',
   'advisorOutPhone',
-  'enName',
   'url',
   'intro',
   'email1',
@@ -62,7 +60,6 @@ const fromProfile = (p: ClubProfile): SettingsValues => ({
   advisorOutDept: p.advisorOutDept,
   advisorOutEmail: p.advisorOutEmail,
   advisorOutPhone: p.advisorOutPhone,
-  enName: p.enName,
   url: p.url,
   intro: p.intro,
   email1: p.emails[0],
@@ -142,7 +139,6 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
           advisorOutDept: v.advisorOutDept ?? '',
           advisorOutEmail: v.advisorOutEmail ?? '',
           advisorOutPhone: v.advisorOutPhone ?? '',
-          enName: v.enName ?? '',
         })
         baseline = fromProfile(next)
         setSaved(baseline)
@@ -239,18 +235,28 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
             <Form.Item label="社團名稱">
               <Input readOnly value={profile.name} style={{ background: 'var(--paper)' }} />
             </Form.Item>
-            <Form.Item name="enName" label="英文名稱" className={itemClass('enName')}>
-              <Input placeholder="English name（選填）" />
+            {/* 英文名稱與社團名稱同樣由學務處維護(行政端管理項目),社團端唯讀 */}
+            <Form.Item label="英文名稱">
+              <Input readOnly value={profile.enName} placeholder="尚未設定" style={{ background: 'var(--paper)' }} />
             </Form.Item>
             <Form.Item
               name="url"
               label="社團網頁連結"
               className={itemClass('url')}
-              rules={[{ type: 'url', message: '網址格式不正確' }]}
+              rules={[
+                { required: true, message: '請填寫社團網頁連結' },
+                { type: 'url', message: '網址格式不正確' },
+              ]}
             >
               <Input placeholder="https://" />
             </Form.Item>
-            <Form.Item name="intro" label="簡介" className={itemClass('intro')} style={{ marginBottom: 0 }}>
+            <Form.Item
+              name="intro"
+              label="簡介"
+              className={itemClass('intro')}
+              rules={[{ required: true, message: '請填寫社團簡介' }]}
+              style={{ marginBottom: 0 }}
+            >
               <Input.TextArea rows={3} placeholder="社團宗旨、特色" />
             </Form.Item>
           </div>

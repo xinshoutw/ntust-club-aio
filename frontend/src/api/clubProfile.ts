@@ -106,7 +106,6 @@ export function useClubSuspension(): ClubSuspension {
 
 export interface ClubProfileInput {
   intro: string
-  enName: string
   url: string
   emails: string[]
   discordWebhook: string
@@ -128,7 +127,6 @@ export function useUpdateClubProfile() {
         method: 'PATCH',
         body: JSON.stringify({
           intro: b.intro,
-          en_name: b.enName.trim() || null,
           website_url: b.url.trim() || null,
           // 第 1 組必填由表單擋;空欄後端會自行過濾
           contact_emails: b.emails.map((e) => e.trim()),

@@ -42,6 +42,10 @@ async def test_profile_rejects_invalid_or_cleared_fields(client, db):
         {"discord_webhook_url": "https://evil.example.com/webhook"},
         {"website_url": "javascript:alert(1)"},
         # 畫面上必填的欄位,直呼 API 不得清空
+        {"intro": ""},
+        {"intro": "   "},
+        {"website_url": ""},
+        {"website_url": None},
         {"advisor_name": ""},
         {"advisor_name": "  "},
         # 承辦人拿這欄寄信,格式要驗
@@ -52,6 +56,22 @@ async def test_profile_rejects_invalid_or_cleared_fields(client, db):
             "/api/v1/club/profile", json=payload, headers=csrf_headers(client)
         )
         assert resp.status_code == 422
+
+
+async def test_profile_ignores_en_name(client, db):
+    """英文名稱由學務處維護:社團端直呼 API 帶這一欄也不會寫進去。"""
+    await setup_club_session(client, db)
+    resp = await client.patch(
+        "/api/v1/club/profile",
+        json={
+            "intro": "我們是熱舞社",
+            "website_url": "https://dance.example.com",
+            "en_name": "Dance Club",
+        },
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200
+    assert resp.json()["data"]["en_name"] is None
 
 
 async def test_member_crud_and_scoping(client, db):

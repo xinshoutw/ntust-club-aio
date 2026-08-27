@@ -20,6 +20,7 @@ const label: React.CSSProperties = { color: 'var(--steel)' }
 
 interface FormState {
   name: string
+  enName: string // 英文名稱:社團端唯讀,只有這裡改得動
   kind: string // 社團/學會;名稱結尾可推導時自動同步,推導不到時手動指定
   attribute: string // 社團性質;沒有性質的社團不會出現在社團漏斗,選錯了要改得回來
   account: string
@@ -62,6 +63,7 @@ export default function AdminClubSettingsPage() {
     !!form &&
     !!saved &&
     (form.name !== saved.name ||
+      form.enName !== saved.enName ||
       form.kind !== saved.kind ||
       form.attribute !== saved.attribute ||
       form.account !== saved.account ||
@@ -100,6 +102,7 @@ export default function AdminClubSettingsPage() {
     if (form === null && detail && club === lastClub) {
       const base = {
         name: detail.name,
+        enName: detail.enName,
         kind: detail.kind,
         // 停社遷入舊社的性質不可考(null):空字串=沒填,選了才送出去
         attribute: detail.attribute ?? '',
@@ -125,6 +128,7 @@ export default function AdminClubSettingsPage() {
           id: clubId,
           // 僅送有變更的欄位(undefined 不會進 JSON body)
           name: name !== saved.name ? name : undefined,
+          enName: form.enName.trim() !== saved.enName ? form.enName.trim() : undefined,
           kind: form.kind !== saved.kind ? form.kind : undefined,
           attribute: form.attribute !== saved.attribute ? form.attribute : undefined,
           username: form.account.trim() !== saved.account ? form.account.trim() : undefined,
@@ -134,6 +138,7 @@ export default function AdminClubSettingsPage() {
           onSuccess: (res) => {
             const base = {
               name: res.name,
+              enName: res.enName,
               kind: res.kind,
               attribute: res.attribute ?? '',
               account: res.username ?? '',
@@ -206,7 +211,6 @@ export default function AdminClubSettingsPage() {
             ) : (
             <>
             <div style={{ display: 'grid', gridTemplateColumns: '104px 1fr', gap: '10px 12px', fontSize: 13 }}>
-              <div style={label}>英文名稱</div><div>{detail?.enName || '—'}</div>
               <div style={label}>校內指導老師</div><div>{advisorText(detail)}</div>
               <div style={label}>校外指導老師</div><div>{advisorOutText(detail)}</div>
               <div style={label}>網頁連結</div>
@@ -250,6 +254,14 @@ export default function AdminClubSettingsPage() {
                     // 結尾社/會自動推導類型;推導不到保留原值由下方手動指定
                     setForm({ ...form, name, kind: deriveKind(name.trim()) ?? form.kind })
                   }}
+                />
+              </div>
+              <div className={form.enName !== saved.enName ? 'field-dirty' : undefined}>
+                <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>英文名稱</div>
+                <Input
+                  value={form.enName}
+                  placeholder="English name"
+                  onChange={(e) => setForm({ ...form, enName: e.target.value })}
                 />
               </div>
               <div className={form.kind !== saved.kind ? 'field-dirty' : undefined}>

@@ -249,6 +249,14 @@ async def import_members(
         if not name or not student_id:
             errors.append(f"第 {line_no} 列:姓名與學號必填")
             continue
+        kind = _KIND_ALIASES.get(identity)
+        if kind is None:
+            errors.append(f"第 {line_no} 列:身份「{identity}」無法辨識")
+            continue
+        if kind in (MemberKind.PRESIDENT, MemberKind.VICE_PRESIDENT):
+            # 負責人與副負責人不寫職稱(D-27,與 _validate_member 同一條規則)。
+            # 要在長度檢查之前丟掉:那一欄反正不留,不該讓舊名單的長職稱把整列退掉
+            title = None
         if (
             len(name) > 50
             or len(student_id) > 20
@@ -259,16 +267,9 @@ async def import_members(
         if student_id in seen:
             errors.append(f"第 {line_no} 列:學號 {student_id} 重複出現")
             continue
-
-        kind = _KIND_ALIASES.get(identity)
-        if kind is None:
-            errors.append(f"第 {line_no} 列:身份「{identity}」無法辨識")
-            continue
         if kind == MemberKind.OFFICER and not title:
             errors.append(f"第 {line_no} 列:幹部需填職稱")
             continue
-        if kind in (MemberKind.PRESIDENT, MemberKind.VICE_PRESIDENT):
-            title = None  # 負責人與副負責人不寫職稱(D-27,與 _validate_member 同一條規則)
 
         seen.add(student_id)
         member = existing.get(student_id)

@@ -464,6 +464,14 @@ async def test_president_kinds_carry_no_title(client, db):
     assert resp.status_code == 200, resp.text
     assert resp.json()["data"]["title"] is None
 
+    # 舊名單的長職稱也不該把整列退掉 —— 那一欄反正不留
+    resp = await client.post(
+        "/api/v1/club/members/import",
+        json={"csv_text": f"長職,B11109009,會長,{'長' * 40}", "semester": "114-2"},
+        headers=csrf_headers(client),
+    )
+    assert resp.json()["data"]["created"] == 1, resp.text
+
     # CSV 帶職稱的那一列照樣進得來,只是職稱不留
     resp = await client.post(
         "/api/v1/club/members/import",
@@ -472,8 +480,8 @@ async def test_president_kinds_carry_no_title(client, db):
     )
     assert resp.json()["data"] == {"created": 1, "updated": 0, "errors": []}
     rows = (await client.get("/api/v1/club/members", params={"kind": "負責人"})).json()["data"]
-    assert sorted(r["student_id"] for r in rows) == ["B11109001", "B11109003"]
-    assert [r["title"] for r in rows] == [None, None]
+    assert sorted(r["student_id"] for r in rows) == ["B11109001", "B11109003", "B11109009"]
+    assert [r["title"] for r in rows] == [None, None, None]
     assert member_id in [r["id"] for r in rows]
 
 

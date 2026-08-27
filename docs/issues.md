@@ -25,7 +25,6 @@
 | ISS-12c | 中 | 評鑑上傳鎖(`eval_settings.unlocked`)**看不到也設不了**:`AwardDetailOut` 不回任何鎖定旗標,上傳鈕永遠可按,社團選完檔才吃 409;而 `EvalSetting` 全後端只有讀、沒有任何寫入端點或 UI |
 | ISS-102 | 中 | **帳號管理的重設密碼/停用/刪除,對按下去必定失敗的列照樣畫按鈕**:後端 `_guard_target`(`api/v1/admin_accounts.py`)擋三種對象 —— 自己、`is_super`、以及持有自己所沒有的權限鍵的同儕。權限彈窗已照 `_check_grantable` 把授不出去的鍵反灰,這三個動作卻對每一列都畫(`AccountsPage.tsx` 的 `actions()`,只有「權限」鈕對 `isSuper` 隱藏),承辦按下去只會拿到 409/403。後端擋得住,是畫面在說謊 |
 | ISS-103 | 低 | **簽核章軌的「已退回」可能標在錯的關卡**:`ActivityReviewModal.stagesOf` 以「第一個沒有核准章的關卡」當作被退回的那一關。承辦核准 → 組長退回 → 社團重送 → **承辦這次直接退回**,此時 advisor 仍留著上一輪的核准章,畫面會把「已退回」蓋在組長那格。要標對得改看 `approval_records` 最後一筆 reject 的 stage(行政端詳情已經帶得出 `approvals`) |
-| ISS-104 | 低 | **CSV 匯出在部分瀏覽器按了沒反應**:`lib/csv.downloadCsv` 在 `a.click()` 的下一行就 `URL.revokeObjectURL`,Safari 與部分 Firefox 版本會在下載真正開始前把 blob 收掉。四處匯出(社團端成員名單、行政端成員列表、報名名單、稽核紀錄)共用這一支 |
 
 ## 3. 預設值讓人不小心就放行(fail-open)
 

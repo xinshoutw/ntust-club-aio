@@ -14,11 +14,15 @@ export function toCsv(rows: string[][]): string {
   return rows.map((r) => r.map(escapeField).join(',')).join('\n')
 }
 
+// a.click() 只是排程下載,不是同步開始 —— 同步 revoke 會讓 Safari 與部分 Firefox 版本
+// 在下載真正開始前就失去來源(按了沒反應)。延後收,頁面關閉時本來就會一併釋放
+const REVOKE_DELAY_MS = 60_000
+
 export function downloadCsv(filename: string, rows: string[][]): void {
   const url = URL.createObjectURL(new Blob(['﻿' + toCsv(rows)], { type: 'text/csv;charset=utf-8' }))
   const a = document.createElement('a')
   a.href = url
   a.download = filename
   a.click()
-  URL.revokeObjectURL(url)
+  setTimeout(() => URL.revokeObjectURL(url), REVOKE_DELAY_MS)
 }

@@ -259,3 +259,8 @@ async def test_location_search_escapes_like_wildcards(client, db):
 
     resp = await client.get("/api/v1/admin/violations", params={"location": "B1_2"})
     assert [d["location"] for d in resp.json()["data"]] == ["B1_2 排練室"]
+
+    # 契約標記(兩種實作都會過):空白字串等於沒篩,與活動名稱搜尋同一條慣例
+    blank = await client.get("/api/v1/admin/violations", params={"location": "   "})
+    unfiltered = await client.get("/api/v1/admin/violations")
+    assert blank.json()["data"] == unfiltered.json()["data"]

@@ -102,7 +102,7 @@ async def list_violations(
         query = query.where(Violation.filler_id.in_(filler_id))
     if item:
         query = query.where(Violation.items.overlap(item))
-    if location:
+    if location and location.strip():
         query = query.where(ilike_contains(Violation.location, location))
     if date_from:
         query = query.where(Violation.occurred_on >= date_from)

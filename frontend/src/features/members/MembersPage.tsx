@@ -133,6 +133,24 @@ export default function MembersPage() {
     }
   }
 
+  // 改成幹部但手上沒有職稱:接著問職稱,兩欄一起送。
+  // 幹部必填職稱,而負責人/副負責人的職稱欄不給編輯 —— 少了這一步,
+  // 「負責人 → 幹部」在畫面上是死路:後端 422,而使用者沒有地方補那個字
+  const [pendingOfficer, setPendingOfficer] = useState<number | null>(null)
+
+  const commitTitle = (m: Member, raw: string) => {
+    const title = raw.trim() || null
+    const becomingOfficer = pendingOfficer === m.id
+    setPendingOfficer(null)
+    setEditing(null)
+    if (becomingOfficer && !title) {
+      message.error('幹部必須填寫職稱')  // 沒填就不改身份,維持原狀
+      return
+    }
+    if (becomingOfficer) patchMember(m.id, { kind: '幹部', title })
+    else if (title !== (m.title ?? null)) patchMember(m.id, { title })
+  }
+
   const patchMember = (id: number, patch: { kind?: MemberKind; title?: string | null }) => {
     update.mutate(
       { id, ...patch },
@@ -257,8 +275,12 @@ export default function MembersPage() {
                         style={{ width: '100%' }}
                         options={kindOptions}
                         onChange={(v) => {
-                          // 改成負責人/副負責人時後端會把職稱清掉(D-27);
-                          // 幹部缺職稱由後端擋下,錯誤訊息照樣顯示
+                          // 改成負責人/副負責人時後端會把職稱清掉(D-27)
+                          if (v === '幹部' && !m.title) {
+                            setPendingOfficer(m.id)
+                            setEditing({ id: m.id, field: 'title' })
+                            return
+                          }
                           patchMember(m.id, { kind: v })
                           setEditing(null)
                         }}
@@ -270,25 +292,22 @@ export default function MembersPage() {
                       </button>
                     )}
                   </td>
-                  <td className="cell-clip" title={m.title ?? undefined}>
-                    {!canHaveTitle(m.kind) ? (
-                      // 身份本身就是職稱:不給編輯入口,填了後端也會捨棄(D-27)
-                      <span style={{ color: 'var(--steel)' }}>—</span>
-                    ) : editing?.id === m.id && editing.field === 'title' ? (
+                  <td className="cell-clip" title={canHaveTitle(m.kind) ? (m.title ?? undefined) : undefined}>
+                    {/* pendingOfficer 也算在編輯中:身份下拉關閉時的 onBlur 會把 editing 清掉,
+                        少了這一條,接著要問的職稱輸入框會在出現的同一刻消失 */}
+                    {pendingOfficer === m.id || (editing?.id === m.id && editing.field === 'title') ? (
                       <Input
                         size="small"
                         autoFocus
                         defaultValue={m.title}
+                        placeholder={pendingOfficer === m.id ? '幹部職稱' : undefined}
                         style={{ width: '100%' }}
-                        onBlur={(e) => {
-                          patchMember(m.id, { title: e.target.value.trim() || null })
-                          setEditing(null)
-                        }}
-                        onPressEnter={(e) => {
-                          patchMember(m.id, { title: (e.target as HTMLInputElement).value.trim() || null })
-                          setEditing(null)
-                        }}
+                        onBlur={(e) => commitTitle(m, e.target.value)}
+                        onPressEnter={(e) => commitTitle(m, (e.target as HTMLInputElement).value)}
                       />
+                    ) : !canHaveTitle(m.kind) ? (
+                      // 身份本身就是職稱:不給編輯入口,填了後端也會捨棄(D-27)
+                      <span style={{ color: 'var(--steel)' }}>—</span>
                     ) : (
                       <button type="button" className="link-btn" style={{ padding: 0, color: 'var(--ink)' }} onClick={() => setEditing({ id: m.id, field: 'title' })}>
                         {m.title ?? (m.kind === '幹部' ? '(未填)' : '—')} <EditOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />

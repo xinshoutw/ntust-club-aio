@@ -211,8 +211,9 @@ export default function MembersPage() {
           <table className="tb fixed" style={{ minWidth: 860 }}>
             {/* 兩個時間欄依 showJoined/showUpdated 增減,colgroup 要跟著長短。
                 姓名放得下四字中文名、學號放得下 9 碼,職稱固定為身份的 1.5 倍;
+                兩個時間欄放得下 `YYYY/MM/DD HH:mm` 不截斷(16 字 + 左右內距 32px);
                 餘裕由靠右的動作欄吸收(給 auto 的欄才不會被 table-layout:fixed 按比例攤回去) */}
-            <Cols widths={[100, 130, 120, 180, 80, ...(showJoined ? [134] : []), ...(showUpdated ? [134] : []), 'auto']} />
+            <Cols widths={[100, 130, 120, 180, 80, ...(showJoined ? [156] : []), ...(showUpdated ? [156] : []), 'auto']} />
             <thead>
               <tr>
                 <th scope="col">{sortHeader('姓名', 'name')}</th>
@@ -232,9 +233,10 @@ export default function MembersPage() {
                   </span>
                 </th>
                 <th scope="col">{sortHeader('職稱', 'title')}</th>
-                <th scope="col">{sortHeader('學期', 'semester')}</th>
-                {showJoined && <th scope="col">{sortHeader('入社時間', 'created_at')}</th>}
-                {showUpdated && <th scope="col">{sortHeader('更新時間', 'updated_at')}</th>}
+                {/* 學期與兩個時間欄靠右:日期與學期都是等寬數字,靠右才對得成一直行 */}
+                <th scope="col" className="r">{sortHeader('學期', 'semester')}</th>
+                {showJoined && <th scope="col" className="r">{sortHeader('入社時間', 'created_at')}</th>}
+                {showUpdated && <th scope="col" className="r">{sortHeader('更新時間', 'updated_at')}</th>}
                 <th scope="col" className="r">動作</th>
               </tr>
             </thead>
@@ -287,9 +289,9 @@ export default function MembersPage() {
                       </button>
                     )}
                   </td>
-                  <td className="num cell-clip" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.semester}</td>
-                  {showJoined && <td className="num cell-clip" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.joinedAt}</td>}
-                  {showUpdated && <td className="num cell-clip" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.updatedAt}</td>}
+                  <td className="num cell-clip r" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.semester}</td>
+                  {showJoined && <td className="num cell-clip r" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.joinedAt}</td>}
+                  {showUpdated && <td className="num cell-clip r" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.updatedAt}</td>}
                   <td className="r">
                     <Popconfirm
                       title={`移除 ${m.name}?`}

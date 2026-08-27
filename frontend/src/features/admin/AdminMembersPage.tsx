@@ -126,12 +126,13 @@ export default function AdminMembersPage() {
         <div style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden' }}>
         <LoadingBlock pending={clubId != null && listQuery.isPending}>
           <table className="tb fixed" style={{ minWidth: 960 }}>
-            {/* 姓名放得下四字中文名、學號放得下 9 碼,職稱固定為身份的 1.5 倍。
+            {/* 姓名放得下四字中文名、學號放得下 9 碼,職稱固定為身份的 1.5 倍;
+                兩個時間欄放得下 `YYYY/MM/DD HH:mm` 不截斷(16 字 + 左右內距 32px)。
                 兩個時間欄依 showJoined/showUpdated 增減;餘裕一律丟給最後一欄吸收 ——
                 table-layout:fixed 下若每欄都給 px,瀏覽器會把餘裕按比例攤回每一欄,姓名與職稱又會被撐開 */}
             <Cols
               widths={[
-                ...[100, 130, 92, 138, 80, ...(showJoined ? [140] : []), ...(showUpdated ? [140] : [])].slice(0, -1),
+                ...[100, 130, 92, 138, 80, ...(showJoined ? [156] : []), ...(showUpdated ? [156] : [])].slice(0, -1),
                 'auto',
               ]}
             />
@@ -141,9 +142,10 @@ export default function AdminMembersPage() {
                 <th scope="col"><MultiSortButton label="學號" sortKey="student_id" entries={entries} onToggle={toggleSort} /></th>
                 <th scope="col"><MultiSortButton label="身份" sortKey="kind" entries={entries} onToggle={toggleSort} /></th>
                 <th scope="col"><MultiSortButton label="職稱" sortKey="title" entries={entries} onToggle={toggleSort} /></th>
-                <th scope="col"><MultiSortButton label="學期" sortKey="semester" entries={entries} onToggle={toggleSort} /></th>
-                {showJoined && <th scope="col"><MultiSortButton label="入社時間" sortKey="created_at" entries={entries} onToggle={toggleSort} /></th>}
-                {showUpdated && <th scope="col"><MultiSortButton label="更新時間" sortKey="updated_at" entries={entries} onToggle={toggleSort} /></th>}
+                {/* 學期與兩個時間欄靠右:日期與學期都是等寬數字,靠右才對得成一直行 */}
+                <th scope="col" className="r"><MultiSortButton label="學期" sortKey="semester" entries={entries} onToggle={toggleSort} /></th>
+                {showJoined && <th scope="col" className="r"><MultiSortButton label="入社時間" sortKey="created_at" entries={entries} onToggle={toggleSort} /></th>}
+                {showUpdated && <th scope="col" className="r"><MultiSortButton label="更新時間" sortKey="updated_at" entries={entries} onToggle={toggleSort} /></th>}
               </tr>
             </thead>
             <tbody>
@@ -153,9 +155,9 @@ export default function AdminMembersPage() {
                   <td className="num cell-clip" style={{ color: 'var(--steel)' }}>{m.studentId}</td>
                   <td>{kindLabel(m.kind, clubKind)}</td>
                   <td className="cell-clip" title={m.title ?? undefined}>{m.title ?? '—'}</td>
-                  <td className="num cell-clip" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.semester}</td>
-                  {showJoined && <td className="num cell-clip" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.joinedAt}</td>}
-                  {showUpdated && <td className="num cell-clip" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.updatedAt}</td>}
+                  <td className="num cell-clip r" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.semester}</td>
+                  {showJoined && <td className="num cell-clip r" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.joinedAt}</td>}
+                  {showUpdated && <td className="num cell-clip r" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.updatedAt}</td>}
                 </tr>
               ))}
               {listQuery.isError && (

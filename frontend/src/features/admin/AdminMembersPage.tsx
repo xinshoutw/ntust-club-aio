@@ -7,7 +7,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { Cols, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
 import { downloadCsv } from '../../lib/csv'
-import { kindLabel } from '../../lib/roles'
+import { kindLabel, memberTitle } from '../../lib/roles'
 import { currentSemester, semesterOptions } from '../../lib/semester'
 import { clampPage } from '../../lib/paging'
 import { useFitRows } from '../../lib/fitRows'
@@ -79,7 +79,7 @@ export default function AdminMembersPage() {
       // 與社團端匯入格式相容(無標題列;後端 csv.reader 支援引號跳脫);身份以顯示詞輸出;職稱補空字串讓各列欄數一致
       downloadCsv(
         `成員名單_${club}_${semester === 'all' ? '全部學期' : semester}.csv`,
-        rows.map((m) => [m.name, m.studentId, kindLabel(m.kind, clubKind), m.title ?? '']),
+        rows.map((m) => [m.name, m.studentId, kindLabel(m.kind, clubKind), memberTitle(m) ?? '']),
       )
       message.success(`已匯出 ${rows.length} 名成員`)
     } catch (e) {
@@ -149,7 +149,9 @@ export default function AdminMembersPage() {
                   <td className="cell-clip" title={m.name} style={{ fontWeight: 500 }}>{m.name}</td>
                   <td className="num cell-clip" style={{ color: 'var(--steel)' }}>{m.studentId}</td>
                   <td>{kindLabel(m.kind, clubKind)}</td>
-                  <td className="cell-clip" title={m.title ?? undefined}>{m.title ?? '—'}</td>
+                  {/* 負責人與副負責人不寫職稱(D-27):遷移前的殘留值不在這裡露出來,
+                      否則同一列社團端顯示 — 而這裡顯示原文 */}
+                  <td className="cell-clip" title={memberTitle(m) ?? undefined}>{memberTitle(m) ?? '—'}</td>
                   <td className="num cell-clip" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.semester}</td>
                   {showJoined && <td className="num cell-clip" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.joinedAt}</td>}
                   {showUpdated && <td className="num cell-clip" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.updatedAt}</td>}

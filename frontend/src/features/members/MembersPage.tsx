@@ -8,7 +8,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { Cols, FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
 import { downloadCsv } from '../../lib/csv'
-import { MEMBER_KINDS, canHaveTitle, kindLabel, type MemberKind } from '../../lib/roles'
+import { MEMBER_KINDS, canHaveTitle, kindLabel, memberTitle, type MemberKind } from '../../lib/roles'
 import { currentSemester } from '../../lib/semester'
 import { useMemberTimeColumns } from '../../lib/memberTable'
 import { useAuth } from '../../app/auth'
@@ -122,7 +122,7 @@ export default function MembersPage() {
       // 職稱補空字串讓各列欄數一致
       downloadCsv(
         `成員名單_${csvSemester}.csv`,
-        rows.map((m) => [m.name, m.studentId, label(m.kind), m.title ?? '']),
+        rows.map((m) => [m.name, m.studentId, label(m.kind), memberTitle(m) ?? '']),
       )
       setExportOpen(false)
       message.success(`已匯出 ${rows.length} 名成員(${csvSemester})`)

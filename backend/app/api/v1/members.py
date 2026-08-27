@@ -4,7 +4,7 @@
 - CSV 格式:姓名,學號,身份[,職稱];身份=社員/幹部/負責人/副負責人
   (多帶的欄位忽略 —— 舊格式第 5 欄是電話,新系統不記錄,但貼進來仍收得下)
   (也接受顯示詞 社長/會長/副社長/副會長,映射為標準身份)
-- 職稱:幹部必填,其他身份選填(2026-07-21 放寬)
+- 職稱:幹部必填、社員選填;**負責人與副負責人不寫職稱**(D-27,填了捨棄)
 """
 
 import csv
@@ -88,7 +88,11 @@ def _unneutralize(cell: str) -> str:
 def _validate_member(kind: MemberKind, title: str | None) -> str | None:
     if kind == MemberKind.OFFICER and not title:
         raise validation_error("幹部必須填寫職稱")
-    return title or None  # 幹部必填,其他身份選填
+    if kind in (MemberKind.PRESIDENT, MemberKind.VICE_PRESIDENT):
+        # 負責人與副負責人不寫職稱:身份本身就是職稱(D-27)。填了就捨棄而不是退件 ——
+        # CSV 貼進來的「第十三屆會長」不該讓整列進不來,遷移端 `member_kind` 同一條規則
+        return None
+    return title or None  # 幹部必填、社員選填
 
 
 @router.get("")
@@ -263,6 +267,8 @@ async def import_members(
         if kind == MemberKind.OFFICER and not title:
             errors.append(f"第 {line_no} 列:幹部需填職稱")
             continue
+        if kind in (MemberKind.PRESIDENT, MemberKind.VICE_PRESIDENT):
+            title = None  # 負責人與副負責人不寫職稱(D-27,與 _validate_member 同一條規則)
 
         seen.add(student_id)
         member = existing.get(student_id)

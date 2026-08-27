@@ -156,8 +156,6 @@ _LEADER_TITLE_RE = re.compile(r"(?<!副)(?:社長|會長)")
 # 帶了「社長」但本人不是社長:社長組的組員、社長的秘書、榮譽社長
 _NOT_LEADER_RE = re.compile(r"社長組|秘書|榮譽")
 
-LEADER_TITLES = {"社長", "會長"}
-
 # 舊系統自動附在審核意見後面的結報提醒;新系統由 pdf._APPLY_NOTE 自己產一份,
 # 原文照搬會在申請表的「意見回饋」印兩次
 # 有 9 筆的提醒沒有 ※ 開頭,直接從標題起頭 —— 只認 ※ 會把整段樣板留成審核意見
@@ -179,7 +177,6 @@ FUND_SOURCE_MAX = next(
 def opinion_residual(raw: str | None) -> str:
     """去掉自動附的結報提醒,留承辦人真正寫的那句(沒寫就是空字串)。"""
     return _OPINION_BOILERPLATE.sub("", raw or "").strip()
-VICE_TITLES = {"副社長", "副會長"}
 
 
 def derive_club_kind(name: str) -> ClubKind:
@@ -449,14 +446,18 @@ def staff_line(item: str | None, owner: str | None) -> str:
 
 
 def member_kind(identity: str | None, title: str | None) -> tuple[MemberKind, str | None]:
-    """舊 Identity+Title → 新標準身份;職稱各身份皆保留(幹部缺職稱補「幹部」)。"""
+    """舊 Identity+Title → 新標準身份;幹部與社員保留職稱(幹部缺職稱補「幹部」)。
+
+    **正副社長/會長一律不留職稱**(2026-08-27 拍板,D-27):身份本身就是職稱。
+    非標準寫法只用來認人,原文一律捨棄 —— 連「第十三屆會長」的屆數、
+    「副社長&文書」的兼任都不留,後端 `_validate_member` 是同一條規則。
+    """
     t = (title or "").strip()
     if not _NOT_LEADER_RE.search(t):
-        # 非標準寫法保留原職稱(「第十三屆會長」比空白有資訊),標準四字才留空
         if _VICE_TITLE_RE.search(t):
-            return MemberKind.VICE_PRESIDENT, (None if t in VICE_TITLES else t)
+            return MemberKind.VICE_PRESIDENT, None
         if _LEADER_TITLE_RE.search(t):
-            return MemberKind.PRESIDENT, (None if t in LEADER_TITLES else t)
+            return MemberKind.PRESIDENT, None
     if identity == "幹部":
         return MemberKind.OFFICER, (t or "幹部")
     return MemberKind.MEMBER, (t if t and t != "社員" else None)

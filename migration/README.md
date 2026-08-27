@@ -70,7 +70,7 @@ uv run python ../migration/cms_import.py --reset    # 3. 再清社團/活動/公
 | 舊 | 新 | 說明 |
 |---|---|---|
 | Club_club + clubcontent + clubproperty | clubs + users(club) | 性質=停社 → is_active=false、attribute=NULL;kind 依名稱結尾推導,特例見 `KIND_OVERRIDES`;`SKIP_CLUBS` 不遷(行政單位 2 個 + 測試社 `testclub`/`Test`/`testtesttest`,後兩者沒標停社,不排掉就是可登入的正式帳號) |
-| Club_student | club_members | Semester「104 1」→「104-1」;`Title` 是自由文字,`member_kind` 正規化後判正副負責人(「副社」「系會長」「第十三屆會長」「財務&副社長」都算;「社長組」「秘書」「榮譽社長」不算);`Date`→created_at/updated_at(入社時間);**`Phone` 不讀**,新系統不記錄社員電話(2026-08-27 拍板);同(社團,學期,學號)取**身份較高**者、同高再取 id 大的。idempotent 同時看舊列 id 與自然鍵 —— 唯一鍵是自然鍵,只認舊 id 會在換新 dump 重跑時撞唯一鍵並回滾整個交易 |
+| Club_student | club_members | Semester「104 1」→「104-1」;`Title` 是自由文字,`member_kind` 正規化後判正副負責人(「副社」「系會長」「第十三屆會長」「財務&副社長」都算;「社長組」「秘書」「榮譽社長」不算)——**這些寫法只用來認人,原文一律不留**(D-27:正副社長/會長不寫職稱,屆數與兼任跟著捨棄);幹部與社員的 `Title` 照樣寫入職稱;`Date`→created_at/updated_at(入社時間);**`Phone` 不讀**,新系統不記錄社員電話(2026-08-27 拍板);同(社團,學期,學號)取**身份較高**者、同高再取 id 大的。idempotent 同時看舊列 id 與自然鍵 —— 唯一鍵是自然鍵,只認舊 id 會在換新 dump 重跑時撞唯一鍵並回滾整個交易 |
 | Club_teacher | clubs.advisor_* / advisor_out_* | 校內/校外各取最新一位。舊欄位標籤是「職位」,存的是職稱(教授/教官),新系統那格叫「系所 / 職稱」,原樣寫入不裁切。**`Phone` 不讀** —— 新系統不記錄指導老師電話(2026-08-27 拍板) |
 | Club_activity(+fund/staff/meta) | activities(+budget_items/reports) | type:course/conference→社課或會議、extra→活動;status 對映見 `STATUS_MAP`;`Review`=申請表的「活動描述」→ `activities.content`(**不是**結案成果,超過 150 字截斷並列印舊 id);結案成果三欄舊制沒有,一律留空待 `text_fields.py` 轉錄 |
 | Club_activityfund | activity_budget_items | 科目名經 `BUDGET_CATEGORY_MAP` 對到現行目錄(`指導老師/教練費`→`指導老師、教練費`;目錄沒有的 `演講費/裁判費`→`其他`,原科目名接進說明)。對不到目錄的科目會列印出來 —— 社團一按儲存就 422 |

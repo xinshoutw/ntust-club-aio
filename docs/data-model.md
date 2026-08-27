@@ -120,7 +120,7 @@ erDiagram
 
 **club_members**(id, club_id, name, student_id, kind enum(負責人,副負責人,幹部,社員), title text NULL, semester text;UNIQUE(club_id, student_id, semester))
 
-名單**按學期各自一份快照**,同學號可跨學期出現;ad5 依該學期快照的人數採計。`title` 幹部必填、其他身份選填。CSV 匯入指定學期,格式 `姓名,學號,身份[,職稱]`,接受顯示詞(社長/會長)並映射為標準身份。**不記錄電話**(D-21)。
+名單**按學期各自一份快照**,同學號可跨學期出現;ad5 依該學期快照的人數採計。`title` 幹部必填、社員選填;**負責人與副負責人不寫職稱**(D-27,身份本身就是職稱)。CSV 匯入指定學期,格式 `姓名,學號,身份[,職稱]`,接受顯示詞(社長/會長)並映射為標準身份。**不記錄電話**(D-21)。
 
 **venues**(id, name UNIQUE, capacity NULL, category enum(教室,練習空間,廣場戶外,宿舍區), allow_fixed, allow_temp, sort, is_active)
 

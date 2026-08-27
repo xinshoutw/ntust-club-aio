@@ -431,6 +431,52 @@ async def test_optional_titles_and_csv_reimport(client, db):
     assert (result["created"], result["updated"]) == (0, 0)
 
 
+async def test_president_kinds_carry_no_title(client, db):
+    """負責人與副負責人不寫職稱(D-27):身份本身就是職稱。
+
+    填了是**捨棄不是退件** —— 承辦貼進來的舊名單有「第十三屆會長」這種寫法,
+    不該讓整列進不來。遷移端 `cms_import.member_kind` 同一條規則。
+    """
+    await setup_club_session(client, db)
+    resp = await client.post(
+        "/api/v1/club/members",
+        json={"name": "陳大文", "student_id": "B11109001", "kind": "負責人",
+              "title": "第十三屆會長", "semester": "114-2"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201, resp.text
+    member_id = resp.json()["data"]["id"]
+    assert resp.json()["data"]["title"] is None
+
+    # 事後改成負責人也一樣:原本的職稱要跟著清掉
+    resp = await client.post(
+        "/api/v1/club/members",
+        json={"name": "李小明", "student_id": "B11109002", "kind": "幹部",
+              "title": "文書", "semester": "114-2"},
+        headers=csrf_headers(client),
+    )
+    officer_id = resp.json()["data"]["id"]
+    resp = await client.patch(
+        f"/api/v1/club/members/{officer_id}",
+        json={"kind": "副負責人"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["title"] is None
+
+    # CSV 帶職稱的那一列照樣進得來,只是職稱不留
+    resp = await client.post(
+        "/api/v1/club/members/import",
+        json={"csv_text": "王大同,B11109003,社長,副社長&文書", "semester": "114-2"},
+        headers=csrf_headers(client),
+    )
+    assert resp.json()["data"] == {"created": 1, "updated": 0, "errors": []}
+    rows = (await client.get("/api/v1/club/members", params={"kind": "負責人"})).json()["data"]
+    assert sorted(r["student_id"] for r in rows) == ["B11109001", "B11109003"]
+    assert [r["title"] for r in rows] == [None, None]
+    assert member_id in [r["id"] for r in rows]
+
+
 async def test_member_list_exposes_join_time_and_sorts_by_it(client, db):
     """入社時間(created_at)是遷移寫進來的入社日期唯一的可見副本(ISS-19):
     行內編輯只動 updated_at,這一欄必須出得來、也排得動。"""

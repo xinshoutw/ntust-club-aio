@@ -44,6 +44,28 @@ def test_member_kind_maps_titles_to_standard_identities():
     assert cms_import.member_kind("社員", "學術長") == (MemberKind.MEMBER, "學術長")
 
 
+def test_free_text_spellings_still_identify_the_president():
+    """舊 Title 是自由文字:只認四個標準字串會把 239 位正副社長降級成幹部,
+    連帶 66 個(社團,學期)沒有負責人 —— 幹部證明被擋、公告 Email 寄 0 人。"""
+    for title in ("副社", "副社長&文書", "系副會長", "關懷組組長兼任副社長"):
+        assert cms_import.member_kind("社員", title) == (MemberKind.VICE_PRESIDENT, None), title
+    for title in ("系會長", "第十三屆會長", "系學會會長"):
+        assert cms_import.member_kind("社員", title) == (MemberKind.PRESIDENT, None), title
+    # 帶了「社長」但本人不是社長
+    assert cms_import.member_kind("幹部", "榮譽社長") == (MemberKind.OFFICER, "榮譽社長")
+    assert cms_import.member_kind("幹部", "社長組") == (MemberKind.OFFICER, "社長組")
+    assert cms_import.member_kind("幹部", "社長秘書") == (MemberKind.OFFICER, "社長秘書")
+
+
+def test_president_titles_are_discarded_not_kept():
+    """正副社長/會長一律不留職稱(D-27):身份本身就是職稱。
+
+    非標準寫法只用來認人 —— 屆數(第十三屆)與兼任(&文書)都跟著捨棄。
+    """
+    for title in ("第十三屆會長", "系會長", "副社長&文書", "副社"):
+        assert cms_import.member_kind("幹部", title)[1] is None, title
+
+
 def test_naive_legacy_timestamps_are_read_as_taipei():
     """dump 裡的 timestamp without time zone 若用主機時區解讀,日期會整批位移一天。"""
     midnight = datetime(2026, 3, 5, 0, 30)  # naive

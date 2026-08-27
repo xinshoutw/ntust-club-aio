@@ -8,7 +8,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { Cols, FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
 import { downloadCsv } from '../../lib/csv'
-import { MEMBER_KINDS, kindLabel, type MemberKind } from '../../lib/roles'
+import { MEMBER_KINDS, canHaveTitle, kindLabel, type MemberKind } from '../../lib/roles'
 import { currentSemester } from '../../lib/semester'
 import { useMemberTimeColumns } from '../../lib/memberTable'
 import { useAuth } from '../../app/auth'
@@ -257,7 +257,8 @@ export default function MembersPage() {
                         style={{ width: '100%' }}
                         options={kindOptions}
                         onChange={(v) => {
-                          // 職稱各身份皆可保留
+                          // 改成負責人/副負責人時後端會把職稱清掉(D-27);
+                          // 幹部缺職稱由後端擋下,錯誤訊息照樣顯示
                           patchMember(m.id, { kind: v })
                           setEditing(null)
                         }}
@@ -270,7 +271,10 @@ export default function MembersPage() {
                     )}
                   </td>
                   <td className="cell-clip" title={m.title ?? undefined}>
-                    {editing?.id === m.id && editing.field === 'title' ? (
+                    {!canHaveTitle(m.kind) ? (
+                      // 身份本身就是職稱:不給編輯入口,填了後端也會捨棄(D-27)
+                      <span style={{ color: 'var(--steel)' }}>—</span>
+                    ) : editing?.id === m.id && editing.field === 'title' ? (
                       <Input
                         size="small"
                         autoFocus
@@ -356,13 +360,16 @@ export default function MembersPage() {
           <Form.Item name="kind" label="身份" rules={[{ required: true }]}>
             <Select options={kindOptions} />
           </Form.Item>
-          <Form.Item
-            name="title"
-            label="職稱"
-            rules={kind === '幹部' ? [{ required: true, message: '請填寫職稱' }] : []}
-          >
-            <Input placeholder={kind === '幹部' ? '例:總務、活動' : '選填'} />
-          </Form.Item>
+          {/* 負責人與副負責人不寫職稱(D-27):不給欄位,而不是給了再默默丟掉 */}
+          {canHaveTitle(kind) && (
+            <Form.Item
+              name="title"
+              label="職稱"
+              rules={kind === '幹部' ? [{ required: true, message: '請填寫職稱' }] : []}
+            >
+              <Input placeholder={kind === '幹部' ? '例:總務、活動' : '選填'} />
+            </Form.Item>
+          )}
         </Form>
       </Modal>
 

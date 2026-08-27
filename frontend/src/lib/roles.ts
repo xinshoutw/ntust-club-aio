@@ -6,6 +6,11 @@ export type MemberKind = (typeof MEMBER_KINDS)[number]
 
 export type ClubKind = '社團' | '學會'
 
+/** 負責人與副負責人不寫職稱:身份本身就是職稱(D-27)。
+ *  後端 `_validate_member` 與遷移 `cms_import.member_kind` 是同一條規則 —— 那兩處會把填進來的字捨棄。 */
+export const canHaveTitle = (kind: MemberKind): boolean =>
+  kind !== '負責人' && kind !== '副負責人'
+
 export function kindLabel(kind: MemberKind, clubKind: ClubKind | string | undefined): string {
   const noun = clubKind === '學會' ? '會' : '社'
   if (kind === '負責人') return `${noun}長`

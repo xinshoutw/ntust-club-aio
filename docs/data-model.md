@@ -118,7 +118,7 @@ erDiagram
 
 社長不另設欄位,由 `club_members`(kind=負責人)推導;逾期次數同理由 `equipment_loans` 推導 —— 雙寫必然漂移。
 
-**club_members**(id, club_id, name, student_id, kind enum(負責人,副負責人,幹部,社員), title text NULL, phone text NULL, semester text;UNIQUE(club_id, student_id, semester))
+**club_members**(id, club_id, name, student_id, kind enum(負責人,副負責人,幹部,社員), title text NULL, semester text;UNIQUE(club_id, student_id, semester))
 
 名單**按學期各自一份快照**,同學號可跨學期出現;ad5 依該學期快照的人數採計。`title` 幹部必填、其他身份選填。CSV 匯入指定學期,格式 `姓名,學號,身份[,職稱]`,接受顯示詞(社長/會長)並映射為標準身份。**不記錄電話**(D-21)。
 

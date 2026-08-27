@@ -526,7 +526,7 @@ def test_close_lock_boundary_is_the_whole_deadline_day():
 
 async def test_close_locked_after_deadline(client, db):
     await setup_session(client, db)
-    stale = (date.today() - timedelta(days=63)).isoformat()  # 超過預設 30 天
+    stale = (date.today() - timedelta(days=63)).isoformat()  # 遠超過任何合理的 close_lock_days
     data = await create_activity(client, date=stale)
     aid = data["id"]
     await approve(db, aid)

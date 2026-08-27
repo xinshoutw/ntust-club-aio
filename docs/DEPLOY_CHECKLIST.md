@@ -149,6 +149,7 @@ CI 只在 `main` 推 GHCR 映像,`dev` 分支沒有可 pull 的映像 —— **`
 - `alembic downgrade base` 在含 seed 資料的庫上會於 venues category CHECK 收窄那一輪失敗;回滾演練請逐版降,不要一路降到 base
 - **跨過遷移的回滾要先 `alembic downgrade` 再換映像**:舊映像的 `upgrade head` 找不到新 revision,backend 直接起不來
 - 結案期限改天制後固定 30 天/月,月制給的是該月實際天數:切換當下每張單的期限會前後位移(預設 1 個月最多縮短 1 天,設定值越大差越多,6 個月是 4 天),原本剛好在期限邊緣的已核准活動會立刻變成逾期鎖定
+- **`c9a4f1e72d38` 與 `d7b2c85f4a19` 是不可逆的 drop column**(社員電話、指導老師電話,D-21/D-22):部署時 backend 起容器就會自動 `upgrade head`,號碼當場消失。降版只還得回欄位、還不回值 —— 要留底就在升版前另外 dump 一份
 - migration 的 enum 欄位用 `native_enum=False, create_constraint=True`,Alembic 於 `add_column` 時會自動補 CHECK。**不要再顯式補**,會 `DuplicateObject`
 - E2E 必須打 web 容器的 `:8080`,直接打 `:8000` 會繞過 nginx 層的上傳上限、登入限流、`auth_request` 與安全標頭
 

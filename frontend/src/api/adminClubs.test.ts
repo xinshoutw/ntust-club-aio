@@ -11,7 +11,6 @@ const member = (id: number) => ({
   student_id: `B1${String(id).padStart(6, '0')}`,
   kind: 'member',
   title: null,
-  phone: null,
   semester: '114-1',
   updated_at: '2026-08-01T00:00:00+08:00',
 })

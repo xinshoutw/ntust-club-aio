@@ -29,6 +29,12 @@ const INPUT_CHROME = 18
 
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 
+// 經費來源:幾乎都是學務處補助,有申請補助又還沒認定過的單先預填(承辦人可改)。
+// 沒申請補助的單留空 —— 那一欄會原樣印進申請表的意見回饋,寫一句沒動到的錢是說謊
+const DEFAULT_FUND_SOURCE = '學務處補助'
+const seedFundSource = (item: ReviewItem | null): string =>
+  item?.fundSource || ((item?.requested ?? 0) > 0 ? DEFAULT_FUND_SOURCE : '')
+
 // 簽核紀錄的決議顯示詞(approval_records.decision;對外不得漏出英文鍵)
 const DECISION_LABEL: Record<string, string> = {
   approve: '核准',
@@ -130,7 +136,7 @@ export default function ActivityReviewModal({
   // 未處理的申請預設不勾(空心=待處理),認可須管理員明確勾選,避免順手核准即誤放 ×3
   const [largeApproved, setLargeApproved] = useState(item?.largeApproved ?? false)
   // 經費來源:核定了補助的案件由第一關認定(後端在核定總額 >0 時必填)
-  const [fundSource, setFundSource] = useState(item?.fundSource ?? '')
+  const [fundSource, setFundSource] = useState(() => seedFundSource(item))
   const d = item?.detail
   // 失敗但手上已有詳情 = 背景重抓失敗(TanStack 的 error 態保留既有 data,而重開同一列
   // staleTime 0 就會重抓):內容照舊、按鈕照舊,否則等於把讀得到的單變成不能簽,
@@ -150,7 +156,7 @@ export default function ActivityReviewModal({
     if (startedNull.current) {
       startedNull.current = false
       setLargeApproved(item.largeApproved ?? false)
-      setFundSource(item.fundSource ?? '')
+      setFundSource(seedFundSource(item))
     }
     if (seeded.current || !item.detail) return
     seeded.current = true
@@ -348,7 +354,7 @@ export default function ActivityReviewModal({
                   size="small"
                   value={fundSource}
                   onChange={(e) => setFundSource(e.target.value)}
-                  placeholder="xxx補助"
+                  placeholder={DEFAULT_FUND_SOURCE}
                 />
               ) : (
                 item.fundSource || '—'

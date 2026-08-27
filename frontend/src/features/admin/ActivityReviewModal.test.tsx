@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from 'vitest'
 import { App } from 'antd'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import ActivityReviewModal from './ActivityReviewModal'
 import type { ReviewItem } from '../../api/adminActivities'
 
@@ -30,15 +30,19 @@ const item = (budget: ReturnType<typeof budgetRow>[]): ReviewItem => ({
   detail: { attachments: [], budget },
 })
 
-const show = (budget: ReturnType<typeof budgetRow>[]) =>
+const show = (
+  budget: ReturnType<typeof budgetRow>[],
+  over: Partial<ReviewItem> = {},
+  onApprove: (p: unknown) => Promise<void> = async () => {},
+) =>
   render(
     <App>
       <ActivityReviewModal
-        item={item(budget)}
+        item={{ ...item(budget), ...over }}
         open
         onClose={() => {}}
         afterClose={() => {}}
-        onApprove={async () => {}}
+        onApprove={onApprove}
       />
     </App>,
   )
@@ -52,7 +56,7 @@ describe('ActivityReviewModal 的核定欄', () => {
     show([budgetRow(1, 0), budgetRow(2, 0)])
 
     expect(screen.queryByRole('columnheader', { name: '核定' })).toBeNull()
-    expect(screen.queryByPlaceholderText('xxx補助')).toBeNull()
+    expect(screen.queryByPlaceholderText('學務處補助')).toBeNull()
     expect(screen.getByText('經費來源')).toBeTruthy()
     expect(screen.getByText('學務處社團補助')).toBeTruthy() // 標籤在不等於值印得出來
     expect(screen.getByRole('columnheader', { name: '擬請' })).toBeTruthy()
@@ -68,11 +72,30 @@ describe('ActivityReviewModal 的核定欄', () => {
     expect(screen.getAllByText('12,000')).toHaveLength(2) // 明細列 + 合計
   })
 
+  // 承辦人幾乎都填同一句,每張單重打一次是白工
+  test('有申請補助又還沒認定過的:經費來源預填學務處補助', () => {
+    show([budgetRow(1, 5000)], { fundSource: undefined })
+
+    expect(screen.getByPlaceholderText<HTMLInputElement>('學務處補助').value).toBe('學務處補助')
+  })
+
+  // 預填只是替承辦省事,不是替他認定:沒動到學校的錢的單留空,
+  // 否則這句會原樣印進申請表的意見回饋(pdf.feedback_text)
+  test('沒申請補助的單不預填來源', async () => {
+    const onApprove = vi.fn(async (_p: unknown) => {})
+    show([budgetRow(1, 0)], { fundSource: undefined }, onApprove)
+
+    // AntD 會在兩個中文字之間插一個空白,名稱不會是「核准」
+    fireEvent.click(screen.getByRole('button', { name: /核\s*准/ }))
+    await waitFor(() => expect(onApprove).toHaveBeenCalled())
+    expect(onApprove.mock.calls[0][0]).toMatchObject({ fundSource: '' })
+  })
+
   test('有申請補助時核定欄出現,但擬請 0 的那一列不給輸入框', () => {
     show([budgetRow(1, 5000), budgetRow(2, 0)])
 
     expect(screen.getByRole('columnheader', { name: '核定' })).toBeTruthy()
-    expect(screen.getByPlaceholderText('xxx補助')).toBeTruthy()
+    expect(screen.getByPlaceholderText('學務處補助')).toBeTruthy()
     // Modal 是 portal,不在 render 的 container 底下
     expect(document.querySelectorAll('tbody input')).toHaveLength(1)
   })

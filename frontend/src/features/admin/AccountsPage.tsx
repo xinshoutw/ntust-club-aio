@@ -19,7 +19,7 @@ import {
 import { CLUB_ATTRIBUTES, useAdminClubMutations, useAdminClubs, type AdminClub } from '../../api/adminClubs'
 import { ApiError } from '../../api/client'
 import { useAuth } from '../../app/auth'
-import { canAccessAdminPath } from '../../lib/permissions'
+import { accountGuardReason, canAccessAdminPath } from '../../lib/permissions'
 
 // 顯示詞一律取自 session 的目錄表(後端 core/permissions 的頁面權限 + 簽核關卡),
 // 前端不留第二份 —— 目錄裡沒有的鍵直接印鍵名,那代表目錄漏了東西
@@ -361,20 +361,33 @@ export default function AccountsPage() {
     />
   )
 
-  const actions = (a: Account, extra?: React.ReactNode) => (
-    <td className="r" style={{ whiteSpace: 'nowrap' }}>
-      {extra}
-      <button type="button" className="link-btn" onClick={() => askResetPassword(a)}>
-        重設密碼
-      </button>
-      <button type="button" className="link-btn" onClick={() => toggleActive(a)}>
-        {a.active ? '停用' : '恢復'}
-      </button>
-      <button type="button" className="link-btn danger" onClick={() => confirmDelete(a)}>
-        刪除
-      </button>
-    </td>
-  )
+  // 四個動作在後端走同一條位階檢查(_guard_target),擋得下的列不畫鈕:
+  // 理由收進 Tooltip,不要讓承辦按了才拿到 409/403(與違規銷案的「已截止」同一套寫法)
+  const actions = (a: Account, extra?: React.ReactNode) => {
+    const blocked = accountGuardReason(me, a)
+    return (
+      <td className="r" style={{ whiteSpace: 'nowrap' }}>
+        {blocked ? (
+          <Tooltip title={blocked}>
+            <span style={{ fontSize: 13, color: 'var(--steel)', padding: '4px 6px' }}>—</span>
+          </Tooltip>
+        ) : (
+          <>
+            {extra}
+            <button type="button" className="link-btn" onClick={() => askResetPassword(a)}>
+              重設密碼
+            </button>
+            <button type="button" className="link-btn" onClick={() => toggleActive(a)}>
+              {a.active ? '停用' : '恢復'}
+            </button>
+            <button type="button" className="link-btn danger" onClick={() => confirmDelete(a)}>
+              刪除
+            </button>
+          </>
+        )}
+      </td>
+    )
+  }
 
   // 查詢失敗顯示錯誤與重試;空狀態僅在非錯誤時呈現,避免「查詢失敗=空表」誤導
   const errorRow = (colSpan: number) =>

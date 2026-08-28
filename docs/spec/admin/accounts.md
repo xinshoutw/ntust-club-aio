@@ -28,7 +28,8 @@
 ## 規則
 
 - 建立與重設密碼:後端產生一次性密碼、argon2id 雜湊、`must_change_password=true`;**明碼只在該次回應出現**
-- 不可刪除或停權自己的帳號,也不可對 `is_super` 帳號動手
+- **位階檢查一條,四個動作共用**(後端 `_guard_target`):不可對自己、不可對 `is_super`、非最高權限者不可對「持有自己所沒有的權限鍵」的同儕動手。第三條是 `_check_grantable` 的另一半 —— 少了它,只持 `aaccount` 的人可以重設同儕或 superadmin 的密碼、拿一次性密碼登入,授權檢查等於白做。刪除、停用、重設密碼、調整權限四支都吃這一條
+- 擋得下的列**整個動作欄畫成 `—` 並以 Tooltip 說明**(`lib/permissions.accountGuardReason`,與違規銷案的「已截止」同一套寫法),不畫按了必定 409/403 的鈕。這裡擋得準是因為判準所需的`permissions` / `is_super` 前端手上就有 —— 與下面「刪除社團不預先反灰」不衝突,那邊缺的是筆數
 - `is_super` 不開放由 API 建立
 - 刪除帳號時稽核紀錄保留(`audit_logs.user_id` ON DELETE SET NULL);已有簽核/開單等業務 FK 的帳號會撞 FK → 409「請改用停權」
 - 停權與重設密碼都會**立即撤銷該帳號所有 session**

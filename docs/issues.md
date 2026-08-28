@@ -23,7 +23,6 @@
 | ISS-101 | 中 | **承辦看不到自己退回或撤銷的理由 —— 行政端根本沒有列出那些單的地方**:三支 `Admin*Out` 已帶 `decision_reason` / `decided_at` / `decided_by`(簽核者姓名),但借用審核兩頁只查 `status=pending`、社團總覽三張卡只查 `active=true`,退回件與撤銷件在行政端一個畫面都不出現。要收得先定「最近處理」要放哪一頁、列幾筆、看多久 |
 | ISS-91 | 中 | 固定借用審核的衝突標示**不含臨時借用**:`roomConflictSlots` 只比對固定借用(待審 + 已核准),而核准端會擋「學期內已核准的單日臨時借用」(`SLOT_TAKEN`)—— 畫面標成無衝突,承辦按下核准才被擋 |
 | ISS-12c | 中 | 評鑑上傳鎖(`eval_settings.unlocked`)**看不到也設不了**:`AwardDetailOut` 不回任何鎖定旗標,上傳鈕永遠可按,社團選完檔才吃 409;而 `EvalSetting` 全後端只有讀、沒有任何寫入端點或 UI |
-| ISS-102 | 中 | **帳號管理的重設密碼/停用/刪除,對按下去必定失敗的列照樣畫按鈕**:後端 `_guard_target`(`api/v1/admin_accounts.py`)擋三種對象 —— 自己、`is_super`、以及持有自己所沒有的權限鍵的同儕。權限彈窗已照 `_check_grantable` 把授不出去的鍵反灰,這三個動作卻對每一列都畫(`AccountsPage.tsx` 的 `actions()`,只有「權限」鈕對 `isSuper` 隱藏),承辦按下去只會拿到 409/403。後端擋得住,是畫面在說謊 |
 | ISS-103 | 低 | **簽核章軌的「已退回」可能標在錯的關卡**:`ActivityReviewModal.stagesOf` 以「第一個沒有核准章的關卡」當作被退回的那一關。承辦核准 → 組長退回 → 社團重送 → **承辦這次直接退回**,此時 advisor 仍留著上一輪的核准章,畫面會把「已退回」蓋在組長那格。要標對得改看 `approval_records` 最後一筆 reject 的 stage(行政端詳情已經帶得出 `approvals`) |
 
 ## 3. 預設值讓人不小心就放行(fail-open)

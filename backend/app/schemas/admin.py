@@ -382,6 +382,10 @@ class AdminVenueBookingOut(BaseModel):
     phone: str | None = None  # 申請時填的聯絡人電話(審核與點交都要聯絡得到人)
     status: BookingStatus
     created_at: datetime
+    # 退回/撤銷的處置(承辦要能查理由與經手人,不必翻稽核軌跡)
+    decision_reason: str | None = None
+    decided_at: datetime | None = None
+    decided_by: str | None = None
 
 
 class AdminEquipmentLoanOut(BaseModel):
@@ -406,6 +410,10 @@ class AdminEquipmentLoanOut(BaseModel):
     last_reminded_at: datetime | None = None
     # 審核檢核資訊(僅待審單推導):該區間可借數(排除本單)
     available_excluding_self: int | None = None
+    # 退回/撤銷的處置(承辦要能查理由與經手人,不必翻稽核軌跡)
+    decision_reason: str | None = None
+    decided_at: datetime | None = None
+    decided_by: str | None = None
 
 
 # ---- 固定場地借用審核(/admin/room-bookings,權限鍵 aroom) ----
@@ -426,6 +434,10 @@ class AdminRoomBookingOut(BaseModel):
     end_date: date
     created_at: datetime
     slots: list[RoomSlotOut] = []  # 每週 dow×節次
+    # 退回/撤銷的處置(承辦要能查理由與經手人,不必翻稽核軌跡)
+    decision_reason: str | None = None
+    decided_at: datetime | None = None
+    decided_by: str | None = None
 
 
 # ---- 維修狀態流轉 ----

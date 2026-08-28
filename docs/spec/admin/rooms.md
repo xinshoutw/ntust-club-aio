@@ -11,7 +11,7 @@
 | 動作 | 端點 |
 |---|---|
 | 受理期間 | `GET /admin/room-bookings/window`(一般 admin 即可讀;只用於頁面上方的說明橫幅,回 `state`:unset / upcoming / open / closed) |
-| 待審清單 | `GET /admin/room-bookings?status=pending`(每頁 50) |
+| 待審清單 | `GET /admin/room-bookings?status=pending`(每頁 50;端點逐列帶退回/撤銷的 `decision_reason`、`decided_at`、`decided_by`,本頁只查待審故一律 null) |
 | 衝突比對名單 | `GET /admin/room-bookings?status=pending`(全量)+ `?status=approved&active=true`(全量,`active` 排除學期已結束的) |
 | 核准 / 退回 | `POST /admin/room-bookings/{id}/{approve,reject}` |
 

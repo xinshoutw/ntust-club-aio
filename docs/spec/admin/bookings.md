@@ -12,7 +12,7 @@
 |---|---|
 | 場地主檔 | `GET /admin/venues` |
 | 單日場況 | `GET /admin/bookings/availability?date=` |
-| 待審場地 / 器材 | `GET /admin/venue-bookings?status=pending`、`/admin/equipment-loans?status=pending` |
+| 待審場地 / 器材 | `GET /admin/venue-bookings?status=pending`、`/admin/equipment-loans?status=pending`(兩支都逐列帶退回/撤銷的 `decision_reason`、`decided_at`、`decided_by`;本頁只查待審,那三欄一律 null) |
 | 核准 / 退回 | `POST /admin/{venue-bookings,equipment-loans}/{id}/{approve,reject}` |
 
 ## 畫面

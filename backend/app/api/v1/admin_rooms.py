@@ -17,7 +17,7 @@ from app.models.enums import ApprovalDecision, ApprovalSubject, BookingStatus, U
 from app.schemas.admin import AdminRoomBookingOut, RejectIn
 from app.schemas.bookings import FixedWindowOut
 from app.schemas.common import ApiResponse
-from app.services import audit, notify
+from app.services import approvals, audit, notify
 from app.services import booking_service as svc
 from app.services.settings_service import get_setting
 
@@ -93,6 +93,7 @@ async def list_room_bookings(
         out.club_name = club_name
         out.venue_name = venue_name
         data.append(out)
+    await approvals.attach_decisions(db, ApprovalSubject.ROOM_BOOKING, data, with_actor=True)
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 

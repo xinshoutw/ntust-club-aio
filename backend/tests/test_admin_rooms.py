@@ -322,3 +322,26 @@ async def test_review_stays_open_after_the_window_closes(client, db):
         f"{URL}/{second.id}/reject", json={"reason": "時段已配給他社"}, headers=csrf_headers(client)
     )
     assert resp.status_code == 200
+
+
+async def test_room_list_carries_the_decision_reason_and_signer(client, db):
+    """固定借用的清單與另外兩種借用同一組處置欄位:理由、時間、簽核者姓名。"""
+    first, _second, _done = await seed(client, db)
+    admin = await db.scalar(sa.select(User).where(User.username == "roomadmin"))
+    admin.name = "王承辦"
+    await db.commit()
+
+    resp = await client.post(
+        f"/api/v1/admin/room-bookings/{first.id}/reject",
+        json={"reason": "該時段已排校方活動"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+
+    data = (
+        await client.get("/api/v1/admin/room-bookings", params={"status": "rejected"})
+    ).json()["data"]
+    assert len(data) == 1
+    assert data[0]["decision_reason"] == "該時段已排校方活動"
+    assert data[0]["decided_at"] is not None
+    assert data[0]["decided_by"] == "王承辦"

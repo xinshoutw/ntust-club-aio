@@ -35,7 +35,7 @@ from app.models.enums import (
 from app.schemas.admin import AdminEquipmentLoanOut, AdminVenueBookingOut, RejectIn
 from app.schemas.bookings import ManualEquipmentLoanIn, ManualVenueBookingIn
 from app.schemas.common import ApiResponse
-from app.services import audit, notify
+from app.services import approvals, audit, notify
 from app.services import booking_service as svc
 from app.services.settings_service import get_setting
 
@@ -143,6 +143,7 @@ async def list_venue_bookings(
         out.venue_name = venue_name
         out.activity_name = activity_name
         data.append(out)
+    await approvals.attach_decisions(db, ApprovalSubject.VENUE_BOOKING, data, with_actor=True)
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 
@@ -322,6 +323,7 @@ async def list_equipment_loans(
                 exclude_loan_id=loan.id,
             )
         data.append(out)
+    await approvals.attach_decisions(db, ApprovalSubject.EQUIPMENT_LOAN, data, with_actor=True)
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 

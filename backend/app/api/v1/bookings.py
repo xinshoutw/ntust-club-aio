@@ -16,7 +16,6 @@ from app.core.deps import ClubUser, DbDep, client_ip
 from app.core.errors import conflict, forbidden, not_found, validation_error
 from app.models import (
     Activity,
-    ApprovalRecord,
     Club,
     Equipment,
     EquipmentLoan,
@@ -27,7 +26,6 @@ from app.models import (
 )
 from app.models.enums import (
     ActivityStatus,
-    ApprovalDecision,
     ApprovalSubject,
     BookingStatus,
     LoanStatus,
@@ -45,7 +43,7 @@ from app.schemas.bookings import (
     VenueOut,
 )
 from app.schemas.common import ApiResponse
-from app.services import activity_service, audit, notify
+from app.services import activity_service, approvals, audit, notify
 from app.services import booking_service as svc
 from app.services.settings_service import get_setting
 
@@ -61,36 +59,6 @@ async def _notify_cancel(background: BackgroundTasks, db, user, title: str, desc
     """社團自行取消(GAP-18 K1–K3):承辦手上的待審單少一張,得知道是誰收回去的。"""
     club = await db.get(Club, user.club_id)
     background.add_task(notify.club_event, "reject", title, desc, club.discord_webhook_url)
-
-
-async def _attach_decision_reasons(db, subject: ApprovalSubject, rows: list) -> None:
-    """把承辦的退回/撤銷原因補進本頁的輸出列(社團端看自己的單,不帶簽核者姓名)。
-
-    退回與撤銷都由承辦填原因,最終狀態不同(rejected / cancelled),前端據狀態分辨
-    「退回原因」與「撤銷原因」;社團自行取消沒有紀錄,那種取消件維持 None。
-    退回是終局狀態(要重申請就是新的一張單),每張單至多一筆;仍以 id 序取最後一筆,
-    不靠「只會有一筆」這個假設。
-    """
-    # 只有終局的兩個狀態可能帶紀錄。三種借用是兩個不同的 enum,但這兩個值的字面值
-    # 相同 —— 比字串而不是放進 set:Enum 的 hash 依名稱,跨 enum 的集合查詢會落空
-    ids = [r.id for r in rows if r.status in ("rejected", "cancelled")]
-    if not ids:
-        return
-    records = await db.scalars(
-        sa.select(ApprovalRecord)
-        .where(
-            ApprovalRecord.subject_type == subject,
-            ApprovalRecord.subject_id.in_(ids),
-            ApprovalRecord.decision.in_([ApprovalDecision.REJECT, ApprovalDecision.REVOKE]),
-        )
-        .order_by(ApprovalRecord.id)
-    )
-    by_subject = {r.subject_id: r for r in records}
-    for out in rows:
-        record = by_subject.get(out.id)
-        if record is not None:
-            out.decision_reason = record.reason
-            out.decided_at = record.created_at
 
 
 async def _ensure_not_suspended(db, user) -> None:
@@ -289,7 +257,7 @@ async def list_room_bookings(
         out = RoomBookingOut.model_validate(request_row)
         out.venue_name = venue_name
         data.append(out)
-    await _attach_decision_reasons(db, ApprovalSubject.ROOM_BOOKING, data)
+    await approvals.attach_decisions(db, ApprovalSubject.ROOM_BOOKING, data)
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 
@@ -397,7 +365,7 @@ async def list_venue_bookings(
         out.venue_name = venue_name
         out.activity_name = activity_name
         data.append(out)
-    await _attach_decision_reasons(db, ApprovalSubject.VENUE_BOOKING, data)
+    await approvals.attach_decisions(db, ApprovalSubject.VENUE_BOOKING, data)
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 
@@ -509,7 +477,7 @@ async def list_equipment_loans(
         out.activity_name = activity_name
         out.overdue = svc.is_overdue_in(loan, return_time, holidays)
         data.append(out)
-    await _attach_decision_reasons(db, ApprovalSubject.EQUIPMENT_LOAN, data)
+    await approvals.attach_decisions(db, ApprovalSubject.EQUIPMENT_LOAN, data)
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 

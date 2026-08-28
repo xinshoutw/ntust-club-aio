@@ -714,3 +714,56 @@ async def test_admin_active_keeps_everything_still_revocable(client, db):
         headers=csrf_headers(client),
     )
     assert resp.status_code == 200
+
+
+async def test_admin_lists_carry_the_decision_reason_and_signer(client, db):
+    """承辦要能在清單上看到自己退回/撤銷的理由與經手人,不必去翻稽核軌跡。"""
+    club, _ = await seed(client, db)
+    # 姓名與帳號取不同值,才驗得出帶出去的是姓名
+    admin = await db.scalar(sa.select(User).where(User.username == "bookadmin"))
+    admin.name = "王承辦"
+    venue = await make_venue(db)
+    equipment = await make_equipment(db)
+    tomorrow = date.today() + timedelta(days=1)
+
+    booking = VenueBooking(
+        club_id=club.id, venue_id=venue.id, date=tomorrow, periods=["3"],
+        purpose="社課", status="pending",
+    )
+    loan = EquipmentLoan(
+        club_id=club.id, equipment_id=equipment.id, qty=1,
+        start_date=tomorrow, end_date=tomorrow, purpose="社課", status="pending",
+    )
+    db.add_all([booking, loan])
+    await db.commit()
+    await db.refresh(booking)
+    await db.refresh(loan)
+
+    for path, row_id in (("venue-bookings", booking.id), ("equipment-loans", loan.id)):
+        resp = await client.post(
+            f"/api/v1/admin/{path}/{row_id}/reject",
+            json={"reason": "場地當日已有校方活動"},
+            headers=csrf_headers(client),
+        )
+        assert resp.status_code == 200, resp.text
+
+        data = (
+            await client.get(f"/api/v1/admin/{path}", params={"status": "rejected"})
+        ).json()["data"]
+        assert len(data) == 1, (path, data)
+        assert data[0]["decision_reason"] == "場地當日已有校方活動"
+        assert data[0]["decided_at"] is not None
+        assert data[0]["decided_by"] == "王承辦"  # 姓名,不是帳號
+
+    # 待審的單沒有處置紀錄,三欄一律 null
+    pending = VenueBooking(
+        club_id=club.id, venue_id=venue.id, date=tomorrow, periods=["4"],
+        purpose="練習", status="pending",
+    )
+    db.add(pending)
+    await db.commit()
+    data = (
+        await client.get("/api/v1/admin/venue-bookings", params={"status": "pending"})
+    ).json()["data"]
+    assert [d["decision_reason"] for d in data] == [None]
+    assert [d["decided_by"] for d in data] == [None]

@@ -1,6 +1,6 @@
 """借用領域的推導規則:節次、固定借用規則、器材可借數與借用區間、逾期判定、場地色格。"""
 
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from datetime import UTC, date, datetime, time, timedelta
 
 import sqlalchemy as sa
@@ -363,8 +363,13 @@ async def fixed_conflict_slots(
         )
     ).all()
 
-    # 場地不開放規則:送出後才新增的規則,核准這關同樣擋(SLOT_BLOCKED)
-    blocked = await blocked_map(db, span_start, span_end)
+    # 場地不開放規則:送出後才新增的規則,核准這關同樣擋(SLOT_BLOCKED)。
+    # 依場地分桶再用 —— 規則逐日展開後可能上千格,逐張待審單掃整張 map 是白掃
+    blocked: dict[int, list[tuple[date, dict[str, str]]]] = {}
+    for (day, vid), cells in (
+        await blocked_map(db, span_start, span_end, venue_ids=venue_ids)
+    ).items():
+        blocked.setdefault(vid, []).append((day, cells))
 
     def put(found: dict[tuple[int, str], str], slot: tuple[int, str], kind: str) -> None:
         if _CONFLICT_RANK[kind] > _CONFLICT_RANK.get(found.get(slot, ""), 0):
@@ -399,8 +404,8 @@ async def fixed_conflict_slots(
                     put(found, (day.isoweekday(), period), CONFLICT_TEMP)
         # 不開放規則逐日展開後比對(規則帶自己的日期區間,只封某幾天的規則對整學期
         # 每週借用一樣是衝突,但只封週一到週三的對週五就不是)
-        for (day, venue_id), cells in blocked.items():
-            if venue_id != req.venue_id or not (req.start_date <= day <= req.end_date):
+        for day, cells in blocked.get(req.venue_id, ()):
+            if not (req.start_date <= day <= req.end_date):
                 continue
             for period in cells:
                 if (day.isoweekday(), period) in mine:
@@ -621,17 +626,25 @@ async def overdue_deadline(db: AsyncSession, end_date: date, return_time: str) -
 
 
 async def blocked_map(
-    db: AsyncSession, start: date, end: date, venue_id: int | None = None
+    db: AsyncSession,
+    start: date,
+    end: date,
+    venue_id: int | None = None,
+    venue_ids: Collection[int] | None = None,
 ) -> dict[tuple[date, int], dict[str, str]]:
     """區間內各(日,場地)的不開放節次 → {節次: 原因}(venue_block_rules 展開)。
 
     weekdays NULL=區間內每天;有值=僅列出的 ISO 星期(1=一…7=日)。
+    兩個場地參數都是選填的過濾條件:規則要逐日展開,不先收窄就是把全校的規則
+    在整個區間內攤平一次(`venue_ids` 給多場地,`venue_id` 給單一場地)。
     """
     query = sa.select(VenueBlockRule).where(
         VenueBlockRule.start_date <= end, VenueBlockRule.end_date >= start
     )
     if venue_id is not None:
         query = query.where(VenueBlockRule.venue_id == venue_id)
+    if venue_ids is not None:
+        query = query.where(VenueBlockRule.venue_id.in_(venue_ids))
     out: dict[tuple[date, int], dict[str, str]] = {}
     for rule in (await db.scalars(query)).all():
         day = max(rule.start_date, start)

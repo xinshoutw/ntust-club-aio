@@ -481,11 +481,19 @@ async def test_staff_remind(client, db, monkeypatch):
 async def test_staff_clubs_carry_the_attribute_for_the_folder_menu(client, db):
     """二級選單的第一層是社團性質:少了它,工讀生端只能平鋪 60+ 社。"""
     await make_club(db, name="熱舞社", attribute=ClubAttribute.ART)
+    await make_club(db, name="慈幼社", attribute=ClubAttribute.SERVICE)
+    await make_club(db, name="吉他社", attribute=ClubAttribute.ART)
     await make_club(db, name="停社舊社", attribute=None, is_active=False)
     await make_user(db, username="staff01", role="staff")
     await login(client, "staff01")
 
-    rows = {c["name"]: c for c in (await client.get("/api/v1/staff/clubs")).json()["data"]}
+    data = (await client.get("/api/v1/staff/clubs")).json()["data"]
+    rows = {c["name"]: c for c in data}
     assert rows["熱舞社"]["attribute"] == "藝術性"
     # 停社舊社沒有性質:前端歸「未分類」,不是錯誤
     assert rows["停社舊社"]["attribute"] is None
+
+    # 排序必須是 性質 → 名稱(與 /admin/clubs/options 同一條):資料夾層是照「主檔出現順序」
+    # 分組的,只按名稱排的話同一個性質的社團會被別的性質插開,資料夾就會重複出現
+    # PG 的 ASC 預設 NULLS LAST,enum 依宣告序(服務性 在 藝術性 之前)
+    assert [c["name"] for c in data] == ["慈幼社", "吉他社", "熱舞社", "停社舊社"]

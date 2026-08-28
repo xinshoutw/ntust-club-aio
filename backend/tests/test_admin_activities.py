@@ -1310,10 +1310,12 @@ async def test_submitted_at_is_the_submit_time_not_the_create_time(client, db):
 
     draft = row("七月就建好的草稿", "draft")
     early = row("八月初就送件", "pending_advisor")
-    db.add_all([draft, early])
+    # 遷入的舊列可能沒有送件時間(SetupTime 為 NULL):排序要把它擺最後,不是最前
+    legacy = row("舊系統沒留送件時間", "pending_advisor")
+    db.add_all([draft, early, legacy])
     await db.commit()
-    await db.refresh(draft)
-    await db.refresh(early)
+    for r in (draft, early, legacy):
+        await db.refresh(r)
     # 兩筆都是七月建的;只有 early 已經送出過
     await db.execute(
         sa.update(Activity)
@@ -1338,7 +1340,22 @@ async def test_submitted_at_is_the_submit_time_not_the_create_time(client, db):
     data = (
         await client.get("/api/v1/admin/activities", params={"sort": "submitted_at"})
     ).json()["data"]
-    assert [a["name"] for a in data] == ["八月初就送件", "七月就建好的草稿"]
+    assert [a["name"] for a in data] == [
+        "八月初就送件",
+        "七月就建好的草稿",
+        "舊系統沒留送件時間",  # PG 的 ASC 本來就 NULLS LAST
+    ]
+
+    # 降冪同樣殿後(NullsLast):PG 的 DESC 預設是 NULLS FIRST,
+    # 少了包裝就會把「沒有送件時間」擺到最新送件的前面
+    desc = (
+        await client.get("/api/v1/admin/activities", params={"sort": "-submitted_at"})
+    ).json()["data"]
+    assert [a["name"] for a in desc] == [
+        "七月就建好的草稿",
+        "八月初就送件",
+        "舊系統沒留送件時間",
+    ]
 
     rows = {a["name"]: a for a in data}
     assert rows["八月初就送件"]["submitted_at"].startswith("2026-08-01")

@@ -407,7 +407,7 @@ async def test_conflict_slots_rank_pending_below_approved_fixed(client, db):
 
 async def test_conflict_slots_include_venue_block_rules(client, db):
     """不開放規則是核准端三項檢核的第三項(SLOT_BLOCKED),清單同樣要標。"""
-    first, _second, _done = await seed(client, db)
+    first, _second, done = await seed(client, db)
     admin = await db.scalar(sa.select(User).where(User.username == "roomadmin"))
     # 學期內某個週二封掉第 3 節 —— 正好是 first 要的 (2, "3")
     day = first.start_date
@@ -421,6 +421,19 @@ async def test_conflict_slots_include_venue_block_rules(client, db):
     )
     await db.commit()
 
+    # 同一格再疊上另外兩種:已核准的固定借用、已核准的單日臨時借用
+    db.add(RoomBookingSlot(request_id=done.id, weekday=2, period="3"))
+    temp_day = first.start_date
+    while temp_day.isoweekday() != 2 or temp_day < date.today():
+        temp_day += timedelta(days=1)
+    db.add(
+        VenueBooking(
+            club_id=first.club_id, venue_id=first.venue_id, date=temp_day, periods=["3"],
+            purpose="臨時活動", status="approved",
+        )
+    )
+    await db.commit()
+
     data = (
         await client.get("/api/v1/admin/room-bookings", params={"status": "pending"})
     ).json()["data"]
@@ -430,5 +443,5 @@ async def test_conflict_slots_include_venue_block_rules(client, db):
         if r["id"] == first.id
         for s in r["conflict_slots"]
     }
-    # 不開放最重:同一格也撞到別張待審單,但能做的只剩退回
+    # 四種同時命中同一格時取最重的:不開放 > 已核准固定 > 已核准臨時 > 其他待審
     assert mine[(2, "3")] == "blocked"

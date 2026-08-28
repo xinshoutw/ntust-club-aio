@@ -131,10 +131,13 @@ def _apply_opinion(activity: Activity) -> str:
 def _apply_footnote(activity: Activity) -> str:
     """頁尾的上網申請時間。
 
-    `created_at` 是 TIMESTAMPTZ,asyncpg 回 UTC-aware —— 直接格式化會印成 UTC,
+    印的是**送件時間**(D-29),不是建立時間 —— 七月建的草稿八月才送出,紙上該寫八月。
+    兩者都是 TIMESTAMPTZ,asyncpg 回 UTC-aware —— 直接格式化會印成 UTC,
     早上 8 點前送的單子連日期都退一天,而這張紙是要送出去的。
     """
-    return f"（上網申請時間：{activity.created_at.astimezone(TAIPEI):%Y/%m/%d %H:%M:%S}）"
+    # 送件時間(D-29);草稿沒有送件時間,而草稿本來就還沒有這張紙要印的那件事
+    stamp = activity.submitted_at or activity.created_at
+    return f"（上網申請時間：{stamp.astimezone(TAIPEI):%Y/%m/%d %H:%M:%S}）"
 
 
 def _approved_text(approved: int | None) -> str:

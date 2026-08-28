@@ -35,10 +35,11 @@ const overdue: AdminActivity = {
 }
 
 let sentStatuses: readonly string[] = []
+let queueRows: AdminActivity[] = []
 
 vi.mock('../../api/adminActivities', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/adminActivities')>()),
-  useAdminActivities: () => ({ data: [], isLoading: false, isError: false }),
+  useAdminActivities: () => ({ data: queueRows, isLoading: false, isError: false }),
   useAdminActivitiesPaged: (p: { statuses?: string[] }) => {
     sentStatuses = p.statuses ?? []
     return {
@@ -64,5 +65,25 @@ describe('最近審核涵蓋逾期鎖定的單', () => {
     expect(sentStatuses).toContain('locked')
     expect(screen.getByText('逾期未結案')).toBeTruthy()
     expect(screen.getByText('已逾期')).toBeTruthy()
+  })
+})
+
+describe('待審佇列排序', () => {
+  test('沒有送件時間的舊資料落在最後,不是最前面(後端白名單同樣是 NullsLast)', () => {
+    queueRows = [
+      { ...overdue, id: '11', name: '沒有送件時間', status: 'pending_advisor', submittedAt: null },
+      { ...overdue, id: '12', name: '八月送件', status: 'pending_advisor', submittedAt: '2026/08/01 09:00' },
+      { ...overdue, id: '13', name: '九月送件', status: 'pending_advisor', submittedAt: '2026/09/01 09:00' },
+    ]
+    render(
+      <App>
+        <ReviewPage />
+      </App>,
+    )
+    const wanted = new Set(['沒有送件時間', '八月送件', '九月送件'])
+    const names = Array.from(document.querySelectorAll('span'))
+      .map((e) => e.textContent)
+      .filter((t): t is string => t !== null && wanted.has(t))
+    expect(names).toEqual(['八月送件', '九月送件', '沒有送件時間'])
   })
 })

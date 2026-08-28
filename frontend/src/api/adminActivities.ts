@@ -41,7 +41,7 @@ export interface ReviewItem {
     location?: string
     participantsIn?: number
     participantsOut?: number
-    submittedAt?: string
+    submittedAt?: string | null
     submittedBy?: string
     content?: string
     works?: WorkItem[]
@@ -82,8 +82,9 @@ export interface AdminActivity extends ReviewItem {
   activityId: number
   clubId: number
   endDate: string // YYYY/MM/DD(未跨日 = date)
-  /** 送件時間(每次送審覆寫,D-29)YYYY/MM/DD HH:mm;行政端看不到草稿,一律有值 */
-  submittedAt: string
+  /** 送件時間(每次送審覆寫,D-29)YYYY/MM/DD HH:mm。
+   *  舊資料與 seed 可能沒有 —— 排序一律讓 null 落在最後(後端白名單走 NullsLast) */
+  submittedAt: string | null
   selfFundTotal: number
   approvedTotal?: number
   closeLocked: boolean
@@ -232,7 +233,7 @@ const toAdminActivity = (o: AdminActivityOut): AdminActivity => ({
   approvedTotal: o.approved_total ?? undefined,
   status: toStatusKey(o),
   fundSource: o.fund_source ?? undefined,
-  submittedAt: o.submitted_at ? slashDateTime(o.submitted_at) : '—',
+  submittedAt: o.submitted_at ? slashDateTime(o.submitted_at) : null,
   closeLocked: o.close_locked,
   closeDeadline: o.close_deadline ? slashDate(o.close_deadline) : undefined,
   semester: o.semester,
@@ -320,7 +321,7 @@ const toAdminDetail = (o: AdminActivityDetailOut): AdminActivityDetail => ({
     participantsOut: o.participants_out,
     content: o.content,
     works: staffTextToWorks(o.staff_text),
-    submittedAt: o.submitted_at ? slashDateTime(o.submitted_at) : '—',
+    submittedAt: o.submitted_at ? slashDateTime(o.submitted_at) : null,
     attachments: o.attachments.map((f) => f.original_name),
     attachmentFiles: o.attachments.map(toFileRef),
     budget: o.budget_items.map((b) => ({

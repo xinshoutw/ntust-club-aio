@@ -192,9 +192,11 @@ def test_apply_pdf_prints_the_submit_time_in_taipei():
         participants_out=0,
         staff_text="",
         # 台北 2026/03/01 07:30 = UTC 2026/02/28 23:30
-        created_at=datetime(2026, 2, 28, 23, 30, tzinfo=UTC),
+        created_at=datetime(2026, 1, 5, 0, 0, tzinfo=UTC),
+        submitted_at=datetime(2026, 2, 28, 23, 30, tzinfo=UTC),
         budget_items=[],
     )
+    # 印的是送件時間,不是一月建立的那個時刻
     assert _apply_footnote(activity) == "（上網申請時間：2026/03/01 07:30:00）"
 
 

@@ -345,7 +345,7 @@ export default function ActivityReviewModal({
               社員 <span className="num">{d?.participantsIn ?? '—'}</span> · 非社員{' '}
               <span className="num">{d?.participantsOut ?? '—'}</span>
             </div>
-            <div style={detailLabel}>申請</div>
+            <div style={detailLabel}>送件</div>
             <div>
               <span className="num">{d?.submittedAt ?? '—'}</span>
               {d?.submittedBy ? ` · ${d.submittedBy}` : ''}

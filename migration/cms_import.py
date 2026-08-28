@@ -685,6 +685,10 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
         db.add(activity)
         await db.flush()
         ids.record(db, "Club_activity", a.id, "activities", activity.id)
+        # SetupTime 為 NULL 時 created_at 走 DB 預設(匯入當下);送件時間比照 —— 留 NULL
+        # 的話行政端整欄 `—`,待審佇列的排序也會失準(alembic a3e91f6b28c4 同一條規則)
+        if activity.submitted_at is None:
+            activity.submitted_at = activity.created_at
 
         for f in funds.get(a.id, []):
             raw_cat = (f.Name or "").strip() or "其他"

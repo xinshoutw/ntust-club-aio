@@ -26,7 +26,7 @@ import struct
 import sys
 import uuid
 import zlib
-from datetime import date, datetime, time
+from datetime import UTC, date, datetime, time
 from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
@@ -445,6 +445,8 @@ def _add_activity(
         is_large_approved=is_large_approved,
         fund_source=fund_source,
         close_draft=close_draft,
+        # 送出過的活動一律有送件時間(D-29);留 NULL 的話行政端整欄 —,排序也失準
+        submitted_at=None if status == ActivityStatus.DRAFT else datetime.now(UTC),
     )
     approved = [b[4] for b in budget if b[4] is not None]
     activity.school_approved = sum(approved) if approved else None

@@ -67,7 +67,17 @@ export default function ReviewPage() {
   )
   const queue = useMemo(
     () =>
-      [...(queueQuery.data ?? [])].sort((a, b) => a.submittedAt.localeCompare(b.submittedAt)),
+      // 沒有送件時間的(舊資料)落在最後,與後端排序白名單的 NullsLast 一致 ——
+      // 直接比字串的話 null 會排到最前面,看起來像「最早送件、最該先審」
+      [...(queueQuery.data ?? [])].sort((a, b) =>
+        a.submittedAt === b.submittedAt
+          ? 0
+          : a.submittedAt === null
+            ? 1
+            : b.submittedAt === null
+              ? -1
+              : a.submittedAt.localeCompare(b.submittedAt),
+      ),
     [queueQuery.data],
   )
 
@@ -160,7 +170,7 @@ export default function ReviewPage() {
                   <LargeBadge applied={item.isLarge} approved={item.largeApproved} />
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 2 }}>
-                  {item.club} · {item.type} · 申請 <span className="num">{item.submittedAt}</span>
+                  {item.club} · {item.type} · 送件 <span className="num">{item.submittedAt ?? '—'}</span>
                 </div>
               </div>
               <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>

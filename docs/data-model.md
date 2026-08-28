@@ -155,6 +155,7 @@ erDiagram
 | staff_text | text | 工作分配(自由格式) |
 | fund_source / school_approved | text NULL / int NULL | 經費來源與核定補助,第一關認定 |
 | status | enum,見下 | |
+| submitted_at | timestamptz NULL | 送出審核的時刻,**每次送審覆寫**(D-29);草稿為 NULL。待審佇列與行政端「送件時間」欄依它排序 —— 取 `created_at` 的話,七月建的草稿八月才送審會排在八月初就送件的活動前面 |
 | close_unlocked | bool | 逾期鎖定的管理員解鎖旗標 |
 | close_draft | jsonb NULL | 結案草稿(跨裝置續填),不含照片;送出結案時清除 |
 

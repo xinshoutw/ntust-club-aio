@@ -63,6 +63,6 @@ describe('AccountsPage 的動作欄', () => {
       expect(rowOf(name).querySelectorAll('button')).toHaveLength(0)
     }
     // 動得了的列照常四個鈕:權限、重設密碼、停用、刪除
-    expect(rowOf('李同事').querySelectorAll('button').length).toBeGreaterThan(0)
+    expect(rowOf('李同事').querySelectorAll('button')).toHaveLength(4)
   })
 })

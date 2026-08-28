@@ -1340,7 +1340,10 @@ async def test_submitted_at_is_the_submit_time_not_the_create_time(client, db):
     ).json()["data"]
     assert [a["name"] for a in data] == ["八月初就送件", "七月就建好的草稿"]
 
-    submitted = {a["name"]: a["submitted_at"] for a in data}
-    assert submitted["八月初就送件"].startswith("2026-08-01")
+    rows = {a["name"]: a for a in data}
+    assert rows["八月初就送件"]["submitted_at"].startswith("2026-08-01")
     # 送件時間與建立時間是兩件事:這一筆的 created_at 停在七月
-    assert submitted["七月就建好的草稿"] > "2026-08-01"
+    just_sent = rows["七月就建好的草稿"]
+    assert just_sent["submitted_at"] is not None
+    assert just_sent["created_at"].startswith("2026-07-01")
+    assert just_sent["submitted_at"] > "2026-08-01"

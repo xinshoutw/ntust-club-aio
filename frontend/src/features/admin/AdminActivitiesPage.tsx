@@ -255,7 +255,7 @@ export default function AdminActivitiesPage() {
                       right={approvedText(a.approvedTotal, fmtMoney)}
                     />
                   </td>
-                  <td className="num">{a.submittedAt}</td>
+                  <td className="num">{a.submittedAt ?? '—'}</td>
                   <td className="num">{a.reviewedAt ?? '—'}</td>
                   <td className="r"><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>
                 </tr>

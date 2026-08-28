@@ -198,7 +198,7 @@ function CloseReviewModal({
         <>
           <SectionTitle first>結案成果</SectionTitle>
           <div style={{ display: 'grid', gridTemplateColumns: '88px 1fr', gap: '9px 12px', fontSize: 13 }}>
-            <div style={detailLabel}>申請時間</div><div className="num">{report.submittedAt}</div>
+            <div style={detailLabel}>結案送出時間</div><div className="num">{report.submittedAt}</div>
             <div style={detailLabel}>社團</div><div>{item.club}</div>
             <div style={detailLabel}>活動日期</div><div className="num">{dateRange}</div>
             <div style={detailLabel}>實際時間</div>

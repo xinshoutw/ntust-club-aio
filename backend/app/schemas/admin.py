@@ -419,6 +419,15 @@ class AdminEquipmentLoanOut(BaseModel):
 # ---- 固定場地借用審核(/admin/room-bookings,權限鍵 aroom) ----
 
 
+class RoomConflictSlotOut(BaseModel):
+    """待審單的一格衝突。kind:taken=已核准固定、temp=已核准臨時、pending=其他待審單。"""
+
+    weekday: int
+    period: str
+    kind: str
+
+
+
 class AdminRoomBookingOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -434,6 +443,9 @@ class AdminRoomBookingOut(BaseModel):
     end_date: date
     created_at: datetime
     slots: list[RoomSlotOut] = []  # 每週 dow×節次
+    # 僅待審單推導:哪幾格會撞、撞到什麼(taken=已核准固定 / temp=已核准臨時 / pending=其他待審)。
+    # 判定與核准端的檢核同一份 —— 畫面自己算會漏掉臨時借用那一種(標成無衝突,按了才 409)
+    conflict_slots: list[RoomConflictSlotOut] = []
     # 退回/撤銷的處置(承辦要能查理由與經手人,不必翻稽核軌跡)
     decision_reason: str | None = None
     decided_at: datetime | None = None

@@ -1,5 +1,6 @@
 """借用領域的推導規則:節次、固定借用規則、器材可借數與借用區間、逾期判定、場地色格。"""
 
+from collections.abc import Sequence
 from datetime import UTC, date, datetime, time, timedelta
 
 import sqlalchemy as sa
@@ -304,6 +305,93 @@ async def fixed_slots_blocked(
         if day.isoweekday() == weekday and period in cells
     }
     return sorted(hit)
+
+
+# 待審固定借用的衝突種類,由重到輕:已核准固定 > 已核准臨時 > 其他待審單。
+# 前兩者核准必被擋(SLOT_TAKEN),只能退回或先撤銷那筆;最後一種是「擇一核准」。
+CONFLICT_TAKEN = "taken"
+CONFLICT_TEMP = "temp"
+CONFLICT_PENDING = "pending"
+_CONFLICT_RANK = {CONFLICT_TAKEN: 3, CONFLICT_TEMP: 2, CONFLICT_PENDING: 1}
+
+
+async def fixed_conflict_slots(
+    db: AsyncSession, requests: Sequence[RoomBookingRequest]
+) -> dict[int, dict[tuple[int, str], str]]:
+    """逐張待審固定借用算出「哪幾格會撞、撞到什麼」。
+
+    判定軸與核准端的三項檢核同一份(`approve_room_booking`)—— 畫面若自己再算一份,
+    漏掉的那一種就是「標成無衝突、按下核准才被擋」。臨時借用那一種尤其容易漏:
+    它要把學期區間展開成每週的哪幾天才比得出來,那段邏輯只該存在一處。
+
+    回傳 `request_id → {(星期, 節次): 種類}`;非待審單不算。
+    """
+    pending = [r for r in requests if r.status == BookingStatus.PENDING]
+    if not pending:
+        return {}
+    venue_ids = {r.venue_id for r in pending}
+    span_start = min(r.start_date for r in pending)
+    span_end = max(r.end_date for r in pending)
+
+    # 對照名單一次取足:全量待審 + 全量已核准(只限用到的場地與涵蓋得到的區間)。
+    # 只比對當前這一頁的話,跨頁的兩社搶同一格會被判成無衝突
+    rivals = (
+        await db.scalars(
+            sa.select(RoomBookingRequest)
+            .where(
+                RoomBookingRequest.venue_id.in_(venue_ids),
+                RoomBookingRequest.status.in_([BookingStatus.PENDING, BookingStatus.APPROVED]),
+                RoomBookingRequest.start_date <= span_end,
+                RoomBookingRequest.end_date >= span_start,
+            )
+            .options(sa.orm.selectinload(RoomBookingRequest.slots))
+        )
+    ).all()
+
+    # 已核准的單日臨時借用:核准端會用它擋下整學期的固定佔用
+    today = today_taipei()
+    temps = (
+        await db.execute(
+            sa.select(VenueBooking.venue_id, VenueBooking.date, VenueBooking.periods).where(
+                VenueBooking.venue_id.in_(venue_ids),
+                VenueBooking.status == BookingStatus.APPROVED,
+                VenueBooking.date >= max(span_start, today),
+                VenueBooking.date <= span_end,
+            )
+        )
+    ).all()
+
+    def put(found: dict[tuple[int, str], str], slot: tuple[int, str], kind: str) -> None:
+        if _CONFLICT_RANK[kind] > _CONFLICT_RANK.get(found.get(slot, ""), 0):
+            found[slot] = kind
+
+    # ponytail: 逐對比對 O(n²),一輪開放窗的待審單頂多百餘筆(前端原本也是這樣算);
+    # 真的長到會卡時再依場地分桶
+    out: dict[int, dict[tuple[int, str], str]] = {}
+    for req in pending:
+        mine = {(s.weekday, s.period) for s in req.slots}
+        found: dict[tuple[int, str], str] = {}
+        for other in rivals:
+            if other.id == req.id or other.venue_id != req.venue_id:
+                continue
+            if other.start_date > req.end_date or other.end_date < req.start_date:
+                continue
+            kind = (
+                CONFLICT_TAKEN if other.status == BookingStatus.APPROVED else CONFLICT_PENDING
+            )
+            for slot in mine & {(s.weekday, s.period) for s in other.slots}:
+                put(found, slot, kind)
+        # 學期已開始後才核准的固定借用,不該被學期內早已過去的臨時借用擋死(與核准端同一條)
+        first_day = max(req.start_date, today)
+        for venue_id, day, periods in temps:
+            if venue_id != req.venue_id or not (first_day <= day <= req.end_date):
+                continue
+            for period in periods:
+                if (day.isoweekday(), period) in mine:
+                    put(found, (day.isoweekday(), period), CONFLICT_TEMP)
+        if found:
+            out[req.id] = found
+    return out
 
 
 async def temp_days_hitting_slots(

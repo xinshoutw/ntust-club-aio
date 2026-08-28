@@ -13,6 +13,7 @@ from app.models import (
     User,
     Venue,
     VenueBlockRule,
+    VenueBooking,
 )
 from app.models.enums import ApprovalSubject, VenueCategory
 from tests.conftest import csrf_headers, login, make_club, make_user
@@ -345,3 +346,60 @@ async def test_room_list_carries_the_decision_reason_and_signer(client, db):
     assert data[0]["decision_reason"] == "該時段已排校方活動"
     assert data[0]["decided_at"] is not None
     assert data[0]["decided_by"] == "王承辦"
+
+
+async def test_conflict_slots_include_approved_temp_bookings(client, db):
+    """核准端擋三種衝突,清單就要標三種 —— 臨時借用那一種前端算不出來(要展開學期的每一週)。"""
+    first, second, done = await seed(client, db)
+    venue = await db.get(Venue, first.venue_id)
+
+    # 學期內的一個週二,落在 first 的 (2, "3") 上:核准端會以 SLOT_TAKEN 擋下
+    day = first.start_date
+    while day.isoweekday() != 2 or day < date.today():
+        day += timedelta(days=1)
+    db.add(
+        VenueBooking(
+            club_id=second.club_id, venue_id=venue.id, date=day, periods=["3"],
+            purpose="臨時活動", status="approved",
+        )
+    )
+    await db.commit()
+
+    data = (
+        await client.get("/api/v1/admin/room-bookings", params={"status": "pending"})
+    ).json()["data"]
+    slots = {
+        r["id"]: {(s["weekday"], s["period"]): s["kind"] for s in r["conflict_slots"]}
+        for r in data
+    }
+    # (2,"3") 兩張待審單互撞,但已核准的臨時借用比較重 —— 核准必被擋,不是「擇一」
+    assert slots[first.id][(2, "3")] == "temp"
+    assert slots[second.id][(2, "3")] == "temp"
+    # (2,"4") 只有 first 有,沒有人撞
+    assert (2, "4") not in slots[first.id]
+
+
+async def test_conflict_slots_rank_pending_below_approved_fixed(client, db):
+    """已核准的固定借用最重;只跟別張待審單撞才是「擇一核准」。"""
+    first, second, done = await seed(client, db)
+    # done 是已核准的固定借用,佔 (5, "1");讓 first 也要那一格
+    db.add(RoomBookingSlot(request_id=first.id, weekday=5, period="1"))
+    await db.commit()
+
+    data = (
+        await client.get("/api/v1/admin/room-bookings", params={"status": "pending"})
+    ).json()["data"]
+    mine = {
+        (s["weekday"], s["period"]): s["kind"]
+        for r in data
+        if r["id"] == first.id
+        for s in r["conflict_slots"]
+    }
+    assert mine[(5, "1")] == "taken"
+    assert mine[(2, "3")] == "pending"  # 與 second 互撞
+
+    # 已核准的單自己不算衝突(只有待審單要標)
+    approved = (
+        await client.get("/api/v1/admin/room-bookings", params={"status": "approved"})
+    ).json()["data"]
+    assert all(r["conflict_slots"] == [] for r in approved)

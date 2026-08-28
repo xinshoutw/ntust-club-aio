@@ -12,11 +12,8 @@ import { intakeNote } from './intakeWindow'
 import {
   CONFLICT_TEXT,
   conflictNote,
-  roomConflictSlots,
   useAdminBookingMutations,
   useAdminFixedWindow,
-  useAllPendingRoomBookings,
-  useApprovedRoomBookings,
   usePendingRoomBookings,
   type AdminRoomRequest,
   type RoomConflictKind,
@@ -165,13 +162,10 @@ export default function AdminRoomsPage() {
   const pending = listQuery.data?.requests ?? []
   const total = listQuery.data?.total ?? 0
 
-  // 標出衝突時段(同場地、學期區間重疊、同星期同節次):對上待審單=擇一核准,
-  // 對上已核准單=核准必被後端擋下。兩份名單都取全量,否則跨頁或已核准的衝突會漏標
-  const allPendingQuery = useAllPendingRoomBookings()
-  const approvedQuery = useApprovedRoomBookings()
-  const conflictSlots = roomConflictSlots(allPendingQuery.data ?? [], approvedQuery.data ?? [])
-  const conflictOf = (apiId: number) => (dow: number, period: string) =>
-    conflictSlots.get(apiId)?.get(`${dow}|${period}`)
+  // 衝突逐格由後端算好隨列帶回(判定與核准端的三項檢核同一份):
+  // 對上待審單=擇一核准,對上已核准的固定或臨時借用=核准必被擋下
+  const conflictOf = (r: AdminRoomRequest) => (dow: number, period: string) =>
+    r.conflicts.get(`${dow}|${period}`)
 
   return (
     <div>
@@ -191,26 +185,8 @@ export default function AdminRoomsPage() {
         </div>
       )}
 
-      {/* 衝突標示算不出來時要說,否則畫面與「確實沒有衝突」完全一樣 */}
-      {(allPendingQuery.isError || approvedQuery.isError) && (
-        <div className="card" style={{ marginTop: 20, padding: '12px 20px', fontSize: 13, color: '#C13B34' }}>
-          衝突標示暫時無法計算(借用清單載入失敗),核准前請自行確認時段
-          <button
-            type="button"
-            className="link-btn"
-            style={{ marginLeft: 8 }}
-            onClick={() => {
-              if (allPendingQuery.isError) void allPendingQuery.refetch()
-              if (approvedQuery.isError) void approvedQuery.refetch()
-            }}
-          >
-            重試
-          </button>
-        </div>
-      )}
-
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
-        <LoadingBlock pending={listQuery.isPending || allPendingQuery.isPending || approvedQuery.isPending}>
+        <LoadingBlock pending={listQuery.isPending}>
           <table className="tb dense fixed" aria-label="待審固定場地借用" style={{ minWidth: 760 }}>
             {/* 社團/場地/用途截斷、每週時段吃剩餘寬且允許換行;狀態/開啟固定 px */}
             <Cols widths={['16%', '15%', 'auto', '18%', 90, 32]} />
@@ -252,7 +228,7 @@ export default function AdminRoomsPage() {
                   <td style={{ fontSize: 13 }}>
                     {r.entries.flatMap((e) =>
                       e.periods.map((p) => {
-                        const conflict = conflictOf(r.apiId)(e.dow, p)
+                        const conflict = conflictOf(r)(e.dow, p)
                         return (
                           <span key={`${e.dow}-${p}`} className="num" style={{ color: conflict ? '#C13B34' : undefined, fontWeight: conflict ? 500 : undefined, marginRight: 8, display: 'inline-block' }}>
                             週{DOW_TEXT[e.dow]} 第{p}節
@@ -295,7 +271,7 @@ export default function AdminRoomsPage() {
         <RoomReviewModal
           key={selected.id}
           item={selected}
-          conflictOf={conflictOf(selected.apiId)}
+          conflictOf={conflictOf(selected)}
           open={open}
           onClose={() => setOpen(false)}
           afterClose={() => setSelected(null)}

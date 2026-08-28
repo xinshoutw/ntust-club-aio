@@ -9,10 +9,7 @@ import { roomEntryText } from '../../api/bookings'
 import { useAdminClubDetail } from '../../api/adminClubs'
 import { fileDownloadUrl } from '../../api/adminFiles'
 import {
-  roomConflictSlots,
   useAdminBookingMutations,
-  useAllPendingRoomBookings,
-  useApprovedRoomBookings,
   type AdminRoomRequest,
   type RoomConflictKind,
 } from '../../api/adminBookings'
@@ -115,16 +112,9 @@ export default function ClubOverviewPage() {
   }
 
   // 固定借用衝突與 AdminRoomsPage 共用一份判定:對上別社的審核中申請(擇一核准)或
-  // 已核准且學期未結束的申請(核准必被擋下),兩份名單都取全量。
-  // 本社沒有待審固定借用時兩份都不抓:衝突只標在待審單上,而開放窗一年只開幾週,
-  // 平常抓回來的全校清單沒有一個字用得到,卻會拖著「借用中」卡一起轉圈
-  const hasPendingRoom = (roomsQuery.data ?? []).some((r) => r.status === 'pending')
-  const needsConflicts = canRooms && clubId != null && hasPendingRoom
-  const pendingRoomsQuery = useAllPendingRoomBookings(needsConflicts)
-  const approvedRoomsQuery = useApprovedRoomBookings(needsConflicts)
-  const conflicts = roomConflictSlots(pendingRoomsQuery.data ?? [], approvedRoomsQuery.data ?? [])
+  // 衝突逐格由後端隨列帶回(只標在待審單上),不再有第二支查詢
   const conflictsOf = (r: AdminRoomRequest): Map<string, RoomConflictKind> | undefined =>
-    r.status === 'pending' ? conflicts.get(r.apiId) : undefined
+    r.status === 'pending' ? r.conflicts : undefined
 
   const openMaintenance = (m: AdminMaintenanceRow) => {
     setDetail({
@@ -196,19 +186,14 @@ export default function ClubOverviewPage() {
   const hasClub = clubId != null
   const trackedLoading =
     loading(activitiesQuery, canActivities && hasClub) || loading(maintQuery, canMaint && hasClub)
-  // 衝突查詢也要等:資料沒到就等於「沒有衝突」,核准鈕卻已經可以按
+  // 衝突隨固定借用列一起回,不再有第二支查詢要等
   const bookingLoading =
     loading(roomsQuery, canRooms && hasClub) ||
     loading(venuesQuery, canBookings && hasClub) ||
-    loading(loansQuery, canBookings && hasClub) ||
-    loading(pendingRoomsQuery, needsConflicts) ||
-    loading(approvedRoomsQuery, needsConflicts)
+    loading(loansQuery, canBookings && hasClub)
   // 失敗與載入中對使用者是同一件事:計數顯示 —,空狀態讓位給錯誤說明(否則兩段同時出現)
   const trackedFailed = anyError(activitiesQuery, maintQuery)
-  // 衝突查詢的 query key 不含社團,停用後 TanStack 仍留著上一次的 error ——
-  // 換到沒有待審固定借用的社團(needsConflicts=false)時那份錯誤與這張卡無關,要排除
-  const conflictQueries = needsConflicts ? [pendingRoomsQuery, approvedRoomsQuery] : []
-  const bookingFailed = anyError(roomsQuery, venuesQuery, loansQuery, ...conflictQueries)
+  const bookingFailed = anyError(roomsQuery, venuesQuery, loansQuery)
 
   const rowStyle: React.CSSProperties = {
     display: 'flex',
@@ -360,7 +345,7 @@ export default function ClubOverviewPage() {
               <StatusPill status={l.status} />
             </div>
           ))}
-          <LoadError queries={[roomsQuery, venuesQuery, loansQuery, ...conflictQueries]} />
+          <LoadError queries={[roomsQuery, venuesQuery, loansQuery]} />
           {(canRooms || canBookings) && !bookingFailed && bookingCount === 0 && (
             <div style={{ padding: '20px 20px 24px', borderTop: '1px solid var(--line)', fontSize: 13, color: 'var(--steel)' }}>
               尚無借用中的場地或器材

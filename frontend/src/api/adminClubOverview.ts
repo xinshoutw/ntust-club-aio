@@ -10,6 +10,7 @@ import {
   slotsToEntries,
   type AdminEquipmentLoan,
   type AdminRoomRequest,
+  type RoomConflictKind,
   type AdminVenueBooking,
 } from './adminBookings'
 import { apiPaged, qs } from './client'
@@ -102,6 +103,7 @@ interface AdminRoomBookingOut {
   start_date: string
   end_date: string
   slots: { weekday: number; period: string }[]
+  conflict_slots: { weekday: number; period: string; kind: RoomConflictKind }[]
 }
 
 interface AdminEquipmentLoanOut {
@@ -144,6 +146,7 @@ const toRoomRequest = (r: AdminRoomBookingOut): AdminRoomRequest => ({
   status: r.status,
   startDate: slashDate(r.start_date),
   endDate: slashDate(r.end_date),
+  conflicts: new Map(r.conflict_slots.map((c) => [`${c.weekday}|${c.period}`, c.kind])),
 })
 
 const toEquipmentLoan = (l: AdminEquipmentLoanOut): AdminEquipmentLoan => ({

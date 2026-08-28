@@ -5,6 +5,7 @@ from datetime import date, timedelta
 import sqlalchemy as sa
 
 from app.models import AuditLog, Equipment, EquipmentLoan, Violation
+from app.models.enums import ClubAttribute
 from app.services import notify
 from app.services.violation_service import add_months, today_taipei
 from tests.conftest import csrf_headers, login, make_club, make_user
@@ -475,3 +476,16 @@ async def test_staff_remind(client, db, monkeypatch):
             "/api/v1/staff/equipment-loans/99999/remind", headers=csrf_headers(client)
         )
     ).status_code == 404
+
+
+async def test_staff_clubs_carry_the_attribute_for_the_folder_menu(client, db):
+    """二級選單的第一層是社團性質:少了它,工讀生端只能平鋪 60+ 社。"""
+    await make_club(db, name="熱舞社", attribute=ClubAttribute.ART)
+    await make_club(db, name="停社舊社", attribute=None, is_active=False)
+    await make_user(db, username="staff01", role="staff")
+    await login(client, "staff01")
+
+    rows = {c["name"]: c for c in (await client.get("/api/v1/staff/clubs")).json()["data"]}
+    assert rows["熱舞社"]["attribute"] == "藝術性"
+    # 停社舊社沒有性質:前端歸「未分類」,不是錯誤
+    assert rows["停社舊社"]["attribute"] is None

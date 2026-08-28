@@ -24,6 +24,8 @@ class StaffClubOut(BaseModel):
 
     id: int
     name: str
+    # 社團性質:二級選單(ClubCascader)的第一層資料夾。停社舊社可能為 null → 「未分類」
+    attribute: str | None
     is_active: bool
 
 

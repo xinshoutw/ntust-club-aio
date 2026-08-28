@@ -1,12 +1,14 @@
-import { App, Button, Checkbox, DatePicker, Form, Input, Select } from 'antd'
+import { App, Button, Checkbox, DatePicker, Form, Input } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import dayjs, { type Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
+import ClubCascader from '../../components/ui/ClubCascader'
 import { useStaffClubs, useStaffMutations, useViolationItems } from '../../api/staff'
 
 interface FormValues {
-  club: number
+  /** 二級選單的介面是社團名稱;送出時對回 id */
+  club: string
   date: Dayjs
   location: string
   items: string[]
@@ -23,9 +25,15 @@ export default function PtViolationFormPage() {
   const { fileViolation } = useStaffMutations()
 
   const onFinish = (v: FormValues) => {
+    // 選單給的是名稱;停用社團不在選項裡,對不到就是選項與主檔不同步,擋下而不是送 undefined
+    const club = (clubsQuery.data ?? []).find((c) => c.name === v.club)
+    if (!club) {
+      message.error('找不到該社團,請重新選擇')
+      return
+    }
     fileViolation.mutate(
       {
-        clubId: v.club,
+        clubId: club.id,
         occurredOn: v.date,
         location: v.location.trim(),
         items: v.items,
@@ -67,14 +75,8 @@ export default function PtViolationFormPage() {
         <LoadingBlock pending={clubsQuery.isPending || itemsQuery.isPending}>
           <Form form={form} layout="vertical" requiredMark onFinish={onFinish}>
             <Form.Item name="club" label="社團" rules={[{ required: true, message: '請選擇社團' }]}>
-              <Select
-                showSearch
-                placeholder="選擇社團"
-                optionFilterProp="label"
-                options={(clubsQuery.data ?? [])
-                  .filter((c) => c.isActive)
-                  .map((c) => ({ value: c.id, label: c.name }))}
-              />
+              {/* 60+ 社平鋪讀不完:與全站其餘社團選擇器同一支二級選單(性質資料夾 → 社團) */}
+              <ClubCascader clubs={clubsQuery.data ?? []} placeholder="選擇社團" width="100%" />
             </Form.Item>
             <Form.Item name="date" label="發生日期" rules={[{ required: true, message: '請選擇日期' }]}>
               <DatePicker

@@ -134,11 +134,14 @@ export interface ClubOption {
 /** 社團的資料夾:停社舊社團的 attribute 為 null,一律歸「未分類」。
  *  二級選單(ClubCascader)與社團漏斗(ClubFilterButton)共用這一份 —— 各寫一份的話,
  *  同一個社團在兩個選單裡會落在不同資料夾 */
+/** 二級選單只需要這三欄:工讀生端的 /staff/clubs 給的就是這個形狀 */
+export type ClubFolderInput = Pick<ClubOption, 'name' | 'attribute' | 'isActive'>
+
 export const clubFolder = (c: Pick<ClubOption, 'attribute'>): string => c.attribute ?? '未分類'
 
 /** 依主檔出現順序分成 資料夾 → 社團名(後端已按 性質 → 名稱 排序;null 排最前 → 未分類在頂) */
 export function groupClubsByFolder(
-  clubs: readonly ClubOption[],
+  clubs: readonly ClubFolderInput[],
 ): { label: string; options: string[] }[] {
   return [...new Set(clubs.map(clubFolder))].map((folder) => ({
     label: folder,
@@ -159,7 +162,7 @@ export function groupClubsByFolder(
  * 否則社團總覽/成員列表打開會是一個空的選擇器與一頁空白。
  */
 export const groupActiveClubs = (
-  clubs: readonly ClubOption[],
+  clubs: readonly ClubFolderInput[],
 ): { label: string; options: string[] }[] => groupClubsByFolder(clubs.filter((c) => c.isActive))
 
 interface ClubOptionOut {

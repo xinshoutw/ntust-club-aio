@@ -13,12 +13,15 @@ export const STAFF_PAGE_SIZE = 20
 export interface StaffClub {
   id: number
   name: string
+  /** 社團性質:二級選單的第一層資料夾;停社舊社可能為 null → 「未分類」 */
+  attribute: string | null
   isActive: boolean
 }
 
 interface StaffClubOut {
   id: number
   name: string
+  attribute: string | null
   is_active: boolean
 }
 
@@ -144,7 +147,12 @@ export function useStaffClubs() {
     queryKey: keys.clubs,
     queryFn: () =>
       api<StaffClubOut[]>('/staff/clubs').then((rows) =>
-        rows.map((c): StaffClub => ({ id: c.id, name: c.name, isActive: c.is_active })),
+        rows.map((c): StaffClub => ({
+          id: c.id,
+          name: c.name,
+          attribute: c.attribute,
+          isActive: c.is_active,
+        })),
       ),
   })
 }

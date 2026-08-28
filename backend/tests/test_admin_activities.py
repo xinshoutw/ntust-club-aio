@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 
 import sqlalchemy as sa
 
@@ -1290,3 +1290,57 @@ async def test_undecided_items_do_not_count_as_a_zero_grant(client, db):
     )
     assert resp.status_code == 200, resp.text
     assert resp.json()["data"]["status"] == "pending_dean"
+
+
+async def test_submitted_at_is_the_submit_time_not_the_create_time(client, db):
+    """待審佇列依送件時間排:七月建的草稿八月才送審,不該排在八月初送件的前面(D-29)。"""
+    club = await seed(client, db)
+    creator = await club_account(db)
+    july = datetime(2026, 7, 1, 9, 0, tzinfo=UTC)
+    future = date.today() + timedelta(days=30)
+
+    def row(name: str, status: str) -> Activity:
+        return Activity(
+            club_id=club.id, name=name, location="x", type="活動",
+            date=future, end_date=future,
+            start_time=time(9, 0), end_time=time(12, 0),
+            staff_text="總召:王小明", participants_in=20, participants_out=0,
+            status=status, created_by=creator.id,
+        )
+
+    draft = row("七月就建好的草稿", "draft")
+    early = row("八月初就送件", "pending_advisor")
+    db.add_all([draft, early])
+    await db.commit()
+    await db.refresh(draft)
+    await db.refresh(early)
+    # 兩筆都是七月建的;只有 early 已經送出過
+    await db.execute(
+        sa.update(Activity)
+        .where(Activity.id.in_([draft.id, early.id]))
+        .values(created_at=july)
+    )
+    await db.execute(
+        sa.update(Activity)
+        .where(Activity.id == early.id)
+        .values(submitted_at=datetime(2026, 8, 1, 9, 0, tzinfo=UTC))
+    )
+    await db.commit()
+
+    # 草稿現在才送審 → 送件時間是現在,排在八月初那筆後面
+    await login(client, "club01")
+    resp = await client.post(
+        f"/api/v1/club/activities/{draft.id}/submit", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+
+    await login(client, "advisor")
+    data = (
+        await client.get("/api/v1/admin/activities", params={"sort": "submitted_at"})
+    ).json()["data"]
+    assert [a["name"] for a in data] == ["八月初就送件", "七月就建好的草稿"]
+
+    submitted = {a["name"]: a["submitted_at"] for a in data}
+    assert submitted["八月初就送件"].startswith("2026-08-01")
+    # 送件時間與建立時間是兩件事:這一筆的 created_at 停在七月
+    assert submitted["七月就建好的草稿"] > "2026-08-01"

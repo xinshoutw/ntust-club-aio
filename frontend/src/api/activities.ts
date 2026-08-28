@@ -109,6 +109,8 @@ export interface ActivityOut {
   id: number
   club_id: number
   created_at: string
+  /** 送出審核的時刻(每次送審覆寫);草稿為 null */
+  submitted_at: string | null
   name: string
   type: ActivityType
   is_large: boolean

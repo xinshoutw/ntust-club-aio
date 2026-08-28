@@ -197,6 +197,7 @@ _SORTABLE = {
     "budget": svc.BUDGET_TOTAL_SQL,
     "status": svc.STATUS_ORDER_SQL,
     "created_at": Activity.created_at,
+    "submitted_at": NullsLast(Activity.submitted_at),
     "reviewed_at": NullsLast(_REVIEWED_AT),
 }
 

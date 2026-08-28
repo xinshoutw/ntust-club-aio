@@ -313,6 +313,8 @@ async def submit_activity(
     # 「有補助案件必須認定經費來源」的檢核吃到殘值而放行
     activity.fund_source = None
     activity.status = ActivityStatus.PENDING_ADVISOR
+    # 每次送審都覆寫(D-29):退回重送就是重新到承辦手上,待審佇列該照新的先後排
+    activity.submitted_at = datetime.now(UTC)
     club = await _club_of(db, user)
     audit.record(
         db,

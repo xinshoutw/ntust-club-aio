@@ -82,7 +82,7 @@ export interface AdminActivity extends ReviewItem {
   activityId: number
   clubId: number
   endDate: string // YYYY/MM/DD(未跨日 = date)
-  /** 送件時間(後端無獨立送出時間戳,以建立時間近似)YYYY/MM/DD HH:mm */
+  /** 送件時間(每次送審覆寫,D-29)YYYY/MM/DD HH:mm;行政端看不到草稿,一律有值 */
   submittedAt: string
   selfFundTotal: number
   approvedTotal?: number
@@ -232,7 +232,7 @@ const toAdminActivity = (o: AdminActivityOut): AdminActivity => ({
   approvedTotal: o.approved_total ?? undefined,
   status: toStatusKey(o),
   fundSource: o.fund_source ?? undefined,
-  submittedAt: slashDateTime(o.created_at),
+  submittedAt: o.submitted_at ? slashDateTime(o.submitted_at) : '—',
   closeLocked: o.close_locked,
   closeDeadline: o.close_deadline ? slashDate(o.close_deadline) : undefined,
   semester: o.semester,
@@ -320,7 +320,7 @@ const toAdminDetail = (o: AdminActivityDetailOut): AdminActivityDetail => ({
     participantsOut: o.participants_out,
     content: o.content,
     works: staffTextToWorks(o.staff_text),
-    submittedAt: slashDateTime(o.created_at),
+    submittedAt: o.submitted_at ? slashDateTime(o.submitted_at) : '—',
     attachments: o.attachments.map((f) => f.original_name),
     attachmentFiles: o.attachments.map(toFileRef),
     budget: o.budget_items.map((b) => ({
@@ -392,7 +392,7 @@ export interface AdminActivityPageParams {
   locked?: boolean
   /** 全部逾期未結案(已核准+超過結案期限,不分鎖定與否;closeLocked 區分兩者) */
   overdue?: boolean
-  /** 排序白名單:club/name/type/date/budget/status/created_at/reviewed_at;前綴 - 為降冪 */
+  /** 排序白名單:club/name/type/date/budget/status/created_at/submitted_at/reviewed_at;前綴 - 為降冪 */
   sort?: string
   page: number
   pageSize: number

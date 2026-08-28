@@ -31,7 +31,7 @@ import ActivityReviewModal from './ActivityReviewModal'
 
 // 排序鍵=後端 /admin/activities 白名單。經費欄顯示「自籌 / 核定」但排序鍵 budget 是
 // 「自籌 + 擬請」合計,兩者不是同一件事 —— 該欄因此不給排序,不做名實不符的指示器
-type SortKey = 'club' | 'name' | 'date' | 'status' | 'created_at' | 'reviewed_at'
+type SortKey = 'club' | 'name' | 'date' | 'status' | 'submitted_at' | 'reviewed_at'
 
 // 結案流程中與已結案:這兩種狀態的重點是結案成果(照片、心得、檢討會議),
 // 審核彈窗看不到那些,改開社團端那份完整檢視(唯讀)
@@ -217,7 +217,7 @@ export default function AdminActivitiesPage() {
                 <th scope="col" className="r num">
                   <MoneyPair left="自籌" right="核定" />
                 </th>
-                <th scope="col">{sortHeader('申請時間', 'created_at')}</th>
+                <th scope="col">{sortHeader('送件時間', 'submitted_at')}</th>
                 <th scope="col">{sortHeader('審核時間', 'reviewed_at')}</th>
                 <th scope="col" aria-label="開啟" />
               </tr>

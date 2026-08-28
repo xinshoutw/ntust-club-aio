@@ -226,6 +226,8 @@ class ActivityOut(BaseModel):
     status: ActivityStatus
     close_unlocked: bool
     created_at: datetime
+    # 送出審核的時刻(D-29),每次送審覆寫;草稿為 NULL —— 行政端看不到草稿
+    submitted_at: datetime | None = None
     # 推導欄位(服務層填)
     self_fund_total: int = 0
     requested_total: int = 0

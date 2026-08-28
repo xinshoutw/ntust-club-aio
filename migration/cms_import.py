@@ -674,7 +674,13 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
             # 退回核銷 = 已在期限內送過結案,補件往返不該再被鎖(同 close_reject 的行為)
             close_unlocked=(a.status == 11),
             created_by=user_id,
-            **({"created_at": local_dt(a.SetupTime)} if a.SetupTime else {}),
+            # 舊系統沒有送件時間,SetupTime 是建檔時間 —— 送件時間一律回填成它(D-29):
+            # 等價於改版前的顯示值,不製造假資料。遷入的活動一律送出過(STATUS_MAP 無草稿)
+            **(
+                {"created_at": local_dt(a.SetupTime), "submitted_at": local_dt(a.SetupTime)}
+                if a.SetupTime
+                else {}
+            ),
         )
         db.add(activity)
         await db.flush()

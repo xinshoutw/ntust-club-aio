@@ -162,10 +162,11 @@ export default function AdminRoomsPage() {
   const pending = listQuery.data?.requests ?? []
   const total = listQuery.data?.total ?? 0
 
-  // 衝突逐格由後端算好隨列帶回(判定與核准端的三項檢核同一份):
-  // 對上待審單=擇一核准,對上已核准的固定或臨時借用=核准必被擋下
+  // 衝突逐格由後端算好隨列帶回(判定與核准端的三項檢核同一份):對上待審單=擇一核准,
+  // 對上不開放規則或已核准的固定/臨時借用=核准必被擋下。
+  // 一律回查現行清單而不是用開窗當下的那份快照 —— 彈窗開著時重抓到的新結果才進得來
   const conflictOf = (r: AdminRoomRequest) => (dow: number, period: string) =>
-    r.conflicts.get(`${dow}|${period}`)
+    (pending.find((x) => x.apiId === r.apiId) ?? r).conflicts.get(`${dow}|${period}`)
 
   return (
     <div>

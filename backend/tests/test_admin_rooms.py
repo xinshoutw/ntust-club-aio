@@ -403,3 +403,32 @@ async def test_conflict_slots_rank_pending_below_approved_fixed(client, db):
         await client.get("/api/v1/admin/room-bookings", params={"status": "approved"})
     ).json()["data"]
     assert all(r["conflict_slots"] == [] for r in approved)
+
+
+async def test_conflict_slots_include_venue_block_rules(client, db):
+    """不開放規則是核准端三項檢核的第三項(SLOT_BLOCKED),清單同樣要標。"""
+    first, _second, _done = await seed(client, db)
+    admin = await db.scalar(sa.select(User).where(User.username == "roomadmin"))
+    # 學期內某個週二封掉第 3 節 —— 正好是 first 要的 (2, "3")
+    day = first.start_date
+    while day.isoweekday() != 2:
+        day += timedelta(days=1)
+    db.add(
+        VenueBlockRule(
+            venue_id=first.venue_id, start_date=day, end_date=day,
+            periods=["3"], reason="場地整修", created_by=admin.id,
+        )
+    )
+    await db.commit()
+
+    data = (
+        await client.get("/api/v1/admin/room-bookings", params={"status": "pending"})
+    ).json()["data"]
+    mine = {
+        (s["weekday"], s["period"]): s["kind"]
+        for r in data
+        if r["id"] == first.id
+        for s in r["conflict_slots"]
+    }
+    # 不開放最重:同一格也撞到別張待審單,但能做的只剩退回
+    assert mine[(2, "3")] == "blocked"

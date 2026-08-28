@@ -307,12 +307,14 @@ async def fixed_slots_blocked(
     return sorted(hit)
 
 
-# 待審固定借用的衝突種類,由重到輕:已核准固定 > 已核准臨時 > 其他待審單。
-# 前兩者核准必被擋(SLOT_TAKEN),只能退回或先撤銷那筆;最後一種是「擇一核准」。
+# 待審固定借用的衝突種類,由重到輕(precedence 與 `fixed_occupancy` 同一組):
+# 不開放規則 > 已核准固定 > 已核准臨時 > 其他待審單。前三者核准必被擋
+# (SLOT_BLOCKED / SLOT_TAKEN),只能退回或先撤銷那筆;最後一種才是「擇一核准」。
+CONFLICT_BLOCKED = "blocked"
 CONFLICT_TAKEN = "taken"
 CONFLICT_TEMP = "temp"
 CONFLICT_PENDING = "pending"
-_CONFLICT_RANK = {CONFLICT_TAKEN: 3, CONFLICT_TEMP: 2, CONFLICT_PENDING: 1}
+_CONFLICT_RANK = {CONFLICT_BLOCKED: 4, CONFLICT_TAKEN: 3, CONFLICT_TEMP: 2, CONFLICT_PENDING: 1}
 
 
 async def fixed_conflict_slots(
@@ -361,9 +363,15 @@ async def fixed_conflict_slots(
         )
     ).all()
 
+    # 場地不開放規則:送出後才新增的規則,核准這關同樣擋(SLOT_BLOCKED)
+    blocked = await blocked_map(db, span_start, span_end)
+
     def put(found: dict[tuple[int, str], str], slot: tuple[int, str], kind: str) -> None:
         if _CONFLICT_RANK[kind] > _CONFLICT_RANK.get(found.get(slot, ""), 0):
             found[slot] = kind
+
+    # 對手單的節次集合先建好:放在內圈的話,每張待審單都會把它重建一次
+    rival_slots = {r.id: {(s.weekday, s.period) for s in r.slots} for r in rivals}
 
     # ponytail: 逐對比對 O(n²),一輪開放窗的待審單頂多百餘筆(前端原本也是這樣算);
     # 真的長到會卡時再依場地分桶
@@ -379,7 +387,7 @@ async def fixed_conflict_slots(
             kind = (
                 CONFLICT_TAKEN if other.status == BookingStatus.APPROVED else CONFLICT_PENDING
             )
-            for slot in mine & {(s.weekday, s.period) for s in other.slots}:
+            for slot in mine & rival_slots[other.id]:
                 put(found, slot, kind)
         # 學期已開始後才核准的固定借用,不該被學期內早已過去的臨時借用擋死(與核准端同一條)
         first_day = max(req.start_date, today)
@@ -389,6 +397,14 @@ async def fixed_conflict_slots(
             for period in periods:
                 if (day.isoweekday(), period) in mine:
                     put(found, (day.isoweekday(), period), CONFLICT_TEMP)
+        # 不開放規則逐日展開後比對(規則帶自己的日期區間,只封某幾天的規則對整學期
+        # 每週借用一樣是衝突,但只封週一到週三的對週五就不是)
+        for (day, venue_id), cells in blocked.items():
+            if venue_id != req.venue_id or not (req.start_date <= day <= req.end_date):
+                continue
+            for period in cells:
+                if (day.isoweekday(), period) in mine:
+                    put(found, (day.isoweekday(), period), CONFLICT_BLOCKED)
         if found:
             out[req.id] = found
     return out

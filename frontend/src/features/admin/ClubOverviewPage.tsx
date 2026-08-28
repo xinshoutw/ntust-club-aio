@@ -112,9 +112,12 @@ export default function ClubOverviewPage() {
   }
 
   // 固定借用衝突與 AdminRoomsPage 共用一份判定:對上別社的審核中申請(擇一核准)或
-  // 衝突逐格由後端隨列帶回(只標在待審單上),不再有第二支查詢
+  // 衝突逐格由後端隨列帶回(只標在待審單上),不再有第二支查詢。
+  // 回查現行清單而不是用開窗當下的快照,彈窗開著時重抓到的新結果才進得來
   const conflictsOf = (r: AdminRoomRequest): Map<string, RoomConflictKind> | undefined =>
-    r.status === 'pending' ? r.conflicts : undefined
+    r.status !== 'pending'
+      ? undefined
+      : ((roomsQuery.data ?? []).find((x) => x.apiId === r.apiId) ?? r).conflicts
 
   const openMaintenance = (m: AdminMaintenanceRow) => {
     setDetail({

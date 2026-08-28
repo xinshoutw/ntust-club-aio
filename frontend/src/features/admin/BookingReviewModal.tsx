@@ -32,8 +32,8 @@ export default function BookingReviewModal({
   onRevoke,
 }: {
   item: BookingReviewItem
-  /** 固定借用衝突:`dow|period` → 種類。後端隨待審列帶回(booking_service.fixed_conflict_slots),
-   *  呼叫端每次 render 由該列取用 —— 存成快照的話,重抓後的新結果就進不來 */
+  /** 固定借用衝突:`dow|period` → 種類。後端隨待審列帶回(booking_service.fixed_conflict_slots);
+   *  呼叫端每次 render 由**現行清單**回查那一列 —— 用開窗當下的快照的話,重抓後的新結果就進不來 */
   conflicts?: Map<string, RoomConflictKind>
   open: boolean
   onClose: () => void

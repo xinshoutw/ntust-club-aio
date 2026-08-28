@@ -217,27 +217,31 @@ export const slotsToEntries = (slots: RoomSlotOut[]): AdminRoomRequest['entries'
     }))
 }
 
-/** 待審單某時段的衝突種類(後端 `booking_service.fixed_conflict_slots` 逐格算好帶回):
- *  `pending`=與別張待審單互撞(擇一核准);`taken`=已被核准的**固定**借用佔用;
- *  `temp`=學期內有已核准的**單日臨時**借用落在這一格。後兩者核准必吃 409 SLOT_TAKEN */
-export type RoomConflictKind = 'pending' | 'taken' | 'temp'
+/** 待審單某時段的衝突種類(後端 `booking_service.fixed_conflict_slots` 逐格算好帶回,
+ *  與核准端的三項檢核同一份)。由重到輕:`blocked`=場地不開放規則(核准吃 409 SLOT_BLOCKED);
+ *  `taken`=已核准的**固定**借用、`temp`=學期內已核准的**單日臨時**借用(皆 SLOT_TAKEN);
+ *  `pending`=與別張待審單互撞,這一種才是「擇一核准」 */
+export type RoomConflictKind = 'blocked' | 'taken' | 'temp' | 'pending'
 
 /** 逐時段的衝突標示;兩個審核彈窗與待審表共用一份,不各寫各的 */
 export const CONFLICT_TEXT: Record<RoomConflictKind, string> = {
-  pending: '(衝突)',
+  blocked: '(場地不開放)',
   taken: '(已核准佔用)',
   temp: '(臨時借用佔用)',
+  pending: '(衝突)',
 }
 
-/** 整單的衝突說明:撞到已核准的單就不是「擇一」的問題,核准必被後端擋下 */
+/** 整單的衝突說明:只有「與其他待審單互撞」是擇一,其餘三種核准必被後端擋下 */
 export const conflictNote = (kinds: (RoomConflictKind | undefined)[]): string | null =>
-  kinds.includes('taken')
-    ? '此申請的時段與已核准的固定借用衝突，請退回此申請或撤銷已核准的那筆'
-    : kinds.includes('temp')
-      ? '此申請的時段與已核准的臨時借用衝突，請退回此申請或撤銷那筆臨時借用'
-      : kinds.includes('pending')
-        ? '此申請與其他申請衝突，請擇一核准'
-        : null
+  kinds.includes('blocked')
+    ? '此申請的時段有場地不開放規則，請退回此申請或先調整該規則'
+    : kinds.includes('taken')
+      ? '此申請的時段與已核准的固定借用衝突，請退回此申請或撤銷已核准的那筆'
+      : kinds.includes('temp')
+        ? '此申請的時段與已核准的臨時借用衝突，請退回此申請或撤銷那筆臨時借用'
+        : kinds.includes('pending')
+          ? '此申請與其他申請衝突，請擇一核准'
+          : null
 
 const toRoomRequest = (r: AdminRoomBookingOut): AdminRoomRequest => ({
   id: String(r.id),

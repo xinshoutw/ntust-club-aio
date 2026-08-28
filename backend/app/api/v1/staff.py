@@ -44,7 +44,10 @@ StaffLoanStatus = Literal["approved", "checked_out", "overdue"]
 @router.get("/clubs")
 async def list_clubs(user: StaffUser, db: DbDep) -> ApiResponse[list[StaffClubOut]]:
     """全部社團(含停用;違規對象可能是已停社的舊社團),名稱排序、不分頁。"""
-    rows = await db.scalars(sa.select(Club).order_by(Club.name, Club.id))
+    # 排序與 /admin/clubs/options 一致:兩端共用同一支二級選單,而資料夾層是照
+    # 「主檔出現順序」分組的(groupClubsByFolder)—— 少了 attribute 這一鍵,
+    # 工讀生端的資料夾順序會變成「哪個資料夾先出現第一個社團就排前面」
+    rows = await db.scalars(sa.select(Club).order_by(Club.attribute, Club.name, Club.id))
     return ApiResponse(data=[StaffClubOut.model_validate(c) for c in rows])
 
 

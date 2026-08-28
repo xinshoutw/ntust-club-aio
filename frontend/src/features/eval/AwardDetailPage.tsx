@@ -201,17 +201,21 @@ export default function AwardDetailPage() {
                     return false
                   }}
                 >
-                  {/* 鎖著就別讓人選檔:後端擋得下(409),但那是選完 50MB 的檔之後的事 */}
+                  {/* 鎖著就別讓人選檔:後端擋得下(409),但那是選完 50MB 的檔之後的事。
+                      disabled 的元素不發 pointer 事件,antd 6 也不再代包 —— 要自己套一層 span,
+                      否則社團只看到一顆反灰的鈕、看不到為什麼 */}
                   <Tooltip title={locked ? '學務處已關閉本獎項的資料上傳' : ''}>
-                    <Button
-                      size="small"
-                      style={{ height: 30 }}
-                      icon={<UploadOutlined />}
-                      disabled={locked}
-                      loading={upload.isPending}
-                    >
-                      上傳
-                    </Button>
+                    <span style={{ display: 'inline-block', cursor: locked ? 'not-allowed' : undefined }}>
+                      <Button
+                        size="small"
+                        style={{ height: 30 }}
+                        icon={<UploadOutlined />}
+                        disabled={locked}
+                        loading={upload.isPending}
+                      >
+                        上傳
+                      </Button>
+                    </span>
                   </Tooltip>
                 </Upload>
               )}

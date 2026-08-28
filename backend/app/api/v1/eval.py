@@ -150,6 +150,7 @@ async def award_detail(award_id: str, user: ClubUser, db: DbDep) -> ApiResponse[
             has_presentation=award.has_presentation,
             is_weighted=award.is_weighted,
             year=window.year,
+            upload_locked=await _upload_locked(db, window.year, award.id),
             items=out_items,
         )
     )

@@ -30,12 +30,12 @@
 
 - 收 `pdf/doc/docx/jpg/jpeg/png/zip`,單檔 50MB,**後台調不到**
 - 去重範圍是「同一 rubric item」:前端在本次 session 內以 SHA-256 先擋,後端以 partial unique index `uq_files_club_eval_subject_sha` 收口(用 `subject_id` 而非 `item_key`,避免跨年度誤擋)
-- `eval_settings.unlocked=false` 時上傳與刪除都回 409;無設定列視為開放
+- `eval_settings.unlocked=false` 時上傳與刪除都回 409;無設定列視為開放。**詳情逐次回 `upload_locked`**,鎖著時上傳鈕反灰附 Tooltip「學務處已關閉本獎項的資料上傳」、檔案 chip 的 × 收掉 —— 不然社團要選完 50MB 的檔才吃 409
 - 刪除時會驗證 item 確實屬於路徑上的獎項,防止借道未鎖定的獎項刪除已凍結獎項的檔案
 
 ## 未完成 / 問題
 
-- **上傳鎖看不到也設不了**:`AwardDetailOut` 不回任何鎖定旗標,上傳鈕永遠可按,社團選完檔才吃 409;`eval_settings.unlocked` 全後端只有讀,沒有寫入端點或 UI
+- **上傳鎖設不了**:`eval_settings.unlocked` 全後端只有讀,沒有任何寫入端點或 UI,現況只能進 DB 手改。開關要哪一把權限鍵、逐獎項還是全鎖、鎖上後已上傳的檔案能不能刪,與 ISS-20(評分凍結)是同一個題目,併入評鑑鏈一起設計
 - 每個細項沒有檔案筆數上限、也沒有加總容量上限,只有單檔 50MB;一個社團可無限上傳
 - 前端只在本次 session 記 hash,重整後同一份檔可重按上傳,靠後端 409 才擋,錯誤訊息不夠明確
 - 逐年 rubric 與獎項主檔沒有管理介面,117 學年度只能改 code(見 [admin/eval.md](../admin/eval.md))

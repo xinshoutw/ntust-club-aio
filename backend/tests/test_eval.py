@@ -390,6 +390,16 @@ async def test_upload_locked_by_eval_settings(client, db):
     )
     assert resp.status_code == 409
 
+    # 詳情要說得出鎖著,社團才不必選完檔才知道
+    locked = (await client.get("/api/v1/club/eval/awards/club")).json()["data"]
+    assert locked["upload_locked"] is True
+
+    # 無設定列=開放(_upload_locked 的另一半)
+    await db.execute(sa.delete(EvalSetting).where(EvalSetting.award_id == "club"))
+    await db.commit()
+    opened = (await client.get("/api/v1/club/eval/awards/club")).json()["data"]
+    assert opened["upload_locked"] is False
+
 
 async def test_activity_scores_follow_the_reviewer_confirmation(client, db):
     """D-14:ad2–ad4 只看承辦的繳交確認,系統不自己數檔案。

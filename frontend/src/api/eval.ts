@@ -67,6 +67,7 @@ interface AwardDetailOut {
   has_presentation: boolean
   is_weighted: boolean
   year: number
+  upload_locked: boolean
   items: RubricItemOut[]
 }
 
@@ -108,6 +109,8 @@ export interface AwardDetail {
   id: string
   name: string
   year: number
+  /** 學務處關閉了本獎項的資料上傳(上傳與刪除都會被擋) */
+  uploadLocked: boolean
   items: AwardRubricItem[]
 }
 
@@ -166,6 +169,7 @@ const toAwardDetail = (a: AwardDetailOut): AwardDetail => ({
   id: a.id,
   name: a.name,
   year: a.year,
+  uploadLocked: a.upload_locked,
   items: a.items.map((i) => ({
     id: i.id,
     itemKey: i.item_key,

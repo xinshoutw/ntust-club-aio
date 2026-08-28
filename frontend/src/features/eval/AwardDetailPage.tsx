@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { App, Button, Upload } from 'antd'
+import { App, Button, Tooltip, Upload } from 'antd'
 import { LeftOutlined, UploadOutlined } from '@ant-design/icons'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
@@ -30,6 +30,7 @@ export default function AwardDetailPage() {
   const { message } = App.useApp()
   const { data: award, isError, error, refetch } = useAwardDetail(awardKey)
   const { upload, remove } = useEvalUploadMutations(awardKey ?? '')
+  const locked = award?.uploadLocked === true
   // 本次 session 上傳檔的 SHA-256(uploadId → hash):同獎項內容去重(沿改版前跨槽位語意);
   // 後端另有未開放/型別/容量重驗,拒絕時以 message.error 顯示(跨 session 去重目前後端未做)
   const sessionHashes = useRef(new Map<number, string>())
@@ -168,15 +169,18 @@ export default function AwardDetailPage() {
                         <button type="button" className="link-btn" style={{ padding: 0, fontSize: 12 }} onClick={() => void openPreview(f)}>
                           {f.name}
                         </button>
-                        <button
-                          type="button"
-                          className="link-btn danger"
-                          aria-label={`移除 ${f.name}`}
-                          style={{ padding: '0 2px', fontSize: 12 }}
-                          onClick={() => removeFile(item, f)}
-                        >
-                          ×
-                        </button>
+                        {/* 刪除吃同一把鎖(後端 409):鎖著就不畫 × */}
+                        {!locked && (
+                          <button
+                            type="button"
+                            className="link-btn danger"
+                            aria-label={`移除 ${f.name}`}
+                            style={{ padding: '0 2px', fontSize: 12 }}
+                            onClick={() => removeFile(item, f)}
+                          >
+                            ×
+                          </button>
+                        )}
                       </span>
                     ))}
                   </div>
@@ -190,15 +194,25 @@ export default function AwardDetailPage() {
                 <Upload
                   accept={ACCEPT}
                   multiple
+                  disabled={locked}
                   showUploadList={false}
                   beforeUpload={(f) => {
                     void addFile(item, f)
                     return false
                   }}
                 >
-                  <Button size="small" style={{ height: 30 }} icon={<UploadOutlined />} loading={upload.isPending}>
-                    上傳
-                  </Button>
+                  {/* 鎖著就別讓人選檔:後端擋得下(409),但那是選完 50MB 的檔之後的事 */}
+                  <Tooltip title={locked ? '學務處已關閉本獎項的資料上傳' : ''}>
+                    <Button
+                      size="small"
+                      style={{ height: 30 }}
+                      icon={<UploadOutlined />}
+                      disabled={locked}
+                      loading={upload.isPending}
+                    >
+                      上傳
+                    </Button>
+                  </Tooltip>
                 </Upload>
               )}
             </div>

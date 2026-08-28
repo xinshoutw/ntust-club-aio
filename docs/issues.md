@@ -75,5 +75,6 @@
 | 編號 | 嚴重度 | 問題 |
 |---|---|---|
 | ISS-90 | 中 | 高風險測試類型整片缺席:真實併發、權限矩陣、月底/閏年/時區邊界、檔案系統故障;另有兩個測試本身有問題(假併發、名實不符) |
-| ISS-111 | 低 | **借用取消鈕的判定前端三份,其中一份靠別處的過濾才對**:後端 `_ensure_cancellable` / `_ensure_venue_cancellable` 是唯一權威(`api/v1/bookings.py`)。`VenueBookingPage` 與 `EquipmentPage` 都寫成「pending,或 approved 且尚未開始」,`FixedRoomPage` 寫的是 `status === 'pending' \|\| 開始日在今天之後` —— 少了 `approved &&`,現在結果一樣只因為那張表只餵得到 pending/approved |
+| ISS-111 | 低 | **借用取消鈕的判定前端六份、四個檔**:後端 `_ensure_cancellable` / `_ensure_venue_cancellable` 是唯一權威(`api/v1/bookings.py`)。`VenueBookingPage`、`EquipmentPage` 寫成「pending,或 approved 且尚未開始」;`FixedRoomPage` 與 `BookingOverviewPage` 的固定借用那份寫的是 `status === 'pending' \|\| 開始日在今天之後` —— 少了 `approved &&`,現在結果一樣只因為那張表只餵得到 pending/approved;`BookingOverviewPage` 另有臨時與器材兩份 |
 | ISS-113 | 低 | **同一個審核彈窗兩處餵不同的 payload**:`ReviewPage` 在非第一關把 `fundSource`/`budget`/`isLargeApproved` 都收掉再送,`ClubOverviewPage` 一律整包送出。後端 `approve` 在非 advisor 關本來就不讀那幾個欄位,現在無害 —— 但兩處對「哪一關該送什麼」各有一套說法,後端哪天開始讀,只有一邊會是對的 |
+| ISS-114 | 低 | **評鑑佐證的內容去重只在同一次瀏覽內有效**:`AwardDetailPage` 用 `sessionHashes` 這個 `useRef` 擋重複檔,重整頁面就空了;而 `EvalFileOut`(`schemas/eval.py`)**不回 `sha256`**(姊妹 schema `activities.FileOut` 有,註解就是給前端做內容去重用的),所以既有檔的雜湊前端拿不到 —— 重整後再選同一個檔,50MB 傳完才吃 409 `DUPLICATE_FILE`。與 ISS-12c 同一種病:後端擋得下,畫面不說 |

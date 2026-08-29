@@ -72,57 +72,49 @@ D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)
   `pnpm run lint` 8 個既有的 fast-refresh warning
 - 新測試逐一做過 mutation 驗證(改回舊寫法會紅)
 
-## 開發庫(正式資料 snapshot,2026-08-24 dump)
+## 開發庫(正式資料 snapshot,2026-08-29 dump)
 
-`legacy_clubs`(pg 容器內)、`legacy/clubclass/cc_2026-08-24.sql`、
-`legacy/club_media/`(17 GB)都在本機。重建:
+`legacy_clubs`(pg 容器內)、`legacy/clubclass/cc_2026-08-29.sql`、
+`legacy/club_media/`(17 GB)都在本機。**`club_aio` 就是這份 snapshot 本身**
+(2026-08-29 整庫重建,舊 demo 資料已全數清掉,以遷移結果為準),數字可以直接對。重建:
 
 ```bash
 cd backend
 uv run python scripts/reset_db.py --yes
-uv run python ../migration/cms_import.py          # 159 社、30,570 成員、1,532 活動、2,228 簽核、8 公告
+rm -rf data/uploads/*                             # reset_db 不動盤上檔案,不清就是孤兒
+uv run python ../migration/cms_import.py          # 157 社、30,575 成員、1,551 活動、2,256 簽核、8 公告
 docker run -d --name cc-legacy -p 127.0.0.1:3307:3306 \
     -e MYSQL_ROOT_PASSWORD=root -e MYSQL_DATABASE=cc mysql:8.0
 docker exec -i cc-legacy mysql --default-character-set=utf8mb4 -uroot -proot cc \
-    < ../../legacy/clubclass/cc_2026-08-24.sql
-uv run python ../migration/cc_import.py           # 15,108 場地借用、8,140 器材借用、25 器材
-uv run python ../migration/media_import.py        # 4,000 張結案照片、4.9 GB
-uv run python ../migration/text_fields.py --import migration/out/activity_texts_2026-08-24_filled.csv
+    < ../../legacy/clubclass/cc_2026-08-29.sql
+uv run python ../migration/cc_import.py           # 15,152 場地借用、8,154 器材借用、25 器材
+uv run python ../migration/media_import.py        # 4,054 張結案照片、4,893 MB
+uv run python ../migration/text_fields.py --import ../migration/out/activity_texts_2026-08-29_filled.csv
 uv run python scripts/set_passwords.py --all --password 'Demo@12345' --no-change-required --yes
 ```
 
+端到端實跑(這個庫的實際值):`activities.content` 有值 1,530 / 1,551、`activity_reports` 973、
+`activity_reflections` 2,323 篇、`files` 4,054、`approval_records` 2,992
+(簽核 2,256 + 活動退件 59 + 借用退件 677)、`club_members` 30,575。
+
 - 照片佔 `backend/data/uploads/` 4.9 GB;`media_import.py --reset` 連盤上檔案一起清,
   **必須跑在 `cms_import.py --reset` 之前**(cms 那支會刪光 system=cms 的 id-map,
-  先跑它照片就成了清不掉的孤兒;已加防呆擋下)
+  先跑它照片就成了清不掉的孤兒;已加防呆擋下)。整庫重建走 `reset_db` 時 id-map 一起沒了,
+  所以要自己 `rm -rf data/uploads/*`
 - **別在這個庫跑 `seed_mock.py`** —— 它會 `rmtree` 整個 UPLOAD_DIR
 - 查舊 MySQL 一律加 `--default-character-set=utf8mb4`,否則中文顯示成 `????`(資料是好的)
-- 全部 177 個帳號已設為 `Demo@12345`、關掉首登強制改密;要換回一次性密碼就重跑遷移
-  (產出在 `migration/out/one_time_passwords_*.csv`,不入版控)
+- 全部 170 個帳號已設為 `Demo@12345`、關掉首登強制改密;要換回一次性密碼就重跑遷移
+  (產出在 `migration/out/one_time_passwords_*.csv`,不入版控)。
+  `_migration`(系統遷移 actor)也在其中,但它 `is_active=false`,密碼設了也登不進去
 
-## 本機開發庫落後遷移腳本(刻意不重建)
+## MIG-13 人工轉錄(2026-08-29 完成)
 
-`club_aio` 建於 `1ca95a8`～`eb0b273` 那批 `fix(migration)` **之前**,之後只補跑過
-`text_fields --import`。**只適合看畫面,不適合對數字**:
-
-| | 這個庫 | 端到端驗證值 |
-|---|---|---|
-| `activities.content` 有值 | 1,171 | 1,511 |
-| `activity_reports` | 956 | 961 |
-| `approval_records` 退件列 | 0 | 應有(73ff25b) |
-
-差異來自沒套用的遷移修正:`content` 少的 340 筆是新版 `cms_import` 會從舊系統活動描述預帶的;
-`reports` 少的 5 筆是舊 `status=11`(退回核銷),`(5, 6, 11)` 已修但 `import_activities`
-idempotent、重跑不補既有列。要正確數字就整個重建(約 15 分鐘)。
-
-## MIG-13 人工轉錄(2026-08-24 完成)
-
-`migration/out/activity_texts_2026-08-24_filled.csv`,**924/924 列全填**
-(另 261 列不派工:活動未結案,成果與心得在 import 端本來就跳過,活動內容已由 `cms_import` 預帶)。
-全新庫端到端實跑:`activities.content` 1,511 / 1,532、`activity_reports` 961、
-`activity_reflections` 2,299 篇分佈在 726 個活動;4 列因活動未結案跳過,屬預期。
+`migration/out/activity_texts_2026-08-29_filled.csv`,**936/936 列全填**
+(另 272 列不派工:活動未結案,成果與心得在 import 端本來就跳過,活動內容已由 `cms_import` 預帶)。
+匯入實跑:活動內容 1,194 筆、成果 859 筆、心得 2,323 篇;4 列因活動未結案跳過,屬預期。
 
 ```bash
-python3 migration/doc_text.py --all                      # 附件 → 純文字(2,676 檔,有快取)
+python3 migration/doc_text.py --all                      # 附件 → 純文字(2,713 檔,有快取)
 python3 migration/fill_shards.py split --budget 200000   # 依文字量切工作包
 python3 migration/fill_shards.py merge                   # *.jsonl → *_filled.csv + 問題報告
 ```
@@ -130,10 +122,16 @@ python3 migration/fill_shards.py merge                   # *.jsonl → *_filled.
 轉錄規則在 `migration/out/fill/INSTRUCTIONS.md`。merge 是**欄位級疊加**,補某一欄只需另寫
 `shard-NN-fix.jsonl`(一行放 `legacy_id` + 那幾欄)。
 
+**換 dump 是增量的,不重跑 split**:`*.jsonl` 以 `legacy_id` 為鍵、與 dump 無關,merge
+會拿最新母 CSV 重併,舊 dump 的 924 列原封不動。8/24→8/29 新增的 12 列另收在
+`shard-33.jsonl`(桌遊社 6 次社課、絃韻吉他社、弓道社、機器人研究社、美術社、全校不分系),
+其中 2 列只有會議紀錄與簽到表可讀,依 INSTRUCTIONS 輸出 `_note` 不硬填。
+
 **已知未處理** —— 匿名回饋可能漏抄:「無署名的參與者回饋 → `填_成果_目標達成`」這條規則是
 第一波 agent 派出**之後**才補進 INSTRUCTIONS.md 的,`shard-01`~`shard-11` 與 `shard-32`
 遇到「像心得但沒署名」的段落會整組丟掉(實例 `14856`、`15020`)。待複查 = 那些 shard 裡
 沒輸出心得的 **86 列**。2026-08-24 決定不做:漏的是補充性質的回饋,成果三欄與具名心得沒受影響。
+(`shard-33` 已照新規則做:`15698` 的無署名助教心得進 `填_成果_目標達成`。)
 
 另有「其他執行狀況與成果:無」的列,有的照抄「無」、有的留空 —— 兩種讀法都成立,不統一。
 

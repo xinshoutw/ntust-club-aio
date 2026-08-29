@@ -134,7 +134,10 @@ def main() -> None:
     if not args:
         sys.exit(__doc__)
     if args[0] == "--all":
-        default = sorted(OUT.parent.glob("activity_texts_*.csv"))[-1]
+        # 排掉 fill_shards merge 產生的 *_filled.csv:字典序會把它排在同日母檔後面,
+        # 一旦轉錄過一輪就會拿自己下游的輸出當輸入(同 fill_shards.latest_csv)
+        cands = [p for p in OUT.parent.glob("activity_texts_*.csv") if not p.stem.endswith("_filled")]
+        default = sorted(cands)[-1]
         csv_path = Path(args[1]) if len(args) > 1 else default
         rels = referenced(csv_path)
         done = 0

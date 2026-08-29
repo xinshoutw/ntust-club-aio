@@ -91,7 +91,7 @@ uv run python ../migration/cms_import.py --reset    # 3. 再清社團/活動/公
 | Club_staff | users | position admin→admin(權限鍵之後由承辦配)、observer→viewer。`SKIP_STAFF` 不遷明確的測試登入名;`INACTIVE_STAFF`(`viewer`/`ntustclub`)遷入但 `is_active=False` —— 看不出是不是正式用途,而 observer 會拿到 `can_view_eval`,不擋就是上線第一天能對評鑑打分 |
 | Club_auditactivityrecord | approval_records | 舊表只有「誰、何時簽的」,沒有決議欄(退回不入表)—— 每列都是核准,同一活動第 1/2/3 列即 advisor/chief/dean,對應申請表的 初核/複核/決行 |
 | Club_auditactivity.Opinions | approval_records.reason(+ activities.fund_source) | 先去掉舊系統自動附的結報提醒(「※」開頭或首行為「活動結報提醒」;新系統由 `pdf._APPLY_NOTE` 自己產,照搬會印兩次)。這一格每一關都被覆寫,留下的是**最後一位**簽核者寫的,所以掛最後一列。只有申請期(`FUND_SOURCE_LEGACY_STATUS`)的殘留才是經費認定會寫進 `fund_source`;已完成件那格早被結案審核覆寫過,只留 `reason` |
-| Club_activity.status=1(退回申請) | approval_records(`decision=reject`) | 舊系統退回**不寫**簽核列,理由只剩 Opinions 一格。不補這段的話 60 件退回活動一筆退件紀錄都沒有,社團看得到「已退回」卻讀不到理由。actor 用不能登入的 `_migration`(系統遷移)帳號,沒有理由的填「未提供更多說明」;對照鍵 `Club_activity:reject` 進 id-map,`--reset` 清得掉 |
+| Club_activity.status=1(退回申請) | approval_records(`decision=reject`) | 舊系統退回**不寫**簽核列,理由只剩 Opinions 一格。不補這段的話 59 件退回活動一筆退件紀錄都沒有,社團看得到「已退回」卻讀不到理由。actor 用不能登入的 `_migration`(系統遷移)帳號,沒有理由的填「未提供更多說明」;對照鍵 `Club_activity:reject` 進 id-map,`--reset` 清得掉 |
 | Club_activityimages | files(`slot=report_photo`) | `media_import.py`;盤上落 `reports/{原始上傳年}/{月}/{uuid}`,`club_id`/`uploaded_by` 跟著活動走 |
 | Club_activity.PlanFile、Club_activityfiles | 只取文字,經 `text_fields.py` 的 CSV 人工轉錄 | 檔案實體不遷(MIG-13) |
 
@@ -136,19 +136,19 @@ uv run python ../migration/cms_import.py --reset    # 3. 再清社團/活動/公
 | 項目 | 數 |
 |---|---|
 | 簽核列 | **2,256**(advisor 1,475 / chief 396 / dean 385) |
-| 去樣板後仍有審核意見 | 75 筆 |
-| 其中寫入 `fund_source` | 61 筆(非退回件且 ≤100 字) |
-| 超過 100 字只留 `reason` | 11 筆 |
-| 掛不上簽核列而未遷入的退件理由 | 52 筆(沒人簽就退回,舊表沒有 actor) |
+| 去樣板後仍有審核意見 | 66 筆 |
+| 其中寫入 `fund_source` | 30 筆(非退回件且 ≤100 字) |
+| 超過 100 字只留 `reason` | 1 筆 |
+| 掛不上簽核列的退件理由 | 51 筆(沒人簽就退回,舊表沒有 actor);由 `import_rejections` 另行補回 |
 
 - **關卡由列序決定,不是由狀態推導**:`AuditActivity.AllowCode` 就是這張表的列數
 - **`Opinions` 不可原文寫進 `fund_source`**:那一欄在行政端是「經費來源」
-  (`ApproveActivityIn` 限 100 字),範圍內 1,384 / 1,518 筆原文超過 100 字 ——
-  承辦一開審核視窗按儲存就 422 而且自己改不掉。而且其中 1,387 筆的全部內容就是
+  (`ApproveActivityIn` 限 100 字),範圍內 1,398 / 1,531 筆原文超過 100 字 ——
+  承辦一開審核視窗按儲存就 422 而且自己改不掉。而且其中 1,335 筆的全部內容就是
   「※…結報提醒」那段樣板,新系統本來就會自己產一份
-- **7 筆舊 status=0 但已簽過初核的活動,新狀態仍是 `pending_advisor`**
-  (`STATUS_MAP` 只看 status,不看 AllowCode)。承辦會多簽一次初核 ——
-  同關多次核准取最後一次,印在紙上的名字仍然正確
+- **狀態停在哪一關由已簽列數決定**:`import_activities` 走 `PENDING_BY_SIGNED[已簽關數]`,
+  不是只看 status。這份 dump 範圍內 status=0 的 20 筆全都一列簽核也沒有,
+  所以 20 筆全落 `pending_advisor`、`pending_chief`/`pending_dean` 各 0 筆
 
 ## 企劃書與結案文字(text_fields.py,2026-08-29)
 
@@ -179,9 +179,9 @@ uv run python ../migration/text_fields.py --import <填好的 CSV>          # �
 | Device(25) | equipment(含 max_lease_count) | 名稱正規化 `DEVICE_RENAME`;停用 8 項建 inactive |
 | Apply(15,255) | venue_bookings | status 0/1/4/2→pending/approved/rejected/cancelled;phone 保留、其餘申請人明細丟棄 |
 | DeviceApply+DeviceLog | equipment_loans(一品項一筆) | 已核准且區間已過→returned;活動已刪或不在遷移範圍內→activity_id NULL |
-| 認不出借用單位的單(空字串 / admin / 8 開頭偽帳號 / 未知) | club_id NULL(顯示「學務處」) | 舊系統有 960 筆 `club_id` 是空字串,**不丟掉**(decisions.md MIG-03);帳號認得出形狀的那一桶另以 `--unknown-clubs` 導出清單交承辦辨識(MIG-06);欄位空白與 admin 不列入(看不出是誰)|
+| 認不出借用單位的單(空字串 / admin / 8 開頭偽帳號 / 未知) | club_id NULL(顯示「學務處」) | 舊系統的 `DeviceApply` 有 400 張母單 `club_id` 是空字串(展開成 960 筆 DeviceLog),**不丟掉**(decisions.md MIG-03);帳號認得出形狀的那一桶另以 `--unknown-clubs` 導出清單交承辦辨識(MIG-06);欄位空白與 admin 不列入(看不出是誰)|
 | `Apply`/`DeviceApply` 的 `reject_info_zh-TW` | approval_records(REJECT) | 只補**真的留了理由**的單(場地 151、器材 236 張申請單→677 列);actor=不能登入的 `_migration`,退回時間取舊系統的 `updated_at`;英譯欄 `reject_info_en-us` 不遷 |
-| ClassroomRule(2,848)、Admin、Notice | 不遷 | 場地封鎖=新 Rule Page 功能;未過期封鎖上線時人工重建 |
+| ClassroomRule(2,948)、Admin、Notice | 不遷 | 場地封鎖=新 Rule Page 功能;未過期封鎖上線時人工重建 |
 
 ## 注意
 

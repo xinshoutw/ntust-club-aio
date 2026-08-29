@@ -780,7 +780,7 @@ async def import_approvals(legacy, db: AsyncSession, ids: IdMap) -> None:
     (`AuditActivity.AllowCode` 就是這張表的列數)。關卡由列序決定,不是由狀態推導。
 
     `AuditActivity.Opinions` 先**去掉舊系統自動附的「※…結報提醒」**再處理:那段樣板
-    佔了 1,387 / 1,518 筆的全部內容,而新系統的申請表由 `pdf._APPLY_NOTE` 自己產一份,
+    佔了 1,335 / 1,531 筆的全部內容,而新系統的申請表由 `pdf._APPLY_NOTE` 自己產一份,
     原文照搬只會在「意見回饋」那格印兩次。剩下的殘留才是承辦人真正寫的那句:
 
     - 退回件(舊 status 1/11)的殘留是退件理由 → 只寫 `reason`

@@ -135,18 +135,17 @@ export default function PtCheckoutPage() {
             </div>
             {/* 現場點交要看得到用途與聯絡人:器材對不上時得當場打電話 */}
             <div style={{ fontSize: 13, color: 'var(--steel)' }}>
-              用途:{selected.purpose || '—'}
-              <span className="num" style={{ marginLeft: 12 }}>
-                聯絡電話:{selected.phone || '—'}
-              </span>
+              用途：{selected.purpose || '—'}
+              <br />
+              聯絡電話：{selected.phone || '—'}
             </div>
             <div>
-              <div style={{ fontSize: 13, marginBottom: 4 }}>借用人姓名</div>
+              <div style={{ fontSize: 13, marginBottom: 4 }}>收件人姓名</div>
               <Input
                 autoFocus
                 value={borrower}
                 onChange={(e) => setBorrower(e.target.value)}
-                placeholder="現場領用人"
+                placeholder="請輸入收件人姓名"
                 maxLength={50}
               />
             </div>
@@ -155,7 +154,7 @@ export default function PtCheckoutPage() {
                 type="info"
                 showIcon
                 message="此品項為依序點交"
-                description={`請於現場逐件核對 ${selected.qty} 件的機身序號後再確認點交;序號不需登入系統。`}
+                description={`請於現場逐件核對 ${selected.qty} 件的機身序號後再確認點交`}
               />
             )}
           </div>

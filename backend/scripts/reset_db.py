@@ -12,8 +12,6 @@ superadmin 首登一律強制改密。未給 --yes 時需互動輸入 YES 確認
 # ruff: noqa: E402 - sys.path 調整必須先於 app 匯入(同 tests/conftest.py)
 import argparse
 import asyncio
-import secrets
-import string
 import subprocess
 import sys
 from pathlib import Path
@@ -24,19 +22,9 @@ sys.path.insert(0, str(BACKEND_DIR))  # 讓 scripts/ 可 import app
 import sqlalchemy as sa
 
 from app.core.db import engine
+from app.core.security import generate_password  # 這一份排除了 0/O、1/l/I
 from scripts._safety import refuse_on_prod
 from scripts.seed import seed
-
-
-def generate_password(length: int = 14) -> str:
-    """產生符合政策的密碼(≥10 碼含大小寫+數字+特殊符號)。"""
-    specials = "!@#$%^&*"
-    pools = (string.ascii_uppercase, string.ascii_lowercase, string.digits, specials)
-    chars = [secrets.choice(pool) for pool in pools]
-    everything = "".join(pools)
-    chars += [secrets.choice(everything) for _ in range(length - len(chars))]
-    secrets.SystemRandom().shuffle(chars)
-    return "".join(chars)
 
 
 async def drop_all() -> None:

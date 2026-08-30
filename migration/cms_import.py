@@ -13,6 +13,7 @@ import csv
 import os
 import re
 import sys
+import tempfile
 from collections import Counter
 from datetime import date, datetime, time
 from pathlib import Path
@@ -1174,15 +1175,27 @@ async def reset(db: AsyncSession) -> None:
     print("已清除 CMS 匯入結果;指導老師欄位不還原(非 id-map 型,重跑會覆寫)")
 
 
-def write_passwords(passwords: list[tuple[str, str, str]]) -> None:
-    """一次性密碼發放 CSV;`--fixes-only` 只會產出那幾筆,不覆蓋完整重匯那份。"""
+def write_passwords(passwords: list[tuple[str, str, str]], fixes_only: bool) -> None:
+    """一次性密碼發放 CSV。
+
+    明碼只存在於這一份檔案裡(庫裡是 argon2 hash),覆寫掉就只能逐社重設密碼。名單改
+    一次就重跑一次是常態,固定檔名同一天的第二次會靜默截掉第一次 —— 而這支跑完只要
+    一秒出頭,實測連續兩次會落在同一秒,帶時間戳也擋不住。用 `mkstemp` 由 OS 保證不撞
+    (順帶把明碼檔開成 0600),不用 `"x"`:此時交易已 commit,這裡拋例外等於帳號建好了、
+    明碼沒了,比撞名更糟。
+    """
     if not passwords:
         return
     out_dir = MIGRATION_DIR / "out"
     out_dir.mkdir(exist_ok=True)
-    suffix = "_fixes" if "--fixes-only" in sys.argv else ""
-    out = out_dir / f"one_time_passwords_{date.today().isoformat()}{suffix}.csv"
-    with out.open("w", newline="") as fh:
+    stamp = datetime.now(TAIPEI).strftime("%Y-%m-%d_%H%M%S")
+    fd, name = tempfile.mkstemp(
+        prefix=f"one_time_passwords_{stamp}{'_fixes' if fixes_only else ''}_",
+        suffix=".csv",
+        dir=out_dir,
+    )
+    out = Path(name)
+    with os.fdopen(fd, "w", newline="") as fh:
         writer = csv.writer(fh)
         writer.writerow(["role", "username", "one_time_password"])
         writer.writerows(passwords)
@@ -1195,14 +1208,18 @@ async def main() -> None:
     legacy_engine = create_async_engine(legacy_url)
 
     passwords: list[tuple[str, str, str]] = []
-    if "--fixes-only" in sys.argv:
+    fixes_only = "--fixes-only" in sys.argv
+    if fixes_only and "--reset" in sys.argv:
+        # 兩個旗標的意思相反,靜默只做其中一件會讓人以為 reset 過了
+        sys.exit("拒絕執行:--reset 與 --fixes-only 不能一起用")
+    if fixes_only:
         # 名冊修正單獨重放(不碰舊庫)。完整重匯會覆寫指導老師欄位(非 id-map 型),
         # 已在用的庫不該為了套修正吃那一刀
         async with async_session_factory() as db:
             await apply_roster_fixes(db, passwords)
             await db.commit()
         await legacy_engine.dispose()
-        write_passwords(passwords)
+        write_passwords(passwords, fixes_only)
         print("完成。")
         return
     async with async_session_factory() as db, legacy_engine.connect() as legacy:
@@ -1225,7 +1242,7 @@ async def main() -> None:
 
     await legacy_engine.dispose()
 
-    write_passwords(passwords)
+    write_passwords(passwords, fixes_only)
     print("完成。")
 
 

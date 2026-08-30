@@ -32,8 +32,8 @@ export const USAGE_SCALE = [
   { max: 0, label: '未借用', bg: CELL.free.bg },
   { max: 30, label: '30%', bg: '#F2C744' },
   { max: 50, label: '50%', bg: '#E8833A' },
-  { max: 70, label: '70%', bg: '#C13B34' },
-  { max: 99, label: '99%', bg: '#7B4EA3' },
+  // 超過 50% 一路到還差一件:數字再細分沒有決策意義,借得到就是借得到
+  { max: 100, label: '未額滿', bg: '#C13B34' },
   { max: 100, label: '額滿', bg: CELL.fixed.bg },
 ] as const
 
@@ -42,10 +42,9 @@ export type UsageStep = (typeof USAGE_SCALE)[number]
 const FULL = USAGE_SCALE[USAGE_SCALE.length - 1]
 const NEARLY_FULL = USAGE_SCALE[USAGE_SCALE.length - 2]
 
-/** 佔用比例落在哪一階(上界含);借滿(與總數 0 的借不到)先判,其餘依比例 */
+/** 佔用比例落在哪一階(上界含);額滿(與總數 0 的借不到)只看件數,不看比例 */
 export function usageStep(used: number, total: number): UsageStep {
   if (total <= 0 || used >= total) return FULL
   const pct = (used / total) * 100
-  // 99%~100% 之間(總數上百才有)還沒借滿,歸最後一個未滿階
   return USAGE_SCALE.slice(0, -1).find((s) => pct <= s.max) ?? NEARLY_FULL
 }

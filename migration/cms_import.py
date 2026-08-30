@@ -466,6 +466,9 @@ async def apply_roster_fixes(db: AsyncSession, passwords: list[tuple[str, str, s
         password = generate_password()
         account.password_hash = hash_password(password)
         account.must_change_password = True
+        # 停社前累積的失敗次數與鎖定不清掉,復社換發的密碼是對的卻照樣登不進去
+        account.failed_login_attempts = 0
+        account.locked_until = None
         passwords.append(("club", username, password))
         reactivated.append(username)
 

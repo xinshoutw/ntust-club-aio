@@ -94,6 +94,9 @@ uv run python scripts/seed_mock.py --yes               # reset 後灌全模組 m
 uv run python scripts/import_holidays.py --year 115    # 政府行事曆假日(加 --yes 才寫入)
 uv run python scripts/set_passwords.py --all --password 'Demo@12345' --no-change-required --yes
                                                        # 批次改密;不加 --yes 只預覽,ENV=prod 拒絕執行
+uv run python scripts/set_passwords.py --all --random --yes
+                                                       # 換發:每帳號各一組隨機密碼、跳過停用帳號,
+                                                       # 明碼出到 migration/out/passwords_*.csv(發放後銷毀)
 
 # 前端(frontend/)
 pnpm exec tsc -b        # --noEmit 是空檢查,不要用

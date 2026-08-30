@@ -107,9 +107,12 @@ uv run python scripts/set_passwords.py --all --password 'Demo@12345' --no-change
   所以要自己 `rm -rf data/uploads/*`
 - **別在這個庫跑 `seed_mock.py`** —— 它會 `rmtree` 整個 UPLOAD_DIR
 - 查舊 MySQL 一律加 `--default-character-set=utf8mb4`,否則中文顯示成 `????`(資料是好的)
-- 全部 170 個帳號已設為 `Demo@12345`、關掉首登強制改密;要換回一次性密碼就重跑遷移
-  (產出在 `migration/out/one_time_passwords_*.csv`,不入版控)。
-  `_migration`(系統遷移 actor)也在其中,但它 `is_active=false`,密碼設了也登不進去
+- 帳號密碼分兩批:**93 個啟用帳號**(7 管理員 + 86 社團)已用
+  `set_passwords.py --all --random --yes` 換發成一帳號一組的隨機密碼、首登強制改密,
+  明碼在 `migration/out/passwords_*.csv`(不入版控,發放後銷毀);
+  其餘 76 個停用帳號(停社 73、`_migration`、停用評審 2)還是舊的 `Demo@12345`。
+  要整庫回到方便登入的狀態就重跑 `--all --password 'Demo@12345' --no-change-required --yes`
+  (`--password` 不跳過停用帳號)。`_migration` 是 `is_active=false`,密碼設了也登不進去
 
 ## MIG-13 人工轉錄(2026-08-29 完成)
 

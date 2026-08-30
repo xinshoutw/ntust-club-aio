@@ -89,6 +89,8 @@ uv run python ../migration/cms_import.py --fixes-only   # 只跑名冊修正,不
 驗收:`users.role='club'` 且社團與帳號皆 active 的筆數 = 承辦名冊的有效列數(115-1 為 86)。
 
 - 一次性密碼輸出到 `migration/out/one_time_passwords_*.csv`(**含明碼,不入版控**,
+  事後整批換發是 `backend/scripts/set_passwords.py --all --random --yes`,
+  出到同一個目錄的 `passwords_*.csv` —— 兩個檔名家族並存,換發後舊的那份即失效,
   檔名由 `mkstemp` 產生、每次執行一份新檔,`--fixes-only` 那份另帶 `_fixes` 字尾;
   發放前記得把同一輪的幾份合起來看,別只發其中一份;
   交承辦發放後銷毀);所有帳號 `must_change_password=True`

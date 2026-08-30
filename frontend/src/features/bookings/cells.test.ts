@@ -1,25 +1,33 @@
 import { describe, expect, it } from 'vitest'
 import { CELL, USAGE_SCALE, usageStep } from './cells'
 
+// 比對階別本身而不是文案:圖例字句會調,落在哪一階才是這支要守的規則
+const [NONE, YELLOW, ORANGE, RED, PURPLE, FULL] = USAGE_SCALE
+
 describe('usageStep', () => {
-  it('比例落在哪一階以下界為準(邊界值取較高的那一階)', () => {
-    expect(usageStep(0, 10).label).toBe('未滿 30%')
-    expect(usageStep(2, 10).label).toBe('未滿 30%') // 20%
-    expect(usageStep(3, 10).label).toBe('30% 以上')
-    expect(usageStep(5, 10).label).toBe('50% 以上')
-    expect(usageStep(7, 10).label).toBe('70% 以上')
-    expect(usageStep(9, 10).label).toBe('70% 以上') // 90% 未達 99%
-    expect(usageStep(199, 200).label).toBe('99% 以上')
-    expect(usageStep(10, 10).label).toBe('已借滿')
+  it('預設色只留給完全沒借用,借出一件就進下一階', () => {
+    expect(usageStep(0, 10)).toBe(NONE)
+    expect(usageStep(1, 100)).toBe(YELLOW) // 1%
   })
 
-  it('借滿與固定借用同色;總數 0(借不到)也算借滿', () => {
-    expect(usageStep(10, 10).bg).toBe(CELL.fixed.bg)
-    expect(usageStep(0, 0).label).toBe('已借滿')
+  it('比例落在哪一階以上界為準(邊界值取較低的那一階)', () => {
+    expect(usageStep(3, 10)).toBe(YELLOW) // 30%
+    expect(usageStep(4, 10)).toBe(ORANGE)
+    expect(usageStep(5, 10)).toBe(ORANGE) // 50%
+    expect(usageStep(6, 10)).toBe(RED)
+    expect(usageStep(7, 10)).toBe(RED) // 70%
+    expect(usageStep(8, 10)).toBe(PURPLE)
+    expect(usageStep(199, 200)).toBe(PURPLE) // 99.5%:還沒借滿就不算額滿
+    expect(usageStep(10, 10)).toBe(FULL)
+  })
+
+  it('額滿與固定借用同色;總數 0(借不到)也算額滿', () => {
+    expect(FULL.bg).toBe(CELL.fixed.bg)
+    expect(usageStep(0, 0)).toBe(FULL)
   })
 
   it('色階由低到高排列,圖例才照得出順序', () => {
-    const mins = USAGE_SCALE.map((s) => s.min)
-    expect(mins).toEqual([...mins].sort((a, b) => a - b))
+    const maxes = USAGE_SCALE.map((s) => s.max)
+    expect(maxes).toEqual([...maxes].sort((a, b) => a - b))
   })
 })

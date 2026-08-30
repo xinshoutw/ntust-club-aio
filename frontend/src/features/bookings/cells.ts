@@ -32,8 +32,7 @@ export const USAGE_SCALE = [
   { max: 0, label: '未借用', bg: CELL.free.bg },
   { max: 30, label: '30%', bg: '#F2C744' },
   { max: 50, label: '50%', bg: '#E8833A' },
-  // 超過 50% 一路到還差一件:數字再細分沒有決策意義,借得到就是借得到
-  { max: 100, label: '未額滿', bg: '#C13B34' },
+  { max: 70, label: '70%', bg: '#C13B34' },
   { max: 100, label: '額滿', bg: CELL.fixed.bg },
 ] as const
 

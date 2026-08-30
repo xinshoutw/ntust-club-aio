@@ -224,8 +224,10 @@ export default function BookingOverviewPage() {
       : venuesQuery.isPending || dayQuery.isPending
   // 場況圖來源查詢失敗時整卡顯示錯誤,不畫預設色格;
   // 15 天檢視為單一批次查詢,重試即重抓整段區間
+  // 器材:手上有資料就照常渲染(格值以絕對日期為鍵,對得上的那幾欄還是真的),
+  // 只有首載失敗才換錯誤畫面 —— 背景重抓失敗不該把讀得到的資料變成不能用
   const gridError = isEquipmentView
-    ? usageQuery.isError
+    ? usageQuery.isLoadingError
       ? { error: usageQuery.error, retry: () => void usageQuery.refetch() }
       : null
     : venuesQuery.isError

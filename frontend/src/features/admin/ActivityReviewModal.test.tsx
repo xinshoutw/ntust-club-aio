@@ -194,8 +194,9 @@ describe('ActivityReviewModal 的簽核紀錄', () => {
   })
 
   // 申請與結案的簽核紀錄同放一張表,依 subject_type 分到兩個頁籤:
-  // 沒有結案資料時結案側切不過去,結案的那幾列因此一列都不該印在申請側
-  test('結案的簽核列不印在申請側', () => {
+  // 結案的那幾列不印在申請側,但也不能就此消失 —— 逾期手動解鎖寫的是 activity_close,
+  // 而那種單多半還沒送過結案(沒有 report),只看 report 決定頁籤能不能切就兩側都看不到
+  test('結案的簽核列歸結案側,沒有結案資料也切得過去', () => {
     showApprovals([
       { actor: '陳彥仁', at: '2026/08/18 16:17', decision: 'approve', isClose: false, stage: 'advisor' },
       { actor: '侍筱鳳', at: '2026/08/19 09:02', decision: 'unlock', isClose: true, stage: 'advisor' },
@@ -203,7 +204,11 @@ describe('ActivityReviewModal 的簽核紀錄', () => {
 
     expect(screen.getByText('陳彥仁')).toBeTruthy()
     expect(screen.queryByText('侍筱鳳')).toBeNull()
-    expect(screen.queryByText('解鎖')).toBeNull()
+
+    fireEvent.click(screen.getByText('結案'))
+    expect(screen.getByText('侍筱鳳')).toBeTruthy()
+    expect(screen.getByText('解鎖')).toBeTruthy()
+    expect(screen.queryByText('陳彥仁')).toBeNull()
   })
 })
 

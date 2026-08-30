@@ -289,7 +289,13 @@ export default function ActivityReviewModal({
   const report = item?.report
   const photos = item?.photos ?? []
   const closeDocs = item?.closeDocs ?? []
-  const activeTab: 'apply' | 'close' = report ? (tab ?? 'close') : 'apply'
+  // 結案側:有結案資料,或有結案的簽核列(逾期手動解鎖寫的是 activity_close,
+  // 那種單多半還沒送過結案 —— 只看 report 的話「誰解了這張單的鎖」兩側都看不到)
+  const closeRows = (item?.detail?.approvals ?? []).filter((r) => r.isClose)
+  const hasCloseSide = !!report || closeRows.length > 0
+  // 預設優先開結案側;只有解鎖紀錄、還沒送結案的單留在申請側(那才是承辦要看的)
+  const activeTab: 'apply' | 'close' =
+    hasCloseSide ? (tab ?? (report ? 'close' : 'apply')) : 'apply'
 
   // 「本關」:**沒有簽核回呼就沒有簽核鈕**。這裡曾有一條「沒 onApprove 就看狀態」的展示用
   // 退路,而唯讀頁(社團活動列表、逾期清單)傳的是真資料 —— 待審的單會長出可按的核准鈕,
@@ -298,7 +304,17 @@ export default function ActivityReviewModal({
   // 結案單關:與申請關卡分開判定,兩者不會同時成立(狀態互斥)
   const canCloseReview =
     !!onCloseApprove && item?.status === 'closing_pending_advisor' && canActOnClose(user)
-  const checks = { ...defaultConfirmations(report, photos.length), ...override }
+  // 待審時的預設勾選是推導出來的初值(落庫值 **且** 內容達門檻);已核准結案的單
+  // 要顯示的是**落庫值本身** —— 承辦當初核實後勾回去的那一勾就是 ad2–ad4 的依據,
+  // 拿門檻再篩一次會讓已結案的單顯示成「沒繳」
+  const checks: Record<CheckKey, boolean> =
+    canCloseReview || !report
+      ? { ...defaultConfirmations(report, photos.length), ...override }
+      : {
+          photos: report.photosConfirmed,
+          report: report.reportConfirmed,
+          reflections: report.reflectionsConfirmed,
+        }
   // 結案側:與申請值不同的實際值標色,hover 出預計值(與社團端詳情同一支 ActualValue)
   const actualTime = report ? `${report.actualStart}–${report.actualEnd}` : ''
   const timeChanged = !!report && !!d?.timeRange && !d.timeRange.includes(actualTime)
@@ -473,7 +489,7 @@ export default function ActivityReviewModal({
                 onChange={(v) => setTab(v as 'apply' | 'close')}
                 options={[
                   { value: 'apply', label: '申請' },
-                  { value: 'close', label: '結案', disabled: !report },
+                  { value: 'close', label: '結案', disabled: !hasCloseSide },
                 ]}
               />
             </>
@@ -750,7 +766,9 @@ export default function ActivityReviewModal({
         </>
         )}
 
-        {activeTab === 'close' && report && (
+        {activeTab === 'close' && (
+        <>
+        {report && (
         <>
         <div>
           <SectionTitle first>結案成果</SectionTitle>
@@ -898,10 +916,12 @@ export default function ActivityReviewModal({
             ))}
           </div>
         </div>
+        </>
+        )}
 
         <div style={{ gridColumn: '1 / -1' }}>
           <SectionTitle>簽核紀錄</SectionTitle>
-          <ApprovalLog rows={(d?.approvals ?? []).filter((r) => r.isClose)} />
+          <ApprovalLog rows={closeRows} />
         </div>
         </>
         )}

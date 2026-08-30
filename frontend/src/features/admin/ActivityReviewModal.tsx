@@ -11,7 +11,7 @@ import WorkTable from '../activities/WorkTable'
 import { ActualValue } from '../activities/ActivityPreviewModal'
 import DownloadMenu from '../activities/DownloadMenu'
 import { useFilePreview } from '../eval/useFilePreview'
-import { downloadEvalFile } from '../eval/files'
+import { downloadEvalFile, downloadPhotosZip } from '../eval/files'
 import { activityApplyPdf } from '../../api/activities'
 import {
   MIN_PHOTOS,
@@ -499,8 +499,19 @@ export default function ActivityReviewModal({
           {item && !singleStage && <StampTrail stages={stagesOf(item)} />}
           {item && (
             <DownloadMenu
-              items={[{ key: 'apply', label: '下載社團活動申請表' }]}
-              onClick={() => downloadEvalFile(activityApplyPdf(item, 'admin'))}
+              items={[
+                { key: 'photos', label: '下載照片檔', disabled: photos.length === 0 },
+                { key: 'apply', label: '下載社團活動申請表' },
+              ]}
+              onClick={({ key }) => {
+                if (key === 'photos') {
+                  downloadPhotosZip(`${item.name}_照片`, photos.map(toEvalFile)).catch((e: unknown) =>
+                    message.error(e instanceof Error ? e.message : '照片下載失敗'),
+                  )
+                  return
+                }
+                downloadEvalFile(activityApplyPdf(item, 'admin'))
+              }}
             />
           )}
         </div>

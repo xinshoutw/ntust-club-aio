@@ -262,7 +262,7 @@ async def delete_activity(
     if activity.status != ActivityStatus.DRAFT:
         raise conflict("僅草稿可刪除")
     disk_paths = []
-    for slot in (svc.PHOTO_SLOT, svc.ATTACHMENT_SLOT):
+    for slot in (svc.PHOTO_SLOT, svc.DOC_SLOT, svc.ATTACHMENT_SLOT):
         for f in await svc.activity_files(db, activity, slot):
             disk_paths.append(await file_service.delete_file(db, f))
     # 整張單連同附件一起實體刪除,比單刪一個檔更該留下紀錄

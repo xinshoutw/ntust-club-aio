@@ -204,7 +204,7 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
             <Form.Item name="maintenanceTotalMb" label="空間報修佐證（含影片）" style={{ marginBottom: 0 }}>
               <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item name="closePhotoTotalMb" label="活動結案照片" style={{ marginBottom: 0 }}>
+            <Form.Item name="closePhotoTotalMb" label="活動結案照片與附件" style={{ marginBottom: 0 }}>
               <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
             </Form.Item>
           </div>

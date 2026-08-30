@@ -9,7 +9,14 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { blurLeavesRow } from '../../lib/form'
 import { notFoundText } from '../../lib/selectOptions'
-import { CLOSE_DOC_ACCEPT, IMAGE_ACCEPT, fmtMB, isImageFile, sha256 } from '../../lib/uploads'
+import {
+  CLOSE_DOC_ACCEPT,
+  CLOSE_DOC_EXTENSIONS,
+  IMAGE_ACCEPT,
+  fmtMB,
+  isImageFile,
+  sha256,
+} from '../../lib/uploads'
 import {
   deleteActivityCloseDoc,
   deleteActivityPhoto,
@@ -351,6 +358,10 @@ function CloseForm({
     setProcessing((n) => n + 1)
     docQueue.current = docQueue.current.then(async () => {
       try {
+        if (!CLOSE_DOC_EXTENSIONS.some((ext) => f.name.toLowerCase().endsWith(ext))) {
+          message.error(`「${f.name}」不是可上傳的附件格式(PDF、DOC、DOCX 或圖片)`)
+          return
+        }
         if (usedBytes() + f.size > closePhotoBytes) {
           message.error(`照片與附件合計超過 ${Math.round(closePhotoBytes / 1024 / 1024)} MB 上限`)
           return

@@ -99,6 +99,7 @@ export const ACTION_LABELS: Record<string, string> = {
   activity_deleted: '刪除活動草稿',
   activity_photo_deleted: '刪除結案照片',
   activity_attachment_deleted: '刪除活動附件',
+  activity_close_doc_deleted: '刪除結案附件',
 }
 
 /** 動作顯示詞;沒對照到就顯示原始鍵(後端新加的動作不會因此消失) */

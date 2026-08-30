@@ -599,7 +599,9 @@ export default function ActivityReviewModal({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: hasBudget ? 'repeat(auto-fit, minmax(320px, 1fr))' : '1fr',
+          // 固定兩欄,不用 auto-fit:跨欄的簽核紀錄(1 / -1)佔滿每一軌,auto-fit 因此
+          // 不再收掉空軌 —— 1080 寬排得下三軌,兩欄就各縮成 320 並在右側留一整軌空白
+          gridTemplateColumns: hasBudget ? 'repeat(2, minmax(0, 1fr))' : '1fr',
           gap: '8px 28px',
           marginTop: 8,
         }}

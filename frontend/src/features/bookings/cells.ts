@@ -24,3 +24,24 @@ export const UNAVAILABLE_BG: Record<'blocked' | 'fixed' | 'temp', string> = {
  * 社團端與行政端的場況圖共用這條判定,兩邊的空格才不會講不同的話。 */
 export const emptyCellState = (venue: { allowFixed: boolean; allowTemp: boolean }): CellState =>
   venue.allowTemp ? 'free' : venue.allowFixed ? 'fixedOnly' : 'closed'
+
+// 器材借用程度色階(借用總覽的器材檢視):0–30% 沿用可借色,借滿與固定借用同色。
+// 場地是「借了沒」的二元狀態,器材是同一品項借掉幾成,兩張圖的圖例各一份
+export const USAGE_SCALE = [
+  { min: 0, label: '未滿 30%', bg: CELL.free.bg },
+  { min: 30, label: '30% 以上', bg: '#F2C744' },
+  { min: 50, label: '50% 以上', bg: '#E8833A' },
+  { min: 70, label: '70% 以上', bg: '#C13B34' },
+  { min: 99, label: '99% 以上', bg: '#7B4EA3' },
+  { min: 100, label: '已借滿', bg: CELL.fixed.bg },
+] as const
+
+export type UsageStep = (typeof USAGE_SCALE)[number]
+
+/** 佔用比例落在哪一階;總數 0(借不到)與全部借出同階 */
+export function usageStep(used: number, total: number): UsageStep {
+  const pct = total > 0 ? (used / total) * 100 : 100
+  let step: UsageStep = USAGE_SCALE[0]
+  for (const s of USAGE_SCALE) if (pct >= s.min) step = s
+  return step
+}

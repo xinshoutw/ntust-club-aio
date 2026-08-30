@@ -556,6 +556,39 @@ async def equipment_available_map(
     return {eid: max(total - used.get(eid, 0), 0) for eid, total in totals.items()}
 
 
+async def equipment_usage_by_day(
+    db: AsyncSession, start: date, end: date
+) -> dict[int, dict[date, int]]:
+    """區間內逐日佔用量:器材 → 日 → 件數(借用總覽的器材色格用)。
+
+    佔用判定與 `_occupies_window` 同一條:未退回未歸還的單子在自己的區間內佔用,
+    借出中(含逾期未還)自今天起一路佔用 —— 東西實體還在別人手上。
+    """
+    rows = await db.scalars(
+        sa.select(EquipmentLoan).where(
+            EquipmentLoan.status.notin_(
+                [LoanStatus.REJECTED, LoanStatus.RETURNED, LoanStatus.CANCELLED]
+            ),
+            sa.or_(
+                sa.and_(EquipmentLoan.start_date <= end, EquipmentLoan.end_date >= start),
+                EquipmentLoan.status == LoanStatus.CHECKED_OUT,
+            ),
+        )
+    )
+    today = today_taipei()
+    days = [start + timedelta(days=i) for i in range((end - start).days + 1)]
+    usage: dict[int, dict[date, int]] = {}
+    for loan in rows:
+        by_day = usage.setdefault(loan.equipment_id, {})
+        for day in days:
+            # or 不是加總:借出中的單子在自己區間內也只佔一次
+            if loan.start_date <= day <= loan.end_date or (
+                loan.status == LoanStatus.CHECKED_OUT and day >= today
+            ):
+                by_day[day] = by_day.get(day, 0) + loan.qty
+    return usage
+
+
 def next_workday_in(d: date, holidays: set[date]) -> date:
     """下一個上班日(跳過週末與政府行事曆假日);純函式,假日集合由呼叫端提供。"""
     cursor = d + timedelta(days=1)

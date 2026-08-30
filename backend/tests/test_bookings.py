@@ -891,6 +891,69 @@ async def test_equipment_available_within_window(client, db):
     ).status_code == 422
 
 
+async def test_equipment_usage_by_day(client, db):
+    """借用總覽的器材色格:逐日佔用量;借出中(逾期未還)自今天起一路佔用。"""
+    club = await setup_session(client, db)
+    eq = await make_equipment(db, name="投影機", total_qty=4)
+    today = date.today()
+    activity = await make_activity(db, club, day=today + timedelta(days=1))
+    resp = await client.post(
+        "/api/v1/club/equipment-loans",
+        json={
+            "equipment_id": eq.id,
+            "activity_id": activity.id,
+            "qty": 3,
+            "purpose": "營隊",
+            "phone": "0912000111",
+            "start_date": (today + timedelta(days=1)).isoformat(),
+            "end_date": (today + timedelta(days=2)).isoformat(),
+        },
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201, resp.text
+
+    # 逾期未還:原區間早已過去,仍佔著今天以後的每一天
+    db.add(
+        EquipmentLoan(
+            club_id=club.id,
+            equipment_id=eq.id,
+            qty=1,
+            start_date=today - timedelta(days=30),
+            end_date=today - timedelta(days=29),
+            status=LoanStatus.CHECKED_OUT,
+            purpose="上個月借走沒還",
+        )
+    )
+    await db.commit()
+
+    resp = await client.get(
+        "/api/v1/club/equipment/usage",
+        params={"start": today.isoformat(), "end": (today + timedelta(days=3)).isoformat()},
+    )
+    row = next(e for e in resp.json()["data"] if e["id"] == eq.id)
+    assert row["total_qty"] == 4
+    assert row["used"] == {
+        today.isoformat(): 1,
+        (today + timedelta(days=1)).isoformat(): 4,
+        (today + timedelta(days=2)).isoformat(): 4,
+        (today + timedelta(days=3)).isoformat(): 1,
+    }
+
+    # 區間上限與反向區間
+    assert (
+        await client.get(
+            "/api/v1/club/equipment/usage",
+            params={"start": today.isoformat(), "end": (today + timedelta(days=40)).isoformat()},
+        )
+    ).status_code == 422
+    assert (
+        await client.get(
+            "/api/v1/club/equipment/usage",
+            params={"start": today.isoformat(), "end": (today - timedelta(days=1)).isoformat()},
+        )
+    ).status_code == 422
+
+
 async def test_next_workday_skips_weekend_and_holiday(db):
     # 2026-03-06 是週五;隔天週六日跳過 → 週一 03-09;若週一是假日 → 03-10
     assert await next_workday(db, date(2026, 3, 6)) == date(2026, 3, 9)

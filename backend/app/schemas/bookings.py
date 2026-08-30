@@ -86,6 +86,15 @@ class EquipmentOut(BaseModel):
     available: int = 0  # 推導(帶 start/end 查詢時=該借用區間內的可借數)
 
 
+class EquipmentUsageOut(BaseModel):
+    """借用總覽的器材檢視:逐日佔用量(僅列有佔用的日期,其餘為 0)。"""
+
+    id: int
+    name: str
+    total_qty: int
+    used: dict[str, int]
+
+
 class RoomSlotIn(BaseModel):
     weekday: int = Field(ge=1, le=7)  # 1=週一 … 7=週日
     period: str

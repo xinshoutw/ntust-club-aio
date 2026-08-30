@@ -101,6 +101,22 @@ const toEquipment = (e: EquipmentOut): EquipmentItem => ({
   available: e.available,
 })
 
+/** 器材逐日佔用量(借用總覽的器材檢視) */
+export interface EquipmentUsage {
+  id: number
+  name: string
+  totalQty: number
+  /** ISO 日期 → 該日佔用件數;未列出=0 */
+  used: Record<string, number>
+}
+
+interface EquipmentUsageOut {
+  id: number
+  name: string
+  total_qty: number
+  used: Record<string, number>
+}
+
 // ---- 借用總覽色格(單日場況) ----
 
 /** 後端僅回傳被佔用/審核中的格子;其餘由前端依場地開放旗標補 可借/不開放 */
@@ -298,6 +314,8 @@ const keys = {
   returned: (page: number) => ['bookings', 'returned', page] as const,
   venues: ['bookings', 'venues'] as const,
   equipment: (range: [string, string] | null) => ['bookings', 'equipment', range] as const,
+  equipmentUsage: (startIso: string, endIso: string) =>
+    ['bookings', 'equipment-usage', startIso, endIso] as const,
   availability: (iso: string) => ['bookings', 'availability', iso] as const,
   availabilityRange: (startIso: string, endIso: string, venueId?: number) =>
     ['bookings', 'availability-range', startIso, endIso, venueId ?? null] as const,
@@ -327,6 +345,30 @@ export function useEquipmentList(range?: DateRange | null) {
       ).then((rows) => rows.map(toEquipment)),
     // 換區間時保留舊列表避免表格閃空;呼叫端以 isPlaceholderData 判斷可借數是否已對應新區間
     placeholderData: keepPreviousData,
+  })
+}
+
+/** 借用總覽的器材色格:區間內每項器材的逐日佔用量(未列出的日期=0) */
+export function useEquipmentUsage(range: DateRange, enabled = true) {
+  const [startIso, endIso] = [toIso(range[0]), toIso(range[1])]
+  return useQuery({
+    queryKey: keys.equipmentUsage(startIso, endIso),
+    enabled,
+    queryFn: () =>
+      api<EquipmentUsageOut[]>(
+        `/club/equipment/usage${qs({ start: startIso, end: endIso })}`,
+      ).then((rows) =>
+        rows.map(
+          (e): EquipmentUsage => ({
+            id: e.id,
+            name: e.name,
+            totalQty: e.total_qty,
+            used: e.used,
+          }),
+        ),
+      ),
+    // 不留舊資料:格值是「日期 → 佔用量」,換區間後沒對到的日期會退成 0,
+    // 看起來像「這天沒人借」—— 換區間就重新載入,寧可閃一下骨架
   })
 }
 

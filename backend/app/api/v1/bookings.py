@@ -35,6 +35,7 @@ from app.schemas.bookings import (
     EquipmentLoanIn,
     EquipmentLoanOut,
     EquipmentOut,
+    EquipmentUsageOut,
     FixedOccupancyOut,
     RoomBookingIn,
     RoomBookingOut,
@@ -165,6 +166,36 @@ async def availability_range(
     grids = await svc.availability_grids(db, start, end, user.club_id, venue_id=venue)
     return ApiResponse(
         data={"days": [{"date": d.isoformat(), "grid": g} for d, g in grids.items()]}
+    )
+
+
+@router.get("/equipment/usage")
+async def equipment_usage(
+    user: ClubUser, db: DbDep, start: date, end: date
+) -> ApiResponse[list[EquipmentUsageOut]]:
+    """借用總覽的器材檢視:區間內每項器材逐日的佔用量(色格依 佔用/總數 上色)。"""
+    if end < start:
+        raise validation_error("結束日期不得早於開始日期")
+    if (end - start).days + 1 > MAX_AVAILABILITY_SPAN_DAYS:
+        raise validation_error(f"查詢區間最多 {MAX_AVAILABILITY_SPAN_DAYS} 天")
+    rows = (
+        await db.scalars(
+            sa.select(Equipment)
+            .where(Equipment.is_active.is_(True))
+            .order_by(Equipment.sort, Equipment.id)
+        )
+    ).all()
+    usage = await svc.equipment_usage_by_day(db, start, end)
+    return ApiResponse(
+        data=[
+            EquipmentUsageOut(
+                id=eq.id,
+                name=eq.name,
+                total_qty=eq.total_qty,
+                used={d.isoformat(): qty for d, qty in sorted(usage.get(eq.id, {}).items())},
+            )
+            for eq in rows
+        ]
     )
 
 

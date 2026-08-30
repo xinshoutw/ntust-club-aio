@@ -33,6 +33,7 @@ async def make_loan(
     start=None,
     end=None,
     borrower=None,
+    checkout_by=None,
 ):
     """借用單工廠:activity_id=None(模型允許;舊系統斷鏈/行政手動借用同形)。"""
     eq = Equipment(name=eq_name, total_qty=10, needs_serial=needs_serial)
@@ -50,6 +51,7 @@ async def make_loan(
         phone="0912-345678",
         status=status,
         borrower_name=borrower,
+        checkout_by=checkout_by,
     )
     db.add(loan)
     await db.commit()
@@ -278,6 +280,7 @@ async def test_loan_lists_and_overdue_filter(client, db):
     by_id = {r["id"]: r for r in body["data"]}
     assert by_id[approved.id]["club_name"] == club.name
     assert by_id[approved.id]["needs_serial"] is False
+    assert by_id[approved.id]["checkout_by_name"] is None  # 還沒借出就沒有出借人
     assert by_id[manual.id]["club_name"] is None
     assert all(r["overdue"] is False for r in body["data"])
 
@@ -319,7 +322,7 @@ async def test_checkout_state(client, db, monkeypatch):
     loan, _ = await make_loan(db, club.id, eq_name="無線麥克風", needs_serial=True, qty=2)
     url = f"/api/v1/staff/equipment-loans/{loan.id}/checkout"
 
-    # 借用人空白 → 422
+    # 收件人空白 → 422
     resp = await client.post(
         url, json={"borrower_name": "  "}, headers=csrf_headers(client)
     )
@@ -339,9 +342,15 @@ async def test_checkout_state(client, db, monkeypatch):
     assert "serials" not in data
     # 借出點交要聯絡得到申請人
     assert data["phone"] == "0912-345678"
+    assert data["checkout_by_name"] == staff.name
     await db.refresh(loan)
     assert loan.checkout_by == staff.id
     assert loan.checkout_at is not None
+    # 出借人要跟著進待歸還清單:歸還點交當下得看得出當初是誰借出的
+    listed = (await client.get(
+        "/api/v1/staff/equipment-loans", params={"status": "checked_out"}
+    )).json()["data"]
+    assert [r["checkout_by_name"] for r in listed] == [staff.name]
     audit_row = await db.scalar(
         sa.select(AuditLog).where(AuditLog.action == "equipment_checked_out")
     )
@@ -386,8 +395,10 @@ async def test_checkout_state(client, db, monkeypatch):
 async def test_checkin_flow(client, db, monkeypatch):
     staff, club = await seed(client, db)
     _mute_club_event(monkeypatch)
+    lender = await make_user(db, username="pt02", role="staff", name="李出借")
     loan, _ = await make_loan(
-        db, club.id, status="checked_out", eq_name="行動音響", borrower="陳借用"
+        db, club.id, status="checked_out", eq_name="行動音響", borrower="陳借用",
+        checkout_by=lender.id,
     )
     url = f"/api/v1/staff/equipment-loans/{loan.id}/checkin"
 
@@ -400,7 +411,10 @@ async def test_checkin_flow(client, db, monkeypatch):
         headers=csrf_headers(client),
     )
     assert resp.status_code == 200, resp.text
-    assert resp.json()["data"]["status"] == "returned"
+    data = resp.json()["data"]
+    assert data["status"] == "returned"
+    # 出借人是當初辦理借出的人,不是此刻點收的 staff
+    assert data["checkout_by_name"] == lender.name != staff.name
     await db.refresh(loan)
     assert loan.returner_name == "張歸還"
     assert loan.checkin_note == "外觀完好"

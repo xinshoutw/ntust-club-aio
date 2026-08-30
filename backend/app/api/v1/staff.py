@@ -16,7 +16,7 @@ from app.api.pagination import Pagination, parse_sort
 from app.api.v1.admin_violations import _FILLER, _SORTABLE, _STATUS_ORDER, _to_out
 from app.core.deps import CurrentUser, DbDep, client_ip, require_staff
 from app.core.errors import conflict, not_found, validation_error
-from app.models import Club, Equipment, EquipmentLoan, Violation
+from app.models import Club, Equipment, EquipmentLoan, User, Violation
 from app.models.enums import LoanStatus
 from app.schemas.admin import AdminViolationOut
 from app.schemas.common import ApiResponse
@@ -36,6 +36,8 @@ router = APIRouter(prefix="/staff", tags=["staff"])
 StaffUser = Annotated[CurrentUser, Depends(require_staff)]
 
 StaffLoanStatus = Literal["approved", "checked_out", "overdue"]
+
+_CHECKOUT_BY = sa.orm.aliased(User)  # 出借人:辦理借出點交的工讀生
 
 
 # ---- 基礎資料(違規開立下拉) ----
@@ -146,11 +148,13 @@ def _loan_out(
     equipment: Equipment,
     return_time: str,
     holidays: set,
+    checkout_by_name: str | None,
 ) -> StaffEquipmentLoanOut:
     out = StaffEquipmentLoanOut.model_validate(loan)
     out.club_name = club_name  # None=行政手動借用(前端顯示「學務處」)
     out.equipment_name = equipment.name
     out.needs_serial = equipment.needs_serial
+    out.checkout_by_name = checkout_by_name
     out.overdue = svc.is_overdue_in(loan, return_time, holidays)
     out.overdue_deadline = svc.overdue_deadline_in(loan.end_date, return_time, holidays)
     return out
@@ -171,9 +175,11 @@ async def list_equipment_loans(
     holidays = await svc.load_holidays(db)
 
     query = (
-        sa.select(EquipmentLoan, Club.name, Equipment)
+        sa.select(EquipmentLoan, Club.name, Equipment, _CHECKOUT_BY.name)
         .outerjoin(Club, EquipmentLoan.club_id == Club.id)  # NULL club=行政手動借用
         .join(Equipment, EquipmentLoan.equipment_id == Equipment.id)
+        # 尚未借出的單沒有出借人(approved 那條清單整批如此)→ outerjoin
+        .outerjoin(_CHECKOUT_BY, EquipmentLoan.checkout_by == _CHECKOUT_BY.id)
     )
     if status == "overdue":
         threshold = svc.overdue_threshold_in(datetime.now(UTC), return_time, holidays)
@@ -193,8 +199,8 @@ async def list_equipment_loans(
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = await db.execute(query.offset(page.offset).limit(page.page_size))
     data = [
-        _loan_out(loan, club_name, equipment, return_time, holidays)
-        for loan, club_name, equipment in rows
+        _loan_out(loan, club_name, equipment, return_time, holidays, checkout_by_name)
+        for loan, club_name, equipment, checkout_by_name in rows
     ]
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
@@ -259,7 +265,7 @@ async def checkout_equipment_loan(
         loan.club_id,
         "alert",
         "器材已借出",
-        f"{equipment.name} ×{loan.qty}(借用人 {body.borrower_name},"
+        f"{equipment.name} ×{loan.qty}(收件人 {body.borrower_name},"
         f"借用區間 {loan.start_date}~{loan.end_date})",
     )
     return_time = await get_setting(db, "equipment_return_time")
@@ -267,7 +273,7 @@ async def checkout_equipment_loan(
     club_name = None
     if loan.club_id is not None:
         club_name = await db.scalar(sa.select(Club.name).where(Club.id == loan.club_id))
-    return ApiResponse(data=_loan_out(loan, club_name, equipment, return_time, holidays))
+    return ApiResponse(data=_loan_out(loan, club_name, equipment, return_time, holidays, user.name))
 
 
 @router.post("/equipment-loans/{loan_id}/checkin")
@@ -312,7 +318,9 @@ async def checkin_equipment_loan(
     club_name = None
     if loan.club_id is not None:
         club_name = await db.scalar(sa.select(Club.name).where(Club.id == loan.club_id))
-    return ApiResponse(data=_loan_out(loan, club_name, equipment, return_time, holidays))
+    # 出借人是當初辦理借出的工讀生,不是此刻點收的人
+    lender = await db.scalar(sa.select(User.name).where(User.id == loan.checkout_by))
+    return ApiResponse(data=_loan_out(loan, club_name, equipment, return_time, holidays, lender))
 
 
 @router.post("/equipment-loans/{loan_id}/remind")

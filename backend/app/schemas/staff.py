@@ -69,7 +69,8 @@ class StaffEquipmentLoanOut(BaseModel):
     purpose: str
     phone: str | None = None  # 申請時填的聯絡人電話
     status: LoanStatus
-    borrower_name: str | None = None  # 借出點交時登記
+    borrower_name: str | None = None  # 收件人(借出點交時登記)
+    checkout_by_name: str | None = None  # 出借人(辦理借出點交的工讀生;未點交為 None)
     overdue: bool = False  # 推導:結束日之隔天上班日 10:30 未歸還
     overdue_deadline: dt.datetime | None = None  # 應歸還時限(台北時區;推導不儲存)
     # 上次寄出歸還提醒的時間:排程每 3 個上班日自動寄一次,人工按之前先看這個

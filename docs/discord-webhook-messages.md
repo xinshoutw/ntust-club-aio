@@ -131,7 +131,7 @@ D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政�
 **器材點交(工讀生端)**
 
 - **J1 器材已借出** `POST /staff/equipment-loans/{id}/checkout` · alert
-  `器材已借出` / `{equipment.name} ×{qty}(借用人 {borrower_name},借用區間 {start}~{end})`
+  `器材已借出` / `{equipment.name} ×{qty}(收件人 {borrower_name},借用區間 {start}~{end})`
 - **J2 器材已歸還** `POST /staff/equipment-loans/{id}/checkin` · approve
   `器材已歸還` / `{equipment.name} ×{qty}(歸還人 {returner_name})`
 

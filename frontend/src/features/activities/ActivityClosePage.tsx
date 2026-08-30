@@ -13,7 +13,9 @@ import {
   CLOSE_DOC_ACCEPT,
   CLOSE_DOC_EXTENSIONS,
   IMAGE_ACCEPT,
+  IMAGE_EXTENSIONS,
   fmtMB,
+  hasAllowedExtension,
   isImageFile,
   sha256,
 } from '../../lib/uploads'
@@ -187,6 +189,7 @@ export default function ActivityClosePage() {
             activity={activity}
             detail={detailQuery.data}
             closePhotoBytes={configQuery.data.uploadLimits.closePhotoBytes}
+            imgBytes={configQuery.data.uploadLimits.imgBytes}
             // 可結案的活動依定義已經結束,多半落在舊學期 —— 不帶學期回去就是空清單
             onDone={() => navigate(activityPath(activity))}
           />
@@ -209,11 +212,13 @@ function CloseForm({
   activity,
   detail,
   closePhotoBytes,
+  imgBytes,
   onDone,
 }: {
   activity: ClubActivity
   detail: ClubActivityDetail
   closePhotoBytes: number
+  imgBytes: number
   onDone: () => void
 }) {
   const { message } = App.useApp()
@@ -327,8 +332,14 @@ function CloseForm({
     setProcessing((n) => n + 1)
     photoQueue.current = photoQueue.current.then(async () => {
       try {
-        if (!(await isImageFile(f))) {
+        if (!(await isImageFile(f)) || !hasAllowedExtension(f.name, IMAGE_EXTENSIONS)) {
           message.error(`「${f.name}」不是有效的圖片檔`)
+          return
+        }
+        // 單檔上限與後端 IMAGE policy 同一個值(system_settings 可調):
+        // 不比的話 12MB 的照片要等按下送出才吃 413,前面傳好的整批回滾
+        if (f.size > imgBytes) {
+          message.error(`「${f.name}」超過 ${Math.round(imgBytes / 1024 / 1024)} MB 單檔上限`)
           return
         }
         if (usedBytes() + f.size > closePhotoBytes) {
@@ -358,7 +369,7 @@ function CloseForm({
     setProcessing((n) => n + 1)
     docQueue.current = docQueue.current.then(async () => {
       try {
-        if (!CLOSE_DOC_EXTENSIONS.some((ext) => f.name.toLowerCase().endsWith(ext))) {
+        if (!hasAllowedExtension(f.name, CLOSE_DOC_EXTENSIONS)) {
           message.error(`「${f.name}」不是可上傳的附件格式(PDF、DOC、DOCX 或圖片)`)
           return
         }
@@ -844,7 +855,7 @@ function CloseForm({
               <div style={label}>
                 活動照片{requiredMark}
                 {/* 送出門檻是 1 張;MIN_PHOTOS 是承辦審核時的參考張數,計不計分看承辦的確認 */}
-                <Tooltip title={`至少 1 張即可送出;達 ${MIN_PHOTOS} 張或附影片連結,承辦通常會採計評鑑分`}>
+                <Tooltip title={`請上傳至少 1 張圖片`}>
                   <InfoCircleOutlined style={{ marginLeft: 6, color: 'var(--steel)' }} />
                 </Tooltip>
               </div>

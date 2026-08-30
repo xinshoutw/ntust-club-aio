@@ -657,6 +657,38 @@ async def test_close_docs_share_the_photo_quota(client, db):
     assert resp.status_code == 409
 
 
+async def test_deleting_a_draft_sweeps_every_slot(client, db):
+    """刪草稿要掃三個 slot:files 對活動是 subject_id 軟關聯,沒有 FK cascade ——
+    漏掃一個 slot 就是 DB 列與磁碟檔一起變孤兒,還繼續佔社團儲存配額。"""
+    from app.models import File
+
+    await setup_session(client, db)
+    past = (date.today() - timedelta(days=3)).isoformat()
+    activity = await create_activity(client, date=past)
+    aid = activity["id"]
+    await client.post(
+        f"/api/v1/club/activities/{aid}/attachments",
+        files={"file": ("企劃書.pdf", io.BytesIO(b"%PDF-1.7 "), "application/pdf")},
+        headers=csrf_headers(client),
+    )
+    # 結案照片與附件只有已核准才收得下;先核准、傳完再放回草稿,製造三個 slot 都有檔的列
+    await approve(db, aid)
+    await upload_photo(client, aid)
+    await client.post(
+        f"/api/v1/club/activities/{aid}/docs",
+        files={"file": ("保單.pdf", io.BytesIO(b"%PDF-1.7 "), "application/pdf")},
+        headers=csrf_headers(client),
+    )
+    await db.execute(sa.update(Activity).where(Activity.id == aid).values(status="draft"))
+    await db.commit()
+    assert await db.scalar(sa.select(sa.func.count()).select_from(File)) == 3
+
+    resp = await client.delete(f"/api/v1/club/activities/{aid}", headers=csrf_headers(client))
+    assert resp.status_code == 200, resp.text
+    assert await db.scalar(sa.select(sa.func.count()).select_from(File)) == 0
+    assert not [p for p in settings.upload_dir.rglob("*") if p.is_file()]
+
+
 async def test_list_filters_and_sorting(client, db):
     await setup_session(client, db)
     await create_activity(client, name="甲", date="2026-03-01", type="社課或會議")

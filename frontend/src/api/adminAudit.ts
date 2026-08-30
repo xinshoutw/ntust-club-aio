@@ -100,6 +100,8 @@ export const ACTION_LABELS: Record<string, string> = {
   activity_photo_deleted: '刪除結案照片',
   activity_attachment_deleted: '刪除活動附件',
   activity_close_doc_deleted: '刪除結案附件',
+  venue_created: '新增場地',
+  venue_updated: '修改場地',
 }
 
 /** 動作顯示詞;沒對照到就顯示原始鍵(後端新加的動作不會因此消失) */

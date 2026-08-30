@@ -260,7 +260,10 @@ DOCUMENT = UploadPolicy(
 # 上限固定 50MB(不入 upload_limits),與前端 PostalPage 一致
 PASSBOOK = UploadPolicy("passbook", IMAGE.extensions | frozenset({".pdf"}), 50 * _MB)
 # 結案附件(保單、租車契約、簽到表、講師資料…):收的正是預覽得了的四類,
-# 其餘擋在門口 —— 舊系統不限格式,搬進來就是一堆開不起來的 zip 與 .doc
+# 其餘擋在門口 —— 舊系統不限格式,搬進來就是一堆開不起來的 zip 與 .doc。
+# 上限固定 50MB(不入 upload_limits,同 PASSBOOK):這一格同時收文件與掃描影像,
+# 掛 doc 或 img 任一把鍵都會讓另一種的實際上限說不清楚;
+# 真正卡住社團的是 close_photo_total_mb 那個與照片共用的加總上限
 REPORT_DOC = UploadPolicy("report_doc", DOCUMENT.extensions | IMAGE.extensions, 50 * _MB)
 ARCHIVE = UploadPolicy("archive", frozenset({".zip"}), 100 * _MB, settings_key="zip")
 VIDEO = UploadPolicy("video", frozenset({".mp4", ".mov"}), 200 * _MB, settings_key="video")

@@ -34,7 +34,7 @@ type SortKey = 'name' | 'type' | 'date' | 'status'
 // 會讓該社的大型活動整批消失,而列上還畫著大型徽章
 const TYPE_OPTIONS = ['社課或會議', '活動', '大型活動']
 
-// 社團端活動列表的行政唯讀版:同一張表、同一個詳情彈窗(features/activities/ActivityPreviewModal),
+// 社團端活動列表的行政唯讀版:同一張表;詳情彈窗走行政端那支(features/admin/ActivityReviewModal),
 // 差別只有三處 —— 沒有動作欄、沒有草稿區(草稿不進行政視野)、詳情沒有編輯/結案按鈕。
 // 欄序、欄寬與經費欄的 MoneyPair 都跟著社團端走:兩頁刻意長一樣,改一頁沒改另一頁
 // 就是同一張表在兩個地方長不一樣(類型漏斗是唯一例外,見上)。
@@ -241,7 +241,7 @@ export default function AdminClubActivitiesPage() {
       </div>
 
       {/* 唯讀:不給 onApprove / onReject,簽核鈕自然收掉。與申請審核、結案審核同一支彈窗。
-          `key` + 條件掛載(全站五處同型):換一列就重掛,彈窗內的頁籤與核定金額不跨單據殘留 */}
+          `key` + 條件掛載(全站六處掛載點同型):換一列就重掛,彈窗內的頁籤與核定金額不跨單據殘留 */}
       {preview && (
         <ActivityReviewModal
           key={preview.id}

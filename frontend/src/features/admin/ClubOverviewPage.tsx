@@ -373,9 +373,15 @@ export default function ClubOverviewPage() {
           onApprove={(p) =>
             actMutations.approve.mutateAsync({
               id: reviewId,
-              fundSource: p.fundSource || undefined,
-              budget: p.budget,
-              isLargeApproved: reviewItem?.type === '活動' ? p.largeApproved : undefined,
+              // 僅第一關送核定內容(同申請審核頁);後兩關省略欄位=不動。
+              // `is_large_approved` 後端每一關都套,不把關就會把遷入件的 NULL 寫成 false ——
+              // 靜靜清掉大型活動認可,而那是 ×3 行政分
+              fundSource: reviewItem?.status === 'pending_advisor' ? p.fundSource : undefined,
+              budget: reviewItem?.status === 'pending_advisor' ? p.budget : [],
+              isLargeApproved:
+                reviewItem?.status === 'pending_advisor' && reviewItem.type === '活動'
+                  ? p.largeApproved
+                  : undefined,
             })
           }
           onReject={(reason) => actMutations.reject.mutateAsync({ id: reviewId, reason })}

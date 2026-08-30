@@ -567,8 +567,10 @@ async def equipment_usage_by_day(
 ) -> dict[int, dict[date, int]]:
     """區間內逐日佔用量:器材 → 日 → 件數(借用總覽的器材色格用)。
 
-    佔用判定與 `_occupies_window` 同一條:未退回未歸還的單子在自己的區間內佔用,
-    借出中(含逾期未還)自今天起一路佔用 —— 東西實體還在別人手上。
+    佔用來源與 `_occupies_window` 同一組單子(未退回、未歸還、未取消),但這裡逐日判定:
+    單子在自己的區間內佔用,借出中(含逾期未還)另從**今天**起一路佔用 —— 東西實體還在
+    別人手上。`_occupies_window` 是列級條件,查詢區間涵蓋今天時會把借出中的單子算進
+    整段(含區間裡已經過去的日子),兩者對過去的日子答案不同,不要互相拿來當保證。
     """
     rows = await db.scalars(
         sa.select(EquipmentLoan).where(

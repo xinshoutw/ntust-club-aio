@@ -74,8 +74,8 @@ class VenueBooking(Base, TimestampMixin):
 class EquipmentLoan(Base, TimestampMixin):
     """器材借用:一單一品項;逾期=推導(checked_out 且過了 end_date 隔天上班日 10:30)。
 
-    綁定審核通過活動,借用區間由活動起訖 ± 工作天緩衝推導後寫入
-    start/end_date(申請當下的區間快照;之後調整緩衝設定不回溯已成立的借用)。
+    綁定審核通過活動;借用區間(start/end_date)由申請者自填 —— 提前籌備與事後驗收
+    的天數推導不出來,行政手動借用同樣自填(補登歷史借用)。
     """
 
     __tablename__ = "equipment_loans"

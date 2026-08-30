@@ -134,7 +134,7 @@ erDiagram
 
 場地不開放規則。`weekdays` 為 ISO 1–7,NULL=區間內每天;`periods` 為不開放的節次子集。場況圖標示不開放、社團申請 422、核准 409 `SLOT_BLOCKED`;行政手動借用不受限。刪除為硬刪,異動走 `audit_logs`。
 
-**holidays**(date PK, name)— 政府行事曆假日;器材逾期的「隔天上班日」與工作天緩衝都依此。**尚無匯入介面**,每年需以 script 或直接操作 DB 灌入;未匯入的年度會退化成只排除週六日。
+**holidays**(date PK, name)— 政府行事曆假日;器材逾期的「隔天上班日」與催還間隔的工作天推算都依此。**尚無匯入介面**,每年需以 script 或直接操作 DB 灌入;未匯入的年度會退化成只排除週六日。
 
 **system_settings**(key PK, value jsonb)— 見 §4 設定分層。
 
@@ -259,7 +259,7 @@ approved 且 end_date + N 天已過且未送結案 → 逾期鎖定(推導,非�
 |---|---|
 | id, club_id NULL, equipment_id, qty, phone NULL | 一單一品項;多品項=多單,點交與逾期各自獨立 |
 | activity_id | FK activities NULL(容手動借用與舊系統已刪活動;新申請必填) |
-| start_date / end_date | 借用區間 = 活動起訖 ∓ 工作天緩衝的**推導快照**;之後調整緩衝設定不回溯既有借用 |
+| start_date / end_date | 借用區間;社團自填(含活動前籌備與活動後驗收),行政手動借用亦自填 |
 | purpose | |
 | status | enum(pending, approved, rejected, cancelled, checked_out, returned) |
 | checkout_by / at / borrower_name | 借出點交(工讀生) |

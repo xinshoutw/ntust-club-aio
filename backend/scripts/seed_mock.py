@@ -875,7 +875,7 @@ async def _create_bookings(
     ]
     db.add(approved_room)
 
-    # 器材借用(區間=活動起訖 ± 工作天緩衝的快照)
+    # 器材借用(區間由申請時自填)
     loans = [
         EquipmentLoan(  # 待審
             club_id=csie.id, equipment_id=equipment["電腦單槍投影機"].id,

@@ -64,7 +64,27 @@ uv run python ../migration/cms_import.py --reset    # 3. 再清社團/活動/公
 
 指導老師欄位不還原(非 id-map 型,重跑本來就會覆寫)。
 
+### 名冊修正(`apply_roster_fixes`)
+
+承辦名冊與舊庫 `Club_clubproperty` 不一致的社團,列在 `cms_import.py` 的
+`NEW_CLUBS` / `REACTIVATE_CLUBS` / `DEACTIVATE_CLUBS`,由 `import_clubs` 之後那一步套用。
+**這些修正一定要走這裡、不能只改 DB**:社團的 `is_active` 與 `attribute` 是從舊庫的
+「停社」推出來的,換 dump 重匯就會被打回舊值。
+
+冪等:三種修正都只在狀態還不對時動手,重跑不會二次生效(復社的密碼只在停用→啟用
+那一次重設,不會洗掉已發給承辦的密碼)。停用的帳號會從一次性密碼 CSV 裡剔除;
+復社的會補進去(`import_clubs` 只在 `not defunct` 時 append,停社社團的密碼從來沒印出來過)。
+
+已在用的庫要單獨套修正,不要跑完整重匯(會覆寫指導老師欄位):
+
+```bash
+uv run python ../migration/cms_import.py --fixes-only   # 只跑名冊修正,不連舊庫
+```
+
+驗收:`users.role='club'` 且社團與帳號皆 active 的筆數 = 承辦名冊的有效列數(115-1 為 86)。
+
 - 一次性密碼輸出到 `migration/out/one_time_passwords_*.csv`(**含明碼,不入版控**,
+  `--fixes-only` 產出的另帶 `_fixes` 字尾,不覆蓋完整重匯那份;
   交承辦發放後銷毀);所有帳號 `must_change_password=True`
 - **活動照片遷**(MIG-12,`media_import.py`);**企劃書與結案附件的檔案實體不遷**,
   裡面的文字走 `text_fields.py` 的人工轉錄 CSV(MIG-13)

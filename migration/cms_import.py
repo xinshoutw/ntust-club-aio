@@ -38,6 +38,7 @@ from app.models import (
     Club,
     ClubMember,
     LegacyIdMap,
+    Session,
     User,
 )
 from app.models.enums import (
@@ -76,6 +77,7 @@ def _actual(n: int | None) -> int:
     """結案回報的實際人數。0 是有效值,只有 NULL 才是沒填。"""
     return 0 if n is None else n
 
+
 TAIPEI = ZoneInfo("Asia/Taipei")
 
 # 遷移範圍(decisions.md MIG-08):只有活動受這個區間限制;社員名單與公告全遷(MIG-11)。
@@ -88,6 +90,7 @@ SCOPE_LAST_SEMESTER = "115-1"
 def _scope_bounds() -> tuple[datetime, datetime]:
     """遷移範圍的 timestamptz 半開區間 [start, end);日界推導只有 semesters.py 一份。"""
     return semester_bounds(SCOPE_FIRST_SEMESTER)[0], semester_bounds(SCOPE_LAST_SEMESTER)[1]
+
 
 # ---------------------------------------------------------------------------
 # 對映規則
@@ -102,6 +105,23 @@ SKIP_STAFF = {"test", "apitest", "admintest1", "admintest2", "admintest3", "0000
 # 看不出是不是正式用途的:遷入但停用,由承辦逐一開通。observer 會拿到 can_view_eval,
 # 上線第一天就能對社團評鑑打分,密碼還印在一次性密碼發放 CSV 裡
 INACTIVE_STAFF = {"viewer", "ntustclub"}
+
+# 承辦名冊(115-1)與舊庫 `Club_clubproperty` 不符的社團,由 `apply_roster_fixes` 補正。
+# 舊庫沒有這三種資訊,推不出來也遷不進來,只能列名單:
+#   - 新社團:舊系統根本沒建過(帳號同時確認過新舊庫皆未使用)
+#   - 復社:舊庫仍掛「停社」但名冊上是現行社團
+#   - 停社:舊庫仍掛性質但名冊上已無此社團
+# 換 dump 重匯後舊值會回來,所以修正必須跟著管線重放,不能只改 DB。
+NEW_CLUBS = [
+    ("121", "資通系學會", ClubAttribute.AUTONOMOUS),
+    ("211", "3D創意研究社", ClubAttribute.ACADEMIC),
+]
+# 復社;舊庫停社時 attribute 一律 NULL,啟用同時要補回性質(否則整個從社團漏斗消失)
+REACTIVATE_CLUBS = {
+    "002": ClubAttribute.AUTONOMOUS,  # 學生議會(名冊寫「學生議會議長」,那是職稱)
+    "402": ClubAttribute.SOCIAL,  # 僑生聯誼社
+}
+DEACTIVATE_CLUBS = {"208", "249", "258", "305", "507", "730", "736", "737"}
 
 # 名稱結尾推導不到時的手動指定;未列出者預設 社團
 KIND_OVERRIDES = {
@@ -169,7 +189,8 @@ REJECTED_LEGACY_STATUS = frozenset({1})
 # 結案意見,寫進 fund_source 會印在申請表的「意見回饋」上 —— 只留 reason
 FUND_SOURCE_LEGACY_STATUS = frozenset({0, 4, 5, 11})
 FUND_SOURCE_MAX = next(
-    m.max_length for m in ApproveActivityIn.model_fields["fund_source"].metadata
+    m.max_length
+    for m in ApproveActivityIn.model_fields["fund_source"].metadata
     if hasattr(m, "max_length")
 )
 
@@ -227,9 +248,9 @@ class IdMap:
 
     async def load(self, db: AsyncSession) -> None:
         rows = await db.execute(
-            sa.select(
-                LegacyIdMap.legacy_table, LegacyIdMap.legacy_id, LegacyIdMap.new_id
-            ).where(LegacyIdMap.legacy_system == self.system)
+            sa.select(LegacyIdMap.legacy_table, LegacyIdMap.legacy_id, LegacyIdMap.new_id).where(
+                LegacyIdMap.legacy_system == self.system
+            )
         )
         for table, legacy_id, new_id in rows:
             self._map[(table, legacy_id)] = new_id
@@ -342,6 +363,85 @@ async def import_clubs(
     if unmapped_attr:
         print(f"  性質未映射 → NULL:{unmapped_attr}")
     return result
+
+
+async def apply_roster_fixes(db: AsyncSession, passwords: list[tuple[str, str, str]]) -> None:
+    """把 NEW_CLUBS / REACTIVATE_CLUBS / DEACTIVATE_CLUBS 套到剛匯入的社團上。
+
+    冪等:三種修正都只在「狀態還不對」時動手,重跑不會二次生效 —— 尤其密碼,復社時
+    才重設,已啟用的重跑不會把發給承辦的密碼洗掉。
+    """
+    accounts = {
+        u.username: u
+        for u in await db.scalars(
+            sa.select(User)
+            .where(User.role == UserRole.CLUB)
+            .where(
+                User.username.in_(
+                    {u for u, _, _ in NEW_CLUBS} | REACTIVATE_CLUBS.keys() | DEACTIVATE_CLUBS
+                )
+            )
+        )
+    }
+    clubs = {
+        u.username: await db.get(Club, u.club_id)
+        for u in accounts.values()
+        if u.club_id is not None
+    }
+
+    created = []
+    for username, name, attribute in NEW_CLUBS:
+        if username in accounts:
+            continue  # `--reset` 不會刪這兩社(不在 legacy_id_map),重匯後仍在
+        club = Club(name=name, kind=derive_club_kind(name), attribute=attribute)
+        db.add(club)
+        await db.flush()
+        password = generate_password()
+        db.add(
+            User(
+                role=UserRole.CLUB,
+                username=username,
+                password_hash=hash_password(password),
+                name=name,
+                club_id=club.id,
+                must_change_password=True,
+            )
+        )
+        passwords.append(("club", username, password))
+        created.append(username)
+
+    reactivated = []
+    for username, attribute in REACTIVATE_CLUBS.items():
+        account, club = accounts.get(username), clubs.get(username)
+        if account is None or club is None:
+            continue
+        club.attribute = attribute
+        if club.is_active and account.is_active:
+            continue
+        club.is_active = account.is_active = True
+        # 舊庫停社的社團,`import_clubs` 沒把密碼寫進發放 CSV(只在 not defunct 時 append),
+        # 復社後承辦手上沒有密碼可發 —— 重設一次並補進同一份 CSV
+        password = generate_password()
+        account.password_hash = hash_password(password)
+        account.must_change_password = True
+        passwords.append(("club", username, password))
+        reactivated.append(username)
+
+    deactivated = []
+    for username in sorted(DEACTIVATE_CLUBS):
+        account, club = accounts.get(username), clubs.get(username)
+        if account is None or club is None:
+            continue
+        if not club.is_active and not account.is_active:
+            continue  # 已停用;重跑要印「這次做了什麼」,不是「名單上有幾個」
+        # 只停用,活動/借用/社員等歷史資料全數保留(與行政端按停用同一個行為)
+        club.is_active = account.is_active = False
+        await db.execute(sa.delete(Session).where(Session.user_id == account.id))
+        deactivated.append(username)
+    # 停用帳號的密碼不該還印在交給承辦的發放表上
+    passwords[:] = [p for p in passwords if not (p[0] == "club" and p[1] in DEACTIVATE_CLUBS)]
+
+    print(f"名冊修正:新建 {created or '—'}、復社 {reactivated or '—'}、停社 {deactivated or '—'}")
 
 
 async def import_staff(
@@ -510,9 +610,7 @@ async def import_members(legacy, db: AsyncSession, ids: IdMap, clubs) -> None:
     existing_keys = {
         (club_id, student_id, semester): member_id
         for member_id, club_id, student_id, semester in await db.execute(
-            sa.select(
-                ClubMember.id, ClubMember.club_id, ClubMember.student_id, ClubMember.semester
-            )
+            sa.select(ClubMember.id, ClubMember.club_id, ClubMember.student_id, ClubMember.semester)
         )
     }
     created = remapped = 0
@@ -725,9 +823,7 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
                     actual_start=local_time(a.ActuallyStartTime)
                     or local_time(a.StartTime)
                     or time(0, 0),
-                    actual_end=local_time(a.ActuallyEndTime)
-                    or local_time(a.EndTime)
-                    or time(0, 0),
+                    actual_end=local_time(a.ActuallyEndTime) or local_time(a.EndTime) or time(0, 0),
                     actual_location=(a.Location or "").strip() or "(未填)",
                     # 舊制沒有成果三欄(Review 是申請期的活動描述,已寫進 Activity.content),
                     # 留空待 text_fields.py 的人工轉錄 CSV 補
@@ -838,9 +934,7 @@ async def import_approvals(legacy, db: AsyncSession, ids: IdMap) -> None:
             # 申請期的殘留是經費認定,申請表「意見回饋」那格讀的就是 fund_source
             if len(note) <= FUND_SOURCE_MAX:
                 await db.execute(
-                    sa.update(Activity)
-                    .where(Activity.id == int(new_aid))
-                    .values(fund_source=note)
+                    sa.update(Activity).where(Activity.id == int(new_aid)).values(fund_source=note)
                 )
                 sources += 1
             else:
@@ -911,7 +1005,7 @@ async def import_rejections(legacy, db: AsyncSession, ids: IdMap) -> None:
                 ' FROM "Club_activity" a'
                 ' LEFT JOIN "Club_auditactivity" au ON au."FK_Activity_id" = a.id'
                 ' WHERE a."StartTime" >= :start AND a."StartTime" < :end AND a.status = 1'
-                ' ORDER BY a.id'
+                " ORDER BY a.id"
             ),
             {"start": scope_start, "end": scope_end},
         )
@@ -1041,12 +1135,37 @@ async def reset(db: AsyncSession) -> None:
     print("已清除 CMS 匯入結果;指導老師欄位不還原(非 id-map 型,重跑會覆寫)")
 
 
+def write_passwords(passwords: list[tuple[str, str, str]]) -> None:
+    """一次性密碼發放 CSV;`--fixes-only` 只會產出那幾筆,不覆蓋完整重匯那份。"""
+    if not passwords:
+        return
+    out_dir = MIGRATION_DIR / "out"
+    out_dir.mkdir(exist_ok=True)
+    suffix = "_fixes" if "--fixes-only" in sys.argv else ""
+    out = out_dir / f"one_time_passwords_{date.today().isoformat()}{suffix}.csv"
+    with out.open("w", newline="") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(["role", "username", "one_time_password"])
+        writer.writerows(passwords)
+    print(f"\n一次性密碼 {len(passwords)} 筆 → {out}(交承辦發放後銷毀;首登強制改密)")
+
+
 async def main() -> None:
     legacy_db = os.environ.get("LEGACY_DB", "legacy_clubs")
     legacy_url = settings.sqlalchemy_url.set(database=legacy_db)
     legacy_engine = create_async_engine(legacy_url)
 
     passwords: list[tuple[str, str, str]] = []
+    if "--fixes-only" in sys.argv:
+        # 名冊修正單獨重放(不碰舊庫)。完整重匯會覆寫指導老師欄位(非 id-map 型),
+        # 已在用的庫不該為了套修正吃那一刀
+        async with async_session_factory() as db:
+            await apply_roster_fixes(db, passwords)
+            await db.commit()
+        await legacy_engine.dispose()
+        write_passwords(passwords)
+        print("完成。")
+        return
     async with async_session_factory() as db, legacy_engine.connect() as legacy:
         if "--reset" in sys.argv:
             await reset(db)
@@ -1055,6 +1174,7 @@ async def main() -> None:
         await ids.load(db)
 
         clubs = await import_clubs(legacy, db, ids, passwords)
+        await apply_roster_fixes(db, passwords)
         await import_staff(legacy, db, ids, passwords)
         await import_teachers(legacy, db, clubs)
         await import_members(legacy, db, ids, clubs)
@@ -1066,15 +1186,7 @@ async def main() -> None:
 
     await legacy_engine.dispose()
 
-    if passwords:
-        out_dir = MIGRATION_DIR / "out"
-        out_dir.mkdir(exist_ok=True)
-        out = out_dir / f"one_time_passwords_{date.today().isoformat()}.csv"
-        with out.open("w", newline="") as fh:
-            writer = csv.writer(fh)
-            writer.writerow(["role", "username", "one_time_password"])
-            writer.writerows(passwords)
-        print(f"\n一次性密碼 {len(passwords)} 筆 → {out}(交承辦發放後銷毀;首登強制改密)")
+    write_passwords(passwords)
     print("完成。")
 
 

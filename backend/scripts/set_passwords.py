@@ -25,9 +25,10 @@
 - **不寫 password_history**:這是管理端的強制覆寫,不是使用者自己改密;
   記進歷史會平白吃掉「3 代不重用」的額度
 
-SSO 帳號(`auth_provider=sso`)與**停用帳號**一律略過:前者沒有本地密碼可設,
-後者連登入的第一關都過不了(`services/auth.py` 先看 `is_active`),給了密碼也用不到,
-還會把停社與 `_migration` 這類不該能登入的帳號混進發放名單。
+SSO 帳號(`auth_provider=sso`)一律略過:它們沒有本地密碼可設。
+`--random` 另外略過**停用帳號** —— 那是發放名單,停社與 `_migration` 這類登不進來的帳號
+(`services/auth.py` 先看 `is_active`)混進去只會被承辦照著發;`--password` 維持原樣
+「選到誰就改誰」,開發與展示要拿停用帳號驗登入被拒還得靠它。
 """
 
 # ruff: noqa: E402 - sys.path 調整必須先於 app 匯入(同 reset_db.py)
@@ -42,6 +43,7 @@ from datetime import datetime
 from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
+OUT_DIR = BACKEND_DIR.parent / "migration" / "out"  # 已在 .gitignore,與遷移的明碼檔同處
 sys.path.insert(0, str(BACKEND_DIR))  # 讓 scripts/ 可 import app
 
 import sqlalchemy as sa
@@ -113,10 +115,9 @@ def write_csv(rows: list[tuple[str, str, str, str]]) -> Path:
     固定檔名同一天跑第二次會靜默截掉第一次,`mkstemp` 由 OS 保證不撞名
     (順帶開成 0600),與 `migration/cms_import.write_passwords` 同一理由。
     """
-    out_dir = BACKEND_DIR.parent / "migration" / "out"  # 已在 .gitignore,與遷移的明碼檔同處
-    out_dir.mkdir(parents=True, exist_ok=True)
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    fd, name = tempfile.mkstemp(prefix=f"passwords_{stamp}_", suffix=".csv", dir=out_dir)
+    fd, name = tempfile.mkstemp(prefix=f"passwords_{stamp}_", suffix=".csv", dir=OUT_DIR)
     # utf-8-sig:承辦是用 Excel 開,沒有 BOM 中文就是亂碼
     with os.fdopen(fd, "w", newline="", encoding="utf-8-sig") as fh:
         writer = csv.writer(fh)
@@ -149,12 +150,12 @@ async def main() -> None:
     async with async_session_factory() as db:
         users = list(
             await db.scalars(
-                # SSO 帳號沒有本地密碼可設、停用帳號本來就登不進來,兩者都不列入
+                # SSO 帳號沒有本地密碼可設;停用帳號只在發放名單(--random)排除
                 sa.select(User)
                 .where(
                     sa.or_(*conditions),
                     User.auth_provider == AuthProvider.LOCAL,
-                    User.is_active.is_(True),
+                    *([User.is_active.is_(True)] if args.random else []),
                 )
                 .order_by(User.id)
             )
@@ -166,7 +167,8 @@ async def main() -> None:
         # 打錯帳號名時要看得見:靜靜地少改幾個比報錯還糟
         missing = sorted(set(args.username) - {u.username for u in users})
         if missing:
-            print(f"找不到(或非本地帳號、已停用)的帳號名:{'、'.join(missing)}")
+            skipped = "、已停用" if args.random else ""
+            print(f"找不到(或非本地帳號{skipped})的帳號名:{'、'.join(missing)}")
 
         by_role = Counter(u.role.value for u in users)
         names = [u.username for u in users]
@@ -175,7 +177,7 @@ async def main() -> None:
             preview += f" …等 {len(names)} 個"
         print(f"符合 {len(users)} 個帳號:{dict(by_role)}")
         print(f"  {preview}")
-        print(f"  密碼:{'每帳號隨機(輸出 CSV)' if args.random else '全部相同'}")
+        print(f"  密碼:{'每帳號隨機(輸出 CSV、不含停用帳號)' if args.random else '全部相同'}")
         print(f"  首登強制改密:{'關閉' if args.no_change_required else '開啟'}")
 
         if not args.yes:
@@ -196,7 +198,14 @@ async def main() -> None:
         )
         # 先落檔再 commit:寫檔失敗就整批回滾,不會留下「密碼改了但沒人知道是什麼」
         out = write_csv(rows) if args.random else None
-        await db.commit()
+        try:
+            await db.commit()
+        except BaseException:
+            # 反過來也一樣糟:commit 失敗卻留著檔,承辦會拿到一份看起來正常、
+            # 但 93 個帳號一個都登不進去的密碼表,而且與成功那幾份長得一模一樣
+            if out:
+                out.unlink(missing_ok=True)
+            raise
         print(f"\n已更新 {len(users)} 個帳號、登出 {killed.rowcount} 個 session")
         if out:
             print(f"密碼 CSV → {out}(含明碼,發放後銷毀)")

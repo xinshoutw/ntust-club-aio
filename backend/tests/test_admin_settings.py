@@ -27,7 +27,6 @@ async def test_get_defaults(client, db):
     data = (await client.get(URL)).json()["data"]
     # 舊鍵(開放月份+手動加開)已移除,固定借用改日期區間
     assert data["fixed_booking_window"] == {"open_from": None, "open_until": None}
-    assert data["equipment_workday_buffer"] == {"before": 2, "after": 1}
     assert data["close_lock_days"] == 21  # DEFAULTS;DB 沒有這一列時的值
     assert data["upload_limits"] == {"doc": 50, "img": 10, "zip": 100, "video": 200}
     # 各申請性質的加總上限(2026-07-17 改依性質給總量)
@@ -65,7 +64,7 @@ async def test_put_partial_update_and_audit(client, db):
     assert data["upload_limits"]["doc"] == 30
     assert data["violation_items"] == ["未經申請使用場地", "其他"]
     # 未帶的鍵不動
-    assert data["equipment_workday_buffer"] == {"before": 2, "after": 1}
+    assert data["upload_limits"]["img"] == 10
 
     stored = await db.get(SystemSetting, "close_lock_days")
     assert stored.value == 45
@@ -104,13 +103,6 @@ async def test_put_validations(client, db):
     assert resp.status_code == 422
     resp = await client.put(URL, json={"close_lock_days": 367}, headers=csrf_headers(client))
     assert resp.status_code == 422
-    resp = await client.put(
-        URL,
-        json={"equipment_workday_buffer": {"before": 99, "after": 1}},
-        headers=csrf_headers(client),
-    )
-    assert resp.status_code == 422
-
     # 清成空清單(每項名稱皆空)
     resp = await client.put(
         URL, json={"budget_categories": [{"name": "  ", "hint": ""}]}, headers=csrf_headers(client)

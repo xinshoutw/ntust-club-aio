@@ -13,8 +13,6 @@ export interface SystemSettings {
   /** 固定場地借用受理期間(YYYY/MM/DD;皆空=不開放) */
   fixedFrom?: string
   fixedUntil?: string
-  loanBefore: number // 器材借用:活動前緩衝(工作天)
-  loanAfter: number
   closeLockDays: number
   docMb: number
   imgMb: number
@@ -31,7 +29,6 @@ export interface SystemSettings {
 
 interface SettingsOut {
   fixed_booking_window: { open_from: string | null; open_until: string | null }
-  equipment_workday_buffer: { before: number; after: number }
   close_lock_days: number
   upload_limits: { doc: number; img: number; zip: number; video: number }
   activity_attachment_total_mb: number
@@ -50,8 +47,6 @@ const toSettings = (s: SettingsOut): SystemSettings => ({
   fixedUntil: s.fixed_booking_window.open_until
     ? dayjs(s.fixed_booking_window.open_until).format(DATE_FMT)
     : undefined,
-  loanBefore: s.equipment_workday_buffer.before,
-  loanAfter: s.equipment_workday_buffer.after,
   closeLockDays: s.close_lock_days,
   docMb: s.upload_limits.doc,
   imgMb: s.upload_limits.img,
@@ -100,7 +95,6 @@ export function useUpdateSettings() {
             open_from: v.fixedFrom ? toIsoDate(v.fixedFrom) : null,
             open_until: v.fixedUntil ? toIsoDate(v.fixedUntil) : null,
           },
-          equipment_workday_buffer: { before: v.loanBefore, after: v.loanAfter },
           close_lock_days: v.closeLockDays,
           upload_limits: { doc: v.docMb, img: v.imgMb, zip: v.zipMb, video: v.videoMb },
           activity_attachment_total_mb: v.attachmentTotalMb,

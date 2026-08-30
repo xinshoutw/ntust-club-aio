@@ -399,7 +399,6 @@ approved 且 end_date + N 天已過且未送結案 → 逾期鎖定(推導,非�
 | `violation_items` | 違規勸導項目目錄 |
 | `close_lock_days` | 結案鎖定天數(預設 21;可設 1–366) |
 | `equipment_return_time` | 器材歸還時限時刻(預設 10:30) |
-| `equipment_workday_buffer` | `{before, after}` 工作天(預設 2/1) |
 | `fixed_booking_window` | `{open_from, open_until}`;未設定=不開放 |
 | `upload_limits` | 單檔上限 `{doc, img, zip, video}` MB |
 | `activity_attachment_total_mb` / `maintenance_total_mb` / `close_photo_total_mb` | 依申請性質的附件加總上限(50 / 250 / 50) |

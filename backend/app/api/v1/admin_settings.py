@@ -29,7 +29,6 @@ PageAdmin = Annotated[CurrentUser, Depends(require_permission("asetting"))]
 # 受管鍵(與 SettingsUpdateIn 欄位一致;GET 依此彙整)
 MANAGED_KEYS = (
     "fixed_booking_window",
-    "equipment_workday_buffer",
     "close_lock_days",
     "upload_limits",
     "activity_attachment_total_mb",

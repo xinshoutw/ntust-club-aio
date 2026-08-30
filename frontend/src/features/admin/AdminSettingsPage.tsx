@@ -79,8 +79,6 @@ function BudgetCategoriesInput({
 
 interface FormValues {
   fixedWindow?: [Dayjs, Dayjs] | null
-  loanBefore: number
-  loanAfter: number
   closeLockDays: number
   docMb: number
   imgMb: number
@@ -119,8 +117,6 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
       {
         fixedFrom: v.fixedWindow?.[0] ? v.fixedWindow[0].format(DATE_FMT) : undefined,
         fixedUntil: v.fixedWindow?.[1] ? v.fixedWindow[1].format(DATE_FMT) : undefined,
-        loanBefore: v.loanBefore,
-        loanAfter: v.loanAfter,
         closeLockDays: v.closeLockDays,
         docMb: v.docMb,
         imgMb: v.imgMb,
@@ -154,8 +150,6 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
           initial.fixedFrom && initial.fixedUntil
             ? [dayjs(initial.fixedFrom, DATE_FMT), dayjs(initial.fixedUntil, DATE_FMT)]
             : undefined,
-        loanBefore: initial.loanBefore,
-        loanAfter: initial.loanAfter,
         closeLockDays: initial.closeLockDays,
         docMb: initial.docMb,
         imgMb: initial.imgMb,
@@ -173,17 +167,9 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
       <div className="form-grid-2" style={{ marginTop: 20, alignItems: 'stretch' }}>
         <div className="card" style={{ padding: 24 }}>
           <div style={sectionTitle}>借用</div>
-          <Form.Item name="fixedWindow" label="固定場地借用受理期間">
+          <Form.Item name="fixedWindow" label="固定場地借用受理期間" style={{ marginBottom: 0 }}>
             <DatePicker.RangePicker style={{ width: '100%' }} format={DATE_FMT} allowClear />
           </Form.Item>
-          <div className="form-grid-2">
-            <Form.Item name="loanBefore" label="器材借用開始緩衝（工作天）" style={{ marginBottom: 0 }}>
-              <InputNumber min={0} max={10} precision={0} style={{ width: '100%' }} />
-            </Form.Item>
-            <Form.Item name="loanAfter" label="器材借用結束緩衝（工作天）" style={{ marginBottom: 0 }}>
-              <InputNumber min={0} max={10} precision={0} style={{ width: '100%' }} />
-            </Form.Item>
-          </div>
         </div>
 
         <div className="card" style={{ padding: 24 }}>

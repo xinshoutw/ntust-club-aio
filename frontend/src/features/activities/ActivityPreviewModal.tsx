@@ -76,6 +76,7 @@ export default function ActivityPreviewModal({ a, detail, loading, error, onRetr
   const rep = a.status === 'closed' || a.status === 'closing_pending_advisor' ? detail?.report : undefined
   const photos = detail?.photos ?? []
   const attachments = detail?.attachments ?? []
+  const closeDocs = detail?.closeDocs ?? []
   const budget = detail?.budget ?? []
 
   // 與申請值比對:相同就不顯示實際值;比較前正規化分隔符
@@ -240,6 +241,17 @@ export default function ActivityPreviewModal({ a, detail, loading, error, onRetr
                   <button key={p.id} type="button" className="link-btn" style={{ padding: 0 }} aria-label={`預覽 ${p.name}`} onClick={() => onPreviewFile(p)}>
                     <img src={p.url} alt={p.name} title={p.name} style={{ width: 104, height: 78, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--line)', display: 'block' }} />
                   </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {rep && closeDocs.length > 0 && (
+            <>
+              <SectionTitle>結案附件</SectionTitle>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {closeDocs.map((f) => (
+                  <FileChip key={f.id} f={f} onPreview={onPreviewFile} />
                 ))}
               </div>
             </>

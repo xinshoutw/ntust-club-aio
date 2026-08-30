@@ -4,6 +4,10 @@
 // 所有允許圖片的上傳點一律含 HEIC/HEIF 等特規格式(accept 僅是選檔提示,實際以魔術位元組為準)
 export const IMAGE_ACCEPT = 'image/*,.heic,.heif,.avif'
 
+// 結案附件(保單、租車契約、簽到表、講師資料…):收的正是站內預覽得了的四類,
+// 與後端 files.REPORT_DOC 同一組。改這裡就要改那裡
+export const CLOSE_DOC_ACCEPT = `.pdf,.doc,.docx,${IMAGE_ACCEPT}`
+
 export async function sha256(f: File): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', await f.arrayBuffer())
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')

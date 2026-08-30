@@ -9,11 +9,13 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { blurLeavesRow } from '../../lib/form'
 import { notFoundText } from '../../lib/selectOptions'
-import { IMAGE_ACCEPT, fmtMB, isImageFile, sha256 } from '../../lib/uploads'
+import { CLOSE_DOC_ACCEPT, IMAGE_ACCEPT, fmtMB, isImageFile, sha256 } from '../../lib/uploads'
 import {
+  deleteActivityCloseDoc,
   deleteActivityPhoto,
   saveCloseDraft,
   submitClose,
+  uploadActivityCloseDoc,
   uploadActivityPhoto,
   useActivityDetail,
   useClosableActivities,
@@ -43,6 +45,35 @@ interface PhotoBag {
 }
 
 const isReflectEmpty = (r: ReflectRow) => !r.name.trim() && !r.dept.trim() && !r.text.trim()
+
+// 結案附件的一列(照片走縮圖,文件走檔名)
+function DocChip({ name, onRemove }: { name: string; onRemove: () => void }) {
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        border: '1px solid var(--line)',
+        background: 'var(--paper)',
+        borderRadius: 4,
+        padding: '2px 8px',
+        fontSize: 13,
+      }}
+    >
+      {name}
+      <button
+        type="button"
+        className="link-btn danger"
+        aria-label={`移除 ${name}`}
+        style={{ padding: 0, fontSize: 12, lineHeight: 1 }}
+        onClick={onRemove}
+      >
+        ×
+      </button>
+    </span>
+  )
+}
 
 const label: React.CSSProperties = { fontSize: 13, fontWeight: 500, marginBottom: 6 }
 const requiredMark = <span style={{ color: '#C13B34' }}> *</span>
@@ -249,6 +280,26 @@ function CloseForm({
     setPhotos(next)
   }
   const [processing, setProcessing] = useState(0)
+  // 結案附件(保單、租車契約、簽到表…):與照片同一條路 —— 送出時才上傳、
+  // 共用 close_photo_total_mb 這一個額度,畫面上因此只有一個「已用 / 上限」
+  const [existingDocs, setExistingDocs] = useState<EvalFile[]>(() => detail.closeDocs)
+  const existingDocsRef = useRef(existingDocs)
+  existingDocsRef.current = existingDocs
+  const [docs, setDocs] = useState<PhotoBag[]>([])
+  const docsRef = useRef(docs)
+  docsRef.current = docs
+  const commitDocs = (next: PhotoBag[]) => {
+    docsRef.current = next
+    setDocs(next)
+  }
+  const docKeyRef = useRef(0)
+  const docQueue = useRef(Promise.resolve())
+  // 照片與附件合計:任一側選檔都要看四份的總和,只數自己那一側會超額
+  const usedBytes = () =>
+    photosRef.current.reduce((s, p) => s + p.file.size, 0) +
+    existingRef.current.reduce((s, f) => s + f.size, 0) +
+    docsRef.current.reduce((s, p) => s + p.file.size, 0) +
+    existingDocsRef.current.reduce((s, f) => s + f.size, 0)
 
   // 未存檔守衛:與載入草稿時的快照比對。這頁沒有 AntD Form 可掛 onValuesChange,
   // 而照片是離開後唯一救不回來的東西(草稿不含檔案),必須納入比對
@@ -257,6 +308,7 @@ function CloseForm({
     highlights, goals, others, reviewMeeting, reviewDate, reviewAttendees,
     reviewTopics, reviewConclusion, videoLink, expense, reflects,
     existing.map((f) => f.id), photos.length,
+    existingDocs.map((f) => f.id), docs.length,
   ])
   const loadedRef = useRef(snapshot)
   useUnsavedGuard(snapshot !== loadedRef.current)
@@ -272,12 +324,8 @@ function CloseForm({
           message.error(`「${f.name}」不是有效的圖片檔`)
           return
         }
-        const cur = photosRef.current
-        const total =
-          cur.reduce((s, p) => s + p.file.size, 0) +
-          existingRef.current.reduce((s, p) => s + p.size, 0)
-        if (total + f.size > closePhotoBytes) {
-          message.error(`照片合計超過 ${Math.round(closePhotoBytes / 1024 / 1024)} MB 上限`)
+        if (usedBytes() + f.size > closePhotoBytes) {
+          message.error(`照片與附件合計超過 ${Math.round(closePhotoBytes / 1024 / 1024)} MB 上限`)
           return
         }
         const hash = await sha256(f)
@@ -297,6 +345,45 @@ function CloseForm({
         setProcessing((n) => n - 1)
       }
     })
+  }
+
+  const addDoc = (f: File) => {
+    setProcessing((n) => n + 1)
+    docQueue.current = docQueue.current.then(async () => {
+      try {
+        if (usedBytes() + f.size > closePhotoBytes) {
+          message.error(`照片與附件合計超過 ${Math.round(closePhotoBytes / 1024 / 1024)} MB 上限`)
+          return
+        }
+        const hash = await sha256(f)
+        if (
+          docsRef.current.some((p) => p.hash === hash) ||
+          existingDocsRef.current.some((p) => p.hash === hash)
+        ) {
+          message.error(`「${f.name}」檔案重複`)
+          return
+        }
+        commitDocs([...docsRef.current, { key: ++docKeyRef.current, file: f, url: '', hash }])
+      } catch (e) {
+        message.error(`「${f.name}」處理失敗:${errMsg(e)}`)
+      } finally {
+        setProcessing((n) => n - 1)
+      }
+    })
+  }
+
+  const removeDoc = (key: number) => commitDocs(docsRef.current.filter((p) => p.key !== key))
+
+  // 移除既有附件=後端刪檔(回收加總額度),不是只從畫面拿掉
+  const removeExistingDoc = async (f: EvalFile) => {
+    try {
+      await deleteActivityCloseDoc(activity.id, f.id)
+      setExistingDocs((xs) => xs.filter((x) => x.id !== f.id))
+      invalidate()
+      message.success('已移除附件')
+    } catch (e) {
+      message.error(errMsg(e))
+    }
   }
 
   const removePhoto = (key: number) => {
@@ -448,10 +535,15 @@ function CloseForm({
     // 照片在此(送出時)才上傳,不進草稿;送出失敗時回滾本次已上傳的照片,
     // 避免留下孤兒檔並阻擋下次(後端跨活動 sha256 去重)重傳
     const uploaded: string[] = []
+    const uploadedDocs: string[] = []
     try {
       for (const p of photos) {
         const up = await uploadActivityPhoto(activity.id, p.file)
         uploaded.push(up.id)
+      }
+      for (const p of docs) {
+        const up = await uploadActivityCloseDoc(activity.id, p.file)
+        uploadedDocs.push(up.id)
       }
       // 送出 → closing_pending_advisor;成果報告/心得 PDF 由後端依模板於下載時生成
       await submitClose(activity.id, body)
@@ -459,7 +551,10 @@ function CloseForm({
       message.success('已送出結案，等待審核')
       onDone()
     } catch (e) {
-      await Promise.allSettled(uploaded.map((id) => deleteActivityPhoto(activity.id, id)))
+      await Promise.allSettled([
+        ...uploaded.map((id) => deleteActivityPhoto(activity.id, id)),
+        ...uploadedDocs.map((id) => deleteActivityCloseDoc(activity.id, id)),
+      ])
       invalidate()
       message.error(errMsg(e))
     } finally {
@@ -719,7 +814,21 @@ function CloseForm({
           </div>
 
           <div className="card" style={{ padding: 24 }}>
-            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>四、附件與經費</div>
+            {/* 容量放在標題列:照片與附件共用一個額度,兩處各印一次只會讓人以為有兩個 */}
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginBottom: 14 }}>
+              <div style={{ fontSize: 15, fontWeight: 600 }}>四、附件與經費</div>
+              <Tooltip title="活動照片與結案附件合計">
+                <span className="num" style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--steel)', cursor: 'help' }}>
+                  {fmtMB(
+                    existing.reduce((s, f) => s + f.size, 0) +
+                      photos.reduce((s, p) => s + p.file.size, 0) +
+                      existingDocs.reduce((s, f) => s + f.size, 0) +
+                      docs.reduce((s, p) => s + p.file.size, 0),
+                  )}
+                  /{Math.round(closePhotoBytes / 1024 / 1024)} MB
+                </span>
+              </Tooltip>
+            </div>
             <div>
               <div style={label}>
                 活動照片{requiredMark}
@@ -771,13 +880,36 @@ function CloseForm({
                 >
                   <Button icon={<UploadOutlined />} loading={processing > 0}>選擇照片</Button>
                 </Upload>
+                <Upload
+                  accept={CLOSE_DOC_ACCEPT}
+                  multiple
+                  showUploadList={false}
+                  beforeUpload={(f) => {
+                    addDoc(f)
+                    return false
+                  }}
+                >
+                  <Button icon={<UploadOutlined />} loading={processing > 0}>選擇附件</Button>
+                </Upload>
                 <span className="num" style={{ fontSize: 12, color: existing.length + photos.length >= MIN_PHOTOS ? '#1F6B45' : 'var(--steel)' }}>
-                  {existing.length + photos.length} 張 ·{' '}
-                  {fmtMB(existing.reduce((s, f) => s + f.size, 0) + photos.reduce((s, p) => s + p.file.size, 0))}/
-                  {Math.round(closePhotoBytes / 1024 / 1024)} MB
+                  {existing.length + photos.length} 張
+                  {existingDocs.length + docs.length > 0 && ` · ${existingDocs.length + docs.length} 件`}
                 </span>
               </div>
             </div>
+            {(existingDocs.length > 0 || docs.length > 0) && (
+              <div style={{ marginTop: 12 }}>
+                <div style={label}>結案附件</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {existingDocs.map((f) => (
+                    <DocChip key={f.id} name={f.name} onRemove={() => void removeExistingDoc(f)} />
+                  ))}
+                  {docs.map((d) => (
+                    <DocChip key={d.key} name={d.file.name} onRemove={() => removeDoc(d.key)} />
+                  ))}
+                </div>
+              </div>
+            )}
             <div className="form-grid-2" style={{ marginTop: 12 }}>
               <div>
                 <div style={label}>影片連結</div>

@@ -47,6 +47,25 @@ const show = (
     </App>,
   )
 
+// 唯讀開窗(社團活動列表、結案審核的逾期清單)不傳簽核回呼:待審的單也不得長出簽核鈕 ——
+// 沒有回呼的核准會直接跳成功訊息,一個字都沒送到後端
+test('沒有簽核回呼就沒有簽核鈕,核定欄也不可編輯', () => {
+  render(
+    <App>
+      <ActivityReviewModal
+        item={item([budgetRow(1, 5000)])}
+        open
+        onClose={() => {}}
+        afterClose={() => {}}
+      />
+    </App>,
+  )
+
+  expect(screen.queryByRole('button', { name: /核\s*准/ })).toBeNull()
+  expect(screen.queryByRole('button', { name: /退\s*回/ })).toBeNull()
+  expect(document.querySelectorAll('tbody input')).toHaveLength(0)
+})
+
 // 擬請 0 的列核不出金額(後端 max=擬請,整單擬請 0 時任何非零核定回 422)。
 // 給一個永遠只能是 0 的輸入框,是把「看得到」與「動得了」混成一個判定。
 describe('ActivityReviewModal 的核定欄', () => {

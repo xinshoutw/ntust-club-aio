@@ -291,8 +291,10 @@ export default function ActivityReviewModal({
   const closeDocs = item?.closeDocs ?? []
   const activeTab: 'apply' | 'close' = report ? (tab ?? 'close') : 'apply'
 
-  // 「本關」:接 API 的頁面(有 onApprove)依登入者簽核鍵推導;mock 展示維持第一關可簽
-  const canReview = item ? (onApprove ? canActOn(user, item.status) : item.status === 'pending_advisor') : false
+  // 「本關」:**沒有簽核回呼就沒有簽核鈕**。這裡曾有一條「沒 onApprove 就看狀態」的展示用
+  // 退路,而唯讀頁(社團活動列表、逾期清單)傳的是真資料 —— 待審的單會長出可按的核准鈕,
+  // 按下去因為沒有回呼而直接跳成功訊息,一個字都沒送到後端
+  const canReview = !!onApprove && !!item && canActOn(user, item.status)
   // 結案單關:與申請關卡分開判定,兩者不會同時成立(狀態互斥)
   const canCloseReview =
     !!onCloseApprove && item?.status === 'closing_pending_advisor' && canActOnClose(user)

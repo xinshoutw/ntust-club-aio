@@ -49,7 +49,15 @@ export interface ReviewItem {
     works?: WorkItem[]
     attachments: string[]
     attachmentFiles?: { id: string; name: string; url: string }[]
-    budget: { id: number; category: string; description: string; selfFund: number; requested: number; approved: number }[]
+    budget: {
+      id: number
+      category: string
+      description: string
+      selfFund: number
+      requested: number
+      /** 已核定金額;null=還沒核定(不是 0 元) */
+      approved: number | null
+    }[]
   }
 }
 
@@ -340,7 +348,9 @@ const toAdminDetail = (o: AdminActivityDetailOut): AdminActivityDetail => ({
       description: b.description,
       selfFund: b.self_fund,
       requested: b.requested_subsidy,
-      approved: b.approved_subsidy ?? b.requested_subsidy, // 未核定前以擬請值預填
+      // 保留 null:`—`(還沒核定)與 0 元(決定不給)對承辦是兩件事。
+      // 第一關輸入框的預填值(未核定=擬請)在使用端算,不在這裡把兩者揉成一個數
+      approved: b.approved_subsidy,
     })),
   },
   report: o.report ? toReport(o.report) : undefined,

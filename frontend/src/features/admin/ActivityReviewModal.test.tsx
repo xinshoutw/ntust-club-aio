@@ -9,7 +9,8 @@ vi.mock('../../app/auth', () => ({
   useAuth: () => ({ user: { role: 'admin', isSuper: true, permissions: [] } }),
 }))
 
-const budgetRow = (id: number, requested: number, approved = 0) => ({
+// approved 預設 null = 還沒核定(不是核了 0 元);要測「核了 0 元」就明寫 0
+const budgetRow = (id: number, requested: number, approved: number | null = null) => ({
   id,
   category: `科目${id}`,
   description: '說明',
@@ -114,7 +115,7 @@ describe('ActivityReviewModal 的核定欄', () => {
   // 會印上申請表意見回饋的話,而擬請 >0、整單核成 0 的單正是最常見的那一種
   test('有申請補助但核定 0 元、來源沒改過:送出空字串而非預填值', async () => {
     const onApprove = vi.fn(async (_p: unknown) => {})
-    show([budgetRow(1, 5000)], { fundSource: undefined }, onApprove)
+    show([budgetRow(1, 5000, 0)], { fundSource: undefined }, onApprove)
 
     expect(screen.getByPlaceholderText<HTMLInputElement>('學務處補助').value).toBe('學務處補助')
     fireEvent.click(screen.getByRole('button', { name: /核\s*准/ }))
@@ -124,12 +125,36 @@ describe('ActivityReviewModal 的核定欄', () => {
 
   test('核定 0 元但承辦人自己打了來源:照他打的送出', async () => {
     const onApprove = vi.fn(async (_p: unknown) => {})
-    show([budgetRow(1, 5000)], { fundSource: undefined }, onApprove)
+    show([budgetRow(1, 5000, 0)], { fundSource: undefined }, onApprove)
 
     fireEvent.change(screen.getByPlaceholderText('學務處補助'), { target: { value: '系友會贊助' } })
     fireEvent.click(screen.getByRole('button', { name: /核\s*准/ }))
     await waitFor(() => expect(onApprove).toHaveBeenCalled())
     expect(onApprove.mock.calls[0][0]).toMatchObject({ fundSource: '系友會贊助' })
+  })
+
+  // 唯讀時「還沒核定」印 —— 不是把第一關輸入框的預填值(未核定=擬請)拿來當已核定的金額。
+  // 列表列與社團端同一筆都印 `—`,彈窗卻印出 5,000 的話,承辦會以為這張單已經核過了
+  test('唯讀開窗時未核定的列印 —,合計也不湊數', () => {
+    render(
+      <App>
+        <ActivityReviewModal
+          item={{ ...item([budgetRow(1, 5000), budgetRow(2, 3000)]), status: 'pending_dean' }}
+          open
+          onClose={() => {}}
+          afterClose={() => {}}
+          onApprove={async () => {}}
+        />
+      </App>,
+    )
+
+    expect(document.querySelectorAll('tbody input')).toHaveLength(0) // 非第一關,不可編輯
+    // 逐列的核定欄(最後一欄)與合計,都不能拿擬請值頂替
+    const cells = [...document.querySelectorAll('tbody tr')].map(
+      (tr) => tr.lastElementChild?.textContent?.trim(),
+    )
+    expect(cells).toEqual(['—', '—'])
+    expect(document.querySelector('tfoot tr')?.lastElementChild?.textContent?.trim()).toBe('—')
   })
 
   test('有申請補助時核定欄出現,但擬請 0 的那一列不給輸入框', () => {

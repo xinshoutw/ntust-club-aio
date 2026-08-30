@@ -255,37 +255,43 @@ export default function ActivityReviewModal({
   const [fundSource, setFundSource] = useState(() => seedFundSource(item))
   // 預填值與承辦人自己打的字要分得開:核定 0 元的單只送後者(見 submitApprove)
   const [fundTouched, setFundTouched] = useState(false)
+  // 頁籤:結案側有東西才切得過去;null = 還沒手動切過,跟著狀態走
+  const [tab, setTab] = useState<'apply' | 'close' | null>(null)
+  // 繳交確認只存承辦手動改過的項目,其餘跟著推導走(詳情是非同步載入的)
+  const [override, setOverride] = useState<Partial<Record<CheckKey, boolean>>>({})
   const d = item?.detail
   // 失敗但手上已有詳情 = 背景重抓失敗(TanStack 的 error 態保留既有 data,而重開同一列
   // staleTime 0 就會重抓):內容照舊、按鈕照舊,否則等於把讀得到的單變成不能簽,
   // 而且按「重試」畫面毫無變化(data 還在,error 不會被清掉)
   const detailFailed = detailError != null && !d
+  // 第一關輸入框的預填:未核定即帶擬請金額(承辦幾乎都是照給或往下砍)
+  const prefill = (b: { requested: number; approved: number | null }) => b.approved ?? b.requested
   // 核定金額:controlled,依預算列 id 管理
   const [approvals, setApprovals] = useState<Record<number, number>>(() =>
-    Object.fromEntries((d?.budget ?? []).map((b) => [b.id, b.approved])),
+    Object.fromEntries((d?.budget ?? []).map((b) => [b.id, prefill(b)])),
   )
-  // 接線頁面開彈窗時詳情可能尚未載入:budget 到位後一次性回填核定金額。
-  // 只補 approvals——fundSource/largeApproved 列表列已帶,且可能已被使用者編輯,不得覆寫。
-  // 以 null 開窗(社團總覽)則首筆資料到位時連 largeApproved/fundSource 一併補種
-  const startedNull = useRef(item == null)
-  const seeded = useRef(!!item?.detail)
+  // 補種依**單據 id**,不依物件識別:各頁都靠 key 重掛來換單,但漏掛一處而重開同一列時
+  // `item` 識別不變、effect 不重跑,上一張單的經費來源與大型認可就會留在畫面上
+  // (largeApproved 被留成 false 等於靜靜清掉 ×3 加權)。
+  // 身分欄位每張單種一次(列表列已帶,詳情到位不覆寫,使用者編輯過的更不能覆寫);
+  // 核定金額等 detail 到位才種
+  const seededId = useRef<string | null>(null)
+  const seededBudget = useRef<string | null>(null)
   useEffect(() => {
     if (!item) return
-    if (startedNull.current) {
-      startedNull.current = false
+    if (seededId.current !== item.id) {
+      seededId.current = item.id
       setLargeApproved(item.largeApproved ?? false)
       setFundSource(seedFundSource(item))
+      setOverride({})
+      setTab(null)
     }
-    if (seeded.current || !item.detail) return
-    seeded.current = true
-    setApprovals(Object.fromEntries(item.detail.budget.map((b) => [b.id, b.approved])))
+    if (item.detail && seededBudget.current !== item.id) {
+      seededBudget.current = item.id
+      setApprovals(Object.fromEntries(item.detail.budget.map((b) => [b.id, prefill(b)])))
+    }
   }, [item])
 
-  // 頁籤:有結案資料才切得過去,且預設就開在結案側(承辦這時要看的是結案);
-  // null = 還沒手動切過,跟著狀態走
-  const [tab, setTab] = useState<'apply' | 'close' | null>(null)
-  // 繳交確認只存承辦手動改過的項目,其餘跟著推導走(詳情是非同步載入的)
-  const [override, setOverride] = useState<Partial<Record<CheckKey, boolean>>>({})
   const report = item?.report
   const photos = item?.photos ?? []
   const closeDocs = item?.closeDocs ?? []
@@ -340,7 +346,14 @@ export default function ActivityReviewModal({
   const canEdit = canReview && isFirstStage
   const selfFundTotal = d?.budget.reduce((s, b) => s + b.selfFund, 0) ?? 0
   const requestedTotal = d?.budget.reduce((s, b) => s + b.requested, 0) ?? item?.requested ?? 0
-  const approvedTotal = d?.budget.reduce((s, b) => s + (approvals[b.id] ?? b.approved), 0) ?? 0
+  // **唯讀欄不讀 `approvals`**:那是編輯用的 state,一開窗就被預填值(未核定=擬請)灌滿,
+  // 拿它顯示等於把「還沒核定」印成「核定=擬請」——清單列與社團端同一筆都印 `—`
+  const approvedTotal = (d?.budget ?? []).reduce(
+    (sum, b) => sum + (canEdit ? (approvals[b.id] ?? prefill(b)) : (b.approved ?? 0)),
+    0,
+  )
+  // 逐項都核定過才算得出總額;有一列還是 null 就印 `—`,不要湊一個看起來已核定的數字
+  const approvedKnownAll = (d?.budget ?? []).every((b) => b.approved != null)
   const singleStage = requestedTotal === 0 // 無補助 → 承辦人單關即核准
   // 能不能核只看擬請(後端也擋非零核定與必填來源)
   const hasSubsidy = requestedTotal > 0
@@ -360,7 +373,7 @@ export default function ActivityReviewModal({
       // 但預填值來自舊資料 —— 遷移列的核定可以大於擬請,沒有輸入框可改就會卡死送不出去
       const budget = (d?.budget ?? []).map((b) => ({
         itemId: b.id,
-        approvedSubsidy: Math.min(approvals[b.id] ?? b.approved, b.requested),
+        approvedSubsidy: Math.min(approvals[b.id] ?? prefill(b), b.requested),
       }))
       // 必填與否看**送出去的**核定總額,不是畫面上的 approvedTotal —— 遷移列會被 min 夾掉,
       // 兩者對不起來就會變成前端放行、後端 422,而承辦人看到的是一句他改不掉的錯誤(D-16)
@@ -479,19 +492,7 @@ export default function ActivityReviewModal({
     <Modal
       open={open}
       onCancel={onClose}
-      afterClose={() => {
-        // 各頁靠 key 重掛來清狀態,但漏掛一處就會把上一張單的核定金額顯示在下一張上
-        // (seeded 是 ref,補種只做一次)—— 關窗時自己也清一次
-        setTab(null)
-        setOverride({})
-        setApprovals({})
-        setFundSource('')
-        setFundTouched(false)
-        setLargeApproved(false)
-        startedNull.current = true
-        seeded.current = false
-        afterClose()
-      }}
+      afterClose={afterClose}
       // 窗的大小只由「有無經費」決定:切頁籤、內容多寡都不改變它,
       // 高度固定後內容自己捲 —— 開同一批單子時每次都停在同一個位置
       width={hasBudget ? 1080 : 640}
@@ -762,12 +763,14 @@ export default function ActivityReviewModal({
                           min={0}
                           max={b.requested}
                           precision={0}
-                          value={approvals[b.id] ?? b.approved}
+                          value={approvals[b.id] ?? prefill(b)}
                           onChange={(v) => setApprovals((prev) => ({ ...prev, [b.id]: v ?? 0 }))}
                           controls={false}
                         />
                       ) : (
-                        <div className="r num" style={{ textAlign: 'right' }}>{(approvals[b.id] ?? b.approved).toLocaleString()}</div>
+                        <div className="r num" style={{ textAlign: 'right' }}>
+                          {approvedText(b.approved)}
+                        </div>
                       )}
                     </td>
                     )}
@@ -791,7 +794,7 @@ export default function ActivityReviewModal({
                   </td>
                   {showApproved && (
                     <td className="r num" style={{ borderBottom: 'none', padding: '10px 0 0', fontWeight: 600 }}>
-                      {approvedTotal.toLocaleString()}
+                      {canEdit || approvedKnownAll ? approvedTotal.toLocaleString() : '—'}
                     </td>
                   )}
                 </tr>

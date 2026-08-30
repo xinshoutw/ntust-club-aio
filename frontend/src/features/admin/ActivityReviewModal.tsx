@@ -449,6 +449,25 @@ export default function ActivityReviewModal({
     onClose()
   }
 
+  // 繳交確認與簽核鈕同一列(靠左):未勾之項目評鑑以 0 分計,承辦是連著這兩顆鈕一起決定的。
+  // 只在結案側出現 —— 申請側的 footer 不該長出結案的東西
+  const confirmRow =
+    activeTab === 'close' && report ? (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 12, color: 'var(--steel)' }}>繳交確認</span>
+        {SUBMISSION_CHECKS.map((c) => (
+          <Checkbox
+            key={c.key}
+            checked={checks[c.key]}
+            disabled={!canCloseReview}
+            onChange={(e) => setOverride((prev) => ({ ...prev, [c.key]: e.target.checked }))}
+          >
+            {c.label}
+          </Checkbox>
+        ))}
+      </div>
+    ) : null
+
   const hasBudget = !!d && d.budget.length > 0
   // 接線資料帶可下載連結;mock 僅檔名
   const files = d?.attachmentFiles
@@ -542,9 +561,11 @@ export default function ActivityReviewModal({
             </Button>
           </div>
         ) : canCloseReview ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {confirmRow}
+            <span style={{ flex: 1 }} />
             {detailStale && (
-              <span style={{ fontSize: 12, color: 'var(--steel)', marginRight: 'auto' }}>
+              <span style={{ fontSize: 12, color: 'var(--steel)' }}>
                 {detailStale === 'error' ? (
                   <>
                     結案內容更新失敗{' '}
@@ -573,14 +594,18 @@ export default function ActivityReviewModal({
             </Button>
           </div>
         ) : (
-          <div style={{ fontSize: 12, color: 'var(--steel)' }}>
-            {!item
-              ? '載入中…'
-              : item.status === 'rejected'
-                ? '此申請已退回社團修正'
-                : stageOfStatus(item.status)
-                  ? '非本關卡待審單據，僅供查看'
-                  : '僅供查看'}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {confirmRow}
+            <span style={{ flex: 1 }} />
+            <span style={{ fontSize: 12, color: 'var(--steel)' }}>
+              {!item
+                ? '載入中…'
+                : item.status === 'rejected'
+                  ? '此申請已退回社團修正'
+                  : stageOfStatus(item.status)
+                    ? '非本關卡待審單據，僅供查看'
+                    : '僅供查看'}
+            </span>
           </div>
         )
       }
@@ -904,31 +929,6 @@ export default function ActivityReviewModal({
           </div>
         </div>
 
-        {/* 繳交確認:待審時由承辦勾(未勾之項目評鑑以 0 分計),已結案則顯示落庫的結果 */}
-        <div style={{ gridColumn: '1 / -1' }}>
-          <SectionTitle>繳交確認</SectionTitle>
-          <div
-            style={{
-              display: 'flex',
-              gap: 18,
-              flexWrap: 'wrap',
-              background: 'var(--paper)',
-              borderRadius: 6,
-              padding: '10px 12px',
-            }}
-          >
-            {SUBMISSION_CHECKS.map((c) => (
-              <Checkbox
-                key={c.key}
-                checked={checks[c.key]}
-                disabled={!canCloseReview}
-                onChange={(e) => setOverride((prev) => ({ ...prev, [c.key]: e.target.checked }))}
-              >
-                {c.label}
-              </Checkbox>
-            ))}
-          </div>
-        </div>
         </>
         )}
 

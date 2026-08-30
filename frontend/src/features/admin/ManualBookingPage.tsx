@@ -91,7 +91,7 @@ export default function ManualBookingPage() {
                 <PeriodPicker value={periods} onChange={setPeriods} size="small" />
               </div>
               <Form.Item name="purpose" label="用途" rules={[{ required: true, message: '請輸入用途' }]}>
-                <Input placeholder="例:行政人員活動" />
+                <Input placeholder="行政人員活動" />
               </Form.Item>
               <Form.Item name="phone" label="聯絡電話" rules={[{ pattern: /^[0-9\-()*#]+$/, message: '僅能輸入數字與 - ( ) * #' }]}>
                 <Input className="num" placeholder="選填" maxLength={30} />

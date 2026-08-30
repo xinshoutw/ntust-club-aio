@@ -22,7 +22,7 @@ export interface SystemSettings {
   videoMb: number
   attachmentTotalMb: number // 活動申請附件加總上限(MB)
   maintenanceTotalMb: number // 空間報修佐證加總上限(MB,含影片)
-  closePhotoTotalMb: number // 活動結案照片加總上限(MB)
+  closePhotoTotalMb: number // 活動結案照片與結案附件的**共用**加總上限(MB)
   perClubGib: number // 單一社團配額(GiB);系統總量改用後端實際磁碟空間
   evalYear: number // 評鑑年度(民國年)
   violItems: string[]

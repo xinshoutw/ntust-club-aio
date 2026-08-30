@@ -28,7 +28,8 @@ export interface ReviewItem {
   // 經費合計(彈窗結案側的「自籌 / 核定 / 實支」一列讀它;approvedTotal 為 null=尚未核定)
   selfFundTotal?: number
   approvedTotal?: number
-  // 結案側的內容(詳情到位才有);彈窗的「結案」頁籤讀這三個,沒有 report 就切不過去
+  // 結案側的內容(詳情到位才有);彈窗的「結案」頁籤讀這三個。
+  // 沒有 report 也可能切得過去 —— 逾期手動解鎖寫的是 activity_close 的簽核列
   report?: AdminCloseReport
   photos?: AdminFileRef[]
   closeDocs?: AdminFileRef[]

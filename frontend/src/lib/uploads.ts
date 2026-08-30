@@ -5,14 +5,16 @@
 export const IMAGE_ACCEPT = 'image/*,.heic,.heif,.avif'
 
 // 結案附件(保單、租車契約、簽到表、講師資料…):收的正是站內預覽得了的四類,
-// 與後端 files.REPORT_DOC 同一組。改這裡就要改那裡
-export const CLOSE_DOC_ACCEPT = `.pdf,.doc,.docx,${IMAGE_ACCEPT}`
-// 選檔對話框可切「所有檔案」繞過 accept,選檔時再比一次副檔名 ——
+// 與後端 files.REPORT_DOC 同一組。改這裡就要改那裡。
+// 選檔對話框可切「所有檔案」繞過 accept,選檔時另比一次副檔名 ——
 // 不擋的話 .zip 要等按下送出、照片都傳完之後才吃後端 415,然後整批回滾
 export const CLOSE_DOC_EXTENSIONS = [
   '.pdf', '.doc', '.docx',
   '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff', '.heic', '.heif', '.avif',
 ]
+// 逐項列舉而不用 `image/*`:那會讓選檔器收得下後端不收的 svg/ico,
+// 使用者先選得到、再被前端擋一次,白跑一趟
+export const CLOSE_DOC_ACCEPT = CLOSE_DOC_EXTENSIONS.join(',')
 
 export async function sha256(f: File): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', await f.arrayBuffer())

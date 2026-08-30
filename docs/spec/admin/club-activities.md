@@ -18,7 +18,7 @@
 | 文件下載 | `GET /admin/activities/{id}/apply-pdf` |
 | 社團選項 | `GET /admin/clubs/options` |
 
-兩支清單端點回的是**同一份 schema**(`ActivityOut` / `ActivityDetailOut`),行政端只多帶 `club_name` 與 `reviewed_at`;前端因此直接沿用社團端的 `toActivity` / `toDetail` 對照,不另寫一份。
+兩支清單端點回的是**同一份 schema**(`ActivityOut` / `ActivityDetailOut`),行政端只多帶 `club_name` 與 `reviewed_at`;前端的清單沿用社團端的 `toActivity`;詳情走行政端的 `toAdminDetail`(彈窗要的是簽核章軌、簽核紀錄與結案附件,社團端那份沒有)。
 
 ## 畫面
 

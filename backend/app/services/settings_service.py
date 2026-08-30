@@ -43,7 +43,7 @@ DEFAULTS: dict[str, Any] = {
     # 單檔上限(MB;magic-byte 型別驗證用的上界,管理員後台可調)
     "upload_limits": {"doc": 50, "img": 10, "zip": 100, "video": 200},
     # 各申請性質的附件加總上限(MB):
-    # 活動申請附件 50、空間報修佐證 250(含影片)、活動結案照片 50
+    # 活動申請附件 50、空間報修佐證 250(含影片)、活動結案照片與附件共用 50
     "activity_attachment_total_mb": 50,
     "maintenance_total_mb": 250,
     "close_photo_total_mb": 50,

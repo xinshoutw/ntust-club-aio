@@ -58,6 +58,9 @@ export interface ReviewApproval {
   at: string // YYYY/MM/DD HH:mm
   decision: 'approve' | 'reject' | 'unlock' | 'revoke'
   isClose: boolean
+  stage: string // advisor / chief / dean
+  /** 退回原因(approve 列為 null);社團看得到的那句,承辦這裡也要看得到 */
+  reason?: string
 }
 
 /** 章軌的一格;推導在後端 `services.apply_approvals`,前端不再自己數一次核准列 */
@@ -128,6 +131,8 @@ export interface AdminActivityDetail extends AdminActivity {
   detail: NonNullable<ReviewItem['detail']>
   report?: AdminCloseReport
   photos: AdminFileRef[]
+  /** 結案附件(保單、租車契約、簽到表…);slot=report_doc */
+  closeDocs: AdminFileRef[]
 }
 
 // ---- 後端 schema(backend/app/schemas/activities.py)----
@@ -203,6 +208,7 @@ interface AdminActivityDetailOut extends AdminActivityOut {
   report: ReportOut | null
   photos: FileOut[]
   attachments: FileOut[]
+  close_docs: FileOut[]
   stamps: StampOut[]
   approvals: ApprovalOut[]
 }
@@ -271,6 +277,8 @@ const toApproval = (a: ApprovalOut): ReviewApproval => ({
   at: slashDateTime(a.created_at),
   decision: a.decision as ReviewApproval['decision'],
   isClose: a.subject_type === 'activity_close',
+  stage: a.stage,
+  reason: a.reason ?? undefined,
 })
 
 const toStamp = (s: StampOut): ReviewStamp => ({
@@ -335,6 +343,7 @@ const toAdminDetail = (o: AdminActivityDetailOut): AdminActivityDetail => ({
   },
   report: o.report ? toReport(o.report) : undefined,
   photos: o.photos.map(toFileRef),
+  closeDocs: o.close_docs.map(toFileRef),
 })
 
 // ---- 「本關」推導 ----

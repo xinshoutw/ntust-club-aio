@@ -49,6 +49,8 @@ export interface ClubActivityDetail extends ClubActivity {
   report?: ActivityReport
   photos: EvalFile[]
   attachments: EvalFile[]
+  /** 結案附件(保單、租車契約、簽到表…);與照片共用結案上傳額度 */
+  closeDocs: EvalFile[]
   rejectReason?: ActivityRejectReason
 }
 
@@ -140,6 +142,7 @@ export interface ActivityDetailOut extends ActivityOut {
   report: ReportOut | null
   photos: FileOut[]
   attachments: FileOut[]
+  close_docs: FileOut[]
   approvals: ApprovalOut[]
 }
 
@@ -277,6 +280,7 @@ export const toDetail = (o: ActivityDetailOut): ClubActivityDetail => {
     report: o.report ? toReport(o.report) : undefined,
     photos: o.photos.map(toFile),
     attachments: o.attachments.map(toFile),
+    closeDocs: o.close_docs.map(toFile),
     rejectReason:
       o.status === 'rejected' && lastReject
         ? {
@@ -507,6 +511,12 @@ export const uploadActivityPhoto = (id: number, file: File): Promise<EvalFile> =
 
 export const deleteActivityPhoto = (id: number, fileId: string): Promise<null> =>
   api<null>(`/club/activities/${id}/photos/${fileId}`, { method: 'DELETE' })
+
+export const uploadActivityCloseDoc = (id: number, file: File): Promise<EvalFile> =>
+  uploadFile(`/club/activities/${id}/docs`, file)
+
+export const deleteActivityCloseDoc = (id: number, fileId: string): Promise<null> =>
+  api<null>(`/club/activities/${id}/docs/${fileId}`, { method: 'DELETE' })
 
 // ---- 結案(草稿/送出)----
 

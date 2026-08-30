@@ -199,6 +199,9 @@ async def get_activity(
         FileOut.model_validate(f)
         for f in await svc.activity_files(db, activity, svc.ATTACHMENT_SLOT)
     ]
+    out.close_docs = [
+        FileOut.model_validate(f) for f in await svc.activity_files(db, activity, svc.DOC_SLOT)
+    ]
     approvals = await db.scalars(
         sa.select(ApprovalRecord)
         .where(
@@ -349,6 +352,22 @@ async def save_close_draft(
     return ApiResponse()
 
 
+async def _close_upload_cap(db, activity: Activity) -> tuple[int, int, AppError]:
+    """結案上傳的共用額度:照片與結案附件合計一個上限(close_photo_total_mb)。
+
+    兩個 slot 各算一次再相加 —— 分兩個上限的話畫面要印兩個數字,
+    而社團在意的只有「還能傳多少」。
+    """
+    cap_mb = int(await get_setting(db, "close_photo_total_mb"))
+    cap = cap_mb * 1024 * 1024
+    used = 0
+    for slot in (svc.PHOTO_SLOT, svc.DOC_SLOT):
+        used += await file_service.total_uploaded(
+            db, subject_type=svc.PHOTO_SUBJECT, subject_id=activity.id, slot=slot
+        )
+    return cap, used, AppError(413, "FILE_TOO_LARGE", f"照片與附件加總超過 {cap_mb}MB 上限")
+
+
 @router.post("/{activity_id}/photos", status_code=201)
 async def upload_photo(
     activity_id: int, file: UploadFile, user: ClubUser, db: DbDep
@@ -361,13 +380,7 @@ async def upload_photo(
     if activity.status != ActivityStatus.APPROVED:
         raise conflict("僅結案準備中(已核准)的活動可上傳照片")
 
-    # 結案照片加總上限(預設 10MB,system_settings 可調)
-    cap_mb = int(await get_setting(db, "close_photo_total_mb"))
-    cap = cap_mb * 1024 * 1024
-    existing = await file_service.total_uploaded(
-        db, subject_type=svc.PHOTO_SUBJECT, subject_id=activity.id, slot=svc.PHOTO_SLOT
-    )
-    over_cap = AppError(413, "FILE_TOO_LARGE", f"照片加總超過 {cap_mb}MB 上限")
+    cap, existing, over_cap = await _close_upload_cap(db, activity)
     if existing >= cap:
         raise over_cap
 
@@ -385,6 +398,39 @@ async def upload_photo(
     )
     if existing + row.size > cap:
         raise over_cap  # 未 commit:落盤的檔案隨交易結束一起清掉
+    await db.commit()
+    return ApiResponse(data=FileOut.model_validate(row))
+
+
+@router.post("/{activity_id}/docs", status_code=201)
+async def upload_close_doc(
+    activity_id: int, file: UploadFile, user: ClubUser, db: DbDep
+) -> ApiResponse[FileOut]:
+    """結案附件:保單、租車契約、簽到表、講師資料等。與照片同一個額度、同一條狀態界線。"""
+    file_service.enforce_upload_rate(user.id)
+    activity = await svc.get_own_activity(db, user, activity_id)
+    await db.refresh(activity, attribute_names=["status"], with_for_update=True)
+    if activity.status != ActivityStatus.APPROVED:
+        raise conflict("僅結案準備中(已核准)的活動可上傳結案附件")
+
+    cap, existing, over_cap = await _close_upload_cap(db, activity)
+    if existing >= cap:
+        raise over_cap
+
+    row = await file_service.save_upload(
+        db,
+        file,
+        policy=file_service.REPORT_DOC,
+        module="reports",
+        uploaded_by=user.id,
+        club_id=user.club_id,
+        subject_type=svc.PHOTO_SUBJECT,
+        subject_id=activity.id,
+        slot=svc.DOC_SLOT,
+        # 不去重:同一份保單掛在兩場活動上是常態,不是誤傳
+    )
+    if existing + row.size > cap:
+        raise over_cap
     await db.commit()
     return ApiResponse(data=FileOut.model_validate(row))
 
@@ -427,6 +473,29 @@ async def delete_photo(
     return ApiResponse()
 
 
+@router.delete("/{activity_id}/docs/{file_id}")
+async def delete_close_doc(
+    activity_id: int, file_id: uuid.UUID, user: ClubUser, db: DbDep, request: Request
+) -> ApiResponse[None]:
+    activity = await svc.get_own_activity(db, user, activity_id)
+    await db.refresh(activity, attribute_names=["status"], with_for_update=True)
+    if activity.status != ActivityStatus.APPROVED:
+        raise conflict("結案已送出,附件不可移除")
+    file = await db.get(File, file_id)
+    if (
+        file is None
+        or file.club_id != user.club_id
+        or file.subject_id != activity.id
+        or file.slot != svc.DOC_SLOT
+    ):
+        raise not_found("找不到附件")
+    _audit_file_deleted(db, request, user, "activity_close_doc_deleted", activity.id, file)
+    disk = await file_service.delete_file(db, file)
+    await db.commit()
+    file_service.unlink_quiet(disk)
+    return ApiResponse()
+
+
 @router.post("/{activity_id}/attachments", status_code=201)
 async def upload_attachment(
     activity_id: int, file: UploadFile, user: ClubUser, db: DbDep
@@ -439,7 +508,7 @@ async def upload_attachment(
     if activity.status not in _EDITABLE:
         raise conflict("僅草稿或退回件可上傳附件")
 
-    # 附件加總上限(預設 15MB,system_settings 可調)
+    # 附件加總上限(預設 50MB,system_settings 可調)
     cap_mb = int(await get_setting(db, "activity_attachment_total_mb"))
     cap = cap_mb * 1024 * 1024
     existing = await file_service.total_uploaded(

@@ -374,6 +374,9 @@ async def get_activity(
         FileOut.model_validate(f)
         for f in await svc.activity_files(db, activity, svc.ATTACHMENT_SLOT)
     ]
+    out.close_docs = [
+        FileOut.model_validate(f) for f in await svc.activity_files(db, activity, svc.DOC_SLOT)
+    ]
     # 帶簽核者姓名:審核彈窗要逐列印「誰於何時核准/退回」,章軌只印每一關最後一次核准
     approvals = (
         await db.execute(

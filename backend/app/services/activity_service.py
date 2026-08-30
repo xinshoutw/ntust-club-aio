@@ -11,9 +11,10 @@ from app.core.semesters import TAIPEI, semester_of
 from app.models import Activity, ActivityBudgetItem, ActivityReport, ApprovalRecord, File, User
 from app.models.enums import ActivityStatus, ApprovalDecision, ApprovalSubject
 
-# 結案照片與申請附件在 files 表的定位
+# 結案照片、結案附件與申請附件在 files 表的定位
 PHOTO_SUBJECT = "activity"
 PHOTO_SLOT = "report_photo"
+DOC_SLOT = "report_doc"
 ATTACHMENT_SLOT = "proposal"
 
 # 申請簽核三關,順序即申請表的 初核 / 複核 / 決行 三格

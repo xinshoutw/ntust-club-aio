@@ -259,6 +259,9 @@ DOCUMENT = UploadPolicy(
 # 郵局存簿與申請書:掃描件常為 PDF,也收影像;
 # 上限固定 50MB(不入 upload_limits),與前端 PostalPage 一致
 PASSBOOK = UploadPolicy("passbook", IMAGE.extensions | frozenset({".pdf"}), 50 * _MB)
+# 結案附件(保單、租車契約、簽到表、講師資料…):收的正是預覽得了的四類,
+# 其餘擋在門口 —— 舊系統不限格式,搬進來就是一堆開不起來的 zip 與 .doc
+REPORT_DOC = UploadPolicy("report_doc", DOCUMENT.extensions | IMAGE.extensions, 50 * _MB)
 ARCHIVE = UploadPolicy("archive", frozenset({".zip"}), 100 * _MB, settings_key="zip")
 VIDEO = UploadPolicy("video", frozenset({".mp4", ".mov"}), 200 * _MB, settings_key="video")
 

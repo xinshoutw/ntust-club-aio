@@ -607,6 +607,56 @@ async def test_photo_upload_dedupe_and_delete(client, db):
     assert resp.status_code == 409
 
 
+async def test_close_docs_share_the_photo_quota(client, db):
+    """結案附件:收 PDF/影像,與照片共用 close_photo_total_mb,送出結案後不可再刪。"""
+    from app.models import SystemSetting
+
+    await setup_session(client, db)
+    db.add(SystemSetting(key="close_photo_total_mb", value=1))  # 1MB 共用上限
+    await db.commit()
+    past = (date.today() - timedelta(days=3)).isoformat()
+    activity = await create_activity(client, date=past)
+    await approve(db, activity["id"])
+    docs = f"/api/v1/club/activities/{activity['id']}/docs"
+
+    pdf = b"%PDF-1.7 " + b"\x00" * 700_000  # ~0.7MB
+    resp = await client.post(
+        docs, files={"file": ("保單.pdf", io.BytesIO(pdf), "application/pdf")},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201, resp.text
+    doc_id = resp.json()["data"]["id"]
+
+    # 額度是照片與附件合計:附件吃掉 0.7MB 後,照片這一側也要看得到
+    resp = await client.post(
+        f"/api/v1/club/activities/{activity['id']}/photos",
+        files={"file": ("big.jpg", io.BytesIO(b"\xff\xd8\xff\xe0" + b"\x00" * 700_000), "image/jpeg")},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 413
+    assert resp.json()["meta"]["code"] == "FILE_TOO_LARGE"
+
+    # 不在預覽得了的四類之內 → 415
+    resp = await client.post(
+        docs, files={"file": ("單據.zip", io.BytesIO(b"PK\x03\x04"), "application/zip")},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 415
+
+    detail = (await client.get(f"/api/v1/club/activities/{activity['id']}")).json()["data"]
+    assert [f["original_name"] for f in detail["close_docs"]] == ["保單.pdf"]
+
+    await upload_photo(client, activity["id"])
+    resp = await client.post(
+        f"/api/v1/club/activities/{activity['id']}/close",
+        json=close_payload(),
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    resp = await client.delete(f"{docs}/{doc_id}", headers=csrf_headers(client))
+    assert resp.status_code == 409
+
+
 async def test_list_filters_and_sorting(client, db):
     await setup_session(client, db)
     await create_activity(client, name="甲", date="2026-03-01", type="社課或會議")

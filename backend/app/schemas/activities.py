@@ -257,6 +257,7 @@ class ActivityDetailOut(ActivityOut):
     report: ReportOut | None = None
     photos: list[FileOut] = []
     attachments: list[FileOut] = []
+    close_docs: list[FileOut] = []
     approvals: list[ApprovalOut] = []
     # 僅行政端詳情填寫(社團端不需要承辦人姓名)
     stamps: list[StampOut] = []

@@ -24,10 +24,9 @@ import {
 } from '../../api/bookings'
 import { useApprovedActivities } from '../../api/activities'
 import { useDecisionReason } from './DecisionReasonModal'
+import { taipeiToday } from '../../lib/today'
 
 const { RangePicker } = DatePicker
-
-const todayStartOfDay = () => dayjs().startOf('day')
 
 export default function EquipmentPage() {
   const { message, modal } = App.useApp()
@@ -42,7 +41,7 @@ export default function EquipmentPage() {
   // 嚴格驗證 query 日期(非嚴格 parse 會把 2026/99/99 正規化成別的日期);過去日期不帶入
   const qDate =
     rawDate && dayjs(rawDate, 'YYYY/MM/DD', true).isValid() &&
-    !dayjs(rawDate, 'YYYY/MM/DD', true).isBefore(todayStartOfDay(), 'day')
+    !dayjs(rawDate, 'YYYY/MM/DD', true).isBefore(taipeiToday(), 'day')
       ? dayjs(rawDate, 'YYYY/MM/DD', true)
       : undefined
 
@@ -71,7 +70,7 @@ export default function EquipmentPage() {
   const recentTotal = recentQuery.data?.total ?? 0
   const decision = useDecisionReason()
   const { createEquipmentLoan, cancelEquipmentLoan } = useBookingMutations()
-  const todayStart = dayjs().startOf('day')
+  const todayStart = taipeiToday()
 
   const cancelRow = (l: { id: number; equipmentName: string; qty: number }) =>
     confirmDialog(modal, {
@@ -265,7 +264,7 @@ export default function EquipmentPage() {
                 style={{ width: '100%' }}
                 format="YYYY/MM/DD"
                 allowClear={false}
-                disabledDate={(d) => d.isBefore(todayStartOfDay(), 'day')}
+                disabledDate={(d) => d.isBefore(taipeiToday(), 'day')}
                 placeholder={['開始日', '結束日']}
               />
             </Form.Item>

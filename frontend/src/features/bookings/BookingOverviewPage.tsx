@@ -40,6 +40,7 @@ import {
 } from '../../api/bookings'
 import { CELL, USAGE_SCALE, emptyCellState, usageStep, type CellState } from './cells'
 import { useDecisionReason } from './DecisionReasonModal'
+import { taipeiToday } from '../../lib/today'
 
 const RETURNED_PAGE = 10
 const VENUE_DAYS = 15 // 單一場地檢視:選擇日 −7 ~ +7 共 15 天
@@ -129,8 +130,8 @@ export default function BookingOverviewPage() {
   // 場地檢視:點場地名稱進入,以當時檢視日為中心 −7~+7 共 15 天。
   // 過去日期可查(查歷史借用紀錄的唯一入口),只是空格不能拿來申請
   const [venueView, setVenueView] = useState<number | null>(null)
-  const [venueStart, setVenueStart] = useState<Dayjs>(() => dayjs().startOf('day'))
-  const todayStart = dayjs().startOf('day')
+  const [venueStart, setVenueStart] = useState<Dayjs>(() => taipeiToday())
+  const todayStart = taipeiToday()
 
   const venuesQuery = useVenues()
   const venues = venuesQuery.data ?? []

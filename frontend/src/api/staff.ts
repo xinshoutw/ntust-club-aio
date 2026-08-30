@@ -4,6 +4,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs, { type Dayjs } from 'dayjs'
 import { api, apiPaged, qs } from './client'
+import { taipeiToday } from '../lib/today'
 import { useInvalidateBadges } from './badges'
 
 export const STAFF_PAGE_SIZE = 20
@@ -83,7 +84,8 @@ export interface StaffLoan {
   end: string
   purpose: string
   phone: string // 申請時填的聯絡人電話(手動借用可能為空)
-  borrower?: string // 借出點交時登記
+  borrower?: string // 收件人(借出點交時登記)
+  lender?: string // 出借人(辦理借出點交的工讀生;未借出或舊資料為空)
   overdue: boolean
   due: string // 應歸還時限 YYYY/MM/DD HH:mm(結束日之隔天上班日;後端推導)
   lastRemindedAt?: string // 上次提醒 MM/DD HH:mm;排程每 3 個上班日自動寄一次
@@ -102,13 +104,11 @@ interface StaffLoanOut {
   phone: string | null
   status: string
   borrower_name: string | null
+  checkout_by_name: string | null
   overdue: boolean
   overdue_deadline: string | null
   last_reminded_at: string | null
 }
-
-// 台北時區「今天」:使用者可能不在 +08:00,不可直接用本地日期
-const taipeiToday = () => dayjs(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }))
 
 // 應歸還時限帶 +08:00 生成,ISO 字串日期部即台北當地日 → 直接取日差
 const daysLate = (deadlineIso: string): number =>
@@ -126,6 +126,7 @@ const toLoan = (l: StaffLoanOut): StaffLoan => ({
   purpose: l.purpose,
   phone: l.phone ?? '',
   borrower: l.borrower_name ?? undefined,
+  lender: l.checkout_by_name ?? undefined,
   lastRemindedAt: l.last_reminded_at ? dayjs(l.last_reminded_at).format('MM/DD HH:mm') : undefined,
   overdue: l.overdue,
   due: l.overdue_deadline ? dayjs(l.overdue_deadline).format('YYYY/MM/DD HH:mm') : '',

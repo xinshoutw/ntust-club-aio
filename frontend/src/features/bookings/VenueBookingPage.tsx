@@ -25,6 +25,7 @@ import {
 import { useApprovedActivities } from '../../api/activities'
 import PeriodPicker from './PeriodPicker'
 import { useDecisionReason } from './DecisionReasonModal'
+import { taipeiToday } from '../../lib/today'
 
 export default function VenueBookingPage() {
   const { message, modal } = App.useApp()
@@ -40,7 +41,7 @@ export default function VenueBookingPage() {
   const qDate =
     rawDate &&
     dayjs(rawDate, 'YYYY/MM/DD', true).isValid() &&
-    !dayjs(rawDate, 'YYYY/MM/DD', true).isBefore(dayjs().startOf('day'))
+    !dayjs(rawDate, 'YYYY/MM/DD', true).isBefore(taipeiToday())
       ? rawDate
       : undefined
   const qPeriod = params.get('period')
@@ -65,7 +66,7 @@ export default function VenueBookingPage() {
   const recentTotal = recentQuery.data?.total ?? 0
   const decision = useDecisionReason()
   const { createVenueBooking, cancelVenueBooking } = useBookingMutations()
-  const todayStart = dayjs().startOf('day')
+  const todayStart = taipeiToday()
 
   // 過去時間全面禁止:過去日期不可選;選「今天」時已開始節次禁選(後端亦擋)
   const dateValue = Form.useWatch('date', form) as Dayjs | undefined
@@ -196,7 +197,7 @@ export default function VenueBookingPage() {
                 format="YYYY/MM/DD"
                 placeholder="日期"
                 style={{ width: 140 }}
-                disabledDate={(d) => d.isBefore(dayjs().startOf('day'))}
+                disabledDate={(d) => d.isBefore(taipeiToday())}
               />
             </Form.Item>
             <div style={{ flex: 1, minWidth: 280 }}>

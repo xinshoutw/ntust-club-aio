@@ -13,6 +13,7 @@ import SuspensionNote from '../../components/ui/SuspensionNote'
 import { useClubSuspension } from '../../api/clubProfile'
 import { useDragSelect } from './useDragSelect'
 import { useDecisionReason } from './DecisionReasonModal'
+import { taipeiToday } from '../../lib/today'
 import { periodKeys, usePeriods } from '../../lib/periods'
 import { UNAVAILABLE_BG } from './cells'
 import {
@@ -121,7 +122,7 @@ export default function FixedRoomPage() {
   const recentTotal = recentQuery.data?.total ?? 0
   const decision = useDecisionReason()
   const { createRoomBooking, cancelRoomBooking } = useBookingMutations()
-  const todayStart = dayjs().startOf('day')
+  const todayStart = taipeiToday()
 
   const cancelRow = (r: { id: number; venueName: string }) =>
     confirmDialog(modal, {

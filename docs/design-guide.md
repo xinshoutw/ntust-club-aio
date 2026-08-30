@@ -154,6 +154,7 @@ theme: {
 
 **其他**
 
+- **日界一律用 `lib/today.taipeiToday()`**,不用 `dayjs().startOf('day')`:後端全走台北時區,裝置本地日在境外會差一天 —— 畫面說可以申請、送出卻回「不得早於今天」
 - 可點卡片/列 hover 一律變色(`.click-tint`)
 - 空狀態:一句話 + 主動作按鈕,不放插圖
 - 載入一律 `components/ui/LoadingBlock`(`pending` 傳 `isPending`,即手上一筆資料都沒有時),鋪 Skeleton 取代內容,不用 spinner;

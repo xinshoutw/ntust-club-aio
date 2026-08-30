@@ -46,6 +46,10 @@ export interface NavGroup {
 /** 側欄徽章:鍵即 NavItem.key(後端 services/badges.py 出的同一份)。0 與未回傳都不顯示 */
 export type Badges = Record<string, number>
 
+// 社團評鑑整條線(分組指派、評審代號、成績彙總、結果頁)都還沒做完,
+// 兩端的入口先反灰。要開回來是把這兩個 disabled 拿掉,不必動別的東西
+const EVAL_UNBUILT = { disabled: true, disabledHint: '尚未開發完成' } as const
+
 const withBadges = (groups: NavGroup[], badges: Badges = {}): NavGroup[] =>
   groups.map((g) => ({
     ...g,
@@ -115,7 +119,7 @@ export function buildClubNav(
     {
       label: '社團評鑑',
       items: [
-        { key: 'eval-docs', label: '資料總覽', path: '/eval', icon: <FolderOpenOutlined /> },
+        { key: 'eval-docs', label: '資料總覽', path: '/eval', icon: <FolderOpenOutlined />, ...EVAL_UNBUILT },
       ],
     },
     {
@@ -209,7 +213,7 @@ export function buildAdminNav(user: SessionUser | null, badges: Badges = {}): Na
   {
     label: '社團評鑑',
     items: [
-      { key: 'a-eval', label: '行政分審核', path: '/admin/eval', icon: <TrophyOutlined /> },
+      { key: 'a-eval', label: '行政分審核', path: '/admin/eval', icon: <TrophyOutlined />, ...EVAL_UNBUILT },
     ],
   },
   {

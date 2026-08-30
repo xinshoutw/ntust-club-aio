@@ -139,3 +139,22 @@ describe('行政端鏡射的工讀生與評審頁', () => {
     expect(findItem(nav, 'v-my')?.badge).toBe(1)
   })
 })
+
+describe('社團評鑑反灰', () => {
+  test('兩端的入口都不可點,hover 說明原因', () => {
+    for (const item of [
+      findItem(buildClubNav(undefined, true), 'eval-docs'),
+      findItem(buildAdminNav(superUser), 'a-eval'),
+    ]) {
+      // 明確斷言存在:項目整個不見時 `item?.disabled` 也是 undefined(恆真)
+      expect(item).toBeDefined()
+      expect(item?.disabled).toBe(true)
+      expect(item?.disabledHint).toBe('尚未開發完成')
+    }
+  })
+
+  test('反灰的是入口不是分組:兩邊都還留在「社團評鑑」底下', () => {
+    expect(groupOf(buildClubNav(undefined, true), 'eval-docs')).toBe('社團評鑑')
+    expect(groupOf(buildAdminNav(superUser), 'a-eval')).toBe('社團評鑑')
+  })
+})

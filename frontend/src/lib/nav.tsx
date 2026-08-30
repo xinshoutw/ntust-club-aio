@@ -48,7 +48,7 @@ export type Badges = Record<string, number>
 
 // 社團評鑑整條線(分組指派、評審代號、成績彙總、結果頁)都還沒做完,
 // 兩端的入口先反灰。要開回來是把這兩個 disabled 拿掉,不必動別的東西
-const EVAL_UNBUILT = { disabled: true, disabledHint: '尚未開發完成' } as const
+const EVAL_UNBUILT = { disabled: true, disabledHint: '目前未開放' } as const
 
 const withBadges = (groups: NavGroup[], badges: Badges = {}): NavGroup[] =>
   groups.map((g) => ({

@@ -149,7 +149,7 @@ describe('社團評鑑反灰', () => {
       // 明確斷言存在:項目整個不見時 `item?.disabled` 也是 undefined(恆真)
       expect(item).toBeDefined()
       expect(item?.disabled).toBe(true)
-      expect(item?.disabledHint).toBe('尚未開發完成')
+      expect(item?.disabledHint).toBe('目前未開放')
     }
   })
 

@@ -6,6 +6,9 @@
   # 全部帳號設成 Demo@12345,並關掉首登強制改密
   uv run python scripts/set_passwords.py --all --password 'Demo@12345' --no-change-required --yes
 
+  # 全部帳號各給一組隨機密碼,輸出發放用 CSV(類型/名稱/代號/密碼)
+  uv run python scripts/set_passwords.py --all --random --yes
+
   # 只動社團與管理員
   uv run python scripts/set_passwords.py --club --admin --password 'Demo@12345' --yes
 
@@ -22,14 +25,20 @@
 - **不寫 password_history**:這是管理端的強制覆寫,不是使用者自己改密;
   記進歷史會平白吃掉「3 代不重用」的額度
 
-SSO 帳號(`auth_provider=sso`)一律略過:它們沒有本地密碼可設。
+SSO 帳號(`auth_provider=sso`)與**停用帳號**一律略過:前者沒有本地密碼可設,
+後者連登入的第一關都過不了(`services/auth.py` 先看 `is_active`),給了密碼也用不到,
+還會把停社與 `_migration` 這類不該能登入的帳號混進發放名單。
 """
 
 # ruff: noqa: E402 - sys.path 調整必須先於 app 匯入(同 reset_db.py)
 import argparse
 import asyncio
+import csv
+import os
 import sys
+import tempfile
 from collections import Counter
+from datetime import datetime
 from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
@@ -38,7 +47,7 @@ sys.path.insert(0, str(BACKEND_DIR))  # 讓 scripts/ 可 import app
 import sqlalchemy as sa
 
 from app.core.db import async_session_factory
-from app.core.security import hash_password, validate_password_strength
+from app.core.security import generate_password, hash_password, validate_password_strength
 from app.models import Session, User
 from app.models.enums import AuthProvider, UserRole
 from scripts._safety import refuse_on_prod
@@ -51,6 +60,12 @@ ROLE_FLAGS = {
     "viewer": UserRole.VIEWER,
 }
 PREVIEW_LIMIT = 20  # 預覽時最多列幾個帳號名
+ROLE_LABELS = {  # CSV 的「類型」欄:發放對象讀的是中文,不是 role 代號
+    UserRole.ADMIN: "管理員",
+    UserRole.STAFF: "工讀生",
+    UserRole.CLUB: "社團",
+    UserRole.VIEWER: "評審",
+}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -59,7 +74,10 @@ def build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    parser.add_argument("--password", required=True, help="要設定的密碼(須符合密碼政策)")
+    parser.add_argument("--password", help="所有帳號共用的密碼(須符合密碼政策)")
+    parser.add_argument(
+        "--random", action="store_true", help="每帳號各給一組隨機密碼,並輸出發放用 CSV"
+    )
     parser.add_argument("--all", action="store_true", help="全部本地帳號")
     for flag, role in ROLE_FLAGS.items():
         parser.add_argument(f"--{flag}", action="store_true", help=f"role={role.value} 的帳號")
@@ -89,6 +107,24 @@ def selection(args: argparse.Namespace) -> list:
     return conditions
 
 
+def write_csv(rows: list[tuple[str, str, str, str]]) -> Path:
+    """發放用 CSV;明碼只存在於這一份檔案裡(庫裡是 argon2 hash)。
+
+    固定檔名同一天跑第二次會靜默截掉第一次,`mkstemp` 由 OS 保證不撞名
+    (順帶開成 0600),與 `migration/cms_import.write_passwords` 同一理由。
+    """
+    out_dir = BACKEND_DIR.parent / "migration" / "out"  # 已在 .gitignore,與遷移的明碼檔同處
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    fd, name = tempfile.mkstemp(prefix=f"passwords_{stamp}_", suffix=".csv", dir=out_dir)
+    # utf-8-sig:承辦是用 Excel 開,沒有 BOM 中文就是亂碼
+    with os.fdopen(fd, "w", newline="", encoding="utf-8-sig") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(["類型", "名稱", "代號", "密碼"])
+        writer.writerows(sorted(rows, key=lambda row: (row[0], row[2])))
+    return Path(name)
+
+
 async def main() -> None:
     parser = build_parser()
     args = parser.parse_args()
@@ -102,17 +138,24 @@ async def main() -> None:
             + " / ".join(f"--{flag}" for flag in ROLE_FLAGS)
             + " / --super / --username"
         )
-    try:
-        validate_password_strength(args.password)
-    except Exception as exc:  # noqa: BLE001 - AppError 在腳本裡只需要印訊息
-        sys.exit(f"密碼不符政策:{getattr(exc, 'message', exc)}")
+    if bool(args.password) == args.random:
+        parser.error("--password 與 --random 要且只要給一個")
+    if args.password:
+        try:
+            validate_password_strength(args.password)
+        except Exception as exc:  # noqa: BLE001 - AppError 在腳本裡只需要印訊息
+            sys.exit(f"密碼不符政策:{getattr(exc, 'message', exc)}")
 
     async with async_session_factory() as db:
         users = list(
             await db.scalars(
-                # SSO 帳號沒有本地密碼可設,不列入
+                # SSO 帳號沒有本地密碼可設、停用帳號本來就登不進來,兩者都不列入
                 sa.select(User)
-                .where(sa.or_(*conditions), User.auth_provider == AuthProvider.LOCAL)
+                .where(
+                    sa.or_(*conditions),
+                    User.auth_provider == AuthProvider.LOCAL,
+                    User.is_active.is_(True),
+                )
                 .order_by(User.id)
             )
         )
@@ -123,7 +166,7 @@ async def main() -> None:
         # 打錯帳號名時要看得見:靜靜地少改幾個比報錯還糟
         missing = sorted(set(args.username) - {u.username for u in users})
         if missing:
-            print(f"找不到(或非本地帳號)的帳號名:{'、'.join(missing)}")
+            print(f"找不到(或非本地帳號、已停用)的帳號名:{'、'.join(missing)}")
 
         by_role = Counter(u.role.value for u in users)
         names = [u.username for u in users]
@@ -132,23 +175,31 @@ async def main() -> None:
             preview += f" …等 {len(names)} 個"
         print(f"符合 {len(users)} 個帳號:{dict(by_role)}")
         print(f"  {preview}")
+        print(f"  密碼:{'每帳號隨機(輸出 CSV)' if args.random else '全部相同'}")
         print(f"  首登強制改密:{'關閉' if args.no_change_required else '開啟'}")
 
         if not args.yes:
             print("\n(預覽模式,未寫入。確認無誤後加 --yes)")
             return
 
+        rows = []
         for user in users:
-            user.password_hash = hash_password(args.password)
+            password = args.password or generate_password()
+            user.password_hash = hash_password(password)
             user.must_change_password = not args.no_change_required
             # 沿用舊密碼鎖住的帳號,不清這兩欄就是「改了密碼還是登不進去」
             user.failed_login_attempts = 0
             user.locked_until = None
+            rows.append((ROLE_LABELS[user.role], user.name, user.username, password))
         killed = await db.execute(
             sa.delete(Session).where(Session.user_id.in_([u.id for u in users]))
         )
+        # 先落檔再 commit:寫檔失敗就整批回滾,不會留下「密碼改了但沒人知道是什麼」
+        out = write_csv(rows) if args.random else None
         await db.commit()
         print(f"\n已更新 {len(users)} 個帳號、登出 {killed.rowcount} 個 session")
+        if out:
+            print(f"密碼 CSV → {out}(含明碼,發放後銷毀)")
 
 
 if __name__ == "__main__":

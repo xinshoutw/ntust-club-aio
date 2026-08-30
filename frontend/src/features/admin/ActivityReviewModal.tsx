@@ -304,17 +304,20 @@ export default function ActivityReviewModal({
   // 結案單關:與申請關卡分開判定,兩者不會同時成立(狀態互斥)
   const canCloseReview =
     !!onCloseApprove && item?.status === 'closing_pending_advisor' && canActOnClose(user)
-  // 待審時的預設勾選是推導出來的初值(落庫值 **且** 內容達門檻);已核准結案的單
-  // 要顯示的是**落庫值本身** —— 承辦當初核實後勾回去的那一勾就是 ad2–ad4 的依據,
-  // 拿門檻再篩一次會讓已結案的單顯示成「沒繳」
+  // 判準是**這張單簽完了沒有**,不是「我現在能不能簽」:
+  // 已結案 → 顯示落庫值本身(承辦核實後勾回去的那一勾就是 ad2–ad4 的依據,
+  //          再拿內容門檻篩一次會把已核准的單顯示成「沒繳」);
+  // 尚未結案 → 三個旗標還是欄位預設的 true 佔位值,顯示它等於替沒人看過的單背書,
+  //            一律走推導初值(落庫值 **且** 內容達門檻)+ 承辦手動改過的部分
+  const decided = item?.status === 'closed'
   const checks: Record<CheckKey, boolean> =
-    canCloseReview || !report
-      ? { ...defaultConfirmations(report, photos.length), ...override }
-      : {
+    report && decided
+      ? {
           photos: report.photosConfirmed,
           report: report.reportConfirmed,
           reflections: report.reflectionsConfirmed,
         }
+      : { ...defaultConfirmations(report, photos.length), ...override }
   // 結案側:與申請值不同的實際值標色,hover 出預計值(與社團端詳情同一支 ActualValue)
   const actualTime = report ? `${report.actualStart}–${report.actualEnd}` : ''
   const timeChanged = !!report && !!d?.timeRange && !d.timeRange.includes(actualTime)

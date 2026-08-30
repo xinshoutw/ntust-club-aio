@@ -4,8 +4,14 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import CloseReviewPage from './CloseReviewPage'
 import type { AdminActivity, AdminActivityDetail } from '../../api/adminActivities'
 
+let noPermission = false
+
 vi.mock('../../app/auth', () => ({
-  useAuth: () => ({ user: { role: 'admin', isSuper: true, permissions: ['aclose'] } }),
+  useAuth: () => ({
+    user: noPermission
+      ? { role: 'admin', isSuper: false, permissions: ['areview'] }
+      : { role: 'admin', isSuper: true, permissions: ['aclose'] },
+  }),
 }))
 
 const item: AdminActivity = {
@@ -126,6 +132,25 @@ describe('結案審核的繳交確認', () => {
       expect(refetch).toHaveBeenCalled()
     } finally {
       refetchFailed = false
+    }
+  })
+
+  // 三個旗標在簽核前是欄位預設的 true 佔位值:沒有簽核權的人開同一張待審單,
+  // 顯示落庫值等於替沒人看過的單背書。判準是「簽完了沒有」,不是「我能不能簽」
+  test('無簽核權開待審單:仍走推導,不顯示落庫的預設 true', async () => {
+    noPermission = true
+    try {
+      render(
+        <App>
+          <CloseReviewPage />
+        </App>,
+      )
+      fireEvent.click(screen.getByRole('button', { name: /^審\s*核$/ }))
+      await screen.findByText('結案成果')
+      expect(box('活動照片').checked).toBe(false) // 落庫是 true,但 0 張且無影片
+      expect(box('學習心得').checked).toBe(false) // 落庫是 true,但只有 1 篇
+    } finally {
+      noPermission = false
     }
   })
 

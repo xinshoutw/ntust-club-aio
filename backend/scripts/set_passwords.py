@@ -209,6 +209,10 @@ async def main() -> None:
         print(f"\n已更新 {len(users)} 個帳號、登出 {killed.rowcount} 個 session")
         if out:
             print(f"密碼 CSV → {out}(含明碼,發放後銷毀)")
+            if any(code.startswith("0") for _, _, code, _ in rows):
+                # 001/002 這種代號 Excel 一開就變成 1/2,承辦照著發就是打不開的帳號;
+                # 加引號也擋不住,只能在匯入時把該欄指定成文字
+                print("  代號有前導零:Excel 直接開會顯示成 1/2,匯入時該欄要選「文字」")
 
 
 if __name__ == "__main__":

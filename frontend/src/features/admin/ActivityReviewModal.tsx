@@ -321,7 +321,7 @@ export default function ActivityReviewModal({
   const canEdit = canReview && isFirstStage
   const selfFundTotal = d?.budget.reduce((s, b) => s + b.selfFund, 0) ?? 0
   const requestedTotal = d?.budget.reduce((s, b) => s + b.requested, 0) ?? item?.requested ?? 0
-  const approvedTotal = d?.budget.reduce((s, b) => s + (approvals[b.id] ?? 0), 0) ?? 0
+  const approvedTotal = d?.budget.reduce((s, b) => s + (approvals[b.id] ?? b.approved), 0) ?? 0
   const singleStage = requestedTotal === 0 // 無補助 → 承辦人單關即核准
   // 能不能核只看擬請(後端也擋非零核定與必填來源)
   const hasSubsidy = requestedTotal > 0
@@ -341,7 +341,7 @@ export default function ActivityReviewModal({
       // 但預填值來自舊資料 —— 遷移列的核定可以大於擬請,沒有輸入框可改就會卡死送不出去
       const budget = (d?.budget ?? []).map((b) => ({
         itemId: b.id,
-        approvedSubsidy: Math.min(approvals[b.id] ?? 0, b.requested),
+        approvedSubsidy: Math.min(approvals[b.id] ?? b.approved, b.requested),
       }))
       // 必填與否看**送出去的**核定總額,不是畫面上的 approvedTotal —— 遷移列會被 min 夾掉,
       // 兩者對不起來就會變成前端放行、後端 422,而承辦人看到的是一句他改不掉的錯誤(D-16)
@@ -442,8 +442,16 @@ export default function ActivityReviewModal({
       open={open}
       onCancel={onClose}
       afterClose={() => {
+        // 各頁靠 key 重掛來清狀態,但漏掛一處就會把上一張單的核定金額顯示在下一張上
+        // (seeded 是 ref,補種只做一次)—— 關窗時自己也清一次
         setTab(null)
         setOverride({})
+        setApprovals({})
+        setFundSource('')
+        setFundTouched(false)
+        setLargeApproved(false)
+        startedNull.current = true
+        seeded.current = false
         afterClose()
       }}
       // 窗的大小只由「有無經費」決定:切頁籤、內容多寡都不改變它,
@@ -697,12 +705,12 @@ export default function ActivityReviewModal({
                           min={0}
                           max={b.requested}
                           precision={0}
-                          value={approvals[b.id]}
+                          value={approvals[b.id] ?? b.approved}
                           onChange={(v) => setApprovals((prev) => ({ ...prev, [b.id]: v ?? 0 }))}
                           controls={false}
                         />
                       ) : (
-                        <div className="r num" style={{ textAlign: 'right' }}>{(approvals[b.id] ?? 0).toLocaleString()}</div>
+                        <div className="r num" style={{ textAlign: 'right' }}>{(approvals[b.id] ?? b.approved).toLocaleString()}</div>
                       )}
                     </td>
                     )}

@@ -240,16 +240,20 @@ export default function AdminClubActivitiesPage() {
         <Pager page={page} pageSize={pageSize} total={total} onChange={setPage} />
       </div>
 
-      {/* 唯讀:不給 onApprove / onReject,簽核鈕自然收掉。與申請審核、結案審核同一支彈窗 */}
-      <ActivityReviewModal
-        item={detailQuery.data ?? null}
-        pendingName={preview?.name}
-        detailError={detailQuery.error}
-        onRetryDetail={() => void detailQuery.refetch()}
-        open={previewOpen}
-        onClose={() => setPreviewOpen(false)}
-        afterClose={() => setPreview(null)}
-      />
+      {/* 唯讀:不給 onApprove / onReject,簽核鈕自然收掉。與申請審核、結案審核同一支彈窗。
+          `key` + 條件掛載(全站五處同型):換一列就重掛,彈窗內的頁籤與核定金額不跨單據殘留 */}
+      {preview && (
+        <ActivityReviewModal
+          key={preview.id}
+          item={detailQuery.data ?? null}
+          pendingName={preview.name}
+          detailError={detailQuery.error}
+          onRetryDetail={() => void detailQuery.refetch()}
+          open={previewOpen}
+          onClose={() => setPreviewOpen(false)}
+          afterClose={() => setPreview(null)}
+        />
+      )}
     </div>
   )
 }

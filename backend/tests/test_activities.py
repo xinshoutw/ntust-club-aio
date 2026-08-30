@@ -4,7 +4,7 @@ from datetime import date, timedelta
 import sqlalchemy as sa
 
 from app.core.config import settings
-from app.models import Activity, AuditLog, SystemSetting
+from app.models import Activity, ApprovalRecord, AuditLog, SystemSetting
 from tests.conftest import csrf_headers, login, make_club, make_user
 
 JPG = b"\xff\xd8\xff\xe0" + b"\x00" * 64
@@ -114,6 +114,33 @@ async def test_negative_amounts_are_rejected_by_the_database(client, db):
             await db.execute(sa.text(sql), params)
             await db.flush()
         await db.rollback()
+
+
+async def test_reading_tolerates_rows_longer_than_the_input_limit(client, db):
+    """輸出 schema 不得沿用輸入的長度限制:舊系統遷入的明細有 633 字。
+
+    沿用的話使用者什麼都沒做錯,活動卻一點開就 500(遷移資料實測 60 個活動打不開)。
+    """
+    await setup_session(client, db)
+    activity_id = (await create_activity(client))["id"]
+    long_text = "線" * 633  # BudgetItemIn 的上限是 200
+    await db.execute(
+        sa.text("UPDATE activity_budget_items SET description = :d WHERE activity_id = :id"),
+        {"d": long_text, "id": activity_id},
+    )
+    await db.commit()
+
+    resp = await client.get(f"/api/v1/club/activities/{activity_id}")
+    assert resp.status_code == 200
+    assert resp.json()["data"]["budget_items"][0]["description"] == long_text
+
+    # 送件端的限制不受影響:超長仍然擋得住
+    resp = await client.post(
+        "/api/v1/club/activities",
+        json={"name": "超長", "budget_items": [{"category": "印刷費", "description": long_text}]},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
 
 
 async def test_budget_category_check_tolerates_legacy_strings(client, db):
@@ -294,6 +321,36 @@ async def test_rejected_activity_cannot_be_moved_further_into_the_past(client, d
     assert ahead.status_code == 200
 
 
+async def test_club_detail_never_carries_the_approver_name(client, db):
+    """簽核者姓名是行政端詳情才填的(ApprovalOut.actor_name 預設空字串)。
+
+    社團端與行政端共用同一個 schema,而「填不進去」目前只是因為 ApprovalRecord
+    沒有 actor_name 屬性 —— 哪天有人加上 actor relationship 或改成 join,就直接漏。
+    社團看得到自己被誰退回沒有意義,而承辦人姓名是個資。
+    """
+    club = await setup_session(client, db)
+    activity = await create_activity(client)
+    admin = await make_user(db, username="reviewer", role="admin", name="承辦人張三")
+    db.add(
+        ApprovalRecord(
+            subject_type="activity",
+            subject_id=activity["id"],
+            stage="advisor",
+            decision="approve",
+            actor_id=admin.id,
+        )
+    )
+    await db.commit()
+
+    resp = await client.get(f"/api/v1/club/activities/{activity['id']}")
+    assert resp.status_code == 200, resp.text
+    approvals = resp.json()["data"]["approvals"]
+    assert len(approvals) == 1
+    assert approvals[0]["actor_name"] is None  # None=這一端不提供,不是「姓名是空白」
+    assert "承辦人張三" not in resp.text
+    assert club.id == activity["club_id"]
+
+
 async def test_club_scoping(client, db):
     await setup_session(client, db)
     data = await create_activity(client)
@@ -348,7 +405,7 @@ async def test_close_eligibility_and_lock_derive_from_end_date(client, db):
     assert resp.status_code == 409
     assert "尚未結束" in resp.json()["error"]
 
-    # 開始日已逾 1 個月但結束日在近期 → 以 end_date 推導,不鎖定、可結案
+    # 開始日已逾結案期限但結束日在近期 → 以 end_date 推導,不鎖定、可結案
     start = (date.today() - timedelta(days=70)).isoformat()
     end = (date.today() - timedelta(days=3)).isoformat()
     data = await create_activity(client, name="跨日活動", date=start, end_date=end)
@@ -450,9 +507,26 @@ async def test_close_submit_and_report(client, db):
     assert detail["report"]["review_conclusion"] == "下次提前一週彩排"
 
 
+def test_close_lock_boundary_is_the_whole_deadline_day():
+    """期限日當天整天仍可結案,隔日零時起鎖定(改天制後這條界線只剩這裡驗)。"""
+    from datetime import datetime, time
+
+    from app.core.semesters import TAIPEI
+    from app.models.enums import ActivityStatus
+    from app.services.activity_service import is_close_locked
+
+    base = date(2026, 3, 1)
+    activity = Activity(
+        status=ActivityStatus.APPROVED, close_unlocked=False, date=base, end_date=base
+    )
+    last_moment = datetime.combine(base + timedelta(days=30), time(23, 59), tzinfo=TAIPEI)
+    assert not is_close_locked(activity, 30, last_moment)
+    assert is_close_locked(activity, 30, last_moment + timedelta(minutes=1))
+
+
 async def test_close_locked_after_deadline(client, db):
     await setup_session(client, db)
-    stale = (date.today() - timedelta(days=63)).isoformat()  # 超過 1 個月
+    stale = (date.today() - timedelta(days=63)).isoformat()  # 遠超過任何合理的 close_lock_days
     data = await create_activity(client, date=stale)
     aid = data["id"]
     await approve(db, aid)
@@ -531,6 +605,88 @@ async def test_photo_upload_dedupe_and_delete(client, db):
         f"/api/v1/club/activities/{a2['id']}/photos/{a2_file}", headers=csrf_headers(client)
     )
     assert resp.status_code == 409
+
+
+async def test_close_docs_share_the_photo_quota(client, db):
+    """結案附件:收 PDF/影像,與照片共用 close_photo_total_mb,送出結案後不可再刪。"""
+    from app.models import SystemSetting
+
+    await setup_session(client, db)
+    db.add(SystemSetting(key="close_photo_total_mb", value=1))  # 1MB 共用上限
+    await db.commit()
+    past = (date.today() - timedelta(days=3)).isoformat()
+    activity = await create_activity(client, date=past)
+    await approve(db, activity["id"])
+    docs = f"/api/v1/club/activities/{activity['id']}/docs"
+
+    pdf = b"%PDF-1.7 " + b"\x00" * 700_000  # ~0.7MB
+    resp = await client.post(
+        docs, files={"file": ("保單.pdf", io.BytesIO(pdf), "application/pdf")},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201, resp.text
+    doc_id = resp.json()["data"]["id"]
+
+    # 額度是照片與附件合計:附件吃掉 0.7MB 後,照片這一側也要看得到
+    resp = await client.post(
+        f"/api/v1/club/activities/{activity['id']}/photos",
+        files={"file": ("big.jpg", io.BytesIO(JPG + b"\x00" * 700_000), "image/jpeg")},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 413
+    assert resp.json()["meta"]["code"] == "FILE_TOO_LARGE"
+
+    # 不在預覽得了的四類之內 → 415
+    resp = await client.post(
+        docs, files={"file": ("單據.zip", io.BytesIO(b"PK\x03\x04"), "application/zip")},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 415
+
+    detail = (await client.get(f"/api/v1/club/activities/{activity['id']}")).json()["data"]
+    assert [f["original_name"] for f in detail["close_docs"]] == ["保單.pdf"]
+
+    await upload_photo(client, activity["id"])
+    resp = await client.post(
+        f"/api/v1/club/activities/{activity['id']}/close",
+        json=close_payload(),
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    resp = await client.delete(f"{docs}/{doc_id}", headers=csrf_headers(client))
+    assert resp.status_code == 409
+
+
+async def test_deleting_a_draft_sweeps_every_slot(client, db):
+    """刪草稿要掃三個 slot:files 對活動是 subject_id 軟關聯,沒有 FK cascade ——
+    漏掃一個 slot 就是 DB 列與磁碟檔一起變孤兒,還繼續佔社團儲存配額。"""
+    from app.models import File
+
+    await setup_session(client, db)
+    past = (date.today() - timedelta(days=3)).isoformat()
+    activity = await create_activity(client, date=past)
+    aid = activity["id"]
+    await client.post(
+        f"/api/v1/club/activities/{aid}/attachments",
+        files={"file": ("企劃書.pdf", io.BytesIO(b"%PDF-1.7 "), "application/pdf")},
+        headers=csrf_headers(client),
+    )
+    # 結案照片與附件只有已核准才收得下;先核准、傳完再放回草稿,製造三個 slot 都有檔的列
+    await approve(db, aid)
+    await upload_photo(client, aid)
+    await client.post(
+        f"/api/v1/club/activities/{aid}/docs",
+        files={"file": ("保單.pdf", io.BytesIO(b"%PDF-1.7 "), "application/pdf")},
+        headers=csrf_headers(client),
+    )
+    await db.execute(sa.update(Activity).where(Activity.id == aid).values(status="draft"))
+    await db.commit()
+    assert await db.scalar(sa.select(sa.func.count()).select_from(File)) == 3
+
+    resp = await client.delete(f"/api/v1/club/activities/{aid}", headers=csrf_headers(client))
+    assert resp.status_code == 200, resp.text
+    assert await db.scalar(sa.select(sa.func.count()).select_from(File)) == 0
+    assert not [p for p in settings.upload_dir.rglob("*") if p.is_file()]
 
 
 async def test_list_filters_and_sorting(client, db):
@@ -819,3 +975,15 @@ async def test_close_actual_times_overnight_rules(client, db):
         headers=csrf_headers(client),
     )
     assert resp.status_code == 200, resp.text
+
+
+async def test_delete_file_rejects_non_uuid_path_param(client, db):
+    """非 UUID 的 file_id 由 FastAPI 擋成 422 —— 宣告成 str 會原樣送進 asyncpg 而 500。"""
+    await setup_session(client, db)
+    data = await create_activity(client, date=(date.today() - timedelta(days=3)).isoformat())
+    for kind in ("photos", "attachments"):
+        resp = await client.delete(
+            f"/api/v1/club/activities/{data['id']}/{kind}/not-a-uuid",
+            headers=csrf_headers(client),
+        )
+        assert resp.status_code == 422, (kind, resp.status_code, resp.text)

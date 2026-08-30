@@ -5,7 +5,6 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import dayjs, { type Dayjs } from 'dayjs'
 import { api, apiPaged, qs } from './client'
 import { useInvalidateBadges } from './badges'
-import { fetchAllPages } from './fetchAll'
 import type { FixedWindow } from './bookings'
 import type { StatusKey } from '../lib/status'
 import { periodRank } from '../lib/periods'
@@ -180,6 +179,8 @@ export interface AdminRoomRequest {
   /** 目標學期起訖 YYYY/MM/DD(可比大小的格式) */
   startDate: string
   endDate: string
+  /** 僅待審單:`dow|period` → 衝突種類(後端算,判定與核准端的檢核同一份) */
+  conflicts: Map<string, RoomConflictKind>
 }
 
 interface RoomSlotOut {
@@ -199,6 +200,7 @@ interface AdminRoomBookingOut {
   end_date: string
   created_at: string
   slots: RoomSlotOut[]
+  conflict_slots: { weekday: number; period: string; kind: RoomConflictKind }[]
 }
 
 /** slots(weekday×period 平面列)→ 依星期分組、節次照課表順序排序 */
@@ -215,59 +217,31 @@ export const slotsToEntries = (slots: RoomSlotOut[]): AdminRoomRequest['entries'
     }))
 }
 
-/** 待審單某時段的衝突種類:`pending`=與別張待審單互撞(擇一核准);
- *  `taken`=已被核准單佔用(核准會吃 409 SLOT_TAKEN,只能退回或先撤銷那筆) */
-export type RoomConflictKind = 'pending' | 'taken'
+/** 待審單某時段的衝突種類(後端 `booking_service.fixed_conflict_slots` 逐格算好帶回,
+ *  與核准端的三項檢核同一份)。由重到輕:`blocked`=場地不開放規則(核准吃 409 SLOT_BLOCKED);
+ *  `taken`=已核准的**固定**借用、`temp`=學期內已核准的**單日臨時**借用(皆 SLOT_TAKEN);
+ *  `pending`=與別張待審單互撞,這一種才是「擇一核准」 */
+export type RoomConflictKind = 'blocked' | 'taken' | 'temp' | 'pending'
 
 /** 逐時段的衝突標示;兩個審核彈窗與待審表共用一份,不各寫各的 */
 export const CONFLICT_TEXT: Record<RoomConflictKind, string> = {
-  pending: '(衝突)',
+  blocked: '(場地不開放)',
   taken: '(已核准佔用)',
+  temp: '(臨時借用佔用)',
+  pending: '(衝突)',
 }
 
-/** 整單的衝突說明:撞到已核准單就不是「擇一」的問題,核准必被後端擋下 */
+/** 整單的衝突說明:只有「與其他待審單互撞」是擇一,其餘三種核准必被後端擋下 */
 export const conflictNote = (kinds: (RoomConflictKind | undefined)[]): string | null =>
-  kinds.includes('taken')
-    ? '此申請的時段已有已核准的固定借用,核准會被系統擋下;請退回本單,或先撤銷已核准的那筆'
-    : kinds.includes('pending')
-      ? '此申請與其他申請衝突,請擇一核准'
-      : null
-
-/**
- * 待審固定借用的衝突時段:同場地、**目標學期區間重疊**、同星期同節次(判定軸與後端
- * 核准檢核一致)。回傳 apiId → `dow|period` → 衝突種類。
- *
- * 兩份對照名單都必須是**全量**:只比對當前這一頁的話,跨頁的兩社搶同一格會被判成無衝突;
- * 少了已核准單則是後端擋得下、畫面卻不標,承辦按了才知道。
- * ponytail: 逐對比對 O(n²),一輪開放窗的待審單頂多百餘筆;真的長到會卡時再改成先依場地分桶。
- */
-export function roomConflictSlots(
-  requests: AdminRoomRequest[],
-  approved: AdminRoomRequest[] = [],
-): Map<number, Map<string, RoomConflictKind>> {
-  const conflicts = new Map<number, Map<string, RoomConflictKind>>()
-  const overlaps = (a: AdminRoomRequest, b: AdminRoomRequest) =>
-    a.startDate <= b.endDate && a.endDate >= b.startDate // YYYY/MM/DD 可直接字串比大小
-  const rivals = [
-    ...requests.map((req) => ({ req, kind: 'pending' as RoomConflictKind })),
-    ...approved.map((req) => ({ req, kind: 'taken' as RoomConflictKind })),
-  ]
-  for (const a of requests) {
-    for (const { req: b, kind } of rivals) {
-      if (b.apiId === a.apiId || b.venueId !== a.venueId || !overlaps(a, b)) continue
-      for (const e of a.entries) {
-        for (const p of e.periods) {
-          if (!b.entries.some((oe) => oe.dow === e.dow && oe.periods.includes(p))) continue
-          const slots = conflicts.get(a.apiId) ?? new Map<string, RoomConflictKind>()
-          // 同時撞到待審與已核准時以 taken 為準:能做的只剩退回
-          if (kind === 'taken' || !slots.has(`${e.dow}|${p}`)) slots.set(`${e.dow}|${p}`, kind)
-          conflicts.set(a.apiId, slots)
-        }
-      }
-    }
-  }
-  return conflicts
-}
+  kinds.includes('blocked')
+    ? '此申請的時段有場地不開放規則，請退回此申請或先調整該規則'
+    : kinds.includes('taken')
+      ? '此申請的時段與已核准的固定借用衝突，請退回此申請或撤銷已核准的那筆'
+      : kinds.includes('temp')
+        ? '此申請的時段與已核准的臨時借用衝突，請退回此申請或撤銷那筆臨時借用'
+        : kinds.includes('pending')
+          ? '此申請與其他申請衝突，請擇一核准'
+          : null
 
 const toRoomRequest = (r: AdminRoomBookingOut): AdminRoomRequest => ({
   id: String(r.id),
@@ -280,6 +254,7 @@ const toRoomRequest = (r: AdminRoomBookingOut): AdminRoomRequest => ({
   status: r.status,
   startDate: toDisplayDate(r.start_date),
   endDate: toDisplayDate(r.end_date),
+  conflicts: new Map(r.conflict_slots.map((c) => [`${c.weekday}|${c.period}`, c.kind])),
 })
 
 // ---- queries ----
@@ -291,8 +266,6 @@ export const keys = {
   venueBookings: (p: PendingListParams) => ['adminBookings', 'venueBookings', p] as const,
   equipmentLoans: (p: PendingListParams) => ['adminBookings', 'equipmentLoans', p] as const,
   roomBookings: (p: PendingListParams) => ['adminBookings', 'roomBookings', p] as const,
-  roomBookingsAll: ['adminBookings', 'roomBookings', 'all'] as const,
-  roomBookingsApproved: ['adminBookings', 'roomBookings', 'approved'] as const,
   fixedWindow: ['adminBookings', 'fixedWindow'] as const,
 }
 
@@ -372,31 +345,6 @@ export function usePendingRoomBookings(p: PendingListParams) {
         `/admin/room-bookings${qs({ status: 'pending', page: p.page, page_size: p.pageSize })}`,
       ).then(({ data, total }) => ({ requests: data.map(toRoomRequest), total })),
     placeholderData: keepPreviousData,
-  })
-}
-
-/** 衝突偵測專用:待審固定借用全量(一輪至多每社一單,量級小);顯示仍走分頁查詢 */
-export function useAllPendingRoomBookings(enabled = true) {
-  return useQuery({
-    queryKey: keys.roomBookingsAll,
-    enabled,
-    queryFn: () =>
-      fetchAllPages<AdminRoomBookingOut>('/admin/room-bookings', { status: 'pending' }).then(
-        (rows) => rows.map(toRoomRequest),
-      ),
-  })
-}
-
-/** 衝突偵測專用:還佔著時段的已核准固定借用(active=true 排除學期已結束的歷年單) */
-export function useApprovedRoomBookings(enabled = true) {
-  return useQuery({
-    queryKey: keys.roomBookingsApproved,
-    enabled,
-    queryFn: () =>
-      fetchAllPages<AdminRoomBookingOut>('/admin/room-bookings', {
-        status: 'approved',
-        active: true,
-      }).then((rows) => rows.map(toRoomRequest)),
   })
 }
 

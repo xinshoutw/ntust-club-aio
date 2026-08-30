@@ -1,6 +1,6 @@
 # 器材借出點交
 
-`/pt/checkout` · `staff` · `features/pt/PtCheckoutPage.tsx`
+`/pt/checkout`(行政端 `/admin/pt/checkout`,鍵 `astaff`) · `staff` · `features/pt/PtCheckoutPage.tsx`
 
 ## 用途
 
@@ -17,7 +17,7 @@
 
 表格:社團、器材(含數量)、借用區間、點交方式(一般 / 依序點交)。點列開 Modal。
 
-Modal:器材與數量、借用區間、申請時填的用途與聯絡電話、借用人姓名輸入;`needs_serial` 的器材另顯示一則提醒,請工讀生現場逐件核對機身序號。底部只有「確認借出」一顆鈕。
+Modal:器材與數量、借用區間、申請時填的用途與聯絡電話、收件人姓名輸入;`needs_serial` 的器材另顯示一則提醒,請工讀生現場逐件核對機身序號。底部只有「確認借出」一顆鈕。
 
 ## 規則
 

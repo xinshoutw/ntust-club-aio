@@ -79,12 +79,12 @@ export default function AttachmentArea({
         }
         const hash = await sha256(f)
         if (valueRef.current.some((b) => b.hash === hash)) {
-          message.error(`「${f.name}」與已加入的檔案內容相同,已拒絕重複上傳`)
+          message.error(`「${f.name}」檔案重複`)
           return
         }
         commit([...valueRef.current, { key: `bag${++bagSeq}`, file: f, hash }])
       } catch (e) {
-        message.error(`檔案處理失敗:${e instanceof Error ? e.message : String(e)}`)
+        message.error(`檔案處理失敗：${e instanceof Error ? e.message : String(e)}`)
       }
     })
   }
@@ -115,7 +115,7 @@ export default function AttachmentArea({
           已使用{' '}
           <span className="num">
             {fmtMB(totalBytes)}
-            {maxTotalBytes != null ? `/${Math.round(maxTotalBytes / 1024 / 1024)}` : ''}
+            {maxTotalBytes != null ? ` / ${Math.round(maxTotalBytes / 1024 / 1024)}` : ''}
           </span>{' '}
           MB
         </p>

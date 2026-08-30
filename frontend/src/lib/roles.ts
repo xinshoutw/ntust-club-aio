@@ -6,6 +6,16 @@ export type MemberKind = (typeof MEMBER_KINDS)[number]
 
 export type ClubKind = '社團' | '學會'
 
+/** 負責人與副負責人不寫職稱:身份本身就是職稱(D-27)。
+ *  後端 `_validate_member` 與遷移 `cms_import.member_kind` 是同一條規則 —— 那兩處會把填進來的字捨棄。 */
+export const canHaveTitle = (kind: MemberKind): boolean =>
+  kind !== '負責人' && kind !== '副負責人'
+
+/** 畫面與匯出看得到的職稱:那兩個身份一律沒有 —— 規則生效前存下的殘留值也不露出來,
+ *  否則同一列社團端顯示 `—`、行政端顯示原文,匯出的 CSV 再匯入又會被丟掉。 */
+export const memberTitle = (m: { kind: MemberKind; title?: string | null }): string | null =>
+  canHaveTitle(m.kind) ? (m.title ?? null) : null
+
 export function kindLabel(kind: MemberKind, clubKind: ClubKind | string | undefined): string {
   const noun = clubKind === '學會' ? '會' : '社'
   if (kind === '負責人') return `${noun}長`

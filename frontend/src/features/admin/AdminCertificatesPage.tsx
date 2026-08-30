@@ -65,7 +65,7 @@ export default function AdminCertificatesPage() {
               )}
               {!certsQuery.isPending && !certsQuery.isError && certs.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有幹部證明申請</td>
+                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>無幹部證明申請</td>
                 </tr>
               )}
             </tbody>

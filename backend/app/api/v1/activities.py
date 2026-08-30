@@ -4,12 +4,12 @@
 draft → pending_advisor →(有補助)pending_chief → pending_dean → approved
      └(無補助)→ approved;任一關退回 → rejected(可修改重送)
 approved →(活動結束後)close → closing_pending_advisor → closed;退回 → approved
-逾期鎖定=推導(活動日+1 個月未送結案),管理員可解鎖(close_unlocked)。
+逾期鎖定=推導(活動結束日+N 天未送結案),管理員可解鎖(close_unlocked)。
 """
 
+import uuid
 from datetime import UTC, datetime, time
 from typing import Annotated
-from urllib.parse import quote
 
 import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Query, Request, Response, UploadFile
@@ -21,7 +21,6 @@ from app.core.errors import AppError, conflict, not_found, validation_error
 from app.core.semesters import TAIPEI, semester_of, semester_range
 from app.models import (
     Activity,
-    ActivityBudgetItem,
     ActivityReflection,
     ActivityReport,
     ApprovalRecord,
@@ -48,43 +47,12 @@ router = APIRouter(prefix="/club/activities", tags=["activities"])
 
 _EDITABLE = {ActivityStatus.DRAFT, ActivityStatus.REJECTED}
 
-# 經費欄顯示「自籌 / 擬請補助」,排序以兩者合計(逐項加總,無經費列為 0)
-_BUDGET_TOTAL = (
-    sa.select(
-        sa.func.coalesce(
-            sa.func.sum(ActivityBudgetItem.self_fund + ActivityBudgetItem.requested_subsidy), 0
-        )
-    )
-    .where(ActivityBudgetItem.activity_id == Activity.id)
-    .correlate(Activity)
-    .scalar_subquery()
-)
-
-# 狀態排序照畫面的流程順序,不是列舉字面值(VARCHAR 排出來會是 approved→closed→…)
-_STATUS_ORDER = sa.case(
-    (Activity.status == ActivityStatus.DRAFT, 0),
-    (
-        Activity.status.in_(
-            [
-                ActivityStatus.PENDING_ADVISOR,
-                ActivityStatus.PENDING_CHIEF,
-                ActivityStatus.PENDING_DEAN,
-            ]
-        ),
-        1,
-    ),
-    (Activity.status == ActivityStatus.APPROVED, 2),
-    (Activity.status == ActivityStatus.CLOSING_PENDING_ADVISOR, 3),
-    (Activity.status == ActivityStatus.CLOSED, 4),
-    else_=5,  # rejected
-)
-
 _SORTABLE = {
     "name": Activity.name,
     "type": Activity.type,
     "date": Activity.date,
-    "budget": _BUDGET_TOTAL,
-    "status": _STATUS_ORDER,
+    "budget": svc.BUDGET_TOTAL_SQL,
+    "status": svc.STATUS_ORDER_SQL,
     "created_at": Activity.created_at,
 }
 
@@ -101,9 +69,9 @@ async def _club_of(db, user) -> Club:
     return await db.get(Club, user.club_id)
 
 
-def _to_out(activity: Activity, lock_months: int) -> ActivityOut:
+def _to_out(activity: Activity, lock_days: int) -> ActivityOut:
     out = ActivityOut.model_validate(activity)
-    svc.decorate(out, activity, lock_months)
+    svc.decorate(out, activity, lock_days)
     return out
 
 
@@ -147,20 +115,6 @@ def _require_future_start(activity: Activity) -> None:
         raise validation_error("活動開始時間早於現在,請調整活動日期與時間")
 
 
-# 清單的 status 篩的是**畫面顯示的狀態**:已核准且逾期鎖定的列顯示成「已逾期」,
-# 所以 approved 不含它們,locked 是獨立的一種(推導,非 ActivityStatus 成員)
-_LOCKED = "locked"
-
-
-def _display_status_condition(key: str, lock_months: int) -> sa.ColumnElement[bool]:
-    locked = svc.close_locked_sql(lock_months)
-    if key == _LOCKED:
-        return locked
-    if key == ActivityStatus.APPROVED:
-        return sa.and_(Activity.status == ActivityStatus.APPROVED, sa.not_(locked))
-    return Activity.status == ActivityStatus(key)
-
-
 @router.get("")
 async def list_activities(
     user: ClubUser,
@@ -182,21 +136,15 @@ async def list_activities(
     if semester:
         start, end = semester_range(semester)
         query = query.where(Activity.date >= start, Activity.date <= end)
-    lock_months = await get_setting(db, "close_lock_months")
+    lock_days = await get_setting(db, "close_lock_days")
     if status:
-        allowed = {s.value for s in ActivityStatus} | {_LOCKED}
-        unknown = [s for s in status if s not in allowed]
-        if unknown:
-            raise validation_error(f"未知的狀態:{','.join(unknown)}")
-        query = query.where(
-            sa.or_(*[_display_status_condition(s, lock_months) for s in status])
-        )
+        query = query.where(svc.display_status_filter(status, lock_days))
     if type:
         query = query.where(Activity.type.in_(type))
     if ended is not None:
         query = query.where(svc.ended_sql() if ended else sa.not_(svc.ended_sql()))
     if closable:
-        query = query.where(svc.can_close_sql(lock_months))
+        query = query.where(svc.can_close_sql(lock_days))
 
     # 計數不必排序:budget 排序是相關子查詢,套在 count 的子查詢上是白工
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
@@ -205,7 +153,7 @@ async def list_activities(
         *parse_sort(sort, _SORTABLE, Activity.date.desc()), Activity.id.desc()
     )
     rows = (await db.scalars(query.offset(page.offset).limit(page.page_size))).all()
-    return ApiResponse(data=[_to_out(a, lock_months) for a in rows], meta=page.meta(total or 0))
+    return ApiResponse(data=[_to_out(a, lock_days) for a in rows], meta=page.meta(total or 0))
 
 
 @router.get("/semesters")
@@ -232,8 +180,8 @@ async def create_activity(body: ActivityIn, user: ClubUser, db: DbDep) -> ApiRes
     db.add(activity)
     await db.commit()
     activity = await svc.get_own_activity(db, user, activity.id)
-    lock_months = await get_setting(db, "close_lock_months")
-    return ApiResponse(data=_to_out(activity, lock_months))
+    lock_days = await get_setting(db, "close_lock_days")
+    return ApiResponse(data=_to_out(activity, lock_days))
 
 
 @router.get("/{activity_id}")
@@ -241,15 +189,18 @@ async def get_activity(
     activity_id: int, user: ClubUser, db: DbDep
 ) -> ApiResponse[ActivityDetailOut]:
     activity = await svc.get_own_activity(db, user, activity_id, with_detail=True)
-    lock_months = await get_setting(db, "close_lock_months")
+    lock_days = await get_setting(db, "close_lock_days")
     out = ActivityDetailOut.model_validate(activity)
-    svc.decorate(out, activity, lock_months)
+    svc.decorate(out, activity, lock_days)
     out.photos = [
         FileOut.model_validate(f) for f in await svc.activity_files(db, activity, svc.PHOTO_SLOT)
     ]
     out.attachments = [
         FileOut.model_validate(f)
         for f in await svc.activity_files(db, activity, svc.ATTACHMENT_SLOT)
+    ]
+    out.close_docs = [
+        FileOut.model_validate(f) for f in await svc.activity_files(db, activity, svc.DOC_SLOT)
     ]
     approvals = await db.scalars(
         sa.select(ApprovalRecord)
@@ -294,8 +245,8 @@ async def update_activity(
             raise validation_error("退回件的活動日期不得再往前調整")
     await db.commit()
     activity = await svc.get_own_activity(db, user, activity_id)
-    lock_months = await get_setting(db, "close_lock_months")
-    return ApiResponse(data=_to_out(activity, lock_months))
+    lock_days = await get_setting(db, "close_lock_days")
+    return ApiResponse(data=_to_out(activity, lock_days))
 
 
 @router.delete("/{activity_id}")
@@ -311,7 +262,7 @@ async def delete_activity(
     if activity.status != ActivityStatus.DRAFT:
         raise conflict("僅草稿可刪除")
     disk_paths = []
-    for slot in (svc.PHOTO_SLOT, svc.ATTACHMENT_SLOT):
+    for slot in (svc.PHOTO_SLOT, svc.DOC_SLOT, svc.ATTACHMENT_SLOT):
         for f in await svc.activity_files(db, activity, slot):
             disk_paths.append(await file_service.delete_file(db, f))
     # 整張單連同附件一起實體刪除,比單刪一個檔更該留下紀錄
@@ -365,6 +316,8 @@ async def submit_activity(
     # 「有補助案件必須認定經費來源」的檢核吃到殘值而放行
     activity.fund_source = None
     activity.status = ActivityStatus.PENDING_ADVISOR
+    # 每次送審都覆寫(D-29):退回重送就是重新到承辦手上,待審佇列該照新的先後排
+    activity.submitted_at = datetime.now(UTC)
     club = await _club_of(db, user)
     audit.record(
         db,
@@ -381,8 +334,8 @@ async def submit_activity(
         f"{club.name}:{activity.name}({activity.date} @ {activity.location})",
         club.discord_webhook_url,
     )
-    lock_months = await get_setting(db, "close_lock_months")
-    return ApiResponse(data=_to_out(activity, lock_months))
+    lock_days = await get_setting(db, "close_lock_days")
+    return ApiResponse(data=_to_out(activity, lock_days))
 
 
 @router.put("/{activity_id}/close-draft")
@@ -399,6 +352,22 @@ async def save_close_draft(
     return ApiResponse()
 
 
+async def _close_upload_cap(db, activity: Activity) -> tuple[int, int, AppError]:
+    """結案上傳的共用額度:照片與結案附件合計一個上限(close_photo_total_mb)。
+
+    兩個 slot 各算一次再相加 —— 分兩個上限的話畫面要印兩個數字,
+    而社團在意的只有「還能傳多少」。
+    """
+    cap_mb = int(await get_setting(db, "close_photo_total_mb"))
+    cap = cap_mb * 1024 * 1024
+    used = 0
+    for slot in (svc.PHOTO_SLOT, svc.DOC_SLOT):
+        used += await file_service.total_uploaded(
+            db, subject_type=svc.PHOTO_SUBJECT, subject_id=activity.id, slot=slot
+        )
+    return cap, used, AppError(413, "FILE_TOO_LARGE", f"照片與附件加總超過 {cap_mb}MB 上限")
+
+
 @router.post("/{activity_id}/photos", status_code=201)
 async def upload_photo(
     activity_id: int, file: UploadFile, user: ClubUser, db: DbDep
@@ -411,13 +380,7 @@ async def upload_photo(
     if activity.status != ActivityStatus.APPROVED:
         raise conflict("僅結案準備中(已核准)的活動可上傳照片")
 
-    # 結案照片加總上限(預設 10MB,system_settings 可調)
-    cap_mb = int(await get_setting(db, "close_photo_total_mb"))
-    cap = cap_mb * 1024 * 1024
-    existing = await file_service.total_uploaded(
-        db, subject_type=svc.PHOTO_SUBJECT, subject_id=activity.id, slot=svc.PHOTO_SLOT
-    )
-    over_cap = AppError(413, "FILE_TOO_LARGE", f"照片加總超過 {cap_mb}MB 上限")
+    cap, existing, over_cap = await _close_upload_cap(db, activity)
     if existing >= cap:
         raise over_cap
 
@@ -439,6 +402,39 @@ async def upload_photo(
     return ApiResponse(data=FileOut.model_validate(row))
 
 
+@router.post("/{activity_id}/docs", status_code=201)
+async def upload_close_doc(
+    activity_id: int, file: UploadFile, user: ClubUser, db: DbDep
+) -> ApiResponse[FileOut]:
+    """結案附件:保單、租車契約、簽到表、講師資料等。與照片同一個額度、同一條狀態界線。"""
+    file_service.enforce_upload_rate(user.id)
+    activity = await svc.get_own_activity(db, user, activity_id)
+    await db.refresh(activity, attribute_names=["status"], with_for_update=True)
+    if activity.status != ActivityStatus.APPROVED:
+        raise conflict("僅結案準備中(已核准)的活動可上傳結案附件")
+
+    cap, existing, over_cap = await _close_upload_cap(db, activity)
+    if existing >= cap:
+        raise over_cap
+
+    row = await file_service.save_upload(
+        db,
+        file,
+        policy=file_service.REPORT_DOC,
+        module="reports",
+        uploaded_by=user.id,
+        club_id=user.club_id,
+        subject_type=svc.PHOTO_SUBJECT,
+        subject_id=activity.id,
+        slot=svc.DOC_SLOT,
+        # 不去重:同一份保單掛在兩場活動上是常態,不是誤傳
+    )
+    if existing + row.size > cap:
+        raise over_cap
+    await db.commit()
+    return ApiResponse(data=FileOut.model_validate(row))
+
+
 def _audit_file_deleted(
     db: DbDep, request: Request, user, action: str, activity_id: int, file: File
 ) -> None:
@@ -454,7 +450,7 @@ def _audit_file_deleted(
 
 @router.delete("/{activity_id}/photos/{file_id}")
 async def delete_photo(
-    activity_id: int, file_id: str, user: ClubUser, db: DbDep, request: Request
+    activity_id: int, file_id: uuid.UUID, user: ClubUser, db: DbDep, request: Request
 ) -> ApiResponse[None]:
     activity = await svc.get_own_activity(db, user, activity_id)
     # 鎖活動列並重讀狀態:submit_close 先 commit 時,這裡看到 closing → 409,
@@ -477,6 +473,29 @@ async def delete_photo(
     return ApiResponse()
 
 
+@router.delete("/{activity_id}/docs/{file_id}")
+async def delete_close_doc(
+    activity_id: int, file_id: uuid.UUID, user: ClubUser, db: DbDep, request: Request
+) -> ApiResponse[None]:
+    activity = await svc.get_own_activity(db, user, activity_id)
+    await db.refresh(activity, attribute_names=["status"], with_for_update=True)
+    if activity.status != ActivityStatus.APPROVED:
+        raise conflict("結案已送出,附件不可移除")
+    file = await db.get(File, file_id)
+    if (
+        file is None
+        or file.club_id != user.club_id
+        or file.subject_id != activity.id
+        or file.slot != svc.DOC_SLOT
+    ):
+        raise not_found("找不到附件")
+    _audit_file_deleted(db, request, user, "activity_close_doc_deleted", activity.id, file)
+    disk = await file_service.delete_file(db, file)
+    await db.commit()
+    file_service.unlink_quiet(disk)
+    return ApiResponse()
+
+
 @router.post("/{activity_id}/attachments", status_code=201)
 async def upload_attachment(
     activity_id: int, file: UploadFile, user: ClubUser, db: DbDep
@@ -489,7 +508,7 @@ async def upload_attachment(
     if activity.status not in _EDITABLE:
         raise conflict("僅草稿或退回件可上傳附件")
 
-    # 附件加總上限(預設 15MB,system_settings 可調)
+    # 附件加總上限(預設 50MB,system_settings 可調)
     cap_mb = int(await get_setting(db, "activity_attachment_total_mb"))
     cap = cap_mb * 1024 * 1024
     existing = await file_service.total_uploaded(
@@ -518,7 +537,7 @@ async def upload_attachment(
 
 @router.delete("/{activity_id}/attachments/{file_id}")
 async def delete_attachment(
-    activity_id: int, file_id: str, user: ClubUser, db: DbDep, request: Request
+    activity_id: int, file_id: uuid.UUID, user: ClubUser, db: DbDep, request: Request
 ) -> ApiResponse[None]:
     activity = await svc.get_own_activity(db, user, activity_id)
     await db.refresh(activity, attribute_names=["status"], with_for_update=True)
@@ -539,41 +558,14 @@ async def delete_attachment(
     return ApiResponse()
 
 
-def _pdf_response(content: bytes, filename: str) -> Response:
-    quoted = quote(filename)
-    return Response(
-        content=content,
-        media_type="application/pdf",
-        headers={"Content-Disposition": f"inline; filename*=UTF-8''{quoted}"},
-    )
-
-
-async def _closed_activity_with_report(db, user, activity_id: int) -> Activity:
+@router.get("/{activity_id}/apply-pdf")
+async def download_apply_pdf(activity_id: int, user: ClubUser, db: DbDep) -> Response:
+    """社團活動申請表 PDF(版面沿用舊系統)。"""
     activity = await svc.get_own_activity(db, user, activity_id, with_detail=True)
-    if activity.report is None:
-        raise conflict("此活動尚未送出結案,無法產生文件")
-    return activity
-
-
-@router.get("/{activity_id}/report-pdf")
-async def download_report_pdf(activity_id: int, user: ClubUser, db: DbDep) -> Response:
-    """成果報告表 PDF(依需求方模板於下載時動態生成)。"""
-    activity = await _closed_activity_with_report(db, user, activity_id)
     club = await _club_of(db, user)
-    # reportlab 為同步 CPU 工作,丟 threadpool 避免卡住 event loop
-    content = await run_in_threadpool(pdf.report_pdf, club, activity, activity.report)
-    return _pdf_response(content, f"{club.name}_{activity.name}_成果報告表.pdf")
-
-
-@router.get("/{activity_id}/reflections-pdf")
-async def download_reflections_pdf(activity_id: int, user: ClubUser, db: DbDep) -> Response:
-    """學習心得 PDF(依需求方模板於下載時動態生成)。"""
-    activity = await _closed_activity_with_report(db, user, activity_id)
-    club = await _club_of(db, user)
-    content = await run_in_threadpool(
-        pdf.reflections_pdf, club, activity, activity.report.reflections
-    )
-    return _pdf_response(content, f"{club.name}_{activity.name}_學習心得.pdf")
+    approvers = await svc.approver_names(db, activity.id)
+    content = await run_in_threadpool(pdf.apply_pdf, club, activity, approvers)
+    return pdf.pdf_response(content, f"{club.name}_{activity.name}_社團活動申請表.pdf")
 
 
 @router.post("/{activity_id}/close")
@@ -586,7 +578,7 @@ async def submit_close(
     background: BackgroundTasks,
 ) -> ApiResponse[ActivityOut]:
     activity = await svc.get_own_activity(db, user, activity_id, with_detail=True)
-    lock_months = await get_setting(db, "close_lock_months")
+    lock_days = await get_setting(db, "close_lock_days")
     # 鎖活動列並重讀狀態:與 upload/delete_photo 統一鎖序,送出與照片增刪序列化
     await db.refresh(activity, attribute_names=["status"], with_for_update=True)
     if activity.status != ActivityStatus.APPROVED:
@@ -594,7 +586,7 @@ async def submit_close(
     now = datetime.now(UTC)
     if now < svc.end_datetime(activity):
         raise conflict("活動尚未結束,不可結案")
-    if svc.is_close_locked(activity, lock_months, now):
+    if svc.is_close_locked(activity, lock_days, now):
         raise conflict("已逾結案期限並鎖定,請洽學務處解鎖")
     # 實際時間先後僅單日活動可用純時間比較;跨日活動(18:00–翌日 10:00)整段合法
     if activity.end_date == activity.date and body.actual_end <= body.actual_start:
@@ -642,4 +634,4 @@ async def submit_close(
         club.discord_webhook_url,
     )
     activity = await svc.get_own_activity(db, user, activity_id)
-    return ApiResponse(data=_to_out(activity, lock_months))
+    return ApiResponse(data=_to_out(activity, lock_days))

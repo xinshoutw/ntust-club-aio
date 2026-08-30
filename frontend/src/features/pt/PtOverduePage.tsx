@@ -55,7 +55,7 @@ export default function PtOverduePage() {
                 <th scope="col">器材</th>
                 <th scope="col">應歸還時限</th>
                 <th scope="col">已逾</th>
-                <th scope="col">借用人</th>
+                <th scope="col">收件人</th>
                 <th scope="col">狀態</th>
                 <th scope="col">動作</th>
               </tr>
@@ -69,8 +69,8 @@ export default function PtOverduePage() {
                   </td>
                   <td className="num" style={{ fontSize: 13 }}>{r.due}</td>
                   <td className="num" style={{ fontSize: 13, color: '#A3341F' }}>{r.daysLate} 天</td>
-                  <td className="cell-clip" title={r.phone ? `${r.borrower ?? ''}・${r.phone}` : r.borrower} style={{ fontSize: 13 }}>
-                    {r.borrower}
+                  <td className="cell-clip" title={[r.borrower, r.phone].filter(Boolean).join('・')} style={{ fontSize: 13 }}>
+                    {r.borrower ?? '—'}
                     {/* 逾期追蹤的動作就是聯絡社團,電話要看得到 */}
                     {r.phone && <div className="num" style={{ fontSize: 12, color: 'var(--steel)' }}>{r.phone}</div>}
                   </td>
@@ -108,7 +108,7 @@ export default function PtOverduePage() {
               )}
               {!listQuery.isPending && !listQuery.isError && rows.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有逾期未歸還的器材</td>
+                  <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>無逾期未歸還的器材</td>
                 </tr>
               )}
             </tbody>

@@ -186,12 +186,12 @@ export default function AdminViolationsPage() {
                   <td className="r">
                     {v.status === 'violation_open' &&
                       (v.expired ? (
-                        <Tooltip title="已逾 1 個月銷案期限,不再受理銷案">
+                        <Tooltip title="已逾 1 個月銷案期限，不再受理銷案">
                           <span style={{ fontSize: 13, color: 'var(--steel)' }}>已截止</span>
                         </Tooltip>
                       ) : (
                         <button type="button" className="link-btn primary" onClick={() => askResolve(v)}>
-                          銷案…
+                          銷案
                         </button>
                       ))}
                   </td>
@@ -216,7 +216,7 @@ export default function AdminViolationsPage() {
               {!loading && !listQuery.isError && !optionsQuery.isError && rows.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={8} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
-                    {filtered ? '沒有符合篩選條件的紀錄' : '目前沒有違規勸導紀錄'}
+                    {filtered ? '無符合篩選條件的紀錄' : '無違規勸導紀錄'}
                   </td>
                 </tr>
               )}

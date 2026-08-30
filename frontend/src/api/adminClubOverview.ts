@@ -10,6 +10,7 @@ import {
   slotsToEntries,
   type AdminEquipmentLoan,
   type AdminRoomRequest,
+  type RoomConflictKind,
   type AdminVenueBooking,
 } from './adminBookings'
 import { apiPaged, qs } from './client'
@@ -102,6 +103,7 @@ interface AdminRoomBookingOut {
   start_date: string
   end_date: string
   slots: { weekday: number; period: string }[]
+  conflict_slots: { weekday: number; period: string; kind: RoomConflictKind }[]
 }
 
 interface AdminEquipmentLoanOut {
@@ -144,6 +146,7 @@ const toRoomRequest = (r: AdminRoomBookingOut): AdminRoomRequest => ({
   status: r.status,
   startDate: slashDate(r.start_date),
   endDate: slashDate(r.end_date),
+  conflicts: new Map(r.conflict_slots.map((c) => [`${c.weekday}|${c.period}`, c.kind])),
 })
 
 const toEquipmentLoan = (l: AdminEquipmentLoanOut): AdminEquipmentLoan => ({
@@ -162,9 +165,8 @@ const toEquipmentLoan = (l: AdminEquipmentLoanOut): AdminEquipmentLoan => ({
   availableExcludingSelf: l.available_excluding_self ?? undefined,
 })
 
-// 借用類三張表都只顯示「未被駁回/未結束」的單:狀態一律交給後端篩(status 收多值)
-const LIVE_BOOKING_STATUSES = ['pending', 'approved', 'cancelled'] as const
-
+// 借用類三張表都只顯示「進行中」的單,判定在後端 active=true(與社團端總覽同一支推導):
+// 借用不會因為日期過了就換狀態,只篩 status 會把整段歷史都當成進行中抓回來。
 export function useAdminClubRoomBookings(clubId: number | null, canView = true) {
   return useQuery({
     queryKey: overviewKeys.roomBookings(clubId ?? 0),
@@ -172,7 +174,7 @@ export function useAdminClubRoomBookings(clubId: number | null, canView = true) 
     queryFn: () =>
       fetchAllPages<AdminRoomBookingOut>('/admin/room-bookings', {
         club_id: clubId,
-        status: [...LIVE_BOOKING_STATUSES],
+        active: true,
       }).then((rows) => rows.map(toRoomRequest)),
   })
 }
@@ -184,27 +186,18 @@ export function useAdminClubVenueBookings(clubId: number | null, canView = true)
     queryFn: () =>
       fetchAllPages<AdminVenueBookingOut>('/admin/venue-bookings', {
         club_id: clubId,
-        status: [...LIVE_BOOKING_STATUSES],
+        active: true,
       }).then((rows) => rows.map(toVenueBooking)),
   })
 }
 
-export type LoanStatusFilter =
-  | 'pending'
-  | 'approved'
-  | 'rejected'
-  | 'cancelled'
-  | 'checked_out'
-  | 'returned'
-  | 'overdue' // 後端推導(checked_out 且已過歸還門檻)
-
 export interface LoanListParams {
   clubId?: number | null
-  /** 可多值(後端取聯集);overdue 為後端推導 */
-  statuses?: LoanStatusFilter[]
+  /** 進行中(審核中/已核准/借出中);判定在後端,見 booking_service */
+  active?: boolean
 }
 
-/** 器材借用列表:社團總覽帶 clubId + 未結束的狀態 */
+/** 器材借用列表:社團總覽用(帶 clubId + active)。逾期追蹤走 `useOverdueLoans`(伺服器分頁) */
 export function useAdminEquipmentLoanList(p: LoanListParams, canView = true) {
   return useQuery({
     queryKey: overviewKeys.equipmentLoans(p),
@@ -212,7 +205,7 @@ export function useAdminEquipmentLoanList(p: LoanListParams, canView = true) {
     queryFn: () =>
       fetchAllPages<AdminEquipmentLoanOut>('/admin/equipment-loans', {
         club_id: p.clubId,
-        status: p.statuses,
+        active: p.active,
       }).then((rows) => rows.map(toEquipmentLoan)),
   })
 }

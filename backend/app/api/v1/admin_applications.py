@@ -1,7 +1,7 @@
-"""行政端:線上申請管理(幹部證明/郵局帳戶異動,權限鍵 aapply)。
+"""行政端:線上申請管理(幹部證明 `acert` / 郵局帳戶異動 `apostal`,各一把鍵)。
 
-2026-07-17 需求方拍板的最小審核:狀態=審核中 → 處理中 → 請洽學務處(完成),
-單步前進、無退回(比照維修管理的狀態機模式);audit + notify 社團。
+2026-07-17 需求方拍板的最小審核:狀態=審核中 → 處理中 → 已完成;
+**只能往前,可跳過處理中**(D-25)、無退回;audit + notify 社團。
 """
 
 from typing import Annotated
@@ -26,16 +26,17 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 CertAdmin = Annotated[CurrentUser, Depends(require_permission("acert"))]
 PostalAdmin = Annotated[CurrentUser, Depends(require_permission("apostal"))]
 
-# 狀態機:審核中 → 處理中 → 請洽學務處(僅允許單步前進,不可回退/跳關)
-_NEXT_STATUS = {
-    ApplicationStatus.PENDING: ApplicationStatus.PROCESSING,
-    ApplicationStatus.PROCESSING: ApplicationStatus.COMPLETED,
+# 狀態機:審核中 → 處理中 → 已完成,**只能往前,可跳過**(D-25)——
+# 承辦當場開完證明就直接結案,逼他先點一次「處理中」只是多一次點擊。不可回退。
+_ALLOWED_NEXT = {
+    ApplicationStatus.PENDING: (ApplicationStatus.PROCESSING, ApplicationStatus.COMPLETED),
+    ApplicationStatus.PROCESSING: (ApplicationStatus.COMPLETED,),
 }
 
 _STATUS_LABELS = {
     ApplicationStatus.PENDING: "審核中",
     ApplicationStatus.PROCESSING: "處理中",
-    ApplicationStatus.COMPLETED: "請洽學務處",
+    ApplicationStatus.COMPLETED: "已完成",
 }
 
 
@@ -112,8 +113,12 @@ async def list_postal_changes(
 
 
 async def _advance_status(db, row, body: ApplicationStatusIn):
-    """單步前進檢核(比照 admin_maintenance;呼叫端先 with_for_update 取列)。"""
-    if _NEXT_STATUS.get(row.status) != body.status:
+    """只准往前的檢核(呼叫端先 with_for_update 取列)。
+
+    與 `admin_maintenance` 的單步前進不同:那邊的「處理中」代表師傅真的在修,
+    這裡的處理中只是承辦的工作註記,跳過它不會漏掉任何一次真實動作。
+    """
+    if body.status not in _ALLOWED_NEXT.get(row.status, ()):
         raise conflict(
             f"無法從「{_STATUS_LABELS[row.status]}」變更為「{_STATUS_LABELS[body.status]}」",
             code="INVALID_STATUS_TRANSITION",

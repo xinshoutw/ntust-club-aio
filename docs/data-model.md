@@ -110,17 +110,17 @@ erDiagram
 | intro / website_url | text / text NULL | `website_url` 是行政分 ad6 的依據 |
 | contact_emails | text[] | 至多 3 組、第 1 組必填;公告通知寄送對象 |
 | discord_webhook_url | text NULL | 社團自設;該社事件只推這裡,NULL 即不推 |
-| advisor_name / dept / email / ext | text NULL | 校內指導老師 |
-| advisor_out_name / dept / email / phone | text NULL | 校外指導老師(校內外各至多一位) |
+| advisor_name / dept / email | text NULL | 校內指導老師(**不記錄電話**,D-22)|
+| advisor_out_name / dept / email | text NULL | 校外指導老師(校內外各至多一位;同樣不記錄電話)|
 | suspended_until / suspend_reason | date NULL / text NULL | NULL=未停權 |
 | is_active | bool | 退社/未立案=停用 |
 | announcements_read_at | timestamptz NULL | 公告已讀水位線:`created_at` 晚於此者為未讀。一社一帳號故掛在 club |
 
 社長不另設欄位,由 `club_members`(kind=負責人)推導;逾期次數同理由 `equipment_loans` 推導 —— 雙寫必然漂移。
 
-**club_members**(id, club_id, name, student_id, kind enum(負責人,副負責人,幹部,社員), title text NULL, phone text NULL, semester text;UNIQUE(club_id, student_id, semester))
+**club_members**(id, club_id, name, student_id, kind enum(負責人,副負責人,幹部,社員), title text NULL, semester text;UNIQUE(club_id, student_id, semester))
 
-名單**按學期各自一份快照**,同學號可跨學期出現;ad5 依該學期快照的人數採計。`title` 幹部必填、其他身份選填。CSV 匯入指定學期,格式 `姓名,學號,身份[,職稱[,電話]]`,接受顯示詞(社長/會長)並映射為標準身份。
+名單**按學期各自一份快照**,同學號可跨學期出現;ad5 依該學期快照的人數採計。`title` 幹部必填、社員選填;**負責人與副負責人不寫職稱**(D-27,身份本身就是職稱)。CSV 匯入指定學期,格式 `姓名,學號,身份[,職稱]`,接受顯示詞(社長/會長)並映射為標準身份。**不記錄電話**(D-21)。
 
 **venues**(id, name UNIQUE, capacity NULL, category enum(教室,練習空間,廣場戶外,宿舍區), allow_fixed, allow_temp, sort, is_active)
 
@@ -134,7 +134,7 @@ erDiagram
 
 場地不開放規則。`weekdays` 為 ISO 1–7,NULL=區間內每天;`periods` 為不開放的節次子集。場況圖標示不開放、社團申請 422、核准 409 `SLOT_BLOCKED`;行政手動借用不受限。刪除為硬刪,異動走 `audit_logs`。
 
-**holidays**(date PK, name)— 政府行事曆假日;器材逾期的「隔天上班日」與工作天緩衝都依此。**尚無匯入介面**,每年需以 script 或直接操作 DB 灌入;未匯入的年度會退化成只排除週六日。
+**holidays**(date PK, name)— 政府行事曆假日;器材逾期的「隔天上班日」與催還間隔的工作天推算都依此。**尚無匯入介面**,每年需以 script 或直接操作 DB 灌入;未匯入的年度會退化成只排除週六日。
 
 **system_settings**(key PK, value jsonb)— 見 §4 設定分層。
 
@@ -155,6 +155,7 @@ erDiagram
 | staff_text | text | 工作分配(自由格式) |
 | fund_source / school_approved | text NULL / int NULL | 經費來源與核定補助,第一關認定 |
 | status | enum,見下 | |
+| submitted_at | timestamptz NULL | 送出審核的時刻,**每次送審覆寫**(D-29);草稿為 NULL。待審佇列與行政端「送件時間」欄依它排序 —— 取 `created_at` 的話,七月建的草稿八月才送審會排在八月初就送件的活動前面 |
 | close_unlocked | bool | 逾期鎖定的管理員解鎖旗標 |
 | close_draft | jsonb NULL | 結案草稿(跨裝置續填),不含照片;送出結案時清除 |
 
@@ -172,7 +173,7 @@ draft
   任一關退回 → rejected(原因必填,可修改後重送)
 approved → [社團送結案] → closing_pending_advisor(單關) → closed
                                                        └─ 退回 → approved(帶原因)
-approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,非欄位;close_unlocked 可解鎖)
+approved 且 end_date + N 天已過且未送結案 → 逾期鎖定(推導,非欄位;close_unlocked 可解鎖)
 ```
 
 **activity_budget_items**(id, activity_id, category text, description, self_fund, requested_subsidy, approved_subsidy int NULL)
@@ -190,12 +191,12 @@ approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,�
 | highlights / goals / others | text | 活動重點 / 如何達成目標 / 其他執行狀況 |
 | review_meeting | bool | true 時 `review_date`、`review_attendees`、`review_topics`、`review_conclusion` 皆必填(應用層) |
 | review_date / attendees / topics / conclusion | date / int / text / text,皆 NULL | |
-| video_url | text NULL | **唯一選填**;http(s) 驗證。照片 <5 張且無影片 → ad2 該活動不計分 |
+| video_url | text NULL | **唯一選填**;http(s) 驗證。照片 <5 張且無影片時畫面紅字提示承辦,計不計分仍看繳交確認(D-14) |
 | expense | int | 實際支出(核銷依據) |
 | submitted_at | timestamptz | |
-| photos_confirmed / report_confirmed / reflections_confirmed | bool 預設 true | 承辦人核准結案時逐項確認繳交;**未確認者評鑑以 0 分計**(照片確認同時涵蓋影片連結) |
+| photos_confirmed / report_confirmed / reflections_confirmed | bool 預設 true | 承辦人核准結案時逐項確認繳交,**ad2–ad4 完全以這三個值為準**(D-14):系統不數照片張數也不數心得筆數,社團可能是交紙本。照片確認同時涵蓋影片連結;沒有 activity_reports 就沒有旗標可讀,三項一律不計 |
 
-照片走 `files`(slot=`report_photo`),收所有常見影像格式(jpg/png/gif/webp/bmp/tiff/heic/heif/avif),魔術位元組與大小後端重驗,sha256 於同社團內跨活動拒重複。成果報告與心得 PDF 依模板於下載時動態生成,不落檔。
+照片走 `files`(slot=`report_photo`),結案附件走 slot=`report_doc`(PDF/DOC/DOCX/影像;保單、租車契約、簽到表這類文件),兩者**共用 `close_photo_total_mb` 一個加總上限**。照片收所有常見影像格式(jpg/png/gif/webp/bmp/tiff/heic/heif/avif),魔術位元組與大小後端重驗,sha256 於同社團內跨活動拒重複。成果報告與心得 PDF 依模板於下載時動態生成,不落檔。
 
 **activity_reflections**(id, report_id, student_name, dept, body)— 送審驗證 ≥3 筆,三欄皆必填。
 
@@ -222,7 +223,7 @@ approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,�
 | club_id | FK NULL | 權限邊界 |
 | uploaded_by | FK users | |
 | subject_type / subject_id | text NULL / int NULL | 所屬單據 |
-| slot | text NULL | 同單據內的位置(report_photo, evidence, passbook…) |
+| slot | text NULL | 同單據內的位置(report_photo, report_doc, proposal, evidence, passbook…) |
 | original_name / size / mime | | |
 | sha256 | text | 前端先算、後端驗證 |
 | path | text | `{module}/{YYYY}/{MM}/{uuid}` |
@@ -258,7 +259,7 @@ approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,�
 |---|---|
 | id, club_id NULL, equipment_id, qty, phone NULL | 一單一品項;多品項=多單,點交與逾期各自獨立 |
 | activity_id | FK activities NULL(容手動借用與舊系統已刪活動;新申請必填) |
-| start_date / end_date | 借用區間 = 活動起訖 ∓ 工作天緩衝的**推導快照**;之後調整緩衝設定不回溯既有借用 |
+| start_date / end_date | 借用區間;社團自填(含活動前籌備與活動後驗收),行政手動借用亦自填 |
 | purpose | |
 | status | enum(pending, approved, rejected, cancelled, checked_out, returned) |
 | checkout_by / at / borrower_name | 借出點交(工讀生) |
@@ -278,7 +279,7 @@ approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,�
 
 **maintenance_requests**(id, club_id, location, items, status enum(pending,in_progress,done), handle_note NULL)— 佐證照片/影片走 files(slot=`evidence`)。
 
-幹部證明與郵局異動共用 **ApplicationStatus**:`pending`(審核中)→ `processing`(處理中)→ `completed`(請洽學務處)。**無退回**,學務處線下溝通後直接處理。
+幹部證明與郵局異動共用 **ApplicationStatus**:`pending`(審核中)→ `processing`(處理中)→ `completed`(已完成)。**只能往前、可跳過處理中**(D-25),**無退回**,學務處線下溝通後直接處理。
 
 三者欄位、驗證、狀態機都不同,故用三張窄表而非 applications + JSONB。「待審申請彙整」頁目前由前端合併幹部證明與郵局異動兩個端點的結果,報修另有專頁。
 
@@ -339,9 +340,9 @@ approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,�
 | 項目 | 規則 | 資料來源 |
 |---|---|---|
 | ad1 活動申請 15 | 結案始算;一般 1 分、認可之大型 3 分;一天至多計 1 件(取當日最高) | activities(closed, is_large_approved) |
-| ad2 照/影片 15 | 每活動照片 ≥5 張**或**有影片連結 → 1 分;大型 3 分 | files(slot=report_photo)+ activity_reports.video_url |
-| ad3 成果單 15 | 有上傳即 1 分;大型 3 分 | activity_reports |
-| ad4 心得回饋 30 | 有上傳即 2 分;大型 6 分 | activity_reflections |
+| ad2 照/影片 15 | 每活動**經承辦確認**照片或影片 → 1 分;大型 3 分 | activity_reports.photos_confirmed |
+| ad3 成果單 15 | 每活動**經承辦確認** → 1 分;大型 3 分 | activity_reports.report_confirmed |
+| ad4 心得回饋 30 | 每活動**經承辦確認** → 2 分;大型 6 分 | activity_reports.reflections_confirmed |
 | ad5 名單更新 10 | 每學期:0 人 0 分、1–9 人 2.5 分、10 人以上 5 分;兩學期合計 | club_members × semester |
 | ad6 網頁經營 5 | 有連結即 5 分(不追蹤更新時間) | clubs.website_url |
 | ad7 負責人會議 5 | 每場簽到 1.25 分(每學期 2 場、全學年 4 場滿分) | session_attendance(leader_meeting) |
@@ -396,12 +397,11 @@ approved 且 end_date + 1 個月已過且未送結案 → 逾期鎖定(推導,�
 |---|---|
 | `budget_categories` | 經費科目九項,`[{name, hint}]`,hint 於社團選到該科目時顯示 |
 | `violation_items` | 違規勸導項目目錄 |
-| `close_lock_months` | 結案鎖定月數(預設 1) |
+| `close_lock_days` | 結案鎖定天數(預設 21;可設 1–366) |
 | `equipment_return_time` | 器材歸還時限時刻(預設 10:30) |
-| `equipment_workday_buffer` | `{before, after}` 工作天(預設 2/1) |
 | `fixed_booking_window` | `{open_from, open_until}`;未設定=不開放 |
 | `upload_limits` | 單檔上限 `{doc, img, zip, video}` MB |
-| `activity_attachment_total_mb` / `maintenance_total_mb` / `close_photo_total_mb` | 依申請性質的附件加總上限(15 / 100 / 10) |
+| `activity_attachment_total_mb` / `maintenance_total_mb` / `close_photo_total_mb` | 依申請性質的附件加總上限(50 / 250 / 50) |
 | `storage_limits` | `{per_club_gib}`;系統總量讀實體磁碟可用空間,不設邏輯容量 |
 | `eval_window` | `{year, start, end}` 評鑑視窗 |
 | `current_year` | 目前學年度 |

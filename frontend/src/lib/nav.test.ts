@@ -5,6 +5,10 @@ import type { SessionUser } from '../api/auth'
 const findItem = (groups: NavGroup[], key: string) =>
   groups.flatMap((g) => g.items).find((i) => i.key === key)
 
+/** 分組內的位置:需求方指定了「插在哪兩項之間」,列表順序本身就是規格 */
+const keysOf = (groups: NavGroup[], label: string) =>
+  groups.find((g) => g.label === label)?.items.map((i) => i.key)
+
 /** 項目所在分組的標題(未分組為 undefined):可點但被丟到「其他」也算沒修好 */
 const groupOf = (groups: NavGroup[], key: string) =>
   groups.find((g) => g.items.some((i) => i.key === key))?.label
@@ -57,5 +61,100 @@ describe('側欄徽章', () => {
     expect(findItem(buildClubNav(undefined, true, { 'act-close': 2 }), 'act-close')?.badge).toBe(2)
     expect(findItem(buildPtNav({ 'pt-overdue': 5 }), 'pt-overdue')?.badge).toBe(5)
     expect(findItem(buildViewerNav({ 'v-my': 1 }), 'v-my')?.badge).toBe(1)
+  })
+})
+
+describe('行政端活動查閱的兩頁', () => {
+  test('所有活動排在活動審核分組最後', () => {
+    expect(keysOf(buildAdminNav(superUser), '活動審核')).toEqual(['a-review', 'a-close', 'a-activities'])
+  })
+
+  test('活動列表夾在成員列表與管理項目之間', () => {
+    expect(keysOf(buildAdminNav(superUser), '社團管理')).toEqual([
+      'a-club-overview',
+      'a-members',
+      'a-club-activities',
+      'a-club-settings',
+      'a-overdue',
+    ])
+  })
+
+  test('受限管理員只看得到自己那把鍵的那一頁', () => {
+    const holder: SessionUser = {
+      ...superUser,
+      isSuper: false,
+      permissions: ['aclubact'],
+      adminPages: [
+        { key: 'aactivity', label: '所有活動', paths: ['/admin/activities'], also: [] },
+        { key: 'aclubact', label: '社團活動列表', paths: ['/admin/club-activities'], also: [] },
+      ],
+    }
+    const nav = buildAdminNav(holder)
+    expect(findItem(nav, 'a-club-activities')).toBeDefined()
+    expect(findItem(nav, 'a-activities')).toBeUndefined()
+  })
+})
+
+// 工讀生端與評審端的頁面在行政端整組再掛一次(權限鍵 astaff / aviewer)
+describe('行政端鏡射的工讀生與評審頁', () => {
+  const mirroredPages = [
+    { key: 'astaff', label: '工讀生作業', paths: ['/admin/pt'], also: [] },
+    { key: 'aviewer', label: '評審評分', paths: ['/admin/viewer'], also: [] },
+  ]
+
+  test('兩組各自成組,路徑都在 /admin 底下', () => {
+    const nav = buildAdminNav(superUser)
+    expect(keysOf(nav, '工讀生作業')).toEqual([
+      'pt-viol-new',
+      'pt-viol-list',
+      'pt-checkout',
+      'pt-checkin',
+      'pt-overdue',
+    ])
+    expect(keysOf(nav, '評審評分')).toEqual(['v-my', 'v-score', 'v-done'])
+    expect(findItem(nav, 'pt-checkout')?.path).toBe('/admin/pt/checkout')
+    expect(findItem(nav, 'v-my')?.path).toBe('/admin/viewer')
+  })
+
+  test('工讀生端與評審端自己的路徑不變', () => {
+    expect(findItem(buildPtNav(), 'pt-checkout')?.path).toBe('/pt/checkout')
+    expect(findItem(buildViewerNav(), 'v-my')?.path).toBe('/viewer')
+  })
+
+  test('一把鍵管整組,沒有那把鍵就整組不見', () => {
+    const holder: SessionUser = {
+      ...superUser,
+      isSuper: false,
+      permissions: ['astaff'],
+      adminPages: mirroredPages,
+    }
+    const nav = buildAdminNav(holder)
+    expect(keysOf(nav, '工讀生作業')).toHaveLength(5)
+    expect(findItem(nav, 'v-my')).toBeUndefined()
+  })
+
+  test('徽章沿用同一批 key,行政端不必另備一份', () => {
+    const nav = buildAdminNav(superUser, { 'pt-overdue': 5, 'v-my': 1 })
+    expect(findItem(nav, 'pt-overdue')?.badge).toBe(5)
+    expect(findItem(nav, 'v-my')?.badge).toBe(1)
+  })
+})
+
+describe('社團評鑑反灰', () => {
+  test('兩端的入口都不可點,hover 說明原因', () => {
+    for (const item of [
+      findItem(buildClubNav(undefined, true), 'eval-docs'),
+      findItem(buildAdminNav(superUser), 'a-eval'),
+    ]) {
+      // 明確斷言存在:項目整個不見時 `item?.disabled` 也是 undefined(恆真)
+      expect(item).toBeDefined()
+      expect(item?.disabled).toBe(true)
+      expect(item?.disabledHint).toBe('目前未開放')
+    }
+  })
+
+  test('反灰的是入口不是分組:兩邊都還留在「社團評鑑」底下', () => {
+    expect(groupOf(buildClubNav(undefined, true), 'eval-docs')).toBe('社團評鑑')
+    expect(groupOf(buildAdminNav(superUser), 'a-eval')).toBe('社團評鑑')
   })
 })

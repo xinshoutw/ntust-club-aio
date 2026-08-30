@@ -1,6 +1,6 @@
 # 違規勸導填寫
 
-`/pt/violations/new` · `staff` · `features/pt/PtViolationFormPage.tsx`
+`/pt/violations/new`(行政端 `/admin/pt/violations/new`,鍵 `astaff`) · `staff` · `features/pt/PtViolationFormPage.tsx`
 
 > `/pt` 的 index 直接轉導到本頁,工讀生登入後第一眼就是這裡。
 
@@ -12,13 +12,13 @@
 
 | 動作 | 端點 |
 |---|---|
-| 社團下拉 | `GET /staff/clubs`(含已停用社團,不分頁) |
+| 社團選單 | `GET /staff/clubs`(不分頁;含停用社團與 `attribute`,前端只列啟用中) |
 | 違規項目目錄 | `GET /staff/violation-items`(`system_settings.violation_items`) |
 | 送出 | `POST /staff/violations` |
 
 ## 畫面
 
-表單:社團(可搜尋下拉,停用社團標「(已停用)」)、發生日期、地點、違規項目(複選,來自目錄)、其他說明(選填,≤500 字)。
+表單:社團(**二級選單** `components/ui/ClubCascader`:性質資料夾 → 社團,可搜尋,只列啟用中社團 —— 全站選擇器同一條規則,見 `design-guide.md` §6;選項由本頁自 `/staff/clubs` 取,元件不自己抓 —— 工讀生打不進 `/admin/*`)、發生日期、地點、違規項目(複選,來自目錄)、其他說明(選填,≤500 字)。
 
 ## 規則
 

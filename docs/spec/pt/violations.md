@@ -1,6 +1,6 @@
 # 違規紀錄查詢
 
-`/pt/violations` · `staff` · `features/pt/PtViolationsPage.tsx`
+`/pt/violations`(行政端 `/admin/pt/violations`,鍵 `astaff`) · `staff` · `features/pt/PtViolationsPage.tsx`
 
 ## 用途
 

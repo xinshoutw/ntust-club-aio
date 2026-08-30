@@ -631,3 +631,139 @@ async def test_revoke_approved_venue_booking_and_stale_loan(client, db):
             headers=csrf_headers(client),
         )
     ).status_code == 409
+
+
+async def test_admin_active_filter_excludes_finished_bookings(client, db):
+    """社團總覽的「借用中」不能收整段歷史:借用不會因為日期過了就換狀態。
+
+    只篩 status 的話,已核准的過期單永遠留在卡上(遷移資料下單一社團上千筆)。
+    這條只鎖「光篩 status 不夠」;界線本身的粒度由
+    test_admin_active_keeps_everything_still_revocable 鎖。
+    """
+    club, _ = await seed(client, db)
+    venue = await make_venue(db)
+    today = date.today()
+    rows = {
+        "future": VenueBooking(club_id=club.id, venue_id=venue.id, date=today + timedelta(days=7),
+                               periods=["3"], purpose="未來", status="approved"),
+        "past": VenueBooking(club_id=club.id, venue_id=venue.id, date=today - timedelta(days=7),
+                             periods=["3"], purpose="已過", status="approved"),
+        "pending": VenueBooking(club_id=club.id, venue_id=venue.id, date=today + timedelta(days=3),
+                                periods=["4"], purpose="待審", status="pending"),
+        "rejected": VenueBooking(club_id=club.id, venue_id=venue.id, date=today + timedelta(days=3),
+                                 periods=["5"], purpose="退回", status="rejected"),
+    }
+    db.add_all(rows.values())
+    await db.commit()
+    for row in rows.values():
+        await db.refresh(row)
+
+    resp = await client.get("/api/v1/admin/venue-bookings", params={"active": "true"})
+    assert {v["id"] for v in resp.json()["data"]} == {rows["future"].id, rows["pending"].id}
+    resp = await client.get("/api/v1/admin/venue-bookings", params={"active": "false"})
+    assert {v["id"] for v in resp.json()["data"]} == {rows["past"].id, rows["rejected"].id}
+
+    eq = await make_equipment(db)
+    loans = {}
+    for key, status in {
+        "pending": "pending", "approved": "approved", "out": "checked_out",
+        "returned": "returned", "cancelled": "cancelled",
+    }.items():
+        loan = EquipmentLoan(
+            club_id=club.id, equipment_id=eq.id, qty=1, purpose="x", status=status,
+            start_date=today - timedelta(days=1), end_date=today + timedelta(days=1),
+        )
+        db.add(loan)
+        await db.commit()
+        await db.refresh(loan)
+        loans[key] = loan.id
+
+    resp = await client.get("/api/v1/admin/equipment-loans", params={"active": "true"})
+    assert {row["id"] for row in resp.json()["data"]} == {
+        loans["pending"], loans["approved"], loans["out"]
+    }
+    resp = await client.get("/api/v1/admin/equipment-loans", params={"active": "false"})
+    assert {row["id"] for row in resp.json()["data"]} == {loans["returned"], loans["cancelled"]}
+
+
+async def test_admin_active_keeps_everything_still_revocable(client, db):
+    """看得到的範圍必須涵蓋動得了的範圍:社團總覽是唯一的撤銷入口。
+
+    撤銷擋在「借用日已過」,社團端的 active 卻擋在「最早節次起點已到」——
+    行政端若照抄社團端那條界線,當天開始後到午夜的單就撤銷得了卻找不到入口。
+    """
+    club, _ = await seed(client, db)
+    venue = await make_venue(db)
+    # 今天、第 1 節(08:10 起):跑測試時多半已經開始,社團端視為「已開始」
+    today = VenueBooking(
+        club_id=club.id, venue_id=venue.id, date=date.today(),
+        periods=["1"], purpose="今天已開始", status="approved",
+    )
+    db.add(today)
+    await db.commit()
+    await db.refresh(today)
+
+    listed = (
+        await client.get("/api/v1/admin/venue-bookings", params={"active": "true"})
+    ).json()["data"]
+    assert today.id in {v["id"] for v in listed}, "當天的單還撤銷得了,就不能從卡片上消失"
+
+    resp = await client.post(
+        f"/api/v1/admin/venue-bookings/{today.id}/revoke",
+        json={"reason": "誤核"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200
+
+
+async def test_admin_lists_carry_the_decision_reason_and_signer(client, db):
+    """承辦要能在清單上看到自己退回/撤銷的理由與經手人,不必去翻稽核軌跡。"""
+    club, _ = await seed(client, db)
+    # 姓名與帳號取不同值,才驗得出帶出去的是姓名
+    admin = await db.scalar(sa.select(User).where(User.username == "bookadmin"))
+    admin.name = "王承辦"
+    venue = await make_venue(db)
+    equipment = await make_equipment(db)
+    tomorrow = date.today() + timedelta(days=1)
+
+    booking = VenueBooking(
+        club_id=club.id, venue_id=venue.id, date=tomorrow, periods=["3"],
+        purpose="社課", status="pending",
+    )
+    loan = EquipmentLoan(
+        club_id=club.id, equipment_id=equipment.id, qty=1,
+        start_date=tomorrow, end_date=tomorrow, purpose="社課", status="pending",
+    )
+    db.add_all([booking, loan])
+    await db.commit()
+    await db.refresh(booking)
+    await db.refresh(loan)
+
+    for path, row_id in (("venue-bookings", booking.id), ("equipment-loans", loan.id)):
+        resp = await client.post(
+            f"/api/v1/admin/{path}/{row_id}/reject",
+            json={"reason": "場地當日已有校方活動"},
+            headers=csrf_headers(client),
+        )
+        assert resp.status_code == 200, resp.text
+
+        data = (
+            await client.get(f"/api/v1/admin/{path}", params={"status": "rejected"})
+        ).json()["data"]
+        assert len(data) == 1, (path, data)
+        assert data[0]["decision_reason"] == "場地當日已有校方活動"
+        assert data[0]["decided_at"] is not None
+        assert data[0]["decided_by"] == "王承辦"  # 姓名,不是帳號
+
+    # 待審的單沒有處置紀錄,三欄一律 null
+    pending = VenueBooking(
+        club_id=club.id, venue_id=venue.id, date=tomorrow, periods=["4"],
+        purpose="練習", status="pending",
+    )
+    db.add(pending)
+    await db.commit()
+    data = (
+        await client.get("/api/v1/admin/venue-bookings", params={"status": "pending"})
+    ).json()["data"]
+    assert [d["decision_reason"] for d in data] == [None]
+    assert [d["decided_by"] for d in data] == [None]

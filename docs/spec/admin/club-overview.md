@@ -17,8 +17,8 @@
 | 基本資料 | `GET /admin/clubs/{id}` | `aclub` |
 | 進行中活動 | `GET /admin/activities?club_id=&status=`(簽核中四種狀態) | `areview`/`aclose` |
 | 空間報修 | `GET /admin/maintenance?club_id=&status=`(待處理、處理中) | `amaint` |
-| 固定借用 | `GET /admin/room-bookings?club_id=&status=`(待審、已核准、已撤銷) | `aroom` |
-| 臨時借用 / 器材 | `GET /admin/{venue-bookings,equipment-loans}?club_id=&status=` | `abooking` |
+| 固定借用 | `GET /admin/room-bookings?club_id=&active=true` | `aroom` |
+| 臨時借用 / 器材 | `GET /admin/{venue-bookings,equipment-loans}?club_id=&active=true` | `abooking` |
 
 ## 畫面
 
@@ -31,7 +31,9 @@
 ## 規則
 
 - **受限管理員不發沒權限的查詢**,該區塊改顯示「您的權限無法檢視此區塊」而不是整排 403 錯誤
-- 已退回 / 已歸還的項目不列入:**狀態一律由後端篩**(各端點 `status` 收多值),前端不再抓回整份歷史再過濾
+- 只列**進行中**的借用:判定一律由後端 `active=true` 給(`booking_service` 的 `*_ongoing_expr`)。**光篩 status 不夠** —— 借用不會因為日期過了就換狀態,只篩狀態會把整段歷史當成進行中(遷移資料下單一社團上千筆,整份抓回前端全部渲染)
+- 界線對齊的是**這一端還動得了什麼**,不是照抄社團端:本頁是唯一的撤銷入口,看不到就沒有入口。固定借用(`end_date >= today`)與器材(狀態)兩端可動範圍相同、共用一支;**臨時借用兩端不同** —— 社團端取消擋在「最早節次起點已到」(`venue_booking_upcoming_expr`),承辦撤銷擋在「借用日已過」(`venue_booking_ongoing_expr`),本頁用後者,當天已開始的單社團動不了、承辦仍撤銷得到當日結束
+- 撤銷成功後該列即從卡片消失(`cancelled` 不是進行中),結果由「已撤銷借用」提示告知
 - 固定借用的衝突標示與 `/admin/rooms` 共用 `roomConflictSlots`,比對對象是**全部待審單 + 全部進行中的已核准單**,分「衝突」與「已核准佔用」兩種;本社沒有待審固定借用時兩份都不抓(衝突只標在待審單上,開放窗外抓回來的全校清單一個字都用不到);衝突由彈窗每次 render 重算(不存快照),載入期間「借用中」卡的列改鋪 Skeleton(卡框與標題留著,計數顯示 —);兩支衝突查詢的 query key 不含社團,**失敗只在需要它的社團(有待審固定借用)才算進這張卡**,否則換到別社仍會誤報載入失敗
 
 **撤銷已核准的借用**:本頁是唯一同時看得到三類已核准借用的地方,借用彈窗對 `approved` 顯示「撤銷借用」(原因必填,狀態落 `cancelled`;固定借用的 10 節額度隨之回歸)。臨時場地日期已過、器材已借出者不得撤銷 —— 器材要走歸還。

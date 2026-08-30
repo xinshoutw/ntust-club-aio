@@ -8,6 +8,7 @@ from app.models.enums import (
     ApplicationStatus,
     BookingStatus,
     CertPosition,
+    ClubAttribute,
     ClubKind,
     LoanStatus,
     MaintenanceStatus,
@@ -222,7 +223,7 @@ class AdminPostalChangeOut(BaseModel):
 
 
 class ApplicationStatusIn(BaseModel):
-    """狀態機:審核中 → 處理中 → 請洽學務處(僅允許單步前進,比照維修管理)。"""
+    """狀態機:審核中 → 處理中 → 已完成(只能往前,可跳過處理中;D-25)。"""
 
     status: ApplicationStatus
 
@@ -249,6 +250,9 @@ class ClubOptionOut(BaseModel):
     name: str
     kind: str  # 社團/學會(負責人顯示詞推導)
     attribute: str | None  # ClubCascader 第一層=性質資料夾;None 歸「未分類」
+    # 行政分審核的下拉只列得出啟用中社團(該頁的端點對停用社團一律 404)。
+    # 停權日等敏感欄位仍留在需要 aclub 的完整主檔,這裡只回啟停用旗標
+    is_active: bool
 
 
 class AdminClubDetailOut(AdminClubOut):
@@ -265,16 +269,35 @@ class AdminClubDetailOut(AdminClubOut):
     advisor_name: str | None
     advisor_dept: str | None
     advisor_email: str | None
-    advisor_ext: str | None
     advisor_out_name: str | None
     advisor_out_dept: str | None
     advisor_out_email: str | None
-    advisor_out_phone: str | None
     suspend_reason: str | None
 
 
+class AdminClubCreate(BaseModel):
+    """新增社團主檔;帳號另走 `POST /admin/clubs/{id}/account`(建了才登得進來)。
+
+    `kind` 不收:一律由名稱結尾推導(`derive_kind`,與改名同一條規則),推不出來時
+    先當社團 —— 它只決定負責人的顯示詞(社長/會長),管理項目改得動。
+    `attribute` 必填:沒有性質的社團不會出現在社團漏斗(`groupClubsForFilter` 略過),
+    建好卻在篩選裡找不到比擋下來更難查。
+    """
+
+    name: str = Field(min_length=1, max_length=100)
+    attribute: ClubAttribute
+
+    @field_validator("name")
+    @classmethod
+    def _strip_name(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("社團名稱不得為空白")
+        return v
+
+
 class AdminClubUpdate(BaseModel):
-    """行政可改:社團名稱 / 社團或學會 / 英文名 / 帳號 username / 啟停用。
+    """行政可改:社團名稱 / 社團或學會 / 性質 / 英文名 / 帳號 username / 啟停用。
 
     改名時結尾「社」→社團、「會」→學會自動推導 kind;推導不到時沿用原值,
     可另帶 kind 手動指定(2026-07-21,取代原「名稱強制社/會結尾」規則)。
@@ -282,6 +305,9 @@ class AdminClubUpdate(BaseModel):
 
     name: str | None = Field(None, min_length=1, max_length=100)
     kind: ClubKind | None = None
+    # 建檔時必填(AdminClubCreate),之後改得動:選錯性質的社團會整個從社團漏斗消失,
+    # 沒有這條就只剩下手動改 DB 一途。既有的 null(停社遷入舊社)不因此被迫補值
+    attribute: ClubAttribute | None = None
     en_name: str | None = Field(None, max_length=200)
     username: str | None = None
     is_active: bool | None = None
@@ -356,6 +382,10 @@ class AdminVenueBookingOut(BaseModel):
     phone: str | None = None  # 申請時填的聯絡人電話(審核與點交都要聯絡得到人)
     status: BookingStatus
     created_at: datetime
+    # 退回/撤銷的處置(承辦要能查理由與經手人,不必翻稽核軌跡)
+    decision_reason: str | None = None
+    decided_at: datetime | None = None
+    decided_by: str | None = None
 
 
 class AdminEquipmentLoanOut(BaseModel):
@@ -380,9 +410,22 @@ class AdminEquipmentLoanOut(BaseModel):
     last_reminded_at: datetime | None = None
     # 審核檢核資訊(僅待審單推導):該區間可借數(排除本單)
     available_excluding_self: int | None = None
+    # 退回/撤銷的處置(承辦要能查理由與經手人,不必翻稽核軌跡)
+    decision_reason: str | None = None
+    decided_at: datetime | None = None
+    decided_by: str | None = None
 
 
 # ---- 固定場地借用審核(/admin/room-bookings,權限鍵 aroom) ----
+
+
+class RoomConflictSlotOut(BaseModel):
+    """待審單的一格衝突;由重到輕 blocked > taken > temp > pending。"""
+
+    weekday: int
+    period: str
+    kind: Literal["blocked", "taken", "temp", "pending"]
+
 
 
 class AdminRoomBookingOut(BaseModel):
@@ -400,6 +443,13 @@ class AdminRoomBookingOut(BaseModel):
     end_date: date
     created_at: datetime
     slots: list[RoomSlotOut] = []  # 每週 dow×節次
+    # 僅待審單推導:哪幾格會撞、撞到什麼(不開放規則 / 已核准固定 / 已核准臨時 / 其他待審)。
+    # 判定與核准端的三項檢核同一份 —— 畫面自己算會漏掉其中一種(標成無衝突,按了才 409)
+    conflict_slots: list[RoomConflictSlotOut] = []
+    # 退回/撤銷的處置(承辦要能查理由與經手人,不必翻稽核軌跡)
+    decision_reason: str | None = None
+    decided_at: datetime | None = None
+    decided_by: str | None = None
 
 
 # ---- 維修狀態流轉 ----

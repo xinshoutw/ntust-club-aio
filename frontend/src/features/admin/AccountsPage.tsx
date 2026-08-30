@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { App, Button, Checkbox, Input, Modal, Tabs, Tooltip } from 'antd'
+import { App, Button, Checkbox, Input, Modal, Select, Tabs, Tooltip } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { confirmDialog } from '../../lib/confirm'
 import { suspendedNow } from '../../lib/status'
@@ -16,9 +16,10 @@ import {
   type Account,
   type ManagedRole,
 } from '../../api/adminAccounts'
-import { useAdminClubMutations, useAdminClubs, type AdminClub } from '../../api/adminClubs'
+import { CLUB_ATTRIBUTES, useAdminClubMutations, useAdminClubs, type AdminClub } from '../../api/adminClubs'
+import { ApiError } from '../../api/client'
 import { useAuth } from '../../app/auth'
-import { canAccessAdminPath } from '../../lib/permissions'
+import { accountGuardReason, canAccessAdminPath } from '../../lib/permissions'
 
 // 顯示詞一律取自 session 的目錄表(後端 core/permissions 的頁面權限 + 簽核關卡),
 // 前端不留第二份 —— 目錄裡沒有的鍵直接印鍵名,那代表目錄漏了東西
@@ -80,6 +81,10 @@ export default function AccountsPage() {
   const [clubAccountTarget, setClubAccountTarget] = useState<AdminClub | null>(null)
   const [clubAccountOpen, setClubAccountOpen] = useState(false)
   const [clubUsername, setClubUsername] = useState('')
+  // 新增社團彈窗:只建主檔,帳號仍走列上的「建立帳號」(建社團與建帳號是兩個動作)
+  const [newClubOpen, setNewClubOpen] = useState(false)
+  const [newClubName, setNewClubName] = useState('')
+  const [newClubAttribute, setNewClubAttribute] = useState<string | undefined>()
 
   // 一次性密碼彈窗:密碼由後端於建立/重設當次回傳,關閉後不再顯示
   const [pwTarget, setPwTarget] = useState<{ title: string; account: string; password: string } | null>(null)
@@ -136,8 +141,8 @@ export default function AccountsPage() {
   const toggleActive = (a: Account) => {
     if (a.active) {
       confirmDialog(modal, {
-        title: `停權 ${a.name}`,
-        content: '停權後無法登入，可隨時恢復',
+        title: `停用 ${a.name}`,
+        content: '停用後無法登入，可隨時恢復',
         okText: '確認',
         okButtonProps: { danger: true },
         cancelText: '取消',
@@ -145,7 +150,7 @@ export default function AccountsPage() {
           setActive.mutate(
             { id: a.id, active: false },
             {
-              onSuccess: () => message.success(`已停權 ${a.name}`),
+              onSuccess: () => message.success(`已停用 ${a.name}`),
               onError: (e) => message.error(e.message),
             },
           )
@@ -166,7 +171,7 @@ export default function AccountsPage() {
   const askResetPassword = (a: Account) =>
     confirmDialog(modal, {
       title: `重設密碼 — ${a.name}`,
-      content: '重設後原密碼立即失效,並須於首次登入時變更密碼',
+      content: '原密碼立即失效，並須於首次登入時變更密碼',
       okText: '確認重設',
       cancelText: '取消',
       onOk: () => {
@@ -199,7 +204,7 @@ export default function AccountsPage() {
           setNewName('')
           setNewAccount('')
           // 建立後直接顯示帳號與一次性密碼
-          showPassword(`已建立${roleLabel}帳號 — ${account.name}`, account.username, password)
+          showPassword(`已建立 ${roleLabel} 帳號 — ${account.name}`, account.username, password)
         },
         onError: (e) => message.error(e.message),
       },
@@ -211,7 +216,7 @@ export default function AccountsPage() {
   const askResetClubPassword = (c: AdminClub) =>
     confirmDialog(modal, {
       title: `重設 ${c.name} 的密碼`,
-      content: '將產生一次性密碼並登出該帳號所有裝置;社團下次登入須立即更改密碼',
+      content: '產生一次性密碼並登出所有裝置，下次登入須立即更改密碼',
       okText: '確認重設',
       cancelText: '取消',
       onOk: () => {
@@ -227,7 +232,7 @@ export default function AccountsPage() {
     if (c.isActive) {
       confirmDialog(modal, {
         title: `停用 ${c.name}`,
-        content: '社團與其帳號將一併停用，停用後無法登入；可隨時重新啟用',
+        content: '社團停用後無法登入，隨時可以恢復',
         okText: '確認停用',
         okButtonProps: { danger: true },
         cancelText: '取消',
@@ -235,7 +240,7 @@ export default function AccountsPage() {
           clubMutations.update.mutate(
             { id: c.id, isActive: false },
             {
-              onSuccess: () => message.success(`已停用 ${c.name}，社團與其帳號已一併停用`),
+              onSuccess: () => message.success(`已停用 ${c.name}`),
               onError: (e) => message.error(e.message),
             },
           )
@@ -245,12 +250,47 @@ export default function AccountsPage() {
       clubMutations.update.mutate(
         { id: c.id, isActive: true },
         {
-          onSuccess: () => message.success(`已啟用 ${c.name}，社團與其帳號已一併啟用`),
+          onSuccess: () => message.success(`已啟用 ${c.name}`),
           onError: (e) => message.error(e.message),
         },
       )
     }
   }
+
+  // 刪除社團:社團底下還有資料時後端會列出各類筆數(CLUB_HAS_DATA),二次確認後強制刪除。
+  // 按鈕不預先反灰 —— 前端沒有那些筆數,擋不準就交給後端說明白
+  const deleteClub = (c: AdminClub, force?: boolean) =>
+    clubMutations.remove.mutate(
+      { id: c.id, force },
+      {
+        onSuccess: () => message.success(`已刪除 ${c.name}`),
+        onError: (e) => {
+          // 只有「底下還有資料」這一種擋法問得下去;其餘 409 再問也是同樣的答案
+          if (e instanceof ApiError && e.code === 'CLUB_HAS_DATA') {
+            confirmDialog(modal, {
+              title: `連同資料刪除 ${c.name}`,
+              content: `${e.message}，一併刪除後無法復原`,
+              okText: '一併刪除',
+              okButtonProps: { danger: true },
+              cancelText: '取消',
+              onOk: () => deleteClub(c, true),
+            })
+            return
+          }
+          message.error(e.message)
+        },
+      },
+    )
+
+  const confirmDeleteClub = (c: AdminClub) =>
+    confirmDialog(modal, {
+      title: `刪除 ${c.name}`,
+      content: '連同社團帳號一併刪除，確認後無法復原',
+      okText: '確認刪除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: () => deleteClub(c),
+    })
 
   const openClubAccountModal = (c: AdminClub) => {
     setClubAccountTarget(c)
@@ -279,6 +319,39 @@ export default function AccountsPage() {
     )
   }
 
+  const closeNewClub = () => {
+    setNewClubOpen(false)
+    setNewClubName('')
+    setNewClubAttribute(undefined)
+  }
+
+  const submitNewClub = () => {
+    // Enter 走 onPressEnter 直接進來,confirmLoading 攔不到(同 submitClubAccount)
+    if (clubMutations.create.isPending) return
+    const name = newClubName.trim()
+    if (!name) {
+      message.error('社團名稱為必填')
+      return
+    }
+    if (!newClubAttribute) {
+      message.error('社團性質為必填')
+      return
+    }
+    clubMutations.create.mutate(
+      { name, attribute: newClubAttribute },
+      {
+        onSuccess: (c) => {
+          closeNewClub()
+          // 主檔建好了但還登不進來:不講的話會以為社團已經可以用了
+          message.success(`已新增 ${c.name}，請於列上「建立帳號」開通登入`)
+          setClubSearch(c.name)
+          setClubPage(1)
+        },
+        onError: (e) => message.error(e.message),
+      },
+    )
+  }
+
   const accountPager = (
     <Pager
       page={accountPage}
@@ -288,20 +361,33 @@ export default function AccountsPage() {
     />
   )
 
-  const actions = (a: Account, extra?: React.ReactNode) => (
-    <td className="r" style={{ whiteSpace: 'nowrap' }}>
-      {extra}
-      <button type="button" className="link-btn" onClick={() => askResetPassword(a)}>
-        重設密碼
-      </button>
-      <button type="button" className="link-btn" onClick={() => toggleActive(a)}>
-        {a.active ? '停權' : '恢復'}
-      </button>
-      <button type="button" className="link-btn danger" onClick={() => confirmDelete(a)}>
-        刪除
-      </button>
-    </td>
-  )
+  // 四個動作在後端走同一條位階檢查(_guard_target),擋得下的列不畫鈕:
+  // 理由收進 Tooltip,不要讓承辦按了才拿到 409/403(與違規銷案的「已截止」同一套寫法)
+  const actions = (a: Account, extra?: React.ReactNode) => {
+    const blocked = accountGuardReason(me, a)
+    return (
+      <td className="r" style={{ whiteSpace: 'nowrap' }}>
+        {blocked ? (
+          <Tooltip title={blocked}>
+            <span style={{ fontSize: 13, color: 'var(--steel)', padding: '4px 6px' }}>—</span>
+          </Tooltip>
+        ) : (
+          <>
+            {extra}
+            <button type="button" className="link-btn" onClick={() => askResetPassword(a)}>
+              重設密碼
+            </button>
+            <button type="button" className="link-btn" onClick={() => toggleActive(a)}>
+              {a.active ? '停用' : '恢復'}
+            </button>
+            <button type="button" className="link-btn danger" onClick={() => confirmDelete(a)}>
+              刪除
+            </button>
+          </>
+        )}
+      </td>
+    )
+  }
 
   // 查詢失敗顯示錯誤與重試;空狀態僅在非錯誤時呈現,避免「查詢失敗=空表」誤導
   const errorRow = (colSpan: number) =>
@@ -460,8 +546,8 @@ export default function AccountsPage() {
         />
       </div>
       <LoadingBlock pending={clubsQuery.isPending} rows={6}>
-      <table className="tb fixed" style={{ minWidth: 760 }}>
-        <Cols widths={['auto', 110, '20%', 140, 160]} />
+      <table className="tb fixed" style={{ minWidth: 820 }}>
+        <Cols widths={['auto', 110, '20%', 140, 220]} />
         <thead>
           <tr><th scope="col">社團名稱</th><th scope="col">性質</th><th scope="col">帳號</th><th scope="col">狀態</th><th scope="col" className="r">動作</th></tr>
         </thead>
@@ -481,7 +567,7 @@ export default function AccountsPage() {
                 <ActiveTag active={c.isActive} inactiveLabel="停用" />
                 {/* 停權(器材逾期)與帳號啟停是兩回事:停權中但仍啟用的社團在這裡本來看起來完全正常 */}
                 {suspendedNow(c.suspendedUntil) && (
-                  <Tooltip title="停權中,期間不得申請借用(原因見逾期追蹤與停權管理)">
+                  <Tooltip title="停權中，期間不得申請借用">
                     <div className="num" style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>
                       停權至 {c.suspendedUntil}
                     </div>
@@ -518,7 +604,15 @@ export default function AccountsPage() {
                       disabled={!canClubSettings}
                       onClick={() => toggleClubActive(c)}
                     >
-                      {c.isActive ? '停用' : '啟用'}
+                      {c.isActive ? '停用' : '恢復'}
+                    </button>
+                    <button
+                      type="button"
+                      className="link-btn danger"
+                      disabled={!canClubSettings}
+                      onClick={() => confirmDeleteClub(c)}
+                    >
+                      刪除
                     </button>
                   </span>
                 </Tooltip>
@@ -537,7 +631,7 @@ export default function AccountsPage() {
               </td>
             </tr>
           )}
-          {!clubsQuery.isPending && !clubsQuery.isError && filteredClubs.length === 0 && (
+          {!clubsQuery.isFetching && !clubsQuery.isError && filteredClubs.length === 0 && (
             <tr className="no-hover">
               <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
                 {clubKeyword ? '沒有符合搜尋的社團' : '尚無社團資料'}
@@ -561,8 +655,20 @@ export default function AccountsPage() {
       <PageHeader
         title="帳號管理"
         extra={
-          // 社團 tab 不提供「+ 新增」:建立帳號走列上動作(僅無帳號社團)
-          tab !== 'clubs' && (
+          // 社團 tab 建的是主檔,帳號仍走列上動作(僅無帳號社團);寫入歸「社團管理項目」。
+          // 沒權限是反灰不是隱藏 —— 與同頁列上三個動作同一條規則,鈕整顆不見會被讀成
+          // 「這頁不提供新增」而不是「我缺權限」
+          tab === 'clubs' ? (
+            <Tooltip title={canClubSettings ? undefined : '需要「社團管理項目」權限'}>
+              <Button
+                type="primary"
+                disabled={!canClubSettings}
+                onClick={() => setNewClubOpen(true)}
+              >
+                + 新增社團
+              </Button>
+            </Tooltip>
+          ) : (
             <Button type="primary" onClick={() => setCreateOpen(true)}>
               + 新增{roleLabel}
             </Button>
@@ -615,6 +721,49 @@ export default function AccountsPage() {
               <span style={{ color: '#C13B34' }}>*</span> 帳號
             </div>
             <Input className="num" value={newAccount} onChange={(e) => setNewAccount(e.target.value)} placeholder={USERNAME_HINT} />
+          </div>
+        </div>
+      </Modal>
+
+      {/* 新增社團:只建主檔(kind 由後端依名稱結尾推導),登入用的帳號另走列上「建立帳號」 */}
+      <Modal
+        open={newClubOpen}
+        title="新增社團"
+        okText="建立"
+        cancelText="取消"
+        destroyOnHidden
+        confirmLoading={clubMutations.create.isPending}
+        onOk={submitNewClub}
+        onCancel={closeNewClub}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 8 }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
+              <span style={{ color: '#C13B34' }}>*</span> 社團名稱
+            </div>
+            <Input
+              autoFocus
+              value={newClubName}
+              onChange={(e) => setNewClubName(e.target.value)}
+              onPressEnter={submitNewClub}
+            />
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>
+              <span style={{ color: '#C13B34' }}>*</span> 社團性質
+            </div>
+            {/* 必填:沒有性質的社團不會出現在社團漏斗,建好卻篩不到比擋下來更難查 */}
+            <Select
+              style={{ width: '100%' }}
+              value={newClubAttribute}
+              onChange={setNewClubAttribute}
+              placeholder="請選擇"
+              options={CLUB_ATTRIBUTES.map((a) => ({ value: a, label: a }))}
+            />
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--steel)', lineHeight: 1.8 }}>
+            <div>建立後於列上「建立帳號」開通登入</div>
+            <div>社團或學會由名稱結尾自動判定，可於「管理項目」修改</div>
           </div>
         </div>
       </Modal>
@@ -687,7 +836,7 @@ export default function AccountsPage() {
                       border: changed ? '1px solid #d48806' : '1px solid transparent',
                       boxShadow: changed ? '0 0 0 1px rgba(212, 136, 6, 0.45)' : undefined,
                     }}
-                    title={locked ? '你本身沒有這項權限,無法授予他人' : undefined}
+                    title={locked ? '你沒有權限' : undefined}
                   >
                     <Checkbox
                       checked={permDraft.includes(value)}
@@ -732,7 +881,7 @@ export default function AccountsPage() {
             placeholder={USERNAME_HINT}
           />
           <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 8 }}>
-            建立後將產生一次性密碼；社團首次登入須立即更改密碼
+            建立後將產生一次性密碼
           </div>
         </div>
       </Modal>

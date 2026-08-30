@@ -3,7 +3,7 @@
 2026-07-15 規則:
 - 固定借用=整學期每週固定時段(星期×節次);僅開放窗受理;每社至多 10 節;
   晚間時段(第 10 節及 A–D 節)至少連續 3 節
-- 臨時借用/器材借用綁定審核通過活動;器材借用區間由活動起訖 ± 工作天緩衝推導
+- 臨時借用/器材借用綁定審核通過活動;器材借用區間由社團自填(不得早於今天)
 """
 
 from datetime import date
@@ -24,12 +24,18 @@ from app.models import (
     Venue,
     VenueBooking,
 )
-from app.models.enums import ActivityStatus, BookingStatus, LoanStatus
+from app.models.enums import (
+    ActivityStatus,
+    ApprovalSubject,
+    BookingStatus,
+    LoanStatus,
+)
 from app.schemas.bookings import (
     ClubFixedWindowOut,
     EquipmentLoanIn,
     EquipmentLoanOut,
     EquipmentOut,
+    EquipmentUsageOut,
     FixedOccupancyOut,
     RoomBookingIn,
     RoomBookingOut,
@@ -38,7 +44,7 @@ from app.schemas.bookings import (
     VenueOut,
 )
 from app.schemas.common import ApiResponse
-from app.services import activity_service, audit, notify
+from app.services import activity_service, approvals, audit, notify
 from app.services import booking_service as svc
 from app.services.settings_service import get_setting
 
@@ -101,20 +107,20 @@ async def list_venues(user: ClubUser, db: DbDep) -> ApiResponse[list[VenueOut]]:
 
 @router.get("/equipment")
 async def list_equipment(
-    user: ClubUser, db: DbDep, activity_id: int | None = Query(None)
+    user: ClubUser, db: DbDep, start: date | None = None, end: date | None = None
 ) -> ApiResponse[list[EquipmentOut]]:
     """器材主檔+可借數。
 
-    - 帶 activity_id(限本社審核通過活動):可借數依該活動推導的借用區間動態計算
-      (總數 − 區間重疊之未歸還且未退回借用量);meta 回推導區間
-    - 未帶:回「目前借出中」推導的粗略值
+    - 帶 start/end(社團自填的借用區間):可借數 = 總數 − 該區間重疊之未歸還且未退回借用量
+    - 未帶:回「目前借出中」推導的粗略值(前端未填區間前一律顯示 —,不拿這個數字當可借數)
     """
     window: tuple[date, date] | None = None
-    if activity_id is not None:
-        activity = await _approved_activity(db, user, activity_id)
-        buffer = await get_setting(db, "equipment_workday_buffer")
-        holidays = await svc.load_holidays(db)
-        window = svc.loan_window(activity, buffer, holidays)
+    if (start is None) != (end is None):
+        raise validation_error("借用區間需同時指定起訖日")
+    if start is not None and end is not None:
+        if end < start:
+            raise validation_error("結束日期不得早於開始日期")
+        window = (start, end)
 
     rows = (
         await db.scalars(
@@ -130,10 +136,7 @@ async def list_equipment(
         item = EquipmentOut.model_validate(eq)
         item.available = available[eq.id]
         out.append(item)
-    meta = None
-    if window is not None:
-        meta = {"loan_start": window[0].isoformat(), "loan_end": window[1].isoformat()}
-    return ApiResponse(data=out, meta=meta)
+    return ApiResponse(data=out)
 
 
 # ---- 借用總覽色格 ----
@@ -163,6 +166,36 @@ async def availability_range(
     grids = await svc.availability_grids(db, start, end, user.club_id, venue_id=venue)
     return ApiResponse(
         data={"days": [{"date": d.isoformat(), "grid": g} for d, g in grids.items()]}
+    )
+
+
+@router.get("/equipment/usage")
+async def equipment_usage(
+    user: ClubUser, db: DbDep, start: date, end: date
+) -> ApiResponse[list[EquipmentUsageOut]]:
+    """借用總覽的器材檢視:區間內每項器材逐日的佔用量(色格依 佔用/總數 上色)。"""
+    if end < start:
+        raise validation_error("結束日期不得早於開始日期")
+    if (end - start).days + 1 > MAX_AVAILABILITY_SPAN_DAYS:
+        raise validation_error(f"查詢區間最多 {MAX_AVAILABILITY_SPAN_DAYS} 天")
+    rows = (
+        await db.scalars(
+            sa.select(Equipment)
+            .where(Equipment.is_active.is_(True))
+            .order_by(Equipment.sort, Equipment.id)
+        )
+    ).all()
+    usage = await svc.equipment_usage_by_day(db, start, end)
+    return ApiResponse(
+        data=[
+            EquipmentUsageOut(
+                id=eq.id,
+                name=eq.name,
+                total_qty=eq.total_qty,
+                used={d.isoformat(): qty for d, qty in sorted(usage.get(eq.id, {}).items())},
+            )
+            for eq in rows
+        ]
     )
 
 
@@ -238,10 +271,7 @@ async def list_room_bookings(
         .options(sa.orm.selectinload(RoomBookingRequest.slots))
     )
     if active is not None:
-        ongoing = sa.and_(
-            RoomBookingRequest.status.in_([BookingStatus.PENDING, BookingStatus.APPROVED]),
-            RoomBookingRequest.end_date >= svc.today_taipei(),
-        )
+        ongoing = svc.room_booking_ongoing_expr()
         query = query.where(ongoing if active else sa.not_(ongoing))
     if active:
         # 正在借用:開始日早的在前(即將到來優先;同日依建立序穩定分頁)
@@ -255,6 +285,7 @@ async def list_room_bookings(
         out = RoomBookingOut.model_validate(request_row)
         out.venue_name = venue_name
         data.append(out)
+    await approvals.attach_decisions(db, ApprovalSubject.ROOM_BOOKING, data)
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 
@@ -346,10 +377,7 @@ async def list_venue_bookings(
         .where(VenueBooking.club_id == user.club_id)
     )
     if active is not None:
-        ongoing = sa.and_(
-            VenueBooking.status.in_([BookingStatus.PENDING, BookingStatus.APPROVED]),
-            sa.not_(svc.venue_booking_started_expr()),
-        )
+        ongoing = svc.venue_booking_upcoming_expr()
         query = query.where(ongoing if active else sa.not_(ongoing))
     if active:
         # 正在申請:借用日早的在前(即將到來優先)
@@ -365,6 +393,7 @@ async def list_venue_bookings(
         out.venue_name = venue_name
         out.activity_name = activity_name
         data.append(out)
+    await approvals.attach_decisions(db, ApprovalSubject.VENUE_BOOKING, data)
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 
@@ -455,9 +484,7 @@ async def list_equipment_loans(
         .where(EquipmentLoan.club_id == user.club_id)
     )
     if active is not None:
-        ongoing = EquipmentLoan.status.in_(
-            [LoanStatus.PENDING, LoanStatus.APPROVED, LoanStatus.CHECKED_OUT]
-        )
+        ongoing = svc.equipment_loan_ongoing_expr()
         query = query.where(ongoing if active else sa.not_(ongoing))
     if status is not None:
         query = query.where(EquipmentLoan.status == status)
@@ -478,6 +505,7 @@ async def list_equipment_loans(
         out.activity_name = activity_name
         out.overdue = svc.is_overdue_in(loan, return_time, holidays)
         data.append(out)
+    await approvals.attach_decisions(db, ApprovalSubject.EQUIPMENT_LOAN, data)
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 
@@ -499,12 +527,13 @@ async def create_equipment_loan(
     activity = await _approved_activity(db, user, body.activity_id)
     _require_not_ended(activity, "器材借用")
 
-    # 借用區間=活動起訖 ± 工作天緩衝(申請當下推導後寫入,設定調整不回溯)
-    buffer = await get_setting(db, "equipment_workday_buffer")
-    holidays = await svc.load_holidays(db)
-    start, end = svc.loan_window(activity, buffer, holidays)
-    if end < svc.today_taipei():
-        raise validation_error("推導的借用區間已過去,無法申請")
+    # 借用區間由社團自填(籌備、驗收各活動不同,不從活動起訖推導);
+    # 過去時間全面禁止,與臨時場地借用同一條規則
+    start, end = body.start_date, body.end_date
+    if start < svc.today_taipei():
+        raise validation_error("借用日期不得早於今天")
+    if (end - start).days + 1 > svc.MAX_LOAN_DAYS:
+        raise validation_error(f"借用區間最長 {svc.MAX_LOAN_DAYS} 天")
 
     # 以器材為鍵序列化檢核與寫入:兩筆並發申請不會同時以同一份佔用量通過檢核
     await svc.lock_resource(db, "equipment", equipment.id)

@@ -8,71 +8,10 @@ import { useAuth } from '../../app/auth'
 import { useUnsavedGuard } from '../../app/unsaved'
 import { changePasswordApi } from '../../api/auth'
 import { useClubProfile, useUpdateClubProfile, type ClubProfile } from '../../api/clubProfile'
+import { fromProfile, profileChanged, type SettingsValues } from './fields'
 
 // 密碼政策(與後端一致):≥10 碼且含大小寫、數字、特殊符號
 const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,}$/
-
-interface SettingsValues {
-  advisorName: string
-  advisorDept?: string
-  advisorEmail?: string
-  advisorExt?: string
-  advisorOutName?: string
-  advisorOutDept?: string
-  advisorOutEmail?: string
-  advisorOutPhone?: string
-  enName?: string
-  url?: string
-  intro?: string
-  email1: string
-  email2?: string
-  email3?: string
-  discordWebhook?: string
-  pwCurrent?: string
-  pwNew?: string
-  pwConfirm?: string
-}
-
-// PATCH /club/profile 涵蓋的欄位(密碼另走 /auth/change-password)
-const PROFILE_KEYS = [
-  'advisorName',
-  'advisorDept',
-  'advisorEmail',
-  'advisorExt',
-  'advisorOutName',
-  'advisorOutDept',
-  'advisorOutEmail',
-  'advisorOutPhone',
-  'enName',
-  'url',
-  'intro',
-  'email1',
-  'email2',
-  'email3',
-  'discordWebhook',
-] as const satisfies readonly (keyof SettingsValues)[]
-
-// dirty 基準=最後載入/儲存的 server 值;密碼欄基準恆為空
-const fromProfile = (p: ClubProfile): SettingsValues => ({
-  advisorName: p.advisorName,
-  advisorDept: p.advisorDept,
-  advisorEmail: p.advisorEmail,
-  advisorExt: p.advisorExt,
-  advisorOutName: p.advisorOutName,
-  advisorOutDept: p.advisorOutDept,
-  advisorOutEmail: p.advisorOutEmail,
-  advisorOutPhone: p.advisorOutPhone,
-  enName: p.enName,
-  url: p.url,
-  intro: p.intro,
-  email1: p.emails[0],
-  email2: p.emails[1],
-  email3: p.emails[2],
-  discordWebhook: p.discordWebhook,
-  pwCurrent: '',
-  pwNew: '',
-  pwConfirm: '',
-})
 
 const sectionTitle: React.CSSProperties = { fontSize: 16, fontWeight: 600, marginBottom: 16 }
 
@@ -122,13 +61,24 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
 
   const itemClass = (k: keyof SettingsValues) => (dirty.has(k) ? 'field-dirty' : undefined)
 
+  // 網頁連結與簡介必填(D-19),但只在**這次真的要存 profile** 時擋:
+  // 密碼是同一張表單裡的另一支 API,而遷入的社團有一批簡介是空字串、網頁連結是 NULL
+  // (`migration/cms_import.py`)—— 讓那些社團連改個密碼都送不出去,不是這條必填要做的事。
+  // 一旦動到 profile 的任何一欄,這兩欄就得補齊
+  const requiredOnProfileSave = (msg: string) => ({
+    validator: (_: unknown, v: string | undefined) => {
+      const cur = form.getFieldsValue(true) as SettingsValues
+      return profileChanged(cur, saved) && !v?.trim() ? Promise.reject(new Error(msg)) : Promise.resolve()
+    },
+  })
+
   const onFinish = async (v: SettingsValues) => {
     const changingPw = !!(v.pwCurrent || v.pwNew || v.pwConfirm)
-    const profileChanged = PROFILE_KEYS.some((k) => (v[k] ?? '') !== (saved[k] ?? ''))
+    const changingProfile = profileChanged(v, saved)
     let baseline = saved
     setSaving(true)
     try {
-      if (profileChanged) {
+      if (changingProfile) {
         const next = await update.mutateAsync({
           intro: v.intro ?? '',
           url: v.url ?? '',
@@ -137,12 +87,9 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
           advisorName: v.advisorName,
           advisorDept: v.advisorDept ?? '',
           advisorEmail: v.advisorEmail ?? '',
-          advisorExt: v.advisorExt ?? '',
           advisorOutName: v.advisorOutName ?? '',
           advisorOutDept: v.advisorOutDept ?? '',
           advisorOutEmail: v.advisorOutEmail ?? '',
-          advisorOutPhone: v.advisorOutPhone ?? '',
-          enName: v.enName ?? '',
         })
         baseline = fromProfile(next)
         setSaved(baseline)
@@ -153,7 +100,7 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
         // 首登強制改密等使用者旗標可能變動,原地更新 auth context
         void refresh()
       }
-      message.success(changingPw ? '設定已儲存,密碼已更新' : '設定已儲存')
+      message.success(changingPw ? '已儲存設定，密碼已更新' : '設定已儲存')
     } catch (e) {
       // 簡介儲存成功、密碼失敗時:簡介基準已前移,僅密碼欄維持 dirty
       message.error(e instanceof Error ? e.message : '儲存失敗')
@@ -195,7 +142,7 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
               >
                 <Input />
               </Form.Item>
-              <Form.Item name="advisorDept" label="系所" className={itemClass('advisorDept')} style={{ marginBottom: 0 }}>
+              <Form.Item name="advisorDept" label="系所 / 職稱" className={itemClass('advisorDept')} style={{ marginBottom: 0 }}>
                 <Input />
               </Form.Item>
               <Form.Item
@@ -203,20 +150,18 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
                 label="Email"
                 className={itemClass('advisorEmail')}
                 rules={[{ type: 'email', message: 'Email 格式不正確' }]}
-                style={{ marginBottom: 0 }}
+                // 電話移除後這一欄落單:讓 Email 跨滿一列(位址本來就長)
+                style={{ marginBottom: 0, gridColumn: '1 / -1' }}
               >
                 <Input />
               </Form.Item>
-              <Form.Item name="advisorExt" label="分機" className={itemClass('advisorExt')} style={{ marginBottom: 0 }}>
-                <Input className="num" />
-              </Form.Item>
             </div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--steel)', margin: '16px 0 8px' }}>校外(選填)</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--steel)', margin: '16px 0 8px' }}>校外（選填）</div>
             <div className="form-grid-2">
               <Form.Item name="advisorOutName" label="姓名" className={itemClass('advisorOutName')} style={{ marginBottom: 0 }}>
                 <Input />
               </Form.Item>
-              <Form.Item name="advisorOutDept" label="單位/職稱" className={itemClass('advisorOutDept')} style={{ marginBottom: 0 }}>
+              <Form.Item name="advisorOutDept" label="單位 / 職稱" className={itemClass('advisorOutDept')} style={{ marginBottom: 0 }}>
                 <Input />
               </Form.Item>
               <Form.Item
@@ -224,12 +169,9 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
                 label="Email"
                 className={itemClass('advisorOutEmail')}
                 rules={[{ type: 'email', message: 'Email 格式不正確' }]}
-                style={{ marginBottom: 0 }}
+                style={{ marginBottom: 0, gridColumn: '1 / -1' }}
               >
                 <Input />
-              </Form.Item>
-              <Form.Item name="advisorOutPhone" label="電話" className={itemClass('advisorOutPhone')} style={{ marginBottom: 0 }}>
-                <Input className="num" />
               </Form.Item>
             </div>
           </div>
@@ -239,18 +181,30 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
             <Form.Item label="社團名稱">
               <Input readOnly value={profile.name} style={{ background: 'var(--paper)' }} />
             </Form.Item>
-            <Form.Item name="enName" label="英文名稱" className={itemClass('enName')}>
-              <Input placeholder="English name（選填）" />
+            {/* 英文名稱與社團名稱同樣由學務處維護(行政端管理項目),社團端唯讀 */}
+            <Form.Item label="英文名稱">
+              <Input readOnly value={profile.enName} placeholder="尚未設定" style={{ background: 'var(--paper)' }} />
             </Form.Item>
             <Form.Item
               name="url"
               label="社團網頁連結"
               className={itemClass('url')}
-              rules={[{ type: 'url', message: '網址格式不正確' }]}
+              required // 必填的星號:規則是自訂 validator,AntD 推導不出來
+              rules={[
+                requiredOnProfileSave('請填寫社團網頁連結'),
+                { type: 'url', message: '網址格式不正確' },
+              ]}
             >
               <Input placeholder="https://" />
             </Form.Item>
-            <Form.Item name="intro" label="簡介" className={itemClass('intro')} style={{ marginBottom: 0 }}>
+            <Form.Item
+              name="intro"
+              label="簡介"
+              className={itemClass('intro')}
+              required
+              rules={[requiredOnProfileSave('請填寫社團簡介')]}
+              style={{ marginBottom: 0 }}
+            >
               <Input.TextArea rows={3} placeholder="社團宗旨、特色" />
             </Form.Item>
           </div>
@@ -332,7 +286,7 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
                     }
                     return PASSWORD_RULE.test(v)
                       ? Promise.resolve()
-                      : Promise.reject(new Error('新密碼須至少 10 碼,含大小寫字母、數字與特殊符號'))
+                      : Promise.reject(new Error('新密碼含大小寫字母、數字與特殊符號，長度至少 10 碼'))
                   },
                 }),
               ]}

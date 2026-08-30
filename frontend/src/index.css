@@ -272,3 +272,22 @@ body {
 .ant-image-preview-wrap .ant-image-preview-img {
   transform-origin: center center !important;
 }
+
+/* 行政端社團選擇器彈窗(ClubCascader):社團數可破 60,預設一次只看得到 5 個。
+   AntD 的 dropdownHeight token 是固定 height,拉高會讓只有幾列的第一層(性質)留一大片空白,
+   所以改成 max-height,並縮小每列上下內距 */
+.club-cascader-popup .ant-cascader-menu {
+  height: auto;
+  max-height: 360px;
+}
+.club-cascader-popup .ant-cascader-menu-item {
+  padding-block: 2px;
+}
+
+/* 表頭漏斗的二級選單(FilterButton 的分組模式):一個性質底下可能有 27 個社團,
+   不封頂的話子選單比視窗還高,AntD 會把它往上翻、翻出畫面外。
+   子選單彈窗不是掛在父層 dropdown 底下,只能用它自己的類名 */
+.ant-dropdown-menu-submenu-popup .ant-dropdown-menu {
+  max-height: 50vh;
+  overflow-y: auto;
+}

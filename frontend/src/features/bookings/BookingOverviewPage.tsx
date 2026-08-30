@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
 import dayjs, { type Dayjs } from 'dayjs'
-import { App, Button, DatePicker, Select, Tooltip } from 'antd'
+import { App, Button, DatePicker, Segmented, Select, Tooltip } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import {
   ArrowLeftOutlined,
@@ -22,10 +22,15 @@ import {
   useActiveEquipmentLoans,
   useActiveRoomBookings,
   useActiveVenueBookings,
+  RECENT_PAGE,
+  useRecentEquipmentLoans,
+  useRecentRoomBookings,
+  useRecentVenueBookings,
   useReturnedEquipmentLoans,
   useAvailability,
   useAvailabilityDays,
   useBookingMutations,
+  useEquipmentUsage,
   useVenues,
   venueLabel,
   type AvailabilityCell,
@@ -33,10 +38,13 @@ import {
   type AvailabilityState,
   type Venue,
 } from '../../api/bookings'
-import { CELL, emptyCellState, type CellState } from './cells'
+import { CELL, USAGE_SCALE, emptyCellState, usageStep, type CellState } from './cells'
+import { useDecisionReason } from './DecisionReasonModal'
+import { taipeiToday } from '../../lib/today'
 
 const RETURNED_PAGE = 10
 const VENUE_DAYS = 15 // 單一場地檢視:選擇日 −7 ~ +7 共 15 天
+const EQUIPMENT_DAYS = 15 // 器材檢視:選擇日起 15 天(欄=日期)
 
 const LEGEND: CellState[] = ['free', 'fixedOnly', 'closed', 'reviewing', 'temp', 'fixed', 'mine']
 const WEEKDAY = ['日', '一', '二', '三', '四', '五', '六']
@@ -80,17 +88,33 @@ function Cell({ state, label, club, bookable, onBook }: { state: CellState; labe
   return club ? <Tooltip title={`${club}・${CELL[state].label}`}>{cell}</Tooltip> : cell
 }
 
-function Legend() {
+function Legend({ items }: { items: readonly { label: string; bg: string }[] }) {
   return (
     <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-      {LEGEND.map((k) => (
-        <span key={k} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--steel)' }}>
-          <span style={{ width: 12, height: 12, borderRadius: 3, background: CELL[k].bg, border: '1px solid rgba(31,36,48,.12)' }} />
-          {CELL[k].label}
+      {items.map((it) => (
+        <span key={it.label} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--steel)' }}>
+          <span style={{ width: 12, height: 12, borderRadius: 3, background: it.bg, border: '1px solid rgba(31,36,48,.12)' }} />
+          {it.label}
         </span>
       ))}
     </div>
   )
+}
+
+// 器材格:借用程度上色;未借滿且非過去日可點,直接帶品項與日期跳到器材借用
+function UsageCell({ label, bg, bookable, onBook }: { label: string; bg: string; bookable: boolean; onBook: () => void }) {
+  const base: React.CSSProperties = { width: '100%', height: 24, borderRadius: 4, background: bg, display: 'block' }
+  const cell = bookable ? (
+    <button
+      type="button"
+      aria-label={`${label},點擊前往器材借用`}
+      onClick={onBook}
+      style={{ ...base, border: 'none', padding: 0, cursor: 'pointer' }}
+    />
+  ) : (
+    <div role="img" aria-label={label} style={base} />
+  )
+  return <Tooltip title={label}>{cell}</Tooltip>
 }
 
 export default function BookingOverviewPage() {
@@ -100,12 +124,14 @@ export default function BookingOverviewPage() {
   const { message, modal } = App.useApp()
   const { cancelRoomBooking, cancelVenueBooking, cancelEquipmentLoan } = useBookingMutations()
   const [returnedPage, setReturnedPage] = useState(1)
+  // 同一張圖兩種資料:場地看節次佔用、器材看借出比例
+  const [view, setView] = useState<'venue' | 'equipment'>('venue')
   const [gridDate, setGridDate] = useState<Dayjs>(() => dayjs())
   // 場地檢視:點場地名稱進入,以當時檢視日為中心 −7~+7 共 15 天。
   // 過去日期可查(查歷史借用紀錄的唯一入口),只是空格不能拿來申請
   const [venueView, setVenueView] = useState<number | null>(null)
-  const [venueStart, setVenueStart] = useState<Dayjs>(() => dayjs().startOf('day'))
-  const todayStart = dayjs().startOf('day')
+  const [venueStart, setVenueStart] = useState<Dayjs>(() => taipeiToday())
+  const todayStart = taipeiToday()
 
   const venuesQuery = useVenues()
   const venues = venuesQuery.data ?? []
@@ -118,6 +144,21 @@ export default function BookingOverviewPage() {
     [venueStart],
   )
   const rangeQuery = useAvailabilityDays(venueDef ? venueDates : [], venueDef?.id)
+
+  // 器材檢視:列=器材、欄=檢視日起 15 天(單一批次區間查詢)
+  const equipmentDates = useMemo(
+    () => Array.from({ length: EQUIPMENT_DAYS }, (_, i) => gridDate.startOf('day').add(i, 'day')),
+    [gridDate],
+  )
+  const isEquipmentView = view === 'equipment'
+  const usageQuery = useEquipmentUsage(
+    [equipmentDates[0], equipmentDates[EQUIPMENT_DAYS - 1]],
+    isEquipmentView,
+  )
+  const usage = usageQuery.data
+  const equipment = usage?.items ?? []
+  // 手上這份資料涵蓋哪一段:翻日期時新露出的欄位還沒載到,不能當成「沒人借」
+  const usageKnown = (iso: string) => usage != null && iso >= usage.start && iso <= usage.end
 
   // 正在借用:伺服器端 active=true 過濾
   const roomsQuery = useActiveRoomBookings()
@@ -135,6 +176,24 @@ export default function BookingOverviewPage() {
     for (const q of listsErrored) void q.refetch()
   }
 
+  // 最近申請:三類各取近 5 筆(與各借用頁同一份查詢),退回件可點開原因
+  const firstPage = { page: 1, pageSize: RECENT_PAGE }
+  const recentRoomsQuery = useRecentRoomBookings(firstPage)
+  const recentVenuesQuery = useRecentVenueBookings(firstPage)
+  const recentLoansQuery = useRecentEquipmentLoans(firstPage)
+  const decision = useDecisionReason()
+  const recentRooms = recentRoomsQuery.data?.rows ?? []
+  const recentVenues = recentVenuesQuery.data?.rows ?? []
+  // 不濾掉已歸還的:這裡拿到的就是後端給的最新 5 筆,濾完可能一列不剩,
+  // 空表再配上「尚無申請紀錄」就成了假話。與上面那張卡重疊幾列是可以接受的代價
+  const recentLoans = recentLoansQuery.data?.rows ?? []
+  const recentQueries = [recentRoomsQuery, recentVenuesQuery, recentLoansQuery]
+  const recentPending = recentQueries.some((q) => q.isPending)
+  const recentErrored = recentQueries.filter((q) => q.isError)
+  const retryRecent = () => {
+    for (const q of recentErrored) void q.refetch()
+  }
+
   // 取消:審核中隨時可取消;已核准僅開始日前可取消(後端亦驗)
   const confirmCancel = (title: string, run: () => void) =>
     confirmDialog(modal, {
@@ -150,21 +209,35 @@ export default function BookingOverviewPage() {
   const book = (venueId: number, date: Dayjs, period: string) =>
     navigate(`/bookings/venue?venue=${venueId}&date=${date.format('YYYY/MM/DD')}&period=${period}`)
 
+  // 器材借用的起訖日預設同為點擊的那一天(要跨天由使用者在借用頁調整)
+  const borrow = (equipmentId: number, date: Dayjs) =>
+    navigate(`/bookings/equipment?equipment=${equipmentId}&date=${date.format('YYYY/MM/DD')}`)
+
   const openVenue = (id: number) => {
     setVenueView(id)
     setVenueStart(gridDate.startOf('day').subtract(7, 'day'))
   }
 
-  const gridPending = venueDef ? rangeQuery.isPending : venuesQuery.isPending || dayQuery.isPending
+  const gridPending = isEquipmentView
+    ? usageQuery.isPending
+    : venueDef
+      ? rangeQuery.isPending
+      : venuesQuery.isPending || dayQuery.isPending
   // 場況圖來源查詢失敗時整卡顯示錯誤,不畫預設色格;
   // 15 天檢視為單一批次查詢,重試即重抓整段區間
-  const gridError = venuesQuery.isError
-    ? { error: venuesQuery.error, retry: () => void venuesQuery.refetch() }
-    : !venueDef && dayQuery.isError
-      ? { error: dayQuery.error, retry: () => void dayQuery.refetch() }
-      : venueDef && rangeQuery.isError
-        ? { error: rangeQuery.error, retry: rangeQuery.refetchErrored }
-        : null
+  // 器材:手上有資料就照常渲染(格值以絕對日期為鍵,對得上的那幾欄還是真的),
+  // 只有首載失敗才換錯誤畫面 —— 背景重抓失敗不該把讀得到的資料變成不能用
+  const gridError = isEquipmentView
+    ? usageQuery.isLoadingError
+      ? { error: usageQuery.error, retry: () => void usageQuery.refetch() }
+      : null
+    : venuesQuery.isError
+      ? { error: venuesQuery.error, retry: () => void venuesQuery.refetch() }
+      : !venueDef && dayQuery.isError
+        ? { error: dayQuery.error, retry: () => void dayQuery.refetch() }
+        : venueDef && rangeQuery.isError
+          ? { error: rangeQuery.error, retry: rangeQuery.refetchErrored }
+          : null
 
   const thStyle: React.CSSProperties = { fontSize: 11, fontWeight: 500, color: 'var(--steel)' }
 
@@ -172,12 +245,24 @@ export default function BookingOverviewPage() {
     <div>
       <PageHeader title="借用總覽" sub={<SuspensionNote />} />
 
-      {/* 場地借用情形:單日全場地 / 單一場地 15 天(−7~+7),兩種檢視 */}
+      {/* 借用情形:場地(單日全場地 / 單一場地 15 天)與器材(15 天借用程度)兩種檢視 */}
       <div className="card" style={{ marginTop: 20, padding: '16px 20px 20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <Segmented
+            size="small"
+            value={view}
+            // 切到器材時退出單一場地檢視:那是場地才有的下鑽
+            onChange={(v) => {
+              setView(v as 'venue' | 'equipment')
+              setVenueView(null)
+            }}
+            options={[
+              { label: '場地', value: 'venue' },
+              { label: '器材', value: 'equipment' },
+            ]}
+          />
           {!venueDef ? (
             <>
-              <div style={{ fontSize: 15, fontWeight: 600, marginRight: 4 }}>場地借用情形</div>
               <Tooltip title="前一週">
                 <Button
                   size="small"
@@ -249,13 +334,77 @@ export default function BookingOverviewPage() {
             </>
           )}
           <div style={{ flex: 1 }} />
-          <Legend />
+          <Legend items={isEquipmentView ? USAGE_SCALE : LEGEND.map((k) => CELL[k])} />
         </div>
 
         <LoadingBlock pending={gridPending}>
           <div style={{ overflowX: 'auto', marginTop: 12 }}>
             {gridError ? (
-              <QueryError compact title="場地借用情形載入失敗" error={gridError.error} onRetry={gridError.retry} />
+              <QueryError
+                compact
+                title={isEquipmentView ? '器材借用情形載入失敗' : '場地借用情形載入失敗'}
+                error={gridError.error}
+                onRetry={gridError.retry}
+              />
+            ) : isEquipmentView ? (
+              // 不淡化重抓中的舊資料:格值以絕對日期為鍵,對得上的那幾欄本來就還是真的,
+              // 只有新露出的日期是未知(留白),不必整張表閃一下
+              <table aria-label="各器材借用情形" style={{ borderCollapse: 'separate', borderSpacing: 3, width: '100%', tableLayout: 'fixed', minWidth: 900 }}>
+                <thead>
+                  <tr>
+                    <th scope="col" style={{ ...thStyle, width: 176, textAlign: 'left', paddingRight: 8 }}>器材</th>
+                    {equipmentDates.map((d) => {
+                      const isToday = d.isSame(todayStart, 'day')
+                      return (
+                        <th
+                          scope="col"
+                          key={d.format('YYYY/MM/DD')}
+                          className="num"
+                          style={{ ...thStyle, color: isToday ? 'var(--seal)' : 'var(--steel)', fontWeight: isToday ? 600 : 500 }}
+                        >
+                          {d.format('MM/DD')}
+                          <div style={{ fontWeight: 400 }}>{WEEKDAY[d.day()]}</div>
+                        </th>
+                      )
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {equipment.map((e) => (
+                    <tr key={e.id}>
+                      <td style={{ whiteSpace: 'nowrap', paddingRight: 8 }}>
+                        {e.name}
+                        <span className="num" style={{ fontSize: 11, color: 'var(--steel)', marginLeft: 5 }}>{e.totalQty}</span>
+                      </td>
+                      {equipmentDates.map((d) => {
+                        const iso = d.format('YYYY-MM-DD')
+                        // 舊資料涵蓋不到的日期是「還沒載到」,不是 0
+                        const known = usageKnown(iso)
+                        const used = e.used[iso] ?? 0
+                        // 借滿、過去日期、還沒載到的格子都不是可申請的入口
+                        const bookable = known && used < e.totalQty && !d.isBefore(todayStart, 'day')
+                        return (
+                          <td key={d.format('YYYY/MM/DD')}>
+                            <UsageCell
+                              label={known ? `${used} / ${e.totalQty}` : '載入中'}
+                              bg={known ? usageStep(used, e.totalQty).bg : 'transparent'}
+                              bookable={bookable}
+                              onBook={() => borrow(e.id, d)}
+                            />
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                  {!usageQuery.isPending && equipment.length === 0 && (
+                    <tr>
+                      <td colSpan={EQUIPMENT_DAYS + 1} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>
+                        無啟用中的器材
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             ) : !venueDef ? (
               <table aria-label="各場地單日借用情形" style={{ borderCollapse: 'separate', borderSpacing: 3, width: '100%', tableLayout: 'fixed', minWidth: 720 }}>
                 <thead>
@@ -511,6 +660,79 @@ export default function BookingOverviewPage() {
         </LoadingBlock>
           <Pager page={returnedPage} pageSize={RETURNED_PAGE} total={returnedTotal} onChange={setReturnedPage} style={{ padding: '10px 0 14px' }} />
       </div>
+
+      {/* 最近申請:已結束/退回/取消的近況,單卡整併三類(與「正在借用」同一份欄位) */}
+      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近申請</div>
+        <LoadingBlock pending={recentPending}>
+          <table className="tb fixed" aria-label="最近申請" style={{ minWidth: 680 }}>
+            <Cols widths={[90, 'auto', 240, 110]} />
+            <thead>
+              <tr>
+                <th scope="col">類別</th>
+                <th scope="col">內容</th>
+                <th scope="col">時間</th>
+                <th scope="col">狀態</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentRooms.map((r) => {
+                const row = decision.rowProps(r.venueName, r.status, r.decision)
+                return (
+                  <tr key={`room-${r.id}`} {...row.tr}>
+                    <td style={{ color: 'var(--steel)', fontSize: 13 }}>固定場地</td>
+                    <td style={{ fontWeight: 500 }}>{row.wrap(r.venueName)}</td>
+                    <td style={{ color: 'var(--steel)', fontSize: 13 }}>
+                      每週 {r.entries.map(roomEntryText).join('、')}
+                    </td>
+                    <td><StatusPill status={r.status} /></td>
+                  </tr>
+                )
+              })}
+              {recentVenues.map((v) => {
+                const row = decision.rowProps(`${v.venueName}（${v.date}）`, v.status, v.decision)
+                return (
+                  <tr key={`venue-${v.id}`} {...row.tr}>
+                    <td style={{ color: 'var(--steel)', fontSize: 13 }}>臨時場地</td>
+                    <td style={{ fontWeight: 500 }}>
+                      {row.wrap(<>{v.venueName}<span style={{ color: 'var(--steel)', fontWeight: 400, fontSize: 13 }}> · {v.purpose}</span></>)}
+                    </td>
+                    <td className="num" style={{ color: 'var(--steel)', fontSize: 13 }}>{v.date} 第 {v.periods.join('、')} 節</td>
+                    <td><StatusPill status={v.status} /></td>
+                  </tr>
+                )
+              })}
+              {recentLoans.map((l) => {
+                const row = decision.rowProps(`${l.equipmentName} ×${l.qty}`, l.status, l.decision)
+                return (
+                  <tr key={`loan-${l.id}`} {...row.tr}>
+                    <td style={{ color: 'var(--steel)', fontSize: 13 }}>器材</td>
+                    <td style={{ fontWeight: 500 }}>
+                      {row.wrap(<>{l.equipmentName} <span className="num">×{l.qty}</span></>)}
+                    </td>
+                    <td className="num" style={{ color: 'var(--steel)', fontSize: 13 }}>{l.startDate} – {l.endDate}</td>
+                    <td><StatusPill status={l.status} /></td>
+                  </tr>
+                )
+              })}
+              {recentErrored.length > 0 && (
+                <tr className="no-hover">
+                  <td colSpan={4}>
+                    <QueryError compact title="申請紀錄載入失敗" error={recentErrored[0]?.error} onRetry={retryRecent} />
+                  </td>
+                </tr>
+              )}
+              {recentErrored.length === 0 && !recentPending && recentRooms.length === 0 && recentVenues.length === 0 && recentLoans.length === 0 && (
+                <tr className="no-hover">
+                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>尚無申請紀錄</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </LoadingBlock>
+      </div>
+
+      {decision.node}
     </div>
   )
 }

@@ -1,15 +1,14 @@
 import { useRef, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { App, Button, Upload } from 'antd'
+import { App, Button, Tooltip, Upload } from 'antd'
 import { LeftOutlined, UploadOutlined } from '@ant-design/icons'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
-import { useAuth } from '../../app/auth'
 import { fmtMB, isImageFile, sha256 } from '../../lib/uploads'
 import { useAwardDetail, useEvalUploadMutations, type AwardRubricItem, type AwardUploadFile } from '../../api/eval'
 import { fetchFile } from '../../api/client'
-import { fileTypeOf, AWARD_BRIEFS, type EvalFile } from './types'
+import { fileTypeOf, type EvalFile } from './types'
 import FilePreview from './FilePreview'
 
 // 對齊後端 EVAL_POLICY:pdf/doc/docx/jpg/jpeg/png/zip,單檔 50MB
@@ -28,10 +27,10 @@ function BackLink() {
 // 獎項詳細頁:評分細項(後端逐年 rubric)→ 上傳槽位(狀態、即時預覽)
 export default function AwardDetailPage() {
   const { award: awardKey } = useParams()
-  const { user } = useAuth()
   const { message } = App.useApp()
   const { data: award, isError, error, refetch } = useAwardDetail(awardKey)
   const { upload, remove } = useEvalUploadMutations(awardKey ?? '')
+  const locked = award?.uploadLocked === true
   // 本次 session 上傳檔的 SHA-256(uploadId → hash):同獎項內容去重(沿改版前跨槽位語意);
   // 後端另有未開放/型別/容量重驗,拒絕時以 message.error 顯示(跨 session 去重目前後端未做)
   const sessionHashes = useRef(new Map<number, string>())
@@ -72,7 +71,7 @@ export default function AwardDetailPage() {
 
   const addFile = async (item: AwardRubricItem, f: File) => {
     if (f.size > MAX_FILE_BYTES) {
-      message.error(`「${f.name}」超過單檔 50 MB 上限`)
+      message.error(`「${f.name}」超過單個檔案 50 MB 上限`)
       return
     }
     // 宣稱是圖片的檔案驗魔術位元組(其餘型別由後端重驗)
@@ -82,7 +81,7 @@ export default function AwardDetailPage() {
     }
     const hash = await sha256(f)
     if ([...sessionHashes.current.values()].includes(hash)) {
-      message.error(`「${f.name}」與已上傳的檔案內容相同,已拒絕重複上傳`)
+      message.error(`「${f.name}」檔案重複`)
       return
     }
     upload.mutate(
@@ -127,11 +126,6 @@ export default function AwardDetailPage() {
       <div style={{ marginTop: 12 }}>
         <PageHeader
           title={award.name}
-          sub={
-            <>
-              {user?.club} · {AWARD_BRIEFS[award.id] ?? ''}
-            </>
-          }
           extra={
             <div style={{ textAlign: 'right', height: 40, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <div style={{ fontSize: 12, color: 'var(--steel)', lineHeight: 1.1 }}>上傳進度</div>
@@ -145,7 +139,7 @@ export default function AwardDetailPage() {
 
       {award.items.length === 0 && (
         <div className="card" style={{ marginTop: 16, padding: '40px 24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
-          {award.year} 年度評分項目尚未建立,請待學務處公告
+          {award.year} 年度評分項目尚未建立，請待學務處公告
         </div>
       )}
 
@@ -164,8 +158,8 @@ export default function AwardDetailPage() {
                 )}
                 {item.uploads.length > 0 && (
                   <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 6 }}>
-                    已使用 <span className="num">{fmtMB(item.uploads.reduce((s, f) => s + f.size, 0))}</span> MB(單檔上限{' '}
-                    <span className="num">50</span> MB)
+                    已使用 <span className="num">{fmtMB(item.uploads.reduce((s, f) => s + f.size, 0))}</span> MB（單個檔案上限{' '}
+                    <span className="num">50</span> MB）
                   </div>
                 )}
                 {item.uploads.length > 0 && (
@@ -175,15 +169,18 @@ export default function AwardDetailPage() {
                         <button type="button" className="link-btn" style={{ padding: 0, fontSize: 12 }} onClick={() => void openPreview(f)}>
                           {f.name}
                         </button>
-                        <button
-                          type="button"
-                          className="link-btn danger"
-                          aria-label={`移除 ${f.name}`}
-                          style={{ padding: '0 2px', fontSize: 12 }}
-                          onClick={() => removeFile(item, f)}
-                        >
-                          ×
-                        </button>
+                        {/* 刪除吃同一把鎖(後端 409):鎖著就不畫 × */}
+                        {!locked && (
+                          <button
+                            type="button"
+                            className="link-btn danger"
+                            aria-label={`移除 ${f.name}`}
+                            style={{ padding: '0 2px', fontSize: 12 }}
+                            onClick={() => removeFile(item, f)}
+                          >
+                            ×
+                          </button>
+                        )}
                       </span>
                     ))}
                   </div>
@@ -197,15 +194,29 @@ export default function AwardDetailPage() {
                 <Upload
                   accept={ACCEPT}
                   multiple
+                  disabled={locked}
                   showUploadList={false}
                   beforeUpload={(f) => {
                     void addFile(item, f)
                     return false
                   }}
                 >
-                  <Button size="small" style={{ height: 30 }} icon={<UploadOutlined />} loading={upload.isPending}>
-                    上傳
-                  </Button>
+                  {/* 鎖著就別讓人選檔:後端擋得下(409),但那是選完 50MB 的檔之後的事。
+                      disabled 的元素不發 pointer 事件,antd 6 也不再代包 —— 要自己套一層 span,
+                      否則社團只看到一顆反灰的鈕、看不到為什麼 */}
+                  <Tooltip title={locked ? '學務處已關閉本獎項的資料上傳' : ''}>
+                    <span style={{ display: 'inline-block', cursor: locked ? 'not-allowed' : undefined }}>
+                      <Button
+                        size="small"
+                        style={{ height: 30 }}
+                        icon={<UploadOutlined />}
+                        disabled={locked}
+                        loading={upload.isPending}
+                      >
+                        上傳
+                      </Button>
+                    </span>
+                  </Tooltip>
                 </Upload>
               )}
             </div>

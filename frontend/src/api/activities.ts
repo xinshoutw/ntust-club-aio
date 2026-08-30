@@ -8,6 +8,7 @@ import { useInvalidateBadges } from './badges'
 import { fetchAllPages } from './fetchAll'
 import type { StatusKey } from '../lib/status'
 import { fileTypeOf, type EvalFile, type EvalFileType } from '../features/eval/types'
+import { staffTextToWorks } from '../features/activities/types'
 import type { ActivityReport, BudgetItem, Reflection, WorkItem } from '../features/activities/types'
 
 export type ActivityType = '社課或會議' | '活動'
@@ -48,6 +49,8 @@ export interface ClubActivityDetail extends ClubActivity {
   report?: ActivityReport
   photos: EvalFile[]
   attachments: EvalFile[]
+  /** 結案附件(保單、租車契約、簽到表…);與照片共用結案上傳額度 */
+  closeDocs: EvalFile[]
   rejectReason?: ActivityRejectReason
 }
 
@@ -104,8 +107,12 @@ interface ApprovalOut {
   created_at: string
 }
 
-interface ActivityOut {
+export interface ActivityOut {
   id: number
+  club_id: number
+  created_at: string
+  /** 送出審核的時刻(每次送審覆寫);草稿為 null */
+  submitted_at: string | null
   name: string
   type: ActivityType
   is_large: boolean
@@ -129,12 +136,13 @@ interface ActivityOut {
   has_close_draft: boolean
 }
 
-interface ActivityDetailOut extends ActivityOut {
+export interface ActivityDetailOut extends ActivityOut {
   budget_items: BudgetItemOut[]
   close_draft: Record<string, unknown> | null
   report: ReportOut | null
   photos: FileOut[]
   attachments: FileOut[]
+  close_docs: FileOut[]
   approvals: ApprovalOut[]
 }
 
@@ -148,21 +156,12 @@ const hm = (t: string): string => t.slice(0, 5) // 'HH:MM:SS' → 'HH:MM'
 const worksToStaffText = (works: WorkItem[]): string =>
   works.map((w) => `${w.task}:${w.owner}`).join('\n')
 
-const staffTextToWorks = (text: string): WorkItem[] =>
-  text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const i = line.lastIndexOf(':')
-      return i >= 0 ? { task: line.slice(0, i), owner: line.slice(i + 1) } : { task: line, owner: '' }
-    })
 
 // 逾期鎖定為推導狀態:已核准且 close_locked 時以前端顯示鍵 'locked' 呈現
 const toStatusKey = (o: ActivityOut): StatusKey =>
   o.status === 'approved' && o.close_locked ? 'locked' : (o.status as StatusKey)
 
-const toActivity = (o: ActivityOut): ClubActivity => ({
+export const toActivity = (o: ActivityOut): ClubActivity => ({
   id: o.id,
   name: o.name,
   type: o.type,
@@ -265,7 +264,7 @@ const STAGE_LABEL: Record<string, string> = {
   dean: '學務長',
 }
 
-const toDetail = (o: ActivityDetailOut): ClubActivityDetail => {
+export const toDetail = (o: ActivityDetailOut): ClubActivityDetail => {
   const lastReject = [...o.approvals].reverse().find((x) => x.decision === 'reject')
   return {
     ...toActivity(o),
@@ -281,6 +280,7 @@ const toDetail = (o: ActivityDetailOut): ClubActivityDetail => {
     report: o.report ? toReport(o.report) : undefined,
     photos: o.photos.map(toFile),
     attachments: o.attachments.map(toFile),
+    closeDocs: o.close_docs.map(toFile),
     rejectReason:
       o.status === 'rejected' && lastReject
         ? {
@@ -292,23 +292,24 @@ const toDetail = (o: ActivityDetailOut): ClubActivityDetail => {
   }
 }
 
-// 成果報告/心得 PDF:後端於下載時動態生成(inline),包成 EvalFile 供 FileChip 預覽/下載
-export const activityReportPdf = (a: Pick<ClubActivity, 'id' | 'name'>, submittedAt?: string): EvalFile => ({
-  id: `report-pdf-${a.id}`,
-  name: `${a.name}_成果報告表.pdf`,
-  type: 'pdf',
-  size: 0,
-  url: `${API_BASE}/club/activities/${a.id}/report-pdf`,
-  uploadedAt: submittedAt ?? '—',
-})
+// 申請表 PDF:後端於下載時動態生成(inline),包成 EvalFile 供下載。
+// base 決定走哪一端的端點:社團端那支由 session 認社團,承辦讀別社時要走 admin 版
+export type PdfBase = 'club' | 'admin'
 
-export const activityReflectionsPdf = (a: Pick<ClubActivity, 'id' | 'name'>, submittedAt?: string): EvalFile => ({
-  id: `reflections-pdf-${a.id}`,
-  name: `${a.name}_學習心得.pdf`,
+const pdfPath = (base: PdfBase, id: number | string, kind: string): string =>
+  `${API_BASE}/${base === 'admin' ? 'admin' : 'club'}/activities/${id}/${kind}`
+
+// 社團活動申請表:版面沿用舊系統,任何狀態(含草稿)都產得出來 —— 不必等結案
+export const activityApplyPdf = (
+  a: { id: number | string; name: string },
+  base: PdfBase = 'club',
+): EvalFile => ({
+  id: `apply-pdf-${a.id}`,
+  name: `${a.name}_社團活動申請表.pdf`,
   type: 'pdf',
   size: 0,
-  url: `${API_BASE}/club/activities/${a.id}/reflections-pdf`,
-  uploadedAt: submittedAt ?? '—',
+  url: pdfPath(base, a.id, 'apply-pdf'),
+  uploadedAt: '—',
 })
 
 // ---- 查詢 ----
@@ -510,6 +511,12 @@ export const uploadActivityPhoto = (id: number, file: File): Promise<EvalFile> =
 
 export const deleteActivityPhoto = (id: number, fileId: string): Promise<null> =>
   api<null>(`/club/activities/${id}/photos/${fileId}`, { method: 'DELETE' })
+
+export const uploadActivityCloseDoc = (id: number, file: File): Promise<EvalFile> =>
+  uploadFile(`/club/activities/${id}/docs`, file)
+
+export const deleteActivityCloseDoc = (id: number, fileId: string): Promise<null> =>
+  api<null>(`/club/activities/${id}/docs/${fileId}`, { method: 'DELETE' })
 
 // ---- 結案(草稿/送出)----
 

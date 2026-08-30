@@ -1,6 +1,6 @@
-// 行政端線上申請管理 API 層(權限鍵 aapply):幹部證明/郵局帳戶異動。
+// 行政端線上申請管理 API 層(幹部證明 acert / 郵局帳戶異動 apostal,各一把鍵)。
 // 兩張表各自伺服器端分頁(排序由後端固定);狀態流轉走後端狀態機:
-// 僅允許單步前進(審核中→處理中→請洽學務處),UI 也只開放下一步選項。
+// 只能往前(審核中→處理中→已完成)但可跳過處理中,UI 開放的正是往前的那幾個。
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api, apiPaged, qs } from './client'
@@ -8,10 +8,10 @@ import { useInvalidateBadges } from './badges'
 
 export type ApplicationStatus = 'pending' | 'processing' | 'completed'
 
-/** 單步前進狀態機(與後端 _NEXT_STATUS 對齊) */
-export const NEXT_STATUS: Partial<Record<ApplicationStatus, ApplicationStatus>> = {
-  pending: 'processing',
-  processing: 'completed',
+/** 往前走得到的狀態(與後端 _ALLOWED_NEXT 對齊):審核中可直接跳到已完成 */
+export const ALLOWED_NEXT: Partial<Record<ApplicationStatus, readonly ApplicationStatus[]>> = {
+  pending: ['processing', 'completed'],
+  processing: ['completed'],
 }
 
 export interface OfficerCertRow {

@@ -6,7 +6,12 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { suspendedNow } from '../../lib/status'
 import { useUnsavedGuard } from '../../app/unsaved'
-import { useAdminClubDetail, useAdminClubMutations, type AdminClubDetail } from '../../api/adminClubs'
+import {
+  CLUB_ATTRIBUTES,
+  useAdminClubDetail,
+  useAdminClubMutations,
+  type AdminClubDetail,
+} from '../../api/adminClubs'
 import ClubSelect from './ClubSelect'
 import OneTimePasswordModal from './OneTimePasswordModal'
 import { useAdminClub } from './clubContext'
@@ -15,7 +20,9 @@ const label: React.CSSProperties = { color: 'var(--steel)' }
 
 interface FormState {
   name: string
+  enName: string // 英文名稱:社團端唯讀,只有這裡改得動
   kind: string // 社團/學會;名稱結尾可推導時自動同步,推導不到時手動指定
+  attribute: string // 社團性質;沒有性質的社團不會出現在社團漏斗,選錯了要改得回來
   account: string
   active: boolean
 }
@@ -26,17 +33,16 @@ const deriveKind = (name: string): string | null =>
 
 const advisorText = (d: AdminClubDetail | undefined): string => {
   if (!d?.advisorName) return '—'
-  return [d.advisorName, d.advisorDept, d.advisorExt ? `分機 ${d.advisorExt}` : null]
-    .filter(Boolean)
-    .join(' · ')
+  return [d.advisorName, d.advisorDept].filter(Boolean).join(' · ')
 }
 
 const advisorOutText = (d: AdminClubDetail | undefined): string => {
   if (!d?.advisorOutName) return '—'
-  return [d.advisorOutName, d.advisorOutDept, d.advisorOutPhone].filter(Boolean).join(' · ')
+  return [d.advisorOutName, d.advisorOutDept].filter(Boolean).join(' · ')
 }
 
-// 行政端管理項目:社團自行維護的內容唯讀;可改名稱/帳號、重設密碼、啟停用
+// 行政端管理項目:社團自行維護的內容唯讀;可改名稱/英文名稱/帳號、重設密碼、啟停用
+// (英文名稱在社團端是唯讀的,只有這裡改得動 —— decisions.md D-19)
 export default function AdminClubSettingsPage() {
   const { club, clubId, setClub } = useAdminClub()
   const { message, modal } = App.useApp()
@@ -56,7 +62,9 @@ export default function AdminClubSettingsPage() {
     !!form &&
     !!saved &&
     (form.name !== saved.name ||
+      form.enName !== saved.enName ||
       form.kind !== saved.kind ||
+      form.attribute !== saved.attribute ||
       form.account !== saved.account ||
       form.active !== saved.active)
   // 未儲存離開警告:側欄/頂欄導航由 shell 攔截,關閉分頁由 beforeunload 攔截
@@ -93,7 +101,10 @@ export default function AdminClubSettingsPage() {
     if (form === null && detail && club === lastClub) {
       const base = {
         name: detail.name,
+        enName: detail.enName,
         kind: detail.kind,
+        // 停社遷入舊社的性質不可考(null):空字串=沒填,選了才送出去
+        attribute: detail.attribute ?? '',
         account: detail.username ?? '',
         active: detail.isActive,
       }
@@ -116,7 +127,9 @@ export default function AdminClubSettingsPage() {
           id: clubId,
           // 僅送有變更的欄位(undefined 不會進 JSON body)
           name: name !== saved.name ? name : undefined,
+          enName: form.enName.trim() !== saved.enName ? form.enName.trim() : undefined,
           kind: form.kind !== saved.kind ? form.kind : undefined,
+          attribute: form.attribute !== saved.attribute ? form.attribute : undefined,
           username: form.account.trim() !== saved.account ? form.account.trim() : undefined,
           isActive: form.active !== saved.active ? form.active : undefined,
         },
@@ -124,7 +137,9 @@ export default function AdminClubSettingsPage() {
           onSuccess: (res) => {
             const base = {
               name: res.name,
+              enName: res.enName,
               kind: res.kind,
+              attribute: res.attribute ?? '',
               account: res.username ?? '',
               active: res.isActive,
             }
@@ -144,7 +159,7 @@ export default function AdminClubSettingsPage() {
     if (saved.active && !form.active) {
       confirmDialog(modal, {
         title: `停用 ${club} 帳號`,
-        content: '社團將無法登入，將不會影響進行中的申請',
+        content: '社團將無法登入，正進行中的申請將不受影響',
         okText: '確認並儲存',
         okButtonProps: { danger: true },
         cancelText: '取消',
@@ -161,7 +176,7 @@ export default function AdminClubSettingsPage() {
     if (clubId == null) return
     confirmDialog(modal, {
       title: `重設 ${club} 的密碼`,
-      content: '將產生一次性密碼並登出該帳號所有裝置;社團下次登入須立即更改密碼',
+      content: '產生一次性密碼並登出所有裝置，下次登入須立即更改密碼',
       okText: '確認重設',
       cancelText: '取消',
       onOk: () => {
@@ -184,7 +199,7 @@ export default function AdminClubSettingsPage() {
         <div className="card" style={{ padding: 24 }}>
           <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 14 }}>社團資料</div>
           <LoadingBlock pending={clubId != null && detailQuery.isPending}>
-            {/* 手上還沒有資料就只顯示錯誤:八個欄位全是 `—` 看起來像「這社什麼都沒填」(同社團總覽) */}
+            {/* 手上還沒有資料就只顯示錯誤:整排 `—` 看起來像「這社什麼都沒填」(同社團總覽) */}
             {detailQuery.isError && !detail ? (
               <QueryError
                 compact
@@ -195,7 +210,6 @@ export default function AdminClubSettingsPage() {
             ) : (
             <>
             <div style={{ display: 'grid', gridTemplateColumns: '104px 1fr', gap: '10px 12px', fontSize: 13 }}>
-              <div style={label}>英文名稱</div><div>{detail?.enName || '—'}</div>
               <div style={label}>校內指導老師</div><div>{advisorText(detail)}</div>
               <div style={label}>校外指導老師</div><div>{advisorOutText(detail)}</div>
               <div style={label}>網頁連結</div>
@@ -241,6 +255,14 @@ export default function AdminClubSettingsPage() {
                   }}
                 />
               </div>
+              <div className={form.enName !== saved.enName ? 'field-dirty' : undefined}>
+                <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>英文名稱</div>
+                <Input
+                  value={form.enName}
+                  placeholder="English name"
+                  onChange={(e) => setForm({ ...form, enName: e.target.value })}
+                />
+              </div>
               <div className={form.kind !== saved.kind ? 'field-dirty' : undefined}>
                 <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>類型</div>
                 <Select
@@ -253,9 +275,18 @@ export default function AdminClubSettingsPage() {
                   disabled={deriveKind(form.name.trim()) != null}
                   onChange={(v) => setForm({ ...form, kind: v })}
                 />
-                <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>
-                  名稱以「社」/「會」結尾時自動判定;其他結尾請手動指定(影響社長/會長顯示詞)
-                </div>
+              </div>
+              <div className={form.attribute !== saved.attribute ? 'field-dirty' : undefined}>
+                <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>性質</div>
+                {/* 沒有性質的社團不會出現在社團漏斗;既有的空值(停社遷入舊社)不強迫補,
+                    但選了就不給再清成空白 */}
+                <Select
+                  value={form.attribute || undefined}
+                  style={{ width: 140 }}
+                  placeholder="未分類"
+                  options={CLUB_ATTRIBUTES.map((a) => ({ value: a, label: a }))}
+                  onChange={(v) => setForm({ ...form, attribute: v })}
+                />
               </div>
               <div className={form.account !== saved.account ? 'field-dirty' : undefined}>
                 <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>社團帳號</div>

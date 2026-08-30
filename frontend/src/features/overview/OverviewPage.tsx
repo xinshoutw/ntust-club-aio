@@ -7,7 +7,12 @@ import StatusPill from '../../components/ui/StatusPill'
 import Markdown from '../../components/ui/Markdown'
 import AnnouncementModal from '../../components/ui/AnnouncementModal'
 import QueryError from '../../components/ui/QueryError'
-import { useAnnouncements, useMarkAnnouncementsRead, type Announcement } from '../../api/announcements'
+import {
+  ANNOUNCEMENT_PAGE_SIZE,
+  useAnnouncements,
+  useMarkAnnouncementsRead,
+  type Announcement,
+} from '../../api/announcements'
 import { useOverviewActivities, type TrackedItem } from '../../api/overview'
 import {
   useActiveEquipmentLoans,
@@ -17,6 +22,8 @@ import {
 import { useCertificates, useMaintenanceList, usePostalList } from '../../api/applications'
 import './overview.css'
 import { clickableProps } from '../../lib/clickable'
+import { Pager } from '../../components/ui/tableControls'
+import { clampPage } from '../../lib/paging'
 
 const countBadge: React.CSSProperties = {
   fontSize: 12,
@@ -45,17 +52,36 @@ function EmptyRow({ text }: { text: string }) {
   )
 }
 
+// 三張卡都可能長到上百列(遷移進來的舊件尤其多)。待辦每列較高(整句敘述 + 動作鈕),
+// 一頁 8 列才與右下兩張卡等高
+const TODO_PAGE_SIZE = 8
+const CARD_PAGE_SIZE = 10
+
+
 export default function OverviewPage() {
   const navigate = useNavigate()
   const categories = ['活動', '借用', '線上申請'] as const
   const [viewing, setViewing] = useState<Announcement | null>(null)
   const [viewOpen, setViewOpen] = useState(false)
+  const [todoPage, setTodoPage] = useState(1)
+  const [announcementPage, setAnnouncementPage] = useState(1)
+  const [trackedPage, setTrackedPage] = useState(1)
 
-  const announcementsQuery = useAnnouncements()
+  const announcementsQuery = useAnnouncements(true, announcementPage)
   const announcements = announcementsQuery.data?.announcements ?? []
   const announcementTotal = announcementsQuery.data?.total ?? 0
 
   // 公告顯示於本頁:進入頁面即視為已讀(鈴鐺紅點熄滅);標記後查詢刷新使 unread 歸零
+  // 公告是伺服器分頁(資料就是那一頁),不像另外兩張卡可以純推導:total 縮到頁碼失效時
+  // 要把 state 收回去,查詢才會跟著換頁。clampPage 對合法頁碼回傳原值,不會來回觸發。
+  // 只在查詢成功後收 —— 失敗時 total 同樣是 0,一起 clamp 會把錯誤說明彈掉
+  const announcementsLoaded = announcementsQuery.isSuccess
+  useEffect(() => {
+    if (announcementsLoaded) {
+      setAnnouncementPage((p) => clampPage(p, announcementTotal, ANNOUNCEMENT_PAGE_SIZE))
+    }
+  }, [announcementsLoaded, announcementTotal])
+
   const markRead = useMarkAnnouncementsRead()
   const { mutate: markReadMutate } = markRead
   const hasUnread = announcements.some((a) => a.unread)
@@ -65,6 +91,8 @@ export default function OverviewPage() {
 
   const activitiesQuery = useOverviewActivities()
   const todos = activitiesQuery.data?.todos ?? []
+  const todoPageNow = clampPage(todoPage, todos.length, TODO_PAGE_SIZE)
+  const pagedTodos = todos.slice((todoPageNow - 1) * TODO_PAGE_SIZE, todoPageNow * TODO_PAGE_SIZE)
 
   // 線上申請近況:與各申請頁共用查詢(近 5 筆)
   const maintenanceQuery = useMaintenanceList()
@@ -132,11 +160,17 @@ export default function OverviewPage() {
         path: '/bookings',
       })),
   ]
-  const tracked = [
-    ...(activitiesQuery.data?.tracked ?? []),
-    ...bookingTracked,
-    ...onlineTracked,
-  ]
+  // 分組只是視覺分隔,切頁以攤平後的順序為準 —— 先分組再切頁會出現有標題沒有列的頁
+  const tracked = categories.flatMap((cat) =>
+    [...(activitiesQuery.data?.tracked ?? []), ...bookingTracked, ...onlineTracked].filter(
+      (t) => t.category === cat,
+    ),
+  )
+  const trackedPageNow = clampPage(trackedPage, tracked.length, CARD_PAGE_SIZE)
+  const pagedTracked = tracked.slice(
+    (trackedPageNow - 1) * CARD_PAGE_SIZE,
+    trackedPageNow * CARD_PAGE_SIZE,
+  )
 
   // 空分類會被 filter 濾掉,查詢失敗時整個分類會安靜消失 —— 六支一起看載入與錯誤
   const trackedQueries = [
@@ -166,13 +200,13 @@ export default function OverviewPage() {
         <div className="card" style={{ marginTop: 20 }}>
           <CardTitle title="待辦" count={todosLoading || activitiesQuery.isError ? '—' : todos.length} />
           <LoadingBlock pending={todosLoading} rows={2}>
-          {todos.map((t) => (
+          {pagedTodos.map((t) => (
             <div key={t.id} className="todo-row">
               <StatusPill status={t.kind} />
               <div style={{ fontSize: 14, lineHeight: 1.6 }}>
                 {t.kind === 'locked' ? (
                   <>
-                    「{t.name}」應於 <span className="num">{t.deadline}</span> 前結案,現已鎖定;請洽課外活動指導組解鎖
+                    「{t.name}」應於 <span className="num">{t.deadline}</span> 前結案，已被鎖定。更多疑問請洽學務處
                   </>
                 ) : (
                   <>
@@ -189,11 +223,11 @@ export default function OverviewPage() {
               </div>
               <div className="todo-action">
                 {t.kind === 'locked' ? (
-                  <Button size="small" style={{ height: 30 }} onClick={() => navigate('/activities')}>
+                  <Button size="small" style={{ height: 30 }} onClick={() => navigate(t.path)}>
                     查看活動
                   </Button>
                 ) : (
-                  <Button type="primary" size="small" style={{ height: 30 }} onClick={() => navigate('/activities')}>
+                  <Button type="primary" size="small" style={{ height: 30 }} onClick={() => navigate(t.path)}>
                     去結案
                   </Button>
                 )}
@@ -205,8 +239,9 @@ export default function OverviewPage() {
               <QueryError compact title="待辦事項載入失敗" error={activitiesQuery.error} onRetry={() => activitiesQuery.refetch()} />
             </div>
           )}
-          {!activitiesQuery.isError && todos.length === 0 && <EmptyRow text="目前沒有待辦事項" />}
+          {!activitiesQuery.isError && todos.length === 0 && <EmptyRow text="無待辦事項" />}
           </LoadingBlock>
+          <Pager page={todoPageNow} pageSize={TODO_PAGE_SIZE} total={todos.length} onChange={setTodoPage} />
         </div>
 
         <div className="overview-grid">
@@ -242,8 +277,14 @@ export default function OverviewPage() {
                 <QueryError compact title="公告載入失敗" error={announcementsQuery.error} onRetry={() => announcementsQuery.refetch()} />
               </div>
             )}
-            {!announcementsQuery.isError && announcements.length === 0 && <EmptyRow text="目前沒有公告" />}
+            {!announcementsQuery.isError && announcements.length === 0 && <EmptyRow text="無公告" />}
             </LoadingBlock>
+            <Pager
+              page={announcementPage}
+              pageSize={ANNOUNCEMENT_PAGE_SIZE}
+              total={announcementTotal}
+              onChange={setAnnouncementPage}
+            />
           </div>
 
           <div className="card">
@@ -255,7 +296,7 @@ export default function OverviewPage() {
               </div>
             )}
             {categories
-              .filter((cat) => tracked.some((t) => t.category === cat))
+              .filter((cat) => pagedTracked.some((t) => t.category === cat))
               .map((cat) => (
                 <Fragment key={cat}>
                   <div
@@ -269,7 +310,7 @@ export default function OverviewPage() {
                   >
                     {cat}
                   </div>
-                  {tracked
+                  {pagedTracked
                     .filter((t) => t.category === cat)
                     .map((t) => (
                       <Link key={t.key} to={t.path} className="tracked-row">
@@ -281,8 +322,14 @@ export default function OverviewPage() {
                     ))}
                 </Fragment>
               ))}
-            {trackedErrored.length === 0 && tracked.length === 0 && <EmptyRow text="目前沒有進行中的申請" />}
+            {trackedErrored.length === 0 && tracked.length === 0 && <EmptyRow text="無進行中的申請" />}
             </LoadingBlock>
+            <Pager
+              page={trackedPageNow}
+              pageSize={CARD_PAGE_SIZE}
+              total={tracked.length}
+              onChange={setTrackedPage}
+            />
           </div>
         </div>
 

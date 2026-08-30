@@ -120,7 +120,7 @@ const keys = {
 
 export const adminEvalKeys = keys
 
-export const EVAL_CLUBS_PAGE_SIZE = 20
+export const EVAL_CLUBS_PAGE_SIZE = 10
 
 /** 各社行政分:伺服器端分頁(分數只算這一頁,社團名升冪由後端排) */
 export function useAdminEvalClubs(page: number) {

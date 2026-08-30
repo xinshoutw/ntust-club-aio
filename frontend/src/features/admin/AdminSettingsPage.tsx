@@ -79,9 +79,7 @@ function BudgetCategoriesInput({
 
 interface FormValues {
   fixedWindow?: [Dayjs, Dayjs] | null
-  loanBefore: number
-  loanAfter: number
-  closeLockMonths: number
+  closeLockDays: number
   docMb: number
   imgMb: number
   zipMb: number
@@ -119,9 +117,7 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
       {
         fixedFrom: v.fixedWindow?.[0] ? v.fixedWindow[0].format(DATE_FMT) : undefined,
         fixedUntil: v.fixedWindow?.[1] ? v.fixedWindow[1].format(DATE_FMT) : undefined,
-        loanBefore: v.loanBefore,
-        loanAfter: v.loanAfter,
-        closeLockMonths: v.closeLockMonths,
+        closeLockDays: v.closeLockDays,
         docMb: v.docMb,
         imgMb: v.imgMb,
         zipMb: v.zipMb,
@@ -154,9 +150,7 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
           initial.fixedFrom && initial.fixedUntil
             ? [dayjs(initial.fixedFrom, DATE_FMT), dayjs(initial.fixedUntil, DATE_FMT)]
             : undefined,
-        loanBefore: initial.loanBefore,
-        loanAfter: initial.loanAfter,
-        closeLockMonths: initial.closeLockMonths,
+        closeLockDays: initial.closeLockDays,
         docMb: initial.docMb,
         imgMb: initial.imgMb,
         zipMb: initial.zipMb,
@@ -173,53 +167,45 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
       <div className="form-grid-2" style={{ marginTop: 20, alignItems: 'stretch' }}>
         <div className="card" style={{ padding: 24 }}>
           <div style={sectionTitle}>借用</div>
-          <Form.Item name="fixedWindow" label="固定場地借用受理期間(期間外不開放申請)">
+          <Form.Item name="fixedWindow" label="固定場地借用受理期間" style={{ marginBottom: 0 }}>
             <DatePicker.RangePicker style={{ width: '100%' }} format={DATE_FMT} allowClear />
           </Form.Item>
-          <div className="form-grid-2">
-            <Form.Item name="loanBefore" label="器材借用:活動前緩衝(工作天)" style={{ marginBottom: 0 }}>
-              <InputNumber min={0} max={10} precision={0} style={{ width: '100%' }} />
-            </Form.Item>
-            <Form.Item name="loanAfter" label="活動後緩衝(工作天)" style={{ marginBottom: 0 }}>
-              <InputNumber min={0} max={10} precision={0} style={{ width: '100%' }} />
-            </Form.Item>
-          </div>
         </div>
 
         <div className="card" style={{ padding: 24 }}>
           <div style={sectionTitle}>活動與評鑑</div>
           <div className="form-grid-2">
-            <Form.Item name="closeLockMonths" label="活動結案期限(結束後 N 個月未結案即鎖定)">
-              <InputNumber min={1} max={6} precision={0} style={{ width: '100%' }} />
+            <Form.Item name="closeLockDays" label="活動結案期限（天）">
+              <InputNumber min={1} max={366} precision={0} style={{ width: '100%' }} />
             </Form.Item>
             <Form.Item name="evalYear" label="評鑑年度" style={{ marginBottom: 0 }}>
               <Select options={evalYears.map((y) => ({ value: y, label: evalYearLabel(y) }))} />
             </Form.Item>
           </div>
-          <div style={{ ...sectionTitle, marginTop: 20 }}>各申請性質的附件加總上限(MB)</div>
+          <div style={{ ...sectionTitle, marginTop: 20 }}>申請附件總上限（MB）</div>
           <div className="form-grid-2">
             <Form.Item name="attachmentTotalMb" label="活動申請附件" style={{ marginBottom: 0 }}>
               <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item name="maintenanceTotalMb" label="空間報修佐證(含影片)" style={{ marginBottom: 0 }}>
+            <Form.Item name="maintenanceTotalMb" label="空間報修佐證（含影片）" style={{ marginBottom: 0 }}>
               <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item name="closePhotoTotalMb" label="活動結案照片" style={{ marginBottom: 0 }}>
+            <Form.Item name="closePhotoTotalMb" label="活動結案照片與附件" style={{ marginBottom: 0 }}>
               <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
             </Form.Item>
           </div>
-          <div style={{ ...sectionTitle, marginTop: 20 }}>單檔上限(型別驗證上界,MB)</div>
+          <div style={{ ...sectionTitle, marginTop: 20 }}>單檔上限（MB）</div>
           <div className="form-grid-2">
-            <Form.Item name="docMb" label="文件單檔" style={{ marginBottom: 0 }}>
+            <Form.Item name="docMb" label="文件" style={{ marginBottom: 0 }}>
               <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item name="imgMb" label="圖片單檔" style={{ marginBottom: 0 }}>
+            <Form.Item name="imgMb" label="圖片" style={{ marginBottom: 0 }}>
               <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item name="zipMb" label="壓縮檔單檔" style={{ marginBottom: 0 }}>
+            <Form.Item name="zipMb" label="壓縮檔" style={{ marginBottom: 0 }}>
               <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
             </Form.Item>
-            <Form.Item name="videoMb" label="影片單檔" style={{ marginBottom: 0 }}>
+            <Form.Item name="videoMb" label="影片" style={{ marginBottom: 0 }}>
               <InputNumber min={1} max={1024} precision={0} style={{ width: '100%' }} />
             </Form.Item>
           </div>

@@ -11,7 +11,10 @@ idempotent 機制:每寫入一列即記 legacy_id_map(cms, 舊表, 舊id → 新
 import asyncio
 import csv
 import os
+import re
 import sys
+import tempfile
+from collections import Counter
 from datetime import date, datetime, time
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -26,28 +29,69 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from app.core.config import settings
 from app.core.db import async_session_factory
 from app.core.security import generate_password, hash_password
+from app.core.semesters import semester_bounds
 from app.models import (
     Activity,
     ActivityBudgetItem,
     ActivityReport,
     Announcement,
+    ApprovalRecord,
     Club,
     ClubMember,
     LegacyIdMap,
+    Session,
     User,
 )
 from app.models.enums import (
     ActivityStatus,
     ActivityType,
     AnnouncementTarget,
+    ApprovalDecision,
+    ApprovalSubject,
     ClubAttribute,
     ClubKind,
     LegacySystem,
     MemberKind,
     UserRole,
 )
+from app.schemas.activities import ActivityIn
+from app.schemas.admin import ApproveActivityIn
+from app.services.activity_service import APPLY_STAGES
+from app.services.settings_service import DEFAULTS as SETTING_DEFAULTS
+
+
+def _max_len(model, field: str) -> int:
+    """從 Pydantic schema 讀長度上限 —— 不要在遷移腳本裡再寫死第二份數字。"""
+    for meta in model.model_fields[field].metadata:
+        limit = getattr(meta, "max_length", None)
+        if limit is not None:
+            return limit
+    raise RuntimeError(f"{model.__name__}.{field} 讀不到 max_length,schema 改過了")
+
+
+# 舊 Club_activity.Review = 申請表的「活動描述」(templates/viewer/activity_activity_detail.html
+# 標籤即為此),不是結案成果。對應新系統的 Activity.content
+CONTENT_MAX = _max_len(ActivityIn, "content")
+
+
+def _actual(n: int | None) -> int:
+    """結案回報的實際人數。0 是有效值,只有 NULL 才是沒填。"""
+    return 0 if n is None else n
+
 
 TAIPEI = ZoneInfo("Asia/Taipei")
+
+# 遷移範圍(decisions.md MIG-08):只有活動受這個區間限制;社員名單與公告全遷(MIG-11)。
+# 是「頭尾兩個學期」不是「要遷的學期清單」—— 中間的學期本來就含在區間裡,
+# 想加學期是把尾端往後挪,不是往裡面塞。換學年只改這兩個標籤。
+SCOPE_FIRST_SEMESTER = "114-1"
+SCOPE_LAST_SEMESTER = "115-1"
+
+
+def _scope_bounds() -> tuple[datetime, datetime]:
+    """遷移範圍的 timestamptz 半開區間 [start, end);日界推導只有 semesters.py 一份。"""
+    return semester_bounds(SCOPE_FIRST_SEMESTER)[0], semester_bounds(SCOPE_LAST_SEMESTER)[1]
+
 
 # ---------------------------------------------------------------------------
 # 對映規則
@@ -55,7 +99,30 @@ TAIPEI = ZoneInfo("Asia/Taipei")
 
 # 不遷移的舊社團(行政單位/測試帳號)
 # 學務處就輔組:帳號「800」與 staff 侍筱鳳同名,此偽社團不遷
-SKIP_CLUBS = {"國際事務處", "testclub", "學務處就輔組"}
+SKIP_CLUBS = {"國際事務處", "testclub", "學務處就輔組", "Test", "testtesttest"}
+
+# 舊 Club_staff 混著測試帳號。不遷 = 一開始就沒有這個登入名
+SKIP_STAFF = {"test", "apitest", "admintest1", "admintest2", "admintest3", "00000"}
+# 看不出是不是正式用途的:遷入但停用,由承辦逐一開通。observer 會拿到 can_view_eval,
+# 上線第一天就能對社團評鑑打分,密碼還印在一次性密碼發放 CSV 裡
+INACTIVE_STAFF = {"viewer", "ntustclub"}
+
+# 承辦名冊(115-1)與舊庫 `Club_clubproperty` 不符的社團,由 `apply_roster_fixes` 補正。
+# 舊庫沒有這三種資訊,推不出來也遷不進來,只能列名單:
+#   - 新社團:舊系統根本沒建過(帳號同時確認過新舊庫皆未使用)
+#   - 復社:舊庫仍掛「停社」但名冊上是現行社團
+#   - 停社:舊庫仍掛性質但名冊上已無此社團
+# 換 dump 重匯後舊值會回來,所以修正必須跟著管線重放,不能只改 DB。
+NEW_CLUBS = [
+    ("121", "資通系學會", ClubAttribute.AUTONOMOUS),
+    ("211", "3D創意研究社", ClubAttribute.ACADEMIC),
+]
+# 復社;舊庫停社時 attribute 一律 NULL,啟用同時要補回性質(否則整個從社團漏斗消失)
+REACTIVATE_CLUBS = {
+    "002": ClubAttribute.AUTONOMOUS,  # 學生議會(名冊寫「學生議會議長」,那是職稱)
+    "402": ClubAttribute.SOCIAL,  # 僑生聯誼社
+}
+DEACTIVATE_CLUBS = {"208", "249", "258", "305", "507", "730", "736", "737"}
 
 # 名稱結尾推導不到時的手動指定;未列出者預設 社團
 KIND_OVERRIDES = {
@@ -80,14 +147,58 @@ STATUS_MAP = {
     6: ActivityStatus.CLOSED,
 }
 
+# 已簽關數 → 下一關(與 APPLY_STAGES 的 advisor/chief/dean 同一組順序)
+PENDING_BY_SIGNED = (
+    ActivityStatus.PENDING_ADVISOR,
+    ActivityStatus.PENDING_CHIEF,
+    ActivityStatus.PENDING_DEAN,
+)
+
+# 舊科目名 → 新目錄。名稱對不到目錄的明細,社團一按儲存就 422
+# (activities._validate_categories 逐項比對名稱),不能原樣搬
+BUDGET_CATEGORY_MAP = {
+    "指導老師/教練費": "指導老師、教練費",  # 只差斜線與頓號
+    "演講費/裁判費": "其他",  # 新目錄沒有這一項;原科目名接進說明才不會遺失
+}
+BUDGET_CATEGORIES = {c["name"] for c in SETTING_DEFAULTS["budget_categories"]}
+
 TYPE_MAP = {
     "course": ActivityType.COURSE_MEETING,
     "conference": ActivityType.COURSE_MEETING,
     "extra": ActivityType.EVENT,
 }
 
-LEADER_TITLES = {"社長", "會長"}
-VICE_TITLES = {"副社長", "副會長"}
+# 舊 Title 是自由文字。只認四個字串會把 239 位正副社長降級成幹部 ——「副社」56 筆、
+# 「系會長」39 筆、還有「第十三屆會長」「財務&副社長」「關懷組組長兼任副社長」…
+# 後果不只名單難看:66 個(社團,學期)沒有負責人 → 幹部證明被擋、公告 Email 寄 0 人。
+# 「副」要先判,因為「副社長」本身也含「社長」
+_VICE_TITLE_RE = re.compile(r"副(?:社長|會長|社|會)")
+_LEADER_TITLE_RE = re.compile(r"(?<!副)(?:社長|會長)")
+# 帶了「社長」但本人不是社長:社長組的組員、社長的秘書、榮譽社長
+_NOT_LEADER_RE = re.compile(r"社長組|秘書|榮譽")
+
+# 舊系統自動附在審核意見後面的結報提醒;新系統由 pdf._APPLY_NOTE 自己產一份,
+# 原文照搬會在申請表的「意見回饋」印兩次
+# 有 9 筆的提醒沒有 ※ 開頭,直接從標題起頭 —— 只認 ※ 會把整段樣板留成審核意見
+_OPINION_BOILERPLATE = re.compile(r"(?:※|活動結報提醒).*", re.S)
+# 舊 status 1=退回申請:意見殘留是退件理由,不是經費認定。11(退回核銷)不算 ——
+# 舊系統的 withdraw 分支只改 status、完全沒碰 Opinions(legacy views.py:2396-2407),
+# 殘留仍是申請期的經費認定
+REJECTED_LEGACY_STATUS = frozenset({1})
+# 只有申請期的殘留才是經費認定。6(已完成)那格早被結案審核覆寫過
+# (legacy views.py:2380 的核銷核准分支寫同一格),裡面混著「活動時間請更正」這類
+# 結案意見,寫進 fund_source 會印在申請表的「意見回饋」上 —— 只留 reason
+FUND_SOURCE_LEGACY_STATUS = frozenset({0, 4, 5, 11})
+FUND_SOURCE_MAX = next(
+    m.max_length
+    for m in ApproveActivityIn.model_fields["fund_source"].metadata
+    if hasattr(m, "max_length")
+)
+
+
+def opinion_residual(raw: str | None) -> str:
+    """去掉自動附的結報提醒,留承辦人真正寫的那句(沒寫就是空字串)。"""
+    return _OPINION_BOILERPLATE.sub("", raw or "").strip()
 
 
 def derive_club_kind(name: str) -> ClubKind:
@@ -138,9 +249,9 @@ class IdMap:
 
     async def load(self, db: AsyncSession) -> None:
         rows = await db.execute(
-            sa.select(
-                LegacyIdMap.legacy_table, LegacyIdMap.legacy_id, LegacyIdMap.new_id
-            ).where(LegacyIdMap.legacy_system == self.system)
+            sa.select(LegacyIdMap.legacy_table, LegacyIdMap.legacy_id, LegacyIdMap.new_id).where(
+                LegacyIdMap.legacy_system == self.system
+            )
         )
         for table, legacy_id, new_id in rows:
             self._map[(table, legacy_id)] = new_id
@@ -194,13 +305,35 @@ async def import_clubs(
         )
     ).all()
 
+    # 自然鍵防護(同 import_staff 的 `existing`):新系統已存在的社團帳號要「認養」進
+    # id-map,不能照建第二份 —— 撞 uq_users_username / uq_clubs_name 會在 flush 當場拋
+    # IntegrityError,整支匯入(社團/成員/活動/簽核/公告)一起回滾,而 `--reset` 清不掉
+    # 沒進 id-map 的列,救不回來。`NEW_CLUBS` 先建、承辦事後才在舊系統補建同一社,
+    # 走的就是這條路。認養後不覆寫既有欄位,與「已 map 的列重跑跳過」同一個語意。
+    by_username = {
+        u.username: (u.club_id, u.id)
+        for u in await db.scalars(sa.select(User).where(User.role == UserRole.CLUB))
+        if u.club_id is not None
+    }
+    club_names = dict(
+        (await db.execute(sa.select(Club.name, Club.id))).all()  # type: ignore[arg-type]
+    )
+
     valid_attrs = {a.value for a in ClubAttribute}
     result: dict[int, tuple[int, int]] = {}
     skipped = 0
+    adopted: list[str] = []
     unmapped_attr: list[str] = []
     for row in rows:
         if row.Name in SKIP_CLUBS:
             skipped += 1
+            continue
+        if ids.get("Club_club", row.id) is None and row.Username in by_username:
+            club_id, user_id = by_username[row.Username]
+            ids.record(db, "Club_club", row.id, "clubs", club_id)
+            ids.record(db, "Club_club:user", row.id, "users", user_id)
+            result[row.id] = (club_id, user_id)
+            adopted.append(row.Username)
             continue
         prop = props.get(row.FK_ClubProperty_id)
         defunct = prop == "停社"
@@ -209,6 +342,14 @@ async def import_clubs(
             unmapped_attr.append(f"{row.Name}({prop})")
         attribute = ClubAttribute(prop) if not defunct and prop in valid_attrs else None
         mapped_club = ids.get("Club_club", row.id)
+        if mapped_club is None and row.Name in club_names:
+            # 同名但帳號不同:可能是同一社換了帳號,也可能真的是兩社。猜錯會把別人的
+            # 活動與成員掛到錯的社團上,停在這裡讓人決定,別讓它撞唯一鍵回滾整支匯入
+            raise RuntimeError(
+                f"舊庫社團「{row.Name}」(帳號 {row.Username})在新系統已存在但帳號不同"
+                f"(clubs.id={club_names[row.Name]});確認是否同一社後,"
+                f"對齊帳號或把它列進 SKIP_CLUBS"
+            )
         if mapped_club is None:
             content = contents.get(row.id)
             club = Club(
@@ -250,9 +391,100 @@ async def import_clubs(
         result[row.id] = (club_id, user_id)
 
     print(f"clubs: {len(result)} 社(含既有)、跳過 {skipped}(行政單位/測試)")
+    if adopted:
+        print(f"  新系統已存在、認養進 id-map:{adopted}")
     if unmapped_attr:
         print(f"  性質未映射 → NULL:{unmapped_attr}")
     return result
+
+
+async def apply_roster_fixes(db: AsyncSession, passwords: list[tuple[str, str, str]]) -> None:
+    """把 NEW_CLUBS / REACTIVATE_CLUBS / DEACTIVATE_CLUBS 套到剛匯入的社團上。
+
+    冪等:三種修正都只在「狀態還不對」時動手,重跑不會二次生效 —— 尤其密碼,復社時
+    才重設,已啟用的重跑不會把發給承辦的密碼洗掉。
+    """
+    accounts = {
+        u.username: u
+        for u in await db.scalars(
+            sa.select(User)
+            .where(User.role == UserRole.CLUB)
+            .where(
+                User.username.in_(
+                    {u for u, _, _ in NEW_CLUBS} | REACTIVATE_CLUBS.keys() | DEACTIVATE_CLUBS
+                )
+            )
+        )
+    }
+    clubs = {
+        u.username: await db.get(Club, u.club_id)
+        for u in accounts.values()
+        if u.club_id is not None
+    }
+    # 名單是以帳號為鍵的修正清單,對不上就是名單錯了(打錯一碼、或接錯庫)。靜默跳過
+    # 只會少印一個號碼,而驗收看的是聚合數 —— 一個該停沒停配一個該啟沒啟剛好互相抵銷
+    missing = sorted((REACTIVATE_CLUBS.keys() | DEACTIVATE_CLUBS) - clubs.keys())
+    if missing:
+        raise RuntimeError(
+            f"名冊修正對不到社團帳號 {missing};"
+            f"確認接的是已跑過 import_clubs 的庫,或修正 REACTIVATE_CLUBS / DEACTIVATE_CLUBS"
+        )
+
+    created = []
+    for username, name, attribute in NEW_CLUBS:
+        if username in accounts:
+            continue  # `--reset` 不會刪這兩社(不在 legacy_id_map),重匯後仍在
+        club = Club(name=name, kind=derive_club_kind(name), attribute=attribute)
+        db.add(club)
+        await db.flush()
+        password = generate_password()
+        db.add(
+            User(
+                role=UserRole.CLUB,
+                username=username,
+                password_hash=hash_password(password),
+                name=name,
+                club_id=club.id,
+                must_change_password=True,
+            )
+        )
+        passwords.append(("club", username, password))
+        created.append(username)
+
+    reactivated = []
+    for username, attribute in REACTIVATE_CLUBS.items():
+        account, club = accounts[username], clubs[username]  # 缺項已在上面擋掉
+        if club.is_active and account.is_active:
+            continue
+        # 屬性只在復社這一刻補(舊庫停社時一律 NULL)。寫在守衛外面會變成永久覆寫:
+        # 承辦事後在行政端改對的性質、以及舊庫解除停社後帶進來的權威值,都會被這個
+        # 常數蓋回去,而且 `reactivated` 是空的、畫面上完全看不出來
+        club.attribute = attribute
+        club.is_active = account.is_active = True
+        # 舊庫停社的社團,`import_clubs` 沒把密碼寫進發放 CSV(只在 not defunct 時 append),
+        # 復社後承辦手上沒有密碼可發 —— 重設一次並補進同一份 CSV
+        password = generate_password()
+        account.password_hash = hash_password(password)
+        account.must_change_password = True
+        # 停社前累積的失敗次數與鎖定不清掉,復社換發的密碼是對的卻照樣登不進去
+        account.failed_login_attempts = 0
+        account.locked_until = None
+        passwords.append(("club", username, password))
+        reactivated.append(username)
+
+    deactivated = []
+    for username in sorted(DEACTIVATE_CLUBS):
+        account, club = accounts[username], clubs[username]  # 缺項已在上面擋掉
+        if not club.is_active and not account.is_active:
+            continue  # 已停用;重跑要印「這次做了什麼」,不是「名單上有幾個」
+        # 只停用,活動/借用/社員等歷史資料全數保留(與行政端按停用同一個行為)
+        club.is_active = account.is_active = False
+        await db.execute(sa.delete(Session).where(Session.user_id == account.id))
+        deactivated.append(username)
+    # 停用帳號的密碼不該還印在交給承辦的發放表上
+    passwords[:] = [p for p in passwords if not (p[0] == "club" and p[1] in DEACTIVATE_CLUBS)]
+
+    print(f"名冊修正:新建 {created or '—'}、復社 {reactivated or '—'}、停社 {deactivated or '—'}")
 
 
 async def import_staff(
@@ -270,10 +502,14 @@ async def import_staff(
     existing = set((await db.scalars(sa.select(User.username))).all())
     result: dict[int, int] = {}
     skipped: list[str] = []
+    test_accounts: list[str] = []
     for row in rows:
         mapped = ids.get("Club_staff", row.id)
         if mapped is not None:
             result[row.id] = int(mapped)
+            continue
+        if row.Username in SKIP_STAFF:
+            test_accounts.append(row.Username)
             continue
         if row.Username in existing:
             skipped.append(row.Username)
@@ -288,6 +524,7 @@ async def import_staff(
             email=row.Email or None,
             can_view_eval=is_viewer,  # 舊 observer=評鑑委員
             must_change_password=True,
+            is_active=row.Username not in INACTIVE_STAFF,
         )
         db.add(user)
         await db.flush()
@@ -295,7 +532,12 @@ async def import_staff(
         passwords.append((user.role.value, row.Username, password))
         existing.add(row.Username)
         result[row.id] = user.id
-    print(f"staff: {len(result)} 帳號;帳號名衝突跳過 {skipped or '無'}")
+    inactive = sorted(INACTIVE_STAFF & {r.Username for r in rows})
+    print(
+        f"staff: {len(result)} 帳號;帳號名衝突跳過 {skipped or '無'}"
+        f";測試帳號不遷 {test_accounts or '無'}"
+        f";遷入但停用(待承辦開通){inactive or '無'}"
+    )
     return result
 
 
@@ -303,11 +545,12 @@ async def import_teachers(legacy, db: AsyncSession, clubs: dict[int, tuple[int, 
     """指導老師:校內(school)/校外(extra)各取最新一位寫入 clubs 欄位。
 
     非 id map 型:直接覆寫社團欄位(重跑結果相同,仍 idempotent)。
+    舊系統的 `Phone` **不讀**:新系統不記錄指導老師電話(2026-08-27 拍板)。
     """
     rows = (
         await legacy.execute(
             sa.text(
-                'SELECT id, "Name", "Position", "Email", "Phone", "Identity",'
+                'SELECT id, "Name", "Position", "Email", "Identity",'
                 ' "FK_Club_id" FROM "Club_teacher" ORDER BY id'
             )
         )
@@ -326,12 +569,10 @@ async def import_teachers(legacy, db: AsyncSession, clubs: dict[int, tuple[int, 
             club.advisor_name = row.Name
             club.advisor_dept = row.Position or None
             club.advisor_email = row.Email or None
-            club.advisor_ext = row.Phone or None
         else:
             club.advisor_out_name = row.Name
             club.advisor_out_dept = row.Position or None
             club.advisor_out_email = row.Email or None
-            club.advisor_out_phone = row.Phone or None
         count += 1
     print(f"teachers: 寫入 {count} 位(校內/校外各取最新)")
 
@@ -348,27 +589,49 @@ def staff_line(item: str | None, owner: str | None) -> str:
 
 
 def member_kind(identity: str | None, title: str | None) -> tuple[MemberKind, str | None]:
-    """舊 Identity+Title → 新標準身份;職稱各身份皆保留(幹部缺職稱補「幹部」)。"""
+    """舊 Identity+Title → 新標準身份;幹部與社員保留職稱(幹部缺職稱補「幹部」)。
+
+    **正副社長/會長一律不留職稱**(2026-08-27 拍板,D-27):身份本身就是職稱。
+    非標準寫法只用來認人,原文一律捨棄 —— 連「第十三屆會長」的屆數、
+    「副社長&文書」的兼任都不留,後端 `_validate_member` 是同一條規則。
+    """
     t = (title or "").strip()
-    if t in LEADER_TITLES:
-        return MemberKind.PRESIDENT, None
-    if t in VICE_TITLES:
-        return MemberKind.VICE_PRESIDENT, None
+    if not _NOT_LEADER_RE.search(t):
+        if _VICE_TITLE_RE.search(t):
+            return MemberKind.VICE_PRESIDENT, None
+        if _LEADER_TITLE_RE.search(t):
+            return MemberKind.PRESIDENT, None
     if identity == "幹部":
         return MemberKind.OFFICER, (t or "幹部")
     return MemberKind.MEMBER, (t if t and t != "社員" else None)
 
 
+# 身份高低:兩列衝突時保留身份較高的那列
+_KIND_RANK = {
+    MemberKind.PRESIDENT: 3,
+    MemberKind.VICE_PRESIDENT: 2,
+    MemberKind.OFFICER: 1,
+    MemberKind.MEMBER: 0,
+}
+
+
+def _kind_rank(row) -> int:
+    return _KIND_RANK[member_kind(row.Identity, row.Title)[0]]
+
+
 async def import_members(legacy, db: AsyncSession, ids: IdMap, clubs) -> None:
+    """社員名單。舊系統的 `Phone` **不讀**:新系統不記錄社員電話(2026-08-27 拍板)。"""
     rows = (
         await legacy.execute(
             sa.text(
-                'SELECT id, "Name", "StudentID", "Phone", "Title", "Date", "Semester",'
+                'SELECT id, "Name", "StudentID", "Title", "Date", "Semester",'
                 ' "FK_Club_id", "Identity" FROM "Club_student" ORDER BY id'
             )
         )
     ).all()
-    # 同(社團,學期,學號)取 id 最大者(最新);UNIQUE(club_id, student_id, semester)
+    # 同(社團,學期,學號)只能留一列(UNIQUE(club_id, student_id, semester))。
+    # 取「身份較高」的那列,同高再取 id 大的 —— 舊表沒有更新時間,「id 最大=最新」
+    # 只是猜測,而 38 組的勝出列剛好是社員、被丟掉的那列才是社長/副社長/財務長
     dedup: dict[tuple[int, str, str], object] = {}
     bad_semester = foreign = 0
     for row in rows:
@@ -379,11 +642,28 @@ async def import_members(legacy, db: AsyncSession, ids: IdMap, clubs) -> None:
         if semester is None or not row.StudentID:
             bad_semester += 1
             continue
-        dedup[(row.FK_Club_id, semester, row.StudentID.strip())] = row
+        key = (row.FK_Club_id, semester, row.StudentID.strip())
+        prev = dedup.get(key)
+        if prev is None or _kind_rank(row) >= _kind_rank(prev):
+            dedup[key] = row
 
-    created = 0
+    # idempotent 判定不能只看舊列 id:唯一鍵是自然鍵。舊系統會對同一個
+    # (社團,學期,學號)重複新增列,換一份較新的 dump 重跑就會撞唯一鍵,
+    # 而整支腳本只有一次 commit —— 活動與公告會跟著一起回滾
+    existing_keys = {
+        (club_id, student_id, semester): member_id
+        for member_id, club_id, student_id, semester in await db.execute(
+            sa.select(ClubMember.id, ClubMember.club_id, ClubMember.student_id, ClubMember.semester)
+        )
+    }
+    created = remapped = 0
     for (legacy_club_id, semester, student_id), row in dedup.items():
         if ids.get("Club_student", row.id) is not None:
+            continue
+        seen = existing_keys.get((clubs[legacy_club_id][0], student_id, semester))
+        if seen is not None:
+            ids.record(db, "Club_student", row.id, "club_members", seen)
+            remapped += 1
             continue
         kind, title = member_kind(row.Identity, row.Title)
         joined = row.Date  # 入社日期 → created_at(列表的「入社時間」)與 updated_at
@@ -394,7 +674,6 @@ async def import_members(legacy, db: AsyncSession, ids: IdMap, clubs) -> None:
             student_id=student_id,
             kind=kind,
             title=title,
-            phone=(row.Phone or "").strip() or None,
             semester=semester,
             **({"created_at": stamp, "updated_at": stamp} if stamp else {}),
         )
@@ -417,21 +696,27 @@ async def import_members(legacy, db: AsyncSession, ids: IdMap, clubs) -> None:
     dropped = len(rows) - len(dedup) - bad_semester - foreign
     print(
         f"members: 新增 {created}(重複學期學號覆蓋 {dropped}、"
-        f"學期不合格式 {bad_semester}、不遷社團 {foreign})"
+        f"學期不合格式 {bad_semester}、不遷社團 {foreign}"
+        + (f"、新 dump 的重複列接回既有成員 {remapped}" if remapped else "")
+        + ")"
     )
 
 
 async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None:
+    scope_start, scope_end = _scope_bounds()
     acts = (
         await legacy.execute(
             sa.text(
                 'SELECT id, "Name", "Type", "ExpectedMemberNumber", "ActuallyMemberNumber",'
                 ' "ExpectedNotMemberNumber", "ActuallyNotMemberNumber", "StartTime", "EndTime",'
                 ' "ActuallyStartTime", "ActuallyEndTime", "Location", "Review", "SetupTime",'
-                ' "FinishTime", status, "FK_Club_id" FROM "Club_activity" ORDER BY id'
-            )
+                ' "FinishTime", status, "FK_Club_id" FROM "Club_activity"'
+                ' WHERE "StartTime" >= :start AND "StartTime" < :end ORDER BY id'
+            ),
+            {"start": scope_start, "end": scope_end},
         )
     ).all()
+    total = await legacy.scalar(sa.text('SELECT count(*) FROM "Club_activity"'))
     funds_rows = (
         await legacy.execute(
             sa.text(
@@ -453,6 +738,18 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
             sa.text('SELECT "FK_Activity_id" AS aid, key, value FROM "Club_activitymeta"')
         )
     ).all()
+    # 舊 status 只說「還在審」,說不出停在哪一關 —— 關卡看已簽的列數
+    signed = {
+        r.aid: r.n
+        for r in await legacy.execute(
+            sa.text(
+                'SELECT au."FK_Activity_id" AS aid, count(*) AS n'
+                ' FROM "Club_auditactivityrecord" r'
+                ' JOIN "Club_auditactivity" au ON au.id = r."FK_AuditActivity_id"'
+                ' GROUP BY au."FK_Activity_id"'
+            )
+        )
+    }
 
     funds: dict[int, list] = {}
     for r in funds_rows:
@@ -467,6 +764,9 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
         metas.setdefault(r.aid, {})[r.key] = r.value == "True"
 
     created = skipped = 0
+    truncated: list[int] = []
+    no_duration: list[int] = []
+    off_catalog: Counter[str] = Counter()
     for a in acts:
         if a.FK_Club_id not in clubs or ids.get("Club_activity", a.id) is not None:
             skipped += 1
@@ -476,62 +776,101 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
         if status is None:  # 未知狀態(不在舊 choices):跳過並記數
             skipped += 1
             continue
+        if status is ActivityStatus.PENDING_ADVISOR:
+            # 承辦人簽過了才會停在下一關;只看 status 會叫他把同一件再簽一次
+            status = PENDING_BY_SIGNED[min(signed.get(a.id, 0), len(PENDING_BY_SIGNED) - 1)]
+        # Review 是申請表的「活動描述」;超過 schema 上限就截斷,否則社團一按儲存就 422
+        content = (a.Review or "").strip()
+        if len(content) > CONTENT_MAX:
+            truncated.append(a.id)
+            content = content[:CONTENT_MAX]
         start_d = local_date(a.StartTime) or local_date(a.SetupTime) or date(1970, 1, 1)
         end_d = local_date(a.EndTime) or start_d
         if end_d < start_d:
             end_d = start_d
+        start_t, end_t = local_time(a.StartTime), local_time(a.EndTime)
+        if end_d == start_d and start_t is not None and end_t is not None and end_t <= start_t:
+            # 34 筆的結束時刻等於開始時刻 —— 舊表單沒擋,實際上是「沒記時長」。
+            # 照搬會過不了 end_time > start_time 的檢核,退回件連暫存都存不了
+            no_duration.append(a.id)
+            end_t = None
         activity = Activity(
             club_id=club_id,
             name=(a.Name or "").strip() or "(未命名)",
-            content="",
+            content=content,
+            # 舊系統結案送出時把申請地點覆寫成實際地點(legacy views.py:1163),所以已結案
+            # 的 956 件這裡拿到的其實是實際地點,申請時填的原值舊庫已不存在、無從還原
             location=(a.Location or "").strip() or "(未填)",
             type=TYPE_MAP.get(a.Type, ActivityType.COURSE_MEETING),
             date=start_d,
             end_date=end_d,
-            start_time=local_time(a.StartTime),
-            end_time=local_time(a.EndTime),
+            start_time=start_t,
+            end_time=end_t,
             # 舊制即為 社員/非社員 人數,語彙已統一
             participants_in=a.ExpectedMemberNumber or 0,
             participants_out=a.ExpectedNotMemberNumber or 0,
             # 送審必填項在遷移件也要有值,否則退回件連暫存都會被 422 擋住
             staff_text="\n".join(staffs.get(a.id, [])) or "(未填)",
             status=status,
+            # 退回核銷 = 已在期限內送過結案,補件往返不該再被鎖(同 close_reject 的行為)
+            close_unlocked=(a.status == 11),
             created_by=user_id,
-            **({"created_at": local_dt(a.SetupTime)} if a.SetupTime else {}),
+            # 舊系統沒有送件時間,SetupTime 是建檔時間 —— 送件時間一律回填成它(D-29):
+            # 等價於改版前的顯示值,不製造假資料。遷入的活動一律送出過(STATUS_MAP 無草稿)
+            **(
+                {"created_at": local_dt(a.SetupTime), "submitted_at": local_dt(a.SetupTime)}
+                if a.SetupTime
+                else {}
+            ),
         )
         db.add(activity)
         await db.flush()
         ids.record(db, "Club_activity", a.id, "activities", activity.id)
+        # SetupTime 為 NULL 時 created_at 走 DB 預設(匯入當下);送件時間比照 —— 留 NULL
+        # 的話行政端整欄 `—`,待審佇列的排序也會失準(alembic a3e91f6b28c4 同一條規則)
+        if activity.submitted_at is None:
+            activity.submitted_at = activity.created_at
 
         for f in funds.get(a.id, []):
+            raw_cat = (f.Name or "").strip() or "其他"
+            category = BUDGET_CATEGORY_MAP.get(raw_cat, raw_cat)
+            desc = (f.Content or "").strip()
+            if category == "其他" and raw_cat != category:
+                # 「其他」的提示本來就是「請在下方註明細項內容」,原科目名放最前面
+                desc = f"{raw_cat}:{desc}" if desc else raw_cat
+            if category not in BUDGET_CATEGORIES:
+                off_catalog[raw_cat] += 1
             db.add(
                 ActivityBudgetItem(
                     activity_id=activity.id,
-                    category=(f.Name or "").strip() or "其他",
-                    description=(f.Content or "").strip(),
+                    category=category,
+                    description=desc,
                     self_fund=f.MatchingFund or 0,
                     requested_subsidy=f.Subsidy or 0,
                     approved_subsidy=f.ApprovedGrant,
                 )
             )
 
-        # 結案(核銷中/已完成):舊制僅有 實際人數/時間 + 單一檢討文字 + 繳交旗標,
-        # 寬鬆匯入 — 缺欄留空
-        if a.status in (5, 6):
+        # 結案(核銷中/已完成/退回核銷):舊制僅有 實際人數/時間 + 繳交旗標,寬鬆匯入 —
+        # 缺欄留空。11(退回核銷)舊系統只改 status、不清實際人數(legacy views.py:2396),
+        # 不建 report 會讓社團打開結案表單是一張白紙,已送出的資料整份消失
+        if a.status in (5, 6, 11):
             meta = metas.get(a.id, {})
             db.add(
                 ActivityReport(
                     activity_id=activity.id,
-                    member_count=a.ActuallyMemberNumber or a.ExpectedMemberNumber or 0,
-                    non_member_count=a.ActuallyNotMemberNumber or a.ExpectedNotMemberNumber or 0,
+                    # 舊結案表單把空白明確存成 0(legacy views.py:976-982),所以 0 是社團
+                    # 真的回報的實際人數。用 `or` 串接會把它當沒填、拿申請期的預估頂替
+                    member_count=_actual(a.ActuallyMemberNumber),
+                    non_member_count=_actual(a.ActuallyNotMemberNumber),
                     actual_start=local_time(a.ActuallyStartTime)
                     or local_time(a.StartTime)
                     or time(0, 0),
-                    actual_end=local_time(a.ActuallyEndTime)
-                    or local_time(a.EndTime)
-                    or time(0, 0),
+                    actual_end=local_time(a.ActuallyEndTime) or local_time(a.EndTime) or time(0, 0),
                     actual_location=(a.Location or "").strip() or "(未填)",
-                    highlights=(a.Review or "").strip(),
+                    # 舊制沒有成果三欄(Review 是申請期的活動描述,已寫進 Activity.content),
+                    # 留空待 text_fields.py 的人工轉錄 CSV 補
+                    highlights="",
                     goals="",
                     others="",
                     review_meeting=False,
@@ -539,19 +878,219 @@ async def import_activities(legacy, db: AsyncSession, ids: IdMap, clubs) -> None
                     submitted_at=local_dt(a.FinishTime)
                     or local_dt(a.EndTime)
                     or datetime.now(TAIPEI),
-                    photos_confirmed=meta.get("photo", True),
-                    report_confirmed=meta.get("performance_report", True),
-                    reflections_confirmed=meta.get("experience_feedback", True),
+                    # 缺 meta = 沒有「已繳交」的證據。預設 True 是白送競賽行政分,
+                    # 模型註解本來就寫「未確認之項目評鑑以 0 分計」
+                    photos_confirmed=meta.get("photo", False),
+                    report_confirmed=meta.get("performance_report", False),
+                    reflections_confirmed=meta.get("experience_feedback", False),
                 )
             )
         created += 1
         if created % 500 == 0:
             await db.flush()
             print(f"  activities … {created}/{len(acts)}")
-    print(f"activities: 新增 {created}、跳過 {skipped}(已遷/不遷社團/未知狀態)")
+    if off_catalog:
+        # 靜靜 fallback 等於把 422 留給社團自己撞,名單要印出來讓承辦決定併科目還是補目錄
+        listed = "、".join(f"{k}×{n}" for k, n in off_catalog.most_common())
+        print(f"  經費科目不在目錄裡(社團儲存會 422):{listed}")
+    if no_duration:
+        print(
+            f"  結束時刻等於開始時刻已改為留空 {len(no_duration)} 筆(舊 id:"
+            f"{'、'.join(map(str, no_duration[:20]))}{' …' if len(no_duration) > 20 else ''})"
+        )
+    if truncated:
+        print(
+            f"  活動內容超過 {CONTENT_MAX} 字已截斷 {len(truncated)} 筆(舊 id:"
+            f"{'、'.join(map(str, truncated[:20]))}{' …' if len(truncated) > 20 else ''});"
+            "全文仍在舊庫 Club_activity.Review"
+        )
+    print(
+        f"activities: 新增 {created}、跳過 {skipped}(已遷/不遷社團/未知狀態)"
+        f";範圍外未讀取 {(total or 0) - len(acts)}"
+        f"({SCOPE_FIRST_SEMESTER}~{SCOPE_LAST_SEMESTER} 之外)"
+    )
+
+
+async def import_approvals(legacy, db: AsyncSession, ids: IdMap) -> None:
+    """舊系統的簽核者 → approval_records:申請表要印 初核/複核/決行 三位的姓名。
+
+    舊 `Club_auditactivityrecord` 只有「誰、什麼時候簽的」,**沒有決議欄** —— 退回不入
+    這張表,所以每一列都是核准,同一活動的第 1/2/3 列即 承辦人/組長/學務長 三關
+    (`AuditActivity.AllowCode` 就是這張表的列數)。關卡由列序決定,不是由狀態推導。
+
+    `AuditActivity.Opinions` 先**去掉舊系統自動附的「※…結報提醒」**再處理:那段樣板
+    佔了 1,335 / 1,531 筆的全部內容,而新系統的申請表由 `pdf._APPLY_NOTE` 自己產一份,
+    原文照搬只會在「意見回饋」那格印兩次。剩下的殘留才是承辦人真正寫的那句:
+
+    - 退回件(舊 status 1/11)的殘留是退件理由 → 只寫 `reason`
+    - 其餘的殘留是經費認定(「本案由三校文化基金會補助經費支應一萬元。」)
+      → 同時寫 `activities.fund_source`,申請表的「意見回饋」才印得出來
+    - 殘留超過 `ApproveActivityIn.fund_source` 的上限(100 字)就只寫 `reason`:
+      塞進去等於承辦一開審核視窗按儲存就 422,而且自己改不掉
+    """
+    scope_start, scope_end = _scope_bounds()
+    rows = (
+        await legacy.execute(
+            sa.text(
+                'SELECT r.id, r."Staff_id" AS staff_id, r."AuditTime" AS audit_time,'
+                ' au."FK_Activity_id" AS aid, au."Opinions" AS opinions, a.status'
+                ' FROM "Club_auditactivityrecord" r'
+                ' JOIN "Club_auditactivity" au ON au.id = r."FK_AuditActivity_id"'
+                ' JOIN "Club_activity" a ON a.id = au."FK_Activity_id"'
+                ' WHERE a."StartTime" >= :start AND a."StartTime" < :end'
+                ' ORDER BY au."FK_Activity_id", r.id'
+            ),
+            {"start": scope_start, "end": scope_end},
+        )
+    ).all()
+
+    # 先算好每一列在該活動裡的關卡序:重跑時已遷入的列會被跳過,
+    # 邊跑邊數會讓補跑的那幾列關卡整個位移
+    stage_of: dict[int, int] = {}
+    counter: dict[int, int] = {}
+    for r in rows:
+        stage_of[r.id] = counter.get(r.aid, 0)
+        counter[r.aid] = stage_of[r.id] + 1
+
+    created = no_activity = no_actor = over_stages = 0
+    notes = sources = too_long = 0
+    for r in rows:
+        if ids.get("Club_auditactivityrecord", r.id) is not None:
+            continue
+        new_aid = ids.get("Club_activity", r.aid)
+        if new_aid is None:
+            no_activity += 1  # 不遷的社團或未知狀態
+            continue
+        actor = ids.get("Club_staff", r.staff_id)
+        if actor is None:
+            no_actor += 1  # 帳號名衝突而未遷入的 staff;actor_id 非空,補不出來
+            continue
+        nth = stage_of[r.id]
+        if nth >= len(APPLY_STAGES):
+            over_stages += 1  # 舊資料最多三關,超過的不知道該掛哪一格
+            continue
+        # Opinions 每一關都被覆寫(legacy views.py:2228/2266/2381),留下的是最後一位
+        # 簽核者寫的。舊庫只有一格文字還原不出各關,掛最後一列比掛承辦人接近事實
+        last = min(counter[r.aid], len(APPLY_STAGES)) - 1
+        note = opinion_residual(r.opinions) if nth == last else ""
+        if note and r.status in FUND_SOURCE_LEGACY_STATUS:
+            # 申請期的殘留是經費認定,申請表「意見回饋」那格讀的就是 fund_source
+            if len(note) <= FUND_SOURCE_MAX:
+                await db.execute(
+                    sa.update(Activity).where(Activity.id == int(new_aid)).values(fund_source=note)
+                )
+                sources += 1
+            else:
+                too_long += 1
+        record = ApprovalRecord(
+            subject_type=ApprovalSubject.ACTIVITY,
+            subject_id=int(new_aid),
+            stage=APPLY_STAGES[nth],
+            decision=ApprovalDecision.APPROVE,
+            actor_id=int(actor),
+            # 退件理由歸 REJECT 列(見 import_rejections),掛在核准列上是張冠李戴
+            reason=None if r.status in REJECTED_LEGACY_STATUS else (note or None),
+            **({"created_at": local_dt(r.audit_time)} if r.audit_time else {}),
+        )
+        db.add(record)
+        await db.flush()
+        ids.record(db, "Club_auditactivityrecord", r.id, "approval_records", record.id)
+        created += 1
+        notes += bool(note)
+    print(
+        f"approvals: 新增 {created} 筆簽核(去樣板後仍有審核意見 {notes} 筆,"
+        f"其中 {sources} 筆寫入 fund_source、{too_long} 筆超過 {FUND_SOURCE_MAX} 字只留 reason)"
+        f";活動未遷 {no_activity}、簽核者未遷 {no_actor}、超過三關 {over_stages}"
+    )
+
+
+MIGRATION_ACTOR_USERNAME = "_migration"
+NO_REASON_GIVEN = "未提供更多說明"
+
+
+async def migration_actor(db: AsyncSession) -> int:
+    """簽核紀錄的 actor_id 非空,但舊系統的退件沒有記是誰退的。
+
+    用一個不能登入的帳號承接:`password_hash=None` + `is_active=False`,列在稽核
+    軌跡上一眼看得出「這筆是遷移補的」,而不是冒用某位承辦人的名字。
+    """
+    user = await db.scalar(sa.select(User).where(User.username == MIGRATION_ACTOR_USERNAME))
+    if user is None:
+        user = User(
+            role=UserRole.ADMIN,
+            username=MIGRATION_ACTOR_USERNAME,
+            password_hash=None,
+            name="系統遷移",
+            permissions=[],
+            must_change_password=False,
+            is_active=False,
+        )
+        db.add(user)
+        await db.flush()
+    return user.id
+
+
+async def import_rejections(legacy, db: AsyncSession, ids: IdMap) -> None:
+    """退回申請 → approval_records(decision=REJECT)。
+
+    舊系統退回不寫 `Club_auditactivityrecord`(legacy views.py:2251-2268 只改 status
+    與 Opinions),理由只剩 `AuditActivity.Opinions` 一格。不補這一段的話,60 件退回
+    活動在新系統一筆退件紀錄都沒有 —— 社團看到「已退回」卻讀不到任何理由,是舊系統
+    看得到、新系統看不到的功能倒退。
+    """
+    scope_start, scope_end = _scope_bounds()
+    rows = (
+        await legacy.execute(
+            sa.text(
+                'SELECT a.id AS aid, au."Opinions" AS opinions,'
+                ' (SELECT count(*) FROM "Club_auditactivityrecord" r'
+                '  WHERE r."FK_AuditActivity_id" = au.id) AS signed'
+                ' FROM "Club_activity" a'
+                ' LEFT JOIN "Club_auditactivity" au ON au."FK_Activity_id" = a.id'
+                ' WHERE a."StartTime" >= :start AND a."StartTime" < :end AND a.status = 1'
+                " ORDER BY a.id"
+            ),
+            {"start": scope_start, "end": scope_end},
+        )
+    ).all()
+    if not rows:
+        return
+    actor_id = await migration_actor(db)
+    created = with_reason = no_activity = 0
+    for r in rows:
+        new_aid = ids.get("Club_activity", r.aid)
+        if new_aid is None:
+            no_activity += 1
+            continue
+        if ids.get("Club_activity:reject", r.aid) is not None:
+            continue  # 重跑不要越補越多
+        reason = opinion_residual(r.opinions)
+        with_reason += bool(reason)
+        record = ApprovalRecord(
+            subject_type=ApprovalSubject.ACTIVITY,
+            subject_id=int(new_aid),
+            # 退回發生在下一個還沒簽的關卡;沒人簽過就是承辦人那關
+            stage=APPLY_STAGES[min(r.signed or 0, len(APPLY_STAGES) - 1)],
+            decision=ApprovalDecision.REJECT,
+            actor_id=actor_id,
+            reason=reason or NO_REASON_GIVEN,
+        )
+        db.add(record)
+        await db.flush()
+        ids.record(db, "Club_activity:reject", r.aid, "approval_records", record.id)
+        created += 1
+    print(
+        f"rejections: 補 {created} 筆退件紀錄(其中 {with_reason} 筆有舊系統留下的理由,"
+        f"其餘填「{NO_REASON_GIVEN}」);活動未遷 {no_activity}"
+        f"\n  actor 是不能登入的 {MIGRATION_ACTOR_USERNAME}(系統遷移)帳號"
+    )
 
 
 async def import_news(legacy, db: AsyncSession, ids: IdMap) -> None:
+    # 公告不套 SCOPE_*:`create_date` 是 Django auto_now_add(貼出來的時刻),
+    # 不是公告的有效期間。舊庫 8 則全在 2017–2023,套學期軸會 100% 濾光,
+    # 而其中「照片請直接上傳」「教育優先區活動須上傳系統」這幾則今天仍然有效。
+    # 8 列也不是量的問題(活動是 14,239→1,495)—— 範圍是為了活動的量而定的。
     rows = (
         await legacy.execute(
             sa.text('SELECT id, title, url, create_date FROM "Club_news" ORDER BY id')
@@ -584,6 +1123,9 @@ async def import_news(legacy, db: AsyncSession, ids: IdMap) -> None:
 # ---------------------------------------------------------------------------
 # id-map 的舊表名 → 要清掉的新表(reset 用;順序即刪除順序,子表在前)
 _RESET_ORDER = (
+    ("Club_auditactivityrecord", ApprovalRecord),
+    # 舊系統的退回不是一列資料,對照鍵只能掛在活動上 —— 進 id-map 才清得掉
+    ("Club_activity:reject", ApprovalRecord),
     ("Club_news", Announcement),
     ("Club_activity", Activity),
     ("Club_student", ClubMember),
@@ -598,8 +1140,26 @@ async def reset(db: AsyncSession) -> None:
     (decisions.md MIG-04)。
 
     只刪自己 id-map 記過的列 —— 新系統上線後自己產生的社團、活動與公告不受影響。
-    先跑 `cc_import.py --reset`(借用單掛在活動與社團上),再跑這支。
+    先跑 `media_import.py --reset`(照片)與 `cc_import.py --reset`(借用單掛在活動
+    與社團上),再跑這支。
     """
+    # 收尾那一刀是「刪光 system=cms 的所有 id-map」,media_import 的照片對照也在裡面。
+    # 先跑這支的話,4,000 列 files 與盤上 4.9 GB 就再也沒有腳本找得到 —— 擋下來。
+    photos = await db.scalar(
+        sa.select(sa.func.count())
+        .select_from(LegacyIdMap)
+        .where(
+            LegacyIdMap.legacy_system == LegacySystem.CMS,
+            LegacyIdMap.legacy_table == "Club_activityimages",
+        )
+    )
+    if photos:
+        sys.exit(
+            f"拒絕執行:legacy_id_map 還有 {photos} 列照片對照。\n"
+            "本腳本的 reset 會刪光 system=cms 的所有對照,照片就變成清不掉的孤兒。\n"
+            "請先跑:uv run python ../migration/media_import.py --reset"
+        )
+
     ids = IdMap()
     await ids.load(db)
     for table, model in _RESET_ORDER:
@@ -612,9 +1172,37 @@ async def reset(db: AsyncSession) -> None:
             continue
         await db.execute(sa.delete(model).where(model.id.in_(target)))
         print(f"  清除 {table}: {len(target)} 列")
+    await db.execute(sa.delete(User).where(User.username == MIGRATION_ACTOR_USERNAME))
     await db.execute(sa.delete(LegacyIdMap).where(LegacyIdMap.legacy_system == LegacySystem.CMS))
     await db.commit()
     print("已清除 CMS 匯入結果;指導老師欄位不還原(非 id-map 型,重跑會覆寫)")
+
+
+def write_passwords(passwords: list[tuple[str, str, str]], fixes_only: bool) -> None:
+    """一次性密碼發放 CSV。
+
+    明碼只存在於這一份檔案裡(庫裡是 argon2 hash),覆寫掉就只能逐社重設密碼。名單改
+    一次就重跑一次是常態,固定檔名同一天的第二次會靜默截掉第一次 —— 而這支跑完只要
+    一秒出頭,實測連續兩次會落在同一秒,帶時間戳也擋不住。用 `mkstemp` 由 OS 保證不撞
+    (順帶把明碼檔開成 0600),不用 `"x"`:此時交易已 commit,這裡拋例外等於帳號建好了、
+    明碼沒了,比撞名更糟。
+    """
+    if not passwords:
+        return
+    out_dir = MIGRATION_DIR / "out"
+    out_dir.mkdir(exist_ok=True)
+    stamp = datetime.now(TAIPEI).strftime("%Y-%m-%d_%H%M%S")
+    fd, name = tempfile.mkstemp(
+        prefix=f"one_time_passwords_{stamp}{'_fixes' if fixes_only else ''}_",
+        suffix=".csv",
+        dir=out_dir,
+    )
+    out = Path(name)
+    with os.fdopen(fd, "w", newline="") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(["role", "username", "one_time_password"])
+        writer.writerows(passwords)
+    print(f"\n一次性密碼 {len(passwords)} 筆 → {out}(交承辦發放後銷毀;首登強制改密)")
 
 
 async def main() -> None:
@@ -623,6 +1211,20 @@ async def main() -> None:
     legacy_engine = create_async_engine(legacy_url)
 
     passwords: list[tuple[str, str, str]] = []
+    fixes_only = "--fixes-only" in sys.argv
+    if fixes_only and "--reset" in sys.argv:
+        # 兩個旗標的意思相反,靜默只做其中一件會讓人以為 reset 過了
+        sys.exit("拒絕執行:--reset 與 --fixes-only 不能一起用")
+    if fixes_only:
+        # 名冊修正單獨重放(不碰舊庫)。完整重匯會覆寫指導老師欄位(非 id-map 型),
+        # 已在用的庫不該為了套修正吃那一刀
+        async with async_session_factory() as db:
+            await apply_roster_fixes(db, passwords)
+            await db.commit()
+        await legacy_engine.dispose()
+        write_passwords(passwords, fixes_only)
+        print("完成。")
+        return
     async with async_session_factory() as db, legacy_engine.connect() as legacy:
         if "--reset" in sys.argv:
             await reset(db)
@@ -631,24 +1233,19 @@ async def main() -> None:
         await ids.load(db)
 
         clubs = await import_clubs(legacy, db, ids, passwords)
+        await apply_roster_fixes(db, passwords)
         await import_staff(legacy, db, ids, passwords)
         await import_teachers(legacy, db, clubs)
         await import_members(legacy, db, ids, clubs)
         await import_activities(legacy, db, ids, clubs)
+        await import_approvals(legacy, db, ids)
+        await import_rejections(legacy, db, ids)
         await import_news(legacy, db, ids)
         await db.commit()
 
     await legacy_engine.dispose()
 
-    if passwords:
-        out_dir = MIGRATION_DIR / "out"
-        out_dir.mkdir(exist_ok=True)
-        out = out_dir / f"one_time_passwords_{date.today().isoformat()}.csv"
-        with out.open("w", newline="") as fh:
-            writer = csv.writer(fh)
-            writer.writerow(["role", "username", "one_time_password"])
-            writer.writerows(passwords)
-        print(f"\n一次性密碼 {len(passwords)} 筆 → {out}(交承辦發放後銷毀;首登強制改密)")
+    write_passwords(passwords, fixes_only)
     print("完成。")
 
 

@@ -35,7 +35,7 @@ from app.models.enums import (
 from app.schemas.admin import AdminEquipmentLoanOut, AdminVenueBookingOut, RejectIn
 from app.schemas.bookings import ManualEquipmentLoanIn, ManualVenueBookingIn
 from app.schemas.common import ApiResponse
-from app.services import audit, notify
+from app.services import approvals, audit, notify
 from app.services import booking_service as svc
 from app.services.settings_service import get_setting
 
@@ -108,8 +108,10 @@ async def list_venue_bookings(
     sort: str | None = None,
     status: Annotated[list[BookingStatus] | None, Query()] = None,
     club_id: int | None = Query(None),
+    active: bool | None = None,
 ) -> ApiResponse[list[AdminVenueBookingOut]]:
-    # status 可重複帶多值:社團總覽要的是「未被駁回的那幾種」,由後端篩才不會整份歷史抓回前端
+    # status 可重複帶多值(取聯集);active=進行中(與社團端 /club/venue-bookings 同一條界線),
+    # 社團總覽要的是這個 —— 只篩 status 會把日期已過的已核准單一起算成進行中
     query = (
         sa.select(VenueBooking, Club.name, Venue.name, Activity.name)
         .outerjoin(Club, VenueBooking.club_id == Club.id)  # NULL club=行政手動借用
@@ -120,6 +122,9 @@ async def list_venue_bookings(
         query = query.where(VenueBooking.status.in_(status))
     if club_id:
         query = query.where(VenueBooking.club_id == club_id)
+    if active is not None:
+        ongoing = svc.venue_booking_ongoing_expr()
+        query = query.where(ongoing if active else sa.not_(ongoing))
 
     if sort:
         query = query.order_by(*parse_sort(sort, _VENUE_SORTABLE, None), VenueBooking.id)
@@ -138,6 +143,7 @@ async def list_venue_bookings(
         out.venue_name = venue_name
         out.activity_name = activity_name
         data.append(out)
+    await approvals.attach_decisions(db, ApprovalSubject.VENUE_BOOKING, data, with_actor=True)
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 
@@ -257,8 +263,9 @@ async def list_equipment_loans(
     sort: str | None = None,
     status: Annotated[list[LoanStatusFilter] | None, Query()] = None,
     club_id: int | None = Query(None),
+    active: bool | None = None,
 ) -> ApiResponse[list[AdminEquipmentLoanOut]]:
-    """status 可重複帶多值(取聯集);
+    """status 可重複帶多值(取聯集);active=進行中(與社團端 /club/equipment-loans 同一條界線);
     overdue=checked_out 且過了結束日之隔天上班日 10:30(推導不儲存)。"""
     return_time = await get_setting(db, "equipment_return_time")
     holidays = await svc.load_holidays(db)
@@ -285,6 +292,9 @@ async def list_equipment_loans(
         query = query.where(sa.or_(*conds))
     if club_id:
         query = query.where(EquipmentLoan.club_id == club_id)
+    if active is not None:
+        ongoing = svc.equipment_loan_ongoing_expr()
+        query = query.where(ongoing if active else sa.not_(ongoing))
 
     if sort:
         query = query.order_by(*parse_sort(sort, _LOAN_SORTABLE, None), EquipmentLoan.id)
@@ -313,6 +323,7 @@ async def list_equipment_loans(
                 exclude_loan_id=loan.id,
             )
         data.append(out)
+    await approvals.attach_decisions(db, ApprovalSubject.EQUIPMENT_LOAN, data, with_actor=True)
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 

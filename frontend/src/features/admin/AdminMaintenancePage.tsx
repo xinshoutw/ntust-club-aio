@@ -145,7 +145,7 @@ export default function AdminMaintenancePage() {
               )}
               {!listQuery.isPending && !listQuery.isError && rows.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有維修申請</td>
+                  <td colSpan={6} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>無維修申請</td>
                 </tr>
               )}
             </tbody>

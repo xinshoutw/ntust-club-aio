@@ -13,10 +13,10 @@ export default function LargeBadge({ applied, approved }: LargeBadgeProps) {
   const rejected = applied && approved === false
   const solid = approved === true
   const tip = solid
-    ? '已認可為大型活動(行政分 ×3)'
+    ? '已認可為大型活動'
     : rejected
-      ? '大型活動申請未通過,以一般活動計'
-      : '大型活動申請,待學務處認可'
+      ? '大型活動申請未通過'
+      : '大型活動申請中'
 
   return (
     <Tooltip title={tip}>

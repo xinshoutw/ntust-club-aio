@@ -7,7 +7,7 @@ import QueryError from '../../components/ui/QueryError'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import { STAFF_PAGE_SIZE, useStaffLoans, useStaffMutations, type StaffLoan } from '../../api/staff'
 
-// 器材借出點交:已核准借用逐單點交,登記借用人。
+// 器材借出點交:已核准借用逐單點交,登記收件人。
 // 「依序點交」器材只在此提醒工讀生現場核對序號 —— 序號本身不入系統(decisions.md ISS-55b)
 export default function PtCheckoutPage() {
   const { message } = App.useApp()
@@ -30,7 +30,7 @@ export default function PtCheckoutPage() {
     if (!selected) return
     const name = borrower.trim()
     if (!name) {
-      message.error('請填寫借用人姓名')
+      message.error('請填寫收件人姓名')
       return
     }
     checkout.mutate(
@@ -104,7 +104,7 @@ export default function PtCheckoutPage() {
               )}
               {!listQuery.isPending && !listQuery.isError && rows.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有待借出的核准單</td>
+                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>無待借出的核准單</td>
                 </tr>
               )}
             </tbody>
@@ -135,18 +135,17 @@ export default function PtCheckoutPage() {
             </div>
             {/* 現場點交要看得到用途與聯絡人:器材對不上時得當場打電話 */}
             <div style={{ fontSize: 13, color: 'var(--steel)' }}>
-              用途:{selected.purpose || '—'}
-              <span className="num" style={{ marginLeft: 12 }}>
-                聯絡電話:{selected.phone || '—'}
-              </span>
+              用途：{selected.purpose || '—'}
+              <br />
+              聯絡電話：{selected.phone || '—'}
             </div>
             <div>
-              <div style={{ fontSize: 13, marginBottom: 4 }}>借用人姓名</div>
+              <div style={{ fontSize: 13, marginBottom: 4 }}>收件人姓名</div>
               <Input
                 autoFocus
                 value={borrower}
                 onChange={(e) => setBorrower(e.target.value)}
-                placeholder="現場領用人"
+                placeholder="請輸入收件人姓名"
                 maxLength={50}
               />
             </div>
@@ -155,7 +154,7 @@ export default function PtCheckoutPage() {
                 type="info"
                 showIcon
                 message="此品項為依序點交"
-                description={`請於現場逐件核對 ${selected.qty} 件的機身序號後再確認點交;序號不需登入系統。`}
+                description={`請於現場逐件核對 ${selected.qty} 件的機身序號後再確認點交`}
               />
             )}
           </div>

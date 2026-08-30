@@ -90,7 +90,7 @@ export default function AdminPostalPage() {
               )}
               {!postalQuery.isPending && !postalQuery.isError && postals.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={8} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有郵局帳戶異動申請</td>
+                  <td colSpan={8} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>無郵局帳戶異動申請</td>
                 </tr>
               )}
             </tbody>

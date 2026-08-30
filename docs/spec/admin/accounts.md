@@ -13,7 +13,7 @@
 | 權限目錄 | `GET /auth/me`(`ADMIN_PAGES` + `APPROVAL_STAGES`,權限彈窗的清單來源) |
 | 管理員/工讀生/評審清單 | `GET /admin/accounts?role=…`(伺服器端分頁,每頁 20;一次一類) |
 | 建立 / 刪除 / 啟停 / 重設密碼 / 權限 | `POST /admin/accounts`、`DELETE`、`PUT /{id}/active`、`POST /{id}/reset-password`、`PUT /{id}/permissions` |
-| 社團分頁 | `GET /admin/clubs`、`POST /admin/clubs/{id}/account`、`POST /admin/clubs/{id}/reset-password`、`PATCH /admin/clubs/{id}` |
+| 社團分頁 | `GET /admin/clubs`、`POST /admin/clubs`、`POST /admin/clubs/{id}/account`、`POST /admin/clubs/{id}/reset-password`、`PATCH /admin/clubs/{id}`、`DELETE /admin/clubs/{id}` |
 
 ## 畫面
 
@@ -21,16 +21,27 @@
 
 **權限設定彈窗**(僅管理員)— 勾選框列出頁面權限與三個簽核關卡,**清單由後端目錄表隨 `/auth/me` 送達**(`ADMIN_PAGES` + `APPROVAL_STAGES`),前端不維護第二份;順序即目錄表順序。目錄以外的既有鍵儲存時原樣保留。非最高權限的操作者只勾得到自己也持有的項目,其餘反灰並附說明(後端 `_check_grantable` 同一條規則,回 `PERMISSION_NOT_GRANTABLE`)。
 
+**新增社團彈窗**(社團分頁的「+ 新增社團」)— 社團名稱 + 社團性質,兩欄皆必填。建好後把搜尋框設成該社名稱,列表直接停在它上面(159 社分頁,不然得自己翻頁找)。
+
 **一次性密碼彈窗** — 帳號 + 密碼(預設遮蔽,可複製),說明「密碼僅顯示這一次」。
 
 ## 規則
 
 - 建立與重設密碼:後端產生一次性密碼、argon2id 雜湊、`must_change_password=true`;**明碼只在該次回應出現**
-- 不可刪除或停權自己的帳號,也不可對 `is_super` 帳號動手
+- **位階檢查一條,四個動作共用**(後端 `_guard_target`):不可對自己、不可對 `is_super`、非最高權限者不可對「持有自己所沒有的權限鍵」的同儕動手。第三條是 `_check_grantable` 的另一半 —— 少了它,只持 `aaccount` 的人可以重設同儕或 superadmin 的密碼、拿一次性密碼登入,授權檢查等於白做。刪除、停用、重設密碼、調整權限四支都吃這一條
+- 擋得下的列**整個動作欄畫成 `—` 並以 Tooltip 說明**(`lib/permissions.accountGuardReason`,與違規銷案的「已截止」同一套寫法),不畫按了必定 409/403 的鈕。這裡擋得準是因為判準所需的`permissions` / `is_super` 前端手上就有 —— 與下面「刪除社團不預先反灰」不衝突,那邊缺的是筆數
 - `is_super` 不開放由 API 建立
 - 刪除帳號時稽核紀錄保留(`audit_logs.user_id` ON DELETE SET NULL);已有簽核/開單等業務 FK 的帳號會撞 FK → 409「請改用停權」
 - 停權與重設密碼都會**立即撤銷該帳號所有 session**
 - 社團分頁的啟停是「社團主檔 + 帳號一併連動」,與前三類的純帳號停權語意不同(狀態標示亦分別為「停用」/「停權」)
 - 社團分頁的狀態欄另標示器材逾期停權(`suspended_until` 未過期者顯示到期日):停權中但仍啟用的社團一眼看得出來
 - 評審帳號建立時 `can_view_eval` 預設 true
+- **新增社團只建主檔,不建帳號**:登入用的帳號仍走列上的「建立帳號」(僅無帳號社團出現),兩者是兩個動作 —— 新社團在開通登入前就要先掛得上成員與活動資料
+- **新增社團的權限鍵是 `aclubset`(社團管理項目),不是 `aaccount`**:寫入 `/admin/clubs` 一律歸管理項目那把鍵,只持帳號管理的人看不到這顆鈕
+- 新增社團的 `kind`(社團/學會)由名稱結尾推導(`derive_kind`,與改名同一條規則),**推不出來先當社團** —— 它只決定負責人的顯示詞,管理項目改得動;`attribute`(性質)則是**必填**,它是所有社團選單與漏斗的資料夾分類,沒填的一律落在「未分類」;選錯了到「管理項目」改得回來
+- **刪除社團**:連同社團帳號一併刪除。社團底下還有資料時後端先回 `CLUB_HAS_DATA`,訊息列出各類筆數(活動 12、社員名單 30、檔案 40…),前端跳第二個確認框,確認後才帶 `?force=true` 再送一次 —— **強制刪除會照 FK 圖把那些資料一路刪掉,不可復原**。稽核 `club_deleted` 記下每一類刪了幾列
+- 強制刪除的範圍由 **pg_catalog 的 FK 圖**決定,不是程式裡的表清單 —— 新增資料表不必回來補,漏掉的 FK 會擋成 409 而不是默默留下半個社團。CASCADE 的子表(社員名單)交給 DB 自己刪,但**筆數要數進確認框**,不然那些列會無聲消失;SET NULL 的不動
+- **社團帳號不走 FK 圖**:從帳號往下追到的是「這個人碰過的東西」,不等於「這個社團的東西」。社團自己的資料清完後直接刪帳號,真有跨社團的列就撞 FK 回 409(整筆交易回滾),不順手刪掉別人的資料
+- 刻意留下的:`audit_logs`(SET NULL)與 `approval_records`(靠 `subject_id` 對應、沒有 FK)—— 誰做過什麼、誰簽過什麼不隨對象消失。檔案的實體檔在 commit 成功後才 unlink(反過來 rollback 會留下「DB 有列、磁碟無檔」)
+- 刪除鈕不預先反灰:那些筆數前端手上沒有,擋不準就交給後端說明白
 - **一社一帳號由 DB 唯一索引保證**(`uq_users_club_id`,revision `a1c7f42d9b30`):應用層檢查擋的是友善錯誤訊息,遷移腳本這種繞過應用層的路徑由索引兜底

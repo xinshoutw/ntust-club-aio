@@ -25,7 +25,7 @@ import {
 } from '../../api/activities'
 import { useClubConfig, type BudgetCategory } from '../../api/clubConfig'
 import { TIME_RANGE_SEP } from './utils'
-import { fmtMoney } from './types'
+import { activityPath, fmtMoney } from './types'
 import './actform.css'
 
 // '18:00–21:00'(容忍 -/—)→ [開始, 結束] TimePicker 值
@@ -309,11 +309,11 @@ function ActivityForm({
     const doSave = async () => {
       setBusy('draft')
       try {
-        if (editing) await updateActivity(editing.id, input)
-        else await createActivity(input)
+        const row = editing ? await updateActivity(editing.id, input) : await createActivity(input)
         invalidate()
         message.success(editing?.status === 'rejected' ? '已儲存修改' : '已暫存草稿')
-        navigate('/activities')
+        // 退回待修的申請幾乎都在舊學期,裸路徑回去會落在空清單(草稿沒日期時 activityPath 不帶學期)
+        navigate(activityPath({ id: row.id, date: input.date }))
       } catch (e) {
         message.error(errMsg(e))
       } finally {
@@ -354,7 +354,7 @@ function ActivityForm({
           setFiles((prev) => prev.filter((x) => x.key !== b.key))
         } catch (e) {
           invalidate()
-          message.error(`附件「${b.file.name}」上傳失敗:${errMsg(e)};申請已存為草稿,請補齊附件後再送出`)
+          message.error(`附件「${b.file.name}」上傳失敗，已存為草稿並請稍後再試 (${errMsg(e)})`)
           navigate(`/activities/${saved.id}/edit`)
           return
         }
@@ -363,14 +363,14 @@ function ActivityForm({
         await submitActivity(saved.id)
       } catch (e) {
         invalidate()
-        message.error(`送出申請失敗:${errMsg(e)};申請已存為草稿`)
+        message.error(`送出申請失敗，已存為草稿並請稍後再試 (${errMsg(e)})`)
         // 新建流程轉入編輯路由:再按送出走更新,不會重複建立草稿
         if (!editing) navigate(`/activities/${saved.id}/edit`)
         return
       }
       invalidate()
       message.success('已送出申請')
-      navigate('/activities')
+      navigate(activityPath({ id: saved.id, date: input.date }))
     } catch (e) {
       invalidate() // 建立/更新可能已成功(如逾時),讓列表刷新
       message.error(errMsg(e))

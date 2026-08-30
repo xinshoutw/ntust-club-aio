@@ -46,7 +46,7 @@ Python 3.14 lazy annotation:欄位名與型別同名時型別須別名(`import d
 - 容器內路徑 `/srv/uploads`(compose 現用具名 volume `uploads`;是否改 bind mount 以便備份工具直接同步,見 DEPLOY_CHECKLIST 待決 3),佈局 `{模組}/{年}/{月}/{uuid}`;DB 存中介資料
 - 一律經帶權限檢查的 API 存取,不裸 serve(競賽資料與結案附件有社團隔離與評審匿名邊界)
 - 上傳串流寫盤(1MB chunk,VM 僅 4GB RAM),邊寫邊算 sha256 與檢查上限;副檔名 × 魔術位元組須一致,client 宣稱的 MIME 一律不信
-- 單檔上限依類型(文件 50 / 圖片 10 / 壓縮檔 100 / 維修影片 200 MB),加總上限依申請性質(活動申請附件 15、空間報修 100、結案照片 10 MB),皆在 `system_settings`。**例外**:郵局存簿與評鑑上傳為固定 50MB,後台調不到;評鑑上傳只收 pdf/doc/docx/jpg/png/zip。成果與宣傳影片不收檔,填外部連結
+- 單檔上限依類型(文件 50 / 圖片 10 / 壓縮檔 100 / 維修影片 200 MB),加總上限依申請性質(活動申請附件 50、空間報修 250、結案照片與附件共用 50 MB),皆在 `system_settings`。**例外**:郵局存簿、評鑑上傳與結案附件為固定 50MB,後台調不到;評鑑上傳只收 pdf/doc/docx/jpg/png/zip。成果與宣傳影片不收檔,填外部連結
 - 配額:單一社團未歸檔檔案 2 GiB;系統總量讀實體磁碟可用空間(`shutil.disk_usage`),不足即回 507 擋下上傳。使用率 ≥80% 警示、**≥90% 關閉上傳前置閘**(`files.ensure_upload_gate_open`,掛在 nginx `auth_request` 子請求上,暫存檔不落地);擴容須人介入
 - 落盤與 DB 列同生共死:交易沒 commit 就結束時,該次寫入的檔案一併從磁碟刪除;刪檔則一律等 commit 成功後才動磁碟,失敗只留孤兒檔
 - 生命週期:競賽採計中的檔案保留在系統;其餘由行政備份下載後自系統刪除,`files.archived_at` 標記,再下載回 410。月份佈局讓歸檔以整月目錄為單位打包搬走
@@ -113,7 +113,7 @@ REST JSON,前綴 `/api/v1`。回應信封:
 
 ```
 club-aio/
-├── compose.yml                 # db + backend + web + db-backup
+├── compose.yml                 # db + backend + web
 ├── backend/
 │   ├── app/{core,models,schemas,api/v1,services,assets}
 │   ├── alembic/  scripts/  tests/
@@ -146,7 +146,7 @@ Internet ──▶ [既有 edge proxy VM]  nginx:443
 ### 6.2 備份
 
 - 每日 `pg_dump`(自訂格式)+ 14 天輪替,**存放於同一環境**(`scripts/backup_db.sh`;decisions.md OPS-01 明定不做異地備份)
-- 上傳目錄不在腳本範圍:由 compose 的 `db-backup` 服務備份 volume,另以 GCE 磁碟快照兜底
+- 上傳目錄不在腳本範圍,而且**目前沒有任何備份機制**:compose 沒有備份服務,GCE 那條路徑只靠磁碟快照兜底,自架站台則完全沒有(DEPLOY_CHECKLIST A 段列為阻擋)
 - 部署前手動加跑一次 dump
 
 單機即單點故障,校內系統可接受短暫維護窗口,但資料不可失。
@@ -166,7 +166,7 @@ GitHub Actions:backend job 跑 `ruff check` + `pytest`(起 postgres service),fro
 
 切換 = 改 `clubs.ntust.edu.tw` 的 vhost,回滾 = 改回舊值:
 
-1. upstream 指到 `<新 VM 內網 IP>:8080` —— edge 現行 upstream 沒寫埠號(預設 80),漏掉會 502
+1. upstream 指到 `<新 VM 內網 IP>:8080` —— edge 現行 upstream 沒寫埠號(預設 80),漏掉會 502;app VM 的 `.env` 同時要設 `WEB_BIND=<app VM 內網 IP>`,否則 web 容器只聽 loopback
 2. 該 vhost 的 `client_max_body_size` 從全域 3072M 收斂為 `256m`(內層最大的那個上傳端點就是這個值;其餘上傳端點在內層各自收到 64m)
 3. 該 vhost 加 `proxy_request_buffering off`,上傳串流直通不在 edge 暫存整包
 4. proxy header 改覆寫式:`proxy_set_header X-Forwarded-For $remote_addr;` 並補 `X-Forwarded-Proto $scheme`(現行 `$proxy_add_x_forwarded_for` 會保留客戶端偽造的 XFF,且沒送 XFP)

@@ -1,17 +1,32 @@
 import { describe, expect, it } from 'vitest'
-import { emptyCellState } from './cells'
+import { CELL, USAGE_SCALE, usageStep } from './cells'
 
-describe('emptyCellState', () => {
-  it('可臨時借用的場地,空格就是可借', () => {
-    expect(emptyCellState({ allowFixed: true, allowTemp: true })).toBe('free')
-    expect(emptyCellState({ allowFixed: false, allowTemp: true })).toBe('free')
+// 比對階別本身而不是文案:圖例字句會調,落在哪一階才是這支要守的規則
+const [NONE, YELLOW, ORANGE, RED, FULL] = USAGE_SCALE
+
+describe('usageStep', () => {
+  it('預設色只留給完全沒借用,借出一件就進下一階', () => {
+    expect(usageStep(0, 10)).toBe(NONE)
+    expect(usageStep(1, 100)).toBe(YELLOW) // 1%
   })
 
-  it('只開放固定借用的場地借不到,但那不是「不開放」', () => {
-    expect(emptyCellState({ allowFixed: true, allowTemp: false })).toBe('fixedOnly')
+  it('比例落在哪一階以上界為準(邊界值取較低的那一階)', () => {
+    expect(usageStep(3, 10)).toBe(YELLOW) // 30%
+    expect(usageStep(4, 10)).toBe(ORANGE)
+    expect(usageStep(5, 10)).toBe(ORANGE) // 50%
+    expect(usageStep(6, 10)).toBe(RED)
+    expect(usageStep(9, 10)).toBe(RED)
+    expect(usageStep(199, 200)).toBe(RED) // 99.5%:還差一件就不算額滿
+    expect(usageStep(10, 10)).toBe(FULL)
   })
 
-  it('兩種都不開放才是不開放', () => {
-    expect(emptyCellState({ allowFixed: false, allowTemp: false })).toBe('closed')
+  it('額滿與固定借用同色;總數 0(借不到)也算額滿', () => {
+    expect(FULL.bg).toBe(CELL.fixed.bg)
+    expect(usageStep(0, 0)).toBe(FULL)
+  })
+
+  it('色階由低到高排列,圖例才照得出順序', () => {
+    const maxes = USAGE_SCALE.map((s) => s.max)
+    expect(maxes).toEqual([...maxes].sort((a, b) => a - b))
   })
 })

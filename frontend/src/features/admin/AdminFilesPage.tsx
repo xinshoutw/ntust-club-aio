@@ -36,8 +36,8 @@ function DownloadButton({ file, message }: { file: StoredFile; message: ReturnTy
   if (file.archived || !file.canDownload) {
     // 檔案管理頁看得到清單不等於看得到內容:下載要該類檔案的頁面權限(decisions.md D-02)
     const why = file.archived
-      ? '已歸檔:檔案已由行政備份後離線保存'
-      : '需要該類檔案所屬頁面的權限才能下載'
+      ? '此檔案已被封存'
+      : '你沒有權限'
     return (
       <Tooltip title={why}>
         <span style={{ color: 'var(--muted)', padding: '0 7px' }}>
@@ -149,7 +149,7 @@ export default function AdminFilesPage() {
               <div style={{ fontSize: 12, color: 'var(--steel)' }}>系統佔用</div>
               <div style={{ lineHeight: 1.15, marginTop: 2 }}>
                 <span className="num" style={{ fontSize: 30, fontWeight: 600 }}>{fmtSize(usedMb)}</span>
-                <span className="num" style={{ fontSize: 14, color: 'var(--steel)' }}> / 磁碟 {usage ? fmtSize(diskTotalMb) : '—'}({pct(usedMb, diskTotalMb)})</span>
+                <span className="num" style={{ fontSize: 14, color: 'var(--steel)' }}> / 磁碟 {usage ? fmtSize(diskTotalMb) : '—'} ({pct(usedMb, diskTotalMb)})</span>
               </div>
             </div>
             <div style={{ flex: 1 }} />
@@ -173,8 +173,8 @@ export default function AdminFilesPage() {
               }}
             >
               {usage.diskLevel === 'alert'
-                ? '磁碟使用率已達 90%:系統已暫停接受新的上傳,請先清理報修影片或擴充磁碟'
-                : '磁碟使用率已超過 80%:請安排清理或擴充,達 90% 時系統會暫停接受上傳'}
+                ? '由於磁碟使用率已達 90%，系統已暫停接受新的上傳'
+                : '由於磁碟使用率已超過 80%，請安排清理或擴充，達 90% 時系統會暫停接受上傳'}
             </div>
           )}
 
@@ -202,7 +202,7 @@ export default function AdminFilesPage() {
               <Tooltip
                 title={
                   <span style={{ fontSize: 13 }}>
-                    {DB_TEXT.label}(表單等資料庫內容)· {fmtSize(usage.dbSizeMb)}({pct(usage.dbSizeMb, diskTotalMb)})
+                    {DB_TEXT.label}(資料庫)· {fmtSize(usage.dbSizeMb)}({pct(usage.dbSizeMb, diskTotalMb)})
                   </span>
                 }
               >
@@ -217,7 +217,7 @@ export default function AdminFilesPage() {
               <Tooltip
                 title={
                   <span style={{ fontSize: 13 }}>
-                    其他佔用(作業系統與同機程式)· {fmtSize(otherUsedMb)}({pct(otherUsedMb, diskTotalMb)})
+                    其他佔用· {fmtSize(otherUsedMb)}({pct(otherUsedMb, diskTotalMb)})
                   </span>
                 }
               >
@@ -269,7 +269,6 @@ export default function AdminFilesPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px 8px', flexWrap: 'wrap' }}>
             <span style={{ width: 10, height: 10, borderRadius: 3, background: MODULE_COLORS.repair }} />
             <div style={{ fontSize: 15, fontWeight: 600 }}>空間報修</div>
-            <div style={{ fontSize: 12, color: 'var(--steel)' }}>檔案大、迭代快,可直接刪除釋放空間</div>
             <div style={{ flex: 1 }} />
             <span style={{ fontSize: 12, color: 'var(--steel)' }}>
               共 <span className="num">{countText(repairTotal, repairQuery)}</span> 個
@@ -331,7 +330,7 @@ export default function AdminFilesPage() {
             }}
             style={{ minWidth: 140 }}
             options={[
-              { value: 'all', label: '全部模組' },
+              { value: 'all', label: '全部' },
               ...otherModules.map((m) => ({ value: m.key as Exclude<ModuleKey, 'repair'>, label: m.label })),
             ]}
           />
@@ -371,7 +370,7 @@ export default function AdminFilesPage() {
                   <td style={{ fontSize: 13, color: 'var(--steel)' }}>{f.archived ? '已歸檔' : '使用中'}</td>
                   <td className="r" style={{ whiteSpace: 'nowrap' }}>
                     <DownloadButton file={f} message={message} />
-                    <Tooltip title="競賽採計與流程檔案依歸檔政策由系統管理">
+                    <Tooltip title="競賽採計與流程檔案由系統管理">
                       <span style={{ color: 'var(--muted)', padding: '0 7px' }}>
                         <DeleteOutlined />
                       </span>
@@ -394,7 +393,7 @@ export default function AdminFilesPage() {
               {!largeQuery.isPending && !largeQuery.isError && largeList.length === 0 && (
                 <tr className="no-hover">
                   <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 24 }}>
-                    此模組尚無大型檔案
+                    無大型檔案
                   </td>
                 </tr>
               )}

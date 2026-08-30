@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { countText } from '../../lib/counts'
 import { Button } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
@@ -8,9 +8,10 @@ import PageHeader from '../../components/ui/PageHeader'
 import StatusPill from '../../components/ui/StatusPill'
 import LargeBadge from '../../components/ui/LargeBadge'
 import { Cols, FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
+import { clampPage } from '../../lib/paging'
 import { STATUS } from '../../lib/status'
 import { useAuth } from '../../app/auth'
-import { fmtMoney } from '../activities/types'
+import { LISTED_STATUSES, fmtMoney } from '../activities/types'
 import {
   canActOn,
   useAdminActivities,
@@ -18,22 +19,19 @@ import {
   useAdminActivityDetail,
   useAdminActivityMutations,
   type AdminActivity,
-  type AdminActivityStatus,
 } from '../../api/adminActivities'
-import { useClubOptions } from '../../api/adminClubs'
+import { groupActiveClubs, useClubOptions } from '../../api/adminClubs'
 import ActivityReviewModal from './ActivityReviewModal'
 import { clickableProps } from '../../lib/clickable'
 
-const PAGE_SIZE = 20
-const ALL_STATUSES: AdminActivityStatus[] = [
-  'pending_advisor',
-  'pending_chief',
-  'pending_dean',
-  'approved',
-  'rejected',
-  'closing_pending_advisor',
-  'closed',
-]
+// 待審佇列是整批撈回來的小結果集(僅本關可簽核者),分頁在前端切;最近審核走伺服器分頁
+const QUEUE_PAGE_SIZE = 8
+const RECENT_PAGE_SIZE = 10
+// 顯示狀態(含推導的 'locked'),與社團端活動列表同一份。
+// 少了 'locked' 這一項,逾期鎖定的單會從最近審核整批消失 —— 後端的 approved
+// 篩的是**畫面上的**已核准,不含顯示為「已逾期」的那些,而漏斗選項也是由這份推導的,
+// 承辦連把它們找回來的入口都沒有
+const ALL_STATUSES = LISTED_STATUSES
 
 // 類型篩選由後端推導(「大型活動」=類型活動且已認可或申請中未被否准);
 // 排序亦為伺服器端白名單(type 排序以原始類型為準,大型不獨立成一級)
@@ -51,6 +49,7 @@ export default function ReviewPage() {
     toggle(k)
     setPage(1) // 伺服器端分頁:換排序回到第 1 頁
   }
+  const [queuePage, setQueuePage] = useState(1)
   const [clubFilter, setClubFilter] = useState<string[]>([])
   const [typeFilter, setTypeFilter] = useState<string[]>([])
   const [statusFilter, setStatusFilter] = useState<string[]>([])
@@ -68,9 +67,25 @@ export default function ReviewPage() {
   )
   const queue = useMemo(
     () =>
-      [...(queueQuery.data ?? [])].sort((a, b) => a.submittedAt.localeCompare(b.submittedAt)),
+      // 沒有送件時間的(舊資料)落在最後,與後端排序白名單的 NullsLast 一致 ——
+      // 直接比字串的話 null 會排到最前面,看起來像「最早送件、最該先審」
+      [...(queueQuery.data ?? [])].sort((a, b) =>
+        a.submittedAt === b.submittedAt
+          ? 0
+          : a.submittedAt === null
+            ? 1
+            : b.submittedAt === null
+              ? -1
+              : a.submittedAt.localeCompare(b.submittedAt),
+      ),
     [queueQuery.data],
   )
+
+  // 簽掉一件後佇列變短,停在末頁會看到空卡片;clampPage 對合法頁碼回傳原值。
+  // 收斂的結果要寫回 state,否則佇列之後又變長(新送件)會把承辦彈回它原本停的那一頁
+  const queuePageNow = clampPage(queuePage, queue.length, QUEUE_PAGE_SIZE)
+  useEffect(() => setQueuePage(queuePageNow), [queuePageNow])
+  const pagedQueue = queue.slice((queuePageNow - 1) * QUEUE_PAGE_SIZE, queuePageNow * QUEUE_PAGE_SIZE)
 
   // 篩選:社團名 → id(選項自最小社團主檔);狀態標籤 → 狀態值(待審三關同標籤合併)
   const othersStatuses = useMemo(
@@ -78,7 +93,7 @@ export default function ReviewPage() {
     [user],
   )
   const clubsQuery = useClubOptions()
-  const clubOptions = (clubsQuery.data ?? []).map((c) => c.name)
+  const clubFolders = groupActiveClubs(clubsQuery.data ?? [])
   const statusOptions = [...new Set(othersStatuses.map((st) => STATUS[st].label))]
 
   const clubIdMatches = clubFilter.length
@@ -96,10 +111,16 @@ export default function ReviewPage() {
     // 顯式預設(-reviewed_at)寫在 useMultiSort defaults:entries 一律非空,固定帶 sort
     sort: sortParam(entries),
     page,
-    pageSize: PAGE_SIZE,
+    pageSize: RECENT_PAGE_SIZE,
   })
   const pagedRows = listQuery.data?.rows ?? []
   const total = listQuery.data?.total ?? 0
+  // 別關簽掉一件就會讓最近審核少一筆;停在末頁只會看到「無審核紀錄」。
+  // 失敗時 total 也是 0,一起 clamp 會把錯誤說明洗掉,所以只在成功後收斂
+  const listLoaded = listQuery.isSuccess
+  useEffect(() => {
+    if (listLoaded) setPage((p) => clampPage(p, total, RECENT_PAGE_SIZE))
+  }, [listLoaded, total])
 
   // 點列即抓詳情(經費/附件),載入完成後彈窗自動補齊
   const detailQuery = useAdminActivityDetail(current?.activityId)
@@ -123,11 +144,11 @@ export default function ReviewPage() {
         }
       />
 
-      {/* 待審佇列:本關可簽核的單據,送件早的在前 */}
+      {/* 待審佇列:本關可簽核的單據,申請早的在前 */}
       <div className="card" style={{ marginTop: 20 }}>
         <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 6px' }}>待審佇列</div>
         <LoadingBlock pending={queueQuery.isLoading} rows={3}>
-          {queue.map((item) => (
+          {pagedQueue.map((item) => (
             <div
               key={item.id}
               className="click-tint"
@@ -149,7 +170,7 @@ export default function ReviewPage() {
                   <LargeBadge applied={item.isLarge} approved={item.largeApproved} />
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 2 }}>
-                  {item.club} · {item.type} · 送件 <span className="num">{item.submittedAt}</span>
+                  {item.club} · {item.type} · 送件 <span className="num">{item.submittedAt ?? '—'}</span>
                 </div>
               </div>
               <div style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
@@ -190,6 +211,7 @@ export default function ReviewPage() {
             </div>
           )}
         </LoadingBlock>
+        <Pager page={queuePageNow} pageSize={QUEUE_PAGE_SIZE} total={queue.length} onChange={setQueuePage} />
       </div>
 
       {/* 最近審核(他關審核中/已核准/已退回):供查閱與追蹤,預設審核時間新→舊 */}
@@ -197,15 +219,30 @@ export default function ReviewPage() {
         <div style={{ fontSize: 15, fontWeight: 600, padding: '16px 20px 8px' }}>最近審核</div>
         <LoadingBlock pending={listQuery.isPending} rows={6}>
           <table className="tb dense fixed" style={{ minWidth: 880 }} aria-label="最近審核的活動申請">
-            {/* 社團/名稱吃剩餘寬並截斷;類型允許換行(含大型徽章);日期/金額/狀態/審核時間固定 px */}
-            <Cols widths={['18%', 'auto', 130, 104, 90, 100, 140, 32]} />
+            {/* 社團/名稱吃剩餘寬並截斷;類型允許換行(含大型徽章);狀態/日期/金額/審核時間固定 px */}
+            <Cols widths={[96, 132, 'auto', 130, 104, 90, 140, 32]} />
             <thead>
               <tr>
                 <th scope="col">
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <MultiSortButton label="社團" sortKey="club" entries={entries} onToggle={toggleSort} />
+                    <MultiSortButton label="狀態" sortKey="status" entries={entries} onToggle={toggleSort} />
                     <FilterButton
-                      options={clubOptions}
+                      options={statusOptions}
+                      selected={statusFilter}
+                      onChange={(next) => {
+                        setStatusFilter(next)
+                        resetPage()
+                      }}
+                      label="篩選狀態"
+                    />
+                  </span>
+                </th>
+                <th scope="col">
+                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                    <MultiSortButton label="社團" sortKey="club" entries={entries} onToggle={toggleSort} />
+                    {/* 159 個社團平鋪讀不完:漏斗改二級選單,資料夾與 ClubCascader 同一份 */}
+                    <FilterButton
+                      options={clubFolders}
                       selected={clubFilter}
                       onChange={(next) => {
                         setClubFilter(next)
@@ -232,20 +269,6 @@ export default function ReviewPage() {
                 </th>
                 <th scope="col"><MultiSortButton label="活動日期" sortKey="date" entries={entries} onToggle={toggleSort} /></th>
                 <th scope="col" className="r">擬請補助</th>
-                <th scope="col">
-                  <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <MultiSortButton label="狀態" sortKey="status" entries={entries} onToggle={toggleSort} />
-                    <FilterButton
-                      options={statusOptions}
-                      selected={statusFilter}
-                      onChange={(next) => {
-                        setStatusFilter(next)
-                        resetPage()
-                      }}
-                      label="篩選狀態"
-                    />
-                  </span>
-                </th>
                 <th scope="col"><MultiSortButton label="審核時間" sortKey="reviewed_at" entries={entries} onToggle={toggleSort} /></th>
                 <th scope="col" aria-label="開啟" />
               </tr>
@@ -257,12 +280,13 @@ export default function ReviewPage() {
                   onClick={() => openItem(item)}
                   style={{ cursor: 'pointer', ...(current?.id === item.id && open ? { background: 'var(--seal-tint)' } : {}) }}
                 >
+                  <td><StatusPill status={item.status} /></td>
                   <td className="cell-clip" title={item.club}>{item.club}</td>
                   <td className="cell-clip" title={item.name} style={{ fontWeight: 500 }}>
                     <button
                       type="button"
                       className="row-open-btn"
-                      aria-label={`開啟「${item.name || '未命名活動'}」詳情`}
+                      aria-label={`開啟「${item.name || '未命名活動'}」詳細資訊`}
                       onClick={(e) => {
                         e.stopPropagation()
                         openItem(item)
@@ -277,7 +301,6 @@ export default function ReviewPage() {
                   </td>
                   <td className="num">{item.date}</td>
                   <td className="r num">{fmtMoney(item.requested)}</td>
-                  <td><StatusPill status={item.status} /></td>
                   <td className="num">{item.reviewedAt ?? '—'}</td>
                   <td className="r"><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>
                 </tr>
@@ -305,14 +328,14 @@ export default function ReviewPage() {
                     {/* 沒下篩選時說「無符合篩選條件」是在指責使用者的操作:新學期本來就一筆都沒有 */}
                     {clubFilter.length || typeFilter.length || statusFilter.length
                       ? '無符合篩選條件的申請'
-                      : '目前沒有審核紀錄'}
+                      : '無審核紀錄'}
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </LoadingBlock>
-        <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} />
+        <Pager page={page} pageSize={RECENT_PAGE_SIZE} total={total} onChange={setPage} />
       </div>
 
       {/* Modal 常駐待關閉動畫結束(afterClose)才卸載;key 依單據重掛,核定金額與退回原因不殘留;

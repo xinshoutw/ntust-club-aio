@@ -31,14 +31,6 @@ class FixedBookingWindowIn(BaseModel):
         }
 
 
-class EquipmentBufferIn(BaseModel):
-    before: int = Field(ge=0, le=10)  # 活動前緩衝(工作天)
-    after: int = Field(ge=0, le=10)  # 活動後緩衝(工作天)
-
-    def to_json(self) -> dict[str, Any]:
-        return {"before": self.before, "after": self.after}
-
-
 # 上界貼齊 `frontend/nginx.conf` 的 `client_max_body_size`:調得比它高的話,
 # 設定頁收下、`/club/config` 下發、畫面照著顯示新上限,而使用者一送出就吃 nginx 的 413
 # ——「畫面說 100MB、系統回超過上限」是最難查的一種不一致。
@@ -116,8 +108,7 @@ class SettingsUpdateIn(BaseModel):
     """PUT /admin/settings:部分更新,只寫有帶的鍵。"""
 
     fixed_booking_window: FixedBookingWindowIn | None = None
-    equipment_workday_buffer: EquipmentBufferIn | None = None
-    close_lock_months: int | None = Field(None, ge=1, le=6)
+    close_lock_days: int | None = Field(None, ge=1, le=366)
     upload_limits: UploadLimitsIn | None = None
     activity_attachment_total_mb: int | None = Field(None, ge=1, le=1024)
     maintenance_total_mb: int | None = Field(None, ge=1, le=1024)

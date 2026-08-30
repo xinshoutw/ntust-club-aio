@@ -4,6 +4,23 @@
 // 所有允許圖片的上傳點一律含 HEIC/HEIF 等特規格式(accept 僅是選檔提示,實際以魔術位元組為準)
 export const IMAGE_ACCEPT = 'image/*,.heic,.heif,.avif'
 
+// 結案附件(保單、租車契約、簽到表、講師資料…):收的正是站內預覽得了的四類,
+// 與後端 files.REPORT_DOC 同一組。改這裡就要改那裡。
+// 選檔對話框可切「所有檔案」繞過 accept,選檔時另比一次副檔名 ——
+// 不擋的話 .zip 要等按下送出、照片都傳完之後才吃後端 415,然後整批回滾
+export const IMAGE_EXTENSIONS = [
+  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff', '.heic', '.heif', '.avif',
+]
+export const CLOSE_DOC_EXTENSIONS = ['.pdf', '.doc', '.docx', ...IMAGE_EXTENSIONS]
+
+/** 後端以副檔名收口(`files._extension`),魔術位元組驗的是內容 —— 兩道都要過。
+ *  內容是 PNG 但檔名 `photo.txt` 的檔前端全放行,送出時才 415、整批回滾 */
+export const hasAllowedExtension = (name: string, exts: readonly string[]): boolean =>
+  exts.some((ext) => name.toLowerCase().endsWith(ext))
+// 逐項列舉而不用 `image/*`:那會讓選檔器收得下後端不收的 svg/ico,
+// 使用者先選得到、再被前端擋一次,白跑一趟
+export const CLOSE_DOC_ACCEPT = CLOSE_DOC_EXTENSIONS.join(',')
+
 export async function sha256(f: File): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', await f.arrayBuffer())
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')

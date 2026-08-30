@@ -5,23 +5,27 @@ import { App, Button, DatePicker, Form, Input, Select } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
+import { PHONE_RULE, normalizePhone } from '../../lib/form'
 import { confirmDialog } from '../../lib/confirm'
 import { bookingStarted, periodKeys, startedPeriods, usePeriods } from '../../lib/periods'
 import { notFoundText } from '../../lib/selectOptions'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
-import { Cols } from '../../components/ui/tableControls'
+import { Cols, Pager } from '../../components/ui/tableControls'
 import SuspensionNote from '../../components/ui/SuspensionNote'
 import { useClubSuspension } from '../../api/clubProfile'
 import {
   useBookingMutations,
   useActiveVenueBookings,
+  RECENT_PAGE,
   useRecentVenueBookings,
   useVenues,
   venueLabel,
 } from '../../api/bookings'
 import { useApprovedActivities } from '../../api/activities'
 import PeriodPicker from './PeriodPicker'
+import { useDecisionReason } from './DecisionReasonModal'
+import { taipeiToday } from '../../lib/today'
 
 export default function VenueBookingPage() {
   const { message, modal } = App.useApp()
@@ -37,7 +41,7 @@ export default function VenueBookingPage() {
   const qDate =
     rawDate &&
     dayjs(rawDate, 'YYYY/MM/DD', true).isValid() &&
-    !dayjs(rawDate, 'YYYY/MM/DD', true).isBefore(dayjs().startOf('day'))
+    !dayjs(rawDate, 'YYYY/MM/DD', true).isBefore(taipeiToday())
       ? rawDate
       : undefined
   const qPeriod = params.get('period')
@@ -56,10 +60,13 @@ export default function VenueBookingPage() {
   // 正在申請=進行中全部(不限長度、可取消);最近申請=已結束/退回/取消 近 5 筆
   const activeQuery = useActiveVenueBookings()
   const activeRows = activeQuery.data ?? []
-  const recentQuery = useRecentVenueBookings()
-  const recent = recentQuery.data ?? []
+  const [recentPage, setRecentPage] = useState(1)
+  const recentQuery = useRecentVenueBookings({ page: recentPage, pageSize: RECENT_PAGE })
+  const recent = recentQuery.data?.rows ?? []
+  const recentTotal = recentQuery.data?.total ?? 0
+  const decision = useDecisionReason()
   const { createVenueBooking, cancelVenueBooking } = useBookingMutations()
-  const todayStart = dayjs().startOf('day')
+  const todayStart = taipeiToday()
 
   // 過去時間全面禁止:過去日期不可選;選「今天」時已開始節次禁選(後端亦擋)
   const dateValue = Form.useWatch('date', form) as Dayjs | undefined
@@ -141,7 +148,7 @@ export default function VenueBookingPage() {
                 placeholder="請選擇"
                 loading={venuesQuery.isPending}
                 options={tempVenues.map((v) => ({ value: v.id, label: venueLabel(v) }))}
-                notFoundContent={notFoundText(venuesQuery, '目前沒有可借用的場地', '場地清單')}
+                notFoundContent={notFoundText(venuesQuery, '無可借用的場地', '場地清單')}
               />
             </Form.Item>
 
@@ -170,10 +177,12 @@ export default function VenueBookingPage() {
             <Form.Item
               name="phone"
               label="聯絡電話"
-              rules={[{ required: true, message: '請輸入聯絡電話' }, { pattern: /^[0-9\-()*#]+$/, message: '僅能輸入數字與 - ( ) * #' }]}
+              normalize={normalizePhone}
+              rules={[{ required: true, message: '請輸入聯絡電話' }, PHONE_RULE]}
               style={{ marginBottom: 0 }}
             >
-              <Input className="num" placeholder="申請聯絡人電話" maxLength={30} />
+              {/* 不設 maxLength:DOM 的 maxlength 在 normalize 之前就把貼上的內容截掉 */}
+              <Input className="num" placeholder="0912-345-678 或 4 碼分機" />
             </Form.Item>
           </div>
           <div style={{ fontSize: 13, fontWeight: 500, margin: '18px 0 8px' }}>
@@ -188,7 +197,7 @@ export default function VenueBookingPage() {
                 format="YYYY/MM/DD"
                 placeholder="日期"
                 style={{ width: 140 }}
-                disabledDate={(d) => d.isBefore(dayjs().startOf('day'))}
+                disabledDate={(d) => d.isBefore(taipeiToday())}
               />
             </Form.Item>
             <div style={{ flex: 1, minWidth: 280 }}>
@@ -250,7 +259,7 @@ export default function VenueBookingPage() {
               )}
               {!activeQuery.isError && !activeQuery.isPending && activeRows.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>目前沒有進行中的申請</td>
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>無進行中的申請</td>
                 </tr>
               )}
             </tbody>
@@ -272,14 +281,18 @@ export default function VenueBookingPage() {
               </tr>
             </thead>
             <tbody>
-              {recent.map((v) => (
-                <tr key={v.id}>
-                  <td style={{ fontWeight: 500 }}>{v.venueName}</td>
-                  <td className="num" style={{ fontSize: 13 }}>{v.date}</td>
-                  <td style={{ color: 'var(--steel)', fontSize: 13 }}>第 {v.periods.join('、')} 節</td>
-                  <td><StatusPill status={v.status} /></td>
-                </tr>
-              ))}
+              {recent.map((v) => {
+                // 退回件與承辦撤銷的取消件可點開原因(舊資料沒留理由時彈窗會說明)
+                const row = decision.rowProps(`${v.venueName}（${v.date}）`, v.status, v.decision)
+                return (
+                  <tr key={v.id} {...row.tr}>
+                    <td style={{ fontWeight: 500 }}>{row.wrap(v.venueName)}</td>
+                    <td className="num" style={{ fontSize: 13 }}>{v.date}</td>
+                    <td style={{ color: 'var(--steel)', fontSize: 13 }}>第 {v.periods.join('、')} 節</td>
+                    <td><StatusPill status={v.status} /></td>
+                  </tr>
+                )
+              })}
               {recentQuery.isError && (
                 <tr className="no-hover">
                   <td colSpan={4}>
@@ -295,7 +308,10 @@ export default function VenueBookingPage() {
             </tbody>
           </table>
         </LoadingBlock>
+        <Pager page={recentPage} pageSize={RECENT_PAGE} total={recentTotal} onChange={setRecentPage} style={{ padding: '10px 0 14px' }} />
       </div>
+
+      {decision.node}
     </div>
   )
 }

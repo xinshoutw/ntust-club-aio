@@ -1,10 +1,15 @@
+import { Tooltip } from 'antd'
+
 export type StampState = 'done' | 'current' | 'todo' | 'rejected'
 
 export interface StampStage {
   char: string
+  /** 章下方那行:簽核者姓名,還沒簽到的關卡是 `-`(關卡本身由 char 表示) */
   label: string
   state: StampState
+  /** 簽核時間(短)。hover 顯示 noteTitle 的完整時刻 */
   note?: string
+  noteTitle?: string
 }
 
 // 關卡色相與 pill 一致(承=琥珀、組=藍、長=紫)
@@ -50,7 +55,9 @@ function StampNode({ stage }: { stage: StampStage }) {
       labelColor = '#C13B34'
       break
     default:
+      // 未蓋章的圈是灰的,但「等待中」三個字給關卡色 —— 灰字疊在虛線圈上會讀成停用
       style = { ...base, background: 'transparent', border: '2px dashed #C8CDD5', color: 'var(--muted)' }
+      labelColor = hue.color
   }
 
   return (
@@ -59,7 +66,13 @@ function StampNode({ stage }: { stage: StampStage }) {
       <div style={{ fontSize: 12, color: labelColor, fontWeight: stage.state === 'current' ? 500 : undefined }}>
         {stage.label}
       </div>
-      {stage.note && <div style={{ fontSize: 11, color: 'var(--steel)' }}>{stage.note}</div>}
+      {stage.note && (
+        <Tooltip mouseEnterDelay={0} title={stage.noteTitle && <span className="num" style={{ fontSize: 13 }}>{stage.noteTitle}</span>}>
+          <div className="num" style={{ fontSize: 11, color: 'var(--steel)', cursor: stage.noteTitle ? 'help' : undefined }}>
+            {stage.note}
+          </div>
+        </Tooltip>
+      )}
     </div>
   )
 }
@@ -71,13 +84,25 @@ interface StampTrailProps {
 
 export default function StampTrail({ stages, width = 400 }: StampTrailProps) {
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', width, maxWidth: '100%' }}>
+    // 關卡數不固定:退回件與 D-16 當場核准的單子只畫到最後一格有動作的關卡(兩格),
+    // 三關跑完才是三格。連接線若是 flex:1,少畫的那幾格會被撐成一條長虛線、
+    // 章跟著黏在固定寬盒子的左緣;改成固定長度後整條軌居中
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'flex-start',
+        justifyContent: 'center',
+        width,
+        maxWidth: '100%',
+      }}
+    >
       {stages.map((stage, i) => (
-        <div key={stage.label} style={{ display: 'contents' }}>
+        <div key={stage.char} style={{ display: 'contents' }}>
           {i > 0 && (
             <div
               style={{
-                flex: 1,
+                // 不長只縮:窄視窗仍讓得出空間,寬的時候不把兩顆章推到兩端
+                flex: '0 1 56px',
                 marginTop: 15,
                 borderTop: stages[i - 1].state === 'done' ? 'none' : '2px dashed #C8CDD5',
                 height: stages[i - 1].state === 'done' ? 2 : 0,

@@ -85,7 +85,7 @@ export default function SignupListPage() {
           })}
           {!listQuery.isPending && !listQuery.isError && !items.length && (
             <div className="card" style={{ padding: '40px 24px', textAlign: 'center', fontSize: 13, color: 'var(--steel)' }}>
-              目前沒有報名活動
+              無報名活動
             </div>
           )}
         </div>

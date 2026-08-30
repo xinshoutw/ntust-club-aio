@@ -26,7 +26,7 @@ import struct
 import sys
 import uuid
 import zlib
-from datetime import date, datetime, time
+from datetime import UTC, date, datetime, time
 from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
@@ -304,7 +304,6 @@ async def _create_clubs_and_users(db: AsyncSession) -> tuple[dict[str, Club], di
     csie.advisor_name = "張明哲"
     csie.advisor_dept = "資訊工程系"
     csie.advisor_email = "mjchang@mail.ntust.edu.tw"
-    csie.advisor_ext = "3271"
     await db.flush()  # 取得 club id
 
     users: dict[str, User] = {}
@@ -335,7 +334,8 @@ async def _create_clubs_and_users(db: AsyncSession) -> tuple[dict[str, Club], di
         username="admin_chen",
         password_hash=admin_hash,
         name="陳承辦",
-        permissions=["abooking", "aroom", "amaint", "aviol", "amember"],
+        # astaff:櫃台沒有工讀生的時候承辦要頂得上(D-26 鏡射的那一組)
+        permissions=["abooking", "aroom", "amaint", "aviol", "amember", "astaff"],
         must_change_password=False,
     )
     # 學務長=受限帳號僅簽核:學務長關卡即使 super 也必須明確持有 approve_dean
@@ -445,6 +445,8 @@ def _add_activity(
         is_large_approved=is_large_approved,
         fund_source=fund_source,
         close_draft=close_draft,
+        # 送出過的活動一律有送件時間(D-29);留 NULL 的話行政端整欄 —,排序也失準
+        submitted_at=None if status == ActivityStatus.DRAFT else datetime.now(UTC),
     )
     approved = [b[4] for b in budget if b[4] is not None]
     activity.school_approved = sum(approved) if approved else None
@@ -873,7 +875,7 @@ async def _create_bookings(
     ]
     db.add(approved_room)
 
-    # 器材借用(區間=活動起訖 ± 工作天緩衝的快照)
+    # 器材借用(區間由申請時自填)
     loans = [
         EquipmentLoan(  # 待審
             club_id=csie.id, equipment_id=equipment["電腦單槍投影機"].id,
@@ -893,7 +895,7 @@ async def _create_bookings(
             start_date=date(2026, 7, 10), end_date=date(2026, 7, 20),
             purpose="整備週戶外器材點檢遮陽", status=LoanStatus.CHECKED_OUT,
             checkout_by=staff.id, checkout_at=_dt(2026, 7, 10, 9, 30),
-            serials=["TENT-01", "TENT-02"], borrower_name="顏志明",
+            borrower_name="顏志明",
         ),
         EquipmentLoan(  # 已歸還(完整借出+歸還點交)
             club_id=csie.id, equipment_id=equipment["擴音機MA101"].id,
@@ -901,7 +903,7 @@ async def _create_bookings(
             start_date=date(2026, 4, 23), end_date=date(2026, 4, 27),
             purpose="宿營團康與營火晚會擴音", status=LoanStatus.RETURNED,
             checkout_by=staff.id, checkout_at=_dt(2026, 4, 23, 10, 0),
-            serials=["MA101-1"], borrower_name="顏志明",
+            borrower_name="顏志明",
             checkin_by=staff.id, checkin_at=_dt(2026, 4, 27, 9, 50),
             checkin_note="功能正常,附件齊全", returner_name="林小芳",
         ),
@@ -1016,7 +1018,7 @@ def _create_announcements(
             title="114-2 學期活動結案作業時程公告",
             content=(
                 "## 結案期限\n\n"
-                "本學期活動請於 **活動結束後 1 個月內** 完成結案,逾期系統將自動鎖定。\n\n"
+                "本學期活動請於 **活動結束後 30 天內** 完成結案,逾期系統將自動鎖定。\n\n"
                 "### 應繳資料\n\n"
                 "1. 成果調查表(系統填寫)\n"
                 "2. 活動照片 **5 張以上** 或成果影片連結\n"
@@ -1291,7 +1293,7 @@ def _print_accounts(super_username: str, super_password: str) -> None:
     rows: list[tuple[str, str, str, str]] = [
         ("admin", super_username, super_password, "superadmin(最高權限)"),
         ("admin", "admin_lee", ADMIN_PASSWORD, "權限:areview/aclose/asignup"),
-        ("admin", "admin_chen", ADMIN_PASSWORD, "權限:abooking/aroom/amaint/aviol/amember"),
+        ("admin", "admin_chen", ADMIN_PASSWORD, "權限:abooking/aroom/amaint/aviol/amember/astaff"),
         ("admin", "dean", ADMIN_PASSWORD, "學務長(僅 approve_dean 簽核)"),
         ("staff", "staff_lee", STAFF_PASSWORD, "工讀生"),
         ("viewer", "viewer01", VIEWER_PASSWORD, "評審(財務獎+活動獎兩組,含已送出示例)"),

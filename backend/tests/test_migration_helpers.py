@@ -44,6 +44,28 @@ def test_member_kind_maps_titles_to_standard_identities():
     assert cms_import.member_kind("社員", "學術長") == (MemberKind.MEMBER, "學術長")
 
 
+def test_free_text_spellings_still_identify_the_president():
+    """舊 Title 是自由文字:只認四個標準字串會把 239 位正副社長降級成幹部,
+    連帶 66 個(社團,學期)沒有負責人 —— 幹部證明被擋、公告 Email 寄 0 人。"""
+    for title in ("副社", "副社長&文書", "系副會長", "關懷組組長兼任副社長"):
+        assert cms_import.member_kind("社員", title) == (MemberKind.VICE_PRESIDENT, None), title
+    for title in ("系會長", "第十三屆會長", "系學會會長"):
+        assert cms_import.member_kind("社員", title) == (MemberKind.PRESIDENT, None), title
+    # 帶了「社長」但本人不是社長
+    assert cms_import.member_kind("幹部", "榮譽社長") == (MemberKind.OFFICER, "榮譽社長")
+    assert cms_import.member_kind("幹部", "社長組") == (MemberKind.OFFICER, "社長組")
+    assert cms_import.member_kind("幹部", "社長秘書") == (MemberKind.OFFICER, "社長秘書")
+
+
+def test_president_titles_are_discarded_not_kept():
+    """正副社長/會長一律不留職稱(D-27):身份本身就是職稱。
+
+    非標準寫法只用來認人 —— 屆數(第十三屆)與兼任(&文書)都跟著捨棄。
+    """
+    for title in ("第十三屆會長", "系會長", "副社長&文書", "副社"):
+        assert cms_import.member_kind("幹部", title)[1] is None, title
+
+
 def test_naive_legacy_timestamps_are_read_as_taipei():
     """dump 裡的 timestamp without time zone 若用主機時區解讀,日期會整批位移一天。"""
     midnight = datetime(2026, 3, 5, 0, 30)  # naive
@@ -163,3 +185,88 @@ def test_holiday_calendar_parsing():
         (date(2027, 1, 1), "開國紀念日"),
         (date(2027, 2, 9), "例假日"),
     ]
+
+
+def test_photo_reset_must_run_before_the_cms_reset():
+    """`cms_import.reset()` 收尾會刪光 system=cms 的所有 id-map,照片對照也在裡面 ——
+    先跑它,4,000 列 files 與盤上 4.9 GB 就再也沒有腳本找得到。防呆比對的表名必須
+    真的等於 media_import 記的那張,不然改個常數就靜靜失效。"""
+    import media_import
+
+    assert media_import.LEGACY_TABLE not in {t for t, _ in cms_import._RESET_ORDER}, (
+        "照片由 media_import 自己清(要連盤上檔案),不該進 cms_import 的刪除順序"
+    )
+    guard = Path(cms_import.__file__).read_text()
+    assert f'== "{media_import.LEGACY_TABLE}"' in guard, (
+        "cms_import.reset() 沒有擋照片對照,或表名與 media_import.LEGACY_TABLE 不一致"
+    )
+
+
+def test_reflection_slots_need_all_three_columns():
+    """心得三欄一組。只填一半就整組不算 —— 而且呼叫端會據此整列不動,
+    否則承辦誤刪一格,既有的三篇會被砍成兩篇。"""
+    import text_fields
+
+    header = text_fields._reflection_header()
+    good = dict.fromkeys(header, "")
+    good.update({"填_心得1_姓名": "王小明", "填_心得1_系級": "資工四", "填_心得1_內容": "很好玩"})
+    parsed, problems = text_fields.parse_reflections(good, header)
+    assert not problems
+    assert parsed == [{"student_name": "王小明", "dept": "資工四", "body": "很好玩"}]
+
+    half = dict(good)
+    half["填_心得1_內容"] = ""
+    parsed, problems = text_fields.parse_reflections(half, header)
+    assert parsed == [] and problems, "缺一欄必須報問題,不能當成沒填而放行"
+
+
+def test_reflection_lengths_come_from_the_schema():
+    """超長的值寫進去,退回件的社團一按儲存就 422 而且自己改不掉。
+    上限一律取自 schema,遷移腳本不得自己寫死第二份數字。"""
+    import text_fields
+
+    from app.schemas.activities import ActivityIn
+
+    assert text_fields.CONTENT_MAX == _field_max_length(ActivityIn, "content")
+    header = text_fields._reflection_header()
+    row = dict.fromkeys(header, "")
+    row.update(
+        {
+            "填_心得1_姓名": "王小明",
+            "填_心得1_系級": "資工四",
+            "填_心得1_內容": "x" * (text_fields.REFLECTION_MAX["body"] + 1),
+        }
+    )
+    parsed, problems = text_fields.parse_reflections(row, header)
+    assert parsed == [] and problems
+
+
+def _field_max_length(model, field: str) -> int:
+    """獨立於 text_fields._max_len 的第二種讀法:兩邊算出同一個數才算數。"""
+    metadata = model.model_fields[field].metadata
+    return next(m.max_length for m in metadata if hasattr(m, "max_length"))
+
+
+def test_opinion_residual_drops_the_boilerplate_the_new_form_prints_itself():
+    """舊審核意見裡 1,387 / 1,518 筆的全部內容就是那段「※…結報提醒」,而新系統的
+    申請表由 `pdf._APPLY_NOTE` 自己產一份 —— 原文照搬會在「意見回饋」那格印兩次。
+    留下來的必須只有承辦人真正寫的那句。"""
+    assert cms_import.opinion_residual(None) == ""
+    assert cms_import.opinion_residual("※請於活動後2周內上傳結報。表格如網址：https://x") == ""
+    assert (
+        cms_import.opinion_residual("本案由企業捐贈款支應。\r\n\r\n※請於活動後2周內上傳結報。")
+        == "本案由企業捐贈款支應。"
+    )
+    # 多行提醒(換行在 ※ 之後)也要整段去掉
+    multiline = "活動重複申請\r\n※請於…\r\n1.活動照片 5 張"
+    assert cms_import.opinion_residual(multiline) == "活動重複申請"
+
+
+def test_apply_stages_match_the_review_flow():
+    """初核/複核/決行三格對的是 advisor/chief/dean 三關。這裡與行政端的
+    `_STAGE_BY_STATUS` 是同一份判定,對不上就會有一格印錯人。"""
+    from app.api.v1.admin_activities import _STAGE_BY_STATUS
+    from app.services.activity_service import APPLY_STAGES
+
+    assert set(APPLY_STAGES) == {stage for _, stage in _STAGE_BY_STATUS.values()}
+    assert len(APPLY_STAGES) == 3

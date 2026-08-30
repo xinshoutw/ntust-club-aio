@@ -10,10 +10,11 @@ export interface ClosedActivity {
   large: boolean // 申請大型活動且經管理員認可
 }
 
+/** ad2–ad4 一律以承辦在結案審核時的三個繳交確認為準(decisions.md D-14):
+ *  系統不自己數照片張數或心得筆數,社團可能是交紙本。 */
 export interface ActivityResultInput {
   activityId: string
-  photoCount: number
-  hasVideoLink: boolean
+  hasPhotos: boolean // 照片或影片(同一個確認框)
   hasReport: boolean
   hasFeedback: boolean
 }
@@ -36,7 +37,6 @@ export interface AdScore {
   note: string
 }
 
-const MIN_PHOTOS = 5
 const LARGE_MULTIPLIER = 3
 export const LEADER_MEETING_POINTS = 1.25 // 負責人會議每場 1.25 分,全學年 4 場滿分 5
 export const AD_MAX: Record<AdKey, number> = {
@@ -65,7 +65,7 @@ export function computeAdScores(i: ScoringInput): AdScore[] {
     const r = resultOf.get(a.id)
     if (!r) continue
     const w = a.large ? LARGE_MULTIPLIER : 1
-    if (r.photoCount >= MIN_PHOTOS || r.hasVideoLink) photo += 1 * w
+    if (r.hasPhotos) photo += 1 * w
     if (r.hasReport) report += 1 * w
     if (r.hasFeedback) feedback += 2 * w
   }
@@ -93,9 +93,9 @@ export function computeAdScores(i: ScoringInput): AdScore[] {
 
   return [
     { key: 'ad1', auto: ad1, max: AD_MAX.ad1, note: `結案 ${i.closed.length} 件(大型 ${larges});一天至多計 1 件` },
-    { key: 'ad2', auto: ad2, max: AD_MAX.ad2, note: `每活動照片 ≥${MIN_PHOTOS} 張或影片連結;大型 ×${LARGE_MULTIPLIER}` },
-    { key: 'ad3', auto: ad3, max: AD_MAX.ad3, note: `每活動 1 分;大型 ×${LARGE_MULTIPLIER}` },
-    { key: 'ad4', auto: ad4, max: AD_MAX.ad4, note: `每活動 2 分;大型 ×${LARGE_MULTIPLIER}` },
+    { key: 'ad2', auto: ad2, max: AD_MAX.ad2, note: `每活動經承辦確認照片或影片;大型 ×${LARGE_MULTIPLIER}` },
+    { key: 'ad3', auto: ad3, max: AD_MAX.ad3, note: `每活動經承辦確認成果報告表 1 分;大型 ×${LARGE_MULTIPLIER}` },
+    { key: 'ad4', auto: ad4, max: AD_MAX.ad4, note: `每活動經承辦確認學習心得 2 分;大型 ×${LARGE_MULTIPLIER}` },
     {
       key: 'ad5',
       auto: ad5,

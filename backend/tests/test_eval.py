@@ -31,7 +31,8 @@ async def setup(client, db):
 
 
 async def seed_closed_activity(
-    db, club, user, *, day, large=False, photos=0, video=None, with_report=True
+    db, club, user, *, day, large=False, photos=0, video=None, with_report=True,
+    confirmed=True, reflections=3,
 ):
     activity = Activity(
         club_id=club.id,
@@ -63,10 +64,13 @@ async def seed_closed_activity(
         video_url=video,
         expense=0,
         submitted_at=datetime.now(UTC),
+        photos_confirmed=confirmed,
+        report_confirmed=confirmed,
+        reflections_confirmed=confirmed,
     )
     if report:
         db.add(report)
-        for i in range(3):
+        for i in range(reflections):
             db.add(
                 ActivityReflection(report_id=activity.id, student_name=f"s{i}", dept="d", body="b")
             )
@@ -127,7 +131,7 @@ async def test_overview_scores_from_sources(client, db):
     scores = {s["key"]: s for s in data["scores"]}
     assert data["year"] == EVAL_YEAR
     assert scores["ad1"]["auto"] == 4  # 一般1 + 大型3(視窗外不計)
-    assert scores["ad2"]["auto"] == 4  # 照片5張=1 + 大型影片=3
+    assert scores["ad2"]["auto"] == 4  # 承辦確認照片 1 + 大型 3
     assert scores["ad3"]["auto"] == 4  # 成果單 1 + 3
     assert scores["ad4"]["auto"] == 8  # 心得 2 + 6
     assert scores["ad6"]["auto"] == 5  # 有網頁連結
@@ -386,6 +390,35 @@ async def test_upload_locked_by_eval_settings(client, db):
     )
     assert resp.status_code == 409
 
+    # 詳情要說得出鎖著,社團才不必選完檔才知道
+    locked = (await client.get("/api/v1/club/eval/awards/club")).json()["data"]
+    assert locked["upload_locked"] is True
+
+    # 無設定列=開放(_upload_locked 的另一半)
+    await db.execute(sa.delete(EvalSetting).where(EvalSetting.award_id == "club"))
+    await db.commit()
+    opened = (await client.get("/api/v1/club/eval/awards/club")).json()["data"]
+    assert opened["upload_locked"] is False
+
+
+async def test_activity_scores_follow_the_reviewer_confirmation(client, db):
+    """D-14:ad2–ad4 只看承辦的繳交確認,系統不自己數檔案。
+
+    社團可能是交紙本 —— 一件檔案都沒有但承辦確認過的活動照樣計分;
+    反過來,檔案齊全但承辦沒確認的一分都不給。
+    """
+    club, user, admin = await setup(client, db)
+    # 紙本那件:一個照片檔與心得列都沒有,只有承辦的確認
+    await seed_closed_activity(db, club, user, day=date(2026, 3, 1), photos=0, reflections=0)
+    # 檔案齊全但承辦沒確認
+    await seed_closed_activity(db, club, user, day=date(2026, 3, 2), photos=9, confirmed=False)
+
+    data = (await client.get("/api/v1/club/eval/overview")).json()["data"]
+    by_key = {s["key"]: s for s in data["scores"]}
+    assert by_key["ad2"]["auto"] == 1  # 紙本那件照樣計;檔案齊全但未確認的不計
+    assert by_key["ad3"]["auto"] == 1
+    assert by_key["ad4"]["auto"] == 2  # 零心得列也計:承辦確認了就是交了
+
 
 async def test_photo_score_needs_a_report_row(client, db):
     """無 activity_reports 的已結案活動不得拿 ad2 照片分。
@@ -402,3 +435,4 @@ async def test_photo_score_needs_a_report_row(client, db):
     by_key = {s["key"]: s for s in data["scores"]}
     assert by_key["ad2"]["auto"] == 0
     assert by_key["ad3"]["auto"] == 0
+    assert by_key["ad4"]["auto"] == 0

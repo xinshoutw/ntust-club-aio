@@ -1,4 +1,4 @@
-"""社團端執行組態:上傳上限與經費科目。
+"""社團端執行組態:上傳上限、器材借用區間上限與經費科目。
 
 前端表單的容量上限、經費科目與其提示由此供給(郵局存簿與評鑑上傳為固定 50MB,不在此列),
 一律由此端點供給;後端仍是各上限的權威來源(save_upload / 各上傳端點實際強制)。
@@ -10,6 +10,7 @@ from fastapi import APIRouter
 
 from app.core.deps import ClubUser, DbDep
 from app.schemas.common import ApiResponse
+from app.services import booking_service
 from app.services.settings_service import get_budget_categories, get_setting
 
 router = APIRouter(prefix="/club", tags=["config"])
@@ -31,6 +32,8 @@ async def club_config(user: ClubUser, db: DbDep) -> ApiResponse[dict[str, Any]]:
                 "img_mb": int(single["img"]),
                 "video_mb": int(single["video"]),
             },
+            # 器材借用區間上限(天):前端表單即時檢核用;後端仍權威
+            "equipment_loan_max_days": booking_service.MAX_LOAN_DAYS,
             # 經費科目 [{name, hint}]:名稱供下拉、hint 選填顯示於該列
             "budget_categories": await get_budget_categories(db),
         }

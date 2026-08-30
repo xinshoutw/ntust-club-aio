@@ -8,7 +8,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { Cols, FilterButton, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
 import { downloadCsv } from '../../lib/csv'
-import { MEMBER_KINDS, kindLabel, type MemberKind } from '../../lib/roles'
+import { MEMBER_KINDS, canHaveTitle, kindLabel, memberTitle, type MemberKind } from '../../lib/roles'
 import { currentSemester } from '../../lib/semester'
 import { useMemberTimeColumns } from '../../lib/memberTable'
 import { useAuth } from '../../app/auth'
@@ -42,11 +42,11 @@ export default function MembersPage() {
   // 預設排序=後端預設(身份權重→學號,準則 4 名冊慣例):未點排序時不送 sort 參數
   const { entries, toggle } = useMultiSort<MemberSortKey>()
   const { showJoined, showUpdated } = useMemberTimeColumns(entries.map((e) => e.key))
-  // 姓名/學號/身份/職稱/電話/學期 + 兩個時間欄 + 動作
-  const colCount = 7 + Number(showJoined) + Number(showUpdated)
+  // 姓名/學號/身份/職稱/學期 + 兩個時間欄 + 動作
+  const colCount = 6 + Number(showJoined) + Number(showUpdated)
   // 篩選值為顯示詞(社長/會長依社團名稱推導),查詢時轉回標準身份
   const [kindFilter, setKindFilter] = useState<string[]>([])
-  const [editing, setEditing] = useState<{ id: number; field: 'kind' | 'title' | 'phone' } | null>(null)
+  const [editing, setEditing] = useState<{ id: number; field: 'kind' | 'title' } | null>(null)
   const [form] = Form.useForm()
   const kind = Form.useWatch('kind', form)
 
@@ -73,7 +73,7 @@ export default function MembersPage() {
   // 頁面目前顯示的學期(「全部學期」時退回當前學期),作為各對話框的預設
   const pageSemester = semester === 'all' ? currentSemester() : semester
 
-  const onAdd = (values: { name: string; studentId: string; kind: MemberKind; title?: string; phone?: string; semester: string }) => {
+  const onAdd = (values: { name: string; studentId: string; kind: MemberKind; title?: string; semester: string }) => {
     // 表單無 submit 鈕,Enter 會直接送 form;confirmLoading 只擋 OK 鈕,攔不到
     if (create.isPending) return
     create.mutate(values, {
@@ -88,7 +88,7 @@ export default function MembersPage() {
 
   const doImport = () => {
     if (!csvText.trim()) {
-      message.error('請先選擇檔案或貼上內容;格式:姓名,學號,身份[,職稱[,電話]]')
+      message.error('請先選擇檔案或貼上內容。格式：姓名,學號,身份[,職稱]')
       return
     }
     importCsv.mutate(
@@ -98,7 +98,7 @@ export default function MembersPage() {
           if (result.errors.length) {
             message.warning(`已匯入 ${result.created + result.updated} 筆;${result.errors[0]} 等 ${result.errors.length} 項問題`)
           } else if (result.created + result.updated === 0) {
-            message.info('內容與名單相同,未有變更')
+            message.info('匯入內容與原名單相同')
           } else {
             message.success(`已匯入 ${result.created + result.updated} 名社員至 ${csvSemester}`)
           }
@@ -122,7 +122,7 @@ export default function MembersPage() {
       // 職稱補空字串讓各列欄數一致
       downloadCsv(
         `成員名單_${csvSemester}.csv`,
-        rows.map((m) => [m.name, m.studentId, label(m.kind), m.title ?? '', m.phone ?? '']),
+        rows.map((m) => [m.name, m.studentId, label(m.kind), memberTitle(m) ?? '']),
       )
       setExportOpen(false)
       message.success(`已匯出 ${rows.length} 名成員(${csvSemester})`)
@@ -133,7 +133,25 @@ export default function MembersPage() {
     }
   }
 
-  const patchMember = (id: number, patch: { kind?: MemberKind; title?: string | null; phone?: string | null }) => {
+  // 改成幹部但手上沒有職稱:接著問職稱,兩欄一起送。
+  // 幹部必填職稱,而負責人/副負責人的職稱欄不給編輯 —— 少了這一步,
+  // 「負責人 → 幹部」在畫面上是死路:後端 422,而使用者沒有地方補那個字
+  const [pendingOfficer, setPendingOfficer] = useState<number | null>(null)
+
+  const commitTitle = (m: Member, raw: string) => {
+    const title = raw.trim() || null
+    const becomingOfficer = pendingOfficer === m.id
+    setPendingOfficer(null)
+    setEditing(null)
+    if (becomingOfficer && !title) {
+      message.error('幹部必須填寫職稱')  // 沒填就不改身份,維持原狀
+      return
+    }
+    if (becomingOfficer) patchMember(m.id, { kind: '幹部', title })
+    else if (title !== (m.title ?? null)) patchMember(m.id, { title })
+  }
+
+  const patchMember = (id: number, patch: { kind?: MemberKind; title?: string | null }) => {
     update.mutate(
       { id, ...patch },
       {
@@ -208,9 +226,16 @@ export default function MembersPage() {
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         <LoadingBlock pending={listQuery.isPending}>
-          <table className="tb fixed" style={{ minWidth: 800 }}>
-            {/* 兩個時間欄依 showJoined/showUpdated 增減,colgroup 要跟著長短 */}
-            <Cols widths={['auto', 100, 120, 'auto', 120, 80, ...(showJoined ? [134] : []), ...(showUpdated ? [134] : []), 90]} />
+          <table className="tb fixed" style={{ minWidth: 860 }}>
+            {/* 兩個時間欄依 showJoined/showUpdated 增減,colgroup 要跟著長短。
+                姓名放得下四字中文名、學號放得下 9 碼。
+                **每一欄都給 px、沒有 auto**:寬螢幕的餘裕按比例攤回每一欄(每欄各寬一點),
+                窄到放不下時表格維持欄寬總和、由卡片橫捲(固定版面取「指定寬」與「欄寬總和」的較大者),
+                所以時間欄不會被壓到截斷。餘裕集中在單一 auto 欄的話,那一欄會胖到不像話
+                (放動作欄則更新時間與「移除」之間空一大條),而且它一欄吃掉全部彈性。
+                職稱固定為身份的 1.5 倍;動作欄 88px = 小尺寸「移除」鈕 + 左右內距;
+                時間欄 156px 放得下 `YYYY/MM/DD HH:mm` */}
+            <Cols widths={[100, 130, 120, 180, 80, ...(showJoined ? [156] : []), ...(showUpdated ? [156] : []), 88]} />
             <thead>
               <tr>
                 <th scope="col">{sortHeader('姓名', 'name')}</th>
@@ -230,7 +255,6 @@ export default function MembersPage() {
                   </span>
                 </th>
                 <th scope="col">{sortHeader('職稱', 'title')}</th>
-                <th scope="col">電話</th>
                 <th scope="col">{sortHeader('學期', 'semester')}</th>
                 {showJoined && <th scope="col">{sortHeader('入社時間', 'created_at')}</th>}
                 {showUpdated && <th scope="col">{sortHeader('更新時間', 'updated_at')}</th>}
@@ -252,7 +276,12 @@ export default function MembersPage() {
                         style={{ width: '100%' }}
                         options={kindOptions}
                         onChange={(v) => {
-                          // 職稱各身份皆可保留
+                          // 改成負責人/副負責人時後端會把職稱清掉(D-27)
+                          if (v === '幹部' && !m.title) {
+                            setPendingOfficer(m.id)
+                            setEditing({ id: m.id, field: 'title' })
+                            return
+                          }
                           patchMember(m.id, { kind: v })
                           setEditing(null)
                         }}
@@ -264,48 +293,25 @@ export default function MembersPage() {
                       </button>
                     )}
                   </td>
-                  <td className="cell-clip" title={m.title ?? undefined}>
-                    {editing?.id === m.id && editing.field === 'title' ? (
+                  <td className="cell-clip" title={canHaveTitle(m.kind) ? (m.title ?? undefined) : undefined}>
+                    {/* pendingOfficer 也算在編輯中:身份下拉關閉時的 onBlur 會把 editing 清掉,
+                        少了這一條,接著要問的職稱輸入框會在出現的同一刻消失 */}
+                    {pendingOfficer === m.id || (editing?.id === m.id && editing.field === 'title') ? (
                       <Input
                         size="small"
                         autoFocus
                         defaultValue={m.title}
+                        placeholder={pendingOfficer === m.id ? '幹部職稱' : undefined}
                         style={{ width: '100%' }}
-                        onBlur={(e) => {
-                          patchMember(m.id, { title: e.target.value.trim() || null })
-                          setEditing(null)
-                        }}
-                        onPressEnter={(e) => {
-                          patchMember(m.id, { title: (e.target as HTMLInputElement).value.trim() || null })
-                          setEditing(null)
-                        }}
+                        onBlur={(e) => commitTitle(m, e.target.value)}
+                        onPressEnter={(e) => commitTitle(m, (e.target as HTMLInputElement).value)}
                       />
+                    ) : !canHaveTitle(m.kind) ? (
+                      // 身份本身就是職稱:不給編輯入口,填了後端也會捨棄(D-27)
+                      <span style={{ color: 'var(--steel)' }}>—</span>
                     ) : (
                       <button type="button" className="link-btn" style={{ padding: 0, color: 'var(--ink)' }} onClick={() => setEditing({ id: m.id, field: 'title' })}>
                         {m.title ?? (m.kind === '幹部' ? '(未填)' : '—')} <EditOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />
-                      </button>
-                    )}
-                  </td>
-                  <td className="cell-clip">
-                    {editing?.id === m.id && editing.field === 'phone' ? (
-                      <Input
-                        size="small"
-                        autoFocus
-                        defaultValue={m.phone}
-                        className="num"
-                        style={{ width: '100%' }}
-                        onBlur={(e) => {
-                          patchMember(m.id, { phone: e.target.value.trim() || null })
-                          setEditing(null)
-                        }}
-                        onPressEnter={(e) => {
-                          patchMember(m.id, { phone: (e.target as HTMLInputElement).value.trim() || null })
-                          setEditing(null)
-                        }}
-                      />
-                    ) : (
-                      <button type="button" className="link-btn num" style={{ padding: 0, color: 'var(--ink)' }} onClick={() => setEditing({ id: m.id, field: 'phone' })}>
-                        {m.phone ?? '—'} <EditOutlined style={{ fontSize: 11, color: 'var(--steel)' }} />
                       </button>
                     )}
                   </td>
@@ -374,16 +380,16 @@ export default function MembersPage() {
           <Form.Item name="kind" label="身份" rules={[{ required: true }]}>
             <Select options={kindOptions} />
           </Form.Item>
-          <Form.Item
-            name="title"
-            label="職稱"
-            rules={kind === '幹部' ? [{ required: true, message: '請填寫職稱' }] : []}
-          >
-            <Input placeholder={kind === '幹部' ? '例:總務、活動' : '選填'} />
-          </Form.Item>
-          <Form.Item name="phone" label="電話">
-            <Input className="num" placeholder="選填" />
-          </Form.Item>
+          {/* 負責人與副負責人不寫職稱(D-27):不給欄位,而不是給了再默默丟掉 */}
+          {canHaveTitle(kind) && (
+            <Form.Item
+              name="title"
+              label="職稱"
+              rules={kind === '幹部' ? [{ required: true, message: '請填寫職稱' }] : []}
+            >
+              <Input placeholder={kind === '幹部' ? '例:總務、活動' : '選填'} />
+            </Form.Item>
+          )}
         </Form>
       </Modal>
 
@@ -414,7 +420,7 @@ export default function MembersPage() {
           rows={6}
           value={csvText}
           onChange={(e) => setCsvText(e.target.value)}
-          placeholder={'王小明,B11100001,幹部,活動,0912345678\n林大同,B11100002,社員'}
+          placeholder={'王小明,B11100001,幹部,活動\n林大同,B11100002,社員'}
         />
       </Modal>
 

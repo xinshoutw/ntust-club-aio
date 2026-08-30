@@ -1,9 +1,11 @@
 """社團主檔管理(/admin/clubs,權限鍵 amember):列表/詳情/修改/建帳號/重設密碼/成員名單。"""
 
+from datetime import date
+
 import sqlalchemy as sa
 
 from app.core.security import validate_password_strength
-from app.models import AuditLog, Club, ClubMember, Session, User
+from app.models import Activity, AuditLog, Club, ClubMember, Session, User, Violation
 from app.models.enums import MemberKind, UserRole
 from tests.conftest import csrf_headers, login, make_club, make_user
 
@@ -23,6 +25,8 @@ async def seed(client, db):
     )
     # 只讀得到名單、改不了設定的帳號(社團三頁各自一把鍵)
     await make_user(db, username="memberonly", role="admin", permissions=["amember"])
+    # 帳號管理頁本身:社團分頁看得到,但 /admin/clubs 的寫入一律歸 aclubset
+    await make_user(db, username="accountonly", role="admin", permissions=["aaccount"])
     await make_user(db, username="other", role="admin", permissions=["aviol"])
     await login(client, "clubadmin")
     return club, account, no_account
@@ -51,6 +55,9 @@ async def test_club_pages_have_separate_keys(client, db):
         await client.post(
             f"{URL}/{club.id}/account", json={"username": "x1"}, headers=csrf_headers(client)
         ),
+        await client.post(
+            URL, json={"name": "新社", "attribute": "藝術性"}, headers=csrf_headers(client)
+        ),
     ):
         assert resp.status_code == 403, resp.text
 
@@ -71,6 +78,115 @@ async def test_permission_gate(client, db):
         f"{URL}/{club.id}/account", json={"username": "newclub"}, headers=csrf_headers(client)
     )
     assert resp.status_code == 403
+    resp = await client.post(
+        URL, json={"name": "新社", "attribute": "藝術性"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 403
+
+
+async def test_create_club(client, db):
+    """新增社團:kind 由名稱結尾推導,性質必填,名稱不得重複。"""
+    club, _, _ = await seed(client, db)
+
+    resp = await client.post(
+        URL, json={"name": "攝影研究會", "attribute": "學藝性"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 201, resp.text
+    body = resp.json()["data"]
+    assert (body["name"], body["kind"], body["attribute"]) == ("攝影研究會", "學會", "學藝性")
+    assert body["is_active"] is True
+    # 帳號另走 /{id}/account:剛建好的社團還登不進來。查 GET 不查建立回應 ——
+    # 後者的 username 是 _detail_out(club, None) 寫死的參數,庫裡有沒有帳號都是 None
+    fetched = await client.get(f"{URL}/{body['id']}")
+    assert fetched.json()["data"]["username"] is None
+
+    # 結尾推不出社/會的先當社團(管理項目改得動),不是擋下來
+    resp = await client.post(
+        URL, json={"name": "臺科大電競", "attribute": "體育性"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["data"]["kind"] == "社團"
+
+    # 名稱前後空白要 trim:不 trim 的話 derive_kind 的 endswith 對不上(kind 落到
+    # fallback)、重名檢查也繞得過去,而全空白會建出一個沒有名字的社團
+    resp = await client.post(
+        URL, json={"name": "  書法社  ", "attribute": "藝術性"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 201, resp.text
+    assert (resp.json()["data"]["name"], resp.json()["data"]["kind"]) == ("書法社", "社團")
+    resp = await client.post(
+        URL, json={"name": "   ", "attribute": "藝術性"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 422, resp.text
+
+    # 名稱唯一;性質必填(沒有性質的社團不會出現在社團漏斗)
+    resp = await client.post(
+        URL, json={"name": club.name, "attribute": "藝術性"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 409, resp.text
+    resp = await client.post(URL, json={"name": "無性質社"}, headers=csrf_headers(client))
+    assert resp.status_code == 422, resp.text
+
+    audits = (
+        await db.scalars(sa.select(AuditLog).where(AuditLog.action == "club_created"))
+    ).all()
+    assert len(audits) == 3
+
+
+async def test_create_club_needs_the_club_settings_key(client, db):
+    """建社團歸 aclubset(社團管理項目),不是 aaccount —— 入口雖然在帳號管理頁上。"""
+    await seed(client, db)
+    await login(client, "accountonly")
+
+    # 帳號管理頁的社團分頁讀得到清單
+    assert (await client.get(URL)).status_code == 200
+    resp = await client.post(
+        URL, json={"name": "攝影社", "attribute": "藝術性"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 403, resp.text
+
+
+async def test_patch_attribute(client, db):
+    """性質改得動:建檔時必填,選錯了不必動 DB;既有的 null 不強迫補值。"""
+    club, _, _ = await seed(client, db)
+
+    resp = await client.patch(
+        f"{URL}/{club.id}", json={"attribute": "體育性"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["attribute"] == "體育性"
+
+    # 不送 attribute 的 PATCH 不得把既有值清掉(exclude_unset)
+    resp = await client.patch(
+        f"{URL}/{club.id}", json={"name": club.name}, headers=csrf_headers(client)
+    )
+    assert resp.json()["data"]["attribute"] == "體育性"
+
+    audits = (
+        await db.scalars(
+            sa.select(AuditLog).where(AuditLog.action == "club_updated")
+        )
+    ).all()
+    assert any("attribute:" in (a.detail or "") for a in audits)
+
+
+async def test_patch_en_name(client, db):
+    """英文名稱由學務處維護(社團端唯讀);清空存 NULL,不留空字串。"""
+    club, _, _ = await seed(client, db)
+
+    resp = await client.patch(
+        f"{URL}/{club.id}", json={"en_name": " Dance Club "}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["en_name"] == "Dance Club"
+
+    resp = await client.patch(
+        f"{URL}/{club.id}", json={"en_name": "   "}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["en_name"] is None
+    await db.refresh(club)
+    assert club.en_name is None
 
 
 async def test_club_options_open_to_any_admin(client, db):
@@ -83,7 +199,9 @@ async def test_club_options_open_to_any_admin(client, db):
     data = resp.json()["data"]
     assert {c["name"] for c in data} == {"熱舞社", "吉他社"}
     row = next(c for c in data if c["id"] == club.id)
-    assert set(row) == {"id", "name", "kind", "attribute"}  # 不含帳號/停權等敏感欄位
+    # is_active 是啟停用旗標(行政分下拉靠它濾掉會 404 的停用社團),不是敏感欄位;
+    # 帳號名與停權日仍只在需要 aclub 的完整主檔
+    assert set(row) == {"id", "name", "kind", "attribute", "is_active"}
 
     # 非 admin 不可讀
     await login(client, "club01")
@@ -231,6 +349,122 @@ async def test_reset_password(client, db):
     )
     assert audit_row is not None
     assert password not in audit_row.detail  # 明碼絕不落稽核
+
+
+async def test_delete_club(client, db):
+    """刪除:社團底下有資料就先擋(訊息列出筆數),force=true 才照 FK 圖一路刪掉。"""
+    club, account, no_account = await seed(client, db)
+
+    # 沒有帳號、沒有資料 → 直接刪得掉
+    resp = await client.delete(f"{URL}/{no_account.id}", headers=csrf_headers(client))
+    assert resp.status_code == 200, resp.text
+    assert await db.scalar(sa.select(Club.id).where(Club.id == no_account.id)) is None
+    audit_row = await db.scalar(sa.select(AuditLog).where(AuditLog.action == "club_deleted"))
+    assert audit_row is not None
+    assert "吉他社" in audit_row.detail
+
+    # 社員名單、活動(由社團帳號開立)、違規紀錄三種擋法:
+    # 名單是 CASCADE(FK 擋不住)、活動擋在帳號的 created_by、違規擋在社團本身
+    db.add(
+        ClubMember(
+            club_id=club.id,
+            name="王小明",
+            student_id="B11000000",
+            kind=MemberKind.MEMBER,
+            semester="114-1",
+        )
+    )
+    db.add(
+        Activity(
+            club_id=club.id, name="迎新", location="活動中心", type="社課或會議",
+            date=date(2026, 3, 1), end_date=date(2026, 3, 1), created_by=account.id,
+        )
+    )
+    filler = await db.scalar(sa.select(User).where(User.username == "clubadmin"))
+    db.add(
+        Violation(
+            club_id=club.id, occurred_on=date(2026, 1, 1), location="活動中心", items=["噪音"],
+            filler_id=filler.id,
+        )
+    )
+    await db.commit()
+
+    resp = await client.delete(f"{URL}/{club.id}", headers=csrf_headers(client))
+    assert resp.status_code == 409
+    assert resp.json()["meta"]["code"] == "CLUB_HAS_DATA"  # 二次確認靠這個碼分辨
+    error = resp.json()["error"]
+    # 確認框要講得出一併刪掉的是什麼、多少筆;社團帳號一律隨社團刪,不列進擋刪清單
+    assert "社員名單 1" in error and "活動 1" in error and "違規勸導 1" in error
+    assert "users" not in error
+    assert await db.scalar(sa.select(Club.id).where(Club.id == club.id)) is not None
+
+    # force=true:社團、帳號與底下三類資料一起消失
+    resp = await client.delete(f"{URL}/{club.id}?force=true", headers=csrf_headers(client))
+    assert resp.status_code == 200, resp.text
+    assert await db.scalar(sa.select(Club.id).where(Club.id == club.id)) is None
+    assert await db.scalar(sa.select(User.id).where(User.id == account.id)) is None
+    assert await db.scalar(sa.select(Activity.id).where(Activity.club_id == club.id)) is None
+    assert await db.scalar(sa.select(Violation.id).where(Violation.club_id == club.id)) is None
+    assert await db.scalar(sa.select(ClubMember.id).where(ClubMember.club_id == club.id)) is None
+    purged = await db.scalar(
+        sa.select(AuditLog).where(AuditLog.action == "club_deleted").order_by(AuditLog.id.desc())
+    )
+    # 刪了哪幾類、各幾列要查得到(帳號本身也算一列)
+    assert "activities=1" in purged.detail
+    assert "club_members=1" in purged.detail
+    assert "violations=1" in purged.detail
+    assert "users=1" in purged.detail
+    assert "force=True" in purged.detail
+
+    assert (await client.delete(f"{URL}/99999", headers=csrf_headers(client))).status_code == 404
+    # 寫入權限歸 aclubset:只有帳號管理鍵刪不動
+    await login(client, "accountonly")
+    other = await make_club(db, name="桌球社")
+    resp = await client.delete(f"{URL}/{other.id}?force=true", headers=csrf_headers(client))
+    assert resp.status_code == 403
+
+
+async def test_delete_club_never_touches_other_clubs(client, db):
+    """強制刪除只清自己那一支:追到別社的列就整個回 409,不是順手刪掉別人的資料。
+
+    走 FK 圖到社團帳號時,追到的是「這個帳號碰過的東西」—— 那不等於「這個社團的東西」。
+    """
+    club, account, other = await seed(client, db)
+    keeper = await db.scalar(sa.select(User).where(User.username == "clubadmin"))
+    db.add_all([
+        Activity(
+            club_id=club.id, name="要刪的", location="x", type="社課或會議",
+            date=date(2026, 3, 1), end_date=date(2026, 3, 1), created_by=account.id,
+        ),
+        # 別社的活動,卻是這個帳號開的(正常操作做不出來,但資料上擋不住)
+        Activity(
+            club_id=other.id, name="別動我", location="x", type="社課或會議",
+            date=date(2026, 3, 1), end_date=date(2026, 3, 1), created_by=account.id,
+        ),
+    ])
+    await db.commit()
+
+    resp = await client.delete(f"{URL}/{club.id}?force=true", headers=csrf_headers(client))
+    assert resp.status_code == 409, resp.text
+    # 交易整個回滾:本社的活動、社團、帳號一列都沒少
+    assert await db.scalar(sa.select(Activity.id).where(Activity.name == "別動我")) is not None
+    assert await db.scalar(sa.select(Activity.id).where(Activity.name == "要刪的")) is not None
+    assert await db.scalar(sa.select(Club.id).where(Club.id == club.id)) is not None
+    assert await db.scalar(sa.select(User.id).where(User.id == account.id)) is not None
+    assert await db.scalar(sa.select(User.id).where(User.id == keeper.id)) is not None
+
+
+async def test_delete_club_keeps_the_audit_trail(client, db):
+    """稽核軌跡不隨社團帳號消失(`audit_logs.user_id` 是 SET NULL,刻意保留)。"""
+    club, account, _ = await seed(client, db)
+    db.add(AuditLog(action="club_login", user_id=account.id, detail=f"club={club.id}"))
+    await db.commit()
+
+    resp = await client.delete(f"{URL}/{club.id}?force=true", headers=csrf_headers(client))
+    assert resp.status_code == 200, resp.text
+    row = await db.scalar(sa.select(AuditLog).where(AuditLog.action == "club_login"))
+    assert row is not None
+    assert row.user_id is None  # 人被刪了,做過什麼還在
 
 
 async def test_create_club_account(client, db):

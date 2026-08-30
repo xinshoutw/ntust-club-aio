@@ -1,8 +1,9 @@
 // 總覽頁 API 層:自 GET /club/activities 推導「待辦」與「進行中申請(活動)」
-// (結案期限、鎖定與可結案一律讀後端推導的欄位,鎖定月數在系統設定可調)
+// (結案期限、鎖定與可結案一律讀後端推導的欄位,鎖定天數在系統設定可調)
 import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { fetchAllPages } from './fetchAll'
+import { activityPath } from '../features/activities/types'
 import type { StatusKey } from '../lib/status'
 
 export interface OverviewTodo {
@@ -11,6 +12,8 @@ export interface OverviewTodo {
   name: string
   deadline: string
   daysLeft: number
+  /** 活動列表的目標網址:帶學期與要開啟的活動,否則落地時預設學期看不到它 */
+  path: string
 }
 
 export interface TrackedItem {
@@ -25,6 +28,7 @@ interface ActivityOut {
   id: number
   name: string
   status: string
+  date: string | null // 草稿可能未填;學期依它推(後端也是用 date 篩學期)
   end_date: string
   close_locked: boolean
   can_close: boolean
@@ -69,7 +73,8 @@ export function useOverviewActivities() {
           id: a.id,
           kind: a.close_locked ? ('locked' as const) : ('closing_due' as const),
           name: a.name,
-          // 期限一律用後端算的(鎖定月數在系統設定可調,前端自己 +1 個月會整片錯)
+          path: activityPath(a),
+          // 期限一律用後端算的(鎖定天數在系統設定可調,前端自己加天數會整片錯)
           deadline: a.close_deadline ? dayjs(a.close_deadline).format('YYYY/MM/DD') : '—',
           daysLeft: a.close_deadline ? dayjs(a.close_deadline).startOf('day').diff(today, 'day') : 0,
         }))
@@ -82,7 +87,7 @@ export function useOverviewActivities() {
           name: a.name,
           category: '活動' as const,
           status: trackedStatus(a),
-          path: '/activities',
+          path: activityPath(a),
         }))
       return { todos, tracked }
     },

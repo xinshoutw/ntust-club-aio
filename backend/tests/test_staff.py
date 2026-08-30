@@ -5,9 +5,9 @@ from datetime import date, timedelta
 import sqlalchemy as sa
 
 from app.models import AuditLog, Equipment, EquipmentLoan, Violation
+from app.models.enums import ClubAttribute
 from app.services import notify
-from app.services.activity_service import add_months
-from app.services.violation_service import today_taipei
+from app.services.violation_service import add_months, today_taipei
 from tests.conftest import csrf_headers, login, make_club, make_user
 
 
@@ -33,6 +33,7 @@ async def make_loan(
     start=None,
     end=None,
     borrower=None,
+    checkout_by=None,
 ):
     """借用單工廠:activity_id=None(模型允許;舊系統斷鏈/行政手動借用同形)。"""
     eq = Equipment(name=eq_name, total_qty=10, needs_serial=needs_serial)
@@ -50,6 +51,7 @@ async def make_loan(
         phone="0912-345678",
         status=status,
         borrower_name=borrower,
+        checkout_by=checkout_by,
     )
     db.add(loan)
     await db.commit()
@@ -73,10 +75,12 @@ def _mute_club_event(monkeypatch):
 async def test_staff_endpoints_forbidden_for_other_roles(client, db):
     club = await make_club(db)
     await make_user(db, username="club01", role="club", club_id=club.id)
-    await make_user(db, username="root", role="admin", is_super=True)
+    # 工讀生那組頁面在行政端也掛得到(astaff),所以「不是工讀生」不再等於進不去:
+    # 擋的是**沒有那把鍵**的管理員(super 一律全通,與其他頁面權限鍵同一條規則)
+    await make_user(db, username="adm01", role="admin", permissions=["aviol"])
     await make_user(db, username="viewer01", role="viewer")
 
-    for username in ("club01", "root", "viewer01"):
+    for username in ("club01", "adm01", "viewer01"):
         await login(client, username)
         assert (await client.get("/api/v1/staff/clubs")).status_code == 403
         assert (await client.get("/api/v1/staff/violation-items")).status_code == 403
@@ -276,6 +280,7 @@ async def test_loan_lists_and_overdue_filter(client, db):
     by_id = {r["id"]: r for r in body["data"]}
     assert by_id[approved.id]["club_name"] == club.name
     assert by_id[approved.id]["needs_serial"] is False
+    assert by_id[approved.id]["checkout_by_name"] is None  # 還沒借出就沒有出借人
     assert by_id[manual.id]["club_name"] is None
     assert all(r["overdue"] is False for r in body["data"])
 
@@ -317,7 +322,7 @@ async def test_checkout_state(client, db, monkeypatch):
     loan, _ = await make_loan(db, club.id, eq_name="無線麥克風", needs_serial=True, qty=2)
     url = f"/api/v1/staff/equipment-loans/{loan.id}/checkout"
 
-    # 借用人空白 → 422
+    # 收件人空白 → 422
     resp = await client.post(
         url, json={"borrower_name": "  "}, headers=csrf_headers(client)
     )
@@ -337,9 +342,15 @@ async def test_checkout_state(client, db, monkeypatch):
     assert "serials" not in data
     # 借出點交要聯絡得到申請人
     assert data["phone"] == "0912-345678"
+    assert data["checkout_by_name"] == staff.name
     await db.refresh(loan)
     assert loan.checkout_by == staff.id
     assert loan.checkout_at is not None
+    # 出借人要跟著進待歸還清單:歸還點交當下得看得出當初是誰借出的
+    listed = (await client.get(
+        "/api/v1/staff/equipment-loans", params={"status": "checked_out"}
+    )).json()["data"]
+    assert [r["checkout_by_name"] for r in listed] == [staff.name]
     audit_row = await db.scalar(
         sa.select(AuditLog).where(AuditLog.action == "equipment_checked_out")
     )
@@ -384,8 +395,10 @@ async def test_checkout_state(client, db, monkeypatch):
 async def test_checkin_flow(client, db, monkeypatch):
     staff, club = await seed(client, db)
     _mute_club_event(monkeypatch)
+    lender = await make_user(db, username="pt02", role="staff", name="李出借")
     loan, _ = await make_loan(
-        db, club.id, status="checked_out", eq_name="行動音響", borrower="陳借用"
+        db, club.id, status="checked_out", eq_name="行動音響", borrower="陳借用",
+        checkout_by=lender.id,
     )
     url = f"/api/v1/staff/equipment-loans/{loan.id}/checkin"
 
@@ -398,7 +411,10 @@ async def test_checkin_flow(client, db, monkeypatch):
         headers=csrf_headers(client),
     )
     assert resp.status_code == 200, resp.text
-    assert resp.json()["data"]["status"] == "returned"
+    data = resp.json()["data"]
+    assert data["status"] == "returned"
+    # 出借人是當初辦理借出的人,不是此刻點收的 staff
+    assert data["checkout_by_name"] == lender.name != staff.name
     await db.refresh(loan)
     assert loan.returner_name == "張歸還"
     assert loan.checkin_note == "外觀完好"
@@ -474,3 +490,24 @@ async def test_staff_remind(client, db, monkeypatch):
             "/api/v1/staff/equipment-loans/99999/remind", headers=csrf_headers(client)
         )
     ).status_code == 404
+
+
+async def test_staff_clubs_carry_the_attribute_for_the_folder_menu(client, db):
+    """二級選單的第一層是社團性質:少了它,工讀生端只能平鋪 60+ 社。"""
+    await make_club(db, name="熱舞社", attribute=ClubAttribute.ART)
+    await make_club(db, name="慈幼社", attribute=ClubAttribute.SERVICE)
+    await make_club(db, name="吉他社", attribute=ClubAttribute.ART)
+    await make_club(db, name="停社舊社", attribute=None, is_active=False)
+    await make_user(db, username="staff01", role="staff")
+    await login(client, "staff01")
+
+    data = (await client.get("/api/v1/staff/clubs")).json()["data"]
+    rows = {c["name"]: c for c in data}
+    assert rows["熱舞社"]["attribute"] == "藝術性"
+    # 停社舊社沒有性質:前端歸「未分類」,不是錯誤
+    assert rows["停社舊社"]["attribute"] is None
+
+    # 排序必須是 性質 → 名稱(與 /admin/clubs/options 同一條):資料夾層是照「主檔出現順序」
+    # 分組的,只按名稱排的話同一個性質的社團會被別的性質插開,資料夾就會重複出現
+    # PG 的 ASC 預設 NULLS LAST,enum 依宣告序(服務性 在 藝術性 之前)
+    assert [c["name"] for c in data] == ["慈幼社", "吉他社", "熱舞社", "停社舊社"]

@@ -5,8 +5,7 @@ import type { FixedWindow } from '../../api/bookings'
 export function intakeNote(w: FixedWindow | undefined): string | null {
   if (!w || w.state === 'open') return null
   const range = w.openFrom && w.openUntil ? `(${w.openFrom} – ${w.openUntil})` : ''
-  const tail = ',已收到的申請仍可審核。受理期間可於系統設定調整'
-  if (w.state === 'unset') return `尚未設定受理期間,社團目前送不出新申請${tail}`
-  if (w.state === 'upcoming') return `受理期間尚未開始${range},社團還不能送新申請${tail}`
-  return `受理期間已結束${range},社團無法再送新申請${tail}`
+  if (w.state === 'unset') return `尚未設定受理期間，社團無法送出申請`
+  if (w.state === 'upcoming') return `受理期間尚未開始 ${range}，社團無法送出申請`
+  return `受理期間已結束 ${range}，社團無法送出申請`
 }

@@ -2,7 +2,7 @@
 // 查詢鍵集中管理,mutation 一律 invalidate 整域(送出借用會同時影響場況圖/可借數/我的借用)
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs, { type Dayjs } from 'dayjs'
-import { api, apiPaged, apiWithMeta, qs } from './client'
+import { api, apiPaged, qs } from './client'
 import { useInvalidateBadges } from './badges'
 import { fetchAllPages } from './fetchAll'
 import type { StatusKey } from '../lib/status'
@@ -14,10 +14,30 @@ const DATE_FMT = 'YYYY/MM/DD'
 const toIso = (d: Dayjs): string => d.format('YYYY-MM-DD')
 const fromIso = (s: string): string => dayjs(s).format(DATE_FMT)
 
+/** 承辦退回或撤銷時填的原因與時間(後端由 approval_records 補);社團自行取消為 undefined */
+export interface DecisionInfo {
+  reason: string
+  at: string // YYYY/MM/DD HH:mm
+}
+
+/** 三種借用的輸出共用同一組欄位;後端一律帶,沒有處置紀錄時是 null */
+interface DecisionOut {
+  decision_reason: string | null
+  decided_at: string | null
+}
+
+const toDecision = (o: DecisionOut): DecisionInfo | undefined =>
+  o.decision_reason && o.decided_at
+    ? { reason: o.decision_reason, at: dayjs(o.decided_at).format('YYYY/MM/DD HH:mm') }
+    : undefined
+
 export interface PageParams {
   page: number
   pageSize: number
 }
+
+/** 借用區間(起、訖;含頭含尾) */
+export type DateRange = [Dayjs, Dayjs]
 
 // ---- 場地主檔 ----
 
@@ -63,18 +83,6 @@ export interface EquipmentItem {
   maxLeaseCount?: number
 }
 
-/** 依關聯活動推導的借用區間(顯示格式) */
-export interface LoanWindow {
-  start: string
-  end: string
-}
-
-export interface EquipmentList {
-  items: EquipmentItem[]
-  /** 帶 activity_id 查詢時後端 meta 回傳的推導區間;未帶時為 null */
-  window: LoanWindow | null
-}
-
 interface EquipmentOut {
   id: number
   name: string
@@ -92,6 +100,30 @@ const toEquipment = (e: EquipmentOut): EquipmentItem => ({
   needsSerial: e.needs_serial,
   available: e.available,
 })
+
+/** 一次查詢的器材佔用結果;帶回涵蓋區間,呼叫端才分得出「沒佔用」與「還沒載到」 */
+export interface EquipmentUsageGrid {
+  /** 這份資料涵蓋的區間(ISO,含頭含尾) */
+  start: string
+  end: string
+  items: EquipmentUsage[]
+}
+
+/** 器材逐日佔用量(借用總覽的器材檢視) */
+export interface EquipmentUsage {
+  id: number
+  name: string
+  totalQty: number
+  /** ISO 日期 → 該日佔用件數;未列出=0 */
+  used: Record<string, number>
+}
+
+interface EquipmentUsageOut {
+  id: number
+  name: string
+  total_qty: number
+  used: Record<string, number>
+}
 
 // ---- 借用總覽色格(單日場況) ----
 
@@ -150,11 +182,12 @@ export interface RoomBooking {
   startDate: string
   status: StatusKey
   entries: RoomEntry[]
+  decision?: DecisionInfo
 }
 
 type BookingStatusOut = 'pending' | 'approved' | 'rejected' | 'cancelled'
 
-interface RoomBookingOut {
+interface RoomBookingOut extends DecisionOut {
   id: number
   venue_id: number
   venue_name: string
@@ -187,6 +220,7 @@ export const toRoomBooking = (r: RoomBookingOut): RoomBooking => {
     startDate: fromIso(r.start_date),
     status: r.status,
     entries,
+    decision: toDecision(r),
   }
 }
 
@@ -201,9 +235,10 @@ export interface VenueBookingRecord {
   periods: string[]
   purpose: string
   status: StatusKey
+  decision?: DecisionInfo
 }
 
-interface VenueBookingOut {
+interface VenueBookingOut extends DecisionOut {
   id: number
   venue_id: number
   venue_name: string
@@ -225,6 +260,7 @@ const toVenueBooking = (v: VenueBookingOut): VenueBookingRecord => ({
   periods: v.periods,
   purpose: v.purpose,
   status: v.status,
+  decision: toDecision(v),
 })
 
 // ---- 器材借用 ----
@@ -241,11 +277,12 @@ export interface EquipmentLoanRecord {
   status: StatusKey
   borrower?: string
   returnedBy?: string
+  decision?: DecisionInfo
 }
 
 type LoanStatusOut = BookingStatusOut | 'checked_out' | 'returned'
 
-interface EquipmentLoanOut {
+interface EquipmentLoanOut extends DecisionOut {
   id: number
   equipment_id: number
   equipment_name: string
@@ -274,6 +311,7 @@ export const toEquipmentLoan = (l: EquipmentLoanOut): EquipmentLoanRecord => ({
   status: l.overdue ? 'overdue' : l.status,
   borrower: l.borrower_name ?? undefined,
   returnedBy: l.returner_name ?? undefined,
+  decision: toDecision(l),
 })
 
 // ---- 查詢鍵 ----
@@ -283,7 +321,9 @@ const keys = {
   active: (kind: string) => ['bookings', 'active', kind] as const,
   returned: (page: number) => ['bookings', 'returned', page] as const,
   venues: ['bookings', 'venues'] as const,
-  equipment: (activityId: number | null) => ['bookings', 'equipment', activityId] as const,
+  equipment: (range: [string, string] | null) => ['bookings', 'equipment', range] as const,
+  equipmentUsage: (startIso: string, endIso: string) =>
+    ['bookings', 'equipment-usage', startIso, endIso] as const,
   availability: (iso: string) => ['bookings', 'availability', iso] as const,
   availabilityRange: (startIso: string, endIso: string, venueId?: number) =>
     ['bookings', 'availability-range', startIso, endIso, venueId ?? null] as const,
@@ -303,20 +343,42 @@ export function useVenues() {
   })
 }
 
-/** 器材列表;帶 activityId 時可借數依該活動推導區間計算,並回傳區間(meta) */
-export function useEquipmentList(activityId?: number) {
+/** 器材列表;帶借用區間時可借數依該區間計算(未帶時後端只扣借出中,呼叫端一律顯示 —) */
+export function useEquipmentList(range?: DateRange | null) {
   return useQuery({
-    queryKey: keys.equipment(activityId ?? null),
-    queryFn: async (): Promise<EquipmentList> => {
-      const { data, meta } = await apiWithMeta<EquipmentOut[], { loan_start: string; loan_end: string }>(
-        `/club/equipment${qs({ activity_id: activityId })}`,
-      )
-      return {
-        items: data.map(toEquipment),
-        window: meta?.loan_start && meta.loan_end ? { start: fromIso(meta.loan_start), end: fromIso(meta.loan_end) } : null,
-      }
-    },
-    // 換活動時保留舊列表避免表格閃空;呼叫端以 isPlaceholderData 判斷可借數是否已對應新活動
+    queryKey: keys.equipment(range ? [toIso(range[0]), toIso(range[1])] : null),
+    queryFn: () =>
+      api<EquipmentOut[]>(
+        `/club/equipment${qs({ start: range && toIso(range[0]), end: range && toIso(range[1]) })}`,
+      ).then((rows) => rows.map(toEquipment)),
+    // 換區間時保留舊列表避免表格閃空;呼叫端以 isPlaceholderData 判斷可借數是否已對應新區間
+    placeholderData: keepPreviousData,
+  })
+}
+
+/** 借用總覽的器材色格:區間內每項器材的逐日佔用量(未列出的日期=0) */
+export function useEquipmentUsage(range: DateRange, enabled = true) {
+  const [startIso, endIso] = [toIso(range[0]), toIso(range[1])]
+  return useQuery({
+    queryKey: keys.equipmentUsage(startIso, endIso),
+    enabled,
+    queryFn: () =>
+      api<EquipmentUsageOut[]>(
+        `/club/equipment/usage${qs({ start: startIso, end: endIso })}`,
+      ).then(
+        (rows): EquipmentUsageGrid => ({
+          start: startIso,
+          end: endIso,
+          items: rows.map((e) => ({
+            id: e.id,
+            name: e.name,
+            totalQty: e.total_qty,
+            used: e.used,
+          })),
+        }),
+      ),
+    // 翻日期時留住舊資料避免表格閃空;舊資料連自己的區間一起帶回來,
+    // 落在區間外的日期呼叫端當「還沒載到」處理 —— 沒對到的日期退成 0 會說謊
     placeholderData: keepPreviousData,
   })
 }
@@ -456,34 +518,45 @@ export function useReturnedEquipmentLoans(p: PageParams) {
   })
 }
 
-// 最近借用(近 5 筆,僅已結束/退回/取消/歸還;active=false)
-export function useRecentRoomBookings() {
+// 最近借用(已結束/退回/取消/歸還;active=false)。
+// 伺服器端分頁:退回件排在借用日之後,不翻頁就永遠看不到自己被退回的原因
+export const RECENT_PAGE = 5
+
+export interface RecentPage<T> {
+  rows: T[]
+  total: number
+}
+
+export function useRecentRoomBookings(p: PageParams) {
   return useQuery({
-    queryKey: keys.rooms({ page: 1, pageSize: 5 }),
-    queryFn: () =>
+    queryKey: keys.rooms(p),
+    queryFn: (): Promise<RecentPage<RoomBooking>> =>
       apiPaged<RoomBookingOut[]>(
-        `/club/room-bookings${qs({ active: false, page: 1, page_size: 5 })}`,
-      ).then(({ data }) => data.map(toRoomBooking)),
+        `/club/room-bookings${qs({ active: false, page: p.page, page_size: p.pageSize })}`,
+      ).then(({ data, total }) => ({ rows: data.map(toRoomBooking), total })),
+    placeholderData: keepPreviousData,
   })
 }
 
-export function useRecentVenueBookings() {
+export function useRecentVenueBookings(p: PageParams) {
   return useQuery({
-    queryKey: keys.venueBookings({ page: 1, pageSize: 5 }),
-    queryFn: () =>
+    queryKey: keys.venueBookings(p),
+    queryFn: (): Promise<RecentPage<VenueBookingRecord>> =>
       apiPaged<VenueBookingOut[]>(
-        `/club/venue-bookings${qs({ active: false, page: 1, page_size: 5 })}`,
-      ).then(({ data }) => data.map(toVenueBooking)),
+        `/club/venue-bookings${qs({ active: false, page: p.page, page_size: p.pageSize })}`,
+      ).then(({ data, total }) => ({ rows: data.map(toVenueBooking), total })),
+    placeholderData: keepPreviousData,
   })
 }
 
-export function useRecentEquipmentLoans() {
+export function useRecentEquipmentLoans(p: PageParams) {
   return useQuery({
-    queryKey: keys.loans({ page: 1, pageSize: 5 }),
-    queryFn: () =>
+    queryKey: keys.loans(p),
+    queryFn: (): Promise<RecentPage<EquipmentLoanRecord>> =>
       apiPaged<EquipmentLoanOut[]>(
-        `/club/equipment-loans${qs({ active: false, page: 1, page_size: 5 })}`,
-      ).then(({ data }) => data.map(toEquipmentLoan)),
+        `/club/equipment-loans${qs({ active: false, page: p.page, page_size: p.pageSize })}`,
+      ).then(({ data, total }) => ({ rows: data.map(toEquipmentLoan), total })),
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -509,6 +582,7 @@ export interface EquipmentLoanInput {
   equipmentId: number
   activityId: number
   qty: number
+  range: DateRange
   purpose: string
   phone: string
 }
@@ -551,6 +625,8 @@ export function useBookingMutations() {
           equipment_id: b.equipmentId,
           activity_id: b.activityId,
           qty: b.qty,
+          start_date: toIso(b.range[0]),
+          end_date: toIso(b.range[1]),
           purpose: b.purpose,
           phone: b.phone.trim(),
         }),

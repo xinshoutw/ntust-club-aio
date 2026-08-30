@@ -5,7 +5,9 @@ import dayjs from 'dayjs'
 import { api, apiPaged, qs } from './client'
 import { useInvalidateBadges } from './badges'
 import { fetchAllPages } from './fetchAll'
-import { fileUrl } from './activities'
+import { staffTextToWorks, type WorkItem } from '../features/activities/types'
+import { fileUrl, toActivity, type ActivityOut } from './activities'
+import { fileTypeOf, type EvalFile } from '../features/eval/types'
 import type { SessionUser } from './auth'
 import type { StatusKey } from '../lib/status'
 
@@ -23,21 +25,63 @@ export interface ReviewItem {
   requested: number
   status: StatusKey
   fundSource?: string // 第一關認定的經費來源(後端 fund_source)
+  // 經費合計(彈窗結案側的「自籌 / 核定 / 實支」一列讀它;approvedTotal 為 null=尚未核定)
+  selfFundTotal?: number
+  approvedTotal?: number
+  // 結案側的內容(詳情到位才有);彈窗的「結案」頁籤讀這三個。
+  // 沒有 report 也可能切得過去 —— 逾期手動解鎖寫的是 activity_close 的簽核列
+  report?: AdminCloseReport
+  photos?: AdminFileRef[]
+  closeDocs?: AdminFileRef[]
   // 行政端社團總覽以社團端活動資料組出唯讀檢視,部分欄位可能缺漏(彈窗以 — 呈現)
   detail?: {
     timeRange?: string
+    /** 簽核章軌:該關最後一次核准的人與時間(僅行政端詳情帶) */
+    stamps?: ReviewStamp[]
+    /** 完整簽核紀錄(誰於何時核准/退回);章軌只印每一關最後一次核准,退回不入軌 */
+    approvals?: ReviewApproval[]
     location?: string
     participantsIn?: number
     participantsOut?: number
-    submittedAt?: string
+    submittedAt?: string | null
     submittedBy?: string
+    content?: string
+    works?: WorkItem[]
     attachments: string[]
     attachmentFiles?: { id: string; name: string; url: string }[]
-    budget: { id: number; category: string; description: string; selfFund: number; requested: number; approved: number }[]
+    budget: {
+      id: number
+      category: string
+      description: string
+      selfFund: number
+      requested: number
+      /** 已核定金額;null=還沒核定(不是 0 元) */
+      approved: number | null
+    }[]
   }
 }
 
-/** 後端實際儲存的活動狀態(locked 為前端推導顯示鍵,不可作查詢參數) */
+/** 簽核紀錄的一列(approval_records)。
+ *  `isClose` 分開申請與結案 —— 兩者同放一張表,只印「核准」會分不出核的是哪一件 */
+export interface ReviewApproval {
+  actor: string
+  at: string // YYYY/MM/DD HH:mm
+  decision: 'approve' | 'reject' | 'unlock' | 'revoke'
+  isClose: boolean
+  stage: string // advisor / chief / dean
+  /** 退回原因(approve 列為 null);社團看得到的那句,承辦這裡也要看得到 */
+  reason?: string
+}
+
+/** 章軌的一格;推導在後端 `services.apply_approvals`,前端不再自己數一次核准列 */
+export interface ReviewStamp {
+  stage: ReviewStage
+  name: string
+  at: string // MM/DD HH:mm
+  atFull: string // YYYY/MM/DD HH:mm:ss
+}
+
+/** 後端實際儲存的活動狀態 */
 export type AdminActivityStatus =
   | 'pending_advisor'
   | 'pending_chief'
@@ -51,12 +95,13 @@ export interface AdminActivity extends ReviewItem {
   activityId: number
   clubId: number
   endDate: string // YYYY/MM/DD(未跨日 = date)
-  /** 送件時間(後端無獨立送出時間戳,以建立時間近似)YYYY/MM/DD HH:mm */
-  submittedAt: string
+  /** 送件時間(每次送審覆寫,D-29)YYYY/MM/DD HH:mm。
+   *  舊資料與 seed 可能沒有 —— 排序一律讓 null 落在最後(後端白名單走 NullsLast) */
+  submittedAt: string | null
   selfFundTotal: number
   approvedTotal?: number
   closeLocked: boolean
-  closeDeadline?: string // 結案期限=活動結束日+鎖定月數(推導)
+  closeDeadline?: string // 結案期限=活動結束日+鎖定天數(推導)
   semester: string
   /** 最近審核時間=申請/結案簽核紀錄的 max(created_at)YYYY/MM/DD HH:mm;無審核紀錄=undefined */
   reviewedAt?: string
@@ -86,12 +131,18 @@ export interface AdminCloseReport {
   expense: number
   submittedAt: string // YYYY/MM/DD HH:mm
   reflections: { name: string; dept: string; text: string }[]
+  // 已落庫的繳交確認(遷移件帶的是舊系統的旗標);結案核准會整組覆寫
+  photosConfirmed: boolean
+  reportConfirmed: boolean
+  reflectionsConfirmed: boolean
 }
 
 export interface AdminActivityDetail extends AdminActivity {
   detail: NonNullable<ReviewItem['detail']>
   report?: AdminCloseReport
   photos: AdminFileRef[]
+  /** 結案附件(保單、租車契約、簽到表…);slot=report_doc */
+  closeDocs: AdminFileRef[]
 }
 
 // ---- 後端 schema(backend/app/schemas/activities.py)----
@@ -130,36 +181,36 @@ interface ReportOut {
   expense: number
   submitted_at: string
   reflections: { id: number; student_name: string; dept: string; body: string }[]
+  photos_confirmed: boolean
+  report_confirmed: boolean
+  reflections_confirmed: boolean
 }
 
-interface AdminActivityOut {
-  id: number
-  club_id: number
+// 與社團端 /club/activities 同一份 schema(backend ActivityOut),行政端多帶社團名與
+// 最近審核時間。**不再各寫一份**:上一版漏了 has_close_draft,同一個回應在兩處長不一樣
+interface AdminActivityOut extends Omit<ActivityOut, 'date' | 'end_date'> {
   club_name: string
-  name: string
-  type: ReviewItem['type']
-  is_large: boolean
-  is_large_approved: boolean | null
-  date: string
+  date: string // 草稿不進行政視野,日期必然齊備
   end_date: string
-  start_time: string | null
-  end_time: string | null
-  location: string
-  content: string
-  participants_in: number
-  participants_out: number
   fund_source: string | null
   school_approved: number | null
-  status: string
-  created_at: string
-  self_fund_total: number
-  requested_total: number
-  approved_total: number | null
-  semester: string
-  close_locked: boolean
   close_deadline: string | null
-  can_close: boolean
   reviewed_at: string | null
+}
+
+interface StampOut {
+  stage: string
+  actor_name: string
+  at: string
+}
+
+export interface ApprovalOut {
+  stage: string
+  decision: string
+  reason: string | null
+  created_at: string
+  subject_type: string // activity / activity_close
+  actor_name: string | null // 僅行政端詳情帶;社團端一律 null(不是空白姓名)
 }
 
 interface AdminActivityDetailOut extends AdminActivityOut {
@@ -167,6 +218,9 @@ interface AdminActivityDetailOut extends AdminActivityOut {
   report: ReportOut | null
   photos: FileOut[]
   attachments: FileOut[]
+  close_docs: FileOut[]
+  stamps: StampOut[]
+  approvals: ApprovalOut[]
 }
 
 // ---- 轉換 ----
@@ -195,7 +249,7 @@ const toAdminActivity = (o: AdminActivityOut): AdminActivity => ({
   approvedTotal: o.approved_total ?? undefined,
   status: toStatusKey(o),
   fundSource: o.fund_source ?? undefined,
-  submittedAt: slashDateTime(o.created_at),
+  submittedAt: o.submitted_at ? slashDateTime(o.submitted_at) : null,
   closeLocked: o.close_locked,
   closeDeadline: o.close_deadline ? slashDate(o.close_deadline) : undefined,
   semester: o.semester,
@@ -203,6 +257,46 @@ const toAdminActivity = (o: AdminActivityOut): AdminActivity => ({
 })
 
 const toFileRef = (f: FileOut): AdminFileRef => ({ id: f.id, name: f.original_name, url: fileUrl(f.id) })
+
+/** AdminFileRef → EvalFile(FilePreview 直接吃);型別以副檔名推導、後端未附 mime 與上傳時間 */
+export const toEvalFile = (f: AdminFileRef): EvalFile => ({
+  id: f.id,
+  name: f.name,
+  type: fileTypeOf(f.name),
+  size: 0,
+  url: f.url,
+  uploadedAt: '',
+})
+
+/** 結案退回會連寫兩筆(先 UNLOCK 再 REJECT,同一個承辦人、同一次操作;
+ *  後端 `close_reject` 的 D-05 自動解鎖)。承辦人按的是「退回」—— 把那筆自動解鎖
+ *  單獨列一行,讀起來會像另外有人解鎖過這張單。手動解鎖(逾期解鎖)後面不接退回,留著。 */
+export const dropAutoUnlock = (rows: readonly ApprovalOut[]): ApprovalOut[] =>
+  rows.filter((r, i) => {
+    if (r.decision !== 'unlock') return true
+    const next = rows[i + 1]
+    return !(
+      next?.decision === 'reject' &&
+      next.subject_type === r.subject_type &&
+      next.actor_name === r.actor_name
+    )
+  })
+
+const toApproval = (a: ApprovalOut): ReviewApproval => ({
+  actor: a.actor_name ?? '—',
+  at: slashDateTime(a.created_at),
+  decision: a.decision as ReviewApproval['decision'],
+  isClose: a.subject_type === 'activity_close',
+  stage: a.stage,
+  reason: a.reason ?? undefined,
+})
+
+const toStamp = (s: StampOut): ReviewStamp => ({
+  stage: s.stage as ReviewStage,
+  name: s.actor_name,
+  at: dayjs(s.at).format('MM/DD HH:mm'),
+  atFull: dayjs(s.at).format('YYYY/MM/DD HH:mm:ss'),
+})
 
 const toReport = (r: ReportOut): AdminCloseReport => ({
   memberCount: r.member_count,
@@ -222,6 +316,9 @@ const toReport = (r: ReportOut): AdminCloseReport => ({
   expense: r.expense,
   submittedAt: slashDateTime(r.submitted_at),
   reflections: r.reflections.map((x) => ({ name: x.student_name, dept: x.dept, text: x.body })),
+  photosConfirmed: r.photos_confirmed,
+  reportConfirmed: r.report_confirmed,
+  reflectionsConfirmed: r.reflections_confirmed,
 })
 
 // 日期時間彙整:跨日附結束日,有填時間附 HH:mm–HH:mm
@@ -235,10 +332,14 @@ const toAdminDetail = (o: AdminActivityDetailOut): AdminActivityDetail => ({
   ...toAdminActivity(o),
   detail: {
     timeRange: timeRangeOf(o),
+    stamps: o.stamps.map(toStamp),
+    approvals: dropAutoUnlock(o.approvals).map(toApproval),
     location: o.location,
     participantsIn: o.participants_in,
     participantsOut: o.participants_out,
-    submittedAt: slashDateTime(o.created_at),
+    content: o.content,
+    works: staffTextToWorks(o.staff_text),
+    submittedAt: o.submitted_at ? slashDateTime(o.submitted_at) : null,
     attachments: o.attachments.map((f) => f.original_name),
     attachmentFiles: o.attachments.map(toFileRef),
     budget: o.budget_items.map((b) => ({
@@ -247,11 +348,14 @@ const toAdminDetail = (o: AdminActivityDetailOut): AdminActivityDetail => ({
       description: b.description,
       selfFund: b.self_fund,
       requested: b.requested_subsidy,
-      approved: b.approved_subsidy ?? b.requested_subsidy, // 未核定前以擬請值預填
+      // 保留 null:`—`(還沒核定)與 0 元(決定不給)對承辦是兩件事。
+      // 第一關輸入框的預填值(未核定=擬請)在使用端算,不在這裡把兩者揉成一個數
+      approved: b.approved_subsidy,
     })),
   },
   report: o.report ? toReport(o.report) : undefined,
   photos: o.photos.map(toFileRef),
+  closeDocs: o.close_docs.map(toFileRef),
 })
 
 // ---- 「本關」推導 ----
@@ -285,23 +389,32 @@ export const canActOnClose = (user: SessionUser | null): boolean =>
 
 // ---- 查詢 ----
 
+/** 清單 `status` 參數收的是**顯示狀態**:落庫的狀態,外加推導的 `locked`
+ *  (已核准且逾期鎖定,畫面顯示成「已逾期」;後端 `display_status_filter` 同一份判定)。
+ *  少了它,`approved` 篩出來的是「已核准且未逾期」,逾期件會從清單整批消失 */
+export type AdminDisplayStatus = AdminActivityStatus | 'locked'
+
 export interface AdminActivityListParams {
   /** 可帶多值(後端 status 多選) */
-  statuses?: AdminActivityStatus[]
+  statuses?: AdminDisplayStatus[]
   clubId?: number
 }
 
 /** 伺服器端分頁查詢(14k+ 筆禁止整批撈取) */
 export interface AdminActivityPageParams {
-  statuses?: AdminActivityStatus[]
+  statuses?: AdminDisplayStatus[]
   clubIds?: number[]
+  /** 學期(民國,如 115-1);後端以活動日期落在該學期區間篩 */
+  semester?: string
+  /** 活動名稱模糊搜尋 */
+  q?: string
   /** 類型標籤(社課或會議/活動/大型活動;大型為後端推導型別) */
   types?: string[]
   /** 僅逾期鎖定(已核准+超過結案期限+未解鎖;後端推導) */
   locked?: boolean
   /** 全部逾期未結案(已核准+超過結案期限,不分鎖定與否;closeLocked 區分兩者) */
   overdue?: boolean
-  /** 排序白名單:club/name/type/date/status/created_at/reviewed_at;前綴 - 為降冪 */
+  /** 排序白名單:club/name/type/date/budget/status/created_at/submitted_at/reviewed_at;前綴 - 為降冪 */
   sort?: string
   page: number
   pageSize: number
@@ -314,6 +427,8 @@ const keys = {
   list: (p: AdminActivityListParams) => ['adminActivities', 'list', p] as const,
   paged: (p: AdminActivityPageParams) => ['adminActivities', 'paged', p] as const,
   detail: (id: number) => ['adminActivities', 'detail', id] as const,
+  semesters: (clubId?: number) => ['adminActivities', 'semesters', clubId ?? null] as const,
+  clubList: (p: AdminClubActivityParams) => ['adminActivities', 'clubList', p] as const,
 }
 
 export const adminActivityKeys = keys
@@ -350,6 +465,8 @@ export function useAdminActivitiesPaged(p: AdminActivityPageParams) {
         `/admin/activities${qs({
           status: p.statuses,
           club_id: p.clubIds?.map(String),
+          semester: p.semester,
+          q: p.q,
           type: p.types,
           locked: p.locked ? true : undefined,
           overdue: p.overdue ? true : undefined,
@@ -367,6 +484,52 @@ export function useAdminActivityDetail(id: number | undefined) {
     queryKey: keys.detail(id ?? -1),
     enabled: id != null,
     queryFn: () => api<AdminActivityDetailOut>(`/admin/activities/${id}`).then(toAdminDetail),
+  })
+}
+
+/** 有活動的學期(新到舊),供學期下拉;帶 clubId 則限該社 */
+export function useAdminActivitySemesters(clubId?: number | null, enabled = true) {
+  return useQuery({
+    queryKey: keys.semesters(clubId ?? undefined),
+    enabled,
+    queryFn: () =>
+      api<string[]>(`/admin/activities/semesters${qs({ club_id: clubId ?? undefined })}`),
+  })
+}
+
+// ---- 行政端唯讀檢視:以社團端的形狀讀行政端端點 ----
+//
+// 兩支端點回的是同一份 schema(ActivityOut / ActivityDetailOut),差別只在行政端多帶
+// club_name 與 reviewed_at。所以不再刻一套對照,直接沿用社團端的 toActivity/toDetail ——
+// 「介面與社團端相同」的頁面若連資料形狀都不同,共用元件就得改成兩種型別各走一條路
+
+export interface AdminClubActivityParams {
+  clubId: number | null
+  semester?: string
+  statuses?: string[]
+  types?: string[]
+  sort?: string
+  page: number
+  pageSize: number
+}
+
+export function useAdminClubActivities(p: AdminClubActivityParams) {
+  return useQuery({
+    queryKey: keys.clubList(p),
+    enabled: p.clubId != null,
+    queryFn: () =>
+      apiPaged<ActivityOut[]>(
+        `/admin/activities${qs({
+          club_id: p.clubId ?? undefined,
+          semester: p.semester,
+          status: p.statuses,
+          type: p.types,
+          sort: p.sort,
+          page: p.page,
+          page_size: p.pageSize,
+        })}`,
+      ).then(({ data, total }) => ({ rows: data.map(toActivity), total })),
+    placeholderData: keepPreviousData,
   })
 }
 

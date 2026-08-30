@@ -1,20 +1,25 @@
 """活動申請/結案的推導規則與共用查詢。"""
 
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, datetime, time, timedelta
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.errors import not_found
+from app.core.errors import not_found, validation_error
 from app.core.semesters import TAIPEI, semester_of
-from app.models import Activity, ActivityBudgetItem, ActivityReport, File, User
-from app.models.enums import ActivityStatus
+from app.models import Activity, ActivityBudgetItem, ActivityReport, ApprovalRecord, File, User
+from app.models.enums import ActivityStatus, ApprovalDecision, ApprovalSubject
 
-# 結案照片與申請附件在 files 表的定位
+# 結案照片、結案附件與申請附件在 files 表的定位
 PHOTO_SUBJECT = "activity"
 PHOTO_SLOT = "report_photo"
+DOC_SLOT = "report_doc"
 ATTACHMENT_SLOT = "proposal"
+
+# 申請簽核三關,順序即申請表的 初核 / 複核 / 決行 三格
+# (顯示詞是 承辦人 / 組長 / 學務長,見 admin_activities._STAGE_LABEL)
+APPLY_STAGES = ("advisor", "chief", "dean")
 
 
 def end_datetime(activity: Activity) -> datetime:
@@ -23,32 +28,9 @@ def end_datetime(activity: Activity) -> datetime:
     return datetime.combine(activity.end_date or activity.date, t, tzinfo=TAIPEI)
 
 
-def add_months(d: date, months: int) -> date:
-    month = d.month - 1 + months
-    year = d.year + month // 12
-    month = month % 12 + 1
-    day = min(
-        d.day,
-        [
-            31,
-            29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28,
-            31,
-            30,
-            31,
-            30,
-            31,
-            31,
-            30,
-            31,
-            30,
-            31,
-        ][month - 1],
-    )
-    return date(year, month, day)
-
-
-# 只持簽核關卡鍵的帳號(如學務長)視野受限;持 areview 才看得到全部
-FULL_VIEW_KEYS = ("areview",)
+# 只持簽核關卡鍵的帳號(如學務長)視野受限;持這些頁面鍵才看得到全部狀態
+# (申請審核、所有活動、社團活動列表 —— 後兩頁的用途就是查閱全部狀態的活動)
+FULL_VIEW_KEYS = ("areview", "aactivity", "aclubact")
 
 
 def visible_statuses(user) -> set[ActivityStatus] | None:
@@ -90,23 +72,22 @@ def actionable_statuses(user) -> set[ActivityStatus]:
     return out
 
 
-def is_close_locked(activity: Activity, lock_months: int, now: datetime | None = None) -> bool:
-    """逾期鎖定(推導):已核准、活動結束日(end_date)+N 個月已過、未送結案、未解鎖。"""
+def is_close_locked(activity: Activity, lock_days: int, now: datetime | None = None) -> bool:
+    """逾期鎖定(推導):已核准、活動結束日(end_date)+N 天已過、未送結案、未解鎖。"""
     if activity.status != ActivityStatus.APPROVED or activity.close_unlocked:
         return False
     now = now or datetime.now(UTC)
     base = activity.end_date or activity.date
     deadline = datetime.combine(
-        add_months(base, lock_months) + timedelta(days=1), time(0, 0), tzinfo=TAIPEI
+        base + timedelta(days=int(lock_days) + 1), time(0, 0), tzinfo=TAIPEI
     )
     return now >= deadline
 
 
-def close_overdue_sql(lock_months: int) -> sa.ColumnElement[bool]:
-    """同一條期限的 SQL 版(逾期清單在 DB 端篩);PG 月加法與 add_months 同為日夾底。"""
+def close_overdue_sql(lock_days: int) -> sa.ColumnElement[bool]:
+    """同一條期限的 SQL 版(逾期清單在 DB 端篩);PG 的 date + 整數即加天數。"""
     return (
-        sa.func.coalesce(Activity.end_date, Activity.date)
-        + sa.func.make_interval(0, int(lock_months))
+        sa.func.coalesce(Activity.end_date, Activity.date) + int(lock_days)
         < datetime.now(TAIPEI).date()
     )
 
@@ -119,7 +100,7 @@ def ended_sql() -> sa.ColumnElement[bool]:
     ) <= datetime.now(TAIPEI).replace(tzinfo=None)
 
 
-def close_locked_sql(lock_months: int) -> sa.ColumnElement[bool]:
+def close_locked_sql(lock_days: int) -> sa.ColumnElement[bool]:
     """`is_close_locked` 的 SQL 版:已核准、未解鎖、結案期限已過。
 
     畫面把這種列顯示成「已逾期」而不是「已核准」,清單的狀態篩選要跟著同一條判定。
@@ -127,11 +108,68 @@ def close_locked_sql(lock_months: int) -> sa.ColumnElement[bool]:
     return sa.and_(
         Activity.status == ActivityStatus.APPROVED,
         Activity.close_unlocked.is_(False),
-        close_overdue_sql(lock_months),
+        close_overdue_sql(lock_days),
     )
 
 
-def can_close_sql(lock_months: int) -> sa.ColumnElement[bool]:
+# 經費欄顯示「自籌 / 擬請補助」,排序以兩者合計(逐項加總,無經費列為 0)
+BUDGET_TOTAL_SQL = (
+    sa.select(
+        sa.func.coalesce(
+            sa.func.sum(ActivityBudgetItem.self_fund + ActivityBudgetItem.requested_subsidy), 0
+        )
+    )
+    .where(ActivityBudgetItem.activity_id == Activity.id)
+    .correlate(Activity)
+    .scalar_subquery()
+)
+
+# 狀態排序照畫面的流程順序,不是列舉字面值(VARCHAR 排出來會是 approved→closed→…)。
+# 社團端與行政端清單共用:同一個「狀態」欄在兩頁點下去要排出同一個順序
+STATUS_ORDER_SQL = sa.case(
+    (Activity.status == ActivityStatus.DRAFT, 0),
+    (
+        Activity.status.in_(
+            [
+                ActivityStatus.PENDING_ADVISOR,
+                ActivityStatus.PENDING_CHIEF,
+                ActivityStatus.PENDING_DEAN,
+            ]
+        ),
+        1,
+    ),
+    (Activity.status == ActivityStatus.APPROVED, 2),
+    (Activity.status == ActivityStatus.CLOSING_PENDING_ADVISOR, 3),
+    (Activity.status == ActivityStatus.CLOSED, 4),
+    else_=5,  # rejected
+)
+
+
+# 清單的 status 篩的是**畫面顯示的狀態**:已核准且逾期鎖定的列顯示成「已逾期」,
+# 所以 approved 不含它們,locked 是獨立的一種(推導,非 ActivityStatus 成員)。
+# 社團端與行政端清單共用這一份 —— 各寫一份的話同一個標籤在兩頁會篩出不同的集合
+LOCKED_STATUS = "locked"
+DISPLAY_STATUSES = frozenset({s.value for s in ActivityStatus} | {LOCKED_STATUS})
+
+
+def display_status_filter(values: list[str], lock_days: int) -> sa.ColumnElement[bool]:
+    """把顯示狀態標籤(含推導的 locked)轉成 WHERE 條件;未知值 422。"""
+    unknown = [s for s in values if s not in DISPLAY_STATUSES]
+    if unknown:
+        raise validation_error(f"未知的狀態:{','.join(unknown)}")
+    locked = close_locked_sql(lock_days)
+    conds = []
+    for key in values:
+        if key == LOCKED_STATUS:
+            conds.append(locked)
+        elif key == ActivityStatus.APPROVED:
+            conds.append(sa.and_(Activity.status == ActivityStatus.APPROVED, sa.not_(locked)))
+        else:
+            conds.append(Activity.status == ActivityStatus(key))
+    return sa.or_(*conds)
+
+
+def can_close_sql(lock_days: int) -> sa.ColumnElement[bool]:
     """can_close 的 SQL 版(結案清單在 DB 端篩,不是抓回全部已核准再過濾)。
 
     「已結束」在 PG 以 date + time 相加成 timestamp 比對台北當下;
@@ -140,21 +178,21 @@ def can_close_sql(lock_months: int) -> sa.ColumnElement[bool]:
     return sa.and_(
         Activity.status == ActivityStatus.APPROVED,
         ended_sql(),
-        sa.not_(close_locked_sql(lock_months)),
+        sa.not_(close_locked_sql(lock_days)),
     )
 
 
-def can_close(activity: Activity, lock_months: int, now: datetime | None = None) -> bool:
+def can_close(activity: Activity, lock_days: int, now: datetime | None = None) -> bool:
     """結案資格:已核准且活動已結束且未被鎖定。"""
     now = now or datetime.now(UTC)
     return (
         activity.status == ActivityStatus.APPROVED
         and now >= end_datetime(activity)
-        and not is_close_locked(activity, lock_months, now)
+        and not is_close_locked(activity, lock_days, now)
     )
 
 
-def decorate(out, activity: Activity, lock_months: int) -> None:
+def decorate(out, activity: Activity, lock_days: int) -> None:
     """填 ActivityOut 的推導欄位。"""
     items = activity.budget_items
     out.self_fund_total = sum(i.self_fund for i in items)
@@ -163,10 +201,10 @@ def decorate(out, activity: Activity, lock_months: int) -> None:
     out.approved_total = sum(approved) if approved else None
     # 部分填寫的草稿可能無日期;日期推導欄位留空
     out.semester = semester_of(activity.date) if activity.date else ""
-    out.close_locked = is_close_locked(activity, lock_months)
+    out.close_locked = is_close_locked(activity, lock_days)
     base = activity.end_date or activity.date
-    out.close_deadline = add_months(base, lock_months) if base else None
-    out.can_close = can_close(activity, lock_months)
+    out.close_deadline = base + timedelta(days=int(lock_days)) if base else None
+    out.can_close = can_close(activity, lock_days)
     out.has_close_draft = activity.close_draft is not None
 
 
@@ -212,3 +250,33 @@ async def activity_files(db: AsyncSession, activity: Activity, slot: str) -> lis
         .order_by(File.created_at)
     )
     return list(rows)
+
+
+async def apply_approvals(
+    db: AsyncSession, activity_id: int
+) -> dict[str, tuple[str, datetime]]:
+    """申請簽核各關最後一次核准的 (簽核者姓名, 時間);沒簽到的關卡不在字典裡。
+
+    **以關卡取,不是把核准列依序排**:退回是回到社團重送,重送後承辦人會再核一次,
+    核准列就變成 承辦人/承辦人/組長/學務長 —— 依序取會把第二次的承辦人印在「複核」、
+    組長印在「決行」,而那張紙是要送出去的。同一關多次核准取最後一次。
+
+    申請表的三格與審核彈窗的簽核章軌都讀這一份 —— 兩邊各推一次就會各錯一種。
+    """
+    rows = await db.execute(
+        sa.select(ApprovalRecord.stage, User.name, ApprovalRecord.created_at)
+        .join(User, ApprovalRecord.actor_id == User.id)
+        .where(
+            ApprovalRecord.subject_type == ApprovalSubject.ACTIVITY,
+            ApprovalRecord.subject_id == activity_id,
+            ApprovalRecord.decision == ApprovalDecision.APPROVE,
+        )
+        .order_by(ApprovalRecord.id)
+    )
+    return {stage: (name, at) for stage, name, at in rows}
+
+
+async def approver_names(db: AsyncSession, activity_id: int) -> list[str]:
+    """申請表 初核/複核/決行 三格的簽核者姓名;該關沒簽到就留空字串。"""
+    latest = await apply_approvals(db, activity_id)
+    return [latest[stage][0] if stage in latest else "" for stage in APPLY_STAGES]

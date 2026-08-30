@@ -147,7 +147,8 @@ async def test_suspend_and_lift(client, db):
     await login(client, "club01")
     resp = await client.post(
         "/api/v1/club/equipment-loans",
-        json={"equipment_id": 1, "activity_id": 1, "qty": 1, "purpose": "x", "phone": "0912000111"},
+        json={"equipment_id": 1, "activity_id": 1, "qty": 1, "purpose": "x",
+              "phone": "0912000111", "start_date": until, "end_date": until},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 403

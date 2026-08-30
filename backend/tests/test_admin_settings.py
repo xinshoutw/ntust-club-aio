@@ -27,13 +27,12 @@ async def test_get_defaults(client, db):
     data = (await client.get(URL)).json()["data"]
     # 舊鍵(開放月份+手動加開)已移除,固定借用改日期區間
     assert data["fixed_booking_window"] == {"open_from": None, "open_until": None}
-    assert data["equipment_workday_buffer"] == {"before": 2, "after": 1}
-    assert data["close_lock_months"] == 1
+    assert data["close_lock_days"] == 21  # DEFAULTS;DB 沒有這一列時的值
     assert data["upload_limits"] == {"doc": 50, "img": 10, "zip": 100, "video": 200}
     # 各申請性質的加總上限(2026-07-17 改依性質給總量)
-    assert data["activity_attachment_total_mb"] == 15
-    assert data["maintenance_total_mb"] == 100
-    assert data["close_photo_total_mb"] == 10
+    assert data["activity_attachment_total_mb"] == 50
+    assert data["maintenance_total_mb"] == 250
+    assert data["close_photo_total_mb"] == 50
     # 系統總量改用實際磁碟空間;設定僅留單一社團配額(移除 capacity/reserve)
     assert data["storage_limits"] == {"per_club_gib": 2}
     assert data["eval_window"]["year"] == 116
@@ -52,7 +51,7 @@ async def test_put_partial_update_and_audit(client, db):
         URL,
         json={
             "fixed_booking_window": {"open_from": "2026-06-01", "open_until": "2026-06-30"},
-            "close_lock_months": 2,
+            "close_lock_days": 45,
             "upload_limits": {"doc": 30, "img": 10, "zip": 100, "video": 200},
             "violation_items": [" 未經申請使用場地 ", "其他", "其他"],  # 去空白、去重
         },
@@ -61,23 +60,23 @@ async def test_put_partial_update_and_audit(client, db):
     assert resp.status_code == 200, resp.text
     data = resp.json()["data"]
     assert data["fixed_booking_window"] == {"open_from": "2026-06-01", "open_until": "2026-06-30"}
-    assert data["close_lock_months"] == 2
+    assert data["close_lock_days"] == 45
     assert data["upload_limits"]["doc"] == 30
     assert data["violation_items"] == ["未經申請使用場地", "其他"]
     # 未帶的鍵不動
-    assert data["equipment_workday_buffer"] == {"before": 2, "after": 1}
+    assert data["upload_limits"]["img"] == 10
 
-    stored = await db.get(SystemSetting, "close_lock_months")
-    assert stored.value == 2
+    stored = await db.get(SystemSetting, "close_lock_days")
+    assert stored.value == 45
     audit_row = await db.scalar(
         sa.select(AuditLog).where(AuditLog.action == "settings_updated")
     )
     assert audit_row is not None
-    assert "close_lock_months" in audit_row.detail
+    assert "close_lock_days" in audit_row.detail
 
     # 再讀一次仍是新值
     data = (await client.get(URL)).json()["data"]
-    assert data["close_lock_months"] == 2
+    assert data["close_lock_days"] == 45
 
 
 async def test_put_validations(client, db):
@@ -100,15 +99,10 @@ async def test_put_validations(client, db):
     assert resp.status_code == 422
 
     # 超出範圍
-    resp = await client.put(URL, json={"close_lock_months": 0}, headers=csrf_headers(client))
+    resp = await client.put(URL, json={"close_lock_days": 0}, headers=csrf_headers(client))
     assert resp.status_code == 422
-    resp = await client.put(
-        URL,
-        json={"equipment_workday_buffer": {"before": 99, "after": 1}},
-        headers=csrf_headers(client),
-    )
+    resp = await client.put(URL, json={"close_lock_days": 367}, headers=csrf_headers(client))
     assert resp.status_code == 422
-
     # 清成空清單(每項名稱皆空)
     resp = await client.put(
         URL, json={"budget_categories": [{"name": "  ", "hint": ""}]}, headers=csrf_headers(client)
@@ -149,12 +143,12 @@ async def test_audit_records_before_and_after_values(client, db):
     async def put(payload):
         return await client.put(URL, json=payload, headers=csrf_headers(client))
 
-    await put({"close_lock_months": 2})
+    await put({"close_lock_days": 45})
     logged = sa.select(AuditLog.detail).where(AuditLog.action == "settings_updated")
-    assert list(await db.scalars(logged)) == ["close_lock_months=1→2"]
+    assert list(await db.scalars(logged)) == ["close_lock_days=21→45"]
 
     # 送出但值沒變:沒有變更就不該留下稽核紀錄
-    await put({"close_lock_months": 2})
+    await put({"close_lock_days": 45})
     assert len(list(await db.scalars(logged))) == 1
 
     # 長清單:整份寫出來會超長,只記增減才看得出動了哪一項

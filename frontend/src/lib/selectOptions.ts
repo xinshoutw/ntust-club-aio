@@ -9,7 +9,7 @@ export const notFoundText = (
   empty: string,
   what: string,
 ): string => {
-  if (query.isError) return `${what}載入失敗,請重新整理頁面`
-  if (query.isPending) return `${what}載入中…`
+  if (query.isError) return `${what}載入失敗，請重新整理頁面`
+  if (query.isPending) return `${what}載入中...`
   return empty
 }

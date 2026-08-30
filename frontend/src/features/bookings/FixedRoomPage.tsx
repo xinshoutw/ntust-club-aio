@@ -8,10 +8,12 @@ import { confirmDialog } from '../../lib/confirm'
 import { notFoundText } from '../../lib/selectOptions'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
-import { Cols } from '../../components/ui/tableControls'
+import { Cols, Pager } from '../../components/ui/tableControls'
 import SuspensionNote from '../../components/ui/SuspensionNote'
 import { useClubSuspension } from '../../api/clubProfile'
 import { useDragSelect } from './useDragSelect'
+import { useDecisionReason } from './DecisionReasonModal'
+import { taipeiToday } from '../../lib/today'
 import { periodKeys, usePeriods } from '../../lib/periods'
 import { UNAVAILABLE_BG } from './cells'
 import {
@@ -22,6 +24,7 @@ import {
   useFixedOccupancy,
   useFixedWindow,
   useActiveRoomBookings,
+  RECENT_PAGE,
   useRecentRoomBookings,
   useVenues,
   venueLabel,
@@ -113,10 +116,13 @@ export default function FixedRoomPage() {
   // 正在申請=進行中全部(不限長度、可取消);最近申請=已結束/退回/取消 近 5 筆
   const activeQuery = useActiveRoomBookings()
   const activeRows = activeQuery.data ?? []
-  const recentQuery = useRecentRoomBookings()
-  const recent = recentQuery.data ?? []
+  const [recentPage, setRecentPage] = useState(1)
+  const recentQuery = useRecentRoomBookings({ page: recentPage, pageSize: RECENT_PAGE })
+  const recent = recentQuery.data?.rows ?? []
+  const recentTotal = recentQuery.data?.total ?? 0
+  const decision = useDecisionReason()
   const { createRoomBooking, cancelRoomBooking } = useBookingMutations()
-  const todayStart = dayjs().startOf('day')
+  const todayStart = taipeiToday()
 
   const cancelRow = (r: { id: number; venueName: string }) =>
     confirmDialog(modal, {
@@ -233,7 +239,7 @@ export default function FixedRoomPage() {
                 options={(venuesQuery.data ?? [])
                   .filter((v) => v.allowFixed)
                   .map((v) => ({ value: v.id, label: venueLabel(v) }))}
-                notFoundContent={notFoundText(venuesQuery, '目前沒有可固定借用的場地', '場地清單')}
+                notFoundContent={notFoundText(venuesQuery, '無可固定借用的場地', '場地清單')}
               />
             </Form.Item>
             <Form.Item name="note" label="用途" rules={[{ required: true, message: '請輸入用途' }]} style={{ marginBottom: 0 }}>
@@ -377,7 +383,7 @@ export default function FixedRoomPage() {
               )}
               {!activeQuery.isError && !activeQuery.isPending && activeRows.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>目前沒有進行中的申請</td>
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 20 }}>無進行中的申請</td>
                 </tr>
               )}
             </tbody>
@@ -398,15 +404,19 @@ export default function FixedRoomPage() {
               </tr>
             </thead>
             <tbody>
-              {recent.map((r) => (
-                <tr key={r.id}>
-                  <td style={{ fontWeight: 500 }}>{r.venueName}</td>
-                  <td style={{ color: 'var(--steel)', fontSize: 13 }}>
-                    {r.entries.map(roomEntryText).join('、')}
-                  </td>
-                  <td><StatusPill status={r.status} /></td>
-                </tr>
-              ))}
+              {recent.map((r) => {
+                // 退回件與承辦撤銷的取消件可點開原因(舊資料沒留理由時彈窗會說明)
+                const row = decision.rowProps(r.venueName, r.status, r.decision)
+                return (
+                  <tr key={r.id} {...row.tr}>
+                    <td style={{ fontWeight: 500 }}>{row.wrap(r.venueName)}</td>
+                    <td style={{ color: 'var(--steel)', fontSize: 13 }}>
+                      {r.entries.map(roomEntryText).join('、')}
+                    </td>
+                    <td><StatusPill status={r.status} /></td>
+                  </tr>
+                )
+              })}
               {recentQuery.isError && (
                 <tr className="no-hover">
                   <td colSpan={3}>
@@ -422,7 +432,10 @@ export default function FixedRoomPage() {
             </tbody>
           </table>
         </LoadingBlock>
+        <Pager page={recentPage} pageSize={RECENT_PAGE} total={recentTotal} onChange={setRecentPage} style={{ padding: '10px 0 14px' }} />
       </div>
+
+      {decision.node}
     </div>
   )
 }

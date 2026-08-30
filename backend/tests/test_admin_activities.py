@@ -1,4 +1,4 @@
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 
 import sqlalchemy as sa
 
@@ -362,7 +362,12 @@ async def test_admin_list_includes_club_name_and_close_deadline(client, db):
     row = next(r for r in listing["data"] if r["id"] == aid)
     assert row["club_id"] == club.id
     assert row["club_name"] == club.name
-    assert row["close_deadline"]  # 推導:活動結束日 + 鎖定月數
+    # 推導:活動結束日 + 鎖定天數。社團端的倒數與鎖定都讀這個值,差一天就是差一天
+    from app.services.settings_service import get_setting
+
+    lock_days = int(await get_setting(db, "close_lock_days"))
+    end = date.fromisoformat(row["end_date"])
+    assert row["close_deadline"] == (end + timedelta(days=lock_days)).isoformat()
 
     detail = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]
     assert detail["club_name"] == club.name
@@ -419,8 +424,8 @@ async def test_close_review_flow(client, db):
     # 退回件不受結案期限限制:補件期間跨過期限也重送得了,不必請行政解鎖
     from app.services.settings_service import get_setting
 
-    lock_months = int(await get_setting(db, "close_lock_months"))
-    long_past = date.today() - timedelta(days=31 * (lock_months + 1))
+    lock_days = int(await get_setting(db, "close_lock_days"))
+    long_past = date.today() - timedelta(days=lock_days + 1)
     await db.execute(
         sa.update(Activity).where(Activity.id == aid).values(date=long_past, end_date=long_past)
     )
@@ -723,8 +728,8 @@ async def test_overdue_filter_includes_unlocked(client, db):
     assert {r["name"] for r in resp.json()["data"]} == {"逾期鎖定"}
 
 
-async def test_overdue_filter_follows_close_lock_months(client, db):
-    """逾期清單(SQL)與每列的 close_locked(Python)必須同源:改鎖定月數,兩邊要一起動。"""
+async def test_overdue_filter_follows_close_lock_days(client, db):
+    """逾期清單(SQL)與每列的 close_locked(Python)必須同源:改鎖定天數,兩邊要一起動。"""
     club = await seed(client, db)
     creator = await club_account(db)
     day = date.today() - timedelta(days=45)
@@ -738,7 +743,7 @@ async def test_overdue_filter_follows_close_lock_months(client, db):
     rows = (await client.get("/api/v1/admin/activities", params={"overdue": "true"})).json()["data"]
     assert [r["close_locked"] for r in rows] == [True]
 
-    db.add(SystemSetting(key="close_lock_months", value=3))
+    db.add(SystemSetting(key="close_lock_days", value=60))
     await db.commit()
     overdue = await client.get("/api/v1/admin/activities", params={"overdue": "true"})
     assert overdue.json()["data"] == []
@@ -810,7 +815,6 @@ async def test_large_type_filter_and_locked_boundary(client, db):
     assert datetime.now().astimezone().utcoffset() == timedelta(hours=8)
 
     from app.models import Activity
-    from app.services.activity_service import add_months
     from app.services.settings_service import get_setting
 
     club = await seed(client, db)
@@ -842,18 +846,9 @@ async def test_large_type_filter_and_locked_boundary(client, db):
     assert names == {"被否准", "一般活動"}
 
     # 鎖定日界:期限日當天不鎖、隔天鎖(與 is_close_locked 同界)
-    lock_months = int(await get_setting(db, "close_lock_months"))
-    # 找 base 使 add_months(base, N) == today(當天不鎖)與 == 昨天(鎖)
-    base_today = None
-    base_locked = None
-    probe = date.today() - timedelta(days=25)
-    for delta in range(70):
-        candidate = probe - timedelta(days=delta)
-        if add_months(candidate, lock_months) == date.today():
-            base_today = candidate
-        if add_months(candidate, lock_months) == date.today() - timedelta(days=1):
-            base_locked = candidate
-    assert base_today and base_locked
+    lock_days = int(await get_setting(db, "close_lock_days"))
+    base_today = date.today() - timedelta(days=lock_days)
+    base_locked = base_today - timedelta(days=1)
     a_edge = Activity(
         club_id=club.id, name="期限日當天", location="x", type="社課或會議",
         date=base_today, end_date=base_today, status="approved", created_by=creator.id,
@@ -960,3 +955,412 @@ async def test_adjacent_stages_cannot_share_a_signer(client, db):
         f"/api/v1/admin/activities/{aid}/approve", json={}, headers=csrf_headers(client)
     )
     assert resp.json()["data"]["status"] == "pending_dean"
+
+
+async def test_semester_filter_and_semesters_endpoint(client, db):
+    """所有活動/社團活動列表的學期下拉:清單依學期篩,選項只列真的有活動的學期。"""
+    club = await seed(client, db)
+    other = await make_club(db, name="別社")
+    creator = await club_account(db)
+    db.add_all([
+        Activity(
+            club_id=club.id, name="上學期件", location="x", type="社課或會議",
+            date=date(2025, 10, 1), end_date=date(2025, 10, 1),
+            status="approved", created_by=creator.id,
+        ),
+        Activity(
+            club_id=club.id, name="下學期件", location="x", type="社課或會議",
+            date=date(2026, 3, 1), end_date=date(2026, 3, 1),
+            status="approved", created_by=creator.id,
+        ),
+        # 草稿不進審核視野:學期選項也不該因為它多出一個查不到東西的學期
+        Activity(
+            club_id=club.id, name="草稿件", location="x", type="社課或會議",
+            date=date(2020, 9, 1), end_date=date(2020, 9, 1),
+            status="draft", created_by=creator.id,
+        ),
+        Activity(
+            club_id=other.id, name="別社的件", location="x", type="社課或會議",
+            date=date(2024, 9, 1), end_date=date(2024, 9, 1),
+            status="approved", created_by=creator.id,
+        ),
+    ])
+    await db.commit()
+
+    await login(client, "advisor")
+    rows = (
+        await client.get("/api/v1/admin/activities", params={"semester": "114-1"})
+    ).json()["data"]
+    assert [r["name"] for r in rows] == ["上學期件"]
+
+    labels = (await client.get("/api/v1/admin/activities/semesters")).json()["data"]
+    assert labels == ["114-2", "114-1", "113-1"]  # 新到舊,不含草稿的 109-1
+
+    # club_id 限縮:社團活動列表的下拉只列該社有的學期
+    labels = (
+        await client.get("/api/v1/admin/activities/semesters", params={"club_id": club.id})
+    ).json()["data"]
+    assert labels == ["114-2", "114-1"]
+
+    assert (
+        await client.get("/api/v1/admin/activities", params={"semester": "亂填"})
+    ).status_code == 422
+
+
+async def test_name_search_and_locked_status_filter(client, db):
+    """所有活動的名稱搜尋,以及 status=locked(顯示狀態,與社團端同一份判定)。"""
+    club = await seed(client, db)
+    creator = await club_account(db)
+    old = date.today() - timedelta(days=200)
+    db.add_all([
+        Activity(
+            club_id=club.id, name="迎新宿營", location="x", type="社課或會議",
+            date=old, end_date=old, status="approved", created_by=creator.id,
+        ),
+        Activity(
+            club_id=club.id, name="期末成果發表", location="x", type="社課或會議",
+            date=date.today() + timedelta(days=3), end_date=date.today() + timedelta(days=3),
+            status="approved", created_by=creator.id,
+        ),
+    ])
+    await db.commit()
+
+    await login(client, "advisor")
+    rows = (await client.get("/api/v1/admin/activities", params={"q": "宿營"})).json()["data"]
+    assert [r["name"] for r in rows] == ["迎新宿營"]
+
+    # LIKE 萬用字元要當字面值:搜「%」不是搜「任何字」
+    rows = (await client.get("/api/v1/admin/activities", params={"q": "%"})).json()["data"]
+    assert rows == []
+
+    # 已核准且逾期鎖定的列畫面顯示成「已逾期」:status=approved 不該再回它
+    rows = (
+        await client.get("/api/v1/admin/activities", params={"status": "locked"})
+    ).json()["data"]
+    assert [r["name"] for r in rows] == ["迎新宿營"]
+    rows = (
+        await client.get("/api/v1/admin/activities", params={"status": "approved"})
+    ).json()["data"]
+    assert [r["name"] for r in rows] == ["期末成果發表"]
+
+    assert (
+        await client.get("/api/v1/admin/activities", params={"status": "不存在"})
+    ).status_code == 422
+
+
+async def test_budget_and_status_sort_match_the_club_list(client, db):
+    """行政端唯讀檢視與社團端是同一張表:同一個欄名點下去要排出同一個順序。
+
+    狀態走流程序(申請中 → 已核准 → 結案中 → 已結案 → 已退回),不是列舉字面值;
+    經費走「自籌 + 擬請」合計 —— 行政端原本連 budget 這個排序鍵都沒有。
+    """
+    club = await seed(client, db)
+    creator = await club_account(db)
+    day = date.today() + timedelta(days=10)
+
+    def act(name, status, self_fund):
+        a = Activity(
+            club_id=club.id, name=name, location="x", type="社課或會議",
+            date=day, end_date=day, status=status, created_by=creator.id,
+        )
+        a.budget_items = [
+            ActivityBudgetItem(category="雜支", description="", self_fund=self_fund,
+                               requested_subsidy=0)
+        ]
+        return a
+
+    db.add_all([
+        act("已退回", "rejected", 300),
+        act("已結案", "closed", 100),
+        act("申請中", "pending_advisor", 200),
+    ])
+    await db.commit()
+
+    await login(client, "advisor")
+    rows = (
+        await client.get("/api/v1/admin/activities", params={"sort": "status"})
+    ).json()["data"]
+    assert [r["name"] for r in rows] == ["申請中", "已結案", "已退回"]
+
+    rows = (
+        await client.get("/api/v1/admin/activities", params={"sort": "budget"})
+    ).json()["data"]
+    assert [r["name"] for r in rows] == ["已結案", "申請中", "已退回"]
+
+
+async def test_admin_cannot_read_a_club_draft(client, db):
+    """草稿不進行政視野:清單擋了,直接打詳情/PDF 也要擋 —— 否則社團還沒送出的
+    企劃內容、經費明細與附件清單,承辦一個 id 就讀得到。"""
+    club = await seed(client, db)
+    creator = await club_account(db)
+    draft = Activity(
+        club_id=club.id, name="還在寫", location="x", type="社課或會議",
+        date=date.today() + timedelta(days=30), end_date=date.today() + timedelta(days=30),
+        status="draft", created_by=creator.id,
+    )
+    db.add(draft)
+    await db.commit()
+
+    await login(client, "advisor")
+    assert (await client.get(f"/api/v1/admin/activities/{draft.id}")).status_code == 404
+    assert (await client.get(f"/api/v1/admin/activities/{draft.id}/apply-pdf")).status_code == 404
+    assert all(
+        a["name"] != "還在寫" for a in (await client.get("/api/v1/admin/activities")).json()["data"]
+    )
+
+
+async def test_stamps_stay_on_their_own_stage_after_a_resubmit(client, db):
+    """章軌與申請表的三格都讀 stamps:退回重送後承辦人會再核一次。
+
+    把核准列依序排的話,順序是 承辦人 / 承辦人 / 組長,第二次的承辦人就會落在「複核」、
+    組長落在「決行」—— 而那三格是要印在送出去的紙上的。
+    """
+    await seed(client, db)
+    aid = await submit_activity(client, db)
+
+    async def approve_first_stage():
+        await login(client, "advisor")
+        items = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]["budget_items"]
+        resp = await client.post(
+            f"/api/v1/admin/activities/{aid}/approve",
+            json={
+                "fund_source": "學務處經費",
+                "budget": [
+                    {"item_id": i["id"], "approved_subsidy": i["requested_subsidy"]} for i in items
+                ],
+            },
+            headers=csrf_headers(client),
+        )
+        assert resp.status_code == 200, resp.text
+
+    await approve_first_stage()
+    await login(client, "chief")
+    assert (
+        await client.post(
+            f"/api/v1/admin/activities/{aid}/reject",
+            json={"reason": "經費明細不清"},
+            headers=csrf_headers(client),
+        )
+    ).status_code == 200
+
+    await login(client, "club01")
+    assert (
+        await client.post(f"/api/v1/club/activities/{aid}/submit", headers=csrf_headers(client))
+    ).status_code == 200
+    await approve_first_stage()  # 承辦人第二次核准
+
+    await login(client, "advisor")
+    stamps = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]["stamps"]
+    assert [s["stage"] for s in stamps] == ["advisor"]
+    assert stamps[0]["actor_name"] == "advisor"
+
+    await login(client, "chief")
+    assert (
+        await client.post(
+            f"/api/v1/admin/activities/{aid}/approve", json={}, headers=csrf_headers(client)
+        )
+    ).status_code == 200
+    await login(client, "advisor")
+    stamps = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]["stamps"]
+    assert [(s["stage"], s["actor_name"]) for s in stamps] == [
+        ("advisor", "advisor"),
+        ("chief", "chief"),
+    ]
+
+
+async def test_zero_approval_finishes_the_case_at_that_stage(client, db):
+    """核定 0 元 = 不動到學校的錢,後面的關卡沒有東西可審 → 當場核准(D-16)。
+
+    判準是**核定**不是擬請:社團申請了、承辦人決定不給,一樣不必再送組長與學務長。
+    """
+    await seed(client, db)
+    aid = await submit_activity(client, db)  # 有擬請補助
+
+    await login(client, "advisor")
+    items = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]["budget_items"]
+    assert sum(i["requested_subsidy"] for i in items) > 0
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/approve",
+        json={
+            "fund_source": "本案不予補助",
+            "budget": [{"item_id": i["id"], "approved_subsidy": 0} for i in items],
+        },
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["status"] == "approved"
+
+    # 章軌只會有承辦人一格 —— 組長與學務長永遠不會簽這張單
+    stamps = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]["stamps"]
+    assert [s["stage"] for s in stamps] == ["advisor"]
+
+
+async def test_partial_zero_still_needs_the_remaining_stages(client, db):
+    """只有一項核定 0 不算數:總額還有錢就照走三關。"""
+    await seed(client, db)
+    aid = await submit_activity(client, db)
+
+    await login(client, "advisor")
+    items = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]["budget_items"]
+    assert len(items) > 1
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/approve",
+        json={
+            "fund_source": "學務處經費",
+            "budget": [
+                {"item_id": i["id"], "approved_subsidy": 0 if n else i["requested_subsidy"]}
+                for n, i in enumerate(items)
+            ],
+        },
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["status"] == "pending_chief"
+
+
+async def test_funding_source_is_only_required_when_money_is_granted(client, db):
+    """核定 0 元沒有經費來源可認定,不該逼承辦人填一句空話才存得下去(D-16)。
+
+    逐項核定仍然每一項都要填 —— 0 也是核定,None 是「還沒看」,兩者不能混。
+    """
+    await seed(client, db)
+    aid = await submit_activity(client, db)
+    await login(client, "advisor")
+    items = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]["budget_items"]
+
+    # 少填一項 → 擋下(這一條沒有放寬)
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/approve",
+        json={"budget": [{"item_id": items[0]["id"], "approved_subsidy": 0}]},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    assert "未核定金額" in resp.text
+
+    # 全部核定 0 元、經費來源留空 → 放行
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/approve",
+        json={"budget": [{"item_id": i["id"], "approved_subsidy": 0} for i in items]},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["status"] == "approved"
+
+
+async def test_funding_source_still_required_when_money_is_granted(client, db):
+    await seed(client, db)
+    aid = await submit_activity(client, db)
+    await login(client, "advisor")
+    items = (await client.get(f"/api/v1/admin/activities/{aid}")).json()["data"]["budget_items"]
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/approve",
+        json={
+            "budget": [
+                {"item_id": i["id"], "approved_subsidy": i["requested_subsidy"]} for i in items
+            ]
+        },
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    assert "經費來源" in resp.text
+
+
+async def test_undecided_items_do_not_count_as_a_zero_grant(client, db):
+    """遷移件在組長關卡時逐項核定可能是 NULL(`ApprovedGrant` 可為空)。
+
+    `or 0` 會把「還沒核定」讀成「核定 0 元」,組長一按就跳過學務長直接核准 ——
+    缺項的守衛只擋得住第一關,後兩關沒有東西擋。
+    """
+    await seed(client, db)
+    aid = await submit_activity(client, db)
+    # 直接落到組長關卡且逐項未核定 —— 模擬遷移件,不經過承辦人那一關
+    await db.execute(
+        sa.update(Activity).where(Activity.id == aid).values(status="pending_chief")
+    )
+    await db.execute(
+        sa.update(ActivityBudgetItem)
+        .where(ActivityBudgetItem.activity_id == aid)
+        .values(approved_subsidy=None)
+    )
+    await db.commit()
+
+    await login(client, "chief")
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/approve", json={}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["status"] == "pending_dean"
+
+
+async def test_submitted_at_is_the_submit_time_not_the_create_time(client, db):
+    """待審佇列依送件時間排:七月建的草稿八月才送審,不該排在八月初送件的前面(D-29)。"""
+    club = await seed(client, db)
+    creator = await club_account(db)
+    july = datetime(2026, 7, 1, 9, 0, tzinfo=UTC)
+    future = date.today() + timedelta(days=30)
+
+    def row(name: str, status: str) -> Activity:
+        return Activity(
+            club_id=club.id, name=name, location="x", type="活動",
+            date=future, end_date=future,
+            start_time=time(9, 0), end_time=time(12, 0),
+            staff_text="總召:王小明", participants_in=20, participants_out=0,
+            status=status, created_by=creator.id,
+        )
+
+    draft = row("七月就建好的草稿", "draft")
+    early = row("八月初就送件", "pending_advisor")
+    # 遷入的舊列可能沒有送件時間(SetupTime 為 NULL):排序要把它擺最後,不是最前
+    legacy = row("舊系統沒留送件時間", "pending_advisor")
+    db.add_all([draft, early, legacy])
+    await db.commit()
+    for r in (draft, early, legacy):
+        await db.refresh(r)
+    # 兩筆都是七月建的;只有 early 已經送出過
+    await db.execute(
+        sa.update(Activity)
+        .where(Activity.id.in_([draft.id, early.id]))
+        .values(created_at=july)
+    )
+    await db.execute(
+        sa.update(Activity)
+        .where(Activity.id == early.id)
+        .values(submitted_at=datetime(2026, 8, 1, 9, 0, tzinfo=UTC))
+    )
+    await db.commit()
+
+    # 草稿現在才送審 → 送件時間是現在,排在八月初那筆後面
+    await login(client, "club01")
+    resp = await client.post(
+        f"/api/v1/club/activities/{draft.id}/submit", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+
+    await login(client, "advisor")
+    data = (
+        await client.get("/api/v1/admin/activities", params={"sort": "submitted_at"})
+    ).json()["data"]
+    assert [a["name"] for a in data] == [
+        "八月初就送件",
+        "七月就建好的草稿",
+        "舊系統沒留送件時間",  # PG 的 ASC 本來就 NULLS LAST
+    ]
+
+    # 降冪同樣殿後(NullsLast):PG 的 DESC 預設是 NULLS FIRST,
+    # 少了包裝就會把「沒有送件時間」擺到最新送件的前面
+    desc = (
+        await client.get("/api/v1/admin/activities", params={"sort": "-submitted_at"})
+    ).json()["data"]
+    assert [a["name"] for a in desc] == [
+        "七月就建好的草稿",
+        "八月初就送件",
+        "舊系統沒留送件時間",
+    ]
+
+    rows = {a["name"]: a for a in data}
+    assert rows["八月初就送件"]["submitted_at"].startswith("2026-08-01")
+    # 送件時間與建立時間是兩件事:這一筆的 created_at 停在七月
+    just_sent = rows["七月就建好的草稿"]
+    assert just_sent["submitted_at"] is not None
+    assert just_sent["created_at"].startswith("2026-07-01")
+    assert just_sent["submitted_at"] > "2026-08-01"

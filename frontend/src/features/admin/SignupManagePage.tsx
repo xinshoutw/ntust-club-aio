@@ -1,20 +1,19 @@
 import { useState } from 'react'
 import { countText } from '../../lib/counts'
 import { useNavigate } from 'react-router'
-import { App, Button, Checkbox, DatePicker, Input, Modal, Select, Tooltip } from 'antd'
+import { App, Button, Checkbox, DatePicker, Input, Modal, Tooltip } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { DeleteOutlined, DownloadOutlined, EditOutlined, RightOutlined } from '@ant-design/icons'
 import type { Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
-import OptionsError from '../../components/ui/OptionsError'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import { confirmDialog } from '../../lib/confirm'
 import { downloadCsv } from '../../lib/csv'
 import { signupCsvRows } from './signupCsv'
-import { notFoundText } from '../../lib/selectOptions'
 import { useClubOptions } from '../../api/adminClubs'
+import ClubCascader from './ClubCascader'
 import KindBadge from '../signup/KindBadge'
 import SignupEditModal from './SignupEditModal'
 import {
@@ -53,8 +52,13 @@ function ManageModal({
   const { confirm, addRegistration, removeRegistration, markAttendance, createSession, deleteSession } = useSignupItemMutations()
   const [editing, setEditing] = useState(false)
   // 補登:實際到場但沒線上報名的社團,不補的話簽到登錄不了、行政分就少算一場
-  const [walkInClub, setWalkInClub] = useState<number | null>(null)
+  // 社團選擇一律走 ClubCascader(二級選單,全站同一支);它以名稱為介面,送出前對回 id
+  const [walkInClub, setWalkInClub] = useState<string | undefined>(undefined)
   const clubOptions = useClubOptions()
+  // 可補登的社團(已在名單上的排除掉)。omit 與 id 對照必須看同一份清單 —— 分兩份的話,
+  // 選好之後該社團才進名單時,選單顯示空白、walkInClubId 卻還在,按下去送的是看不見的社團
+  const walkInOptions = (clubOptions.data ?? []).filter((c) => !regs.some((r) => r.clubId === c.id))
+  const walkInClubId = walkInOptions.find((c) => c.name === walkInClub)?.id ?? null
 
   // 場次制(負責人會議):場次清單+逐場簽到;非場次制不發查詢
   const sessionsQuery = useSessions(item.sessionBased ? item.id : undefined)
@@ -69,15 +73,15 @@ function ManageModal({
 
   const onRemove = (r: Registration) =>
     confirmDialog(modal, {
-      title: `撤除「${r.club}」的補登?`,
-      content: '這筆報名沒有參加人名單,撤除後該社團可自行線上報名',
-      okText: '撤除',
+      title: `確定刪除「${r.club}」的登記？`,
+      content: '刪除後該社團仍可自行線上報名',
+      okText: '刪除',
       okButtonProps: { danger: true },
       cancelText: '取消',
       onOk: () =>
         removeRegistration.mutate(
           { itemId: item.id, clubId: r.clubId },
-          { onSuccess: () => message.success('已撤除'), onError: (e) => message.error(e.message) },
+          { onSuccess: () => message.success('已刪除'), onError: (e) => message.error(e.message) },
         ),
     })
 
@@ -85,11 +89,11 @@ function ManageModal({
   const exportCsv = () => {
     // 匯出鈕在 LoadingBlock 外面:載入中按下去會落到「尚無報名名單」那句假答案
     if (regsQuery.isPending) {
-      message.error('報名名單尚在載入,請稍候再匯出')
+      message.error('報名名單尚在載入，請稍候')
       return
     }
     if (regsQuery.isError) {
-      message.error('報名名單載入失敗,無法匯出;請重試後再匯出')
+      message.error('報名名單載入失敗，請稍後再重試')
       return
     }
     if (!regs.length) {
@@ -143,7 +147,7 @@ function ManageModal({
   const askDeleteSession = (s: SignupSession) =>
     confirmDialog(modal, {
       title: '刪除場次',
-      content: `「${s.name}」(${s.date})刪除後,該場出席紀錄將一併刪除`,
+      content: `「${s.name}」(${s.date}) 刪除後，出席紀錄將一併刪除`,
       okText: '確認刪除',
       okButtonProps: { danger: true },
       cancelText: '取消',
@@ -195,32 +199,28 @@ function ManageModal({
 
       {/* 補登社團:簽到硬性要求先有報名列,現場來了卻沒線上報名的社團登錄不了(decisions.md DEC-07) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-        <Select
+        <ClubCascader
           size="small"
-          showSearch
           allowClear
+          width={220}
           placeholder="補登未線上報名的社團"
-          style={{ minWidth: 220 }}
           value={walkInClub}
           onChange={setWalkInClub}
-          optionFilterProp="label"
-          loading={clubOptions.isPending}
-          notFoundContent={notFoundText(clubOptions, '沒有社團可補登', '社團清單')}
-          options={(clubOptions.data ?? [])
-            .filter((c) => !regs.some((r) => r.clubId === c.id))
-            .map((c) => ({ value: c.id, label: c.name }))}
+          omit={(clubOptions.data ?? [])
+            .filter((c) => !walkInOptions.includes(c))
+            .map((c) => c.name)}
         />
         <Button
           size="small"
-          disabled={walkInClub == null}
+          disabled={walkInClubId == null}
           loading={addRegistration.isPending}
           onClick={() => {
             addRegistration.mutate(
-              { itemId: item.id, clubId: walkInClub as number },
+              { itemId: item.id, clubId: walkInClubId as number },
               {
                 onSuccess: () => {
                   message.success('已補登')
-                  setWalkInClub(null)
+                  setWalkInClub(undefined)
                 },
                 onError: (e) => message.error(e.message),
               },
@@ -229,9 +229,6 @@ function ManageModal({
         >
           補登
         </Button>
-        {clubOptions.isError && (
-          <OptionsError what="社團清單" error={clubOptions.error} onRetry={() => void clubOptions.refetch()} />
-        )}
       </div>
 
       <LoadingBlock pending={regsQuery.isPending || (item.sessionBased && sessionsQuery.isPending)}>
@@ -266,7 +263,7 @@ function ManageModal({
               </div>
             )}
             {!sessionsQuery.isPending && !sessionsQuery.isError && sessions.length === 0 && (
-              <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 8 }}>尚未建立場次,新增場次後即可逐場登錄簽到</div>
+              <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 8 }}>尚未建立場次，新增場次後即可逐場登錄簽到</div>
             )}
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               <Input
@@ -325,7 +322,7 @@ function ManageModal({
                     簽到
                   </Checkbox>
                 ) : (
-                  <Tooltip title="活動結束後開放登錄簽到">
+                  <Tooltip title="活動尚未開始">
                     <Checkbox disabled>簽到</Checkbox>
                   </Tooltip>
                 )}
@@ -336,13 +333,13 @@ function ManageModal({
                     確認報名
                   </Button>
                 )}
-                {/* 補登的單(沒有參加人名單)才給撤除:選錯社團的話不撤掉就等於
+                {/* 補登的單(沒有參加人名單)才給刪除:選錯社團的話不撤掉就等於
                     讓那個社團永久報不了這個活動(社團端「一經報名不得更改」) */}
                 {r.count === 0 && (
                   <button
                     type="button"
                     className="link-btn danger"
-                    aria-label={`撤除 ${r.club} 的補登`}
+                    aria-label={`刪除 ${r.club} 的登記`}
                     onClick={() => onRemove(r)}
                   >
                     <DeleteOutlined />

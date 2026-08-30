@@ -73,7 +73,7 @@ export default function TakeoverOverlay() {
     // 勾「不再顯示」→ 後端持久化;失敗最壞情況=下次登入再蓋板,不擋關閉、僅提示
     if (neverShow) {
       dismissForever.mutate(current.id, {
-        onError: () => message.error('「不再顯示」設定儲存失敗,下次登入時公告將再次顯示'),
+        onError: () => message.error('紀錄儲存失敗'),
       })
     }
     const next = [...dismissed, current.id]

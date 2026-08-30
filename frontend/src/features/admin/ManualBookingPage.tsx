@@ -66,7 +66,7 @@ export default function ManualBookingPage() {
 
   return (
     <div>
-      <PageHeader title="手動借用" sub="行政直接借用,免審核直接核准;佔用以「學務處」顯示" />
+      <PageHeader title="手動借用"/>
       <div className="form-grid-2" style={{ marginTop: 20, alignItems: 'start' }}>
           <div className="card" style={{ padding: 24 }}>
             <div style={sectionTitle}>臨時場地</div>
@@ -77,7 +77,7 @@ export default function ManualBookingPage() {
                   showSearch
                   options={venues.map((v) => ({ value: v.id, label: v.name }))}
                   placeholder="請選擇"
-                  notFoundContent={notFoundText(venuesQuery, '目前沒有啟用中的場地', '場地清單')}
+                  notFoundContent={notFoundText(venuesQuery, '無啟用中的場地', '場地清單')}
                 />
               </Form.Item>
               {/* 不擋過去日期:手動借用的用途就是補登歷史資料,後端亦刻意放行 */}
@@ -91,7 +91,7 @@ export default function ManualBookingPage() {
                 <PeriodPicker value={periods} onChange={setPeriods} size="small" />
               </div>
               <Form.Item name="purpose" label="用途" rules={[{ required: true, message: '請輸入用途' }]}>
-                <Input placeholder="例:行政人員活動" />
+                <Input placeholder="行政人員活動" />
               </Form.Item>
               <Form.Item name="phone" label="聯絡電話" rules={[{ pattern: /^[0-9\-()*#]+$/, message: '僅能輸入數字與 - ( ) * #' }]}>
                 <Input className="num" placeholder="選填" maxLength={30} />
@@ -114,7 +114,7 @@ export default function ManualBookingPage() {
                   showSearch
                   options={equipment.map((e) => ({ value: e.id, label: `${e.name}(總數 ${e.totalQty})` }))}
                   placeholder="請選擇"
-                  notFoundContent={notFoundText(equipmentQuery, '目前沒有啟用中的器材', '器材清單')}
+                  notFoundContent={notFoundText(equipmentQuery, '無啟用中的器材', '器材清單')}
                 />
               </Form.Item>
               <Form.Item name="qty" label="數量" rules={[{ required: true, message: '請輸入數量' }]}>
@@ -124,7 +124,7 @@ export default function ManualBookingPage() {
                 <RangePicker style={{ width: '100%' }} format="YYYY/MM/DD" />
               </Form.Item>
               <Form.Item name="purpose" label="用途" rules={[{ required: true, message: '請輸入用途' }]}>
-                <Input placeholder="例:校慶佈置" />
+                <Input placeholder="行政人員使用" />
               </Form.Item>
               <Form.Item name="phone" label="聯絡電話" rules={[{ pattern: /^[0-9\-()*#]+$/, message: '僅能輸入數字與 - ( ) * #' }]}>
                 <Input className="num" placeholder="選填" maxLength={30} />

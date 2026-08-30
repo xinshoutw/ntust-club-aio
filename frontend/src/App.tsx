@@ -18,6 +18,7 @@ import ActivityClosePage from './features/activities/ActivityClosePage'
 import SignupListPage from './features/signup/SignupListPage'
 import SignupFormPage from './features/signup/SignupFormPage'
 import ReviewPage from './features/admin/ReviewPage'
+import AdminActivitiesPage from './features/admin/AdminActivitiesPage'
 import ClubOverviewPage from './features/admin/ClubOverviewPage'
 import AdminClubSettingsPage from './features/admin/AdminClubSettingsPage'
 import { AdminClubProvider } from './features/admin/clubContext'
@@ -41,6 +42,7 @@ import AnnouncementsPage from './features/admin/AnnouncementsPage'
 import AdminBookingsPage from './features/admin/AdminBookingsPage'
 import AdminRoomsPage from './features/admin/AdminRoomsPage'
 import AdminMembersPage from './features/admin/AdminMembersPage'
+import AdminClubActivitiesPage from './features/admin/AdminClubActivitiesPage'
 import OverduePage from './features/admin/OverduePage'
 import AdminEvalPage from './features/admin/AdminEvalPage'
 import AccountsPage from './features/admin/AccountsPage'
@@ -131,7 +133,7 @@ function AdminPermissionGate() {
       <div className="card" style={{ marginTop: 20, padding: 32, textAlign: 'center' }}>
         <div style={{ fontSize: 15, fontWeight: 600 }}>您沒有此頁面的存取權限</div>
         <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 8 }}>
-          如需使用此功能,請聯絡系統管理員調整帳號權限
+          如需使用此功能，請聯絡系統管理員調整帳號權限
         </div>
       </div>
     )
@@ -212,6 +214,7 @@ export default function App() {
           <Route index element={<AdminHomePage />} />
           <Route path="review" element={<ReviewPage />} />
           <Route path="close-review" element={<CloseReviewPage />} />
+          <Route path="activities" element={<AdminActivitiesPage />} />
           <Route path="signups" element={<SignupManagePage />} />
           <Route path="signup-items/new" element={<SignupBuilderPage />} />
           <Route path="announcements" element={<AnnouncementsPage />} />
@@ -221,6 +224,7 @@ export default function App() {
           <Route path="venue-rules" element={<VenueRulesPage />} />
           <Route path="club-overview" element={<ClubOverviewPage />} />
           <Route path="members" element={<AdminMembersPage />} />
+          <Route path="club-activities" element={<AdminClubActivitiesPage />} />
           <Route path="club-settings" element={<AdminClubSettingsPage />} />
           <Route path="overdue" element={<OverduePage />} />
           <Route path="eval" element={<AdminEvalPage />} />
@@ -232,6 +236,17 @@ export default function App() {
           <Route path="files" element={<AdminFilesPage />} />
           <Route path="settings" element={<AdminSettingsPage />} />
           <Route path="audit" element={<AuditPage />} />
+          {/* 工讀生端與評審端的頁面整組再掛一次(權限鍵 astaff / aviewer):
+              同一批元件、同一批端點,只是包在行政端外殼裡 */}
+          <Route path="pt" element={<Navigate to="/admin/pt/violations/new" replace />} />
+          <Route path="pt/violations/new" element={<PtViolationFormPage />} />
+          <Route path="pt/violations" element={<PtViolationsPage />} />
+          <Route path="pt/checkout" element={<PtCheckoutPage />} />
+          <Route path="pt/checkin" element={<PtCheckinPage />} />
+          <Route path="pt/overdue" element={<PtOverduePage />} />
+          <Route path="viewer" element={<MyReviewsPage />} />
+          <Route path="viewer/score" element={<ViewerScorePage />} />
+          <Route path="viewer/done" element={<ViewerDonePage />} />
         </Route>
       </Route>
 

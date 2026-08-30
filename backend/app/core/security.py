@@ -69,7 +69,12 @@ ONE_TIME_PASSWORD_LENGTH = 12
 
 
 def generate_password(length: int = ONE_TIME_PASSWORD_LENGTH) -> str:
-    """產生符合密碼政策的一次性密碼(四類字元各至少一個)。"""
+    """產生符合密碼政策的一次性密碼(四類字元各至少一個,首字為英數)。
+
+    **首字不能是符號**:一次性密碼是用 CSV 交給承辦發放的,Excel 會把 `=` `+` `-` `@`
+    開頭的儲存格當公式,那一格顯示成 `#NAME?` —— 密碼本身沒錯,但沒有人看得到它。
+    只擋這四個字元會讓「哪些符號能開頭」變成要記的規則,整類符號一起擋掉更省事。
+    """
     length = max(length, PASSWORD_MIN_LENGTH)
     while True:
         chars = [
@@ -83,6 +88,8 @@ def generate_password(length: int = ONE_TIME_PASSWORD_LENGTH) -> str:
             j = secrets.randbelow(i + 1)
             chars[i], chars[j] = chars[j], chars[i]
         password = "".join(chars)
+        if password[0] in _PW_SYMBOL:
+            continue  # 重抽而非就地換字:換字會讓首字的分佈偏掉
         try:
             validate_password_strength(password)
         except Exception:  # noqa: BLE001 - 極小機率不合格,重抽

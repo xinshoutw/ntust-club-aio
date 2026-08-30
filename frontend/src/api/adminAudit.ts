@@ -36,7 +36,9 @@ export const ACTION_LABELS: Record<string, string> = {
   announcement_created: '發布公告',
   announcement_deleted: '刪除公告',
   announcement_takeover_updated: '調整公告蓋板',
+  club_created: '新增社團',
   club_updated: '更新社團主檔',
+  club_deleted: '刪除社團',
   club_profile_updated: '更新社團資料',
   club_password_reset: '重設社團密碼',
   club_suspended: '停權社團',
@@ -97,6 +99,9 @@ export const ACTION_LABELS: Record<string, string> = {
   activity_deleted: '刪除活動草稿',
   activity_photo_deleted: '刪除結案照片',
   activity_attachment_deleted: '刪除活動附件',
+  activity_close_doc_deleted: '刪除結案附件',
+  venue_created: '新增場地',
+  venue_updated: '修改場地',
 }
 
 /** 動作顯示詞;沒對照到就顯示原始鍵(後端新加的動作不會因此消失) */

@@ -15,9 +15,16 @@ class BudgetItemIn(BaseModel):
     requested_subsidy: int = Field(0, ge=0, le=10_000_000)
 
 
-class BudgetItemOut(BudgetItemIn):
+# Out 一律不繼承 In:輸出描述的是「庫裡是什麼」,輸入的長度與範圍限制是「使用者能送什麼」。
+# 兩者混在一起的話,舊系統遷入、或規則收緊之前存下的列會讓讀取端點 500 —— 使用者
+# 什麼都沒做錯,卻連看都看不到(遷移資料實測:71 筆經費明細超過 200 字,最長 633)。
+class BudgetItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    category: str
+    description: str
+    self_fund: int
+    requested_subsidy: int
     id: int
     approved_subsidy: int | None
 
@@ -94,9 +101,14 @@ class ReflectionIn(BaseModel):
     body: str = Field(min_length=1, max_length=5000)
 
 
-class ReflectionOut(ReflectionIn):
+class ReflectionOut(BaseModel):
+    """同 BudgetItemOut:不繼承 In 的長度限制。"""
+
     model_config = ConfigDict(from_attributes=True)
 
+    student_name: str
+    dept: str
+    body: str
     id: int
 
 
@@ -171,6 +183,10 @@ class ReportOut(BaseModel):
     expense: int
     submitted_at: datetime
     reflections: list[ReflectionOut]
+    # 已落庫的繳交確認:遷移件帶的是舊系統的旗標,結案核准會整組覆寫
+    photos_confirmed: bool
+    report_confirmed: bool
+    reflections_confirmed: bool
 
 
 class ApprovalOut(BaseModel):
@@ -180,6 +196,11 @@ class ApprovalOut(BaseModel):
     decision: str
     reason: str | None
     created_at: datetime
+    # 申請與結案的簽核紀錄同放一張表:不帶這欄的話「核准」印出來分不出是核了哪一件
+    subject_type: str = ""
+    # 僅行政端詳情填(社團端看自己的單,不需要簽核者姓名)。用 None 不用空字串 ——
+    # 空字串是在說「這個人沒有名字」,而實情是這一端本來就不提供
+    actor_name: str | None = None
 
 
 class ActivityOut(BaseModel):
@@ -205,13 +226,15 @@ class ActivityOut(BaseModel):
     status: ActivityStatus
     close_unlocked: bool
     created_at: datetime
+    # 送出審核的時刻(D-29),每次送審覆寫;草稿為 NULL —— 行政端看不到草稿
+    submitted_at: datetime | None = None
     # 推導欄位(服務層填)
     self_fund_total: int = 0
     requested_total: int = 0
     approved_total: int | None = None
     semester: str = ""
     close_locked: bool = False
-    close_deadline: date | None = None  # 結案期限=活動結束日+N 個月(推導不儲存)
+    close_deadline: date | None = None  # 結案期限=活動結束日+N 天(推導不儲存)
     can_close: bool = False
     has_close_draft: bool = False
     club_name: str = ""  # 行政端填(社團端看自己,免帶)
@@ -220,13 +243,24 @@ class ActivityOut(BaseModel):
     reviewed_at: datetime | None = None
 
 
+class StampOut(BaseModel):
+    """簽核章軌的一格:該關最後一次核准的人與時間(services.apply_approvals)。"""
+
+    stage: str
+    actor_name: str
+    at: datetime
+
+
 class ActivityDetailOut(ActivityOut):
     budget_items: list[BudgetItemOut] = []
     close_draft: dict[str, Any] | None = None
     report: ReportOut | None = None
     photos: list[FileOut] = []
     attachments: list[FileOut] = []
+    close_docs: list[FileOut] = []
     approvals: list[ApprovalOut] = []
+    # 僅行政端詳情填寫(社團端不需要承辦人姓名)
+    stamps: list[StampOut] = []
 
 
 class CloseDraftIn(BaseModel):

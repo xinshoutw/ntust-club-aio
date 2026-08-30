@@ -10,7 +10,7 @@ from typing import Annotated
 import sqlalchemy as sa
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 
-from app.api.pagination import Pagination, parse_sort
+from app.api.pagination import Pagination, ilike_contains, parse_sort
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, not_found
 from app.models import Club, User, Violation
@@ -102,8 +102,8 @@ async def list_violations(
         query = query.where(Violation.filler_id.in_(filler_id))
     if item:
         query = query.where(Violation.items.overlap(item))
-    if location:
-        query = query.where(Violation.location.ilike(f"%{location}%"))
+    if location and location.strip():
+        query = query.where(ilike_contains(Violation.location, location))
     if date_from:
         query = query.where(Violation.occurred_on >= date_from)
     if date_to:

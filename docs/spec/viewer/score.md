@@ -1,6 +1,6 @@
 # 評分(依獎項)
 
-`/viewer/score?group=` · `viewer` · `features/viewer/ViewerScorePage.tsx`
+`/viewer/score?group=`(行政端 `/admin/viewer/score`,鍵 `aviewer`) · `viewer` · `features/viewer/ViewerScorePage.tsx`
 
 ## 用途
 

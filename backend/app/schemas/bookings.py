@@ -83,7 +83,16 @@ class EquipmentOut(BaseModel):
     total_qty: int
     max_lease_count: int | None = None  # 單次可借上限;NULL=不限
     needs_serial: bool  # False=一般、True=依序點交
-    available: int = 0  # 推導(帶 activity_id 查詢時=該活動借用區間內的可借數)
+    available: int = 0  # 推導(帶 start/end 查詢時=該借用區間內的可借數)
+
+
+class EquipmentUsageOut(BaseModel):
+    """借用總覽的器材檢視:逐日佔用量(僅列有佔用的日期,其餘為 0)。"""
+
+    id: int
+    name: str
+    total_qty: int
+    used: dict[str, int]
 
 
 class RoomSlotIn(BaseModel):
@@ -131,6 +140,10 @@ class RoomBookingOut(BaseModel):
     status: BookingStatus
     created_at: datetime
     slots: list[RoomSlotOut] = []
+    # 承辦退回或撤銷時填的原因與時間(approval_records 最後一筆 REJECT/REVOKE)。
+    # 社團自行取消不寫簽核紀錄,那種取消件為 None —— 兩種「已取消」由此分辨
+    decision_reason: str | None = None
+    decided_at: datetime | None = None
 
 
 class FixedWindowOut(BaseModel):
@@ -178,9 +191,22 @@ def _validate_phone(v: str | None) -> str | None:
 
 
 def _validate_phone_required(v: str) -> str:
+    """社團端借用申請:09 開頭的 10 碼手機,或 4 碼校內分機(2026-08-27 需求方拍板)。
+
+    只看去掉 `-` 之後的位數與開頭,不管 `-` 打在哪 —— 前端 `lib/form.normalizePhone`
+    送的是 `0912-345-678`,但 API 也收得下沒有 `-` 的同一支號碼。
+    行政手動借用不走這一條(`Manual*In` 用寬鬆的 `_validate_phone`)—— 那是補登舊件,
+    紙本上寫什麼就是什麼。
+    """
     out = _validate_phone(v)
     if not out:
         raise ValueError("請輸入聯絡電話")
+    digits = out.replace("-", "")
+    ok = digits.isdigit() and (
+        len(digits) == 4 or (len(digits) == 10 and digits.startswith("09"))
+    )
+    if not ok:
+        raise ValueError("聯絡電話須為 09 開頭的 10 碼手機或 4 碼校內分機")
     return out
 
 
@@ -214,18 +240,30 @@ class VenueBookingOut(BaseModel):
     phone: str | None = None
     status: BookingStatus
     created_at: datetime
+    # 承辦退回或撤銷時填的原因與時間(approval_records 最後一筆 REJECT/REVOKE)。
+    # 社團自行取消不寫簽核紀錄,那種取消件為 None —— 兩種「已取消」由此分辨
+    decision_reason: str | None = None
+    decided_at: datetime | None = None
 
 
 class EquipmentLoanIn(BaseModel):
-    """借用區間不再自選:由所綁定審核通過活動的起訖 ± 工作天緩衝推導。"""
+    """借用區間由社團自填:籌備與驗收各活動不同,從活動起訖推導一律不準。"""
 
     equipment_id: int
     activity_id: int
     qty: int = Field(ge=1, le=1000)
+    start_date: date
+    end_date: date
     purpose: str = Field(min_length=1, max_length=200)
     phone: str = Field(min_length=1, max_length=30)  # 聯絡電話必填
 
     _phone = field_validator("phone")(_validate_phone_required)
+
+    @model_validator(mode="after")
+    def _range(self) -> EquipmentLoanIn:
+        if self.end_date < self.start_date:
+            raise ValueError("結束日不得早於開始日")
+        return self
 
 
 class EquipmentLoanOut(BaseModel):
@@ -241,13 +279,17 @@ class EquipmentLoanOut(BaseModel):
     end_date: date
     purpose: str
     status: LoanStatus
-    borrower_name: str | None  # 借用人(借出點交時登記)
+    borrower_name: str | None  # 收件人(借出點交時登記)
     returner_name: str | None  # 歸還人(歸還點交時登記)
     checkout_at: datetime | None
     checkin_at: datetime | None
     checkin_note: str | None
     created_at: datetime
     overdue: bool = False  # 推導
+    # 承辦退回或撤銷時填的原因與時間(approval_records 最後一筆 REJECT/REVOKE)。
+    # 社團自行取消不寫簽核紀錄,那種取消件為 None —— 兩種「已取消」由此分辨
+    decision_reason: str | None = None
+    decided_at: datetime | None = None
 
 
 # ---- 行政手動借用 / 場地不開放規則 ----

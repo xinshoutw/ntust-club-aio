@@ -1,9 +1,10 @@
 """社團端:成員列表(CRUD + CSV 匯入)。
 
 - 名單按學期各自一份快照(club_members.semester);同學號可跨學期出現
-- CSV 格式:姓名,學號,身份[,職稱[,電話]];身份=社員/幹部/負責人/副負責人
+- CSV 格式:姓名,學號,身份[,職稱];身份=社員/幹部/負責人/副負責人
+  (多帶的欄位忽略 —— 舊格式第 5 欄是電話,新系統不記錄,但貼進來仍收得下)
   (也接受顯示詞 社長/會長/副社長/副會長,映射為標準身份)
-- 職稱:幹部必填,其他身份選填(2026-07-21 放寬)
+- 職稱:幹部必填、社員選填;**負責人與副負責人不寫職稱**(D-27,填了捨棄)
 """
 
 import csv
@@ -87,7 +88,11 @@ def _unneutralize(cell: str) -> str:
 def _validate_member(kind: MemberKind, title: str | None) -> str | None:
     if kind == MemberKind.OFFICER and not title:
         raise validation_error("幹部必須填寫職稱")
-    return title or None  # 幹部必填,其他身份選填
+    if kind in (MemberKind.PRESIDENT, MemberKind.VICE_PRESIDENT):
+        # 負責人與副負責人不寫職稱:身份本身就是職稱(D-27)。填了就捨棄而不是退件 ——
+        # CSV 貼進來的「第十三屆會長」不該讓整列進不來,遷移端 `member_kind` 同一條規則
+        return None
+    return title or None  # 幹部必填、社員選填
 
 
 @router.get("")
@@ -146,7 +151,6 @@ async def create_member(
         student_id=body.student_id,
         kind=body.kind,
         title=title,
-        phone=body.phone or None,
         semester=body.semester,
     )
     db.add(member)
@@ -232,7 +236,7 @@ async def import_members(
     # str.strip() 不會移除 U+FEFF,首列第一欄姓名會被污染成帶 BOM 前綴的值
     csv_text = body.csv_text.lstrip("﻿")
     for line_no, row in enumerate(csv.reader(io.StringIO(csv_text)), start=1):
-        # 匯出端為了中和 Excel 公式,會在 = + - @ 開頭的值前面補一個單引號(電話 +886… 就會中);
+        # 匯出端為了中和 Excel 公式,會在 = + - @ 開頭的值前面補一個單引號;
         # 原樣貼回來時要脫掉,否則每往返一次多一個。只脫真的被中和過的,不動以 ' 開頭的名字
         cells = [_unneutralize(c.strip()) for c in row]
         if not any(cells):
@@ -242,25 +246,26 @@ async def import_members(
             continue
         name, student_id, identity = cells[0], cells[1], cells[2]
         title = cells[3].strip() if len(cells) > 3 and cells[3].strip() else None
-        phone = cells[4].strip() if len(cells) > 4 and cells[4].strip() else None
         if not name or not student_id:
             errors.append(f"第 {line_no} 列:姓名與學號必填")
             continue
+        kind = _KIND_ALIASES.get(identity)
+        if kind is None:
+            errors.append(f"第 {line_no} 列:身份「{identity}」無法辨識")
+            continue
+        if kind in (MemberKind.PRESIDENT, MemberKind.VICE_PRESIDENT):
+            # 負責人與副負責人不寫職稱(D-27,與 _validate_member 同一條規則)。
+            # 要在長度檢查之前丟掉:那一欄反正不留,不該讓舊名單的長職稱把整列退掉
+            title = None
         if (
             len(name) > 50
             or len(student_id) > 20
             or (title and len(title) > 30)
-            or (phone and len(phone) > 30)
         ):
             errors.append(f"第 {line_no} 列:欄位長度超過上限")
             continue
         if student_id in seen:
             errors.append(f"第 {line_no} 列:學號 {student_id} 重複出現")
-            continue
-
-        kind = _KIND_ALIASES.get(identity)
-        if kind is None:
-            errors.append(f"第 {line_no} 列:身份「{identity}」無法辨識")
             continue
         if kind == MemberKind.OFFICER and not title:
             errors.append(f"第 {line_no} 列:幹部需填職稱")
@@ -276,20 +281,19 @@ async def import_members(
                     student_id=student_id,
                     kind=kind,
                     title=title,
-                    phone=phone,
                     semester=body.semester,
                 )
             )
             created += 1
             touched.add(student_id)
-        elif (member.name, member.kind, member.title, member.phone) != (name, kind, title, phone):
+        elif (member.name, member.kind, member.title) != (name, kind, title):
             # 值沒變不計入 updated:重匯同一份名單要回報 0 筆更新,不能謊報整份都動過
-            member.name, member.kind, member.title, member.phone = name, kind, title, phone
+            member.name, member.kind, member.title = name, kind, title
             updated += 1
             touched.add(student_id)
 
     if touched:
-        # 匯入是 upsert,會覆寫既有成員的姓名/身份/職稱/電話 —— 只記數量查不出改了誰
+        # 匯入是 upsert,會覆寫既有成員的姓名/身份/職稱 —— 只記數量查不出改了誰
         shown = ",".join(sorted(touched)[:_AUDIT_ID_LIMIT])
         more = f"…等 {len(touched)} 人" if len(touched) > _AUDIT_ID_LIMIT else ""
         audit.record(

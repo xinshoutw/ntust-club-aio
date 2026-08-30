@@ -46,6 +46,10 @@ export interface NavGroup {
 /** 側欄徽章:鍵即 NavItem.key(後端 services/badges.py 出的同一份)。0 與未回傳都不顯示 */
 export type Badges = Record<string, number>
 
+// 社團評鑑整條線(分組指派、評審代號、成績彙總、結果頁)都還沒做完,
+// 兩端的入口先反灰。要開回來是把這兩個 disabled 拿掉,不必動別的東西
+const EVAL_UNBUILT = { disabled: true, disabledHint: '目前未開放' } as const
+
 const withBadges = (groups: NavGroup[], badges: Badges = {}): NavGroup[] =>
   groups.map((g) => ({
     ...g,
@@ -115,7 +119,7 @@ export function buildClubNav(
     {
       label: '社團評鑑',
       items: [
-        { key: 'eval-docs', label: '資料總覽', path: '/eval', icon: <FolderOpenOutlined /> },
+        { key: 'eval-docs', label: '資料總覽', path: '/eval', icon: <FolderOpenOutlined />, ...EVAL_UNBUILT },
       ],
     },
     {
@@ -129,6 +133,14 @@ export function buildClubNav(
     },
   ], badges)
 }
+
+// 工讀生端與評審端的頁面在行政端整組再掛一次(權限鍵 astaff / aviewer):
+// 承辦要頂得了櫃台、也要看得到評審那三頁。只換路徑前綴,**項目 key 照舊** ——
+// 徽章因此不必為行政端另備一份(後端 badges 出的就是 pt-* / v-* 這幾把)
+const mirrored = (label: string, groups: NavGroup[]): NavGroup => ({
+  label,
+  items: groups.flatMap((g) => g.items).map((i) => ({ ...i, path: `/admin${i.path}` })),
+})
 
 const ADMIN_ROOM_ITEM: NavItem = {
   key: 'a-room',
@@ -160,6 +172,8 @@ export function buildAdminNav(user: SessionUser | null, badges: Badges = {}): Na
         path: '/admin/close-review',
         icon: <FileDoneOutlined />,
       },
+      // 查閱用:全校、全狀態、依學期(審核動作仍在上面兩頁)
+      { key: 'a-activities', label: '所有活動', path: '/admin/activities', icon: <UnorderedListOutlined /> },
     ],
   },
   {
@@ -191,6 +205,7 @@ export function buildAdminNav(user: SessionUser | null, badges: Badges = {}): Na
     items: [
       { key: 'a-club-overview', label: '社團總覽', path: '/admin/club-overview', icon: <HomeOutlined /> },
       { key: 'a-members', label: '成員列表', path: '/admin/members', icon: <TeamOutlined /> },
+      { key: 'a-club-activities', label: '活動列表', path: '/admin/club-activities', icon: <UnorderedListOutlined /> },
       { key: 'a-club-settings', label: '管理項目', path: '/admin/club-settings', icon: <SettingOutlined /> },
       { key: 'a-overdue', label: '逾期追蹤與停權', path: '/admin/overdue', icon: <StopOutlined /> },
     ],
@@ -198,7 +213,7 @@ export function buildAdminNav(user: SessionUser | null, badges: Badges = {}): Na
   {
     label: '社團評鑑',
     items: [
-      { key: 'a-eval', label: '行政分審核', path: '/admin/eval', icon: <TrophyOutlined /> },
+      { key: 'a-eval', label: '行政分審核', path: '/admin/eval', icon: <TrophyOutlined />, ...EVAL_UNBUILT },
     ],
   },
   {
@@ -219,6 +234,8 @@ export function buildAdminNav(user: SessionUser | null, badges: Badges = {}): Na
       { key: 'a-files', label: '檔案管理', path: '/admin/files', icon: <FolderOpenOutlined /> },
     ],
   },
+  mirrored('工讀生作業', PT_GROUPS),
+  mirrored('評審評分', VIEWER_GROUPS),
   ]
   return withBadges(
     groups
@@ -229,8 +246,7 @@ export function buildAdminNav(user: SessionUser | null, badges: Badges = {}): Na
 }
 
 // 工讀生端(URL 前綴 /pt;登入角色鍵維持 staff)
-export function buildPtNav(badges: Badges = {}): NavGroup[] {
-  return withBadges([
+const PT_GROUPS: NavGroup[] = [
     {
       label: '違規勸導',
       items: [
@@ -246,12 +262,14 @@ export function buildPtNav(badges: Badges = {}): NavGroup[] {
         { key: 'pt-overdue', label: '逾期追蹤', path: '/pt/overdue', icon: <StopOutlined /> },
       ],
     },
-  ], badges)
+]
+
+export function buildPtNav(badges: Badges = {}): NavGroup[] {
+  return withBadges(PT_GROUPS, badges)
 }
 
 // 評審端
-export function buildViewerNav(badges: Badges = {}): NavGroup[] {
-  return withBadges([
+const VIEWER_GROUPS: NavGroup[] = [
     {
       items: [
         { key: 'v-my', label: '我負責的評分', path: '/viewer', icon: <HomeOutlined /> },
@@ -259,5 +277,8 @@ export function buildViewerNav(badges: Badges = {}): NavGroup[] {
         { key: 'v-done', label: '已完成評分', path: '/viewer/done', icon: <FileDoneOutlined /> },
       ],
     },
-  ], badges)
+]
+
+export function buildViewerNav(badges: Badges = {}): NavGroup[] {
+  return withBadges(VIEWER_GROUPS, badges)
 }

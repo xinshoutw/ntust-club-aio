@@ -240,3 +240,27 @@ async def test_resolve_within_deadline_and_reject_expired(client, db):
     await make_user(db, username="other-admin", role="admin", permissions=["areview"])
     await login(client, "other-admin")
     assert (await client.get("/api/v1/admin/violations")).status_code == 403
+
+
+async def test_location_search_escapes_like_wildcards(client, db):
+    """地點是使用者打的字面值:「B1_2」的底線不是萬用字元,不該撈出「B1X2」。"""
+    club, _other, staff, _rows = await seed(client, db)
+    db.add_all([
+        Violation(
+            club_id=club.id, occurred_on=date(2026, 4, 1), location="B1_2 排練室",
+            items=["噪音影響他人"], filler_id=staff.id,
+        ),
+        Violation(
+            club_id=club.id, occurred_on=date(2026, 4, 2), location="B1X2 排練室",
+            items=["噪音影響他人"], filler_id=staff.id,
+        ),
+    ])
+    await db.commit()
+
+    resp = await client.get("/api/v1/admin/violations", params={"location": "B1_2"})
+    assert [d["location"] for d in resp.json()["data"]] == ["B1_2 排練室"]
+
+    # 契約標記(兩種實作都會過):空白字串等於沒篩,與活動名稱搜尋同一條慣例
+    blank = await client.get("/api/v1/admin/violations", params={"location": "   "})
+    unfiltered = await client.get("/api/v1/admin/violations")
+    assert blank.json()["data"] == unfiltered.json()["data"]

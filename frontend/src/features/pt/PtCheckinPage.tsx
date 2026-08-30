@@ -60,14 +60,16 @@ export default function PtCheckinPage() {
 
       <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
         <LoadingBlock pending={listQuery.isPending}>
-          <table className="tb dense fixed" style={{ minWidth: 720 }}>
-            <Cols widths={['30%', 'auto', 250, 110]} />
+          <table className="tb dense fixed" style={{ minWidth: 850 }}>
+            {/* 借用區間要放得下「日期 – 日期」+ 逾期 pill,不可再縮 */}
+            <Cols widths={['24%', 'auto', 250, 110, 110]} />
             <thead>
               <tr>
                 <th scope="col">社團</th>
                 <th scope="col">器材</th>
                 <th scope="col">借用區間</th>
-                <th scope="col">借用人</th>
+                <th scope="col">收件人</th>
+                <th scope="col">出借人</th>
               </tr>
             </thead>
             <tbody>
@@ -98,12 +100,13 @@ export default function PtCheckinPage() {
                     {l.start} – {l.end}
                     {l.overdue && <span style={{ marginLeft: 8 }}><StatusPill status="overdue" /></span>}
                   </td>
-                  <td className="cell-clip" title={l.borrower} style={{ fontSize: 13 }}>{l.borrower}</td>
+                  <td className="cell-clip" title={l.borrower} style={{ fontSize: 13 }}>{l.borrower ?? '—'}</td>
+                  <td className="cell-clip" title={l.lender} style={{ fontSize: 13 }}>{l.lender ?? '—'}</td>
                 </tr>
               ))}
               {listQuery.isError && (
                 <tr className="no-hover">
-                  <td colSpan={4}>
+                  <td colSpan={5}>
                     <QueryError
                       compact
                       title="借出中清單載入失敗"
@@ -115,7 +118,7 @@ export default function PtCheckinPage() {
               )}
               {!listQuery.isPending && !listQuery.isError && rows.length === 0 && (
                 <tr className="no-hover">
-                  <td colSpan={4} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>目前沒有借出中的器材</td>
+                  <td colSpan={5} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>無借出中的器材</td>
                 </tr>
               )}
             </tbody>
@@ -141,7 +144,7 @@ export default function PtCheckinPage() {
             <div>
               {selected.equipment} <span className="num">×{selected.qty}</span>
               <span style={{ marginLeft: 12, fontSize: 13, color: 'var(--steel)' }}>
-                借用人 {selected.borrower}
+                收件人 {selected.borrower ?? '—'}・出借人 {selected.lender ?? '—'}
               </span>
               {selected.overdue && <span style={{ marginLeft: 12 }}><StatusPill status="overdue" /></span>}
             </div>

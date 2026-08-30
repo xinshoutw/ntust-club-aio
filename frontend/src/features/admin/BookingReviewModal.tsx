@@ -32,8 +32,8 @@ export default function BookingReviewModal({
   onRevoke,
 }: {
   item: BookingReviewItem
-  /** 固定借用衝突:`dow|period` → 種類;由呼叫端每次 render 算(見 roomConflictSlots)——
-   *  存成快照的話,衝突清單晚一步回來就會永遠停在「沒有衝突」 */
+  /** 固定借用衝突:`dow|period` → 種類。後端隨待審列帶回(booking_service.fixed_conflict_slots);
+   *  呼叫端每次 render 由**現行清單**回查那一列 —— 用開窗當下的快照的話,重抓後的新結果就進不來 */
   conflicts?: Map<string, RoomConflictKind>
   open: boolean
   onClose: () => void
@@ -221,14 +221,14 @@ export default function BookingReviewModal({
         onCancel={closeReason}
       >
         <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 8 }}>
-          {reasonMode === 'revoke' ? '撤銷原因(必填,通知社團)' : '退回原因(必填,通知社團)'}
+          {reasonMode === 'revoke' ? '撤銷原因' : '退回原因'}
         </div>
         <Input.TextArea
           autoFocus
           rows={3}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
-          placeholder={reasonMode === 'revoke' ? '例:場地整修,該時段停止開放' : '例:所選時段已有其他社團借用'}
+          placeholder={reasonMode === 'revoke' ? '場地整修' : '所選時段已有其他社團借用'}
         />
       </Modal>
     </Modal>

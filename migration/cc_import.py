@@ -29,12 +29,22 @@ sys.path.insert(0, str(MIGRATION_DIR))
 
 import pymysql
 import sqlalchemy as sa
-from cms_import import IdMap
+from cms_import import IdMap, migration_actor
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import async_session_factory
-from app.models import Equipment, EquipmentLoan, LegacyIdMap, User, Venue, VenueBooking
+from app.models import (
+    ApprovalRecord,
+    Equipment,
+    EquipmentLoan,
+    LegacyIdMap,
+    User,
+    Venue,
+    VenueBooking,
+)
 from app.models.enums import (
+    ApprovalDecision,
+    ApprovalSubject,
     BookingStatus,
     LegacySystem,
     LoanStatus,
@@ -45,7 +55,10 @@ from app.models.enums import (
 TAIPEI = ZoneInfo("Asia/Taipei")
 PERIOD_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "A", "B", "C", "D"]
 
-# 舊 Classroom.id → 新場地名稱(seed 19 處);一舍 B2 一律拆成 樓梯+白板 兩筆
+# 舊 Classroom.id → 新場地名稱(seed 19 處)。
+# 一舍 B2 在 2026-08-24 那份 dump 之前是**一間**(id 22「一舍 B2」),當時一律拆成
+# 樓梯+白板 兩筆;舊系統後來自己拆成 22 白板側 / 23 樓梯側,改回一對一 ——
+# 兩邊都分得出來還複製一份,等於在樓梯側憑空多出 734 筆歷史借用
 VENUE_MAP: dict[int, list[str]] = {
     1: ["S301"],
     2: ["S302/S303"],
@@ -64,7 +77,8 @@ VENUE_MAP: dict[int, list[str]] = {
     18: ["S209"],
     19: ["S207"],
     20: ["T4 舞蹈區"],
-    22: ["一宿 B2 樓梯", "一宿 B2 白板"],
+    22: ["一宿 B2 白板"],
+    23: ["一宿 B2 樓梯"],
 }
 # 新版已無的舊場地:建 is_active=false 承接歷史申請(名稱沿用舊系統)
 LEGACY_VENUES: dict[int, tuple[str, VenueCategory]] = {
@@ -224,7 +238,7 @@ async def import_applies(
     with legacy.cursor() as cur:
         cur.execute("SELECT * FROM Apply ORDER BY id")
         rows = cur.fetchall()
-    created = skipped = 0
+    created = skipped = unlinked = 0
     for r in rows:
         status = BOOKING_STATUS_MAP.get(r["status"])
         targets = venue_ids.get(r["classroom_id"])
@@ -235,6 +249,8 @@ async def import_applies(
             skipped += 1  # 壞日期/未知狀態/未知場地/無節次
             continue
         activity_id = act_lookup.get(r["activity_id"])
+        if activity_id is None:
+            unlinked += 1  # 活動已刪,或不在 cms_import 的 SCOPE_* 內
         purpose = (r["purpose"] or "").strip() or (r["activity"] or "").strip() or "(未填)"
         created_at = epoch_dt(r["created_at"])
         for seq, venue_id in enumerate(targets):
@@ -258,7 +274,10 @@ async def import_applies(
             created += 1
         if created and created % 2000 == 0:
             print(f"  applies … {created}")
-    print(f"applies: 新增 {created} 筆場地借用、跳過 {skipped} 單(髒資料)")
+    print(
+        f"applies: 新增 {created} 筆場地借用、跳過 {skipped} 單(髒資料)"
+        f";其中 {unlinked} 單接不回活動(已刪或不在遷移範圍)"
+    )
 
 
 async def import_device_loans(
@@ -271,7 +290,7 @@ async def import_device_loans(
         cur.execute("SELECT * FROM DeviceLog ORDER BY id")
         logs = cur.fetchall()
     today = datetime.now(TAIPEI).date()
-    created = skipped = 0
+    created = skipped = unlinked = 0
     for log in logs:
         if ids.get("DeviceLog", log["id"]) is not None:
             continue
@@ -293,6 +312,8 @@ async def import_device_loans(
         if status == LoanStatus.APPROVED and end < today:
             status = LoanStatus.RETURNED
         created_at = epoch_dt(head["created_at"])
+        if act_lookup.get(head["activity_id"]) is None:
+            unlinked += 1  # 活動已刪,或不在 cms_import 的 SCOPE_* 內
         loan = EquipmentLoan(
             club_id=club_id,
             equipment_id=equipment_id,
@@ -311,8 +332,103 @@ async def import_device_loans(
         await db.flush()
         ids.record(db, "DeviceLog", log["id"], "equipment_loans", loan.id)
         created += 1
-    print(f"device loans: 新增 {created} 筆器材借用、跳過 {skipped}(孤兒/髒資料)")
+    print(
+        f"device loans: 新增 {created} 筆器材借用、跳過 {skipped}(孤兒/髒資料)"
+        f";其中 {unlinked} 筆接不回活動(已刪或不在遷移範圍)"
+    )
 
+
+
+# 退回理由的舊欄位;`reject_info_en-us` 是同一段的英譯,新系統只有中文一份
+REJECT_INFO = "reject_info_zh-TW"
+
+
+async def import_rejections(
+    legacy, db: AsyncSession, ids: IdMap, venue_ids: dict[int, list[int]]
+) -> None:
+    """退回理由 → approval_records(decision=REJECT)。
+
+    舊系統把理由存在 `Apply`/`DeviceApply` 的 `reject_info_zh-TW`,新系統一律走
+    approval_records。不補這一段,社團在新系統看到「已退回」卻讀不到任何理由,
+    是舊系統看得到、新系統看不到的功能倒退(同 cms_import.import_rejections)。
+
+    只補**真的留了理由**的單:舊系統多數退回本來就沒寫理由,替它們生一列
+    「未提供更多說明」只是把空白換個講法,還多出兩千列。
+    """
+    actor_id = await migration_actor(db)
+    created = no_row = 0
+
+    with legacy.cursor() as cur:
+        cur.execute(
+            f"SELECT id, classroom_id, `{REJECT_INFO}` AS reason, updated_at FROM Apply"
+            f" WHERE status = 4 AND `{REJECT_INFO}` > '' ORDER BY id"
+        )
+        applies = cur.fetchall()
+        cur.execute(
+            f"SELECT id, `{REJECT_INFO}` AS reason, updated_at FROM DeviceApply"
+            f" WHERE status = 4 AND `{REJECT_INFO}` > '' ORDER BY id"
+        )
+        headers = cur.fetchall()
+        cur.execute("SELECT id, device_apply_id FROM DeviceLog ORDER BY id")
+        logs_by_header: dict[int, list[int]] = {}
+        for log in cur.fetchall():
+            logs_by_header.setdefault(log["device_apply_id"], []).append(log["id"])
+
+    async def add(subject, map_key: str, legacy_id: int, new_id, reason: str, ts) -> None:
+        nonlocal created
+        if ids.get(map_key, legacy_id) is not None:
+            return  # 重跑不要越補越多
+        record = ApprovalRecord(
+            subject_type=subject,
+            subject_id=int(new_id),
+            stage="single",  # 臨時場地/器材:管理員單關(同 admin_bookings._record_approval)
+            decision=ApprovalDecision.REJECT,
+            actor_id=actor_id,
+            reason=reason,
+            **({"created_at": ts} if ts else {}),
+        )
+        db.add(record)
+        await db.flush()
+        ids.record(db, map_key, legacy_id, "approval_records", record.id)
+        created += 1
+
+    for r in applies:
+        # SQL 的 > '' 濾不掉純空白(MySQL utf8mb4_0900_ai_ci 是 NO PAD),
+        # strip 後仍是空的就跳過 —— 補一列空理由等於把空白換個講法
+        reason = (r["reason"] or "").strip()
+        if not reason:
+            continue
+        ts = epoch_dt(r["updated_at"])  # 舊系統沒有審核時刻,最後更新時間是最接近的
+        # 一舍 B2 拆成兩筆借用時,兩筆各自要有自己的退件紀錄(與 import_applies 同一套鍵)
+        for seq in range(len(venue_ids.get(r["classroom_id"], []))):
+            key = f"Apply:{seq}" if seq else "Apply"
+            new_id = ids.get(key, r["id"])
+            if new_id is None:
+                no_row += 1
+                continue
+            await add(
+                ApprovalSubject.VENUE_BOOKING, f"reject:{key}", r["id"], new_id, reason, ts
+            )
+
+    for head in headers:
+        reason = (head["reason"] or "").strip()
+        if not reason:
+            continue
+        ts = epoch_dt(head["updated_at"])
+        # 一張申請單含多項器材,新系統一項一列借用,理由逐列複製
+        for log_id in logs_by_header.get(head["id"], []):
+            new_id = ids.get("DeviceLog", log_id)
+            if new_id is None:
+                no_row += 1
+                continue
+            await add(
+                ApprovalSubject.EQUIPMENT_LOAN, "reject:DeviceLog", log_id, new_id, reason, ts
+            )
+
+    print(
+        f"rejections: 補 {created} 筆退件理由(場地 {len(applies)} 單、器材 {len(headers)} 單);"
+        f"借用未遷 {no_row}\n  actor 是不能登入的 _migration(系統遷移)帳號"
+    )
 
 # 沒有任何未知單位時檔頭也要長一樣,否則承辦拿到的兩份 CSV 欄位對不起來
 UNKNOWN_CSV_FIELDS = ("類型", "舊帳號", "舊單號", "日期", "標的", "節次", "用途", "電話")
@@ -399,6 +515,14 @@ async def reset(db: AsyncSession) -> None:
         if target:
             await db.execute(sa.delete(model).where(model.id.in_(target)))
         deleted[table] = len(target)
+    rejects = [
+        int(new_id)
+        for (_t, _lid), new_id in ids._map.items()  # noqa: SLF001 - 同一套腳本的內部結構
+        if _t.startswith("reject:")
+    ]
+    if rejects:
+        await db.execute(sa.delete(ApprovalRecord).where(ApprovalRecord.id.in_(rejects)))
+    deleted["approval_records"] = len(rejects)
     await db.execute(
         sa.delete(LegacyIdMap).where(LegacyIdMap.legacy_system == LegacySystem.CLUBCLASS)
     )
@@ -431,6 +555,7 @@ async def main() -> None:
             venue_ids, device_ids = await ensure_masters(legacy, db, ids)
             await import_applies(legacy, db, ids, venue_ids, club_lookup, act_lookup)
             await import_device_loans(legacy, db, ids, device_ids, club_lookup, act_lookup)
+            await import_rejections(legacy, db, ids, venue_ids)
             await db.commit()
     finally:
         legacy.close()

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { canAccessAdminPath } from './permissions'
+import { accountGuardReason, canAccessAdminPath } from './permissions'
 import type { AdminPage, SessionUser } from '../api/auth'
 
 // 後端 core/permissions.ADMIN_PAGES 的形狀,取其中幾筆
@@ -65,5 +65,51 @@ describe('canAccessAdminPath', () => {
 
   test('目錄表沒有的行政路徑不放行', () => {
     expect(canAccessAdminPath(admin(['aaudit']), '/admin/unknown-page')).toBe(false)
+  })
+})
+
+// 工讀生端與評審端的頁面在行政端整組再掛一次:一把鍵配一個前綴,底下子頁全涵蓋
+describe('鏡射頁的整組前綴', () => {
+  const mirrored = (permissions: string[]): SessionUser =>
+    admin(permissions, {
+      adminPages: [
+        ...PAGES,
+        { key: 'astaff', label: '工讀生作業', paths: ['/admin/pt'], also: [] },
+        { key: 'aviewer', label: '評審評分', paths: ['/admin/viewer'], also: [] },
+      ],
+    })
+
+  test('前綴底下的子頁一次涵蓋', () => {
+    const u = mirrored(['astaff'])
+    expect(canAccessAdminPath(u, '/admin/pt/checkout')).toBe(true)
+    expect(canAccessAdminPath(u, '/admin/pt/violations/new')).toBe(true)
+  })
+
+  test('兩組互不相通', () => {
+    expect(canAccessAdminPath(mirrored(['astaff']), '/admin/viewer/score')).toBe(false)
+    expect(canAccessAdminPath(mirrored(['aviewer']), '/admin/pt/checkin')).toBe(false)
+  })
+})
+
+describe('accountGuardReason', () => {
+  const target = (id: number, permissions: string[], isSuper = false) => ({ id, isSuper, permissions })
+
+  test('自己與最高權限帳號一律動不了', () => {
+    expect(accountGuardReason(admin(['aaccount'], { id: 7 }), target(7, []))).toContain('自己')
+    expect(accountGuardReason(admin(['aaccount']), target(9, [], true))).toContain('最高權限')
+    // super 也不能對 super 動手(後端 _guard_target 的第二條在 is_super 之前)
+    expect(accountGuardReason(admin([], { isSuper: true }), target(9, [], true))).toContain('最高權限')
+  })
+
+  test('對方持有我沒有的鍵就動不了 —— 少了這條,重設密碼就是一條提權路徑', () => {
+    const me = admin(['aaccount'], { id: 1 })
+    expect(accountGuardReason(me, target(2, ['aaccount', 'asetting']))).toContain('權限')
+    expect(accountGuardReason(me, target(2, ['aaccount']))).toBeNull()
+    expect(accountGuardReason(me, target(2, []))).toBeNull()
+  })
+
+  test('最高權限不受位階限制;沒有登入資訊時 fail-closed', () => {
+    expect(accountGuardReason(admin([], { isSuper: true, id: 1 }), target(2, ['asetting']))).toBeNull()
+    expect(accountGuardReason(null, target(2, []))).not.toBeNull()
   })
 })

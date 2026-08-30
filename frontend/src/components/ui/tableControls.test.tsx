@@ -25,4 +25,26 @@ describe('FilterButton', () => {
     await screen.findByText('已核准')
     expect(screen.getAllByText('待審核')).toHaveLength(1)
   })
+
+  test('分組選項排成二級選單:第一層是資料夾,已選但不屬於任何資料夾的值仍列得出來', async () => {
+    render(
+      <FilterButton
+        label="社團"
+        options={[
+          { label: '藝術', options: ['吉他社', '熱舞社'] },
+          { label: '學術', options: ['資訊社'] },
+        ]}
+        selected={['已停社的舊社團']}
+        onChange={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '社團' }))
+    await screen.findByText('藝術')
+    expect(screen.getByText('學術')).toBeTruthy()
+    // 資料夾未展開,社團名還不在畫面上 —— 159 個平鋪讀不完才改成二級
+    expect(screen.queryByText('吉他社')).toBeNull()
+    // 選項清單對不上的已選值一律留在最上層,否則取消不掉
+    expect(screen.getByText('已停社的舊社團')).toBeTruthy()
+  })
 })

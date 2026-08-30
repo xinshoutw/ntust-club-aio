@@ -38,9 +38,9 @@ describe('intakeNote', () => {
     expect(note).not.toContain('(')
   })
 
-  test('三種都要說「已收到的申請仍可審核」', () => {
+  test('三種都要說社團送不出申請 —— 橫幅的重點是「社團端停了」,不是「這頁停了」', () => {
     for (const state of ['unset', 'upcoming', 'closed'] as const) {
-      expect(intakeNote(w({ state }))).toContain('仍可審核')
+      expect(intakeNote(w({ state }))).toContain('社團無法送出申請')
     }
   })
 })

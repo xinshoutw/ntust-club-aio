@@ -177,7 +177,7 @@ export default function AuditPage() {
                     {/* 沒下篩選時新庫或窄區間本來就可能一筆都沒有,別說成「不符篩選條件」 */}
                     {whoFilter || roleFilter || actionFilter || range
                       ? '無符合篩選條件的紀錄'
-                      : '目前沒有稽核紀錄'}
+                      : '無稽核紀錄'}
                   </td>
                 </tr>
               )}

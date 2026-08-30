@@ -79,3 +79,46 @@ async def test_destructive_scripts_refuse_on_prod(monkeypatch, capsys):
 
     monkeypatch.setattr(settings, "env", "dev")
     refuse_on_prod("還原資料庫")  # 開發環境照常放行
+
+
+async def test_bulk_password_reset_only_touches_what_was_asked_for(db):
+    """`set_passwords.py` 一次改一整批密碼:選錯範圍就是把不該動的帳號一起換掉,
+    而且沒有回頭路(舊 hash 不留)。角色旗標是聯集,SSO 帳號一律不列入。"""
+    import argparse
+
+    import sqlalchemy as sa
+
+    from app.models import User
+    from app.models.enums import AuthProvider, UserRole
+    from scripts.set_passwords import selection
+    from tests.conftest import make_club, make_user
+
+    club = await make_club(db, name="測試社")
+    await make_user(db, username="c1", role=UserRole.CLUB, club_id=club.id)
+    await make_user(db, username="a1", role=UserRole.ADMIN)
+    await make_user(db, username="a2", role=UserRole.ADMIN, is_super=True)
+    await make_user(db, username="v1", role=UserRole.VIEWER)
+    await make_user(db, username="sso1", role=UserRole.ADMIN, auth_provider=AuthProvider.SSO)
+
+    async def matched(**flags) -> set[str]:
+        defaults = dict(
+            all=False, club=False, admin=False, staff=False, viewer=False,
+            is_super=False, username=[],
+        )
+        args = argparse.Namespace(**(defaults | flags))
+        conditions = selection(args)
+        if not conditions:
+            return set()
+        rows = await db.scalars(
+            sa.select(User.username).where(
+                sa.or_(*conditions), User.auth_provider == AuthProvider.LOCAL
+            )
+        )
+        return set(rows)
+
+    assert await matched() == set(), "沒給條件必須選不到任何人(main 會 parser.error)"
+    assert await matched(club=True) == {"c1"}
+    assert await matched(is_super=True) == {"a2"}
+    assert await matched(club=True, viewer=True) == {"c1", "v1"}, "角色旗標是聯集"
+    assert await matched(username=["c1", "v1"]) == {"c1", "v1"}
+    assert await matched(all=True) == {"c1", "a1", "a2", "v1"}, "SSO 帳號沒有本地密碼可設"

@@ -14,6 +14,9 @@ export default function StatusPill({ status }: StatusPillProps) {
         alignItems: 'center',
         gap: 4,
         height: 22,
+        // 有 border 的狀態(已核准、開放中、已銷案…)沒有這行會高 24px:
+        // 全站沒有 box-sizing reset,height 算的是內容框,同一列的 pill 就不等高
+        boxSizing: 'border-box',
         padding: '0 10px',
         borderRadius: 999,
         fontSize: 12,

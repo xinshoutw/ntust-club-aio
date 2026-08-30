@@ -76,7 +76,7 @@ export default function AdminBookingsPage() {
     if (booking) {
       openReview({ kind: 'venue', data: booking })
     } else {
-      message.error(`「${club}」的待審申請不在目前這一頁,請於下方待審列表翻頁開啟`)
+      message.error(`「${club}」的待審申請不在目前這一頁，請於下方待審列表翻頁開啟`)
     }
   }
 

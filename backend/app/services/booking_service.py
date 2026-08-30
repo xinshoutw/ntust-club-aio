@@ -1,5 +1,6 @@
 """借用領域的推導規則:節次、固定借用規則、器材可借數與借用區間、逾期判定、場地色格。"""
 
+from collections.abc import Collection, Sequence
 from datetime import UTC, date, datetime, time, timedelta
 
 import sqlalchemy as sa
@@ -7,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.semesters import TAIPEI, next_semester_range
 from app.models import (
-    Activity,
     Club,
     EquipmentLoan,
     Holiday,
@@ -106,6 +106,61 @@ def venue_booking_started_expr(now: datetime | None = None) -> sa.ColumnElement[
             sa.and_(VenueBooking.date == today, VenueBooking.periods.op("&&")(started)),
         )
     return expr
+
+
+# 「進行中」的界線。狀態不夠用 —— 借用不會因為日期過了就換狀態,
+# 只篩 status 會把整段歷史當成進行中。
+#
+# 每條界線都對齊「那一端還動得了什麼」:清單看不到的單就沒有入口,
+# 所以看得到的範圍必須涵蓋動得了的範圍(見 AGENTS.md「看得到與動得了是兩個判定」)。
+# 固定借用與器材兩端的可動範圍相同,共用一支;臨時借用兩端不同,分兩支。
+
+
+def room_booking_ongoing_expr(now: datetime | None = None) -> sa.ColumnElement[bool]:
+    """固定借用進行中:審核中,或已核准且學期尚未結束。
+
+    社團端取消與行政端撤銷都擋在 `end_date < today`,兩端同一條界線。
+    """
+    return sa.and_(
+        RoomBookingRequest.status.in_([BookingStatus.PENDING, BookingStatus.APPROVED]),
+        RoomBookingRequest.end_date >= today_taipei(now),
+    )
+
+
+def venue_booking_ongoing_expr(now: datetime | None = None) -> sa.ColumnElement[bool]:
+    """臨時借用未結束:審核中或已核准,且借用日未過。
+
+    行政端「借用中」用這條 —— 與撤銷端點 `date < today` 同一界線。
+    比 upcoming 寬:當天已開始的單社團動不了了,承辦仍可撤銷到當日結束,
+    卡片就必須繼續列出來,否則誤核的單當天就再也解不開。
+    """
+    return sa.and_(
+        VenueBooking.status.in_([BookingStatus.PENDING, BookingStatus.APPROVED]),
+        VenueBooking.date >= today_taipei(now),
+    )
+
+
+def venue_booking_upcoming_expr(now: datetime | None = None) -> sa.ColumnElement[bool]:
+    """臨時借用尚未開始:審核中或已核准,且最早節次起點未到。
+
+    社團端「正在申請」用這條 —— 與社團端取消的界線相同(起始時刻一過即不可取消),
+    「正在申請」表內必有取消入口。起點一過即落到「最近申請」。
+    """
+    return sa.and_(
+        VenueBooking.status.in_([BookingStatus.PENDING, BookingStatus.APPROVED]),
+        sa.not_(venue_booking_started_expr(now)),
+    )
+
+
+def equipment_loan_ongoing_expr() -> sa.ColumnElement[bool]:
+    """器材借用進行中:審核中、已核准、借出中。
+
+    只看狀態即可 —— 器材有點交流程,歸還會把狀態推到 returned,
+    不像場地借用要靠日期才分得出結束。
+    """
+    return EquipmentLoan.status.in_(
+        [LoanStatus.PENDING, LoanStatus.APPROVED, LoanStatus.CHECKED_OUT]
+    )
 
 # 固定借用規則
 MAX_FIXED_SLOTS = 10  # 每社至多 10 節(1 節 = 1 小時)
@@ -251,6 +306,114 @@ async def fixed_slots_blocked(
     return sorted(hit)
 
 
+# 待審固定借用的衝突種類,由重到輕(precedence 與 `fixed_occupancy` 同一組):
+# 不開放規則 > 已核准固定 > 已核准臨時 > 其他待審單。前三者核准必被擋
+# (SLOT_BLOCKED / SLOT_TAKEN),只能退回或先撤銷那筆;最後一種才是「擇一核准」。
+CONFLICT_BLOCKED = "blocked"
+CONFLICT_TAKEN = "taken"
+CONFLICT_TEMP = "temp"
+CONFLICT_PENDING = "pending"
+_CONFLICT_RANK = {CONFLICT_BLOCKED: 4, CONFLICT_TAKEN: 3, CONFLICT_TEMP: 2, CONFLICT_PENDING: 1}
+
+
+async def fixed_conflict_slots(
+    db: AsyncSession, requests: Sequence[RoomBookingRequest]
+) -> dict[int, dict[tuple[int, str], str]]:
+    """逐張待審固定借用算出「哪幾格會撞、撞到什麼」。
+
+    判定軸與核准端的三項檢核同一份(`approve_room_booking`)—— 畫面若自己再算一份,
+    漏掉的那一種就是「標成無衝突、按下核准才被擋」。臨時借用那一種尤其容易漏:
+    它要把學期區間展開成每週的哪幾天才比得出來,那段邏輯只該存在一處。
+
+    回傳 `request_id → {(星期, 節次): 種類}`;非待審單不算。
+    """
+    pending = [r for r in requests if r.status == BookingStatus.PENDING]
+    if not pending:
+        return {}
+    venue_ids = {r.venue_id for r in pending}
+    span_start = min(r.start_date for r in pending)
+    span_end = max(r.end_date for r in pending)
+
+    # 對照名單一次取足:全量待審 + 全量已核准(只限用到的場地與涵蓋得到的區間)。
+    # 只比對當前這一頁的話,跨頁的兩社搶同一格會被判成無衝突
+    rivals = (
+        await db.scalars(
+            sa.select(RoomBookingRequest)
+            .where(
+                RoomBookingRequest.venue_id.in_(venue_ids),
+                RoomBookingRequest.status.in_([BookingStatus.PENDING, BookingStatus.APPROVED]),
+                RoomBookingRequest.start_date <= span_end,
+                RoomBookingRequest.end_date >= span_start,
+            )
+            .options(sa.orm.selectinload(RoomBookingRequest.slots))
+        )
+    ).all()
+
+    # 已核准的單日臨時借用:核准端會用它擋下整學期的固定佔用
+    today = today_taipei()
+    temps = (
+        await db.execute(
+            sa.select(VenueBooking.venue_id, VenueBooking.date, VenueBooking.periods).where(
+                VenueBooking.venue_id.in_(venue_ids),
+                VenueBooking.status == BookingStatus.APPROVED,
+                VenueBooking.date >= max(span_start, today),
+                VenueBooking.date <= span_end,
+            )
+        )
+    ).all()
+
+    # 場地不開放規則:送出後才新增的規則,核准這關同樣擋(SLOT_BLOCKED)。
+    # 依場地分桶再用 —— 規則逐日展開後可能上千格,逐張待審單掃整張 map 是白掃
+    blocked: dict[int, list[tuple[date, dict[str, str]]]] = {}
+    for (day, vid), cells in (
+        await blocked_map(db, span_start, span_end, venue_ids=venue_ids)
+    ).items():
+        blocked.setdefault(vid, []).append((day, cells))
+
+    def put(found: dict[tuple[int, str], str], slot: tuple[int, str], kind: str) -> None:
+        if _CONFLICT_RANK[kind] > _CONFLICT_RANK.get(found.get(slot, ""), 0):
+            found[slot] = kind
+
+    # 對手單的節次集合先建好:放在內圈的話,每張待審單都會把它重建一次
+    rival_slots = {r.id: {(s.weekday, s.period) for s in r.slots} for r in rivals}
+
+    # ponytail: 逐對比對 O(n²),一輪開放窗的待審單頂多百餘筆(前端原本也是這樣算);
+    # 真的長到會卡時再依場地分桶
+    out: dict[int, dict[tuple[int, str], str]] = {}
+    for req in pending:
+        mine = {(s.weekday, s.period) for s in req.slots}
+        found: dict[tuple[int, str], str] = {}
+        for other in rivals:
+            if other.id == req.id or other.venue_id != req.venue_id:
+                continue
+            if other.start_date > req.end_date or other.end_date < req.start_date:
+                continue
+            kind = (
+                CONFLICT_TAKEN if other.status == BookingStatus.APPROVED else CONFLICT_PENDING
+            )
+            for slot in mine & rival_slots[other.id]:
+                put(found, slot, kind)
+        # 學期已開始後才核准的固定借用,不該被學期內早已過去的臨時借用擋死(與核准端同一條)
+        first_day = max(req.start_date, today)
+        for venue_id, day, periods in temps:
+            if venue_id != req.venue_id or not (first_day <= day <= req.end_date):
+                continue
+            for period in periods:
+                if (day.isoweekday(), period) in mine:
+                    put(found, (day.isoweekday(), period), CONFLICT_TEMP)
+        # 不開放規則逐日展開後比對(規則帶自己的日期區間,只封某幾天的規則對整學期
+        # 每週借用一樣是衝突,但只封週一到週三的對週五就不是)
+        for day, cells in blocked.get(req.venue_id, ()):
+            if not (req.start_date <= day <= req.end_date):
+                continue
+            for period in cells:
+                if (day.isoweekday(), period) in mine:
+                    put(found, (day.isoweekday(), period), CONFLICT_BLOCKED)
+        if found:
+            out[req.id] = found
+    return out
+
+
 async def temp_days_hitting_slots(
     db: AsyncSession, venue_id: int, start: date, end: date, pairs: list[tuple[int, str]]
 ) -> bool:
@@ -393,6 +556,47 @@ async def equipment_available_map(
     return {eid: max(total - used.get(eid, 0), 0) for eid, total in totals.items()}
 
 
+# 器材借用區間上限(天,含頭含尾)。自填區間沒有上界的話,一張還沒審的單就能把
+# 某品項的可借數壓成 0 到天荒地老(pending 亦佔用),年份點錯即成事故。
+# 舊系統 8,154 筆借用最長 7 天;放到 60 天已足夠涵蓋提前籌備與事後驗收
+MAX_LOAN_DAYS = 60
+
+
+async def equipment_usage_by_day(
+    db: AsyncSession, start: date, end: date
+) -> dict[int, dict[date, int]]:
+    """區間內逐日佔用量:器材 → 日 → 件數(借用總覽的器材色格用)。
+
+    佔用來源與 `_occupies_window` 同一組單子(未退回、未歸還、未取消),但這裡逐日判定:
+    單子在自己的區間內佔用,借出中(含逾期未還)另從**今天**起一路佔用 —— 東西實體還在
+    別人手上。`_occupies_window` 是列級條件,查詢區間涵蓋今天時會把借出中的單子算進
+    整段(含區間裡已經過去的日子),兩者對過去的日子答案不同,不要互相拿來當保證。
+    """
+    rows = await db.scalars(
+        sa.select(EquipmentLoan).where(
+            EquipmentLoan.status.notin_(
+                [LoanStatus.REJECTED, LoanStatus.RETURNED, LoanStatus.CANCELLED]
+            ),
+            sa.or_(
+                sa.and_(EquipmentLoan.start_date <= end, EquipmentLoan.end_date >= start),
+                EquipmentLoan.status == LoanStatus.CHECKED_OUT,
+            ),
+        )
+    )
+    today = today_taipei()
+    days = [start + timedelta(days=i) for i in range((end - start).days + 1)]
+    usage: dict[int, dict[date, int]] = {}
+    for loan in rows:
+        by_day = usage.setdefault(loan.equipment_id, {})
+        for day in days:
+            # or 不是加總:借出中的單子在自己區間內也只佔一次
+            if loan.start_date <= day <= loan.end_date or (
+                loan.status == LoanStatus.CHECKED_OUT and day >= today
+            ):
+                by_day[day] = by_day.get(day, 0) + loan.qty
+    return usage
+
+
 def next_workday_in(d: date, holidays: set[date]) -> date:
     """下一個上班日(跳過週末與政府行事曆假日);純函式,假日集合由呼叫端提供。"""
     cursor = d + timedelta(days=1)
@@ -414,13 +618,6 @@ def add_workdays(d: date, n: int, holidays: set[date]) -> date:
         if cursor.weekday() < 5 and cursor not in holidays:
             left -= 1
     return cursor
-
-
-def loan_window(activity: Activity, buffer: dict, holidays: set[date]) -> tuple[date, date]:
-    """器材借用區間=活動開始日 −before 個工作天 ~ 活動結束日 +after 個工作天。"""
-    start = add_workdays(activity.date, -int(buffer.get("before", 2)), holidays)
-    end = add_workdays(activity.end_date or activity.date, int(buffer.get("after", 1)), holidays)
-    return start, end
 
 
 def overdue_deadline_in(end_date: date, return_time: str, holidays: set[date]) -> datetime:
@@ -462,17 +659,25 @@ async def overdue_deadline(db: AsyncSession, end_date: date, return_time: str) -
 
 
 async def blocked_map(
-    db: AsyncSession, start: date, end: date, venue_id: int | None = None
+    db: AsyncSession,
+    start: date,
+    end: date,
+    venue_id: int | None = None,
+    venue_ids: Collection[int] | None = None,
 ) -> dict[tuple[date, int], dict[str, str]]:
     """區間內各(日,場地)的不開放節次 → {節次: 原因}(venue_block_rules 展開)。
 
     weekdays NULL=區間內每天;有值=僅列出的 ISO 星期(1=一…7=日)。
+    兩個場地參數都是選填的過濾條件:規則要逐日展開,不先收窄就是把全校的規則
+    在整個區間內攤平一次(`venue_ids` 給多場地,`venue_id` 給單一場地)。
     """
     query = sa.select(VenueBlockRule).where(
         VenueBlockRule.start_date <= end, VenueBlockRule.end_date >= start
     )
     if venue_id is not None:
         query = query.where(VenueBlockRule.venue_id == venue_id)
+    if venue_ids is not None:
+        query = query.where(VenueBlockRule.venue_id.in_(venue_ids))
     out: dict[tuple[date, int], dict[str, str]] = {}
     for rule in (await db.scalars(query)).all():
         day = max(rule.start_date, start)

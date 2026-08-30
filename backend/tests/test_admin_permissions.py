@@ -18,6 +18,12 @@ from tests.conftest import csrf_headers, login, make_user
 PAGE_READS: list[tuple[str, str]] = [
     ("areview", "/api/v1/admin/activities?status=pending_advisor"),
     ("aclose", "/api/v1/admin/activities?status=closing_pending_advisor"),
+    ("aactivity", "/api/v1/admin/activities"),
+    ("aactivity", "/api/v1/admin/activities/semesters"),
+    ("aactivity", "/api/v1/admin/clubs/options"),
+    ("aclubact", "/api/v1/admin/activities"),
+    ("aclubact", "/api/v1/admin/activities/semesters"),
+    ("aclubact", "/api/v1/admin/clubs/options"),
     ("asignup", "/api/v1/admin/signup-items"),
     ("aannounce", "/api/v1/admin/announcements"),
     ("aannounce", "/api/v1/admin/clubs/options"),
@@ -45,6 +51,13 @@ PAGE_READS: list[tuple[str, str]] = [
     ("asetting", "/api/v1/admin/venues?include_inactive=true"),
     ("asetting", "/api/v1/admin/equipment"),
     ("aaudit", "/api/v1/admin/audit"),
+    # 工讀生端與評審端的頁面在行政端整組再掛了一次:一把鍵要開得了那一組的全部端點
+    ("astaff", "/api/v1/staff/clubs"),
+    ("astaff", "/api/v1/staff/violation-items"),
+    ("astaff", "/api/v1/staff/violations"),
+    ("astaff", "/api/v1/staff/equipment-loans?status=approved"),
+    ("aviewer", "/api/v1/viewer/assignments"),
+    ("aviewer", "/api/v1/viewer/done"),
 ]
 
 
@@ -63,6 +76,9 @@ FORMERLY_SUPER = [
     ("/api/v1/admin/equipment", "asetting"),
     ("/api/v1/admin/venue-rules", "arule"),
     ("/api/v1/admin/settings", "asetting"),
+    # 鏡射頁同樣是鍵控:aviol 看得到違規管理,不代表進得了工讀生那一組
+    ("/api/v1/staff/violations", "astaff"),
+    ("/api/v1/viewer/assignments", "aviewer"),
 ]
 
 
@@ -284,3 +300,42 @@ async def test_every_grantable_key_fits_in_one_request(client, db):
     )
     assert resp.status_code == 200, resp.text
     assert len(resp.json()["data"]["permissions"]) == len(PERMISSION_KEYS)
+
+
+# ---- 鏡射頁:工讀生端與評審端的頁面在行政端整組再掛一次(astaff / aviewer)----
+
+
+async def test_mirrored_pages_are_one_key_per_group(client, db):
+    """一把鍵開整組:少了這條就會有人把它拆成一頁一鍵,兩邊的路徑前綴也就對不上。"""
+    mirrored = {p.key: p.paths for p in permissions.ADMIN_PAGES}
+    assert mirrored["astaff"] == ("/admin/pt",)
+    assert mirrored["aviewer"] == ("/admin/viewer",)
+
+
+async def test_viewer_key_does_not_need_the_viewer_flag(client, db):
+    """can_view_eval 是評審帳號的開關,管理員身上一律是預設值 —— 拿它當條件這把鍵永遠開不了。"""
+    holder = await make_user(db, username="mirror", role="admin", permissions=["aviewer"])
+    assert holder.can_view_eval is False
+
+    await login(client, "mirror")
+    assert (await client.get("/api/v1/viewer/assignments")).status_code == 200
+
+
+async def test_mirrored_keys_do_not_leak_to_other_roles(client, db):
+    """鍵是行政端的東西:社團帳號帶著同名字串也不該進得去(權限只對 admin 生效)。"""
+    await make_user(db, username="pretend", role="club", permissions=["astaff", "aviewer"])
+    await login(client, "pretend")
+
+    assert (await client.get("/api/v1/staff/violations")).status_code == 403
+    assert (await client.get("/api/v1/viewer/assignments")).status_code == 403
+
+
+async def test_mirrored_keys_grant_no_file_access(client, db):
+    """鏡射不擴權:兩把鍵都不對上任何檔案類型。
+
+    `aviewer` 特別要守住 —— admin 分支的下載不做指派範圍檢查,給了它 eval_upload
+    就是讓一把「只多三頁」的鍵拿到全校全年度的佐證檔,繞過對評審收緊的那條範圍。
+    """
+    for key in ("astaff", "aviewer"):
+        assert not any(key in keys for keys in permissions.FILE_SUBJECT_KEYS.values()), key
+        assert not permissions.can_download("eval_upload", [key])

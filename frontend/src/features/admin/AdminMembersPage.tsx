@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { App, Button, Select } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { DownloadOutlined } from '@ant-design/icons'
@@ -7,8 +7,10 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { Cols, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
 import { downloadCsv } from '../../lib/csv'
-import { kindLabel } from '../../lib/roles'
+import { kindLabel, memberTitle } from '../../lib/roles'
 import { currentSemester, semesterOptions } from '../../lib/semester'
+import { clampPage } from '../../lib/paging'
+import { useFitRows } from '../../lib/fitRows'
 import { useMemberTimeColumns } from '../../lib/memberTable'
 import {
   fetchAllAdminMembers,
@@ -19,8 +21,6 @@ import {
 import ClubSelect from './ClubSelect'
 import { useAdminClub } from './clubContext'
 
-const PAGE_SIZE = 50
-
 // 伺服器端排序白名單(members 端點;kind=身份權重,負責人→副負責人→幹部→社員)
 type SortKey = 'name' | 'student_id' | 'kind' | 'title' | 'semester' | 'created_at' | 'updated_at'
 
@@ -28,12 +28,16 @@ type SortKey = 'name' | 'student_id' | 'kind' | 'title' | 'semester' | 'created_
 export default function AdminMembersPage() {
   const { club, clubId, clubKind } = useAdminClub()
   const { message } = App.useApp()
+  // 卡片撐到視窗底、列數依高度算;分頁列跟著卡片底邊,列數不足時位置也不變
+  const tableCard = useRef<HTMLDivElement>(null)
+  const { height: cardHeight, rows: pageSize } = useFitRows(tableCard)
   const [page, setPage] = useState(1)
   const [semester, setSemester] = useState<string>(currentSemester())
   // 名冊慣例的預設序(身份權重→學號)=後端預設:不點排序時不帶 sort
   const { entries, toggle } = useMultiSort<SortKey>()
   const { showJoined, showUpdated } = useMemberTimeColumns(entries.map((e) => e.key))
-  const colCount = 6 + Number(showJoined) + Number(showUpdated)
+  // 姓名/學號/身份/職稱/學期 + 兩個時間欄;這頁沒有動作欄(社團端才有,那邊是 6)
+  const colCount = 5 + Number(showJoined) + Number(showUpdated)
   const [exporting, setExporting] = useState(false)
   useEffect(() => setPage(1), [clubId, semester])
   // 換社團要一併回到當前學期:上一社選的學期在新社可能根本不存在,列表與匯出都會是誤導性的空
@@ -47,10 +51,16 @@ export default function AdminMembersPage() {
     semester: semester === 'all' ? undefined : semester,
     sort: sortParam(entries),
     page,
-    pageSize: PAGE_SIZE,
+    pageSize,
   })
   const members = listQuery.data?.members ?? []
   const total = listQuery.data?.total ?? 0
+
+  // 視窗變高會讓總頁數變少;停在末頁只會看到空表。失敗時 total 也是 0,只在成功後收斂
+  const listLoaded = listQuery.isSuccess
+  useEffect(() => {
+    if (listLoaded) setPage((p) => clampPage(p, total, pageSize))
+  }, [listLoaded, total, pageSize])
 
   const toggleSort = (key: SortKey) => {
     toggle(key)
@@ -69,7 +79,7 @@ export default function AdminMembersPage() {
       // 與社團端匯入格式相容(無標題列;後端 csv.reader 支援引號跳脫);身份以顯示詞輸出;職稱補空字串讓各列欄數一致
       downloadCsv(
         `成員名單_${club}_${semester === 'all' ? '全部學期' : semester}.csv`,
-        rows.map((m) => [m.name, m.studentId, kindLabel(m.kind, clubKind), m.title ?? '', m.phone ?? '']),
+        rows.map((m) => [m.name, m.studentId, kindLabel(m.kind, clubKind), memberTitle(m) ?? '']),
       )
       message.success(`已匯出 ${rows.length} 名成員`)
     } catch (e) {
@@ -108,18 +118,27 @@ export default function AdminMembersPage() {
         }
       />
 
-      <div className="card" style={{ marginTop: 20, overflowX: 'auto' }}>
+      <div
+        ref={tableCard}
+        className="card"
+        style={{ marginTop: 20, height: cardHeight, display: 'flex', flexDirection: 'column' }}
+      >
+        {/* 表格區吃掉剩餘高度;直向不捲(列數就是照這塊高度算的),橫向留給窄視窗 */}
+        <div style={{ flex: 1, minHeight: 0, overflowX: 'auto', overflowY: 'hidden' }}>
         <LoadingBlock pending={clubId != null && listQuery.isPending}>
-          <table className="tb fixed" style={{ minWidth: 680 }}>
-            {/* 姓名/職稱吃彈性寬並截斷;其餘固定 px。兩個時間欄依 showJoined/showUpdated 增減 */}
-            <Cols widths={['15%', 100, 92, 'auto', 105, 80, ...(showJoined ? [140] : []), ...(showUpdated ? [140] : [])]} />
+          <table className="tb fixed" style={{ minWidth: 960 }}>
+            {/* 姓名放得下四字中文名、學號放得下 9 碼,時間欄 156px 放得下 `YYYY/MM/DD HH:mm`
+                (16 字 + 左右內距 32px);時間欄依 showJoined/showUpdated 增減。
+                **每一欄都給 px、沒有 auto**:寬螢幕的餘裕按比例攤回每一欄,窄到放不下時
+                表格維持欄寬總和、由外層橫捲,時間欄不會被壓到截斷。版面同社團端
+                (欄寬另計:這頁密一級,且沒有動作欄)*/}
+            <Cols widths={[100, 130, 92, 138, 80, ...(showJoined ? [156] : []), ...(showUpdated ? [156] : [])]} />
             <thead>
               <tr>
                 <th scope="col"><MultiSortButton label="姓名" sortKey="name" entries={entries} onToggle={toggleSort} /></th>
                 <th scope="col"><MultiSortButton label="學號" sortKey="student_id" entries={entries} onToggle={toggleSort} /></th>
                 <th scope="col"><MultiSortButton label="身份" sortKey="kind" entries={entries} onToggle={toggleSort} /></th>
                 <th scope="col"><MultiSortButton label="職稱" sortKey="title" entries={entries} onToggle={toggleSort} /></th>
-                <th scope="col">電話</th>
                 <th scope="col"><MultiSortButton label="學期" sortKey="semester" entries={entries} onToggle={toggleSort} /></th>
                 {showJoined && <th scope="col"><MultiSortButton label="入社時間" sortKey="created_at" entries={entries} onToggle={toggleSort} /></th>}
                 {showUpdated && <th scope="col"><MultiSortButton label="更新時間" sortKey="updated_at" entries={entries} onToggle={toggleSort} /></th>}
@@ -129,10 +148,11 @@ export default function AdminMembersPage() {
               {members.map((m) => (
                 <tr key={m.id}>
                   <td className="cell-clip" title={m.name} style={{ fontWeight: 500 }}>{m.name}</td>
-                  <td className="num" style={{ color: 'var(--steel)' }}>{m.studentId}</td>
+                  <td className="num cell-clip" style={{ color: 'var(--steel)' }}>{m.studentId}</td>
                   <td>{kindLabel(m.kind, clubKind)}</td>
-                  <td className="cell-clip" title={m.title ?? undefined}>{m.title ?? '—'}</td>
-                  <td className="num cell-clip">{m.phone ?? '—'}</td>
+                  {/* 負責人與副負責人不寫職稱(D-27):遷移前的殘留值不在這裡露出來,
+                      否則同一列社團端顯示 — 而這裡顯示原文 */}
+                  <td className="cell-clip" title={memberTitle(m) ?? undefined}>{memberTitle(m) ?? '—'}</td>
                   <td className="num cell-clip" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.semester}</td>
                   {showJoined && <td className="num cell-clip" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.joinedAt}</td>}
                   {showUpdated && <td className="num cell-clip" style={{ fontSize: 13, color: 'var(--steel)' }}>{m.updatedAt}</td>}
@@ -158,7 +178,7 @@ export default function AdminMembersPage() {
                 <tr className="no-hover">
                   <td colSpan={colCount} style={{ textAlign: 'center', color: 'var(--steel)', padding: 24 }}>
                     {clubsQuery.isError
-                      ? '社團清單載入失敗,請以頁首的重試鈕重新載入'
+                      ? '社團清單載入失敗，請以頁首的重試鈕重新載入'
                       : clubId == null
                         ? '請先選擇社團'
                         : `${club} 尚未建立成員名單`}
@@ -168,8 +188,10 @@ export default function AdminMembersPage() {
             </tbody>
           </table>
         </LoadingBlock>
+        </div>
+        {/* 分頁列改放卡片內:卡片高度固定,它才會永遠停在同一條線上(全站其餘表格同型) */}
+        <Pager page={page} pageSize={pageSize} total={total} onChange={setPage} />
       </div>
-      <Pager page={page} pageSize={PAGE_SIZE} total={total} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
     </div>
   )
 }

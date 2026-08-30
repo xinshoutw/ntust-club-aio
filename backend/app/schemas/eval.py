@@ -65,6 +65,9 @@ class AwardDetailOut(BaseModel):
     has_presentation: bool
     is_weighted: bool
     year: int
+    # 學務處是否關閉了本獎項的資料上傳(eval_settings.unlocked=False;無設定列=開放)。
+    # 上傳與刪除都吃這把鎖 —— 不回它,社團要選完檔才吃 409
+    upload_locked: bool
     items: list[RubricItemOut]
 
 

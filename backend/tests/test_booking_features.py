@@ -202,7 +202,8 @@ async def test_max_lease_count(client, db):
     eq = await make_equipment(db, total_qty=10, max_lease_count=2)
     activity = await make_activity(db, club, day=TOMORROW)
     body = {"equipment_id": eq.id, "activity_id": activity.id, "qty": 3,
-            "purpose": "活動", "phone": "0912000111"}
+            "purpose": "活動", "phone": "0912000111",
+            "start_date": TOMORROW.isoformat(), "end_date": TOMORROW.isoformat()}
     resp = await client.post(
         "/api/v1/club/equipment-loans", json=body, headers=csrf_headers(client)
     )
@@ -497,7 +498,8 @@ async def test_equipment_loan_rejects_ended_activity(client, db):
         db, club, day=YESTERDAY - timedelta(days=2), end_day=YESTERDAY
     )
     body = {"equipment_id": eq.id, "activity_id": ended.id, "qty": 1,
-            "purpose": "補借", "phone": "0912000111"}
+            "purpose": "補借", "phone": "0912000111",
+            "start_date": TOMORROW.isoformat(), "end_date": TOMORROW.isoformat()}
     resp = await client.post(
         "/api/v1/club/equipment-loans", json=body, headers=csrf_headers(client)
     )
@@ -514,22 +516,35 @@ async def test_equipment_loan_rejects_ended_activity(client, db):
     assert resp.status_code == 201, resp.text
 
 
-async def test_phone_character_whitelist(client, db):
+async def test_phone_must_be_a_mobile_or_a_4_digit_extension(client, db):
+    """社團端借用的聯絡電話:09 開頭的 10 碼手機或 4 碼校內分機(2026-08-27 需求方拍板)。
+
+    寬鬆的字元白名單只剩行政手動借用在用(`Manual*In`)—— 那是補登紙本舊件。
+    """
     club = await seed_club(client, db)
     venue = await make_venue(db, allow_temp=True)
     activity = await make_activity(db, club, day=TOMORROW)
     body = {"venue_id": venue.id, "activity_id": activity.id, "date": str(TOMORROW),
-            "periods": ["5"], "purpose": "x", "phone": "0912-345 678"}  # 空白不合法
+            "periods": ["5"], "purpose": "x", "phone": "0912-345-678"}
     resp = await client.post(
         "/api/v1/club/venue-bookings", json=body, headers=csrf_headers(client)
     )
-    assert resp.status_code == 422
+    assert resp.status_code == 201, resp.text
     resp = await client.post(
         "/api/v1/club/venue-bookings",
-        json={**body, "phone": "(02)2737#123*"},
+        json={**body, "periods": ["6"], "phone": "7604"},  # 校內分機
         headers=csrf_headers(client),
     )
     assert resp.status_code == 201, resp.text
+
+    # 夾空白、括號區碼與分機寫法、打到一半的號碼、10 碼市話:一律擋在 schema
+    for bad in ("0912-345 678", "(02)2737#123*", "0912345", "02-27333141"):
+        resp = await client.post(
+            "/api/v1/club/venue-bookings",
+            json={**body, "periods": ["7"], "phone": bad},
+            headers=csrf_headers(client),
+        )
+        assert resp.status_code == 422, bad
 
 
 def test_fixed_target_semester_follows_the_intake_window():

@@ -14,10 +14,10 @@ from app.core.deps import CurrentUser, DbDep, client_ip, require_permission, req
 from app.core.errors import conflict, not_found
 from app.models import ApprovalRecord, Club, RoomBookingRequest, RoomBookingSlot, Venue
 from app.models.enums import ApprovalDecision, ApprovalSubject, BookingStatus, UserRole
-from app.schemas.admin import AdminRoomBookingOut, RejectIn
+from app.schemas.admin import AdminRoomBookingOut, RejectIn, RoomConflictSlotOut
 from app.schemas.bookings import FixedWindowOut
 from app.schemas.common import ApiResponse
-from app.services import audit, notify
+from app.services import approvals, audit, notify
 from app.services import booking_service as svc
 from app.services.settings_service import get_setting
 
@@ -74,12 +74,8 @@ async def list_room_bookings(
     if club_id:
         query = query.where(RoomBookingRequest.club_id == club_id)
     if active is not None:
-        # 進行中=審核中或學期未結束的已核准(與社團端 /club/room-bookings 同一條界線)。
         # 衝突標示只需要還佔著時段的已核准單,歷年的不必抓回前端
-        ongoing = sa.and_(
-            RoomBookingRequest.status.in_([BookingStatus.PENDING, BookingStatus.APPROVED]),
-            RoomBookingRequest.end_date >= svc.today_taipei(),
-        )
+        ongoing = svc.room_booking_ongoing_expr()
         query = query.where(ongoing if active else sa.not_(ongoing))
 
     if sort:
@@ -92,11 +88,21 @@ async def list_room_bookings(
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
     rows = await db.execute(query.offset(page.offset).limit(page.page_size))
     data = []
+    bookings = []
     for booking, club_name, venue_name in rows:
         out = AdminRoomBookingOut.model_validate(booking)
         out.club_name = club_name
         out.venue_name = venue_name
         data.append(out)
+        bookings.append(booking)
+    await approvals.attach_decisions(db, ApprovalSubject.ROOM_BOOKING, data, with_actor=True)
+    # 衝突逐格帶出來:畫面不再自己算一份,漏掉臨時借用那一種的問題就不存在
+    conflicts = await svc.fixed_conflict_slots(db, bookings)
+    for out in data:
+        out.conflict_slots = [
+            RoomConflictSlotOut(weekday=wd, period=p, kind=kind)
+            for (wd, p), kind in sorted(conflicts.get(out.id, {}).items())
+        ]
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 

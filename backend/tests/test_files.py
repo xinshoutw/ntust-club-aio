@@ -43,6 +43,16 @@ async def test_save_upload_streams_and_hashes(db):
     assert (settings.upload_dir / row.path).read_bytes() == PNG_BYTES
 
 
+def test_detect_mime_trusts_content_over_the_extension():
+    """上傳端要的是「符不符合宣告」(不符即 415,使用者重傳一次);離線匯入沒有使用者
+    可以重傳,要的是內容真正是什麼 —— 舊系統實測有 6 張 `.PNG` 其實是 JPEG,
+    照宣告存下去 file_response 就會用錯的 Content-Type 送出。"""
+    assert file_service.detect_mime(PNG_BYTES, ".png") == "image/png"
+    assert file_service.detect_mime(JPG_BYTES, ".png") == "image/jpeg"  # 副檔名說謊
+    assert file_service.detect_mime(JPG_BYTES, ".unknown") == "image/jpeg"
+    assert file_service.detect_mime(b"not an image at all", ".png") is None
+
+
 async def test_magic_bytes_mismatch_rejected(db):
     user = await make_user(db, username="club01")
     with pytest.raises(AppError) as err:

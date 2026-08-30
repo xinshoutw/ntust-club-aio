@@ -199,9 +199,9 @@ def announcement_email_html(title: str, content: str, date: str) -> str:
     <pre style="{pre_style}">{safe_content}</pre>
   </div>
   <div style="padding:12px 4px;font-size:12px;color:#6b7280;">
-    此信由系統自動發送,請勿直接回覆。前往
+    此信由系統自動發送，請勿直接回覆。前往
     <a href="{SITE_URL}" style="color:#2f6fb2;">{SITE_URL.removeprefix("https://")}</a>
-    查看完整公告。
+    來查看完整公告。
   </div>
 </div>
 """

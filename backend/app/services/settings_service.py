@@ -32,21 +32,19 @@ DEFAULTS: dict[str, Any] = {
         "器材未歸還或損壞",
         "其他",
     ],
-    # 結案鎖定:活動日 +N 個月未結案即鎖定(管理員可解鎖)
-    "close_lock_months": 1,
+    # 結案鎖定:活動日 +N 天未結案即鎖定(管理員可解鎖)
+    "close_lock_days": 21,
     # 器材歸還時限:結束日之隔天上班日此時刻前
     "equipment_return_time": "10:30",
-    # 器材借用區間緩衝(工作天):活動開始日 −before ~ 活動結束日 +after
-    "equipment_workday_buffer": {"before": 2, "after": 1},
     # 固定場地借用開放窗:日期區間;未設定即不開放,由管理員於系統設定調整
     "fixed_booking_window": {"open_from": None, "open_until": None},
     # 單檔上限(MB;magic-byte 型別驗證用的上界,管理員後台可調)
     "upload_limits": {"doc": 50, "img": 10, "zip": 100, "video": 200},
     # 各申請性質的附件加總上限(MB):
-    # 活動申請附件 15、空間報修佐證 100(含影片)、活動結案照片 10
-    "activity_attachment_total_mb": 15,
-    "maintenance_total_mb": 100,
-    "close_photo_total_mb": 10,
+    # 活動申請附件 50、空間報修佐證 250(含影片)、活動結案照片與附件共用 50
+    "activity_attachment_total_mb": 50,
+    "maintenance_total_mb": 250,
+    "close_photo_total_mb": 50,
     # 儲存配額(GiB):系統總量取實際磁碟可用空間,此處只設單一社團未歸檔檔案上限
     "storage_limits": {"per_club_gib": 2},
     # 評鑑視窗(預設 116 年,2026/02/01–2027/01/31)

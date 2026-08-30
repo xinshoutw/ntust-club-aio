@@ -13,6 +13,7 @@ from app.models import (
     User,
     Venue,
     VenueBlockRule,
+    VenueBooking,
 )
 from app.models.enums import ApprovalSubject, VenueCategory
 from tests.conftest import csrf_headers, login, make_club, make_user
@@ -322,3 +323,125 @@ async def test_review_stays_open_after_the_window_closes(client, db):
         f"{URL}/{second.id}/reject", json={"reason": "時段已配給他社"}, headers=csrf_headers(client)
     )
     assert resp.status_code == 200
+
+
+async def test_room_list_carries_the_decision_reason_and_signer(client, db):
+    """固定借用的清單與另外兩種借用同一組處置欄位:理由、時間、簽核者姓名。"""
+    first, _second, _done = await seed(client, db)
+    admin = await db.scalar(sa.select(User).where(User.username == "roomadmin"))
+    admin.name = "王承辦"
+    await db.commit()
+
+    resp = await client.post(
+        f"/api/v1/admin/room-bookings/{first.id}/reject",
+        json={"reason": "該時段已排校方活動"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+
+    data = (
+        await client.get("/api/v1/admin/room-bookings", params={"status": "rejected"})
+    ).json()["data"]
+    assert len(data) == 1
+    assert data[0]["decision_reason"] == "該時段已排校方活動"
+    assert data[0]["decided_at"] is not None
+    assert data[0]["decided_by"] == "王承辦"
+
+
+async def test_conflict_slots_include_approved_temp_bookings(client, db):
+    """核准端擋三種衝突,清單就要標三種 —— 臨時借用那一種前端算不出來(要展開學期的每一週)。"""
+    first, second, done = await seed(client, db)
+    venue = await db.get(Venue, first.venue_id)
+
+    # 學期內的一個週二,落在 first 的 (2, "3") 上:核准端會以 SLOT_TAKEN 擋下
+    day = first.start_date
+    while day.isoweekday() != 2 or day < date.today():
+        day += timedelta(days=1)
+    db.add(
+        VenueBooking(
+            club_id=second.club_id, venue_id=venue.id, date=day, periods=["3"],
+            purpose="臨時活動", status="approved",
+        )
+    )
+    await db.commit()
+
+    data = (
+        await client.get("/api/v1/admin/room-bookings", params={"status": "pending"})
+    ).json()["data"]
+    slots = {
+        r["id"]: {(s["weekday"], s["period"]): s["kind"] for s in r["conflict_slots"]}
+        for r in data
+    }
+    # (2,"3") 兩張待審單互撞,但已核准的臨時借用比較重 —— 核准必被擋,不是「擇一」
+    assert slots[first.id][(2, "3")] == "temp"
+    assert slots[second.id][(2, "3")] == "temp"
+    # (2,"4") 只有 first 有,沒有人撞
+    assert (2, "4") not in slots[first.id]
+
+
+async def test_conflict_slots_rank_pending_below_approved_fixed(client, db):
+    """已核准的固定借用最重;只跟別張待審單撞才是「擇一核准」。"""
+    first, second, done = await seed(client, db)
+    # done 是已核准的固定借用,佔 (5, "1");讓 first 也要那一格
+    db.add(RoomBookingSlot(request_id=first.id, weekday=5, period="1"))
+    await db.commit()
+
+    data = (
+        await client.get("/api/v1/admin/room-bookings", params={"status": "pending"})
+    ).json()["data"]
+    mine = {
+        (s["weekday"], s["period"]): s["kind"]
+        for r in data
+        if r["id"] == first.id
+        for s in r["conflict_slots"]
+    }
+    assert mine[(5, "1")] == "taken"
+    assert mine[(2, "3")] == "pending"  # 與 second 互撞
+
+    # 已核准的單自己不算衝突(只有待審單要標)
+    approved = (
+        await client.get("/api/v1/admin/room-bookings", params={"status": "approved"})
+    ).json()["data"]
+    assert all(r["conflict_slots"] == [] for r in approved)
+
+
+async def test_conflict_slots_include_venue_block_rules(client, db):
+    """不開放規則是核准端三項檢核的第三項(SLOT_BLOCKED),清單同樣要標。"""
+    first, _second, done = await seed(client, db)
+    admin = await db.scalar(sa.select(User).where(User.username == "roomadmin"))
+    # 學期內某個週二封掉第 3 節 —— 正好是 first 要的 (2, "3")
+    day = first.start_date
+    while day.isoweekday() != 2:
+        day += timedelta(days=1)
+    db.add(
+        VenueBlockRule(
+            venue_id=first.venue_id, start_date=day, end_date=day,
+            periods=["3"], reason="場地整修", created_by=admin.id,
+        )
+    )
+    await db.commit()
+
+    # 同一格再疊上另外兩種:已核准的固定借用、已核准的單日臨時借用
+    db.add(RoomBookingSlot(request_id=done.id, weekday=2, period="3"))
+    temp_day = first.start_date
+    while temp_day.isoweekday() != 2 or temp_day < date.today():
+        temp_day += timedelta(days=1)
+    db.add(
+        VenueBooking(
+            club_id=first.club_id, venue_id=first.venue_id, date=temp_day, periods=["3"],
+            purpose="臨時活動", status="approved",
+        )
+    )
+    await db.commit()
+
+    data = (
+        await client.get("/api/v1/admin/room-bookings", params={"status": "pending"})
+    ).json()["data"]
+    mine = {
+        (s["weekday"], s["period"]): s["kind"]
+        for r in data
+        if r["id"] == first.id
+        for s in r["conflict_slots"]
+    }
+    # 四種同時命中同一格時取最重的:不開放 > 已核准固定 > 已核准臨時 > 其他待審
+    assert mine[(2, "3")] == "blocked"

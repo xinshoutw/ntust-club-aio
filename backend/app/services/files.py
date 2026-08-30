@@ -216,6 +216,23 @@ _SIGNATURES = {
 }
 
 
+def detect_mime(head: bytes, ext: str) -> str | None:
+    """以魔術位元組判定 MIME:先驗宣告的副檔名,不符再掃其餘簽章;認不出回 None。
+
+    上傳端要的是「符不符合宣告」(不符即 415,使用者重傳一次就好);**離線匯入沒有
+    使用者可以重傳**,要的是內容真正是什麼 —— 舊系統的 Django ImageField 只保證
+    「是一張圖」,不保證副檔名對得上(實測有 6 張 `.PNG` 其實是 JPEG)。
+    宣告優先是為了 zip 系格式:`.docx` 與 `.zip` 同一組簽章,只掃簽章會挑錯。
+    """
+    declared = _SIGNATURES.get(ext.lower())
+    if declared and declared[0](head):
+        return declared[1]
+    for sniff, mime in _SIGNATURES.values():
+        if sniff(head):
+            return mime
+    return None
+
+
 @dataclass(frozen=True)
 class UploadPolicy:
     name: str
@@ -242,6 +259,12 @@ DOCUMENT = UploadPolicy(
 # 郵局存簿與申請書:掃描件常為 PDF,也收影像;
 # 上限固定 50MB(不入 upload_limits),與前端 PostalPage 一致
 PASSBOOK = UploadPolicy("passbook", IMAGE.extensions | frozenset({".pdf"}), 50 * _MB)
+# 結案附件(保單、租車契約、簽到表、講師資料…):收的正是預覽得了的四類,
+# 其餘擋在門口 —— 舊系統不限格式,搬進來就是一堆開不起來的 zip 與 .doc。
+# 上限固定 50MB(不入 upload_limits,同 PASSBOOK):這一格同時收文件與掃描影像,
+# 掛 doc 或 img 任一把鍵都會讓另一種的實際上限說不清楚;
+# 真正卡住社團的是 close_photo_total_mb 那個與照片共用的加總上限
+REPORT_DOC = UploadPolicy("report_doc", DOCUMENT.extensions | IMAGE.extensions, 50 * _MB)
 ARCHIVE = UploadPolicy("archive", frozenset({".zip"}), 100 * _MB, settings_key="zip")
 VIDEO = UploadPolicy("video", frozenset({".mp4", ".mov"}), 200 * _MB, settings_key="video")
 
@@ -529,6 +552,12 @@ async def delete_file(db: AsyncSession, file: File) -> Path:
     disk = Path(settings.upload_dir) / file.path
     await db.delete(file)
     return disk
+
+
+def unlink_all(paths: Sequence[str]) -> None:
+    """清理性刪多檔(`File.path` 的相對路徑);同 `unlink_quiet`,失敗只記 log。"""
+    for path in paths:
+        unlink_quiet(Path(settings.upload_dir) / path)
 
 
 def enforce_upload_rate(user_id: int) -> None:

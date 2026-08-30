@@ -30,11 +30,9 @@ export interface AdminClubDetail extends AdminClub {
   advisorName: string | null
   advisorDept: string | null
   advisorEmail: string | null
-  advisorExt: string | null
   advisorOutName: string | null
   advisorOutDept: string | null
   advisorOutEmail: string | null
-  advisorOutPhone: string | null
   suspendReason: string | null
 }
 
@@ -57,11 +55,9 @@ interface AdminClubDetailOut extends AdminClubOut {
   advisor_name: string | null
   advisor_dept: string | null
   advisor_email: string | null
-  advisor_ext: string | null
   advisor_out_name: string | null
   advisor_out_dept: string | null
   advisor_out_email: string | null
-  advisor_out_phone: string | null
   suspend_reason: string | null
 }
 
@@ -85,11 +81,9 @@ const toDetail = (c: AdminClubDetailOut): AdminClubDetail => ({
   advisorName: c.advisor_name,
   advisorDept: c.advisor_dept,
   advisorEmail: c.advisor_email,
-  advisorExt: c.advisor_ext,
   advisorOutName: c.advisor_out_name,
   advisorOutDept: c.advisor_out_dept,
   advisorOutEmail: c.advisor_out_email,
-  advisorOutPhone: c.advisor_out_phone,
   suspendReason: c.suspend_reason,
 })
 
@@ -134,12 +128,58 @@ export interface ClubOption {
   name: string
   kind: string // 社團/學會(負責人顯示詞推導)
   attribute: string | null // null 歸「未分類」
+  isActive: boolean
+}
+
+/** 二級選單只需要這三欄:工讀生端的 /staff/clubs 給的就是這個形狀 */
+export type ClubFolderInput = Pick<ClubOption, 'name' | 'attribute' | 'isActive'>
+
+/** 社團的資料夾:停社舊社團的 attribute 為 null,一律歸「未分類」。
+ *  二級選單(ClubCascader)與社團漏斗(ClubFilterButton)共用這一份 —— 各寫一份的話,
+ *  同一個社團在兩個選單裡會落在不同資料夾 */
+export const clubFolder = (c: Pick<ClubOption, 'attribute'>): string => c.attribute ?? '未分類'
+
+/** 依主檔出現順序分成 資料夾 → 社團名(後端已按 性質 → 名稱 排序;null 排最前 → 未分類在頂) */
+export function groupClubsByFolder(
+  clubs: readonly ClubFolderInput[],
+): { label: string; options: string[] }[] {
+  return [...new Set(clubs.map(clubFolder))].map((folder) => ({
+    label: folder,
+    options: clubs.filter((c) => clubFolder(c) === folder).map((c) => c.name),
+  }))
+}
+
+/** 選單用的資料夾:只列啟用中社團。
+ *
+ * 全站的社團選擇器(ClubCascader 的每一頁、兩個社團漏斗、工讀生的違規勸導填寫)一律走這一版 ——
+ * 停用社團在任何一個「要選一個社團來做事」的地方都不該是選項。
+ *
+ * **判的是 `is_active`,不是「有沒有性質」**:正式資料裡 67 個 attribute 為 null 的確實全是停社
+ * 舊社,但反過來不成立(有性質卻停用的也有),而遷移匯入認不得性質時會留下啟用中卻沒有性質的社團 ——
+ * 那些是還在跑的社團,不該藏。
+ *
+ * 收掉的只是**選項**:已經選中的社團(跨頁帶著舊選擇過來、或用名稱對回 id)仍照常顯示與查詢,
+ * 否則社團總覽/成員列表打開會是一個空的選擇器與一頁空白。
+ */
+export const groupActiveClubs = (
+  clubs: readonly ClubFolderInput[],
+): { label: string; options: string[] }[] => groupClubsByFolder(clubs.filter((c) => c.isActive))
+
+interface ClubOptionOut {
+  id: number
+  name: string
+  kind: string
+  attribute: string | null
+  is_active: boolean
 }
 
 export function useClubOptions() {
   return useQuery({
     queryKey: adminClubKeys.options,
-    queryFn: () => api<ClubOption[]>('/admin/clubs/options'),
+    queryFn: () =>
+      api<ClubOptionOut[]>('/admin/clubs/options').then((rows) =>
+        rows.map((c) => ({ ...c, isActive: c.is_active })),
+      ),
     staleTime: 5 * 60_000, // 同上;主檔 mutation invalidate 整域時一併更新
   })
 }
@@ -160,7 +200,6 @@ export interface AdminMember {
   studentId: string
   kind: MemberKind
   title?: string
-  phone?: string
   semester: string
   joinedAt: string
   updatedAt: string
@@ -172,7 +211,6 @@ interface MemberOut {
   student_id: string
   kind: MemberKind
   title: string | null
-  phone: string | null
   semester: string
   created_at: string
   updated_at: string
@@ -184,7 +222,6 @@ const toMember = (m: MemberOut): AdminMember => ({
   studentId: m.student_id,
   kind: m.kind,
   title: m.title ?? undefined,
-  phone: m.phone ?? undefined,
   semester: m.semester,
   joinedAt: dayjs(m.created_at).format('YYYY/MM/DD HH:mm'),
   updatedAt: dayjs(m.updated_at).format('YYYY/MM/DD HH:mm'),
@@ -233,6 +270,7 @@ export interface AdminClubPatch {
   id: number
   name?: string
   kind?: string // 社團/學會;改名推導不到時手動指定
+  attribute?: string // 社團性質;建檔時必填,選錯了要改得回來
   enName?: string
   username?: string
   isActive?: boolean
@@ -242,11 +280,21 @@ export function useAdminClubMutations() {
   const qc = useQueryClient()
   const invalidate = () => void qc.invalidateQueries({ queryKey: adminClubKeys.all })
   const update = useMutation({
-    mutationFn: ({ id, name, kind, enName, username, isActive }: AdminClubPatch) =>
+    mutationFn: ({ id, name, kind, attribute, enName, username, isActive }: AdminClubPatch) =>
       api<AdminClubDetailOut>(`/admin/clubs/${id}`, {
         method: 'PATCH',
         // JSON.stringify 會略過 undefined 欄位 → 未變更欄位不送(後端 exclude_unset)
-        body: JSON.stringify({ name, kind, en_name: enName, username, is_active: isActive }),
+        body: JSON.stringify({ name, kind, attribute, en_name: enName, username, is_active: isActive }),
+      }).then(toDetail),
+    onSuccess: invalidate,
+  })
+  // 新增社團主檔:kind 由後端依名稱結尾推導,性質必填(沒有性質的社團不會出現在社團漏斗);
+  // 登入用的帳號另走 createAccount —— 建社團與建帳號是兩個動作
+  const create = useMutation({
+    mutationFn: ({ name, attribute }: { name: string; attribute: string }) =>
+      api<AdminClubDetailOut>('/admin/clubs', {
+        method: 'POST',
+        body: JSON.stringify({ name, attribute }),
       }).then(toDetail),
     onSuccess: invalidate,
   })
@@ -267,5 +315,12 @@ export function useAdminClubMutations() {
       }),
     onSuccess: invalidate,
   })
-  return { update, resetPassword, createAccount }
+  // 刪除社團主檔(連同帳號):社團底下還有資料時後端回 CLUB_HAS_DATA(訊息列出各類筆數),
+  // 二次確認後帶 force 再送一次,那些資料會一起刪掉
+  const remove = useMutation({
+    mutationFn: ({ id, force }: { id: number; force?: boolean }) =>
+      api<null>(`/admin/clubs/${id}${force ? '?force=true' : ''}`, { method: 'DELETE' }),
+    onSuccess: invalidate,
+  })
+  return { create, update, resetPassword, createAccount, remove }
 }

@@ -10,12 +10,14 @@
 from typing import Annotated
 
 import sqlalchemy as sa
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response
+from starlette.concurrency import run_in_threadpool
 
-from app.api.pagination import NullsLast, Pagination, parse_sort
+from app.api.pagination import NullsLast, Pagination, ilike_contains, parse_sort
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, forbidden, not_found, validation_error
-from app.models import Activity, ActivityReport, ApprovalRecord, Club
+from app.core.semesters import semester_of, semester_range
+from app.models import Activity, ActivityReport, ApprovalRecord, Club, User
 from app.models.enums import (
     ActivityStatus,
     ActivityType,
@@ -27,7 +29,7 @@ from app.schemas.activities import ActivityDetailOut, ActivityOut
 from app.schemas.admin import ApproveActivityIn, CloseApproveIn, RejectIn
 from app.schemas.common import ApiResponse
 from app.services import activity_service as svc
-from app.services import audit, notify
+from app.services import audit, notify, pdf
 from app.services.settings_service import get_setting
 
 router = APIRouter(prefix="/admin/activities", tags=["admin"])
@@ -114,6 +116,19 @@ async def _require_different_actor(db, activity: Activity, stage: str, user) -> 
         )
 
 
+def _require_visible(user, activity: Activity) -> None:
+    """詳情與 PDF 的視野界線,與清單同一條(一律 404,避免探測)。
+
+    **草稿也在這條界線內**:社團還沒送出的東西承辦看不到,清單的
+    `status != DRAFT` 若只擋清單,直接打 `/admin/activities/{id}` 就繞過去了。
+    """
+    if activity.status == ActivityStatus.DRAFT:
+        raise not_found("找不到活動")
+    visible = svc.visible_statuses(user)
+    if visible is not None and activity.status not in visible:
+        raise not_found("找不到活動")
+
+
 async def _get_activity(db, activity_id: int, *, for_update: bool = False) -> Activity:
     query = (
         sa.select(Activity)
@@ -178,8 +193,11 @@ _SORTABLE = {
     "name": Activity.name,
     "type": Activity.type,
     "date": Activity.date,
-    "status": Activity.status,
+    # 經費與狀態的排序運算式與社團端同一份:同一個欄名在兩頁要排出同一個順序
+    "budget": svc.BUDGET_TOTAL_SQL,
+    "status": svc.STATUS_ORDER_SQL,
     "created_at": Activity.created_at,
+    "submitted_at": NullsLast(Activity.submitted_at),
     "reviewed_at": NullsLast(_REVIEWED_AT),
 }
 
@@ -201,14 +219,18 @@ async def list_activities(
     user: Reviewer,
     db: DbDep,
     page: Pagination,
-    status: Annotated[list[ActivityStatus] | None, Query()] = None,
+    semester: str | None = Query(None, pattern=r"^\d{3}-[12]$"),
+    status: Annotated[list[str] | None, Query()] = None,
     club_id: Annotated[list[int] | None, Query()] = None,
     type_: Annotated[list[str] | None, Query(alias="type")] = None,
+    q: Annotated[str | None, Query(max_length=100)] = None,
     locked: bool = Query(False),
     overdue: bool = Query(False),
     sort: str | None = None,
 ) -> ApiResponse[list[ActivityOut]]:
-    # status/club_id/type 可重複帶多值;locked=true 僅回逾期鎖定(已核准+超過結案期限+未解鎖);
+    # status/club_id/type 可重複帶多值;status 收的是**顯示狀態**(另有推導的 locked,
+    # 與社團端同一份 svc.display_status_filter);q 以活動名稱模糊搜尋;
+    # locked=true 僅回逾期鎖定(已核准+超過結案期限+未解鎖);
     # overdue=true 回全部逾期未結案(不分是否已解鎖,結案審核頁逾期表);
     # sort 走白名單(預設 id 降冪)——清單一律伺服器端分頁
     query = (
@@ -220,8 +242,14 @@ async def list_activities(
     visible = svc.visible_statuses(user)
     if visible is not None:
         query = query.where(Activity.status.in_(visible))
+    lock_days = await get_setting(db, "close_lock_days")
     if status:
-        query = query.where(Activity.status.in_(status))
+        query = query.where(svc.display_status_filter(status, lock_days))
+    if semester:
+        start, end = semester_range(semester)
+        query = query.where(Activity.date >= start, Activity.date <= end)
+    if q and q.strip():
+        query = query.where(ilike_contains(Activity.name, q))
     if club_id:
         query = query.where(Activity.club_id.in_(club_id))
     if type_:
@@ -236,7 +264,6 @@ async def list_activities(
         if "大型活動" in type_:
             conds.append(_large_condition())
         query = query.where(sa.or_(*conds))
-    lock_months = await get_setting(db, "close_lock_months")
     may_see_approved = visible is None or ActivityStatus.APPROVED in visible
     if (locked or overdue) and not may_see_approved:
         # 逾期未結案全是 approved 狀態。看不到 approved 的帳號(例如只持 approve_advisor)
@@ -246,7 +273,7 @@ async def list_activities(
         # locked 僅未解鎖者,overdue 不分鎖定與否(是否鎖定由回應的 close_locked 區分)
         query = query.where(
             Activity.status == ActivityStatus.APPROVED,
-            svc.close_overdue_sql(lock_months),
+            svc.close_overdue_sql(lock_days),
         )
         if locked:
             query = query.where(Activity.close_unlocked.is_(False))
@@ -266,11 +293,55 @@ async def list_activities(
     data = []
     for activity, club_name, reviewed_at in rows:
         out = ActivityOut.model_validate(activity)
-        svc.decorate(out, activity, lock_months)
+        svc.decorate(out, activity, lock_days)
         out.club_name = club_name
         out.reviewed_at = reviewed_at
         data.append(out)
     return ApiResponse(data=data, meta=page.meta(total or 0))
+
+
+# 必須宣告在 /{activity_id} 之前,否則 "semesters" 會被當成路徑參數吃掉(422)
+@router.get("/semesters")
+async def list_semesters(
+    user: Reviewer, db: DbDep, club_id: int | None = None
+) -> ApiResponse[list[str]]:
+    """有活動的學期(新到舊),供學期下拉;帶 club_id 則限該社。
+
+    界線與清單同一條:草稿不算,受限關卡帳號也只數得到自己看得到的狀態 ——
+    下拉列得出來的學期,清單就查得到東西。
+    """
+    query = (
+        sa.select(Activity.date)
+        .where(Activity.status != ActivityStatus.DRAFT, Activity.date.is_not(None))
+        .distinct()
+    )
+    visible = svc.visible_statuses(user)
+    if visible is not None:
+        query = query.where(Activity.status.in_(visible))
+    if club_id is not None:
+        query = query.where(Activity.club_id == club_id)
+    dates = await db.scalars(query)
+    return ApiResponse(data=sorted({semester_of(d) for d in dates}, reverse=True))
+
+
+@router.get("/{activity_id}/apply-pdf")
+async def download_apply_pdf(activity_id: int, user: Reviewer, db: DbDep) -> Response:
+    """社團活動申請表 PDF;與詳情同一條視野界線(草稿看不到,其餘不分狀態皆可)。"""
+    activity = await db.scalar(
+        sa.select(Activity)
+        .where(Activity.id == activity_id)
+        .options(
+            sa.orm.selectinload(Activity.budget_items),
+            sa.orm.selectinload(Activity.report),
+        )
+    )
+    if activity is None:
+        raise not_found("找不到活動")
+    _require_visible(user, activity)
+    club = await db.get(Club, activity.club_id)
+    approvers = await svc.approver_names(db, activity.id)
+    content = await run_in_threadpool(pdf.apply_pdf, club, activity, approvers)
+    return pdf.pdf_response(content, f"{club.name}_{activity.name}_社團活動申請表.pdf")
 
 
 @router.get("/{activity_id}")
@@ -278,7 +349,7 @@ async def get_activity(
     activity_id: int, user: Reviewer, db: DbDep
 ) -> ApiResponse[ActivityDetailOut]:
     from app.models import ActivityReport
-    from app.schemas.activities import ApprovalOut, FileOut
+    from app.schemas.activities import ApprovalOut, FileOut, StampOut
 
     activity = await db.scalar(
         sa.select(Activity)
@@ -290,12 +361,10 @@ async def get_activity(
     )
     if activity is None:
         raise not_found("找不到活動")
-    visible = svc.visible_statuses(user)
-    if visible is not None and activity.status not in visible:
-        raise not_found("找不到活動")  # 受限關卡帳號視同不存在,避免探測
-    lock_months = await get_setting(db, "close_lock_months")
+    _require_visible(user, activity)
+    lock_days = await get_setting(db, "close_lock_days")
     out = ActivityDetailOut.model_validate(activity)
-    svc.decorate(out, activity, lock_months)
+    svc.decorate(out, activity, lock_days)
     club = await db.get(Club, activity.club_id)
     out.club_name = club.name if club else ""
     out.photos = [
@@ -305,9 +374,14 @@ async def get_activity(
         FileOut.model_validate(f)
         for f in await svc.activity_files(db, activity, svc.ATTACHMENT_SLOT)
     ]
+    out.close_docs = [
+        FileOut.model_validate(f) for f in await svc.activity_files(db, activity, svc.DOC_SLOT)
+    ]
+    # 帶簽核者姓名:審核彈窗要逐列印「誰於何時核准/退回」,章軌只印每一關最後一次核准
     approvals = (
-        await db.scalars(
-            sa.select(ApprovalRecord)
+        await db.execute(
+            sa.select(ApprovalRecord, User.name)
+            .join(User, ApprovalRecord.actor_id == User.id)
             .where(
                 ApprovalRecord.subject_type.in_(
                     [ApprovalSubject.ACTIVITY, ApprovalSubject.ACTIVITY_CLOSE]
@@ -317,8 +391,21 @@ async def get_activity(
             .order_by(ApprovalRecord.id)
         )
     ).all()
-    out.approvals = [ApprovalOut.model_validate(r) for r in approvals]
-    out.reviewed_at = max((r.created_at for r in approvals), default=None)
+    # 用 model_validate 而非逐欄手建:社團端(activities.py)也是這樣組,
+    # 兩邊各寫一份的話 ApprovalOut 之後加欄位只有一邊會跟上,而 default 不會報錯
+    out.approvals = []
+    for record, actor_name in approvals:
+        item = ApprovalOut.model_validate(record)
+        item.actor_name = actor_name
+        out.approvals.append(item)
+    out.reviewed_at = max((r.created_at for r, _ in approvals), default=None)
+    # 簽核章軌:每一關印誰、什麼時候簽的(推導規則在 services,前端不再自己數一次)
+    stamped = await svc.apply_approvals(db, activity.id)
+    out.stamps = [
+        StampOut(stage=stage, actor_name=stamped[stage][0], at=stamped[stage][1])
+        for stage in svc.APPLY_STAGES
+        if stage in stamped
+    ]
     return ApiResponse(data=out)
 
 
@@ -364,12 +451,16 @@ async def approve(
                 )
             item.approved_subsidy = approval.approved_subsidy
         if requested_total > 0:
-            # 有申請補助:經費來源必填、每個項目都要有核定金額,總額由後端加總
-            if not activity.fund_source:
-                raise validation_error("有申請補助的案件必須認定經費來源")
+            # 有申請補助:每一項都要有核定金額(0 也是核定,代表承辦人真的看過那一項)。
+            # 缺項先擋 —— 有 None 就算不出總額,分不清「不給」與「還沒填」
             missing = [i for i in activity.budget_items if i.approved_subsidy is None]
             if missing:
                 raise validation_error("尚有經費項目未核定金額")
+            # 經費來源只在**真的要動到錢**時必填(D-16):整單核定 0 元沒有來源可認定,
+            # 還逼承辦人填一句空話才存得下去
+            granted = sum(i.approved_subsidy for i in activity.budget_items)
+            if granted > 0 and not activity.fund_source:
+                raise validation_error("核定補助的案件必須認定經費來源")
         if requested_total == 0:
             # 逐項一併歸零:畫面的 approved_total 是逐項加總來的,只清聚合欄位
             # 會讓兩個金額來源對不起來(遷移資料就可能是擬請 0 元卻有核定值)
@@ -394,11 +485,21 @@ async def approve(
     elif body.is_large_approved is False or stage == "advisor":
         activity.is_large_approved = False
 
-    if stage == "advisor" and requested_total > 0:
+    # 核定 0 元 = 這張單不動到學校的錢,後面的關卡沒有東西可審 → 當場核准(D-16)。
+    # 判準是**核定**不是擬請:社團有申請、承辦人決定不給,一樣不必再送組長與學務長。
+    # 任何一關都算 —— 舊系統 53 件提前核准裡有 11 件是組長把金額改成 0 的。
+    # 逐項加總才是權威值:遷移件的 school_approved 是 NULL(21 件待審全部),
+    # 拿聚合欄位判會把「還沒補寫聚合值」讀成「核定 0 元」而跳過後兩關。
+    # 逐項的 None 同理 —— `or 0` 會把它讀成「不給」。缺項只有第一關擋得住
+    #(那裡不是全部歸零就是必填),組長/學務長關拿到 NULL 的遷移件會直接跳過學務長
+    decided = [i.approved_subsidy for i in activity.budget_items]
+    if all(v is not None for v in decided) and sum(decided) == 0:
+        activity.status = ActivityStatus.APPROVED
+    elif stage == "advisor":
         activity.status = ActivityStatus.PENDING_CHIEF
     elif stage == "chief":
         activity.status = ActivityStatus.PENDING_DEAN
-    else:  # advisor 無補助單關,或 dean 終關
+    else:  # dean 終關
         activity.status = ActivityStatus.APPROVED
 
     _record(db, activity, ApprovalSubject.ACTIVITY, stage, ApprovalDecision.APPROVE, user)
@@ -420,9 +521,9 @@ async def approve(
         "活動申請已核准" if final else "活動申請通過關卡",
         f"{activity.name}(關卡:{_STAGE_LABEL.get(stage, stage)})",
     )
-    lock_months = await get_setting(db, "close_lock_months")
+    lock_days = await get_setting(db, "close_lock_days")
     out = ActivityOut.model_validate(activity)
-    svc.decorate(out, activity, lock_months)
+    svc.decorate(out, activity, lock_days)
     return ApiResponse(data=out)
 
 
@@ -570,8 +671,8 @@ async def unlock(
     activity = await _get_activity(db, activity_id, for_update=True)
     if activity.status != ActivityStatus.APPROVED:
         raise conflict("僅已核准且未結案的活動可解鎖")
-    lock_months = await get_setting(db, "close_lock_months")
-    if not svc.is_close_locked(activity, lock_months):
+    lock_days = await get_setting(db, "close_lock_days")
+    if not svc.is_close_locked(activity, lock_days):
         # 未逾期不得預先解鎖,否則永久繞過結案鎖定。
         # 已解鎖的也走這裡:結案退回會自動解鎖(D-05),那時它可能其實已經逾期了
         raise conflict("此活動未處於鎖定狀態(未逾期,或已經解鎖)")

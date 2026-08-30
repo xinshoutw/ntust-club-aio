@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { App, Button, Checkbox, Input, InputNumber, Modal, Skeleton } from 'antd'
+import { App, Button, Checkbox, Input, InputNumber, Modal, Segmented, Skeleton, Tooltip } from 'antd'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import SectionTitle from '../../components/ui/SectionTitle'
@@ -8,19 +8,31 @@ import { Cols } from '../../components/ui/tableControls'
 import StampTrail, { type StampStage, type StampState } from '../../components/ui/StampTrail'
 import { useModalAutoFocus } from '../../components/ui/useModalAutoFocus'
 import WorkTable from '../activities/WorkTable'
+import { ActualValue } from '../activities/ActivityPreviewModal'
 import DownloadMenu from '../activities/DownloadMenu'
 import { useFilePreview } from '../eval/useFilePreview'
 import { downloadEvalFile } from '../eval/files'
 import { activityApplyPdf } from '../../api/activities'
-import { numColWidth, showsApproved } from '../activities/types'
+import {
+  MIN_PHOTOS,
+  approvedText,
+  fmtMoney,
+  highlightsLabel,
+  numColWidth,
+  showsApproved,
+} from '../activities/types'
 import { useAuth } from '../../app/auth'
 import {
   canActOn,
+  canActOnClose,
   stageOfStatus,
   toEvalFile,
+  type AdminFileRef,
+  type ReviewApproval,
   type ReviewItem,
   type ReviewStage,
 } from '../../api/adminActivities'
+import { SUBMISSION_CHECKS, defaultConfirmations, type CheckKey } from './closeChecks'
 
 // .tb.dense td 的左右內距(index.css);核定欄的 td 右內距歸零、改由 InputNumber 自己的
 // 內距與邊框佔掉,兩者分開算才不會少估而讓數字換行
@@ -41,6 +53,101 @@ const DECISION_LABEL: Record<string, string> = {
   reject: '退回',
   unlock: '解鎖',
   revoke: '撤銷',
+}
+
+// 簽核紀錄的關卡顯示詞(行政端用語,與後端 _STAGE_LABEL 一致)
+const STAGE_LABEL: Record<string, string> = {
+  advisor: '承辦人',
+  chief: '組長',
+  dean: '學務長',
+}
+
+const DECISION_COLOR: Record<string, string> = {
+  approve: '#1F6B45',
+  reject: '#B03A2E',
+  unlock: '#1D5A9E',
+  revoke: '#B03A2E',
+}
+
+/** 簽核紀錄:每一次核准/退回逐列印出,含關卡、簽核者、時間與**退回原因**。
+ *
+ * 依 `subject_type` 分到兩個頁籤 —— 申請的簽核歸申請側、結案的歸結案側;
+ * 章軌只印每一關最後一次核准,退回與退回重送再核的那幾次都不在軌上,
+ * 而那正是要查「這張單被卡在哪」時要看的。
+ */
+function ApprovalLog({ rows }: { rows: ReviewApproval[] }) {
+  if (!rows.length) return <div style={{ fontSize: 13, color: 'var(--steel)' }}>—</div>
+  return (
+    <div>
+      {rows.map((r, i) => (
+        <div
+          key={i}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '72px minmax(0, 1fr) auto',
+            gap: '4px 12px',
+            fontSize: 13,
+            padding: '8px 0 8px 10px',
+            borderLeft: `2px solid ${DECISION_COLOR[r.decision] ?? 'var(--line)'}`,
+            borderTop: i ? '1px dashed var(--line)' : undefined,
+          }}
+        >
+          <div style={{ color: 'var(--steel)' }}>{STAGE_LABEL[r.stage] ?? r.stage}</div>
+          <div>
+            <span style={{ fontWeight: 500 }}>{r.actor}</span>
+            <span className="num" style={{ color: 'var(--steel)' }}> · {r.at}</span>
+          </div>
+          <div style={{ color: DECISION_COLOR[r.decision], fontWeight: 500 }}>
+            {DECISION_LABEL[r.decision] ?? r.decision}
+          </div>
+          {r.reason && (
+            <div
+              style={{
+                gridColumn: '2 / -1',
+                background: '#FBE9E7',
+                borderRadius: 4,
+                padding: '6px 10px',
+                fontSize: 12,
+                lineHeight: 1.7,
+                color: '#7D2B22',
+              }}
+            >
+              <b style={{ color: '#B03A2E', marginRight: 4 }}>退回原因</b>
+              {r.reason}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** 申請附件與結案附件:同一種呈現,點開站內預覽彈窗(不另開分頁) */
+function FileLinks({
+  files,
+  onPreview,
+}: {
+  files: AdminFileRef[]
+  onPreview: (f: AdminFileRef) => void
+}) {
+  if (!files.length) return <>—</>
+  return (
+    <>
+      {files.map((f, i) => (
+        <span key={f.id}>
+          {i > 0 && ' · '}
+          <button
+            type="button"
+            className="link-btn"
+            style={{ color: 'var(--focus)', padding: 0 }}
+            onClick={() => onPreview(f)}
+          >
+            {f.name}
+          </button>
+        </span>
+      ))}
+    </>
+  )
 }
 
 // 章面的關卡字 —— 章下方那行留給簽核者姓名,關卡名(承辦人/組長/學務長)由這個字表示
@@ -110,6 +217,9 @@ export default function ActivityReviewModal({
   afterClose,
   onApprove,
   onReject,
+  onCloseApprove,
+  onCloseReject,
+  detailStale,
 }: {
   item: ReviewItem | null
   /** item 尚未載入時標題列顯示的名稱(通常=列表列的活動名) */
@@ -122,6 +232,12 @@ export default function ActivityReviewModal({
   afterClose: () => void
   onApprove?: (payload: ActivityApprovePayload) => Promise<unknown>
   onReject?: (reason: string) => Promise<unknown>
+  /** 結案單關:核准帶三個繳交確認;缺這兩個回呼即無結案簽核鈕(唯讀開窗) */
+  onCloseApprove?: (checks: Record<CheckKey, boolean>) => Promise<unknown>
+  onCloseReject?: (reason: string) => Promise<unknown>
+  /** 手上的詳情不確定是最新的:繳交確認是從它推導的,不給核准。
+   *  'error' 另附重試 —— 補件重送後舊快取會把新繳的算成沒繳,而那會永久落庫 */
+  detailStale?: 'fetching' | 'error' | false
 }) {
   const { message } = App.useApp()
   const { user } = useAuth()
@@ -165,8 +281,39 @@ export default function ActivityReviewModal({
     setApprovals(Object.fromEntries(item.detail.budget.map((b) => [b.id, b.approved])))
   }, [item])
 
+  // 頁籤:有結案資料才切得過去,且預設就開在結案側(承辦這時要看的是結案);
+  // null = 還沒手動切過,跟著狀態走
+  const [tab, setTab] = useState<'apply' | 'close' | null>(null)
+  // 繳交確認只存承辦手動改過的項目,其餘跟著推導走(詳情是非同步載入的)
+  const [override, setOverride] = useState<Partial<Record<CheckKey, boolean>>>({})
+  const report = item?.report
+  const photos = item?.photos ?? []
+  const closeDocs = item?.closeDocs ?? []
+  const activeTab: 'apply' | 'close' = report ? (tab ?? 'close') : 'apply'
+
   // 「本關」:接 API 的頁面(有 onApprove)依登入者簽核鍵推導;mock 展示維持第一關可簽
   const canReview = item ? (onApprove ? canActOn(user, item.status) : item.status === 'pending_advisor') : false
+  // 結案單關:與申請關卡分開判定,兩者不會同時成立(狀態互斥)
+  const canCloseReview =
+    !!onCloseApprove && item?.status === 'closing_pending_advisor' && canActOnClose(user)
+  const checks = { ...defaultConfirmations(report, photos.length), ...override }
+  // 結案側:與申請值不同的實際值標色,hover 出預計值(與社團端詳情同一支 ActualValue)
+  const actualTime = report ? `${report.actualStart}–${report.actualEnd}` : ''
+  const timeChanged = !!report && !!d?.timeRange && !d.timeRange.includes(actualTime)
+  const locationChanged = !!report && !!d?.location && report.actualLocation !== d.location
+  const plannedCounts = `社員 ${d?.participantsIn ?? '—'} · 非社員 ${d?.participantsOut ?? '—'}`
+  const actualCounts = report ? `社員 ${report.memberCount} · 非社員 ${report.nonMemberCount}` : ''
+  const countChanged = !!report && plannedCounts !== actualCounts
+  // 有申請補助,或雖沒申請但確實核了錢(遷移資料有這種列)才顯示核定;
+  // 有申請卻還沒核定時 approvedTotal 是 null —— `?? 0` 會把「還沒核定」說成「核定 0 元」,
+  // 連帶讓超支判定拿一個假的上限去比
+  const closeHasSubsidy = showsApproved(item?.requested ?? 0, item?.approvedTotal)
+  const approvedKnown = (item?.requested ?? 0) === 0 || item?.approvedTotal != null
+  const overBudget =
+    !!report &&
+    approvedKnown &&
+    report.expense > (item?.selfFundTotal ?? 0) + (item?.approvedTotal ?? 0)
+  const photoShort = !!report && photos.length < MIN_PHOTOS && !report.videoUrl
   // 經費來源/逐項核定/大型認可僅第一關(承辦人)可編輯;組長/學務長關唯讀核准
   const isFirstStage = item?.status === 'pending_advisor'
   const canEdit = canReview && isFirstStage
@@ -245,6 +392,45 @@ export default function ActivityReviewModal({
     onClose()
   }
 
+  const submitCloseApprove = async () => {
+    if (!item || !onCloseApprove) return
+    setSubmitting(true)
+    try {
+      await onCloseApprove({
+        photos: checks.photos,
+        report: checks.report,
+        reflections: checks.reflections,
+      })
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : '操作失敗')
+      return
+    } finally {
+      setSubmitting(false)
+    }
+    message.success(`已核准「${item.name}」結案`)
+    onClose()
+  }
+
+  const submitCloseReject = async () => {
+    if (!item || !onCloseReject) return
+    if (!reason.trim()) {
+      message.error('退回原因為必填')
+      return
+    }
+    setSubmitting(true)
+    try {
+      await onCloseReject(reason.trim())
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : '操作失敗')
+      return
+    } finally {
+      setSubmitting(false)
+    }
+    message.success(`已退回「${item.name}」結案`)
+    closeReject()
+    onClose()
+  }
+
   const hasBudget = !!d && d.budget.length > 0
   // 接線資料帶可下載連結;mock 僅檔名
   const files = d?.attachmentFiles
@@ -253,8 +439,15 @@ export default function ActivityReviewModal({
     <Modal
       open={open}
       onCancel={onClose}
-      afterClose={afterClose}
+      afterClose={() => {
+        setTab(null)
+        setOverride({})
+        afterClose()
+      }}
+      // 窗的大小只由「有無經費」決定:切頁籤、內容多寡都不改變它,
+      // 高度固定後內容自己捲 —— 開同一批單子時每次都停在同一個位置
       width={hasBudget ? 1080 : 640}
+      styles={{ body: { height: 'min(560px, 58vh)', overflowY: 'auto' } }}
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 26 }}>
           <span style={{ fontSize: 16, fontWeight: 600 }}>{item?.name ?? pendingName ?? ''}</span>
@@ -263,6 +456,16 @@ export default function ActivityReviewModal({
               {/* 本關可簽核時,徽章即時反映下方「認可為大型活動」勾選 */}
               <LargeBadge applied={item.isLarge} approved={canEdit ? largeApproved : item.largeApproved} />
               <StatusPill status={item.status} />
+              {/* 沒有結案資料就切不過去(反灰);有的話預設就開在結案側 */}
+              <Segmented
+                size="small"
+                value={activeTab}
+                onChange={(v) => setTab(v as 'apply' | 'close')}
+                options={[
+                  { value: 'apply', label: '申請' },
+                  { value: 'close', label: '結案', disabled: !report },
+                ]}
+              />
             </>
           )}
           <span style={{ flex: 1 }} />
@@ -301,6 +504,37 @@ export default function ActivityReviewModal({
               核准
             </Button>
           </div>
+        ) : canCloseReview ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
+            {detailStale && (
+              <span style={{ fontSize: 12, color: 'var(--steel)', marginRight: 'auto' }}>
+                {detailStale === 'error' ? (
+                  <>
+                    結案內容更新失敗{' '}
+                    <Button type="link" size="small" style={{ padding: 0 }} onClick={onRetryDetail}>
+                      重試
+                    </Button>
+                  </>
+                ) : (
+                  '結案內容更新中'
+                )}
+              </span>
+            )}
+            <Button danger style={{ height: 38 }} disabled={submitting} onClick={() => setRejectOpen(true)}>
+              退回
+            </Button>
+            <Button
+              type="primary"
+              ref={approveRef}
+              style={{ height: 38 }}
+              // 手上這份不確定是最新的就不給核准:繳交確認是從它推導的,寫下去沒有回頭路
+              disabled={!report || !!detailStale}
+              loading={submitting && !rejectOpen}
+              onClick={() => void submitCloseApprove()}
+            >
+              核准結案
+            </Button>
+          </div>
         ) : (
           <div style={{ fontSize: 12, color: 'var(--steel)' }}>
             {!item
@@ -323,7 +557,7 @@ export default function ActivityReviewModal({
       )}
       {/* 詳情未到位先鋪 Skeleton(彈窗立即開啟,內容漸進補齊) */}
       {!item && !detailFailed && <Skeleton active paragraph={{ rows: 6 }} style={{ marginTop: 8 }} />}
-      {/* 有經費才走雙欄:左=基本資料,右=經費逐項核定 */}
+      {/* 有經費才走雙欄:左=基本資料,右=經費逐項核定。欄數只看有無經費,不隨頁籤變 */}
       {item && !detailFailed && (
       <div
         style={{
@@ -333,22 +567,23 @@ export default function ActivityReviewModal({
           marginTop: 8,
         }}
       >
+        {activeTab === 'apply' && (
+        <>
         <div>
           <SectionTitle first>基本資料</SectionTitle>
           <div style={{ display: 'grid', gridTemplateColumns: '96px 1fr', gap: '8px 12px', fontSize: 13 }}>
-            <div style={detailLabel}>社團</div><div>{item.club}</div>
-            <div style={detailLabel}>類型</div><div>{item.type}</div>
-            <div style={detailLabel}>日期時間</div><div className="num">{d?.timeRange ?? item.date}</div>
-            <div style={detailLabel}>地點</div><div>{d?.location ?? '—'}</div>
-            <div style={detailLabel}>參加人數</div>
-            <div>
-              社員 <span className="num">{d?.participantsIn ?? '—'}</span> · 非社員{' '}
-              <span className="num">{d?.participantsOut ?? '—'}</span>
-            </div>
-            <div style={detailLabel}>送件</div>
+            <div style={detailLabel}>社團</div><div>{item.club} · {item.type}</div>
+            <div style={detailLabel}>申請時間</div>
             <div>
               <span className="num">{d?.submittedAt ?? '—'}</span>
               {d?.submittedBy ? ` · ${d.submittedBy}` : ''}
+            </div>
+            <div style={detailLabel}>活動時間</div><div className="num">{d?.timeRange ?? item.date}</div>
+            <div style={detailLabel}>活動地點</div><div>{d?.location ?? '—'}</div>
+            <div style={detailLabel}>預期人數</div>
+            <div>
+              社員 <span className="num">{d?.participantsIn ?? '—'}</span> · 非社員{' '}
+              <span className="num">{d?.participantsOut ?? '—'}</span>
             </div>
             {/* 經費來源:有申請補助時第一關必填認定(submitApprove 同一條判定)。
                 只有「能不能改」看 hasSubsidy —— 認定過的來源不論有沒有經費明細都印出來,
@@ -383,30 +618,20 @@ export default function ActivityReviewModal({
             )}
             <div style={detailLabel}>附件</div>
             <div>
-              {files?.length
-                ? files.map((f, i) => (
-                    <span key={f.id}>
-                      {i > 0 && ' · '}
-                      <button
-                        type="button"
-                        className="link-btn"
-                        style={{ color: 'var(--focus)', padding: 0 }}
-                        onClick={() => filePreview.preview(toEvalFile(f))}
-                      >
-                        {f.name}
-                      </button>
-                    </span>
-                  ))
-                : d?.attachments.length
-                  ? d.attachments.map((f, i) => (
-                      <span key={f}>
-                        {i > 0 && ' · '}
-                        <button type="button" className="link-btn" style={{ color: 'var(--focus)', padding: 0 }}>
-                          {f}
-                        </button>
-                      </span>
-                    ))
-                  : '—'}
+              {files?.length ? (
+                <FileLinks files={files} onPreview={(f) => filePreview.preview(toEvalFile(f))} />
+              ) : d?.attachments.length ? (
+                d.attachments.map((f, i) => (
+                  <span key={f}>
+                    {i > 0 && ' · '}
+                    <button type="button" className="link-btn" style={{ color: 'var(--focus)', padding: 0 }}>
+                      {f}
+                    </button>
+                  </span>
+                ))
+              ) : (
+                '—'
+              )}
             </div>
           </div>
 
@@ -419,28 +644,9 @@ export default function ActivityReviewModal({
               >
                 認可為大型活動
               </Checkbox>
-              {item.isLarge && (
-                <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 4 }}>社團已申請認定為大型活動</div>
-              )}
             </div>
           )}
 
-          {/* 簽核紀錄:每一次核准/退回逐列印出。章軌只印每一關**最後一次**核准 ——
-              退回、退回後重送再核的那幾次都不在軌上,而那正是要查「這張單被卡在哪」時要看的 */}
-          {!!d?.approvals?.length && (
-            <div style={{ marginTop: 14 }}>
-              <SectionTitle>簽核紀錄</SectionTitle>
-              <div style={{ fontSize: 12, color: 'var(--steel)', lineHeight: 1.9 }}>
-                {d.approvals.map((r, i) => (
-                  <div key={i}>
-                    {r.actor} 於 <span className="num">{r.at}</span>{' '}
-                    {r.isClose ? '結案' : ''}
-                    {DECISION_LABEL[r.decision] ?? r.decision}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {hasBudget && (
@@ -526,18 +732,181 @@ export default function ActivityReviewModal({
             </table>
           </div>
         )}
+        {/* 申請側只印申請的簽核列;結案那幾筆歸結案頁籤(approval_records.subject_type) */}
+        <div style={{ gridColumn: '1 / -1' }}>
+          <SectionTitle>簽核紀錄</SectionTitle>
+          <ApprovalLog rows={(d?.approvals ?? []).filter((r) => !r.isClose)} />
+        </div>
+        </>
+        )}
+
+        {activeTab === 'close' && report && (
+        <>
+        <div>
+          <SectionTitle first>結案成果</SectionTitle>
+          <div style={{ display: 'grid', gridTemplateColumns: '96px 1fr', gap: '8px 12px', fontSize: 13 }}>
+            <div style={detailLabel}>申請時間</div><div className="num">{d?.submittedAt ?? '—'}</div>
+            <div style={detailLabel}>活動時間</div>
+            <div>
+              <span className="num">{item.date}</span>{' '}
+              {timeChanged ? (
+                <ActualValue actual={actualTime} planned={d?.timeRange ?? '未填'} />
+              ) : (
+                <span className="num">{actualTime}</span>
+              )}
+            </div>
+            <div style={detailLabel}>活動地點</div>
+            <div>
+              {locationChanged ? (
+                <ActualValue actual={report.actualLocation} planned={d?.location || '未填'} />
+              ) : (
+                report.actualLocation
+              )}
+            </div>
+            <div style={detailLabel}>實際人數</div>
+            <div>
+              {countChanged ? (
+                <ActualValue actual={actualCounts} planned={plannedCounts} />
+              ) : (
+                <span className="num">{actualCounts}</span>
+              )}
+            </div>
+            <div style={detailLabel}>經費</div>
+            <div>
+              自籌 <span className="num">{fmtMoney(item.selfFundTotal ?? 0)}</span>
+              {closeHasSubsidy && (
+                <> · 核定 <span className="num">{approvedText(item.approvedTotal, fmtMoney)}</span></>
+              )}
+              {' '}· 實支{' '}
+              <span className="num" style={overBudget ? { color: '#C13B34', fontWeight: 500 } : undefined}>
+                {fmtMoney(report.expense)}
+              </span>
+            </div>
+            <div style={detailLabel}>{highlightsLabel(item.type)}</div>
+            <div style={{ lineHeight: 1.7 }}>{report.highlights}</div>
+            <div style={detailLabel}>達成目標</div>
+            <div style={{ lineHeight: 1.7 }}>{report.goals}</div>
+            <div style={detailLabel}>其他成果</div>
+            <div style={{ lineHeight: 1.7 }}>{report.others}</div>
+            {report.reviewMeeting && (
+              <>
+                <div style={detailLabel}>檢討會議</div>
+                <div style={{ lineHeight: 1.7 }}>
+                  <span className="num">{report.reviewDate}</span> · 與會{' '}
+                  <span className="num">{report.reviewAttendees}</span> 人
+                  <div style={{ fontSize: 12, color: 'var(--steel)' }}>討論：{report.reviewTopics}</div>
+                  <div style={{ fontSize: 12, color: 'var(--steel)' }}>決議：{report.reviewConclusion}</div>
+                </div>
+              </>
+            )}
+            <div style={detailLabel}>結案附件</div>
+            <div>
+              <FileLinks files={closeDocs} onPreview={(f) => filePreview.preview(toEvalFile(f))} />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <SectionTitle first>
+            活動照片（
+            <Tooltip title={photoShort ? `未達 ${MIN_PHOTOS} 張且無影片連結` : undefined}>
+              <span
+                className="num"
+                style={photoShort ? { color: '#C13B34', cursor: 'help' } : undefined}
+              >
+                {photos.length}
+              </span>
+            </Tooltip>
+            ）張
+          </SectionTitle>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {photos.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className="link-btn"
+                style={{ padding: 0 }}
+                title={p.name}
+                aria-label={`預覽 ${p.name}`}
+                onClick={() => filePreview.preview(toEvalFile(p))}
+              >
+                <img
+                  src={p.url}
+                  alt={p.name}
+                  loading="lazy"
+                  width={96}
+                  height={72}
+                  style={{ width: 96, height: 72, objectFit: 'cover', borderRadius: 6, display: 'block' }}
+                />
+              </button>
+            ))}
+          </div>
+          <SectionTitle>成果影片</SectionTitle>
+          <div style={{ fontSize: 13, wordBreak: 'break-all' }}>
+            {report.videoUrl ? (
+              <a href={report.videoUrl} target="_blank" rel="noopener noreferrer">{report.videoUrl}</a>
+            ) : (
+              <span style={{ color: 'var(--steel)' }}>—</span>
+            )}
+          </div>
+          <SectionTitle>
+            學習心得（<span className="num">{report.reflections.length}</span> 人）
+          </SectionTitle>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {report.reflections.map((r, i) => (
+              <div key={i} style={{ padding: '8px 12px', background: 'var(--paper)', borderRadius: 6, fontSize: 13 }}>
+                <span style={{ fontWeight: 500 }}>{r.name}</span>
+                <span style={{ color: 'var(--steel)', fontSize: 12 }}>（{r.dept}）</span>
+                <div style={{ lineHeight: 1.7, marginTop: 2 }}>{r.text}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 繳交確認:待審時由承辦勾(未勾之項目評鑑以 0 分計),已結案則顯示落庫的結果 */}
+        <div style={{ gridColumn: '1 / -1' }}>
+          <SectionTitle>繳交確認</SectionTitle>
+          <div
+            style={{
+              display: 'flex',
+              gap: 18,
+              flexWrap: 'wrap',
+              background: 'var(--paper)',
+              borderRadius: 6,
+              padding: '10px 12px',
+            }}
+          >
+            {SUBMISSION_CHECKS.map((c) => (
+              <Checkbox
+                key={c.key}
+                checked={checks[c.key]}
+                disabled={!canCloseReview}
+                onChange={(e) => setOverride((prev) => ({ ...prev, [c.key]: e.target.checked }))}
+              >
+                {c.label}
+              </Checkbox>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ gridColumn: '1 / -1' }}>
+          <SectionTitle>簽核紀錄</SectionTitle>
+          <ApprovalLog rows={(d?.approvals ?? []).filter((r) => r.isClose)} />
+        </div>
+        </>
+        )}
       </div>
       )}
 
       <Modal
         open={rejectOpen}
-        title="退回申請"
+        title={canCloseReview ? '退回結案' : '退回申請'}
         okText="確認退回"
         destroyOnHidden
         confirmLoading={submitting}
         okButtonProps={{ danger: true }}
         cancelText="取消"
-        onOk={() => void submitReject()}
+        onOk={() => void (canCloseReview ? submitCloseReject() : submitReject())}
         onCancel={closeReject}
       >
         <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 8 }}>

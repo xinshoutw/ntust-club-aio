@@ -1,42 +1,29 @@
 import { useEffect, useState } from 'react'
 import { countText } from '../../lib/counts'
-import { App, Button, Checkbox, Input, Modal, Skeleton, Tooltip } from 'antd'
+import { App, Button } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
-import StatusPill from '../../components/ui/StatusPill'
 import { useAuth } from '../../app/auth'
-import { approvedText, fmtMoney, highlightsLabel, showsApproved } from '../activities/types'
+import { fmtMoney } from '../activities/types'
 import { Cols, Pager } from '../../components/ui/tableControls'
-import { useModalAutoFocus } from '../../components/ui/useModalAutoFocus'
-import SectionTitle from '../../components/ui/SectionTitle'
 import {
-  canActOnClose,
   useAdminActivitiesPaged,
   useAdminActivityDetail,
   useAdminActivityMutations,
-  toEvalFile,
   type AdminActivity,
 } from '../../api/adminActivities'
 import ActivityReviewModal from './ActivityReviewModal'
-import DownloadMenu from '../activities/DownloadMenu'
-import { useFilePreview } from '../eval/useFilePreview'
-import { downloadEvalFile } from '../eval/files'
-import { activityApplyPdf } from '../../api/activities'
 import { clickableProps } from '../../lib/clickable'
-import { SUBMISSION_CHECKS, defaultConfirmations, type CheckKey } from './closeChecks'
 import { clampPage } from '../../lib/paging'
-import { MIN_PHOTOS } from '../activities/types'
 
 // 兩張表各自分頁:待審是逐件處理的佇列,逾期是追蹤用的清單
 const PENDING_PAGE_SIZE = 8
 const OVERDUE_PAGE_SIZE = 10
 
-const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
 
-
-// 結案審核彈窗:承辦人單關;完整結案資料(GET /admin/activities/{id})+繳交確認,
-// 核准或退回(退回原因必填)
+// 結案審核彈窗 = 統一的活動彈窗(ActivityReviewModal)+ 結案簽核回呼:
+// 承辦人單關,核准時一併寫三個繳交確認。內容與申請審核、所有活動同一份版面
 function CloseReviewModal({
   item,
   open,
@@ -48,312 +35,37 @@ function CloseReviewModal({
   onClose: () => void
   afterClose: () => void
 }) {
-  const { message } = App.useApp()
-  const { user } = useAuth()
   const detailQuery = useAdminActivityDetail(item.activityId)
   const { closeApprove, closeReject } = useAdminActivityMutations()
-  const [rejectOpen, setRejectOpen] = useState(false)
-  const [reason, setReason] = useState('')
-  const approveRef = useModalAutoFocus(open)
-  const filePreview = useFilePreview()
-  // 只存承辦手動改過的項目,其餘跟著推導走:詳情是非同步載入的,
-  // 用 state 存預設值就得等 effect 補寫,中間那一刻的值會是錯的
-  const [override, setOverride] = useState<Partial<Record<CheckKey, boolean>>>({})
-
   const detail = detailQuery.data
-  const report = detail?.report
-  const photos = detail?.photos ?? []
-  // 手上還沒有詳情才算失敗:背景重抓失敗時 TanStack 保留既有 data,
-  // 內容與按鈕都照舊(同 ActivityReviewModal)
+  // 手上還沒有詳情才算失敗:背景重抓失敗時 TanStack 保留既有 data,內容與按鈕都照舊
   const detailFailed = detailQuery.isError && !detail
   // 手上這份可能不是最新的:重抓在途或重抓失敗都不給核准 —— 繳交確認是從它推導的,
   // 而核准一次寫死三個旗標並轉 closed,沒有第二條路能改
-  const detailStale = detailQuery.isFetching || (detailQuery.isError && !!detail)
-  const autoChecks = defaultConfirmations(report, photos.length)
-  const checks = { ...autoChecks, ...override }
-  const canReview = item.status === 'closing_pending_advisor' && canActOnClose(user)
-
-  const closeReject_ = () => {
-    setRejectOpen(false)
-    setReason('')
-  }
-
-  const submitApprove = () => {
-    closeApprove.mutate(
-      {
-        id: item.activityId,
-        photosConfirmed: checks.photos,
-        reportConfirmed: checks.report,
-        reflectionsConfirmed: checks.reflections,
-      },
-      {
-        onSuccess: () => {
-          message.success(`已核准「${item.name}」結案`)
-          onClose()
-        },
-        onError: (e) => message.error(e.message),
-      },
-    )
-  }
-
-  const submitReject = () => {
-    if (!reason.trim()) {
-      message.error('退回原因為必填')
-      return
-    }
-    closeReject.mutate(
-      { id: item.activityId, reason: reason.trim() },
-      {
-        onSuccess: () => {
-          message.success(`已退回「${item.name}」結案`)
-          closeReject_()
-          onClose()
-        },
-        onError: (e) => message.error(e.message),
-      },
-    )
-  }
-
-  // 核定補助:有申請補助,或雖沒申請但確實核了錢(遷移資料有這種列)才顯示。
-  // 有申請卻還沒核定時 approvedTotal 是 null —— `?? 0` 會把「還沒核定」說成「核定 0 元」,
-  // 連帶讓超支判定拿一個假的上限去比
-  const hasSubsidy = showsApproved(item.requested, item.approvedTotal)
-  const approvedKnown = item.requested === 0 || item.approvedTotal != null
-  // 實際支出含自籌:與「自籌+核定補助」的總經費比較才可比(僅比核定補助幾乎必超)
-  const totalBudget = item.selfFundTotal + (item.approvedTotal ?? 0)
-  const overBudget = !!report && approvedKnown && report.expense > totalBudget
-  const photoShort = !!detail && !!report && photos.length < MIN_PHOTOS && !report.videoUrl
-  const dateRange = item.endDate !== item.date ? `${item.date} – ${item.endDate}` : item.date
+  const detailStale = detailQuery.isError && !!detail ? 'error' : detailQuery.isFetching && 'fetching'
 
   return (
-    <Modal
+    <ActivityReviewModal
+      item={detail ?? item}
+      detailError={detailFailed ? detailQuery.error : undefined}
+      onRetryDetail={() => void detailQuery.refetch()}
+      detailStale={detailStale}
       open={open}
-      onCancel={onClose}
+      onClose={onClose}
       afterClose={afterClose}
-      width={760}
-      title={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', paddingRight: 26 }}>
-          <span style={{ fontSize: 16, fontWeight: 600 }}>{item.name}</span>
-          <StatusPill status={item.status} />
-          <span style={{ flex: 1 }} />
-          <DownloadMenu
-            items={[{ key: 'apply', label: '下載社團活動申請表' }]}
-            onClick={() => downloadEvalFile(activityApplyPdf(item, 'admin'))}
-          />
-        </div>
+      onCloseApprove={(checks) =>
+        closeApprove.mutateAsync({
+          id: item.activityId,
+          photosConfirmed: checks.photos,
+          reportConfirmed: checks.report,
+          reflectionsConfirmed: checks.reflections,
+        })
       }
-      footer={
-        // 讀不到結案內容就不給簽核鈕:看不到照片與心得就沒有東西可核實,
-        // 繳交確認也只會是空詳情推導出來的值;退回也不該在讀不到內容時按
-        detailFailed ? (
-          <div style={{ fontSize: 12, color: 'var(--steel)' }}>
-            詳細資訊載入失敗，請重試{canReview ? '後再審核' : ''}
-          </div>
-        ) : canReview ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10 }}>
-            {detail && detailStale && (
-              <span style={{ fontSize: 12, color: 'var(--steel)', marginRight: 'auto' }}>
-                {detailQuery.isError ? (
-                  <>
-                    結案內容更新失敗{' '}
-                    <Button type="link" size="small" style={{ padding: 0 }} onClick={() => void detailQuery.refetch()}>
-                      重試
-                    </Button>
-                  </>
-                ) : (
-                  '結案內容更新中'
-                )}
-              </span>
-            )}
-            <Button danger style={{ height: 38 }} disabled={closeApprove.isPending} onClick={() => setRejectOpen(true)}>
-              退回
-            </Button>
-            <Button
-              type="primary"
-              ref={approveRef}
-              style={{ height: 38 }}
-              disabled={!report || detailStale}
-              loading={closeApprove.isPending}
-              onClick={submitApprove}
-            >
-              核准結案
-            </Button>
-          </div>
-        ) : (
-          <div style={{ fontSize: 12, color: 'var(--steel)' }}>
-            {item.status === 'closing_pending_advisor' ? '無結案簽核權限，僅供查看' : '僅供查看'}
-          </div>
-        )
-      }
-    >
-      {detailQuery.isPending ? (
-        <Skeleton active paragraph={{ rows: 8 }} style={{ marginTop: 12 }} />
-      ) : detailFailed ? (
-        <div style={{ marginTop: 12 }}>
-          <QueryError compact title="結案詳細資訊載入失敗" error={detailQuery.error} onRetry={() => void detailQuery.refetch()} />
-        </div>
-      ) : !report ? (
-        <div style={{ marginTop: 16, fontSize: 13, color: 'var(--steel)' }}>此活動尚無結案資料</div>
-      ) : (
-        <>
-          <SectionTitle first>結案成果</SectionTitle>
-          <div style={{ display: 'grid', gridTemplateColumns: '88px 1fr', gap: '9px 12px', fontSize: 13 }}>
-            <div style={detailLabel}>結案送出時間</div><div className="num">{report.submittedAt}</div>
-            <div style={detailLabel}>社團</div><div>{item.club}</div>
-            <div style={detailLabel}>活動日期</div><div className="num">{dateRange}</div>
-            <div style={detailLabel}>實際時間</div>
-            <div className="num">{report.actualStart}–{report.actualEnd}</div>
-            <div style={detailLabel}>實際地點</div><div>{report.actualLocation}</div>
-            <div style={detailLabel}>實際人數</div>
-            <div>
-              社員 <span className="num">{report.memberCount}</span> · 非社員{' '}
-              <span className="num">{report.nonMemberCount}</span>
-            </div>
-            <div style={detailLabel}>經費</div>
-            <div>
-              {hasSubsidy && (
-                <>
-                  核定補助 <span className="num">{approvedText(item.approvedTotal, fmtMoney)}</span> ·{' '}
-                </>
-              )}
-              自籌 <span className="num">{fmtMoney(item.selfFundTotal)}</span> · 實支{' '}
-              <span className="num" style={overBudget ? { color: '#C13B34', fontWeight: 500 } : undefined}>
-                {fmtMoney(report.expense)}
-              </span>
-            </div>
-            <div style={detailLabel}>成果</div>
-            <div>
-              {/* 紅字沒有說明就只剩顏色在傳達異常,而承辦看到的是「活動照片」被自動取消勾選
-                  卻不知道為什麼 —— 說明收進 Tooltip(design-guide §UI 文字精簡) */}
-              照片{' '}
-              <Tooltip title={photoShort ? `未達 ${MIN_PHOTOS} 張且無影片連結` : undefined}>
-                <span
-                  className="num"
-                  style={photoShort ? { color: '#C13B34', cursor: 'help' } : undefined}
-                >
-                  {photos.length}
-                </span>
-              </Tooltip>{' '}
-              張
-              {report.videoUrl ? (
-                <>
-                  {' '}·{' '}
-                  <a href={report.videoUrl} target="_blank" rel="noopener noreferrer">影片連結</a>
-                </>
-              ) : (
-                ' · 無影片連結'
-              )}
-              {' '}· 心得 <span className="num">{report.reflections.length}</span> 人
-            </div>
-            <div style={detailLabel}>{highlightsLabel(item.type)}</div><div style={{ lineHeight: 1.7 }}>{report.highlights}</div>
-            <div style={detailLabel}>達成目標</div><div style={{ lineHeight: 1.7 }}>{report.goals}</div>
-            {report.others && (
-              <>
-                <div style={detailLabel}>其他成果</div><div style={{ lineHeight: 1.7 }}>{report.others}</div>
-              </>
-            )}
-            {report.reviewMeeting && (
-              <>
-                <div style={detailLabel}>檢討會議</div>
-                <div style={{ lineHeight: 1.7 }}>
-                  <span className="num">{report.reviewDate}</span> · 與會{' '}
-                  <span className="num">{report.reviewAttendees}</span> 人
-                  <div style={{ fontSize: 12, color: 'var(--steel)' }}>討論：{report.reviewTopics}</div>
-                  <div style={{ fontSize: 12, color: 'var(--steel)' }}>決議：{report.reviewConclusion}</div>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* 照片縮圖:點擊開站內預覽彈窗(與「所有活動」同一支 FilePreview) */}
-          {photos.length > 0 && (
-            <div>
-              <SectionTitle>活動照片（<span className="num">{photos.length}</span> 張）</SectionTitle>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {photos.map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className="link-btn"
-                    style={{ padding: 0 }}
-                    title={p.name}
-                    aria-label={`預覽 ${p.name}`}
-                    onClick={() => filePreview.preview(toEvalFile(p))}
-                  >
-                    <img
-                      src={p.url}
-                      alt={p.name}
-                      loading="lazy"
-                      width={96}
-                      height={72}
-                      style={{ width: 96, height: 72, objectFit: 'cover', borderRadius: 6, display: 'block' }}
-                    />
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 學習心得全文:審核者須核實內容 */}
-          <div>
-            <SectionTitle>學習心得（<span className="num">{report.reflections.length}</span> 人）</SectionTitle>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 220, overflowY: 'auto' }}>
-              {report.reflections.map((r, i) => (
-                <div key={i} style={{ padding: '8px 12px', background: 'var(--paper)', borderRadius: 6, fontSize: 13 }}>
-                  <span style={{ fontWeight: 500 }}>{r.name}</span>
-                  <span style={{ color: 'var(--steel)', fontSize: 12 }}>（{r.dept}）</span>
-                  <div style={{ lineHeight: 1.7, marginTop: 2 }}>{r.text}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* 繳交確認:未勾選之項目評鑑以 0 分計 */}
-          {canReview && (
-            <div style={{ marginTop: 16, padding: '12px 14px', background: 'var(--paper)', borderRadius: 6 }}>
-              <SectionTitle first>繳交確認</SectionTitle>
-              <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
-                {SUBMISSION_CHECKS.map((c) => (
-                  <Checkbox
-                    key={c.key}
-                    checked={checks[c.key]}
-                    onChange={(e) => setOverride((prev) => ({ ...prev, [c.key]: e.target.checked }))}
-                  >
-                    {c.label}
-                  </Checkbox>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      <Modal
-        open={rejectOpen}
-        title="退回結案"
-        okText="確認退回"
-        destroyOnHidden
-        confirmLoading={closeReject.isPending}
-        okButtonProps={{ danger: true }}
-        cancelText="取消"
-        onOk={submitReject}
-        onCancel={closeReject_}
-      >
-        <div style={{ fontSize: 13, color: 'var(--steel)', marginBottom: 8 }}>
-          原因
-        </div>
-        <Input.TextArea
-          autoFocus
-          rows={3}
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder={'心得太隨便'}
-        />
-      </Modal>
-      {filePreview.node}
-    </Modal>
+      onCloseReject={(reason) => closeReject.mutateAsync({ id: item.activityId, reason })}
+    />
   )
 }
+
 
 export default function CloseReviewPage() {
   const { message } = App.useApp()

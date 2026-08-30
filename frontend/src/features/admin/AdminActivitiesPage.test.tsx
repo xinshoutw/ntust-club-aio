@@ -3,7 +3,7 @@ import { App } from 'antd'
 import { fireEvent, render, screen } from '@testing-library/react'
 import AdminActivitiesPage from './AdminActivitiesPage'
 import type { AdminActivity, AdminActivityDetail } from '../../api/adminActivities'
-import type { ClubActivity, ClubActivityDetail } from '../../api/activities'
+import type { ClubActivity } from '../../api/activities'
 
 vi.mock('../../app/auth', () => ({
   useAuth: () => ({ user: { role: 'admin', isSuper: true, permissions: ['approve_advisor'] } }),
@@ -49,13 +49,15 @@ const reviewDetail: AdminActivityDetail = {
   ...pending,
   detail: { attachments: [], budget: [] },
   photos: [],
+  closeDocs: [],
 }
 
-const fullDetail: ClubActivityDetail = {
-  ...clubShape(closed),
-  budget: [],
+// 已結案:完整內容都在同一支 admin 詳情裡(結案成果走彈窗的「結案」頁籤)
+const closedDetail: AdminActivityDetail = {
+  ...closed,
+  detail: { attachments: [], budget: [] },
   photos: [],
-  attachments: [],
+  closeDocs: [],
   report: {
     memberCount: 20,
     nonMemberCount: 5,
@@ -67,8 +69,11 @@ const fullDetail: ClubActivityDetail = {
     others: '',
     reviewMeeting: false,
     expense: 0,
-    submittedAt: '2026/09/25',
+    submittedAt: '2026/09/25 10:00',
     reflections: [{ name: '陳同學', dept: '資工系', text: '收穫很多' }],
+    photosConfirmed: true,
+    reportConfirmed: true,
+    reflectionsConfirmed: true,
   },
 }
 
@@ -91,9 +96,11 @@ vi.mock('../../api/adminActivities', async (importOriginal) => ({
     isPlaceholderData: false,
     isFetching: false,
   }),
-  // 兩支詳情各自只在對應狀態被啟用;測試一律回自己的那一份
-  useAdminActivityDetail: (id?: number) => ({ data: id ? reviewDetail : undefined, isPending: false }),
-  useAdminClubActivityDetail: (id?: number) => ({ data: id ? fullDetail : undefined, isPending: false }),
+  // 一支詳情吃所有狀態:回該列自己的那一份
+  useAdminActivityDetail: (id?: number) => ({
+    data: id === 2 ? closedDetail : id ? reviewDetail : undefined,
+    isPending: false,
+  }),
   useAdminActivityMutations: () => ({ approve: { mutateAsync: vi.fn() }, reject: { mutateAsync: vi.fn() } }),
 }))
 

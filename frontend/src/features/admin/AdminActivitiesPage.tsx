@@ -14,15 +14,12 @@ import { clampPage } from '../../lib/paging'
 import { useFitRows } from '../../lib/fitRows'
 import { semesterOptions } from '../../lib/semester'
 import { useFilePreview } from '../eval/useFilePreview'
-import ActivityPreviewModal from '../activities/ActivityPreviewModal'
 import { LISTED_STATUS_LABELS, approvedText, fmtMoney, statusesForLabels } from '../activities/types'
-import type { ClubActivity } from '../../api/activities'
 import {
   useAdminActivitiesPaged,
   useAdminActivityDetail,
   useAdminActivityMutations,
   useAdminActivitySemesters,
-  useAdminClubActivityDetail,
   type AdminActivity,
 } from '../../api/adminActivities'
 import { groupActiveClubs, useClubOptions } from '../../api/adminClubs'
@@ -32,10 +29,6 @@ import ActivityReviewModal from './ActivityReviewModal'
 // 排序鍵=後端 /admin/activities 白名單。經費欄顯示「自籌 / 核定」但排序鍵 budget 是
 // 「自籌 + 擬請」合計,兩者不是同一件事 —— 該欄因此不給排序,不做名實不符的指示器
 type SortKey = 'club' | 'name' | 'date' | 'status' | 'submitted_at' | 'reviewed_at'
-
-// 結案流程中與已結案:這兩種狀態的重點是結案成果(照片、心得、檢討會議),
-// 審核彈窗看不到那些,改開社團端那份完整檢視(唯讀)
-const CLOSE_STAGE = new Set(['closing_pending_advisor', 'closed'])
 
 /** 全校活動的查閱頁:所有狀態、所有社團,學期在右上角 */
 export default function AdminActivitiesPage() {
@@ -52,8 +45,6 @@ export default function AdminActivitiesPage() {
   const [keyword, setKeyword] = useState('')
   const [query, setQuery] = useState('')
   const [current, setCurrent] = useState<AdminActivity | null>(null)
-  // 完整檢視吃社團端型別;與 current 同一列、同一次查詢,兩份形狀一起收下
-  const [currentClub, setCurrentClub] = useState<ClubActivity | null>(null)
   const [open, setOpen] = useState(false)
   const filePreview = useFilePreview()
 
@@ -83,7 +74,6 @@ export default function AdminActivitiesPage() {
     pageSize,
   })
   const rows = listQuery.data?.rows ?? []
-  const clubRows = listQuery.data?.clubRows ?? []
   const total = listQuery.data?.total ?? 0
 
   // 別處簽掉一件就會讓清單少一筆,停在末頁只會看到空表。
@@ -93,10 +83,8 @@ export default function AdminActivitiesPage() {
     if (listLoaded) setPage((p) => clampPage(p, total, pageSize))
   }, [listLoaded, total, pageSize])
 
-  const closeStage = current != null && CLOSE_STAGE.has(current.status)
-  // 兩個彈窗吃不同型別,詳情只發需要的那一支
-  const reviewDetail = useAdminActivityDetail(closeStage ? undefined : current?.activityId)
-  const fullDetail = useAdminClubActivityDetail(closeStage ? current?.activityId : undefined)
+  // 一支彈窗吃所有狀態:申請面與結案面都在 admin 詳情裡(結案的走「結案」頁籤)
+  const reviewDetail = useAdminActivityDetail(current?.activityId)
   const { approve, reject } = useAdminActivityMutations()
 
   const resetPage = () => setPage(1)
@@ -109,7 +97,6 @@ export default function AdminActivitiesPage() {
   )
   const openRow = (i: number) => {
     setCurrent(rows[i])
-    setCurrentClub(clubRows[i])
     setOpen(true)
   }
   const applyKeyword = (v: string) => {
@@ -296,9 +283,9 @@ export default function AdminActivitiesPage() {
         <Pager page={page} pageSize={pageSize} total={total} onChange={setPage} />
       </div>
 
-      {/* 結案相關狀態開完整唯讀檢視(結案成果、照片、心得);其餘開審核彈窗 ——
-          待本關者可就地簽核,非本關自動唯讀。兩者常駐待退場動畫結束才卸載 */}
-      {current && !closeStage && (
+      {/* 一支彈窗吃所有狀態:待本關者可就地簽核,非本關自動唯讀;
+          結案內容在「結案」頁籤。常駐待退場動畫結束才卸載 */}
+      {current && (
         <ActivityReviewModal
           key={current.id}
           item={reviewDetail.data ?? current}
@@ -306,10 +293,7 @@ export default function AdminActivitiesPage() {
           onRetryDetail={() => void reviewDetail.refetch()}
           open={open}
           onClose={() => setOpen(false)}
-          afterClose={() => {
-            setCurrent(null)
-            setCurrentClub(null)
-          }}
+          afterClose={() => setCurrent(null)}
           onApprove={(p) =>
             approve.mutateAsync({
               id: current.activityId,
@@ -321,24 +305,6 @@ export default function AdminActivitiesPage() {
             })
           }
           onReject={(reason) => reject.mutateAsync({ id: current.activityId, reason })}
-        />
-      )}
-      {closeStage && (
-        <ActivityPreviewModal
-          key={current.id}
-          a={fullDetail.data ?? currentClub}
-          detail={fullDetail.data}
-          loading={fullDetail.isPending}
-          error={fullDetail.error}
-          onRetry={() => void fullDetail.refetch()}
-          open={open}
-          onClose={() => setOpen(false)}
-          afterClose={() => {
-            setCurrent(null)
-            setCurrentClub(null)
-          }}
-          onPreviewFile={filePreview.preview}
-          pdfBase="admin"
         />
       )}
       {filePreview.node}

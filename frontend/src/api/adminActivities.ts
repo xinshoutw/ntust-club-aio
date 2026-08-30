@@ -31,6 +31,13 @@ export interface ReviewItem {
   requested: number
   status: StatusKey
   fundSource?: string // 第一關認定的經費來源(後端 fund_source)
+  // 經費合計(彈窗結案側的「自籌 / 核定 / 實支」一列讀它;approvedTotal 為 null=尚未核定)
+  selfFundTotal?: number
+  approvedTotal?: number
+  // 結案側的內容(詳情到位才有);彈窗的「結案」頁籤讀這三個,沒有 report 就切不過去
+  report?: AdminCloseReport
+  photos?: AdminFileRef[]
+  closeDocs?: AdminFileRef[]
   // 行政端社團總覽以社團端活動資料組出唯讀檢視,部分欄位可能缺漏(彈窗以 — 呈現)
   detail?: {
     timeRange?: string

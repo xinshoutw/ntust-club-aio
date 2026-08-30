@@ -30,6 +30,7 @@ const detail: AdminActivityDetail = {
   ...item,
   detail: { attachments: [], budget: [] },
   photos: [],
+  closeDocs: [],
   report: {
     memberCount: 20,
     nonMemberCount: 5,
@@ -70,8 +71,8 @@ vi.mock('../../api/adminActivities', async (importOriginal) => ({
     refetch,
   }),
   useAdminActivityMutations: () => ({
-    closeApprove: { mutate: approve, isPending: false },
-    closeReject: { mutate: vi.fn(), isPending: false },
+    closeApprove: { mutateAsync: approve, isPending: false },
+    closeReject: { mutateAsync: vi.fn(), isPending: false },
     unlock: { mutate: vi.fn(), isPending: false, variables: undefined },
   }),
 }))
@@ -134,14 +135,11 @@ describe('結案審核的繳交確認', () => {
     fireEvent.click(box('成果報告表'))
     fireEvent.click(screen.getByRole('button', { name: '核准結案' }))
 
-    expect(approve).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: 1,
-        photosConfirmed: false,
-        reportConfirmed: true,
-        reflectionsConfirmed: false,
-      }),
-      expect.anything(),
-    )
+    expect(approve).toHaveBeenCalledWith({
+      id: 1,
+      photosConfirmed: false,
+      reportConfirmed: true,
+      reflectionsConfirmed: false,
+    })
   })
 })

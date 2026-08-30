@@ -142,32 +142,49 @@ describe('ActivityReviewModal 的簽核紀錄', () => {
       </App>,
     )
 
-  test('逐列印出簽核者、時間與決議', () => {
+  test('逐列印出關卡、簽核者、時間與決議', () => {
     showApprovals([
-      { actor: '陳彥仁', at: '2026/08/18 16:17', decision: 'approve', isClose: false },
-      { actor: '侍筱鳳', at: '2026/08/19 09:02', decision: 'reject', isClose: false },
+      { actor: '陳彥仁', at: '2026/08/18 16:17', decision: 'approve', isClose: false, stage: 'advisor' },
+      { actor: '侍筱鳳', at: '2026/08/19 09:02', decision: 'reject', isClose: false, stage: 'chief' },
     ])
 
-    expect(screen.getByText(/陳彥仁 於/).textContent).toContain('核准')
-    expect(screen.getByText(/侍筱鳳 於/).textContent).toContain('退回')
-    // 時間自己一個 span,不在 getByText 的比對範圍內 —— 不另外斷言的話整段刪掉也不會紅
-    expect(screen.getByText('2026/08/18 16:17')).toBeTruthy()
-    expect(screen.getByText('2026/08/19 09:02')).toBeTruthy()
+    expect(screen.getByText('承辦人')).toBeTruthy()
+    expect(screen.getByText('組長')).toBeTruthy()
+    expect(screen.getByText('核准')).toBeTruthy()
+    expect(screen.getByText('退回')).toBeTruthy()
+    // 時間自己一個 span,不在姓名的比對範圍內 —— 不另外斷言的話整段刪掉也不會紅
+    expect(screen.getByText(/2026\/08\/18 16:17/)).toBeTruthy()
+    expect(screen.getByText(/2026\/08\/19 09:02/)).toBeTruthy()
   })
 
-  // 申請與結案的簽核紀錄同放一張表:只印「核准」的話,結案那次會被讀成又核了一次申請
-  // 摺疊自動解鎖是 api 層 dropAutoUnlock 的事(元件收到的已經是映射過的資料),
-  // 測在 adminActivities.test.ts。這裡測的是 DECISION_LABEL 認得 unlock
-  test('手動解鎖照樣印出來', () => {
-    showApprovals([{ actor: '侍筱鳳', at: '2026/08/19 09:02', decision: 'unlock', isClose: true }])
+  // 退回原因原本只有社團看得到,承辦得去稽核軌跡翻;每次送審不清簽核紀錄,
+  // 所以退回重送後兩輪的核准與退回都還在
+  test('退回原因逐列印出', () => {
+    showApprovals([
+      {
+        actor: '侍筱鳳',
+        at: '2026/08/19 09:02',
+        decision: 'reject',
+        isClose: false,
+        stage: 'chief',
+        reason: '經費明細第 3 項未附估價單',
+      },
+    ])
 
-    expect(screen.getByText(/侍筱鳳 於/).textContent).toContain('結案解鎖')
+    expect(screen.getByText('經費明細第 3 項未附估價單')).toBeTruthy()
   })
 
-  test('結案的那幾列標明是結案', () => {
-    showApprovals([{ actor: '陳彥仁', at: '2026/08/18 16:17', decision: 'approve', isClose: true }])
+  // 申請與結案的簽核紀錄同放一張表,依 subject_type 分到兩個頁籤:
+  // 沒有結案資料時結案側切不過去,結案的那幾列因此一列都不該印在申請側
+  test('結案的簽核列不印在申請側', () => {
+    showApprovals([
+      { actor: '陳彥仁', at: '2026/08/18 16:17', decision: 'approve', isClose: false, stage: 'advisor' },
+      { actor: '侍筱鳳', at: '2026/08/19 09:02', decision: 'unlock', isClose: true, stage: 'advisor' },
+    ])
 
-    expect(screen.getByText(/陳彥仁 於/).textContent).toContain('結案核准')
+    expect(screen.getByText('陳彥仁')).toBeTruthy()
+    expect(screen.queryByText('侍筱鳳')).toBeNull()
+    expect(screen.queryByText('解鎖')).toBeNull()
   })
 })
 

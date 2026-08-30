@@ -46,7 +46,7 @@ function FileChip({ f, onPreview }: { f: EvalFile; onPreview: (f: EvalFile) => v
 
 // 詳情彈窗的分區標題
 // 與申請不一致的實際值:直接取代申請值並以色彩標示,hover 顯示預計值
-function ActualValue({ actual, planned }: { actual: React.ReactNode; planned: string }) {
+export function ActualValue({ actual, planned }: { actual: React.ReactNode; planned: string }) {
   return (
     <Tooltip mouseEnterDelay={0} title={<span style={{ fontSize: 14 }}>預計 {planned}</span>}>
       <span className="num" style={{ color: '#8A5A00', borderBottom: '1px dotted #8A5A00', cursor: 'help' }}>{actual}</span>

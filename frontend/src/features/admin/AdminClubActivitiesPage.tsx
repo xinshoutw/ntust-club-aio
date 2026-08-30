@@ -12,15 +12,14 @@ import { countText } from '../../lib/counts'
 import { clampPage } from '../../lib/paging'
 import { semesterOptions } from '../../lib/semester'
 import { useFitRows } from '../../lib/fitRows'
-import { useFilePreview } from '../eval/useFilePreview'
-import ActivityPreviewModal from '../activities/ActivityPreviewModal'
+import ActivityReviewModal from './ActivityReviewModal'
 import { LISTED_STATUS_LABELS, approvedText, fmtMoney, statusesForLabels } from '../activities/types'
 import { dateRangeText } from '../activities/utils'
 import { type ClubActivity } from '../../api/activities'
 import {
   useAdminActivitySemesters,
   useAdminClubActivities,
-  useAdminClubActivityDetail,
+  useAdminActivityDetail,
 } from '../../api/adminActivities'
 import { useClubOptions } from '../../api/adminClubs'
 import ClubSelect from './ClubSelect'
@@ -52,7 +51,6 @@ export default function AdminClubActivitiesPage() {
   const [statusFilter, setStatusFilter] = useState<string[]>([])
   const [preview, setPreview] = useState<ClubActivity | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
-  const filePreview = useFilePreview()
 
   // 換社團要回第一頁,學期也要放掉:上一社選的學期在新社可能一筆都沒有,
   // 留著就是一片空白卻沒有任何說明(比照 AdminMembersPage)
@@ -78,7 +76,7 @@ export default function AdminClubActivitiesPage() {
   })
   const rows = listQuery.data?.rows ?? []
   const total = listQuery.data?.total ?? 0
-  const detailQuery = useAdminClubActivityDetail(preview?.id)
+  const detailQuery = useAdminActivityDetail(preview?.id)
 
   // 視窗變高會讓總頁數變少;停在末頁只會看到空表。失敗時 total 也是 0,只在成功後收斂
   const listLoaded = listQuery.isSuccess
@@ -242,21 +240,16 @@ export default function AdminClubActivitiesPage() {
         <Pager page={page} pageSize={pageSize} total={total} onChange={setPage} />
       </div>
 
-      {/* 唯讀:不給 onEdit / onGoClose,footer 的編輯與前往結案自然收掉;
-          結案 PDF 走行政端那兩支(社團端的綁 club_id,承辦讀別社會 404) */}
-      <ActivityPreviewModal
-        a={preview}
-        detail={detailQuery.data}
-        loading={preview != null && detailQuery.isPending}
-        error={detailQuery.error}
-        onRetry={() => void detailQuery.refetch()}
+      {/* 唯讀:不給 onApprove / onReject,簽核鈕自然收掉。與申請審核、結案審核同一支彈窗 */}
+      <ActivityReviewModal
+        item={detailQuery.data ?? null}
+        pendingName={preview?.name}
+        detailError={detailQuery.error}
+        onRetryDetail={() => void detailQuery.refetch()}
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
         afterClose={() => setPreview(null)}
-        onPreviewFile={filePreview.preview}
-        pdfBase="admin"
       />
-      {filePreview.node}
     </div>
   )
 }

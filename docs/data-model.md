@@ -196,7 +196,7 @@ approved 且 end_date + N 天已過且未送結案 → 逾期鎖定(推導,非�
 | submitted_at | timestamptz | |
 | photos_confirmed / report_confirmed / reflections_confirmed | bool 預設 true | 承辦人核准結案時逐項確認繳交,**ad2–ad4 完全以這三個值為準**(D-14):系統不數照片張數也不數心得筆數,社團可能是交紙本。照片確認同時涵蓋影片連結;沒有 activity_reports 就沒有旗標可讀,三項一律不計 |
 
-照片走 `files`(slot=`report_photo`),收所有常見影像格式(jpg/png/gif/webp/bmp/tiff/heic/heif/avif),魔術位元組與大小後端重驗,sha256 於同社團內跨活動拒重複。成果報告與心得 PDF 依模板於下載時動態生成,不落檔。
+照片走 `files`(slot=`report_photo`),結案附件走 slot=`report_doc`(PDF/DOC/DOCX/影像;保單、租車契約、簽到表這類文件),兩者**共用 `close_photo_total_mb` 一個加總上限**。照片收所有常見影像格式(jpg/png/gif/webp/bmp/tiff/heic/heif/avif),魔術位元組與大小後端重驗,sha256 於同社團內跨活動拒重複。成果報告與心得 PDF 依模板於下載時動態生成,不落檔。
 
 **activity_reflections**(id, report_id, student_name, dept, body)— 送審驗證 ≥3 筆,三欄皆必填。
 
@@ -223,7 +223,7 @@ approved 且 end_date + N 天已過且未送結案 → 逾期鎖定(推導,非�
 | club_id | FK NULL | 權限邊界 |
 | uploaded_by | FK users | |
 | subject_type / subject_id | text NULL / int NULL | 所屬單據 |
-| slot | text NULL | 同單據內的位置(report_photo, evidence, passbook…) |
+| slot | text NULL | 同單據內的位置(report_photo, report_doc, proposal, evidence, passbook…) |
 | original_name / size / mime | | |
 | sha256 | text | 前端先算、後端驗證 |
 | path | text | `{module}/{YYYY}/{MM}/{uuid}` |
@@ -402,7 +402,7 @@ approved 且 end_date + N 天已過且未送結案 → 逾期鎖定(推導,非�
 | `equipment_workday_buffer` | `{before, after}` 工作天(預設 2/1) |
 | `fixed_booking_window` | `{open_from, open_until}`;未設定=不開放 |
 | `upload_limits` | 單檔上限 `{doc, img, zip, video}` MB |
-| `activity_attachment_total_mb` / `maintenance_total_mb` / `close_photo_total_mb` | 依申請性質的附件加總上限(15 / 100 / 10) |
+| `activity_attachment_total_mb` / `maintenance_total_mb` / `close_photo_total_mb` | 依申請性質的附件加總上限(50 / 250 / 50) |
 | `storage_limits` | `{per_club_gib}`;系統總量讀實體磁碟可用空間,不設邏輯容量 |
 | `eval_window` | `{year, start, end}` 評鑑視窗 |
 | `current_year` | 目前學年度 |

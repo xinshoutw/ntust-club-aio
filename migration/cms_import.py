@@ -447,9 +447,12 @@ async def apply_roster_fixes(db: AsyncSession, passwords: list[tuple[str, str, s
         account, club = accounts.get(username), clubs.get(username)
         if account is None or club is None:
             continue
-        club.attribute = attribute
         if club.is_active and account.is_active:
             continue
+        # 屬性只在復社這一刻補(舊庫停社時一律 NULL)。寫在守衛外面會變成永久覆寫:
+        # 承辦事後在行政端改對的性質、以及舊庫解除停社後帶進來的權威值,都會被這個
+        # 常數蓋回去,而且 `reactivated` 是空的、畫面上完全看不出來
+        club.attribute = attribute
         club.is_active = account.is_active = True
         # 舊庫停社的社團,`import_clubs` 沒把密碼寫進發放 CSV(只在 not defunct 時 append),
         # 復社後承辦手上沒有密碼可發 —— 重設一次並補進同一份 CSV

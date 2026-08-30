@@ -420,6 +420,14 @@ async def apply_roster_fixes(db: AsyncSession, passwords: list[tuple[str, str, s
         for u in accounts.values()
         if u.club_id is not None
     }
+    # 名單是以帳號為鍵的修正清單,對不上就是名單錯了(打錯一碼、或接錯庫)。靜默跳過
+    # 只會少印一個號碼,而驗收看的是聚合數 —— 一個該停沒停配一個該啟沒啟剛好互相抵銷
+    missing = sorted((REACTIVATE_CLUBS.keys() | DEACTIVATE_CLUBS) - clubs.keys())
+    if missing:
+        raise RuntimeError(
+            f"名冊修正對不到社團帳號 {missing};"
+            f"確認接的是已跑過 import_clubs 的庫,或修正 REACTIVATE_CLUBS / DEACTIVATE_CLUBS"
+        )
 
     created = []
     for username, name, attribute in NEW_CLUBS:
@@ -444,9 +452,7 @@ async def apply_roster_fixes(db: AsyncSession, passwords: list[tuple[str, str, s
 
     reactivated = []
     for username, attribute in REACTIVATE_CLUBS.items():
-        account, club = accounts.get(username), clubs.get(username)
-        if account is None or club is None:
-            continue
+        account, club = accounts[username], clubs[username]  # 缺項已在上面擋掉
         if club.is_active and account.is_active:
             continue
         # 屬性只在復社這一刻補(舊庫停社時一律 NULL)。寫在守衛外面會變成永久覆寫:
@@ -464,9 +470,7 @@ async def apply_roster_fixes(db: AsyncSession, passwords: list[tuple[str, str, s
 
     deactivated = []
     for username in sorted(DEACTIVATE_CLUBS):
-        account, club = accounts.get(username), clubs.get(username)
-        if account is None or club is None:
-            continue
+        account, club = accounts[username], clubs[username]  # 缺項已在上面擋掉
         if not club.is_active and not account.is_active:
             continue  # 已停用;重跑要印「這次做了什麼」,不是「名單上有幾個」
         # 只停用,活動/借用/社員等歷史資料全數保留(與行政端按停用同一個行為)

@@ -154,7 +154,10 @@ export default function BookingOverviewPage() {
     [equipmentDates[0], equipmentDates[EQUIPMENT_DAYS - 1]],
     isEquipmentView,
   )
-  const equipment = usageQuery.data ?? []
+  const usage = usageQuery.data
+  const equipment = usage?.items ?? []
+  // 手上這份資料涵蓋哪一段:翻日期時新露出的欄位還沒載到,不能當成「沒人借」
+  const usageKnown = (iso: string) => usage != null && iso >= usage.start && iso <= usage.end
 
   // 正在借用:伺服器端 active=true 過濾
   const roomsQuery = useActiveRoomBookings()
@@ -341,6 +344,8 @@ export default function BookingOverviewPage() {
                 onRetry={gridError.retry}
               />
             ) : isEquipmentView ? (
+              // 不淡化重抓中的舊資料:格值以絕對日期為鍵,對得上的那幾欄本來就還是真的,
+              // 只有新露出的日期是未知(留白),不必整張表閃一下
               <table aria-label="各器材借用情形" style={{ borderCollapse: 'separate', borderSpacing: 3, width: '100%', tableLayout: 'fixed', minWidth: 900 }}>
                 <thead>
                   <tr>
@@ -369,15 +374,17 @@ export default function BookingOverviewPage() {
                         <span className="num" style={{ fontSize: 11, color: 'var(--steel)', marginLeft: 5 }}>{e.totalQty}</span>
                       </td>
                       {equipmentDates.map((d) => {
-                        const used = e.used[d.format('YYYY-MM-DD')] ?? 0
-                        const step = usageStep(used, e.totalQty)
-                        // 借滿與過去日期都不是可申請的入口(申請本來就禁過去時間)
-                        const bookable = used < e.totalQty && !d.isBefore(todayStart, 'day')
+                        const iso = d.format('YYYY-MM-DD')
+                        // 舊資料涵蓋不到的日期是「還沒載到」,不是 0
+                        const known = usageKnown(iso)
+                        const used = e.used[iso] ?? 0
+                        // 借滿、過去日期、還沒載到的格子都不是可申請的入口
+                        const bookable = known && used < e.totalQty && !d.isBefore(todayStart, 'day')
                         return (
                           <td key={d.format('YYYY/MM/DD')}>
                             <UsageCell
-                              label={`${used} / ${e.totalQty}`}
-                              bg={step.bg}
+                              label={known ? `${used} / ${e.totalQty}` : '載入中'}
+                              bg={known ? usageStep(used, e.totalQty).bg : 'transparent'}
                               bookable={bookable}
                               onBook={() => borrow(e.id, d)}
                             />

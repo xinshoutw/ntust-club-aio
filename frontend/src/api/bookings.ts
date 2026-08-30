@@ -101,6 +101,14 @@ const toEquipment = (e: EquipmentOut): EquipmentItem => ({
   available: e.available,
 })
 
+/** 一次查詢的器材佔用結果;帶回涵蓋區間,呼叫端才分得出「沒佔用」與「還沒載到」 */
+export interface EquipmentUsageGrid {
+  /** 這份資料涵蓋的區間(ISO,含頭含尾) */
+  start: string
+  end: string
+  items: EquipmentUsage[]
+}
+
 /** 器材逐日佔用量(借用總覽的器材檢視) */
 export interface EquipmentUsage {
   id: number
@@ -357,18 +365,21 @@ export function useEquipmentUsage(range: DateRange, enabled = true) {
     queryFn: () =>
       api<EquipmentUsageOut[]>(
         `/club/equipment/usage${qs({ start: startIso, end: endIso })}`,
-      ).then((rows) =>
-        rows.map(
-          (e): EquipmentUsage => ({
+      ).then(
+        (rows): EquipmentUsageGrid => ({
+          start: startIso,
+          end: endIso,
+          items: rows.map((e) => ({
             id: e.id,
             name: e.name,
             totalQty: e.total_qty,
             used: e.used,
-          }),
-        ),
+          })),
+        }),
       ),
-    // 不留舊資料:格值是「日期 → 佔用量」,換區間後沒對到的日期會退成 0,
-    // 看起來像「這天沒人借」—— 換區間就重新載入,寧可閃一下骨架
+    // 翻日期時留住舊資料避免表格閃空;舊資料連自己的區間一起帶回來,
+    // 落在區間外的日期呼叫端當「還沒載到」處理 —— 沒對到的日期退成 0 會說謊
+    placeholderData: keepPreviousData,
   })
 }
 

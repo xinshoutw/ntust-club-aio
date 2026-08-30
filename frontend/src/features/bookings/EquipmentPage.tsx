@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import dayjs, { type Dayjs } from 'dayjs'
 import { App, Button, DatePicker, Form, Input, InputNumber, Select } from 'antd'
@@ -56,6 +56,8 @@ export default function EquipmentPage() {
   const picked = Form.useWatch('range', form) as [Dayjs | null, Dayjs | null] | null | undefined
   const loanRange: DateRange | null = picked?.[0] && picked[1] ? [picked[0], picked[1]] : null
   const equipmentQuery = useEquipmentList(loanRange)
+  // 深連結的品項只回填一次:使用者自己清掉後不該又被塞回來
+  const prefilled = useRef(false)
   const items = equipmentQuery.data ?? []
   // 換區間時沿用舊列表避免表格閃空,但可借數在新區間資料就緒前一律視為未知(顯示 —)
   const ready = loanRange != null && !equipmentQuery.isPlaceholderData
@@ -93,11 +95,20 @@ export default function EquipmentPage() {
     ? Math.min(selectedAvail, selectedCap)
     : selectedAvail ?? selectedCap
 
-  // 換區間即重推可借數:原選品項在新區間不可借就清掉(資料就緒後檢查)
+  // 換區間即重推可借數:原選品項在新區間不可借就清掉(資料就緒後檢查)。
+  // 器材主檔為非同步載入,借用總覽帶進來的品項同樣待資料就緒後才驗證回填 ——
+  // 不放 initialValues:那會讓下面的清除守衛把它又塞回來(resetFields 是重設回初值)
   useEffect(() => {
     if (!ready) return
     const id = form.getFieldValue('equipment') as number | undefined
-    if (id == null) return
+    if (id == null) {
+      const picked = items.find((e) => e.id === qEquipmentId)
+      if (picked && picked.available > 0 && !prefilled.current) {
+        prefilled.current = true
+        form.setFieldValue('equipment', picked.id)
+      }
+      return
+    }
     const item = items.find((e) => e.id === id)
     if (!item || item.available === 0) form.resetFields(['equipment'])
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -220,7 +231,7 @@ export default function EquipmentPage() {
             layout="vertical"
             onFinish={submit}
             requiredMark
-            initialValues={{ equipment: qEquipmentId, range: qDate ? [qDate, qDate] : undefined }}
+            initialValues={{ range: qDate ? [qDate, qDate] : undefined }}
             onValuesChange={(changed) => {
               guard.onValuesChange()
               if ('equipment' in changed) form.resetFields(['qty'])

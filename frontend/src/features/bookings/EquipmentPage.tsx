@@ -259,7 +259,7 @@ export default function EquipmentPage() {
                   const a = ready ? e.available : null
                   return {
                     value: e.id,
-                    label: `${e.name}(可借 ${a ?? '—'})`,
+                    label: `${e.name}（剩餘 ${a ?? '—'}）`,
                     disabled: a === 0,
                   }
                 })}

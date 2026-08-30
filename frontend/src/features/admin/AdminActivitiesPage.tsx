@@ -13,7 +13,6 @@ import { countText } from '../../lib/counts'
 import { clampPage } from '../../lib/paging'
 import { useFitRows } from '../../lib/fitRows'
 import { semesterOptions } from '../../lib/semester'
-import { useFilePreview } from '../eval/useFilePreview'
 import { LISTED_STATUS_LABELS, approvedText, fmtMoney, statusesForLabels } from '../activities/types'
 import {
   useAdminActivitiesPaged,
@@ -46,7 +45,6 @@ export default function AdminActivitiesPage() {
   const [query, setQuery] = useState('')
   const [current, setCurrent] = useState<AdminActivity | null>(null)
   const [open, setOpen] = useState(false)
-  const filePreview = useFilePreview()
 
   const semestersQuery = useAdminActivitySemesters()
   // 「全部學期」是必要的出口:逾期未結案與跨學期搜尋幾乎都落在舊學期
@@ -307,7 +305,6 @@ export default function AdminActivitiesPage() {
           onReject={(reason) => reject.mutateAsync({ id: current.activityId, reason })}
         />
       )}
-      {filePreview.node}
     </div>
   )
 }

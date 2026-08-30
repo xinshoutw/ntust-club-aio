@@ -43,7 +43,7 @@ vi.mock('../../api/adminActivities', async (importOriginal) => ({
   useAdminActivitiesPaged: (p: { statuses?: string[] }) => {
     sentStatuses = p.statuses ?? []
     return {
-      data: { rows: [overdue], clubRows: [], total: 1 },
+      data: { rows: [overdue], total: 1 },
       isPending: false,
       isError: false,
       isSuccess: true,

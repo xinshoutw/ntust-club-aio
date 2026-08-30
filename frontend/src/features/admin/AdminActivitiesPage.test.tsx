@@ -3,7 +3,6 @@ import { App } from 'antd'
 import { fireEvent, render, screen } from '@testing-library/react'
 import AdminActivitiesPage from './AdminActivitiesPage'
 import type { AdminActivity, AdminActivityDetail } from '../../api/adminActivities'
-import type { ClubActivity } from '../../api/activities'
 
 vi.mock('../../app/auth', () => ({
   useAuth: () => ({ user: { role: 'admin', isSuper: true, permissions: ['approve_advisor'] } }),
@@ -23,27 +22,6 @@ const base = {
 }
 const pending: AdminActivity = { ...base, id: '1', activityId: 1, name: '迎新', status: 'pending_advisor' }
 const closed: AdminActivity = { ...base, id: '2', activityId: 2, name: '成發', status: 'closed' }
-
-const clubShape = (a: AdminActivity): ClubActivity => ({
-  id: a.activityId,
-  name: a.name,
-  type: a.type,
-  isLarge: false,
-  date: a.date,
-  endDate: a.endDate,
-  location: '學生活動中心',
-  content: '',
-  participantsIn: 20,
-  participantsOut: 5,
-  works: [],
-  status: a.status,
-  semester: a.semester,
-  selfFundTotal: 0,
-  requestedTotal: 0,
-  closeLocked: false,
-  canClose: false,
-  hasCloseDraft: false,
-})
 
 const reviewDetail: AdminActivityDetail = {
   ...pending,
@@ -89,7 +67,7 @@ vi.mock('../../api/adminActivities', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/adminActivities')>()),
   useAdminActivitySemesters: () => ({ data: ['115-1'], isPending: false, isError: false }),
   useAdminActivitiesPaged: () => ({
-    data: { rows: [pending, closed], clubRows: [clubShape(pending), clubShape(closed)], total: 2 },
+    data: { rows: [pending, closed], total: 2 },
     isPending: false,
     isError: false,
     isSuccess: true,

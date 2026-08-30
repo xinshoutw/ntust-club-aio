@@ -6,13 +6,7 @@ import { api, apiPaged, qs } from './client'
 import { useInvalidateBadges } from './badges'
 import { fetchAllPages } from './fetchAll'
 import { staffTextToWorks, type WorkItem } from '../features/activities/types'
-import {
-  fileUrl,
-  toActivity,
-  toDetail,
-  type ActivityDetailOut,
-  type ActivityOut,
-} from './activities'
+import { fileUrl, toActivity, type ActivityOut } from './activities'
 import { fileTypeOf, type EvalFile } from '../features/eval/types'
 import type { SessionUser } from './auth'
 import type { StatusKey } from '../lib/status'
@@ -424,7 +418,6 @@ const keys = {
   detail: (id: number) => ['adminActivities', 'detail', id] as const,
   semesters: (clubId?: number) => ['adminActivities', 'semesters', clubId ?? null] as const,
   clubList: (p: AdminClubActivityParams) => ['adminActivities', 'clubList', p] as const,
-  clubDetail: (id: number) => ['adminActivities', 'clubDetail', id] as const,
 }
 
 export const adminActivityKeys = keys
@@ -470,12 +463,7 @@ export function useAdminActivitiesPaged(p: AdminActivityPageParams) {
           page: p.page,
           page_size: p.pageSize,
         })}`,
-      ).then(({ data, total }) => ({
-        rows: data.map(toAdminActivity),
-        // 同一份 payload 的社團端形狀:所有活動頁的完整唯讀檢視吃這個型別
-        clubRows: data.map(toActivity),
-        total,
-      })),
+      ).then(({ data, total }) => ({ rows: data.map(toAdminActivity), total })),
     placeholderData: keepPreviousData,
   })
 }
@@ -531,14 +519,6 @@ export function useAdminClubActivities(p: AdminClubActivityParams) {
         })}`,
       ).then(({ data, total }) => ({ rows: data.map(toActivity), total })),
     placeholderData: keepPreviousData,
-  })
-}
-
-export function useAdminClubActivityDetail(id: number | undefined) {
-  return useQuery({
-    queryKey: keys.clubDetail(id ?? -1),
-    enabled: id != null,
-    queryFn: () => api<ActivityDetailOut>(`/admin/activities/${id}`).then(toDetail),
   })
 }
 

@@ -55,7 +55,7 @@ export default function PtOverduePage() {
                 <th scope="col">器材</th>
                 <th scope="col">應歸還時限</th>
                 <th scope="col">已逾</th>
-                <th scope="col">借用人</th>
+                <th scope="col">收件人</th>
                 <th scope="col">狀態</th>
                 <th scope="col">動作</th>
               </tr>

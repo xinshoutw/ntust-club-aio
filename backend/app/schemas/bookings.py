@@ -279,7 +279,7 @@ class EquipmentLoanOut(BaseModel):
     end_date: date
     purpose: str
     status: LoanStatus
-    borrower_name: str | None  # 借用人(借出點交時登記)
+    borrower_name: str | None  # 收件人(借出點交時登記)
     returner_name: str | None  # 歸還人(歸還點交時登記)
     checkout_at: datetime | None
     checkin_at: datetime | None

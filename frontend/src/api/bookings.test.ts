@@ -56,7 +56,7 @@ describe('toEquipmentLoan', () => {
     decided_at: null,
   } as const
 
-  it('日期轉顯示格式;借用人/歸還人為選填', () => {
+  it('日期轉顯示格式;收件人/歸還人為選填', () => {
     const loan = toEquipmentLoan({ ...base })
     expect(loan.startDate).toBe('2026/06/12')
     expect(loan.endDate).toBe('2026/06/15')

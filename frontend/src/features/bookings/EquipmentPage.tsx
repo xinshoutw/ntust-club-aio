@@ -411,7 +411,7 @@ export default function EquipmentPage() {
                     <td className="num" style={{ fontSize: 13 }}>{l.startDate} – {l.endDate}</td>
                     <td style={{ color: 'var(--steel)', fontSize: 13 }}>{l.activityName ?? l.purpose}</td>
                     <td style={{ color: 'var(--steel)', fontSize: 13 }}>
-                      {l.borrower && <>借用 {l.borrower}</>}
+                      {l.borrower && <>收件 {l.borrower}</>}
                       {l.borrower && l.returnedBy && ' · '}
                       {l.returnedBy && <>歸還 {l.returnedBy}</>}
                       {!l.borrower && !l.returnedBy && '—'}

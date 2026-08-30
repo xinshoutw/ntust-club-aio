@@ -7,7 +7,7 @@ import QueryError from '../../components/ui/QueryError'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import { STAFF_PAGE_SIZE, useStaffLoans, useStaffMutations, type StaffLoan } from '../../api/staff'
 
-// 器材借出點交:已核准借用逐單點交,登記借用人。
+// 器材借出點交:已核准借用逐單點交,登記收件人。
 // 「依序點交」器材只在此提醒工讀生現場核對序號 —— 序號本身不入系統(decisions.md ISS-55b)
 export default function PtCheckoutPage() {
   const { message } = App.useApp()
@@ -30,7 +30,7 @@ export default function PtCheckoutPage() {
     if (!selected) return
     const name = borrower.trim()
     if (!name) {
-      message.error('請填寫借用人姓名')
+      message.error('請填寫收件人姓名')
       return
     }
     checkout.mutate(

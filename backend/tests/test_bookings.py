@@ -777,6 +777,33 @@ async def test_equipment_loan_range_is_user_supplied(client, db):
     )
     assert resp.status_code == 422
 
+    # 區間過長不受理:一張待審單就能把可借數壓成 0,沒有上界等於開後門
+    resp = await client.post(
+        "/api/v1/club/equipment-loans",
+        json={
+            **body,
+            "end_date": (
+                tue - timedelta(days=7) + timedelta(days=booking_service.MAX_LOAN_DAYS)
+            ).isoformat(),
+        },
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    assert f"最長 {booking_service.MAX_LOAN_DAYS} 天" in resp.json()["error"]
+    # 剛好上限則放行(含頭含尾)
+    resp = await client.post(
+        "/api/v1/club/equipment-loans",
+        json={
+            **body,
+            "qty": 1,
+            "end_date": (
+                tue - timedelta(days=7) + timedelta(days=booking_service.MAX_LOAN_DAYS - 1)
+            ).isoformat(),
+        },
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201, resp.text
+
     # 未核准活動不可借
     pending = await make_activity(db, club, name="未核准", status=ActivityStatus.DRAFT)
     resp = await client.post(
@@ -1032,7 +1059,7 @@ async def test_loan_overdue_flag(client, db):
 
     listing = (await client.get("/api/v1/club/equipment-loans")).json()["data"]
     assert listing[0]["overdue"] is True
-    # 借用紀錄顯示借用人/歸還人(2026-07-15)
+    # 借用紀錄顯示收件人/歸還人(2026-07-15)
     assert listing[0]["borrower_name"] == "陳予恩"
     assert listing[0]["returner_name"] is None
     assert listing[0]["activity_name"] == "迎新宿營"

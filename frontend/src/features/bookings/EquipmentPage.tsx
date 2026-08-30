@@ -13,6 +13,7 @@ import StatusPill from '../../components/ui/StatusPill'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import SuspensionNote from '../../components/ui/SuspensionNote'
 import { useClubSuspension } from '../../api/clubProfile'
+import { useClubConfig } from '../../api/clubConfig'
 import {
   useBookingMutations,
   useEquipmentList,
@@ -47,6 +48,9 @@ export default function EquipmentPage() {
 
   // 器材借用綁定審核通過之活動(排除已結束,後端亦擋);
   // 借用區間由社團自填 —— 提前籌備與事後驗收推導不出來
+  // 區間上限的權威在後端(booking_service.MAX_LOAN_DAYS),前端讀 /club/config 即時擋;
+  // 組態讀不到就不預檢,交給送出時的後端訊息(不自己編一個數字)
+  const maxLoanDays = useClubConfig().data?.equipmentLoanMaxDays
   const activitiesQuery = useApprovedActivities()
   const approved = activitiesQuery.data ?? [] // 已結束的由後端篩掉
   const picked = Form.useWatch('range', form) as [Dayjs | null, Dayjs | null] | null | undefined
@@ -235,7 +239,15 @@ export default function EquipmentPage() {
             <Form.Item
               name="range"
               label="借用區間"
-              rules={[{ required: true, message: '請選擇借用區間' }]}
+              rules={[
+                { required: true, message: '請選擇借用區間' },
+                {
+                  validator: (_, v: [Dayjs, Dayjs] | null) =>
+                    maxLoanDays != null && v?.[0] && v[1] && v[1].diff(v[0], 'day') + 1 > maxLoanDays
+                      ? Promise.reject(new Error(`借用區間最長 ${maxLoanDays} 天`))
+                      : Promise.resolve(),
+                },
+              ]}
             >
               {/* 含籌備與驗收的天數一併填進來;過去日期不受理(後端亦擋) */}
               <RangePicker
@@ -321,7 +333,7 @@ export default function EquipmentPage() {
                 <th scope="col">品項</th>
                 <th scope="col">借用期間</th>
                 <th scope="col">活動/用途</th>
-                <th scope="col">借用人</th>
+                <th scope="col">收件人</th>
                 <th scope="col">狀態</th>
                 <th scope="col" className="r">動作</th>
               </tr>
@@ -373,7 +385,7 @@ export default function EquipmentPage() {
                 <th scope="col">品項</th>
                 <th scope="col">借用期間</th>
                 <th scope="col">活動/用途</th>
-                <th scope="col">借用/歸還人</th>
+                <th scope="col">收件/歸還人</th>
                 <th scope="col">狀態</th>
               </tr>
             </thead>

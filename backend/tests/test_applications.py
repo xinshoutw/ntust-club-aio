@@ -11,6 +11,7 @@ from app.models import (
     Violation,
 )
 from app.models.enums import ApplicationStatus, CertPosition
+from app.services import booking_service
 from tests.conftest import csrf_headers, login, make_club, make_user
 
 
@@ -358,7 +359,7 @@ async def test_maintenance_evidence_capped(client, db, monkeypatch):
 
 
 async def test_club_config(client, db):
-    """社團端執行組態:上傳上限(依申請性質)+ 經費科目({name, hint})。"""
+    """社團端執行組態:上傳上限(依申請性質)+ 器材借用區間上限 + 經費科目({name, hint})。"""
     await setup_session(client, db)
     data = (await client.get("/api/v1/club/config")).json()["data"]
     ul = data["upload_limits"]
@@ -366,6 +367,8 @@ async def test_club_config(client, db):
     assert ul["maintenance_mb"] == 250
     assert ul["close_photo_mb"] == 50
     assert ul["img_mb"] == 10 and ul["video_mb"] == 200
+    # 借用區間上限前端要拿來即時檢核,與後端送出關同一個數字
+    assert data["equipment_loan_max_days"] == booking_service.MAX_LOAN_DAYS
     cats = data["budget_categories"]
     assert {"name", "hint"} <= set(cats[0])
     assert any(c["name"] == "保險費" and c["hint"] for c in cats)

@@ -19,6 +19,8 @@ export interface UploadLimits {
 
 export interface ClubConfig {
   uploadLimits: UploadLimits
+  /** 器材借用區間上限(天,含頭含尾);後端 booking_service.MAX_LOAN_DAYS 為權威 */
+  equipmentLoanMaxDays: number
   budgetCategories: BudgetCategory[]
 }
 
@@ -31,6 +33,7 @@ interface ConfigOut {
     img_mb: number
     video_mb: number
   }
+  equipment_loan_max_days: number
   budget_categories: BudgetCategory[]
 }
 
@@ -45,6 +48,7 @@ const toConfig = (o: ConfigOut): ClubConfig => ({
     imgBytes: o.upload_limits.img_mb * MB,
     videoBytes: o.upload_limits.video_mb * MB,
   },
+  equipmentLoanMaxDays: o.equipment_loan_max_days,
   budgetCategories: o.budget_categories,
 })
 

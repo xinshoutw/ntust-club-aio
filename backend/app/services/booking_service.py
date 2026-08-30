@@ -556,6 +556,12 @@ async def equipment_available_map(
     return {eid: max(total - used.get(eid, 0), 0) for eid, total in totals.items()}
 
 
+# 器材借用區間上限(天,含頭含尾)。自填區間沒有上界的話,一張還沒審的單就能把
+# 某品項的可借數壓成 0 到天荒地老(pending 亦佔用),年份點錯即成事故。
+# 舊系統 8,154 筆借用最長 7 天;放到 60 天已足夠涵蓋提前籌備與事後驗收
+MAX_LOAN_DAYS = 60
+
+
 async def equipment_usage_by_day(
     db: AsyncSession, start: date, end: date
 ) -> dict[int, dict[date, int]]:

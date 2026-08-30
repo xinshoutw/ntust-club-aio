@@ -532,6 +532,8 @@ async def create_equipment_loan(
     start, end = body.start_date, body.end_date
     if start < svc.today_taipei():
         raise validation_error("借用日期不得早於今天")
+    if (end - start).days + 1 > svc.MAX_LOAN_DAYS:
+        raise validation_error(f"借用區間最長 {svc.MAX_LOAN_DAYS} 天")
 
     # 以器材為鍵序列化檢核與寫入:兩筆並發申請不會同時以同一份佔用量通過檢核
     await svc.lock_resource(db, "equipment", equipment.id)

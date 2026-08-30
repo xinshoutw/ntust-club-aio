@@ -83,7 +83,7 @@ class EquipmentOut(BaseModel):
     total_qty: int
     max_lease_count: int | None = None  # 單次可借上限;NULL=不限
     needs_serial: bool  # False=一般、True=依序點交
-    available: int = 0  # 推導(帶 activity_id 查詢時=該活動借用區間內的可借數)
+    available: int = 0  # 推導(帶 start/end 查詢時=該借用區間內的可借數)
 
 
 class RoomSlotIn(BaseModel):
@@ -238,15 +238,23 @@ class VenueBookingOut(BaseModel):
 
 
 class EquipmentLoanIn(BaseModel):
-    """借用區間不再自選:由所綁定審核通過活動的起訖 ± 工作天緩衝推導。"""
+    """借用區間由社團自填:籌備與驗收各活動不同,從活動起訖推導一律不準。"""
 
     equipment_id: int
     activity_id: int
     qty: int = Field(ge=1, le=1000)
+    start_date: date
+    end_date: date
     purpose: str = Field(min_length=1, max_length=200)
     phone: str = Field(min_length=1, max_length=30)  # 聯絡電話必填
 
     _phone = field_validator("phone")(_validate_phone_required)
+
+    @model_validator(mode="after")
+    def _range(self) -> EquipmentLoanIn:
+        if self.end_date < self.start_date:
+            raise ValueError("結束日不得早於開始日")
+        return self
 
 
 class EquipmentLoanOut(BaseModel):

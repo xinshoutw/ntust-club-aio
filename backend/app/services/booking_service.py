@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.semesters import TAIPEI, next_semester_range
 from app.models import (
-    Activity,
     Club,
     EquipmentLoan,
     Holiday,
@@ -578,13 +577,6 @@ def add_workdays(d: date, n: int, holidays: set[date]) -> date:
         if cursor.weekday() < 5 and cursor not in holidays:
             left -= 1
     return cursor
-
-
-def loan_window(activity: Activity, buffer: dict, holidays: set[date]) -> tuple[date, date]:
-    """器材借用區間=活動開始日 −before 個工作天 ~ 活動結束日 +after 個工作天。"""
-    start = add_workdays(activity.date, -int(buffer.get("before", 2)), holidays)
-    end = add_workdays(activity.end_date or activity.date, int(buffer.get("after", 1)), holidays)
-    return start, end
 
 
 def overdue_deadline_in(end_date: date, return_time: str, holidays: set[date]) -> datetime:

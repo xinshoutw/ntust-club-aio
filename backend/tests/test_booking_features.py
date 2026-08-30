@@ -202,7 +202,8 @@ async def test_max_lease_count(client, db):
     eq = await make_equipment(db, total_qty=10, max_lease_count=2)
     activity = await make_activity(db, club, day=TOMORROW)
     body = {"equipment_id": eq.id, "activity_id": activity.id, "qty": 3,
-            "purpose": "活動", "phone": "0912000111"}
+            "purpose": "活動", "phone": "0912000111",
+            "start_date": TOMORROW.isoformat(), "end_date": TOMORROW.isoformat()}
     resp = await client.post(
         "/api/v1/club/equipment-loans", json=body, headers=csrf_headers(client)
     )
@@ -497,7 +498,8 @@ async def test_equipment_loan_rejects_ended_activity(client, db):
         db, club, day=YESTERDAY - timedelta(days=2), end_day=YESTERDAY
     )
     body = {"equipment_id": eq.id, "activity_id": ended.id, "qty": 1,
-            "purpose": "補借", "phone": "0912000111"}
+            "purpose": "補借", "phone": "0912000111",
+            "start_date": TOMORROW.isoformat(), "end_date": TOMORROW.isoformat()}
     resp = await client.post(
         "/api/v1/club/equipment-loans", json=body, headers=csrf_headers(client)
     )

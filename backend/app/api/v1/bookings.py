@@ -106,20 +106,20 @@ async def list_venues(user: ClubUser, db: DbDep) -> ApiResponse[list[VenueOut]]:
 
 @router.get("/equipment")
 async def list_equipment(
-    user: ClubUser, db: DbDep, activity_id: int | None = Query(None)
+    user: ClubUser, db: DbDep, start: date | None = None, end: date | None = None
 ) -> ApiResponse[list[EquipmentOut]]:
     """器材主檔+可借數。
 
-    - 帶 activity_id(限本社審核通過活動):可借數依該活動推導的借用區間動態計算
-      (總數 − 區間重疊之未歸還且未退回借用量);meta 回推導區間
-    - 未帶:回「目前借出中」推導的粗略值
+    - 帶 start/end(社團自填的借用區間):可借數 = 總數 − 該區間重疊之未歸還且未退回借用量
+    - 未帶:回「目前借出中」推導的粗略值(前端未填區間前一律顯示 —,不拿這個數字當可借數)
     """
     window: tuple[date, date] | None = None
-    if activity_id is not None:
-        activity = await _approved_activity(db, user, activity_id)
-        buffer = await get_setting(db, "equipment_workday_buffer")
-        holidays = await svc.load_holidays(db)
-        window = svc.loan_window(activity, buffer, holidays)
+    if (start is None) != (end is None):
+        raise validation_error("借用區間需同時指定起訖日")
+    if start is not None and end is not None:
+        if end < start:
+            raise validation_error("結束日期不得早於開始日期")
+        window = (start, end)
 
     rows = (
         await db.scalars(
@@ -135,10 +135,7 @@ async def list_equipment(
         item = EquipmentOut.model_validate(eq)
         item.available = available[eq.id]
         out.append(item)
-    meta = None
-    if window is not None:
-        meta = {"loan_start": window[0].isoformat(), "loan_end": window[1].isoformat()}
-    return ApiResponse(data=out, meta=meta)
+    return ApiResponse(data=out)
 
 
 # ---- 借用總覽色格 ----
@@ -499,12 +496,11 @@ async def create_equipment_loan(
     activity = await _approved_activity(db, user, body.activity_id)
     _require_not_ended(activity, "器材借用")
 
-    # 借用區間=活動起訖 ± 工作天緩衝(申請當下推導後寫入,設定調整不回溯)
-    buffer = await get_setting(db, "equipment_workday_buffer")
-    holidays = await svc.load_holidays(db)
-    start, end = svc.loan_window(activity, buffer, holidays)
-    if end < svc.today_taipei():
-        raise validation_error("推導的借用區間已過去,無法申請")
+    # 借用區間由社團自填(籌備、驗收各活動不同,不從活動起訖推導);
+    # 過去時間全面禁止,與臨時場地借用同一條規則
+    start, end = body.start_date, body.end_date
+    if start < svc.today_taipei():
+        raise validation_error("借用日期不得早於今天")
 
     # 以器材為鍵序列化檢核與寫入:兩筆並發申請不會同時以同一份佔用量通過檢核
     await svc.lock_resource(db, "equipment", equipment.id)

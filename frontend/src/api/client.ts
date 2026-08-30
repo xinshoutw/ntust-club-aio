@@ -80,12 +80,6 @@ export async function apiPaged<T>(path: string, init: RequestInit = {}): Promise
   return { data: body.data as T, total: meta.total ?? 0 }
 }
 
-/** 需要自訂 meta 的端點(如器材可借數查詢回傳推導借用區間):回傳 data + meta */
-export async function apiWithMeta<T, M>(path: string, init: RequestInit = {}): Promise<{ data: T; meta: M | null }> {
-  const body = await request<T>(path, init)
-  return { data: body.data as T, meta: (body.meta ?? null) as M | null }
-}
-
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const body = await request<T>(path, init)
   // data 可為 null:呼叫端以 api<T | null> 表達可空端點

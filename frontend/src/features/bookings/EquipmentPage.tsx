@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import dayjs from 'dayjs'
-import { App, Button, Form, Input, InputNumber, Select } from 'antd'
+import { useSearchParams } from 'react-router'
+import dayjs, { type Dayjs } from 'dayjs'
+import { App, Button, DatePicker, Form, Input, InputNumber, Select } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
@@ -18,9 +19,14 @@ import {
   useActiveEquipmentLoans,
   useRecentEquipmentLoans,
   RECENT_PAGE,
+  type DateRange,
 } from '../../api/bookings'
 import { useApprovedActivities } from '../../api/activities'
 import { useDecisionReason } from './DecisionReasonModal'
+
+const { RangePicker } = DatePicker
+
+const todayStartOfDay = () => dayjs().startOf('day')
 
 export default function EquipmentPage() {
   const { message, modal } = App.useApp()
@@ -28,16 +34,27 @@ export default function EquipmentPage() {
   const guard = useFormUnsavedGuard()
   const { suspended } = useClubSuspension()
 
-  // 器材借用綁定審核通過之活動,借用區間由活動推導;
-  // 可借數與借用區間由後端依所選活動推導(GET /club/equipment?activity_id=);
-  // 排除已結束活動(後端亦擋)
+  // 借用總覽的器材格點入時帶入品項與日期(起訖同日)
+  const [params] = useSearchParams()
+  const qEquipmentId = Number(params.get('equipment')) || undefined
+  const rawDate = params.get('date')
+  // 嚴格驗證 query 日期(非嚴格 parse 會把 2026/99/99 正規化成別的日期);過去日期不帶入
+  const qDate =
+    rawDate && dayjs(rawDate, 'YYYY/MM/DD', true).isValid() &&
+    !dayjs(rawDate, 'YYYY/MM/DD', true).isBefore(todayStartOfDay(), 'day')
+      ? dayjs(rawDate, 'YYYY/MM/DD', true)
+      : undefined
+
+  // 器材借用綁定審核通過之活動(排除已結束,後端亦擋);
+  // 借用區間由社團自填 —— 提前籌備與事後驗收推導不出來
   const activitiesQuery = useApprovedActivities()
   const approved = activitiesQuery.data ?? [] // 已結束的由後端篩掉
-  const activityId = Form.useWatch('activity', form) as number | undefined
-  const equipmentQuery = useEquipmentList(activityId)
-  const items = equipmentQuery.data?.items ?? []
-  // 換活動時沿用舊列表避免表格閃空,但可借數在新活動資料就緒前一律視為未知(顯示 —)
-  const loanWindow = activityId != null && !equipmentQuery.isPlaceholderData ? equipmentQuery.data?.window ?? null : null
+  const picked = Form.useWatch('range', form) as [Dayjs | null, Dayjs | null] | null | undefined
+  const loanRange: DateRange | null = picked?.[0] && picked[1] ? [picked[0], picked[1]] : null
+  const equipmentQuery = useEquipmentList(loanRange)
+  const items = equipmentQuery.data ?? []
+  // 換區間時沿用舊列表避免表格閃空,但可借數在新區間資料就緒前一律視為未知(顯示 —)
+  const ready = loanRange != null && !equipmentQuery.isPlaceholderData
 
   // 正在借用=進行中全部(不限長度、可取消);最近借用=歸還/退回/取消 近 5 筆
   const activeQuery = useActiveEquipmentLoans()
@@ -65,16 +82,16 @@ export default function EquipmentPage() {
     })
 
   const selectedId = Form.useWatch('equipment', form) as number | undefined
-  const selectedAvail = loanWindow != null && selectedId != null ? items.find((e) => e.id === selectedId)?.available ?? null : null
+  const selectedAvail = ready && selectedId != null ? items.find((e) => e.id === selectedId)?.available ?? null : null
   // 單次可借上限(undefined=不限):與可借數取小作為數量上限
   const selectedCap = selectedId != null ? items.find((e) => e.id === selectedId)?.maxLeaseCount ?? null : null
   const qtyMax = selectedAvail != null && selectedCap != null
     ? Math.min(selectedAvail, selectedCap)
     : selectedAvail ?? selectedCap
 
-  // 換活動=換借用區間,可借數重新推導:原選品項在新區間不可借就清掉(資料就緒後檢查)
+  // 換區間即重推可借數:原選品項在新區間不可借就清掉(資料就緒後檢查)
   useEffect(() => {
-    if (!loanWindow) return
+    if (!ready) return
     const id = form.getFieldValue('equipment') as number | undefined
     if (id == null) return
     const item = items.find((e) => e.id === id)
@@ -82,7 +99,14 @@ export default function EquipmentPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [equipmentQuery.data])
 
-  const submit = (values: { activity: number; equipment: number; qty: number; purpose: string; phone: string }) => {
+  const submit = (values: {
+    activity: number
+    range: DateRange
+    equipment: number
+    qty: number
+    purpose: string
+    phone: string
+  }) => {
     const equipmentName = items.find((e) => e.id === values.equipment)?.name ?? ''
     const activityName = approved.find((a) => a.id === values.activity)?.name ?? ''
     createEquipmentLoan.mutate(
@@ -90,6 +114,7 @@ export default function EquipmentPage() {
         equipmentId: values.equipment,
         activityId: values.activity,
         qty: values.qty,
+        range: values.range,
         purpose: values.purpose,
         phone: values.phone,
       },
@@ -123,8 +148,8 @@ export default function EquipmentPage() {
               </thead>
               <tbody>
                 {items.map((e) => {
-                  const a = loanWindow ? e.available : null
-                  // 未選關聯活動(a===null)前不可點選帶入;可借 0 也不可點
+                  const a = ready ? e.available : null
+                  // 未填借用區間(a===null)前不可點選帶入;可借 0 也不可點
                   const disabled = a === null || a === 0
                   const pick = () => {
                     form.setFieldValue('equipment', e.id)
@@ -191,27 +216,15 @@ export default function EquipmentPage() {
             layout="vertical"
             onFinish={submit}
             requiredMark
+            initialValues={{ equipment: qEquipmentId, range: qDate ? [qDate, qDate] : undefined }}
             onValuesChange={(changed) => {
               guard.onValuesChange()
               if ('equipment' in changed) form.resetFields(['qty'])
-              // 換活動=換借用區間:數量一律重填(原選品項的清除待新資料就緒後於 effect 處理)
-              if ('activity' in changed) form.resetFields(['qty'])
+              // 換區間=換可借數:數量一律重填(原選品項的清除待新資料就緒後於 effect 處理)
+              if ('range' in changed) form.resetFields(['qty'])
             }}
           >
-            <Form.Item
-              name="activity"
-              label="關聯活動"
-              rules={[{ required: true, message: '請選擇活動' }]}
-              extra={
-                loanWindow ? (
-                  <span className="num">
-                    可借用區間 {loanWindow.start} – {loanWindow.end}
-                  </span>
-                ) : (
-                  '選擇活動後推算借用區間與可借數量'
-                )
-              }
-            >
+            <Form.Item name="activity" label="關聯活動" rules={[{ required: true, message: '請選擇活動' }]}>
               <Select
                 placeholder="請選擇活動"
                 loading={activitiesQuery.isPending}
@@ -219,17 +232,31 @@ export default function EquipmentPage() {
                 notFoundContent={notFoundText(activitiesQuery, '無審核通過之活動', '活動清單')}
               />
             </Form.Item>
+            <Form.Item
+              name="range"
+              label="借用區間"
+              rules={[{ required: true, message: '請選擇借用區間' }]}
+            >
+              {/* 含籌備與驗收的天數一併填進來;過去日期不受理(後端亦擋) */}
+              <RangePicker
+                style={{ width: '100%' }}
+                format="YYYY/MM/DD"
+                allowClear={false}
+                disabledDate={(d) => d.isBefore(todayStartOfDay(), 'day')}
+                placeholder={['開始日', '結束日']}
+              />
+            </Form.Item>
             <Form.Item name="equipment" label="品項" rules={[{ required: true, message: '請選擇品項' }]}>
-              {/* 器材查詢失敗時 loanWindow 也是 null,不能照樣說「請先選擇關聯活動」——
-                  活動明明已經選了,那句話會讓人一直重選活動 */}
+              {/* 器材查詢失敗時 ready 也是 false,不能照樣說「請先選擇借用區間」——
+                  區間明明已經填了,那句話會讓人一直重選日期 */}
               <Select
                 placeholder={
-                  equipmentQuery.isError ? '器材清單載入失敗' : loanWindow ? '請選擇' : '請先選擇關聯活動'
+                  equipmentQuery.isError ? '器材清單載入失敗' : ready ? '請選擇' : '請先選擇借用區間'
                 }
-                disabled={!loanWindow}
-                notFoundContent={notFoundText(equipmentQuery, '此活動區間沒有可借器材', '器材清單')}
+                disabled={!ready}
+                notFoundContent={notFoundText(equipmentQuery, '此區間沒有可借器材', '器材清單')}
                 options={items.map((e) => {
-                  const a = loanWindow ? e.available : null
+                  const a = ready ? e.available : null
                   return {
                     value: e.id,
                     label: `${e.name}(可借 ${a ?? '—'})`,
@@ -257,7 +284,7 @@ export default function EquipmentPage() {
               ]}
               extra={selectedCap != null ? `單次至多 ${selectedCap} 件` : undefined}
             >
-              <InputNumber style={{ width: '100%' }} min={1} max={qtyMax ?? 99} precision={0} disabled={!loanWindow} />
+              <InputNumber style={{ width: '100%' }} min={1} max={qtyMax ?? 99} precision={0} disabled={!ready} />
             </Form.Item>
 
             <Form.Item

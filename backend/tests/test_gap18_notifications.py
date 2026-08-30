@@ -110,7 +110,8 @@ async def test_k3_equipment_loan_self_cancel(client, db, monkeypatch):
     created = await client.post(
         "/api/v1/club/equipment-loans",
         json={"equipment_id": eq.id, "activity_id": activity.id, "qty": 2, "purpose": "營隊",
-              "phone": "0912000111"},
+              "phone": "0912000111", "start_date": tue.isoformat(),
+              "end_date": (tue + timedelta(days=2)).isoformat()},
         headers=csrf_headers(client),
     )
     loan_id = created.json()["data"]["id"]

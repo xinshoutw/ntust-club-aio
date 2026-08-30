@@ -733,48 +733,65 @@ async def test_fixed_booking_scoped_to_target_semester(client, db):
     assert str(venue.id) not in await grid_of(thu_after)
 
 
-# ---- 器材借用(綁定審核通過活動,區間推導) ----
+# ---- 器材借用(綁定審核通過活動,區間自填) ----
 
 
-async def test_equipment_loan_window_derived_from_activity(client, db):
-    """借用區間=活動開始日 −2 個工作天 ~ 結束日 +1 個工作天(排除週六日與假日)。"""
+async def test_equipment_loan_range_is_user_supplied(client, db):
+    """借用區間由社團自填:提前籌備、事後驗收都推導不出來,只能讓社團自己填。"""
     club = await setup_session(client, db)
     eq = await make_equipment(db, total_qty=5)
-    # 未來的週二 ~ 週四(相對日期:過去活動已禁止借用)
     tue = future_tuesday()
-    thu = tue + timedelta(days=2)
-    activity = await make_activity(db, club, day=tue, end_day=thu)
-
+    activity = await make_activity(db, club, day=tue, end_day=tue + timedelta(days=2))
+    body = {
+        "equipment_id": eq.id,
+        "activity_id": activity.id,
+        "qty": 2,
+        "purpose": "營隊",
+        "phone": "0912000111",
+        # 活動前一週籌備、活動後一週驗收
+        "start_date": (tue - timedelta(days=7)).isoformat(),
+        "end_date": (tue + timedelta(days=9)).isoformat(),
+    }
     resp = await client.post(
-        "/api/v1/club/equipment-loans",
-        json={"equipment_id": eq.id, "activity_id": activity.id, "qty": 2, "purpose": "營隊",
-              "phone": "0912000111"},
-        headers=csrf_headers(client),
+        "/api/v1/club/equipment-loans", json=body, headers=csrf_headers(client)
     )
     assert resp.status_code == 201, resp.text
     data = resp.json()["data"]
-    assert data["start_date"] == (tue - timedelta(days=4)).isoformat()  # 週二 −2 工作天=上週五
-    assert data["end_date"] == (thu + timedelta(days=1)).isoformat()  # 週四 +1 工作天=週五
+    assert (data["start_date"], data["end_date"]) == (body["start_date"], body["end_date"])
     assert data["activity_name"] == "迎新宿營"
 
-    # 假日再往前跳:上週五為假日 → 起日再往前一天(週四)
-    db.add(Holiday(date=tue - timedelta(days=4), name="補假"))
-    await db.commit()
-    activity2 = await make_activity(db, club, name="第二活動", day=tue, end_day=thu)
+    # 過去日期不受理(與臨時場地借用同一條規則)
     resp = await client.post(
         "/api/v1/club/equipment-loans",
-        json={"equipment_id": eq.id, "activity_id": activity2.id, "qty": 1, "purpose": "x",
-              "phone": "0912000111"},
+        json={**body, "start_date": (date.today() - timedelta(days=1)).isoformat()},
         headers=csrf_headers(client),
     )
-    assert resp.json()["data"]["start_date"] == (tue - timedelta(days=5)).isoformat()
+    assert resp.status_code == 422
+    assert "不得早於今天" in resp.json()["error"]
+
+    # 結束日早於開始日
+    resp = await client.post(
+        "/api/v1/club/equipment-loans",
+        json={**body, "end_date": (tue - timedelta(days=8)).isoformat()},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
 
     # 未核准活動不可借
     pending = await make_activity(db, club, name="未核准", status=ActivityStatus.DRAFT)
     resp = await client.post(
         "/api/v1/club/equipment-loans",
-        json={"equipment_id": eq.id, "activity_id": pending.id, "qty": 1, "purpose": "x",
-              "phone": "0912000111"},
+        json={**body, "activity_id": pending.id},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+
+    # 他社活動不可借
+    other = await make_club(db, name="吉他社")
+    other_activity = await make_activity(db, other, name="他社活動")
+    resp = await client.post(
+        "/api/v1/club/equipment-loans",
+        json={**body, "activity_id": other_activity.id},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
@@ -784,9 +801,9 @@ async def test_equipment_list_round_trips_do_not_grow_with_equipment_count(clien
     """可借數逐列查詢時往返次數等於器材數;批次彙整後與器材數無關。"""
     from app.core.db import engine
 
-    club = await setup_session(client, db)
-    activity = await make_activity(db, club)
+    await setup_session(client, db)
     await make_equipment(db, total_qty=5)
+    today = date.today()
 
     statements: list[str] = []
 
@@ -795,7 +812,10 @@ async def test_equipment_list_round_trips_do_not_grow_with_equipment_count(clien
 
     sa.event.listen(engine.sync_engine, "before_cursor_execute", record)
     try:
-        url = f"/api/v1/club/equipment?activity_id={activity.id}"
+        url = (
+            f"/api/v1/club/equipment?start={today.isoformat()}"
+            f"&end={(today + timedelta(days=3)).isoformat()}"
+        )
         await client.get(url)
         with_one = len(statements)
 
@@ -811,61 +831,64 @@ async def test_equipment_list_round_trips_do_not_grow_with_equipment_count(clien
 
 
 async def test_equipment_available_within_window(client, db):
-    """可借數依指定活動推導區間動態計算:總數 − 區間重疊之未歸還未退回借用量。"""
+    """可借數依查詢區間動態計算:總數 − 區間重疊之未歸還未退回借用量。"""
     club = await setup_session(client, db)
     eq = await make_equipment(db, total_qty=5)
-    tue = future_tuesday()  # 未來的週二(相對日期:過去活動已禁止借用)
-    first = await make_activity(db, club, day=tue, end_day=tue + timedelta(days=2))
+    tue = future_tuesday()
+    activity = await make_activity(db, club, day=tue, end_day=tue + timedelta(days=14))
+
+    def body(start: date, end: date, qty: int = 3) -> dict:
+        return {
+            "equipment_id": eq.id,
+            "activity_id": activity.id,
+            "qty": qty,
+            "purpose": "營隊",
+            "phone": "0912000111",
+            "start_date": start.isoformat(),
+            "end_date": end.isoformat(),
+        }
 
     resp = await client.post(
         "/api/v1/club/equipment-loans",
-        json={"equipment_id": eq.id, "activity_id": first.id, "qty": 3, "purpose": "營隊",
-              "phone": "0912000111"},
+        json=body(tue, tue + timedelta(days=3)),
         headers=csrf_headers(client),
     )
-    assert resp.status_code == 201  # 佔用 週五(−4)~ 週五(+3)(pending 亦佔用)
+    assert resp.status_code == 201, resp.text  # 佔用 tue ~ tue+3(pending 亦佔用)
 
-    # 區間重疊的活動(下週一起,窗 週四(+2)– 週三(+8))→ 可借 2
-    overlap = await make_activity(
-        db, club, name="重疊活動",
-        day=tue + timedelta(days=6), end_day=tue + timedelta(days=7),
+    # 區間重疊 → 可借 2,再借 3 件即超量
+    overlap = (tue + timedelta(days=2), tue + timedelta(days=5))
+    listing = await client.get(
+        "/api/v1/club/equipment",
+        params={"start": overlap[0].isoformat(), "end": overlap[1].isoformat()},
     )
-    listing = await client.get("/api/v1/club/equipment", params={"activity_id": overlap.id})
-    body = listing.json()
-    assert body["data"][0]["available"] == 2
-    assert body["meta"] == {
-        "loan_start": (tue + timedelta(days=2)).isoformat(),
-        "loan_end": (tue + timedelta(days=8)).isoformat(),
-    }
-
+    assert listing.json()["data"][0]["available"] == 2
     resp = await client.post(
-        "/api/v1/club/equipment-loans",
-        json={"equipment_id": eq.id, "activity_id": overlap.id, "qty": 3, "purpose": "x",
-              "phone": "0912000111"},
-        headers=csrf_headers(client),
+        "/api/v1/club/equipment-loans", json=body(*overlap), headers=csrf_headers(client)
     )
-    assert resp.status_code == 409  # 超過區間可借數
+    assert resp.status_code == 409
 
-    # 不重疊的活動(再下週一起,窗自 週四(+9) 起)→ 可借 5
-    apart = await make_activity(
-        db, club, name="不重疊活動",
-        day=tue + timedelta(days=13), end_day=tue + timedelta(days=14),
+    # 不重疊 → 可借 5
+    apart = (tue + timedelta(days=4), tue + timedelta(days=6))
+    listing = await client.get(
+        "/api/v1/club/equipment",
+        params={"start": apart[0].isoformat(), "end": apart[1].isoformat()},
     )
-    listing = (await client.get("/api/v1/club/equipment", params={"activity_id": apart.id})).json()
-    assert listing["data"][0]["available"] == 5
+    assert listing.json()["data"][0]["available"] == 5
     resp = await client.post(
-        "/api/v1/club/equipment-loans",
-        json={"equipment_id": eq.id, "activity_id": apart.id, "qty": 5, "purpose": "x",
-              "phone": "0912000111"},
-        headers=csrf_headers(client),
+        "/api/v1/club/equipment-loans", json=body(*apart, qty=5), headers=csrf_headers(client)
     )
-    assert resp.status_code == 201
+    assert resp.status_code == 201, resp.text
 
-    # 他社審核通過活動不可用來查詢
-    other = await make_club(db, name="吉他社")
-    other_activity = await make_activity(db, other, name="他社活動")
-    resp = await client.get("/api/v1/club/equipment", params={"activity_id": other_activity.id})
-    assert resp.status_code == 422
+    # 半套區間與反向區間都是查詢錯誤,不是「沒帶區間」
+    assert (
+        await client.get("/api/v1/club/equipment", params={"start": apart[0].isoformat()})
+    ).status_code == 422
+    assert (
+        await client.get(
+            "/api/v1/club/equipment",
+            params={"start": apart[1].isoformat(), "end": apart[0].isoformat()},
+        )
+    ).status_code == 422
 
 
 async def test_next_workday_skips_weekend_and_holiday(db):
@@ -894,7 +917,9 @@ async def test_suspended_club_cannot_book(client, db):
     resp = await client.post(
         "/api/v1/club/equipment-loans",
         json={"equipment_id": eq.id, "activity_id": activity.id, "qty": 1, "purpose": "x",
-              "phone": "0912000111"},
+              "phone": "0912000111",
+              "start_date": (date_cls.today() + timedelta(days=14)).isoformat(),
+              "end_date": (date_cls.today() + timedelta(days=15)).isoformat()},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 403
@@ -992,14 +1017,19 @@ async def test_overdue_loan_still_occupies_stock(client, db):
     await db.commit()
 
     activity = await make_activity(db, club)
-    resp = await client.get(f"/api/v1/club/equipment?activity_id={activity.id}")
+    soon = date.today() + timedelta(days=7)
+    resp = await client.get(
+        "/api/v1/club/equipment",
+        params={"start": soon.isoformat(), "end": (soon + timedelta(days=1)).isoformat()},
+    )
     row = next(e for e in resp.json()["data"] if e["id"] == eq.id)
     assert row["available"] == 0
 
     resp = await client.post(
         "/api/v1/club/equipment-loans",
         json={"equipment_id": eq.id, "activity_id": activity.id, "qty": 1, "purpose": "營隊",
-              "phone": "0912000111"},
+              "phone": "0912000111", "start_date": soon.isoformat(),
+              "end_date": (soon + timedelta(days=1)).isoformat()},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 409

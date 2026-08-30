@@ -140,8 +140,11 @@ async def apply_admin(db, admin: Admin, wanted: list[str], write: bool) -> str:
                 f"{admin.username}:帳號不存在,而表裡沒有姓名可以建立。\n"
                 "這個帳號預期由 migration/cms_import.py 帶進來 —— 請先確認遷移已跑過。"
             )
-        password = generate_password()
-        validate_password_strength(password)
+        # 密碼只在真的要寫的時候產:預覽也產一組的話,承辦會記下一組永遠沒寫進庫的密碼,
+        # 拿去打五次還會把帳號鎖 15 分鐘
+        password = generate_password() if write else None
+        if password:
+            validate_password_strength(password)
         if write:
             db.add(
                 User(
@@ -157,7 +160,7 @@ async def apply_admin(db, admin: Admin, wanted: list[str], write: bool) -> str:
         return (
             f"  建立 {admin.username}({admin.name})"
             f"{' [最高權限]' if admin.is_super else f' {len(wanted)} 把鍵'}"
-            f"　一次性密碼:{password}(首登強制改密)"
+            f"　一次性密碼:{password or '加 --yes 時產生'}(首登強制改密)"
         )
 
     changes = []

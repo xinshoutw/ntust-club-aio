@@ -630,7 +630,7 @@ async def test_close_docs_share_the_photo_quota(client, db):
     # 額度是照片與附件合計:附件吃掉 0.7MB 後,照片這一側也要看得到
     resp = await client.post(
         f"/api/v1/club/activities/{activity['id']}/photos",
-        files={"file": ("big.jpg", io.BytesIO(b"\xff\xd8\xff\xe0" + b"\x00" * 700_000), "image/jpeg")},
+        files={"file": ("big.jpg", io.BytesIO(JPG + b"\x00" * 700_000), "image/jpeg")},
         headers=csrf_headers(client),
     )
     assert resp.status_code == 413

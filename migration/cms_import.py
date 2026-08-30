@@ -304,13 +304,35 @@ async def import_clubs(
         )
     ).all()
 
+    # 自然鍵防護(同 import_staff 的 `existing`):新系統已存在的社團帳號要「認養」進
+    # id-map,不能照建第二份 —— 撞 uq_users_username / uq_clubs_name 會在 flush 當場拋
+    # IntegrityError,整支匯入(社團/成員/活動/簽核/公告)一起回滾,而 `--reset` 清不掉
+    # 沒進 id-map 的列,救不回來。`NEW_CLUBS` 先建、承辦事後才在舊系統補建同一社,
+    # 走的就是這條路。認養後不覆寫既有欄位,與「已 map 的列重跑跳過」同一個語意。
+    by_username = {
+        u.username: (u.club_id, u.id)
+        for u in await db.scalars(sa.select(User).where(User.role == UserRole.CLUB))
+        if u.club_id is not None
+    }
+    club_names = dict(
+        (await db.execute(sa.select(Club.name, Club.id))).all()  # type: ignore[arg-type]
+    )
+
     valid_attrs = {a.value for a in ClubAttribute}
     result: dict[int, tuple[int, int]] = {}
     skipped = 0
+    adopted: list[str] = []
     unmapped_attr: list[str] = []
     for row in rows:
         if row.Name in SKIP_CLUBS:
             skipped += 1
+            continue
+        if ids.get("Club_club", row.id) is None and row.Username in by_username:
+            club_id, user_id = by_username[row.Username]
+            ids.record(db, "Club_club", row.id, "clubs", club_id)
+            ids.record(db, "Club_club:user", row.id, "users", user_id)
+            result[row.id] = (club_id, user_id)
+            adopted.append(row.Username)
             continue
         prop = props.get(row.FK_ClubProperty_id)
         defunct = prop == "停社"
@@ -319,6 +341,14 @@ async def import_clubs(
             unmapped_attr.append(f"{row.Name}({prop})")
         attribute = ClubAttribute(prop) if not defunct and prop in valid_attrs else None
         mapped_club = ids.get("Club_club", row.id)
+        if mapped_club is None and row.Name in club_names:
+            # 同名但帳號不同:可能是同一社換了帳號,也可能真的是兩社。猜錯會把別人的
+            # 活動與成員掛到錯的社團上,停在這裡讓人決定,別讓它撞唯一鍵回滾整支匯入
+            raise RuntimeError(
+                f"舊庫社團「{row.Name}」(帳號 {row.Username})在新系統已存在但帳號不同"
+                f"(clubs.id={club_names[row.Name]});確認是否同一社後,"
+                f"對齊帳號或把它列進 SKIP_CLUBS"
+            )
         if mapped_club is None:
             content = contents.get(row.id)
             club = Club(
@@ -360,6 +390,8 @@ async def import_clubs(
         result[row.id] = (club_id, user_id)
 
     print(f"clubs: {len(result)} 社(含既有)、跳過 {skipped}(行政單位/測試)")
+    if adopted:
+        print(f"  新系統已存在、認養進 id-map:{adopted}")
     if unmapped_attr:
         print(f"  性質未映射 → NULL:{unmapped_attr}")
     return result

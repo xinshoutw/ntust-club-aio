@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { App, Button, Checkbox, Input, InputNumber, Modal, Segmented, Skeleton, Tooltip } from 'antd'
+import { DownloadOutlined } from '@ant-design/icons'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import SectionTitle from '../../components/ui/SectionTitle'
@@ -8,7 +9,6 @@ import { Cols } from '../../components/ui/tableControls'
 import StampTrail, { type StampStage, type StampState } from '../../components/ui/StampTrail'
 import { useModalAutoFocus } from '../../components/ui/useModalAutoFocus'
 import WorkTable from '../activities/WorkTable'
-import { ActualValue } from '../activities/ActivityPreviewModal'
 import DownloadMenu from '../activities/DownloadMenu'
 import { useFilePreview } from '../eval/useFilePreview'
 import { downloadEvalFile, downloadPhotosZip } from '../eval/files'
@@ -40,6 +40,17 @@ const CELL_PAD = 24
 const INPUT_CHROME = 18
 
 const detailLabel: React.CSSProperties = { color: 'var(--steel)' }
+
+/** 與申請不一致的實際值:直接取代申請值並以色彩標示,hover 顯示預計值 */
+export function ActualValue({ actual, planned }: { actual: React.ReactNode; planned: string }) {
+  return (
+    <Tooltip mouseEnterDelay={0} title={<span style={{ fontSize: 14 }}>預計 {planned}</span>}>
+      <span className="num" style={{ color: '#8A5A00', borderBottom: '1px dotted #8A5A00', cursor: 'help' }}>
+        {actual}
+      </span>
+    </Tooltip>
+  )
+}
 
 // 經費來源:幾乎都是學務處補助,有申請補助又還沒認定過的單先預填(承辦人可改)。
 // 沒申請補助的單留空 —— 那一欄會原樣印進申請表的意見回饋,寫一句沒動到的錢是說謊
@@ -94,8 +105,9 @@ function ApprovalLog({ rows }: { rows: ReviewApproval[] }) {
         >
           <div style={{ color: 'var(--steel)' }}>{STAGE_LABEL[r.stage] ?? r.stage}</div>
           <div>
-            <span style={{ fontWeight: 500 }}>{r.actor}</span>
-            <span className="num" style={{ color: 'var(--steel)' }}> · {r.at}</span>
+            {/* 社團端拿不到簽核者姓名(後端刻意不給):印一格 '—' 看起來像資料掉了 */}
+            {r.actor && <span style={{ fontWeight: 500 }}>{r.actor}</span>}
+            <span className="num" style={{ color: 'var(--steel)' }}>{r.actor ? ' · ' : ''}{r.at}</span>
           </div>
           <div style={{ color: DECISION_COLOR[r.decision], fontWeight: 500 }}>
             {DECISION_LABEL[r.decision] ?? r.decision}
@@ -122,7 +134,9 @@ function ApprovalLog({ rows }: { rows: ReviewApproval[] }) {
   )
 }
 
-/** 申請附件與結案附件:同一種呈現,點開站內預覽彈窗(不另開分頁) */
+/** 申請附件與結案附件:同一種呈現,檔名點開站內預覽彈窗(不另開分頁),右側附下載鈕。
+ *  下載鈕不能省:預覽窗只給**不能線上看**的檔(zip、舊 .doc)下載入口,
+ *  圖片與 PDF 走預覽分支,少了這顆就完全沒有地方把附件存下來 */
 function FileLinks({
   files,
   onPreview,
@@ -143,6 +157,15 @@ function FileLinks({
             onClick={() => onPreview(f)}
           >
             {f.name}
+          </button>
+          <button
+            type="button"
+            className="link-btn"
+            aria-label={`下載 ${f.name}`}
+            style={{ padding: '0 4px' }}
+            onClick={() => downloadEvalFile(toEvalFile(f))}
+          >
+            <DownloadOutlined style={{ fontSize: 12, color: 'var(--steel)' }} />
           </button>
         </span>
       ))}
@@ -196,9 +219,11 @@ function stagesOf(item: ReviewItem): StampStage[] {
   return all.slice(0, last + 1)
 }
 
-/** 第一關核准送出的內容:經費來源、逐項核定金額、大型活動認可 */
+/** 第一關核准送出的內容:經費來源、逐項核定金額、大型活動認可;備註任一關都送 */
 export interface ActivityApprovePayload {
   fundSource: string
+  /** 審核備註:空字串=清空,undefined=承辦人沒動過,不覆寫 */
+  adminNote?: string
   budget: { itemId: number; approvedSubsidy: number }[]
   largeApproved: boolean
 }
@@ -220,6 +245,9 @@ export default function ActivityReviewModal({
   onCloseApprove,
   onCloseReject,
   detailStale,
+  viewer = 'admin',
+  onEdit,
+  onGoClose,
 }: {
   item: ReviewItem | null
   /** item 尚未載入時標題列顯示的名稱(通常=列表列的活動名) */
@@ -238,9 +266,17 @@ export default function ActivityReviewModal({
   /** 手上的詳情不確定是最新的:繳交確認是從它推導的,不給核准。
    *  'error' 另附重試 —— 補件重送後舊快取會把新繳的算成沒繳,而那會永久落庫 */
   detailStale?: 'fetching' | 'error' | false
+  /** 社團端開自己的單:收掉審核用的東西(章軌、大型認可、繳交確認、關卡說明),
+   *  footer 換成社團自己的動作,申請表 PDF 走社團端端點 */
+  viewer?: 'admin' | 'club'
+  /** 僅 viewer='club':草稿/退回件的「繼續編輯」與已結束活動的「前往結案」 */
+  onEdit?: () => void
+  onGoClose?: () => void
 }) {
   const { message } = App.useApp()
   const { user } = useAuth()
+  // 社團端開自己的單:全程唯讀(頁面本來就不傳簽核回呼),差別在收掉哪些審核用的東西
+  const isClub = viewer === 'club'
   const [rejectOpen, setRejectOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -255,6 +291,11 @@ export default function ActivityReviewModal({
   const [fundSource, setFundSource] = useState(() => seedFundSource(item))
   // 預填值與承辦人自己打的字要分得開:核定 0 元的單只送後者(見 submitApprove)
   const [fundTouched, setFundTouched] = useState(false)
+  // 審核備註:留給社團看的話,任一關都寫得動(不是第一關的認定)
+  const [adminNote, setAdminNote] = useState(item?.adminNote ?? '')
+  // 沒動過就不送:種值來自**清單列**(詳情到位不重種),那份可能落後 ——
+  // 每一關都送的欄位一旦回寫舊值,就是把別人剛寫的備註靜靜蓋掉
+  const [noteTouched, setNoteTouched] = useState(false)
   // 頁籤:結案側有東西才切得過去;null = 還沒手動切過,跟著狀態走
   const [tab, setTab] = useState<'apply' | 'close' | null>(null)
   // 繳交確認只存承辦手動改過的項目,其餘跟著推導走(詳情是非同步載入的)
@@ -283,6 +324,8 @@ export default function ActivityReviewModal({
       seededId.current = item.id
       setLargeApproved(item.largeApproved ?? false)
       setFundSource(seedFundSource(item))
+      setAdminNote(item.adminNote ?? '')
+      setNoteTouched(false)
       setOverride({})
       setTab(null)
     }
@@ -367,7 +410,6 @@ export default function ActivityReviewModal({
 
   const submitApprove = async () => {
     if (!item) return
-    const largeNote = isFirstStage && item.type === '活動' ? `(大型活動${largeApproved ? '已認可' : '未認可'})` : ''
     if (onApprove) {
       // 核定不得超過擬請(後端同一條,擬請 0 的列帶非零核定整單 422)。輸入框有 max 擋著,
       // 但預填值來自舊資料 —— 遷移列的核定可以大於擬請,沒有輸入框可改就會卡死送不出去
@@ -390,6 +432,7 @@ export default function ActivityReviewModal({
       try {
         await onApprove({
           fundSource: source,
+          adminNote: noteTouched ? adminNote : undefined,
           budget,
           largeApproved,
         })
@@ -400,7 +443,7 @@ export default function ActivityReviewModal({
         setSubmitting(false)
       }
     }
-    message.success(`已核准「${item.name}」${largeNote}`)
+    message.success(`已核准「${item.name}」`)
     onClose()
   }
 
@@ -518,8 +561,9 @@ export default function ActivityReviewModal({
             </>
           )}
           <span style={{ flex: 1 }} />
-          {/* 單關(無補助)不畫章軌:只有一顆章沒有資訊量,徒佔標題列空間 */}
-          {item && !singleStage && <StampTrail stages={stagesOf(item)} />}
+          {/* 單關(無補助)不畫章軌:只有一顆章沒有資訊量,徒佔標題列空間。
+              社團端一律不畫 —— 那是審核人的簽章,而社團端根本拿不到姓名 */}
+          {item && !singleStage && !isClub && <StampTrail stages={stagesOf(item)} />}
           {item && (
             <DownloadMenu
               items={[
@@ -533,7 +577,7 @@ export default function ActivityReviewModal({
                   )
                   return
                 }
-                downloadEvalFile(activityApplyPdf(item, 'admin'))
+                downloadEvalFile(activityApplyPdf(item, isClub ? 'club' : 'admin'))
               }}
             />
           )}
@@ -597,6 +641,15 @@ export default function ActivityReviewModal({
               核准結案
             </Button>
           </div>
+        ) : isClub ? (
+          // 社團端:繳交確認與關卡說明都是給承辦看的,這裡換成社團自己的動作
+          item && (item.status === 'draft' || item.status === 'rejected') && onEdit ? (
+            <Button type="primary" onClick={onEdit}>
+              {item.status === 'rejected' ? '編輯重送' : '繼續編輯'}
+            </Button>
+          ) : item?.canClose && onGoClose ? (
+            <Button type="primary" onClick={onGoClose}>前往結案</Button>
+          ) : null
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             {confirmRow}
@@ -640,14 +693,17 @@ export default function ActivityReviewModal({
         <div>
           <SectionTitle first>基本資料</SectionTitle>
           <div style={{ display: 'grid', gridTemplateColumns: '96px 1fr', gap: '8px 12px', fontSize: 13 }}>
-            <div style={detailLabel}>社團</div><div>{item.club} · {item.type}</div>
+            <div style={detailLabel}>{item.club ? '社團' : '類型'}</div>
+            <div>{[item.club, item.type].filter(Boolean).join(' · ')}</div>
             <div style={detailLabel}>申請時間</div>
             <div>
               <span className="num">{d?.submittedAt ?? '—'}</span>
               {d?.submittedBy ? ` · ${d.submittedBy}` : ''}
             </div>
             <div style={detailLabel}>活動時間</div><div className="num">{d?.timeRange ?? item.date}</div>
-            <div style={detailLabel}>活動地點</div><div>{d?.location ?? '—'}</div>
+            {/* 草稿可以只填一半,而地點後端是 str(空字串);`??` 只擋 null,
+                空字串會印成一格空白,看起來像畫面掉了 */}
+            <div style={detailLabel}>活動地點</div><div>{d?.location || '—'}</div>
             <div style={detailLabel}>預期人數</div>
             <div>
               社員 <span className="num">{d?.participantsIn ?? '—'}</span> · 非社員{' '}
@@ -701,9 +757,36 @@ export default function ActivityReviewModal({
                 '—'
               )}
             </div>
+            {/* 審核備註:管理員留給社團的話,**任一關都寫得動**(不像經費來源是第一關的認定)。
+                原樣印進申請表的意見回饋、社團端詳情也看得到,所以社團端有值才佔一列 */}
+            {(canReview || !!item.adminNote || !isClub) && (
+              <>
+                <div style={detailLabel}>備註</div>
+                <div>
+                  {canReview ? (
+                    <Input.TextArea
+                      size="small"
+                      autoSize={{ minRows: 3, maxRows: 10 }}
+                      value={adminNote}
+                      onChange={(e) => {
+                        setNoteTouched(true)
+                        setAdminNote(e.target.value)
+                      }}
+                      maxLength={1000}
+                      placeholder="提供額外資訊給社團，將一併寫入活動申請表中"
+                    />
+                  ) : (
+                    <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
+                      {item.adminNote || '—'}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
-          {item.type === '活動' && (
+          {/* 大型活動認可是承辦人的決定,社團端只在標題徽章看結果 */}
+          {item.type === '活動' && !isClub && (
             <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--paper)', borderRadius: 6 }}>
               <Checkbox
                 checked={largeApproved}
@@ -712,6 +795,12 @@ export default function ActivityReviewModal({
               >
                 認可為大型活動
               </Checkbox>
+            </div>
+          )}
+
+          {isClub && item.status === 'locked' && (
+            <div style={{ fontSize: 13, color: '#A3341F', marginTop: 16 }}>
+              已逾期並鎖定，更多疑問請洽學務處
             </div>
           )}
 

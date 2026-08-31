@@ -65,14 +65,20 @@ DEC-01:這學年評鑑在新系統跑,但學年末才用 —— 不擋上線。
 hover 顯示「目前未開放」(`lib/nav.EVAL_UNBUILT`)。收的**只有側欄入口** —— 路由與頁面都還在,
 直接輸入網址進得去;評審端三頁不收(那是評審帳號唯一的工作面)。GAP-01～04 做完就把那兩個常數拿掉。
 
+**活動審核的「備註」**(2026-08-31,D-33/D-34):`activities.admin_note`,承辦人留給社團的話,
+**任一關都寫得動**、空字串即清空。與經費來源一起印進申請表的「意見回饋」,
+**原本固定接在後面的結報提醒一併移除**(系統自己會催結案,那句樣板還會蓋掉承辦想說的話)。
+社團端的活動詳情**改用行政端那支審核彈窗**(`viewer="club"`),`ActivityPreviewModal` 已刪除 ——
+章軌、大型認可、繳交確認與關卡說明都收掉,footer 換回繼續編輯/前往結案。
+
 **要跑遷移**:D-21/D-22 是 drop column,`alembic upgrade head` 之後舊號碼就沒了。
 D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)—— 走 `--reset` 重灌,
 或把該學期匯出再匯入一次。
 
 ## 驗證現況
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **525 passed**;`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **200 passed**(42 檔)、
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **550 passed**;`ruff check .` 全綠
+- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **218 passed**(49 檔)、
   `pnpm run lint` 8 個既有的 fast-refresh warning
 - 新測試逐一做過 mutation 驗證(改回舊寫法會紅)
 
@@ -157,6 +163,8 @@ python3 migration/fill_shards.py merge                   # *.jsonl → *_filled.
   約束(仍在逾期清單裡)。這是 D-05 的字面意思,但等於期限有一條誰都能走的路
 - 開機的 `/auth/me` 沒有 timeout:後端連上但不回應時會白畫面到 nginx `proxy_read_timeout`
   (預設 60 秒)。要收得先決定 timeout 值與失敗文案
+- **舊系統的長審核意見現在有地方放了**:`cms_import` 把 `Opinions` 的殘留寫進 `fund_source`,超過
+  100 字的直接丟掉(`too_long`)。`admin_note` 是 text 且上限 1000,要撈回那批就改寫入端
 - `c7e...` migration 的 downgrade 會刪除跨學期重複成員資料,部署前需決定是否接受
 - 內層 nginx 信任所有 RFC1918 網段,依賴 GCP firewall;正式部署可收窄至實際來源
 

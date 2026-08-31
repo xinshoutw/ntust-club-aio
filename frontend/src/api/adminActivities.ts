@@ -25,6 +25,10 @@ export interface ReviewItem {
   requested: number
   status: StatusKey
   fundSource?: string // 第一關認定的經費來源(後端 fund_source)
+  /** 審核備註:管理員留給社團的話(後端 admin_note);社團端詳情與申請表意見回饋都印它 */
+  adminNote?: string
+  /** 活動已結束、可以送結案(後端推導);社團端開窗的「前往結案」看它 */
+  canClose?: boolean
   // 經費合計(彈窗結案側的「自籌 / 核定 / 實支」一列讀它;approvedTotal 為 null=尚未核定)
   selfFundTotal?: number
   approvedTotal?: number
@@ -48,7 +52,7 @@ export interface ReviewItem {
     content?: string
     works?: WorkItem[]
     attachments: string[]
-    attachmentFiles?: { id: string; name: string; url: string }[]
+    attachmentFiles?: AdminFileRef[]
     budget: {
       id: number
       category: string
@@ -111,6 +115,8 @@ export interface AdminFileRef {
   id: string
   name: string
   url: string
+  /** 位元組;預覽窗的標題印它 —— 寫死 0 會讓每個檔都印成「1 KB」 */
+  size: number
 }
 
 export interface AdminCloseReport {
@@ -188,11 +194,10 @@ interface ReportOut {
 
 // 與社團端 /club/activities 同一份 schema(backend ActivityOut),行政端多帶社團名與
 // 最近審核時間。**不再各寫一份**:上一版漏了 has_close_draft,同一個回應在兩處長不一樣
-interface AdminActivityOut extends Omit<ActivityOut, 'date' | 'end_date'> {
+interface AdminActivityOut extends ActivityOut {
   club_name: string
-  date: string // 草稿不進行政視野,日期必然齊備
-  end_date: string
   fund_source: string | null
+  admin_note: string | null
   school_approved: number | null
   close_deadline: string | null
   reviewed_at: string | null
@@ -242,13 +247,16 @@ const toAdminActivity = (o: AdminActivityOut): AdminActivity => ({
   type: o.type,
   isLarge: o.is_large,
   largeApproved: o.is_large_approved ?? undefined,
-  date: slashDate(o.date),
-  endDate: slashDate(o.end_date),
+  // 行政視野沒有草稿,日期必然齊備;社團端共用這支轉換,草稿才可能是 null
+  date: o.date ? slashDate(o.date) : '—',
+  endDate: o.end_date ? slashDate(o.end_date) : '—',
   requested: o.requested_total,
   selfFundTotal: o.self_fund_total,
   approvedTotal: o.approved_total ?? undefined,
   status: toStatusKey(o),
   fundSource: o.fund_source ?? undefined,
+  adminNote: o.admin_note ?? undefined,
+  canClose: o.can_close,
   submittedAt: o.submitted_at ? slashDateTime(o.submitted_at) : null,
   closeLocked: o.close_locked,
   closeDeadline: o.close_deadline ? slashDate(o.close_deadline) : undefined,
@@ -256,14 +264,19 @@ const toAdminActivity = (o: AdminActivityOut): AdminActivity => ({
   reviewedAt: o.reviewed_at ? slashDateTime(o.reviewed_at) : undefined,
 })
 
-const toFileRef = (f: FileOut): AdminFileRef => ({ id: f.id, name: f.original_name, url: fileUrl(f.id) })
+const toFileRef = (f: FileOut): AdminFileRef => ({
+  id: f.id,
+  name: f.original_name,
+  url: fileUrl(f.id),
+  size: f.size,
+})
 
 /** AdminFileRef → EvalFile(FilePreview 直接吃);型別以副檔名推導、後端未附 mime 與上傳時間 */
 export const toEvalFile = (f: AdminFileRef): EvalFile => ({
   id: f.id,
   name: f.name,
   type: fileTypeOf(f.name),
-  size: 0,
+  size: f.size,
   url: f.url,
   uploadedAt: '',
 })
@@ -283,7 +296,7 @@ export const dropAutoUnlock = (rows: readonly ApprovalOut[]): ApprovalOut[] =>
   })
 
 const toApproval = (a: ApprovalOut): ReviewApproval => ({
-  actor: a.actor_name ?? '—',
+  actor: a.actor_name ?? '',
   at: slashDateTime(a.created_at),
   decision: a.decision as ReviewApproval['decision'],
   isClose: a.subject_type === 'activity_close',
@@ -323,7 +336,11 @@ const toReport = (r: ReportOut): AdminCloseReport => ({
 
 // 日期時間彙整:跨日附結束日,有填時間附 HH:mm–HH:mm
 const timeRangeOf = (o: AdminActivityOut): string => {
-  const days = o.end_date !== o.date ? `${slashDate(o.date)} – ${slashDate(o.end_date)}` : slashDate(o.date)
+  if (!o.date) return '—' // 草稿(僅社團端看得到)可能還沒填日期
+  const days =
+    o.end_date && o.end_date !== o.date
+      ? `${slashDate(o.date)} – ${slashDate(o.end_date)}`
+      : slashDate(o.date)
   const time = o.start_time && o.end_time ? ` ${hm(o.start_time)}–${hm(o.end_time)}` : ''
   return `${days}${time}`
 }
@@ -487,6 +504,17 @@ export function useAdminActivityDetail(id: number | undefined) {
   })
 }
 
+/** 社團端的活動詳情也開這個彈窗(唯讀,`viewer='club'`):後端兩支端點回的是**同一份**
+ *  `ActivityDetailOut`,轉換沿用行政端這一份 —— 差別只有社團名與章軌,社團端都不帶。
+ *  查詢鍵掛在 `activities` 底下,社團端的 invalidate 一併吃得到。 */
+export function useClubActivityReview(id: number | undefined) {
+  return useQuery({
+    queryKey: ['activities', 'review', id ?? -1] as const,
+    enabled: id != null,
+    queryFn: () => api<AdminActivityDetailOut>(`/club/activities/${id}`).then(toAdminDetail),
+  })
+}
+
 /** 有活動的學期(新到舊),供學期下拉;帶 clubId 則限該社 */
 export function useAdminActivitySemesters(clubId?: number | null, enabled = true) {
   return useQuery({
@@ -539,6 +567,8 @@ export interface ApproveActivityInput {
   id: number
   /** 第一關必填(有申請補助時);其後關卡免帶 */
   fundSource?: string
+  /** 審核備註:任一關都送(空字串=清空,undefined=不動) */
+  adminNote?: string
   budget: { itemId: number; approvedSubsidy: number }[]
   /** 大型活動認可:僅類型=活動時帶;undefined=不異動 */
   isLargeApproved?: boolean
@@ -557,6 +587,8 @@ export function useAdminActivityMutations() {
         method: 'POST',
         body: JSON.stringify({
           fund_source: v.fundSource?.trim() || null,
+          // `|| null` 會讓「清掉備註」按不掉 —— 空字串就是要清,不帶才是不動
+          admin_note: v.adminNote ?? null,
           budget: v.budget.map((b) => ({ item_id: b.itemId, approved_subsidy: b.approvedSubsidy })),
           is_large_approved: v.isLargeApproved ?? null,
         }),

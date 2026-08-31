@@ -313,3 +313,67 @@ describe('ActivityReviewModal 的簽核章軌', () => {
     expect(stampLabels()).toEqual(['陳彥仁', '已退回'])
   })
 })
+
+const NOTE_PLACEHOLDER = '提供額外資訊給社團，將一併寫入活動申請表中'
+
+// 備註會原樣印進申請表的意見回饋,所以「清掉」必須真的清得掉:
+// 沿用經費來源那條 `trim() || null` 的送法,空字串會變成 null=不動,按鈕按了等於沒按
+test('審核備註清空時送出空字串,不是省略欄位', async () => {
+  const onApprove = vi.fn(async (_p: unknown) => {})
+  show([budgetRow(1, 0)], { adminNote: '核銷單據請於 9/30 前送件' }, onApprove)
+
+  const box = screen.getByPlaceholderText<HTMLTextAreaElement>(NOTE_PLACEHOLDER)
+  expect(box.value).toBe('核銷單據請於 9/30 前送件')
+  fireEvent.change(box, { target: { value: '' } })
+  fireEvent.click(screen.getByRole('button', { name: /核\s*准/ }))
+  await waitFor(() => expect(onApprove).toHaveBeenCalled())
+  expect(onApprove.mock.calls[0][0]).toMatchObject({ adminNote: '' })
+})
+
+// 社團端與行政端共用這支彈窗:社團看得到承辦留的備註,但審核用的東西一件都不該露出來
+// (章軌是審核人的簽章,而社團端連姓名都拿不到;大型認可是承辦的決定)
+test('viewer=club:備註看得到,章軌與大型認可都收掉', () => {
+  render(
+    <App>
+      <ActivityReviewModal
+        viewer="club"
+        item={{
+          ...item([budgetRow(1, 5000, 5000)]),
+          club: '',
+          status: 'pending_chief',
+          adminNote: '核銷單據請於 9/30 前送件',
+        }}
+        open
+        onClose={() => {}}
+        afterClose={() => {}}
+      />
+    </App>,
+  )
+
+  expect(screen.getByText('備註')).toBeTruthy()
+  expect(screen.getByText('核銷單據請於 9/30 前送件')).toBeTruthy()
+  expect(screen.queryByPlaceholderText(NOTE_PLACEHOLDER)).toBeNull() // 唯讀
+  expect(screen.queryByText('認可為大型活動')).toBeNull()
+  expect(screen.queryByText('承')).toBeNull() // 章軌
+})
+
+// 種值取自清單列(詳情到位不重種),而備註每一關都送 —— 沒動過還照送等於把
+// 別人剛寫的那句用手上這份可能落後的快取蓋回去
+test('沒動過備註就不送那一欄', async () => {
+  const onApprove = vi.fn(async (_p: unknown) => {})
+  show([budgetRow(1, 0)], { adminNote: '核銷單據請於 9/30 前送件' }, onApprove)
+
+  fireEvent.click(screen.getByRole('button', { name: /核\s*准/ }))
+  await waitFor(() => expect(onApprove).toHaveBeenCalled())
+  expect((onApprove.mock.calls[0][0] as { adminNote?: string }).adminNote).toBeUndefined()
+})
+
+// 草稿可以只填一半,而地點後端是 str(空字串);社團端現在開的是同一支彈窗,
+// `?? '—'` 只擋 null,空字串會留下一格空白,看起來像畫面掉了
+test('地點是空字串時印 —,不是留一格空白', () => {
+  show([budgetRow(1, 0)], { detail: { attachments: [], budget: [], location: '' } })
+
+  const labels = [...document.querySelectorAll('div')].filter((d) => d.textContent === '活動地點')
+  expect(labels.length).toBeGreaterThan(0)
+  expect(labels[0].nextElementSibling?.textContent).toBe('—')
+})

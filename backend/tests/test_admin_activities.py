@@ -1364,3 +1364,49 @@ async def test_submitted_at_is_the_submit_time_not_the_create_time(client, db):
     assert just_sent["submitted_at"] is not None
     assert just_sent["created_at"].startswith("2026-07-01")
     assert just_sent["submitted_at"] > "2026-08-01"
+
+
+async def test_admin_note_is_writable_at_any_stage_and_visible_to_the_club(client, db):
+    """審核備註是留給社團看的話,不是第一關的認定 —— 組長也改得動、也清得掉。
+
+    `fund_source` 那條「空值不覆寫」的寫法套過來會讓「清掉備註」按不掉:
+    前端送空字串就是要清,省略欄位才是不動。
+    """
+    await seed(client, db)
+    aid = await submit_activity(client, db)
+    items_url = f"/api/v1/admin/activities/{aid}"
+
+    await login(client, "advisor")
+    items = (await client.get(items_url)).json()["data"]["budget_items"]
+    resp = await client.post(
+        f"{items_url}/approve",
+        json={
+            "fund_source": "學務處補助",
+            "admin_note": "  核銷單據請於 9/30 前送件  ",
+            "budget": [
+                {"item_id": i["id"], "approved_subsidy": i["requested_subsidy"]} for i in items
+            ],
+        },
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["admin_note"] == "核銷單據請於 9/30 前送件"
+
+    # 社團端看得到(自己的單)
+    await login(client, "club01")
+    resp = await client.get(f"/api/v1/club/activities/{aid}")
+    assert resp.json()["data"]["admin_note"] == "核銷單據請於 9/30 前送件"
+
+    # 組長:省略欄位=不動
+    await login(client, "chief")
+    resp = await client.post(f"{items_url}/approve", json={}, headers=csrf_headers(client))
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["admin_note"] == "核銷單據請於 9/30 前送件"
+
+    # 學務長:空字串=清空
+    await login(client, "dean")
+    resp = await client.post(
+        f"{items_url}/approve", json={"admin_note": ""}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["admin_note"] is None

@@ -40,7 +40,6 @@ import type { Reflection } from './types'
 import { TIME_RANGE_SEP, dateRangeText } from './utils'
 import './actform.css'
 import { clickableProps } from '../../lib/clickable'
-import { scrollBehavior } from '../../lib/motion'
 
 interface ReflectRow extends Reflection {
   key: number
@@ -527,7 +526,7 @@ function CloseForm({
       setTimeout(() => {
         document
           .querySelector('.ant-input-status-error, .ant-input-number-status-error, .ant-picker-status-error, .area-error')
-          ?.scrollIntoView({ behavior: scrollBehavior(), block: 'center' })
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }, 0)
       return
     }
@@ -856,7 +855,7 @@ function CloseForm({
               <div style={label}>
                 活動照片{requiredMark}
                 {/* 送出門檻是 1 張;MIN_PHOTOS 是承辦審核時的參考張數,計不計分看承辦的確認 */}
-                <Tooltip title={`請上傳至少 1 張圖片`}>
+                <Tooltip title={`請上傳至少 1 張照片`}>
                   <InfoCircleOutlined style={{ marginLeft: 6, color: 'var(--steel)' }} />
                 </Tooltip>
               </div>

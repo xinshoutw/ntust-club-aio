@@ -222,6 +222,8 @@ class ActivityOut(BaseModel):
     participants_out: int
     staff_text: str
     fund_source: str | None
+    # 審核備註:管理員在審核時寫的一段話,社團端一併看得到
+    admin_note: str | None = None
     school_approved: int | None
     status: ActivityStatus
     close_unlocked: bool

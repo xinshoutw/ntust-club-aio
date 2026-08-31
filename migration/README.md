@@ -118,7 +118,7 @@ uv run python ../migration/cms_import.py --fixes-only   # 只跑名冊修正,不
 | Club_news | announcements | 內容=原始連結(markdown) |
 | Club_staff | users | position admin→admin(權限鍵之後由承辦配)、observer→viewer。`SKIP_STAFF` 不遷明確的測試登入名;`INACTIVE_STAFF`(`viewer`/`ntustclub`)遷入但 `is_active=False` —— 看不出是不是正式用途,而 observer 會拿到 `can_view_eval`,不擋就是上線第一天能對評鑑打分 |
 | Club_auditactivityrecord | approval_records | 舊表只有「誰、何時簽的」,沒有決議欄(退回不入表)—— 每列都是核准,同一活動第 1/2/3 列即 advisor/chief/dean,對應申請表的 初核/複核/決行 |
-| Club_auditactivity.Opinions | approval_records.reason(+ activities.fund_source) | 先去掉舊系統自動附的結報提醒(「※」開頭或首行為「活動結報提醒」;新系統由 `pdf._APPLY_NOTE` 自己產,照搬會印兩次)。這一格每一關都被覆寫,留下的是**最後一位**簽核者寫的,所以掛最後一列。只有申請期(`FUND_SOURCE_LEGACY_STATUS`)的殘留才是經費認定會寫進 `fund_source`;已完成件那格早被結案審核覆寫過,只留 `reason` |
+| Club_auditactivity.Opinions | approval_records.reason(+ activities.fund_source) | 先去掉舊系統自動附的結報提醒(「※」開頭或首行為「活動結報提醒」;新系統靠逾期鎖定與通知催結案,紙上不再印那段話)。這一格每一關都被覆寫,留下的是**最後一位**簽核者寫的,所以掛最後一列。只有申請期(`FUND_SOURCE_LEGACY_STATUS`)的殘留才是經費認定會寫進 `fund_source`;已完成件那格早被結案審核覆寫過,只留 `reason` |
 | Club_activity.status=1(退回申請) | approval_records(`decision=reject`) | 舊系統退回**不寫**簽核列,理由只剩 Opinions 一格。不補這段的話 59 件退回活動一筆退件紀錄都沒有,社團看得到「已退回」卻讀不到理由。actor 用不能登入的 `_migration`(系統遷移)帳號,沒有理由的填「未提供更多說明」;對照鍵 `Club_activity:reject` 進 id-map,`--reset` 清得掉 |
 | Club_activityimages | files(`slot=report_photo`) | `media_import.py`;盤上落 `reports/{原始上傳年}/{月}/{uuid}`,`club_id`/`uploaded_by` 跟著活動走 |
 | Club_activity.PlanFile、Club_activityfiles | 只取文字,經 `text_fields.py` 的 CSV 人工轉錄 | 檔案實體不遷(MIG-13) |
@@ -173,7 +173,7 @@ uv run python ../migration/cms_import.py --fixes-only   # 只跑名冊修正,不
 - **`Opinions` 不可原文寫進 `fund_source`**:那一欄在行政端是「經費來源」
   (`ApproveActivityIn` 限 100 字),範圍內 1,398 / 1,531 筆原文超過 100 字 ——
   承辦一開審核視窗按儲存就 422 而且自己改不掉。而且其中 1,335 筆的全部內容就是
-  「※…結報提醒」那段樣板,新系統本來就會自己產一份
+  「※…結報提醒」那段樣板,新系統紙上根本不印那段話
 - **狀態停在哪一關由已簽列數決定**:`import_activities` 走 `PENDING_BY_SIGNED[已簽關數]`,
   不是只看 status。這份 dump 範圍內 status=0 的 20 筆全都一列簽核也沒有,
   所以 20 筆全落 `pending_advisor`、`pending_chief`/`pending_dean` 各 0 筆

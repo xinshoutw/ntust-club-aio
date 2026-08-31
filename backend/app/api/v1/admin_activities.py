@@ -472,6 +472,12 @@ async def approve(
                 i.approved_subsidy for i in activity.budget_items if i.approved_subsidy is not None
             )
 
+    # 審核備註:**任一關都寫得動**(不是第一關的認定,組長與學務長也留得下話)。
+    # 省略=不動、空字串=清空 —— fund_source 那種 `or None` 的寫法會讓「清掉備註」按不掉。
+    # 這段會原樣印進申請表的意見回饋,社團端詳情也看得到
+    if body.admin_note is not None:
+        activity.admin_note = body.admin_note.strip() or None
+
     # 大型活動認可:實心=已認可(含未申請但管理員逕行核定)。
     #
     # 第一關是認定點,沒勾就是否准;**但後續關卡仍改得動**(decisions.md ISS-54)——

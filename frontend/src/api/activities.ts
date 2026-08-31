@@ -37,12 +37,6 @@ export interface ClubActivity {
   hasCloseDraft: boolean
 }
 
-export interface ActivityRejectReason {
-  by: string
-  date: string
-  text: string
-}
-
 export interface ClubActivityDetail extends ClubActivity {
   budget: BudgetItem[]
   closeDraft?: Partial<ActivityReport> // 前端自訂 JSON 形狀(後端 close_draft 為 opaque dict)
@@ -51,7 +45,6 @@ export interface ClubActivityDetail extends ClubActivity {
   attachments: EvalFile[]
   /** 結案附件(保單、租車契約、簽到表…);與照片共用結案上傳額度 */
   closeDocs: EvalFile[]
-  rejectReason?: ActivityRejectReason
 }
 
 // ---- 後端 schema(backend/app/schemas/activities.py)----
@@ -256,16 +249,7 @@ const toCloseDraft = (raw: Record<string, unknown> | null): Partial<ActivityRepo
   }
 }
 
-// 簽核關卡顯示詞(社團端不顯示個人姓名,僅關卡;
-// 第一關顯示「承辦人」,程式鍵 advisor 不變)
-const STAGE_LABEL: Record<string, string> = {
-  advisor: '承辦人',
-  chief: '課外組組長',
-  dean: '學務長',
-}
-
 export const toDetail = (o: ActivityDetailOut): ClubActivityDetail => {
-  const lastReject = [...o.approvals].reverse().find((x) => x.decision === 'reject')
   return {
     ...toActivity(o),
     budget: o.budget_items.map((b) => ({
@@ -281,14 +265,6 @@ export const toDetail = (o: ActivityDetailOut): ClubActivityDetail => {
     photos: o.photos.map(toFile),
     attachments: o.attachments.map(toFile),
     closeDocs: o.close_docs.map(toFile),
-    rejectReason:
-      o.status === 'rejected' && lastReject
-        ? {
-            by: STAGE_LABEL[lastReject.stage] ?? lastReject.stage,
-            date: slashDate(lastReject.created_at),
-            text: lastReject.reason ?? '',
-          }
-        : undefined,
   }
 }
 

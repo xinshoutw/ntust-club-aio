@@ -51,12 +51,6 @@ _CC = ParagraphStyle("cell_center", parent=_C, alignment=1)
 _CR = ParagraphStyle("cell_right", parent=_C, alignment=2)
 _FOOT = ParagraphStyle("foot", fontName=_KAI, fontSize=9, leading=13, alignment=2)
 
-# 意見回饋固定收尾的結報提醒:承辦人填的經費來源可能是空的(沒申請經費時),這段一律都在
-_APPLY_NOTE = (
-    "※ 請於活動結束後兩週內完成並上傳結報。結報內容應包含："
-    "1. 活動照片 5 張；2. 3 位同學的心得；3. 活動成果報告"
-)
-
 _APPLY_COLS = [
     w * 174 * mm / 720
     for w in (60, 45, 75, 52, 61.5, 61.5, 55, 55, 63.75, 63.75, 63.75, 63.75)
@@ -120,12 +114,14 @@ def _kai(text: str, style=_C) -> Paragraph:
 
 
 def _apply_opinion(activity: Activity) -> str:
-    """意見回饋 = 承辦人核准時填的經費來源 + 固定的結報提醒。
+    """意見回饋 = 承辦人核准時填的經費來源 + 審核備註,各佔一行。
 
-    經費來源可能是空的(沒申請經費的活動不需要認定來源),提醒則一律都在。
+    兩者都可能是空的(沒申請經費就沒有來源可認定,備註本來就是選填),整格空白也是對的。
+    這裡曾固定接一段結報提醒 —— 系統本身會催結案(逾期鎖定與 Discord 通知),
+    每張紙都印同一句話沒有人會讀。
     """
-    source = (activity.fund_source or "").strip()
-    return f"{source}\n{_APPLY_NOTE}" if source else _APPLY_NOTE
+    parts = [(activity.fund_source or "").strip(), (activity.admin_note or "").strip()]
+    return "\n".join(p for p in parts if p)
 
 
 def _apply_footnote(activity: Activity) -> str:

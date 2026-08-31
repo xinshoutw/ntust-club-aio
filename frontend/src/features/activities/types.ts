@@ -82,7 +82,6 @@ export interface Activity {
   budget: BudgetItem[]
   report?: ActivityReport // 已送結案後存在
   closeDraft?: Partial<ActivityReport> // 結案草稿(不含照片檔)
-  rejectReason?: { by: string; date: string; text: string }
   closeDeadline?: string
   closeDaysLeft?: number
   submittedAt?: string
@@ -109,12 +108,6 @@ export const highlightsLabel = (type?: string): string =>
   type === '社課或會議' ? '課程重點' : '活動重點'
 
 export const fmtMoney = (n: number): string => `$${n.toLocaleString('en-US')}`
-
-/** 活動列表與詳情的經費欄:自籌 / 擬請;兩者皆 0 時不佔一格數字 */
-export const money = (a: { selfFundTotal: number; requestedTotal: number }): string =>
-  a.selfFundTotal === 0 && a.requestedTotal === 0
-    ? '–'
-    : `${fmtMoney(a.selfFundTotal)} / ${fmtMoney(a.requestedTotal)}`
 
 /** 工作分配的項目欄對齊寬度(全形字數≈em)。
  *

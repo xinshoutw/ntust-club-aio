@@ -212,7 +212,7 @@ def _validate_phone_required(v: str) -> str:
 
 class VenueBookingIn(BaseModel):
     venue_id: int
-    activity_id: int  # 借用活動(限審核通過)
+    activity_id: int | None = None  # 借用活動(限審核通過);留空僅 NO_ACTIVITY_ACCOUNT 可用
     date: date
     periods: list[str] = Field(min_length=1, max_length=14)
     purpose: str = Field(min_length=1, max_length=200)  # 用途必填

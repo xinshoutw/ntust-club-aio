@@ -443,6 +443,60 @@ async def test_venue_booking_locks_before_the_duplicate_check(client, db):
     assert locked < checked
 
 
+async def test_venue_booking_activity_optional_only_for_802(client, db):
+    """802 國際事務處免綁活動(D-36);代碼或名稱任一不符、以及一般社團留空一律 422。"""
+    club = await make_club(db, name="國際事務處")
+    await make_user(db, username="802", name="國際事務處", club_id=club.id)
+    await login(client, "802")
+    venue = await make_venue(db, name="精誠廣場", allow_fixed=False, allow_temp=True)
+    body = {
+        "venue_id": venue.id,
+        "date": (date.today() + timedelta(days=14)).isoformat(),
+        "periods": ["3", "4"],
+        "purpose": "國際生說明會",
+        "phone": "0912000111",
+    }
+    resp = await client.post("/api/v1/club/venue-bookings", json=body, headers=csrf_headers(client))
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["data"]["activity_id"] is None
+    assert resp.json()["data"]["activity_name"] is None
+
+    # 代碼 802、社團改名 → 不再吃這條例外(比的是活的 Club.name,不是建帳當下的 User.name)
+    club.name = "國際事務中心"
+    await db.commit()
+    resp = await client.post(
+        "/api/v1/club/venue-bookings",
+        json={**body, "periods": ["6", "7"]},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    assert "請選擇借用活動" in resp.text
+
+    # 反之亦然:名稱對但代碼不是 802
+    other = await make_club(db, name="國際事務處")
+    await make_user(db, username="803", name="國際事務處", club_id=other.id)
+    await login(client, "803")
+    resp = await client.post(
+        "/api/v1/club/venue-bookings",
+        json={**body, "periods": ["8", "9"]},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    assert "請選擇借用活動" in resp.text
+
+    # 一般社團留空 → 422
+    plain = await make_club(db, name="吉他社")
+    await make_user(db, username="club01", name="吉他社", club_id=plain.id)
+    await login(client, "club01")
+    resp = await client.post(
+        "/api/v1/club/venue-bookings",
+        json={**body, "periods": ["A", "B"]},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    assert "請選擇借用活動" in resp.text
+
+
 async def test_venue_booking_requires_approved_activity(client, db):
     club = await setup_session(client, db)
     venue = await make_venue(db, name="精誠廣場", allow_fixed=False, allow_temp=True)

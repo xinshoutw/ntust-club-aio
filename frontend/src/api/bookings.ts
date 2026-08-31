@@ -571,7 +571,8 @@ export interface RoomBookingInput {
 
 export interface VenueBookingInput {
   venueId: number
-  activityId: number
+  /** null = 免綁活動(僅 802 國際事務處,見 VenueBookingPage) */
+  activityId: number | null
   date: Dayjs
   periods: string[]
   purpose: string

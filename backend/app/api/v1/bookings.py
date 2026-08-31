@@ -72,6 +72,24 @@ async def _ensure_not_suspended(db, user) -> None:
         )
 
 
+# 802 國際事務處是行政單位,借臨時場地沒有社團活動可綁(D-36)。一個帳號一條例外,
+# 不為它開資料欄位;要放行第二個單位時再改成主檔設定。
+# 前端同一份判定在 features/bookings/VenueBookingPage.tsx
+NO_ACTIVITY_ACCOUNT = ("802", "國際事務處")
+
+
+async def _skips_activity(db, user) -> bool:
+    """帳號代碼與社團名稱兩者皆符才吃這條例外。
+
+    比的是 `Club.name` 而不是 `User.name`:後者是建帳當下的快照,社團改名
+    只寫 `Club.name`(`admin_clubs.update_club`),全系統沒有第二支 API 更新得了它。
+    拿快照比就變成「改完名還繼續免綁」,而且畫面上顯示的一律是活的 `Club.name`,
+    漂移完全看不出來。
+    """
+    club = await db.get(Club, user.club_id)  # _ensure_not_suspended 已載入,不另發 SQL
+    return (user.username, club.name) == NO_ACTIVITY_ACCOUNT
+
+
 async def _approved_activity(db, user, activity_id: int) -> Activity:
     """借用綁定的活動:必須是本社團且審核通過。"""
     activity = await db.scalar(
@@ -409,8 +427,12 @@ async def create_venue_booking(
     venue = await db.get(Venue, body.venue_id)
     if venue is None or not venue.is_active or not venue.allow_temp:
         raise validation_error("該場地不開放臨時借用")
-    activity = await _approved_activity(db, user, body.activity_id)
-    _require_not_ended(activity, "場地借用")
+    activity = None
+    if body.activity_id is not None:
+        activity = await _approved_activity(db, user, body.activity_id)
+        _require_not_ended(activity, "場地借用")
+    elif not await _skips_activity(db, user):
+        raise validation_error("請選擇借用活動")
 
     # 過去時間全面禁止:過去日期直接擋;
     # 今天則以節次時刻表擋「最早節次已開始」的申請
@@ -443,7 +465,7 @@ async def create_venue_booking(
     row = VenueBooking(
         club_id=user.club_id,
         venue_id=venue.id,
-        activity_id=activity.id,
+        activity_id=activity.id if activity else None,
         date=body.date,
         periods=body.periods,
         purpose=body.purpose,
@@ -461,7 +483,7 @@ async def create_venue_booking(
     )
     out = VenueBookingOut.model_validate(row)
     out.venue_name = venue.name
-    out.activity_name = activity.name
+    out.activity_name = activity.name if activity else None
     return ApiResponse(data=out)
 
 

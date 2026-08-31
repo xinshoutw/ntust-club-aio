@@ -222,8 +222,8 @@ function stagesOf(item: ReviewItem): StampStage[] {
 /** 第一關核准送出的內容:經費來源、逐項核定金額、大型活動認可;備註任一關都送 */
 export interface ActivityApprovePayload {
   fundSource: string
-  /** 審核備註(空字串=清空) */
-  adminNote: string
+  /** 審核備註:空字串=清空,undefined=承辦人沒動過,不覆寫 */
+  adminNote?: string
   budget: { itemId: number; approvedSubsidy: number }[]
   largeApproved: boolean
 }
@@ -293,6 +293,9 @@ export default function ActivityReviewModal({
   const [fundTouched, setFundTouched] = useState(false)
   // 審核備註:留給社團看的話,任一關都寫得動(不是第一關的認定)
   const [adminNote, setAdminNote] = useState(item?.adminNote ?? '')
+  // 沒動過就不送:種值來自**清單列**(詳情到位不重種),那份可能落後 ——
+  // 每一關都送的欄位一旦回寫舊值,就是把別人剛寫的備註靜靜蓋掉
+  const [noteTouched, setNoteTouched] = useState(false)
   // 頁籤:結案側有東西才切得過去;null = 還沒手動切過,跟著狀態走
   const [tab, setTab] = useState<'apply' | 'close' | null>(null)
   // 繳交確認只存承辦手動改過的項目,其餘跟著推導走(詳情是非同步載入的)
@@ -322,6 +325,7 @@ export default function ActivityReviewModal({
       setLargeApproved(item.largeApproved ?? false)
       setFundSource(seedFundSource(item))
       setAdminNote(item.adminNote ?? '')
+      setNoteTouched(false)
       setOverride({})
       setTab(null)
     }
@@ -428,7 +432,7 @@ export default function ActivityReviewModal({
       try {
         await onApprove({
           fundSource: source,
-          adminNote,
+          adminNote: noteTouched ? adminNote : undefined,
           budget,
           largeApproved,
         })
@@ -764,7 +768,10 @@ export default function ActivityReviewModal({
                       size="small"
                       autoSize={{ minRows: 3, maxRows: 10 }}
                       value={adminNote}
-                      onChange={(e) => setAdminNote(e.target.value)}
+                      onChange={(e) => {
+                        setNoteTouched(true)
+                        setAdminNote(e.target.value)
+                      }}
                       maxLength={1000}
                       placeholder="給社團看的說明，會印在申請表的意見回饋（可留空）"
                     />

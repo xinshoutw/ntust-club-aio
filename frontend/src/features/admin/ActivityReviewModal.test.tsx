@@ -357,6 +357,17 @@ test('viewer=club:備註看得到,章軌與大型認可都收掉', () => {
   expect(screen.queryByText('承')).toBeNull() // 章軌
 })
 
+// 種值取自清單列(詳情到位不重種),而備註每一關都送 —— 沒動過還照送等於把
+// 別人剛寫的那句用手上這份可能落後的快取蓋回去
+test('沒動過備註就不送那一欄', async () => {
+  const onApprove = vi.fn(async (_p: unknown) => {})
+  show([budgetRow(1, 0)], { adminNote: '核銷單據請於 9/30 前送件' }, onApprove)
+
+  fireEvent.click(screen.getByRole('button', { name: /核\s*准/ }))
+  await waitFor(() => expect(onApprove).toHaveBeenCalled())
+  expect((onApprove.mock.calls[0][0] as { adminNote?: string }).adminNote).toBeUndefined()
+})
+
 // 草稿可以只填一半,而地點後端是 str(空字串);社團端現在開的是同一支彈窗,
 // `?? '—'` 只擋 null,空字串會留下一格空白,看起來像畫面掉了
 test('地點是空字串時印 —,不是留一格空白', () => {

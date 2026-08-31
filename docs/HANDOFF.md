@@ -75,9 +75,10 @@ hover 顯示「目前未開放」(`lib/nav.EVAL_UNBUILT`)。收的**只有側欄
 資料改走免登入的 `/public/*`(節次、場地、場況、器材佔用),社團端、行政端「臨時場地器材借用」
 與**未登入首頁**讀同一份。呼叫端只決定點格去哪一頁:社團去申請頁、行政帶參數去手動借用
 (`allowPast`,補登照樣點得動)、未登入不給入口即純預覽。
-**行政端原本那張專用場況圖連同它的能力一起沒了** —— 點審核中的格子開審核彈窗、hover 看該格
-全部待審單(含被已核准蓋掉的),端點 `/admin/bookings/availability`、`admin_availability_grid`
-與其測試都已刪除。衝突現在要自己對照下方待審表。
+行政端原本那張專用場況圖的能力**疊回共用元件**:每格的 `pending`(該格全部待審單,含被
+已核准或不開放蓋掉的)由 `availability_grids(with_pending=)` 一併回傳,**只給持 `abooking`
+的承辦**(`api/v1/public._sees_pending`);有可審的格子就地開審核彈窗,多筆出選單。
+原本的行政專用端點 `/admin/bookings/availability` 與 `admin_availability_grid` 已刪除。
 
 **未登入的 `/`**(2026-08-31):借用情形的公開預覽,右上角登入鈕進 `/login`;
 其餘社團路徑未登入仍轉 `/login`。GAP-16 的社團導覽頁還沒做。
@@ -89,8 +90,8 @@ D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)
 
 ## 驗證現況
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **554 passed**;`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **229 passed**(51 檔)、
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **555 passed**;`ruff check .` 全綠
+- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **232 passed**(51 檔)、
   `pnpm run lint` 8 個既有的 fast-refresh warning
 - 新測試逐一做過 mutation 驗證(改回舊寫法會紅);借用色格圖那支另在 `TZ=UTC` 與 `TZ=Pacific/Honolulu` 下各跑過一次
 

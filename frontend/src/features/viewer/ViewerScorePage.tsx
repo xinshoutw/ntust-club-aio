@@ -7,6 +7,7 @@ import QueryError from '../../components/ui/QueryError'
 import { fetchFile } from '../../api/client'
 import { Cols, Pager, sortRows, type SortEntry } from '../../components/ui/tableControls'
 import { notFoundText } from '../../lib/selectOptions'
+import { scrollBehavior } from '../../lib/motion'
 import FilePreview from '../eval/FilePreview'
 import type { EvalFile } from '../eval/types'
 import {
@@ -324,7 +325,7 @@ function ScorePanel({
       setTimeout(() => {
         panelRef.current
           ?.querySelector('.ant-input-number-status-error')
-          ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          ?.scrollIntoView({ behavior: scrollBehavior(), block: 'center' })
       }, 0)
       return
     }

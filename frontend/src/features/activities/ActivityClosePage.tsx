@@ -40,6 +40,7 @@ import type { Reflection } from './types'
 import { TIME_RANGE_SEP, dateRangeText } from './utils'
 import './actform.css'
 import { clickableProps } from '../../lib/clickable'
+import { scrollBehavior } from '../../lib/motion'
 
 interface ReflectRow extends Reflection {
   key: number
@@ -526,7 +527,7 @@ function CloseForm({
       setTimeout(() => {
         document
           .querySelector('.ant-input-status-error, .ant-input-number-status-error, .ant-picker-status-error, .area-error')
-          ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          ?.scrollIntoView({ behavior: scrollBehavior(), block: 'center' })
       }, 0)
       return
     }

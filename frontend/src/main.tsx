@@ -46,8 +46,11 @@ createRoot(document.getElementById('root')!).render(
           fontSize: 14,
           fontFamily: FONT_FAMILY,
           controlHeight: 40,
-          // 全域動畫加速:預設 motionUnit 0.1 → Fast/Mid/Slow
-          // = 0.1/0.2/0.3s,改 0.06 → 0.06/0.12/0.18s(Modal 進出場吃 Slow)
+          // 全域動畫加速:預設 motionUnit 0.1 → Fast/Mid/Slow = 0.1/0.2/0.3s。
+          // 改 0.06 後實際是 0.1/0.1/0.2s(不是 0.06/0.12/0.18)——antd 對
+          // motionBase + motionUnit * n 做 .toFixed(1)。Modal 進出場吃 Slow。
+          // 別再往下調:motionUnit < 0.05 會讓 Fast 變 "0.0s",0 秒動畫發不發
+          // animationend 沒保障,rc-motion 的彈窗會收不了尾。
           motionUnit: 0.06,
         },
         components: {

@@ -339,7 +339,7 @@ const keys = {
 export function useVenues() {
   return useQuery({
     queryKey: keys.venues,
-    queryFn: () => api<VenueOut[]>('/club/venues').then((rows) => rows.map(toVenue)),
+    queryFn: () => api<VenueOut[]>('/public/venues').then((rows) => rows.map(toVenue)),
   })
 }
 
@@ -364,7 +364,7 @@ export function useEquipmentUsage(range: DateRange, enabled = true) {
     enabled,
     queryFn: () =>
       api<EquipmentUsageOut[]>(
-        `/club/equipment/usage${qs({ start: startIso, end: endIso })}`,
+        `/public/equipment/usage${qs({ start: startIso, end: endIso })}`,
       ).then(
         (rows): EquipmentUsageGrid => ({
           start: startIso,
@@ -384,7 +384,7 @@ export function useEquipmentUsage(range: DateRange, enabled = true) {
 }
 
 const fetchAvailability = (d: Dayjs): Promise<AvailabilityGrid> =>
-  api<AvailabilityOut>(`/club/bookings/availability${qs({ date: toIso(d) })}`).then((r) => r.grid)
+  api<AvailabilityOut>(`/public/bookings/availability${qs({ date: toIso(d) })}`).then((r) => r.grid)
 
 /** 單日全場地場況 */
 export function useAvailability(date: Dayjs) {
@@ -404,7 +404,7 @@ export function useAvailabilityDays(dates: Dayjs[], venueId?: number) {
     queryKey: keys.availabilityRange(startIso, endIso, venueId),
     queryFn: () =>
       api<{ days: { date: string; grid: AvailabilityGrid }[] }>(
-        `/club/bookings/availability-range${qs({ start: startIso, end: endIso, venue: venueId })}`,
+        `/public/bookings/availability-range${qs({ start: startIso, end: endIso, venue: venueId })}`,
       ).then((r) => Object.fromEntries(r.days.map((d) => [d.date, d.grid]))),
     enabled: dates.length > 0,
     placeholderData: keepPreviousData,

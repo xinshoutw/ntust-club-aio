@@ -167,7 +167,7 @@ async def test_venue_block_rules(client, db):
 
     # 場況圖:封鎖格標 blocked 且蓋過既有佔用
     resp = await client.get(
-        "/api/v1/club/bookings/availability", params={"date": str(TOMORROW)}
+        "/api/v1/public/bookings/availability", params={"date": str(TOMORROW)}
     )
     cell = resp.json()["data"]["grid"][str(venue.id)]
     assert cell["3"]["status"] == "blocked"

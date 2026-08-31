@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.db import get_db
-from app.core.errors import forbidden, unauthenticated
+from app.core.errors import AppError, forbidden, unauthenticated
 from app.core.security import SESSION_RENEW_INTERVAL, SESSION_TTL
 from app.models import Session, User
 from app.models.enums import UserRole
@@ -90,6 +90,22 @@ async def get_auth(request: Request, response: Response, db: DbDep) -> tuple[Ses
 
 
 AuthDep = Annotated[tuple[Session, User], Depends(get_auth)]
+
+
+async def get_optional_user(request: Request, response: Response, db: DbDep) -> User | None:
+    """有有效 session 就回使用者,否則 None —— 免登入端點(`/public/*`)用。
+
+    不擋 must_change_password:那是「能不能操作」的閘,唯讀的公開資料不受它管;
+    首登未改密的社團看首頁的借用情形圖,仍該看得到自己的借用。
+    """
+    try:
+        _, user = await get_auth(request, response, db)
+    except AppError:
+        return None
+    return user
+
+
+OptionalUser = Annotated[User | None, Depends(get_optional_user)]
 
 
 async def get_current_user(auth: AuthDep) -> User:

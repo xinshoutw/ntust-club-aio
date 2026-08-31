@@ -107,6 +107,7 @@ REST JSON,前綴 `/api/v1`。回應信封:
 
 - **分頁**:`?page=1&page_size=20`(1-based,page_size 上限 100),回應 `meta = { page, page_size, total }`。歷史型列表一律分頁;主檔與選項端點為全量回傳
 - **排序**:`?sort=field` 升冪、`-field` 降冪,逗號分隔多鍵;欄位採各端點白名單,未知欄位 422;非唯一排序鍵一律補 id tiebreak
+- **免登入端點**:只有 `/public/*`(節次目錄、場地主檔、場況與器材佔用)—— 未登入首頁的借用情形預覽讀這一組,社團端與行政端的同一張色格圖也讀它,不另開第二份。全部唯讀 GET;帶著有效 session 進來時仍認得使用者(社團看得到自己的 `mine` 格),認不出來就當訪客
 - **CSRF**:登入時發 `csrf_token` cookie(非 HttpOnly,double-submit 綁 session 列);除 `/auth/login`(此時尚無 session)外,所有寫入請求須帶 `X-CSRF-Token`,前端 `client.ts` 自動附帶
 
 ## 5. Repo 結構

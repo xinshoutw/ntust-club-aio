@@ -10,7 +10,7 @@
 
 | 動作 | 端點 |
 |---|---|
-| 場地主檔 | `GET /club/venues`(取 `allow_temp`) |
+| 場地主檔 | `GET /public/venues`(取 `allow_temp`) |
 | 關聯活動下拉 | `GET /club/activities?status=approved&ended=false`(已結束由後端篩掉);查詢失敗時下拉說「活動清單載入失敗」,不說「無審核通過之活動」 |
 | 正在申請 / 最近申請 | `GET /club/venue-bookings?active=true\|false` |
 | 送出 | `POST /club/venue-bookings` |

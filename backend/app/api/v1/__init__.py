@@ -28,6 +28,7 @@ from app.api.v1 import (
     club_profile,
     files,
     members,
+    public,
     signups,
     staff,
     viewer_eval,
@@ -41,6 +42,7 @@ router = APIRouter()
 router.include_router(auth.router)
 router.include_router(badges.router)
 router.include_router(files.router)
+router.include_router(public.router)
 router.include_router(club_config.router)
 router.include_router(club_profile.router)
 router.include_router(members.router)

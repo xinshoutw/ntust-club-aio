@@ -637,7 +637,7 @@ async def test_availability_grid_statuses(client, db):
 
     await login(client, "club01")
     grid = (
-        await client.get("/api/v1/club/bookings/availability", params={"date": thu.isoformat()})
+        await client.get("/api/v1/public/bookings/availability", params={"date": thu.isoformat()})
     ).json()["data"]["grid"]
     # 本社的臨時申請仍在審核中 → pending(非 mine);格帶社團名供 hover
     assert grid[str(venue.id)]["3"] == {"status": "pending", "club": "熱舞社"}
@@ -650,20 +650,20 @@ async def test_availability_grid_statuses(client, db):
     )
     await db.commit()
     grid = (
-        await client.get("/api/v1/club/bookings/availability", params={"date": thu.isoformat()})
+        await client.get("/api/v1/public/bookings/availability", params={"date": thu.isoformat()})
     ).json()["data"]["grid"]
     assert grid[str(fixed_venue.id)]["5"] == {"status": "fixed", "club": "吉他社"}
     # 每週固定:下週同星期也佔用,不同星期不佔用
     grid = (
         await client.get(
-            "/api/v1/club/bookings/availability",
+            "/api/v1/public/bookings/availability",
             params={"date": (thu + timedelta(days=7)).isoformat()},
         )
     ).json()["data"]["grid"]
     assert grid[str(fixed_venue.id)]["5"]["status"] == "fixed"
     grid = (
         await client.get(
-            "/api/v1/club/bookings/availability",
+            "/api/v1/public/bookings/availability",
             params={"date": (thu + timedelta(days=1)).isoformat()},
         )
     ).json()["data"]["grid"]
@@ -710,7 +710,7 @@ async def test_availability_range(client, db):
 
     days = (
         await client.get(
-            "/api/v1/club/bookings/availability-range",
+            "/api/v1/public/bookings/availability-range",
             params={"start": wed.isoformat(), "end": next_thu.isoformat()},
         )
     ).json()["data"]["days"]
@@ -728,7 +728,7 @@ async def test_availability_range(client, db):
     # venue 篩選(單一場地檢視):只回該場地的格
     days = (
         await client.get(
-            "/api/v1/club/bookings/availability-range",
+            "/api/v1/public/bookings/availability-range",
             params={"start": wed.isoformat(), "end": next_thu.isoformat(), "venue": fixed_venue.id},
         )
     ).json()["data"]["days"]
@@ -738,12 +738,12 @@ async def test_availability_range(client, db):
 
     # 區間驗證:起訖顛倒、超出上限
     resp = await client.get(
-        "/api/v1/club/bookings/availability-range",
+        "/api/v1/public/bookings/availability-range",
         params={"start": "2026-03-05", "end": "2026-03-04"},
     )
     assert resp.status_code == 422
     resp = await client.get(
-        "/api/v1/club/bookings/availability-range",
+        "/api/v1/public/bookings/availability-range",
         params={"start": "2026-03-01", "end": "2026-04-15"},
     )
     assert resp.status_code == 422
@@ -778,7 +778,7 @@ async def test_fixed_booking_scoped_to_target_semester(client, db):
 
     async def grid_of(day: date) -> dict:
         resp = await client.get(
-            "/api/v1/club/bookings/availability", params={"date": day.isoformat()}
+            "/api/v1/public/bookings/availability", params={"date": day.isoformat()}
         )
         return resp.json()["data"]["grid"]
 
@@ -1008,7 +1008,7 @@ async def test_equipment_usage_by_day(client, db):
     await db.commit()
 
     resp = await client.get(
-        "/api/v1/club/equipment/usage",
+        "/api/v1/public/equipment/usage",
         params={"start": today.isoformat(), "end": (today + timedelta(days=3)).isoformat()},
     )
     row = next(e for e in resp.json()["data"] if e["id"] == eq.id)
@@ -1023,13 +1023,13 @@ async def test_equipment_usage_by_day(client, db):
     # 區間上限與反向區間
     assert (
         await client.get(
-            "/api/v1/club/equipment/usage",
+            "/api/v1/public/equipment/usage",
             params={"start": today.isoformat(), "end": (today + timedelta(days=40)).isoformat()},
         )
     ).status_code == 422
     assert (
         await client.get(
-            "/api/v1/club/equipment/usage",
+            "/api/v1/public/equipment/usage",
             params={"start": today.isoformat(), "end": (today - timedelta(days=1)).isoformat()},
         )
     ).status_code == 422

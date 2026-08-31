@@ -356,3 +356,13 @@ test('viewer=club:備註看得到,章軌與大型認可都收掉', () => {
   expect(screen.queryByText('認可為大型活動')).toBeNull()
   expect(screen.queryByText('承')).toBeNull() // 章軌
 })
+
+// 草稿可以只填一半,而地點後端是 str(空字串);社團端現在開的是同一支彈窗,
+// `?? '—'` 只擋 null,空字串會留下一格空白,看起來像畫面掉了
+test('地點是空字串時印 —,不是留一格空白', () => {
+  show([budgetRow(1, 0)], { detail: { attachments: [], budget: [], location: '' } })
+
+  const labels = [...document.querySelectorAll('div')].filter((d) => d.textContent === '活動地點')
+  expect(labels.length).toBeGreaterThan(0)
+  expect(labels[0].nextElementSibling?.textContent).toBe('—')
+})

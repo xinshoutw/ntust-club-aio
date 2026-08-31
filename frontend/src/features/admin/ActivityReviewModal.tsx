@@ -685,7 +685,9 @@ export default function ActivityReviewModal({
               {d?.submittedBy ? ` · ${d.submittedBy}` : ''}
             </div>
             <div style={detailLabel}>活動時間</div><div className="num">{d?.timeRange ?? item.date}</div>
-            <div style={detailLabel}>活動地點</div><div>{d?.location ?? '—'}</div>
+            {/* 草稿可以只填一半,而地點後端是 str(空字串);`??` 只擋 null,
+                空字串會印成一格空白,看起來像畫面掉了 */}
+            <div style={detailLabel}>活動地點</div><div>{d?.location || '—'}</div>
             <div style={detailLabel}>預期人數</div>
             <div>
               社員 <span className="num">{d?.participantsIn ?? '—'}</span> · 非社員{' '}

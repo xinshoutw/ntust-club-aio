@@ -1,6 +1,7 @@
 """`/public/*`:未登入首頁、社團端借用總覽、行政端場況圖共用的同一份色格資料。
 
-四支都不必登入;登入中的社團仍拿得到 `mine`(自己已核准的借用另外上色)。
+四支都不必登入;登入中的社團仍拿得到 `mine`(自己已核准的借用另外上色),
+審這一關的承辦(`abooking`)另外拿得到每格的待審單清單。
 """
 
 from datetime import date, timedelta
@@ -107,6 +108,68 @@ async def test_block_reasons_are_admin_free_text_and_stay_private(client, db):
     await login(client, "club01")
     signed_in = await client.get("/api/v1/public/bookings/availability", params={"date": iso})
     assert blocked(signed_in.json()) == {"status": "blocked", "club": "熱舞社違規停用"}
+
+
+async def test_pending_list_is_for_the_officer_who_reviews_them(client, db):
+    """待審單清單只給 `abooking`:已核准或不開放蓋掉格色,底下壓著誰的申請仍看得見。"""
+    venue, _ = await seed(db)
+    other = await make_club(db, name="吉他社")
+    await make_user(db, username="bookadmin", role="admin", permissions=["abooking"])
+    await make_user(db, username="viol", role="admin", permissions=["aviol"])
+    admin_id = await db.scalar(sa.select(User.id).order_by(User.id).limit(1))
+
+    def booking(club_id, periods, status="pending"):
+        return VenueBooking(
+            club_id=club_id, venue_id=venue.id, activity_id=None, date=DAY,
+            periods=periods, purpose="彩排", status=status,
+        )
+
+    # "3" 已有本社已核准的借用(seed),再壓一張他社待審 → 格色是已核准,待審單仍在
+    covered = booking(other.id, ["3"])
+    # "9" 兩社搶同一格,兩筆都要在;"7" 被不開放規則蓋掉,待審單同樣要留著
+    first, second = booking(other.id, ["9", "7"]), booking(None, ["9"])
+    db.add_all([covered, first, second])
+    db.add(
+        VenueBlockRule(
+            venue_id=venue.id, start_date=DAY, end_date=DAY, weekdays=[],
+            periods=["7"], reason="行政徵用", created_by=admin_id,
+        )
+    )
+    await db.commit()
+    await db.refresh(covered)
+    await db.refresh(first)
+    await db.refresh(second)
+    iso = DAY.isoformat()
+
+    async def grid(username: str | None) -> dict:
+        if username:
+            await login(client, username)
+        resp = await client.get("/api/v1/public/bookings/availability", params={"date": iso})
+        return resp.json()["data"]["grid"][str(venue.id)]
+
+    # 匿名、社團、沒有這把鍵的管理員:整個 pending 欄位都不存在
+    for who in (None, "club01", "viol"):
+        cells = await grid(who)
+        assert all("pending" not in c for c in cells.values()), who
+        client.cookies.clear()
+
+    cells = await grid("bookadmin")
+    assert cells["3"]["status"] == "temp"  # 已核准蓋過審核中
+    assert cells["3"]["pending"] == [{"id": covered.id, "club": "吉他社", "kind": "temp"}]
+    assert cells["7"]["status"] == "blocked"  # 不開放蓋過一切
+    assert cells["7"]["pending"] == [{"id": first.id, "club": "吉他社", "kind": "temp"}]
+    # 同一格多筆:依申請 id 即送件序,行政手動借用顯示「學務處」
+    assert cells["9"]["pending"] == [
+        {"id": first.id, "club": "吉他社", "kind": "temp"},
+        {"id": second.id, "club": "學務處", "kind": "temp"},
+    ]
+    # 區間端點同一份判定
+    days = (
+        await client.get(
+            "/api/v1/public/bookings/availability-range", params={"start": iso, "end": iso}
+        )
+    ).json()["data"]["days"]
+    assert days[0]["grid"][str(venue.id)]["7"]["pending"][0]["id"] == first.id
 
 
 async def test_public_endpoints_need_no_login(client, db):

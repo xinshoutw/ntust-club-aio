@@ -700,11 +700,15 @@ async def blocked_periods(
     return [p for p in periods if p in hit]
 
 
+# 格色權重:mine 優先顯示;已核准蓋過審核中;不開放(blocked)蓋過一切
+_CELL_RANK = {"pending": 0, "temp": 1, "fixed": 1, "mine": 2, "blocked": 3}
+
+
 async def availability_grid(
-    db: AsyncSession, day: date, own_club_id: int | None
+    db: AsyncSession, day: date, own_club_id: int | None, *, with_pending: bool = False
 ) -> dict[int, dict[str, dict]]:
     """單日場況(區間版的特例);格式見 availability_grids。"""
-    return (await availability_grids(db, day, day, own_club_id))[day]
+    return (await availability_grids(db, day, day, own_club_id, with_pending=with_pending))[day]
 
 
 async def availability_grids(
@@ -713,6 +717,8 @@ async def availability_grids(
     end: date,
     own_club_id: int | None,
     venue_id: int | None = None,
+    *,
+    with_pending: bool = False,
 ) -> dict[date, dict[int, dict[str, dict]]]:
     """逐日場況:日 → 場地 × 節次 → {status, club}。
     status:pending(審核中)/temp(臨時)/fixed(固定)/mine(自己已核准);club=借用社團名(hover 顯示)。
@@ -724,18 +730,27 @@ async def availability_grids(
     - 區間一次撈(單一場地 15 天檢視原逐日 15 請求,2026-07-17 改批次);
       venue_id 給定時(單一場地檢視)SQL 端即縮小到該場地
     - 兩查詢皆 ORDER BY id:同一格多筆待審時,hover 顯示哪一社不隨 PG 回傳順序變動
+    - `with_pending` 另給每格 `pending`:該格**全部**待審單 [{id, club, kind}],
+      id 僅臨時借用有(供點格開審核彈窗),固定借用要到 /admin/rooms 審。
+      已核准或不開放蓋掉格色之後,被蓋掉的待審單仍留在這裡 —— 承辦最需要看見的正是
+      「這格已被核准,底下還壓著誰的申請」。誰拿得到由呼叫端決定(見 api/v1/public)
     """
     grids: dict[date, dict[int, dict[str, dict]]] = {
         start + timedelta(days=i): {} for i in range((end - start).days + 1)
     }
 
-    def mark(day: date, venue_id: int, period: str, status: str, club: str) -> None:
+    def mark(day: date, venue_id: int, period: str, status: str, club: str) -> dict:
         cell = grids[day].setdefault(venue_id, {})
-        # mine 優先顯示;已核准蓋過審核中;不開放(blocked)蓋過一切
-        rank = {"pending": 0, "temp": 1, "fixed": 1, "mine": 2, "blocked": 3}
         current = cell.get(period)
-        if current is None or rank[status] > rank[current["status"]]:
-            cell[period] = {"status": status, "club": club}
+        if current is None:
+            current = {"status": status, "club": club}
+            if with_pending:
+                current["pending"] = []
+            cell[period] = current
+        elif _CELL_RANK[status] > _CELL_RANK[current["status"]]:
+            # 就地改格色,不換掉整格 —— 換掉的話累積到一半的 pending 會跟著不見
+            current["status"], current["club"] = status, club
+        return current
 
     temp_query = (
         sa.select(VenueBooking, Club.name)
@@ -759,8 +774,11 @@ async def availability_grids(
             status = "mine" if mine else "temp"
         else:
             status = "pending"
+        name = club_name or "學務處"
         for period in booking.periods:
-            mark(booking.date, booking.venue_id, period, status, club_name or "學務處")
+            cell = mark(booking.date, booking.venue_id, period, status, name)
+            if with_pending and status == "pending":
+                cell["pending"].append({"id": booking.id, "club": name, "kind": "temp"})
 
     fixed_query = (
         sa.select(RoomBookingSlot, RoomBookingRequest, Club.name)
@@ -790,7 +808,10 @@ async def availability_grids(
                 status = "pending"
             else:
                 status = "mine" if request.club_id == own_club_id else "fixed"
-            mark(day, request.venue_id, slot.period, status, club_name)
+            cell = mark(day, request.venue_id, slot.period, status, club_name)
+            if with_pending and status == "pending":
+                # 固定借用沒有 id:承辦在這張圖上標示得到,但要到「固定場地借用審核」才審得了
+                cell["pending"].append({"id": None, "club": club_name, "kind": "fixed"})
 
     # 不開放規則:蓋過一切;hover 顯示原因
     for (day, vid), cells in (await blocked_map(db, start, end, venue_id)).items():

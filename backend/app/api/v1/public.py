@@ -11,7 +11,7 @@ from datetime import date
 import sqlalchemy as sa
 from fastapi import APIRouter
 
-from app.core.deps import DbDep, OptionalUser
+from app.core.deps import DbDep, OptionalUser, admin_with
 from app.core.errors import validation_error
 from app.models import Equipment, Venue
 from app.schemas.auth import PeriodOut
@@ -22,6 +22,15 @@ from app.services import booking_service as svc
 router = APIRouter(prefix="/public", tags=["public"])
 
 MAX_AVAILABILITY_SPAN_DAYS = 31  # 單一場地 15 天檢視用;上限防範圍濫用
+
+
+def _sees_pending(user) -> bool:
+    """待審單清單只給審這一關的承辦(`abooking`)。
+
+    社團與匿名不該知道別人送了什麼還沒過 —— 格色已經說了「這個時段有人在等」,
+    是誰在等是審核端的事。
+    """
+    return admin_with("abooking", user)
 
 
 def _strip_block_reasons(grid: dict) -> dict:
@@ -54,7 +63,9 @@ async def list_venues(db: DbDep) -> ApiResponse[list[VenueOut]]:
 
 @router.get("/bookings/availability")
 async def availability(user: OptionalUser, db: DbDep, date: date) -> ApiResponse[dict]:
-    grid = await svc.availability_grid(db, date, user.club_id if user else None)
+    grid = await svc.availability_grid(
+        db, date, user.club_id if user else None, with_pending=_sees_pending(user)
+    )
     if user is None:
         _strip_block_reasons(grid)
     return ApiResponse(data={"date": date.isoformat(), "grid": grid})
@@ -73,7 +84,12 @@ async def availability_range(
     if (end - start).days + 1 > MAX_AVAILABILITY_SPAN_DAYS:
         raise validation_error(f"查詢區間最多 {MAX_AVAILABILITY_SPAN_DAYS} 天")
     grids = await svc.availability_grids(
-        db, start, end, user.club_id if user else None, venue_id=venue
+        db,
+        start,
+        end,
+        user.club_id if user else None,
+        venue_id=venue,
+        with_pending=_sees_pending(user),
     )
     if user is None:
         for grid in grids.values():

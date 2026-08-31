@@ -90,37 +90,46 @@ function Cell({ state, label, club, pending, bookable, bookLabel, onBook, onOpen
       state !== 'reviewing' && pending?.length ? `inset 0 0 0 2px ${CELL.reviewing.bg}` : undefined,
   }
   const suffix = pendingText(pending)
-  const title = (club ? `${club}・${CELL[state].label}` : CELL[state].label) + suffix
+  // 審核中格的社名就是待審單裡那一筆,不再括號重覆一次
+  const owner = club && state !== 'reviewing' ? club : undefined
+  const title = (owner ? `${owner}・${CELL[state].label}` : CELL[state].label) + suffix
 
   if (openable.length > 0) {
+    const many = openable.length > 1
     const button = (
       <button
         type="button"
-        aria-label={`${label}${club ? `(${club})` : ''}${suffix},點擊開啟審核`}
+        // 多筆點下去開的是選單不是彈窗,唸出來要對得上
+        aria-label={`${owner ? `${label}(${owner})` : label}${suffix},點擊${many ? '選擇要審核的申請' : '開啟審核'}`}
+        aria-haspopup={many ? 'menu' : undefined}
         // 多筆時點擊由 Dropdown 接手,自己不掛 onClick
-        onClick={openable.length === 1 ? () => onOpenPending?.(openable[0]) : undefined}
+        onClick={many ? undefined : () => onOpenPending?.(openable[0])}
         style={{ ...base, border: 'none', padding: 0, cursor: 'pointer' }}
       />
     )
     // 同一格多筆待審(兩社搶同一格):每一筆都要點得到,不能只留一筆
-    const el =
-      openable.length > 1 ? (
-        <Dropdown
-          trigger={['click']}
-          menu={{
-            items: openable.map((p) => ({
-              key: String(p.id),
-              label: `審核 ${p.club} 的申請`,
-              onClick: () => onOpenPending?.(p),
-            })),
-          }}
-        >
-          {button}
-        </Dropdown>
-      ) : (
-        button
-      )
-    return <Tooltip title={title}>{el}</Tooltip>
+    const el = many ? (
+      <Dropdown
+        trigger={['click']}
+        menu={{
+          items: openable.map((p) => ({
+            key: String(p.id),
+            label: `審核 ${p.club} 的申請`,
+            onClick: () => onOpenPending?.(p),
+          })),
+        }}
+      >
+        {button}
+      </Dropdown>
+    ) : (
+      button
+    )
+    // 承辦在格陣間橫掃著看,tooltip 不留延遲
+    return (
+      <Tooltip title={title} mouseEnterDelay={0}>
+        {el}
+      </Tooltip>
+    )
   }
 
   if (state === 'free' && bookable) {
@@ -134,11 +143,17 @@ function Cell({ state, label, club, pending, bookable, bookLabel, onBook, onOpen
     )
   }
   const cell = (
-    <div role="img" aria-label={`${club ? `${label}(${club})` : label}${suffix}`} style={base} />
+    <div role="img" aria-label={`${owner ? `${label}(${owner})` : label}${suffix}`} style={base} />
   )
   // 有社名或有待審單才掛 tooltip:被佔用格是借用社團,不開放格是原因
   // (未登入時後端不給原因,那些格就沒有 hover)
-  return club || pending?.length ? <Tooltip title={title}>{cell}</Tooltip> : cell
+  return club || pending?.length ? (
+    <Tooltip title={title} mouseEnterDelay={0}>
+      {cell}
+    </Tooltip>
+  ) : (
+    cell
+  )
 }
 
 function Legend({ items }: { items: readonly { label: string; bg: string }[] }) {

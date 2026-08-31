@@ -2,6 +2,7 @@ import { beforeEach, expect, test, vi } from 'vitest'
 import dayjs from 'dayjs'
 import { fireEvent, render, screen } from '@testing-library/react'
 import BookingGrid from './BookingGrid'
+import { taipeiToday } from '../../lib/today'
 import type { Period } from '../../api/auth'
 
 // 三個呼叫端的差別只有四件事:格子點不點得動、過去日期放不放行、圖例列不列「我的借用」、
@@ -19,6 +20,7 @@ let catalogue: {
 }
 let usage: { start: string; end: string; items: unknown[] } | undefined
 let grid: Record<string, Record<string, unknown>> = {}
+let range: Record<string, Record<string, Record<string, unknown>>> = {}
 
 vi.mock('../../app/auth', () => ({ useAuth: () => ({ user }) }))
 vi.mock('../../lib/periods', async (orig) => ({
@@ -32,7 +34,7 @@ vi.mock('../../api/bookings', () => ({
     isError: false,
   }),
   useAvailability: () => ({ data: grid, isPending: false, isError: false }),
-  useAvailabilityDays: () => ({ isPending: false, isError: false, byDate: {}, refetchErrored: () => {} }),
+  useAvailabilityDays: () => ({ isPending: false, isError: false, byDate: range, refetchErrored: () => {} }),
   useEquipmentUsage: () => ({ data: usage, isPending: false, isError: false, isLoadingError: false }),
   venueLabel: (v: { name: string }) => v.name,
 }))
@@ -42,6 +44,7 @@ beforeEach(() => {
   catalogue = { periods: [P3], isPending: false, isLoadingError: false, refetch: vi.fn() }
   usage = undefined
   grid = {}
+  range = {}
 })
 
 /** 已核准的格子(粉色)底下壓著兩張待審單 —— 只有審核端拿得到 pending */
@@ -130,7 +133,31 @@ test('待審單:格色被已核准蓋掉,底下的申請仍點得開,並在說�
   render(<BookingGrid onOpenPending={onOpenPending} />)
   const cell = screen.getByRole('button', { name: /點擊開啟審核/ })
   expect(cell.getAttribute('aria-label')).toContain('待審:熱舞社')
+  // 格色不是「審核中」時要描橘框,否則被蓋掉的那顆可點格在畫面上根本不存在
+  expect(cell.style.boxShadow).toContain('inset')
   fireEvent.click(cell)
+  expect(onOpenPending).toHaveBeenCalledTimes(1)
+  expect(onOpenPending).toHaveBeenCalledWith({ id: 11, club: '熱舞社', kind: 'temp' })
+})
+
+test('待審單:整格只有固定借用時看得到也標得到,但點不了', () => {
+  const onOpenPending = vi.fn()
+  grid = { 7: { 3: { status: 'pending', club: '弓道社', pending: [{ id: null, club: '弓道社', kind: 'fixed' }] } } }
+  render(<BookingGrid onOpenPending={onOpenPending} />)
+  expect(screen.queryByRole('button', { name: /審核/ })).toBeNull()
+  const cell = screen.getByRole('img', { name: /待審/ })
+  expect(cell.getAttribute('aria-label')).toContain('弓道社(固定借用)')
+  // 審核中格的社名已經在「待審:」裡,不再括號重覆一次
+  expect(cell.getAttribute('aria-label')).not.toContain('(弓道社)')
+})
+
+test('待審單:單一場地 15 天檢視也吃同一份判定', () => {
+  const onOpenPending = vi.fn()
+  const iso = taipeiToday().format('YYYY-MM-DD')
+  range = { [iso]: { 7: { 3: { status: 'temp', club: '吉他社', pending: [{ id: 11, club: '熱舞社', kind: 'temp' }] } } } }
+  render(<BookingGrid onOpenPending={onOpenPending} />)
+  fireEvent.click(screen.getByRole('button', { name: /檢視 精誠廣場/ }))
+  fireEvent.click(screen.getByRole('button', { name: /點擊開啟審核/ }))
   expect(onOpenPending).toHaveBeenCalledWith({ id: 11, club: '熱舞社', kind: 'temp' })
 })
 
@@ -148,10 +175,14 @@ test('待審單:同一格多筆要每筆都點得到,固定借用標示得到但
     { id: null, club: '弓道社', kind: 'fixed' },
   ])
   render(<BookingGrid onOpenPending={onOpenPending} />)
-  const cell = screen.getByRole('button', { name: /點擊開啟審核/ })
+  const cell = screen.getByRole('button', { name: /點擊選擇要審核的申請/ })
+  expect(cell.getAttribute('aria-haspopup')).toBe('menu')
   expect(cell.getAttribute('aria-label')).toContain('弓道社(固定借用)')
+  // 多筆時格子本身不直接開彈窗,點下去只出選單
   fireEvent.click(cell)
+  expect(onOpenPending).not.toHaveBeenCalled()
   fireEvent.click(screen.getByText('審核 吉他社 的申請'))
+  expect(onOpenPending).toHaveBeenCalledTimes(1)
   expect(onOpenPending).toHaveBeenCalledWith({ id: 12, club: '吉他社', kind: 'temp' })
   // 固定借用沒有申請 id,選單裡不該出現
   expect(screen.queryByText('審核 弓道社 的申請')).toBeNull()

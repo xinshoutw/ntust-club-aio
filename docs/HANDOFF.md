@@ -91,7 +91,7 @@ D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)
 ## 驗證現況
 
 - 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **555 passed**;`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **232 passed**(51 檔)、
+- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **234 passed**(51 檔)、
   `pnpm run lint` 8 個既有的 fast-refresh warning
 - 新測試逐一做過 mutation 驗證(改回舊寫法會紅);借用色格圖那支另在 `TZ=UTC` 與 `TZ=Pacific/Honolulu` 下各跑過一次
 

@@ -248,8 +248,8 @@ def _field_max_length(model, field: str) -> int:
 
 
 def test_opinion_residual_drops_the_boilerplate_the_new_form_prints_itself():
-    """舊審核意見裡 1,387 / 1,518 筆的全部內容就是那段「※…結報提醒」,而新系統的
-    申請表由 `pdf._APPLY_NOTE` 自己產一份 —— 原文照搬會在「意見回饋」那格印兩次。
+    """舊審核意見裡 1,387 / 1,518 筆的全部內容就是那段「※…結報提醒」——
+    新系統本身會催結案,那段話原文照搬只是把「意見回饋」那格塞滿樣板。
     留下來的必須只有承辦人真正寫的那句。"""
     assert cms_import.opinion_residual(None) == ""
     assert cms_import.opinion_residual("※請於活動後2周內上傳結報。表格如網址：https://x") == ""

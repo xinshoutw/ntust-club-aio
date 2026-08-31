@@ -4,7 +4,6 @@ import sqlalchemy as sa
 
 from app.models import Activity, ActivityBudgetItem, Club
 from app.services.pdf import (
-    _APPLY_NOTE,
     _apply_footnote,
     _apply_opinion,
     _approved_text,
@@ -99,9 +98,13 @@ def test_apply_pdf_falls_back_for_glyphs_kai_lacks():
     assert "拾穗" in markup and "十歲" in markup
 
 
-def test_apply_pdf_opinion_always_carries_the_close_report_notice():
-    """經費來源可能是空的(沒申請經費);結報提醒不論如何都要在意見回饋裡。"""
-    def opinion_of(fund_source: str | None) -> str:
+def test_apply_pdf_opinion_prints_only_what_the_reviewer_wrote():
+    """意見回饋 = 經費來源 + 審核備註,各佔一行,兩者都可能是空的。
+
+    這裡曾固定接一段結報提醒 —— 系統本身會催結案(逾期鎖定與通知),
+    每張紙都印同一句話沒有人會讀,而它還會蓋掉承辦人真正想說的那句。
+    """
+    def opinion_of(fund_source: str | None, admin_note: str | None = None) -> str:
         activity = Activity(
             name="活動",
             content="",
@@ -112,14 +115,20 @@ def test_apply_pdf_opinion_always_carries_the_close_report_notice():
             participants_out=0,
             staff_text="",
             fund_source=fund_source,
+            admin_note=admin_note,
             created_at=datetime(2026, 2, 1, 9, 30, tzinfo=UTC),
             budget_items=[],
         )
         return _apply_opinion(activity)
 
-    assert opinion_of(None) == _APPLY_NOTE
-    assert opinion_of("   ") == _APPLY_NOTE
-    assert opinion_of("由三校文化基金會支應") == f"由三校文化基金會支應\n{_APPLY_NOTE}"
+    assert opinion_of(None) == ""
+    assert opinion_of("   ") == ""
+    assert opinion_of("由三校文化基金會支應") == "由三校文化基金會支應"
+    assert opinion_of(None, "核銷單據請於 9/30 前送件") == "核銷單據請於 9/30 前送件"
+    assert (
+        opinion_of("由三校文化基金會支應", "核銷單據請於 9/30 前送件")
+        == "由三校文化基金會支應\n核銷單據請於 9/30 前送件"
+    )
 
 
 async def test_approver_names_fill_stages_not_the_first_three_approvals(client, db):

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { App, Button, Checkbox, Input, InputNumber, Modal, Segmented, Skeleton, Tooltip } from 'antd'
+import { DownloadOutlined } from '@ant-design/icons'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import SectionTitle from '../../components/ui/SectionTitle'
@@ -133,7 +134,9 @@ function ApprovalLog({ rows }: { rows: ReviewApproval[] }) {
   )
 }
 
-/** 申請附件與結案附件:同一種呈現,點開站內預覽彈窗(不另開分頁) */
+/** 申請附件與結案附件:同一種呈現,檔名點開站內預覽彈窗(不另開分頁),右側附下載鈕。
+ *  下載鈕不能省:預覽窗只給**不能線上看**的檔(zip、舊 .doc)下載入口,
+ *  圖片與 PDF 走預覽分支,少了這顆就完全沒有地方把附件存下來 */
 function FileLinks({
   files,
   onPreview,
@@ -154,6 +157,15 @@ function FileLinks({
             onClick={() => onPreview(f)}
           >
             {f.name}
+          </button>
+          <button
+            type="button"
+            className="link-btn"
+            aria-label={`下載 ${f.name}`}
+            style={{ padding: '0 4px' }}
+            onClick={() => downloadEvalFile(toEvalFile(f))}
+          >
+            <DownloadOutlined style={{ fontSize: 12, color: 'var(--steel)' }} />
           </button>
         </span>
       ))}

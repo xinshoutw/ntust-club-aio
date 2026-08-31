@@ -52,7 +52,7 @@ export interface ReviewItem {
     content?: string
     works?: WorkItem[]
     attachments: string[]
-    attachmentFiles?: { id: string; name: string; url: string }[]
+    attachmentFiles?: AdminFileRef[]
     budget: {
       id: number
       category: string
@@ -115,6 +115,8 @@ export interface AdminFileRef {
   id: string
   name: string
   url: string
+  /** 位元組;預覽窗的標題印它 —— 寫死 0 會讓每個檔都印成「1 KB」 */
+  size: number
 }
 
 export interface AdminCloseReport {
@@ -262,14 +264,19 @@ const toAdminActivity = (o: AdminActivityOut): AdminActivity => ({
   reviewedAt: o.reviewed_at ? slashDateTime(o.reviewed_at) : undefined,
 })
 
-const toFileRef = (f: FileOut): AdminFileRef => ({ id: f.id, name: f.original_name, url: fileUrl(f.id) })
+const toFileRef = (f: FileOut): AdminFileRef => ({
+  id: f.id,
+  name: f.original_name,
+  url: fileUrl(f.id),
+  size: f.size,
+})
 
 /** AdminFileRef → EvalFile(FilePreview 直接吃);型別以副檔名推導、後端未附 mime 與上傳時間 */
 export const toEvalFile = (f: AdminFileRef): EvalFile => ({
   id: f.id,
   name: f.name,
   type: fileTypeOf(f.name),
-  size: 0,
+  size: f.size,
   url: f.url,
   uploadedAt: '',
 })

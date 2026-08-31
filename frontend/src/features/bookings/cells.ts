@@ -21,7 +21,8 @@ export const UNAVAILABLE_BG: Record<'blocked' | 'fixed' | 'temp', string> = {
 }
 
 /** 未佔用格的狀態:能臨時借就是可借;只開放固定借用的借不到,但那不是「不開放」。
- * 社團端與行政端的場況圖共用這條判定,兩邊的空格才不會講不同的話。 */
+ * 社團端、行政端與未登入首頁是同一張圖(features/bookings/BookingGrid.tsx),
+ * 這條判定跟著只有一份。 */
 export const emptyCellState = (venue: { allowFixed: boolean; allowTemp: boolean }): CellState =>
   venue.allowTemp ? 'free' : venue.allowFixed ? 'fixedOnly' : 'closed'
 

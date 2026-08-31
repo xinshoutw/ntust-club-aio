@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import dayjs, { type Dayjs } from 'dayjs'
+import { type Dayjs } from 'dayjs'
 import { Button, DatePicker, Segmented, Select, Tooltip } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import {
@@ -11,7 +11,7 @@ import {
 } from '@ant-design/icons'
 import QueryError from '../../components/ui/QueryError'
 import { useAuth } from '../../app/auth'
-import { periodKeys, usePeriods } from '../../lib/periods'
+import { periodKeys, usePeriodCatalogue } from '../../lib/periods'
 import {
   useAvailability,
   useAvailabilityDays,
@@ -56,20 +56,21 @@ function cellOf(
 // 單一場地格:可借才可點(呼叫端決定去哪一頁申請);審核中不可點;不開放不畫方框。
 // 過去日期只供查閱歷史借用,空格不是可申請的入口(bookable=false)。
 // 被佔用格 hover 顯示借用社團名(mine 顯示「我的社團」語意由色塊表達,仍附社名)
-function Cell({ state, label, club, bookable, onBook }: { state: CellState; label: string; club?: string; bookable: boolean; onBook: () => void }) {
+function Cell({ state, label, club, bookable, bookLabel, onBook }: { state: CellState; label: string; club?: string; bookable: boolean; bookLabel: string; onBook: () => void }) {
   const base: React.CSSProperties = { width: '100%', height: 24, borderRadius: 4, background: CELL[state].bg, display: 'block' }
   if (state === 'free' && bookable) {
     return (
       <button
         type="button"
-        aria-label={`${label},點擊前往借用`}
+        aria-label={`${label},點擊前往${bookLabel}`}
         onClick={onBook}
         style={{ ...base, border: 'none', padding: 0, cursor: 'pointer' }}
       />
     )
   }
   const cell = <div role="img" aria-label={club ? `${label}(${club})` : label} style={base} />
-  // 被佔用格(有社團名)才掛 tooltip;不開放格無社名不掛
+  // 有社名才掛 tooltip:被佔用格是借用社團,不開放格是原因
+  // (未登入時後端不給原因,那些格就沒有 hover)
   return club ? <Tooltip title={`${club}・${CELL[state].label}`}>{cell}</Tooltip> : cell
 }
 
@@ -87,12 +88,12 @@ function Legend({ items }: { items: readonly { label: string; bg: string }[] }) 
 }
 
 // 器材格:借用程度上色;未借滿且非過去日可點,直接帶品項與日期跳到器材借用
-function UsageCell({ label, bg, bookable, onBook }: { label: string; bg: string; bookable: boolean; onBook: () => void }) {
+function UsageCell({ label, bg, bookable, bookLabel, onBook }: { label: string; bg: string; bookable: boolean; bookLabel: string; onBook: () => void }) {
   const base: React.CSSProperties = { width: '100%', height: 24, borderRadius: 4, background: bg, display: 'block' }
   const cell = bookable ? (
     <button
       type="button"
-      aria-label={`${label},點擊前往借用`}
+      aria-label={`${label},點擊前往${bookLabel}`}
       onClick={onBook}
       style={{ ...base, border: 'none', padding: 0, cursor: 'pointer' }}
     />
@@ -108,18 +109,26 @@ interface BookingGridProps {
   onBookEquipment?: (equipmentId: number, date: Dayjs) => void
   /** 過去日期也可點:行政端手動借用刻意放行(補登紙本舊件正是它的用途) */
   allowPast?: boolean
+  /** 可點格的目的地,唸給螢幕閱讀器聽 —— 三個呼叫端去的不是同一頁 */
+  bookLabel?: string
 }
 
 /** 借用情形色格圖:場地(單日全場地 / 單一場地 15 天)與器材(15 天借用程度)兩種檢視。
  *  社團端借用總覽、行政端臨時場地器材借用、未登入首頁共用這一份 —— 同一張圖只有一個實作。 */
-export default function BookingGrid({ onBookVenue, onBookEquipment, allowPast = false }: BookingGridProps) {
-  const periodAxis = periodKeys(usePeriods())
+export default function BookingGrid({
+  onBookVenue,
+  onBookEquipment,
+  allowPast = false,
+  bookLabel = '借用申請',
+}: BookingGridProps) {
+  const periodCatalogue = usePeriodCatalogue()
+  const periodAxis = periodKeys(periodCatalogue.periods)
   // 「我的借用」只有社團帳號標得出來(後端以 own_club_id 判定);
   // 行政端與未登入首頁列了也永遠不會出現,圖例就不該有那一格
   const isClub = useAuth().user?.role === 'club'
   // 同一張圖兩種資料:場地看節次佔用、器材看借出比例
   const [view, setView] = useState<'venue' | 'equipment'>('venue')
-  const [gridDate, setGridDate] = useState<Dayjs>(() => dayjs())
+  const [gridDate, setGridDate] = useState<Dayjs>(() => taipeiToday())
   // 場地檢視:點場地名稱進入,以當時檢視日為中心 −7~+7 共 15 天。
   // 過去日期可查(查歷史借用紀錄的唯一入口),只是空格不能拿來申請
   const [venueView, setVenueView] = useState<number | null>(null)
@@ -158,7 +167,11 @@ export default function BookingGrid({ onBookVenue, onBookEquipment, allowPast = 
     setVenueStart(gridDate.startOf('day').subtract(7, 'day'))
   }
 
-  const gridPending = isEquipmentView
+  // 節次目錄拿不到就畫不出欄:那張沒有節次的表和「今天沒有節次」長得一樣,
+  // 兩種檢視都得先過這一關(器材的欄是日期,但沒有節次目錄一樣代表資料源有問題)
+  const gridPending = periodCatalogue.isPending
+    ? true
+    : isEquipmentView
     ? usageQuery.isPending
     : venueDef
       ? rangeQuery.isPending
@@ -167,7 +180,9 @@ export default function BookingGrid({ onBookVenue, onBookEquipment, allowPast = 
   // 15 天檢視為單一批次查詢,重試即重抓整段區間
   // 器材:手上有資料就照常渲染(格值以絕對日期為鍵,對得上的那幾欄還是真的),
   // 只有首載失敗才換錯誤畫面 —— 背景重抓失敗不該把讀得到的資料變成不能用
-  const gridError = isEquipmentView
+  const gridError = periodCatalogue.isLoadingError
+    ? { error: periodCatalogue.error, retry: periodCatalogue.refetch }
+    : isEquipmentView
     ? usageQuery.isLoadingError
       ? { error: usageQuery.error, retry: () => void usageQuery.refetch() }
       : null
@@ -235,7 +250,7 @@ export default function BookingGrid({ onBookVenue, onBookEquipment, allowPast = 
             <Tooltip title="後一週">
               <Button size="small" icon={<DoubleRightOutlined />} aria-label="後一週" onClick={() => setGridDate((d) => d.add(7, 'day'))} />
             </Tooltip>
-            <Button size="small" onClick={() => setGridDate(dayjs())}>今天</Button>
+            <Button size="small" onClick={() => setGridDate(todayStart)}>今天</Button>
           </>
         ) : (
           <>
@@ -331,6 +346,7 @@ export default function BookingGrid({ onBookVenue, onBookEquipment, allowPast = 
                             label={known ? `${used} / ${e.totalQty}` : '載入中'}
                             bg={known ? usageStep(used, e.totalQty).bg : 'transparent'}
                             bookable={bookable}
+                            bookLabel={bookLabel}
                             onBook={() => onBookEquipment?.(e.id, d)}
                           />
                         </td>
@@ -383,6 +399,7 @@ export default function BookingGrid({ onBookVenue, onBookEquipment, allowPast = 
                             label={label}
                             club={club}
                             bookable={canBook(gridDate)}
+                            bookLabel={bookLabel}
                             onBook={() => onBookVenue?.(v.id, gridDate, p)}
                           />
                         </td>
@@ -421,6 +438,7 @@ export default function BookingGrid({ onBookVenue, onBookEquipment, allowPast = 
                               label={label}
                               club={club}
                               bookable={canBook(d)}
+                              bookLabel={bookLabel}
                               onBook={() => onBookVenue?.(venueDef.id, d, p)}
                             />
                           </td>

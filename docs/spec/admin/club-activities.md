@@ -6,7 +6,7 @@
 
 查閱單一社團的活動申請與結案內容。**唯讀** —— 簽核在 [review.md](review.md) 與 [close-review.md](close-review.md),這頁只負責「看得到社團看得到的東西」。
 
-介面刻意與社團端 [club/activity-list.md](../club/activity-list.md) 相同:同一張表;詳情彈窗走行政端唯一那支 `features/admin/ActivityReviewModal`(唯讀,不給簽核回呼)。行政端四頁(社團總覽、成員列表、本頁、管理項目)與行政分審核共用同一個「選擇社團」狀態(`AdminClubProvider`),跨頁同步。
+介面刻意與社團端 [club/activity-list.md](../club/activity-list.md) 相同:同一張表;詳情彈窗是全站唯一那支 `features/admin/ActivityReviewModal`(唯讀,不給簽核回呼)—— 社團端開的是同一支(D-34),「相同」因此由型別保證,不靠兩份版面各自維護。行政端四頁(社團總覽、成員列表、本頁、管理項目)與行政分審核共用同一個「選擇社團」狀態(`AdminClubProvider`),跨頁同步。
 
 ## 資料來源
 

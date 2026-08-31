@@ -11,18 +11,17 @@ import StatusPill from '../../components/ui/StatusPill'
 import MoneyPair from '../../components/ui/MoneyPair'
 import LargeBadge from '../../components/ui/LargeBadge'
 import { semesterOptions } from '../../lib/semester'
-import { useFilePreview } from '../eval/useFilePreview'
 import {
   ACTIVITY_PAGE_SIZE,
-  useActivityDetail,
   useActivityList,
   useActivityMutations,
   useDraftActivities,
   useActivitySemesters,
   type ClubActivity,
 } from '../../api/activities'
+import { useClubActivityReview } from '../../api/adminActivities'
 import { LISTED_STATUS_LABELS, approvedText, fmtMoney, statusesForLabels } from './types'
-import ActivityPreviewModal from './ActivityPreviewModal'
+import ActivityReviewModal from '../admin/ActivityReviewModal'
 import { dateRangeText } from './utils'
 
 // 排序鍵=後端 /club/activities 白名單(同值的 id 降冪 tiebreak 由後端固定,
@@ -46,9 +45,9 @@ export default function ActivityListPage() {
   const [typeFilter, setTypeFilter] = useState<string[]>([])
   // 以顯示標籤篩選:三個申請關卡共用「申請待審核」,避免選單出現重複項
   const [statusFilter, setStatusFilter] = useState<string[]>([])
-  const [preview, setPreview] = useState<ClubActivity | null>(null)
+  // 詳情彈窗與行政端同一支(唯讀開窗):這裡只記要開哪一筆,內容由彈窗自己的查詢補齊
+  const [preview, setPreview] = useState<{ id: number; name: string } | null>(null)
   const [previewOpen, setPreviewOpen] = useState(false)
-  const filePreview = useFilePreview()
 
   // 學期下拉:資料既有學期 + 當前學期,預設最新
   const semestersQuery = useActivitySemesters()
@@ -89,28 +88,21 @@ export default function ActivityListPage() {
       }),
     [draftsQuery.data],
   )
-  const detailQuery = useActivityDetail(preview?.id)
-  // 深連結:詳情本身就是完整的 ClubActivity,不必等它出現在當頁列表
-  // (它可能落在第 3 頁,或被目前的狀態/類型篩選擋掉)
-  const linkedQuery = useActivityDetail(openParam ?? undefined)
-  const linked = linkedQuery.data
-  const linkedFailed = linkedQuery.isError
+  const reviewQuery = useClubActivityReview(preview?.id)
+  // 深連結:直接開窗,詳情由彈窗自己載(骨架與失敗重試都在裡面)——
+  // 這一筆可能落在第 3 頁,或被目前的狀態/類型篩選擋掉,不必等它出現在當頁列表。
+  // 別社的活動或已刪除就是那支查詢的錯誤,彈窗裡看得到
   useEffect(() => {
-    if (!linked && !linkedFailed) return
-    if (linked) {
-      setPreview(linked)
-      setPreviewOpen(true)
-    } else {
-      // 別社的活動或已刪除:靜默不動的話網址卡著 open、畫面像什麼都沒發生
-      message.error('找不到這個活動，可能已被刪除')
-    }
-    // 用掉(或確定用不了)就從網址移除:重新整理或返回時不該又試一次
+    if (!openParam) return
+    setPreview({ id: openParam, name: '' })
+    setPreviewOpen(true)
+    // 用掉就從網址移除:重新整理或返回時不該又開一次
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev)
       next.delete('open')
       return next
     }, { replace: true })
-  }, [linked, linkedFailed, message, setSearchParams])
+  }, [openParam, setSearchParams])
   const { submit, remove } = useActivityMutations()
 
   const paged = listQuery.data?.rows ?? []
@@ -127,7 +119,7 @@ export default function ActivityListPage() {
 
   // 點列一律開活動詳情預覽;結案走列上的動作鈕(或預覽內「前往結案」)
   const onRowClick = (a: ClubActivity) => {
-    setPreview(a)
+    setPreview({ id: a.id, name: a.name })
     setPreviewOpen(true)
   }
 
@@ -347,26 +339,29 @@ export default function ActivityListPage() {
         </LoadingBlock>
         </div>
       <Pager page={page} pageSize={ACTIVITY_PAGE_SIZE} total={total} onChange={setPage} style={{ padding: 0, marginTop: 14 }} />
-      <ActivityPreviewModal
-        a={preview}
-        detail={detailQuery.data}
-        loading={preview != null && detailQuery.isPending}
-        error={detailQuery.error}
-        onRetry={() => void detailQuery.refetch()}
-        open={previewOpen}
-        onClose={() => setPreviewOpen(false)}
-        afterClose={() => setPreview(null)}
-        onEdit={() => {
-          setPreviewOpen(false)
-          if (preview) navigate(`/activities/${preview.id}/edit`)
-        }}
-        onGoClose={() => {
-          setPreviewOpen(false)
-          if (preview) navigate(`/activities/close?id=${preview.id}`)
-        }}
-        onPreviewFile={filePreview.preview}
-      />
-      {filePreview.node}
+      {/* 與行政端同一支彈窗(viewer='club':章軌、大型認可、繳交確認等審核用的東西全收掉);
+          常駐待關閉動畫結束(afterClose)才卸載,key 依單據重掛 */}
+      {preview && (
+        <ActivityReviewModal
+          key={preview.id}
+          viewer="club"
+          item={reviewQuery.data ?? null}
+          pendingName={preview.name || undefined}
+          detailError={reviewQuery.error}
+          onRetryDetail={() => void reviewQuery.refetch()}
+          open={previewOpen}
+          onClose={() => setPreviewOpen(false)}
+          afterClose={() => setPreview(null)}
+          onEdit={() => {
+            setPreviewOpen(false)
+            navigate(`/activities/${preview.id}/edit`)
+          }}
+          onGoClose={() => {
+            setPreviewOpen(false)
+            navigate(`/activities/close?id=${preview.id}`)
+          }}
+        />
+      )}
     </div>
   )
 }

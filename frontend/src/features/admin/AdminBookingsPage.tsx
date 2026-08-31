@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
+import { useAuth } from '../../app/auth'
+import { canAccessAdminPath } from '../../lib/permissions'
 import { countText } from '../../lib/counts'
 import { Tooltip } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
@@ -20,6 +22,9 @@ const PAGE_SIZE = 50
 
 export default function AdminBookingsPage() {
   const navigate = useNavigate()
+  // 「看得到」與「動得了」是兩個判定:本頁是 abooking,手動借用是 amanual(一頁一鍵)。
+  // 只有 abooking 的承辦點格子只會撞上權限牆,那就別把格子畫成可點的
+  const canManual = canAccessAdminPath(useAuth().user, '/admin/manual-booking')
   const [selected, setSelected] = useState<BookingReviewItem | null>(null)
   const [open, setOpen] = useState(false)
   const [venuePage, setVenuePage] = useState(1)
@@ -53,13 +58,22 @@ export default function AdminBookingsPage() {
       {/* 借用情形:與社團端、公開首頁同一份色格圖。點格直接帶參數去手動借用 */}
       <BookingGrid
         allowPast
-        onBookVenue={(venueId, date, period) =>
-          navigate(
-            `/admin/manual-booking?venue=${venueId}&date=${date.format('YYYY/MM/DD')}&period=${period}`,
-          )
+        bookLabel="手動借用"
+        onBookVenue={
+          canManual
+            ? (venueId, date, period) =>
+                navigate(
+                  `/admin/manual-booking?venue=${venueId}&date=${date.format('YYYY/MM/DD')}&period=${period}`,
+                )
+            : undefined
         }
-        onBookEquipment={(equipmentId, date) =>
-          navigate(`/admin/manual-booking?equipment=${equipmentId}&date=${date.format('YYYY/MM/DD')}`)
+        onBookEquipment={
+          canManual
+            ? (equipmentId, date) =>
+                navigate(
+                  `/admin/manual-booking?equipment=${equipmentId}&date=${date.format('YYYY/MM/DD')}`,
+                )
+            : undefined
         }
       />
 

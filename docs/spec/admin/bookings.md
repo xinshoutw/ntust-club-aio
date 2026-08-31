@@ -16,7 +16,7 @@
 
 ## 畫面
 
-**借用情形** — 社團端借用總覽那張色格圖的同一個元件(`features/bookings/BookingGrid.tsx`),畫面與規則見 [club/booking-overview.md](../club/booking-overview.md);差別只有兩點:可借格點下去帶參數跳「手動借用」而不是社團的申請頁,而且**過去日期照樣可點**(補登是手動借用的用途)。圖例不列「我的借用」(行政帳號沒有社團)。
+**借用情形** — 社團端借用總覽那張色格圖的同一個元件(`features/bookings/BookingGrid.tsx`),畫面與規則見 [club/booking-overview.md](../club/booking-overview.md);差別只有兩點:可借格點下去帶參數跳「手動借用」而不是社團的申請頁,而且**過去日期照樣可點**(補登是手動借用的用途)。圖例不列「我的借用」(行政帳號沒有社團)。**只持 `abooking` 的承辦格子點不動** —— 手動借用是另一把鍵(`amanual`),看得到不等於動得了。
 
 **場地待審表** — 社團、場地、日期、時段與用途、狀態。每頁 50。
 

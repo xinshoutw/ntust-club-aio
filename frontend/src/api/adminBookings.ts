@@ -5,7 +5,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import dayjs, { type Dayjs } from 'dayjs'
 import { api, apiPaged, qs } from './client'
 import { useInvalidateBadges } from './badges'
-import type { FixedWindow } from './bookings'
+import { keys as bookingKeys, type FixedWindow } from './bookings'
 import type { StatusKey } from '../lib/status'
 import { periodRank } from '../lib/periods'
 
@@ -323,6 +323,9 @@ export function useAdminBookingMutations() {
   const invalidateBadges = useInvalidateBadges()
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: keys.all })
+    // 場況色格圖走 /public/*(bookingKeys),不在 adminBookings 這一域:漏掉的話
+    // 從格子審完之後那格還是橘的、還點得動,再點一次就撞上「不在目前這一頁」的假錯誤
+    void qc.invalidateQueries({ queryKey: bookingKeys.all })
     invalidateBadges() // 側欄徽章與總覽數字卡
   }
   const post = (path: string, body?: object) =>

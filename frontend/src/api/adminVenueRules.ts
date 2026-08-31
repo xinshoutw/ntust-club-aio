@@ -2,6 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs, { type Dayjs } from 'dayjs'
 import { api, qs } from './client'
+import { keys as bookingKeys } from './bookings'
 
 export interface VenueRule {
   id: number
@@ -65,7 +66,7 @@ export function useVenueRuleMutations() {
   const qc = useQueryClient()
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: keys.all })
-    void qc.invalidateQueries({ queryKey: ['adminBookings'] }) // 場況圖同步刷新
+    void qc.invalidateQueries({ queryKey: bookingKeys.all }) // 場況色格圖同步刷新(/public/*)
   }
   const create = useMutation({
     mutationFn: (b: VenueRuleInput) =>

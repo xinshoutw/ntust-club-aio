@@ -325,7 +325,7 @@ export const toEquipmentLoan = (l: EquipmentLoanOut): EquipmentLoanRecord => ({
 
 // ---- 查詢鍵 ----
 
-const keys = {
+export const keys = {
   all: ['bookings'] as const,
   active: (kind: string) => ['bookings', 'active', kind] as const,
   returned: (page: number) => ['bookings', 'returned', page] as const,

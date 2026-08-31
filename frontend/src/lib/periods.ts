@@ -1,12 +1,22 @@
+import { useQuery } from '@tanstack/react-query'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useAuth } from '../app/auth'
+import { api } from '../api/client'
 import type { Period } from '../api/auth'
 
 // 節次(第 1–10 節、A–D 節)的單一真相在後端 services/booking_service.PERIOD_TIMES,
 // 隨 /auth/me 下發。借用頁全在 RequireRole 之後,取用時 user 必定已就緒。
+// 未登入的公開首頁沒有 /auth/me,只好另外跟後端要同一份目錄(不在前端放第二份)。
 
 export function usePeriods(): Period[] {
-  return useAuth().user?.periods ?? []
+  const { user } = useAuth()
+  const publicPeriods = useQuery({
+    queryKey: ['public', 'periods'],
+    queryFn: () => api<Period[]>('/public/periods'),
+    enabled: !user,
+    staleTime: Infinity,
+  })
+  return user?.periods ?? publicPeriods.data ?? []
 }
 
 /** 節次排序權重:數字節在前、字母節在後。

@@ -42,11 +42,34 @@ async def seed(db) -> tuple[Venue, Equipment]:
     return venue, equipment
 
 
+async def test_manual_booking_is_never_mine(client, db):
+    """行政手動借用的 club_id 是 NULL —— 匿名(own_club_id 也是 None)不得標成 mine。"""
+    venue, _ = await seed(db)
+    db.add(
+        VenueBooking(
+            club_id=None,
+            venue_id=venue.id,
+            activity_id=None,
+            date=DAY,
+            periods=["5"],
+            purpose="場地整理",
+            status="approved",
+        )
+    )
+    await db.commit()
+    grid = (
+        await client.get("/api/v1/public/bookings/availability", params={"date": DAY.isoformat()})
+    ).json()["data"]["grid"]
+    assert grid[str(venue.id)]["5"] == {"status": "temp", "club": "學務處"}
+
+
 async def test_public_endpoints_need_no_login(client, db):
     venue, equipment = await seed(db)
     iso = DAY.isoformat()
 
-    periods = (await client.get("/api/v1/public/periods")).json()["data"]
+    resp = await client.get("/api/v1/public/periods")
+    assert resp.status_code == 200
+    periods = resp.json()["data"]
     assert [p["key"] for p in periods][:3] == ["1", "2", "3"]
     assert periods[0]["start"] and periods[0]["end"]
 

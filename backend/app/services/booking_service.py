@@ -750,9 +750,13 @@ async def availability_grids(
     if venue_id is not None:
         temp_query = temp_query.where(VenueBooking.venue_id == venue_id)
     for booking, club_name in (await db.execute(temp_query)).all():
-        # 本社已核准=mine;其餘已核准=temp;審核中(含本社)=pending
+        # 本社已核准=mine;其餘已核准=temp;審核中(含本社)=pending。
+        # own_club_id 為 None(匿名、行政、工讀生、評審)時誰都不是「我的」——
+        # 行政手動借用的 club_id 也是 NULL,少了左邊那半 None == None 會把它染成綠色,
+        # 而那三端的圖例根本沒有「我的借用」這一格
+        mine = own_club_id is not None and booking.club_id == own_club_id
         if booking.status == BookingStatus.APPROVED:
-            status = "mine" if booking.club_id == own_club_id else "temp"
+            status = "mine" if mine else "temp"
         else:
             status = "pending"
         for period in booking.periods:

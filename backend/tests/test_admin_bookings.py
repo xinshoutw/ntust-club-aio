@@ -1,4 +1,4 @@
-"""臨時場地與器材借用審核(/admin,權限鍵 abooking)+ 全校單日場況與逾期列表。"""
+"""臨時場地與器材借用審核(/admin,權限鍵 abooking)+ 逾期列表。"""
 
 from datetime import date, timedelta
 
@@ -329,9 +329,6 @@ async def test_equipment_overdue_filter(client, db):
         )
     ).json()["data"]
     assert sorted(d["purpose"] for d in data) == ["已歸還", "更逾期", "逾期單"]
-
-
-# ---- 全校單日場況 ----
 
 
 # ---- 核准衝突/可借數硬性檢核(2026-07-17 第十二輪) ----

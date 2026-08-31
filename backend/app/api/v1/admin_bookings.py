@@ -1,10 +1,9 @@
-"""行政端:臨時場地與器材借用審核(權限鍵 abooking)+ 全校單日場況。
+"""行政端:臨時場地與器材借用審核(權限鍵 abooking)。
 
 - 臨時場地/器材:pending → approved/rejected(退回必填原因);簽核走 approval_records
 - 器材待審單附「該區間可借數(排除本單)」檢核資訊——推導不儲存,不足時前端紅字警示,
   是否核准由管理員裁量(不強制擋)
 - 逾期=推導:結束日之隔天上班日 10:30(?status=overdue 以單調門檻日於 SQL 篩選)
-- 場況格:審核中格帶申請 id,供點格開審核彈窗
 """
 
 from datetime import UTC, datetime

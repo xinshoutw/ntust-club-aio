@@ -1,9 +1,11 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { App, Button, DatePicker, Form, Input, InputNumber, Select } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
-import { type Dayjs } from 'dayjs'
+import dayjs, { type Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
 import PeriodPicker from '../bookings/PeriodPicker'
+import { periodKeys, usePeriods } from '../../lib/periods'
 import { notFoundText } from '../../lib/selectOptions'
 import { useAdminEquipment } from '../../api/adminEquipment'
 import { useAdminVenues, useManualBookingMutations } from '../../api/adminBookings'
@@ -22,7 +24,20 @@ export default function ManualBookingPage() {
   const { createVenue, createEquipment } = useManualBookingMutations()
   const [venueForm] = Form.useForm()
   const [equipmentForm] = Form.useForm()
-  const [periods, setPeriods] = useState<string[]>([])
+
+  // 借用情形色格圖點格進來時帶入場地/器材、日期與節次。
+  // **不濾掉過去日期**:補登紙本舊件正是這一頁的用途,後端也刻意放行
+  const [params] = useSearchParams()
+  const raw = params.get('date')
+  // 嚴格 parse:非嚴格會把 2026/99/99 正規化成別的日期
+  const qDate = raw && dayjs(raw, 'YYYY/MM/DD', true).isValid() ? dayjs(raw, 'YYYY/MM/DD', true) : undefined
+  const qVenue = Number(params.get('venue')) || undefined
+  const qEquipment = Number(params.get('equipment')) || undefined
+  const qPeriod = params.get('period')
+  const periodAxis = periodKeys(usePeriods())
+  const [periods, setPeriods] = useState<string[]>(() =>
+    qPeriod && periodAxis.includes(qPeriod) ? [qPeriod] : [],
+  )
 
   const venues = venuesQuery.data ?? [] // /admin/venues 已僅回啟用中場地
   const equipment = (equipmentQuery.data ?? []).filter((e) => e.isActive)
@@ -71,7 +86,12 @@ export default function ManualBookingPage() {
           <div className="card" style={{ padding: 24 }}>
             <div style={sectionTitle}>臨時場地</div>
             <LoadingBlock pending={venuesQuery.isPending} rows={5}>
-            <Form form={venueForm} layout="vertical" onFinish={submitVenue}>
+            <Form
+              form={venueForm}
+              layout="vertical"
+              onFinish={submitVenue}
+              initialValues={{ venue: qVenue, date: qDate }}
+            >
               <Form.Item name="venue" label="場地" rules={[{ required: true, message: '請選擇場地' }]}>
                 <Select
                   showSearch
@@ -108,7 +128,12 @@ export default function ManualBookingPage() {
           <div className="card" style={{ padding: 24 }}>
             <div style={sectionTitle}>器材</div>
             <LoadingBlock pending={equipmentQuery.isPending} rows={5}>
-            <Form form={equipmentForm} layout="vertical" onFinish={submitEquipment}>
+            <Form
+              form={equipmentForm}
+              layout="vertical"
+              onFinish={submitEquipment}
+              initialValues={{ equipment: qEquipment, range: qDate && [qDate, qDate] }}
+            >
               <Form.Item name="equipment" label="器材" rules={[{ required: true, message: '請選擇器材' }]}>
                 <Select
                   showSearch

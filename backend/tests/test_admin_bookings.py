@@ -14,7 +14,6 @@ from app.models import (
     RoomBookingSlot,
     User,
     Venue,
-    VenueBlockRule,
     VenueBooking,
 )
 from app.models.enums import (
@@ -94,9 +93,6 @@ async def test_venue_permission_gate(client, db):
         "/api/v1/admin/venue-bookings/1/approve", headers=csrf_headers(client)
     )
     assert resp.status_code == 403
-    assert (
-        await client.get("/api/v1/admin/bookings/availability", params={"date": "2026-03-05"})
-    ).status_code == 403
 
 
 async def test_venue_list_and_review_flow(client, db):
@@ -336,136 +332,6 @@ async def test_equipment_overdue_filter(client, db):
 
 
 # ---- 全校單日場況 ----
-
-
-async def test_admin_availability_grid_with_booking_ids(client, db):
-    club, other_club = await seed(client, db)
-    venue = await make_venue(db)
-    fixed_venue = await make_venue(db, name="S304", allow_fixed=True, allow_temp=False)
-    activity = await make_activity(db, club)
-    day = date(2026, 3, 5)  # 週四(isoweekday=4)
-
-    pending = VenueBooking(club_id=club.id, venue_id=venue.id, activity_id=activity.id,
-                           date=day, periods=["3"], purpose="彩排")
-    approved = VenueBooking(club_id=other_club.id, venue_id=venue.id, activity_id=None,
-                            date=day, periods=["7"], purpose="社課", status="approved")
-    # 目標學期起訖涵蓋查詢日,場況才會顯示(2026-07-17:固定借用僅在學期內佔格)
-    fixed = RoomBookingRequest(club_id=other_club.id, venue_id=fixed_venue.id,
-                               purpose="社課", status="approved",
-                               start_date=date(2026, 2, 1), end_date=date(2026, 7, 31))
-    fixed.slots = [RoomBookingSlot(weekday=4, period="5")]
-    db.add_all([pending, approved, fixed])
-    await db.commit()
-    await db.refresh(pending)
-
-    grid = (
-        await client.get("/api/v1/admin/bookings/availability", params={"date": "2026-03-05"})
-    ).json()["data"]["grid"]
-    # 待審單帶申請 id(供點格開審核彈窗);已核准格只有社團名。kind 區分臨時/固定
-    assert grid[str(venue.id)]["3"] == {
-        "status": "pending",
-        "club": club.name,
-        "pending": [{"id": pending.id, "club": club.name, "kind": "temp"}],
-    }
-    assert grid[str(venue.id)]["7"] == {
-        "status": "temp",
-        "club": other_club.name,
-        "pending": [],
-    }
-    assert grid[str(fixed_venue.id)]["5"] == {
-        "status": "fixed",
-        "club": other_club.name,
-        "pending": [],
-    }
-
-    # 審核中的固定借用也要標,否則承辦核准臨時借用時那格是空白的(點不了,要到 /admin/rooms 審)
-    pending_fixed = RoomBookingRequest(
-        club_id=club.id, venue_id=fixed_venue.id, purpose="待審社課",
-        start_date=date(2026, 2, 1), end_date=date(2026, 7, 31),
-    )
-    pending_fixed.slots = [RoomBookingSlot(weekday=4, period="6")]
-    db.add(pending_fixed)
-    await db.commit()
-    grid = (
-        await client.get("/api/v1/admin/bookings/availability", params={"date": "2026-03-05"})
-    ).json()["data"]["grid"]
-    assert grid[str(fixed_venue.id)]["6"] == {
-        "status": "pending",
-        "club": club.name,
-        "pending": [{"id": None, "club": club.name, "kind": "fixed"}],
-    }
-
-    # 不同星期:固定借用不佔用
-    grid = (
-        await client.get("/api/v1/admin/bookings/availability", params={"date": "2026-03-06"})
-    ).json()["data"]["grid"]
-    assert str(fixed_venue.id) not in grid
-
-    # 日期必填/格式驗證
-    assert (
-        await client.get("/api/v1/admin/bookings/availability", params={"date": "bad"})
-    ).status_code == 422
-
-
-async def test_admin_grid_lists_every_pending_in_a_cell(client, db):
-    """一格多筆待審:已核准蓋過審核中之後仍點得到底下的待審單,兩社搶同一格也兩筆都在。"""
-    club, other_club = await seed(client, db)
-    venue = await make_venue(db)
-    activity = await make_activity(db, club)
-    day = date(2026, 3, 5)
-
-    def booking(owner, periods, status="pending", *, id=None):
-        return VenueBooking(id=id, club_id=owner.id, venue_id=venue.id, activity_id=activity.id,
-                            date=day, periods=periods, purpose="彩排", status=status)
-
-    # 指定 id 並讓寫入順序與 id 順序相反,盡量讓「拿掉 ORDER BY」現形。
-    # 但這條斷言測不出排序被拿掉:小表的回傳順序由 planner 決定(實測 join clubs 之後
-    # 剛好又回到 id 序),要真正壓出反序得操縱執行計畫,不值得。斷言留著是為了釘住契約
-    # ——「同一格多筆待審時,格色與 pending 順序照送件序」——ORDER BY 別在重構時被順手刪掉
-    second = booking(other_club, ["5"], id=20)
-    approved = booking(other_club, ["3"], "approved", id=30)
-    first = booking(club, ["3", "5"], id=10)
-    for row in (second, approved, first):
-        db.add(row)
-        await db.commit()
-
-    grid = (
-        await client.get("/api/v1/admin/bookings/availability", params={"date": "2026-03-05"})
-    ).json()["data"]["grid"]
-    # 格色是已核准的,但被蓋掉的待審單仍在 pending —— 承辦點得到、也看得到是誰的
-    assert grid[str(venue.id)]["3"] == {
-        "status": "temp",
-        "club": other_club.name,
-        "pending": [{"id": first.id, "club": club.name, "kind": "temp"}],
-    }
-    # 兩社搶同一格:兩筆都要點得到,順序依 id(不隨 PG 回傳順序變動)
-    assert grid[str(venue.id)]["5"] == {
-        "status": "pending",
-        "club": club.name,
-        "pending": [
-            {"id": first.id, "club": club.name, "kind": "temp"},
-            {"id": second.id, "club": other_club.name, "kind": "temp"},
-        ],
-    }
-
-    # 行政手動借用沒有社團(club_id NULL),格上顯示「學務處」
-    db.add(VenueBooking(club_id=None, venue_id=venue.id, activity_id=None, date=day,
-                        periods=["7"], purpose="場地整理", status="approved"))
-    # 不開放規則蓋掉格色,但底下壓著的待審單要留著(承辦要看得到「這張得退掉」)
-    admin_id = await db.scalar(sa.select(User.id).order_by(User.id).limit(1))
-    db.add(VenueBlockRule(venue_id=venue.id, start_date=day, end_date=day,
-                          weekdays=[], periods=["3"], reason="行政徵用", created_by=admin_id))
-    await db.commit()
-
-    grid = (
-        await client.get("/api/v1/admin/bookings/availability", params={"date": "2026-03-05"})
-    ).json()["data"]["grid"]
-    assert grid[str(venue.id)]["7"] == {"status": "temp", "club": "學務處", "pending": []}
-    assert grid[str(venue.id)]["3"] == {
-        "status": "blocked",
-        "club": "行政徵用",
-        "pending": [{"id": first.id, "club": club.name, "kind": "temp"}],
-    }
 
 
 # ---- 核准衝突/可借數硬性檢核(2026-07-17 第十二輪) ----

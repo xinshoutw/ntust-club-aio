@@ -7,7 +7,7 @@
 - 場況格:審核中格帶申請 id,供點格開審核彈窗
 """
 
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from typing import Annotated, Literal
 
 import sqlalchemy as sa
@@ -501,16 +501,6 @@ async def reject_equipment_loan(
         f"{equipment.name} ×{loan.qty}:{body.reason}",
     )
     return ApiResponse()
-
-
-# ---- 全校單日場況 ----
-
-
-@router.get("/bookings/availability")
-async def availability(user: BookingAdmin, db: DbDep, date: date) -> ApiResponse[dict]:
-    """全校單日場況格;審核中格帶臨時借用申請 id,供點格開審核彈窗。"""
-    grid = await svc.admin_availability_grid(db, date)
-    return ApiResponse(data={"date": date.isoformat(), "grid": grid})
 
 
 # ---- 最高權限手動借用:club NULL=行政,顯示「學務處」 ----

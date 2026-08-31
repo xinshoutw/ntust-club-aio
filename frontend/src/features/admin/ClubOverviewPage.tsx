@@ -377,6 +377,8 @@ export default function ClubOverviewPage() {
               // `is_large_approved` 後端每一關都套,不把關就會把遷入件的 NULL 寫成 false ——
               // 靜靜清掉大型活動認可,而那是 ×3 行政分
               fundSource: reviewItem?.status === 'pending_advisor' ? p.fundSource : undefined,
+              // 備註任一關都寫得動,不看關卡
+              adminNote: p.adminNote,
               budget: reviewItem?.status === 'pending_advisor' ? p.budget : [],
               isLargeApproved:
                 reviewItem?.status === 'pending_advisor' && reviewItem.type === '活動'

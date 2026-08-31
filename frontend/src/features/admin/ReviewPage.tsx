@@ -354,6 +354,8 @@ export default function ReviewPage() {
               id: current.activityId,
               // 僅第一關送核定內容;組長/學務長關空 body 過關(後端規則)
               fundSource: current.status === 'pending_advisor' ? p.fundSource : undefined,
+              // 備註任一關都寫得動,不看關卡
+              adminNote: p.adminNote,
               budget: current.status === 'pending_advisor' ? p.budget : [],
               isLargeApproved:
                 current.status === 'pending_advisor' && current.type === '活動' ? p.largeApproved : undefined,

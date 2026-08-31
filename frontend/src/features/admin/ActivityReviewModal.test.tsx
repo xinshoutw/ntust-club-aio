@@ -313,3 +313,46 @@ describe('ActivityReviewModal 的簽核章軌', () => {
     expect(stampLabels()).toEqual(['陳彥仁', '已退回'])
   })
 })
+
+const NOTE_PLACEHOLDER = '給社團看的說明，會印在申請表的意見回饋（可留空）'
+
+// 備註會原樣印進申請表的意見回饋,所以「清掉」必須真的清得掉:
+// 沿用經費來源那條 `trim() || null` 的送法,空字串會變成 null=不動,按鈕按了等於沒按
+test('審核備註清空時送出空字串,不是省略欄位', async () => {
+  const onApprove = vi.fn(async (_p: unknown) => {})
+  show([budgetRow(1, 0)], { adminNote: '核銷單據請於 9/30 前送件' }, onApprove)
+
+  const box = screen.getByPlaceholderText<HTMLTextAreaElement>(NOTE_PLACEHOLDER)
+  expect(box.value).toBe('核銷單據請於 9/30 前送件')
+  fireEvent.change(box, { target: { value: '' } })
+  fireEvent.click(screen.getByRole('button', { name: /核\s*准/ }))
+  await waitFor(() => expect(onApprove).toHaveBeenCalled())
+  expect(onApprove.mock.calls[0][0]).toMatchObject({ adminNote: '' })
+})
+
+// 社團端與行政端共用這支彈窗:社團看得到承辦留的備註,但審核用的東西一件都不該露出來
+// (章軌是審核人的簽章,而社團端連姓名都拿不到;大型認可是承辦的決定)
+test('viewer=club:備註看得到,章軌與大型認可都收掉', () => {
+  render(
+    <App>
+      <ActivityReviewModal
+        viewer="club"
+        item={{
+          ...item([budgetRow(1, 5000, 5000)]),
+          club: '',
+          status: 'pending_chief',
+          adminNote: '核銷單據請於 9/30 前送件',
+        }}
+        open
+        onClose={() => {}}
+        afterClose={() => {}}
+      />
+    </App>,
+  )
+
+  expect(screen.getByText('備註')).toBeTruthy()
+  expect(screen.getByText('核銷單據請於 9/30 前送件')).toBeTruthy()
+  expect(screen.queryByPlaceholderText(NOTE_PLACEHOLDER)).toBeNull() // 唯讀
+  expect(screen.queryByText('認可為大型活動')).toBeNull()
+  expect(screen.queryByText('承')).toBeNull() // 章軌
+})

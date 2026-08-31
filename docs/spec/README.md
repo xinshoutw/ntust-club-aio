@@ -21,6 +21,7 @@
 
 | 檔 | 內容 |
 |---|---|
+| [shared/public-home.md](shared/public-home.md) | 未登入首頁(`/`):借用情形公開預覽 |
 | [shared/login.md](shared/login.md) | 登入、強制改密、面板未開放 |
 | [shared/shell.md](shared/shell.md) | 外殼、側欄、通知鈴鐺、蓋板公告、未存檔守衛、權限閘 |
 
@@ -28,7 +29,7 @@
 
 | 頁 | 路由 |
 |---|---|
-| [club/overview.md](club/overview.md) | `/` |
+| [club/overview.md](club/overview.md) | `/`(登入中的社團;未登入見 shared/public-home.md) |
 | [club/activity-form.md](club/activity-form.md) | `/activities/new`、`/activities/:id/edit` |
 | [club/activity-close.md](club/activity-close.md) | `/activities/close` |
 | [club/activity-list.md](club/activity-list.md) | `/activities` |

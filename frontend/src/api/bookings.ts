@@ -129,10 +129,19 @@ interface EquipmentUsageOut {
 
 /** 後端僅回傳被佔用/審核中的格子;其餘由前端依場地開放旗標補 可借/不開放 */
 export type AvailabilityState = 'pending' | 'temp' | 'fixed' | 'mine' | 'blocked'
+/** 該格的一筆待審單;id 僅臨時借用有(點格開審核彈窗),固定借用要到 /admin/rooms 審 */
+export interface GridPending {
+  id: number | null
+  club: string
+  kind: 'temp' | 'fixed'
+}
 /** 每格帶狀態與借用社團名(hover 顯示) */
 export interface AvailabilityCell {
   status: AvailabilityState
   club: string
+  /** 該格**全部**待審單,含被已核准/不開放蓋掉的那些。
+   *  只有審這一關的承辦(權限鍵 abooking)拿得到 —— 其餘角色後端不回這個欄位 */
+  pending?: GridPending[]
 }
 export type AvailabilityGrid = Record<string, Partial<Record<string, AvailabilityCell>>>
 
@@ -316,7 +325,7 @@ export const toEquipmentLoan = (l: EquipmentLoanOut): EquipmentLoanRecord => ({
 
 // ---- 查詢鍵 ----
 
-const keys = {
+export const keys = {
   all: ['bookings'] as const,
   active: (kind: string) => ['bookings', 'active', kind] as const,
   returned: (page: number) => ['bookings', 'returned', page] as const,
@@ -339,7 +348,7 @@ const keys = {
 export function useVenues() {
   return useQuery({
     queryKey: keys.venues,
-    queryFn: () => api<VenueOut[]>('/club/venues').then((rows) => rows.map(toVenue)),
+    queryFn: () => api<VenueOut[]>('/public/venues').then((rows) => rows.map(toVenue)),
   })
 }
 
@@ -364,7 +373,7 @@ export function useEquipmentUsage(range: DateRange, enabled = true) {
     enabled,
     queryFn: () =>
       api<EquipmentUsageOut[]>(
-        `/club/equipment/usage${qs({ start: startIso, end: endIso })}`,
+        `/public/equipment/usage${qs({ start: startIso, end: endIso })}`,
       ).then(
         (rows): EquipmentUsageGrid => ({
           start: startIso,
@@ -384,7 +393,7 @@ export function useEquipmentUsage(range: DateRange, enabled = true) {
 }
 
 const fetchAvailability = (d: Dayjs): Promise<AvailabilityGrid> =>
-  api<AvailabilityOut>(`/club/bookings/availability${qs({ date: toIso(d) })}`).then((r) => r.grid)
+  api<AvailabilityOut>(`/public/bookings/availability${qs({ date: toIso(d) })}`).then((r) => r.grid)
 
 /** 單日全場地場況 */
 export function useAvailability(date: Dayjs) {
@@ -404,7 +413,7 @@ export function useAvailabilityDays(dates: Dayjs[], venueId?: number) {
     queryKey: keys.availabilityRange(startIso, endIso, venueId),
     queryFn: () =>
       api<{ days: { date: string; grid: AvailabilityGrid }[] }>(
-        `/club/bookings/availability-range${qs({ start: startIso, end: endIso, venue: venueId })}`,
+        `/public/bookings/availability-range${qs({ start: startIso, end: endIso, venue: venueId })}`,
       ).then((r) => Object.fromEntries(r.days.map((d) => [d.date, d.grid]))),
     enabled: dates.length > 0,
     placeholderData: keepPreviousData,
@@ -571,7 +580,8 @@ export interface RoomBookingInput {
 
 export interface VenueBookingInput {
   venueId: number
-  activityId: number
+  /** null = 免綁活動(僅 802 國際事務處,見 VenueBookingPage) */
+  activityId: number | null
   date: Dayjs
   periods: string[]
   purpose: string

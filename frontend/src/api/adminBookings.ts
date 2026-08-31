@@ -5,7 +5,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import dayjs, { type Dayjs } from 'dayjs'
 import { api, apiPaged, qs } from './client'
 import { useInvalidateBadges } from './badges'
-import type { FixedWindow } from './bookings'
+import { keys as bookingKeys, type FixedWindow } from './bookings'
 import type { StatusKey } from '../lib/status'
 import { periodRank } from '../lib/periods'
 
@@ -39,32 +39,6 @@ const toVenue = (v: VenueOut): AdminVenue => ({
   allowFixed: v.allow_fixed,
   allowTemp: v.allow_temp,
 })
-
-// ---- 全校單日場況 ----
-
-export type GridStatus = 'pending' | 'temp' | 'fixed' | 'blocked'
-
-/** 該格的一筆待審單;id 僅臨時借用有(點格開審核彈窗),固定借用要到 /admin/rooms 審 */
-export interface GridPending {
-  id: number | null
-  club: string
-  kind: 'temp' | 'fixed'
-}
-
-export interface GridCell {
-  status: GridStatus
-  club: string | null // 決定格色的借用社團(blocked 格為不開放原因)
-  pending: GridPending[] // 該格全部待審單;已核准蓋過審核中時,被蓋掉的仍在這裡
-}
-
-/** venue_id → 節次 → 格值;未列出的格=可借 */
-export type AvailabilityGrid = Record<string, Record<string, GridCell>>
-
-// 格值欄位皆為 snake_case 無關的單字,直接沿用回應形狀(不需轉換層)
-interface AvailabilityOut {
-  date: string
-  grid: AvailabilityGrid
-}
 
 // ---- 臨時場地借用 ----
 
@@ -262,7 +236,6 @@ const toRoomRequest = (r: AdminRoomBookingOut): AdminRoomRequest => ({
 export const keys = {
   all: ['adminBookings'] as const,
   venues: ['adminBookings', 'venues'] as const,
-  availability: (date: string) => ['adminBookings', 'availability', date] as const,
   venueBookings: (p: PendingListParams) => ['adminBookings', 'venueBookings', p] as const,
   equipmentLoans: (p: PendingListParams) => ['adminBookings', 'equipmentLoans', p] as const,
   roomBookings: (p: PendingListParams) => ['adminBookings', 'roomBookings', p] as const,
@@ -302,16 +275,6 @@ export function useAdminVenues() {
   return useQuery({
     queryKey: keys.venues,
     queryFn: () => api<VenueOut[]>('/admin/venues').then((rows) => rows.map(toVenue)),
-  })
-}
-
-/** date:ISO(YYYY-MM-DD) */
-export function useAdminAvailability(date: string) {
-  return useQuery({
-    queryKey: keys.availability(date),
-    queryFn: () =>
-      api<AvailabilityOut>(`/admin/bookings/availability${qs({ date })}`).then((out) => out.grid),
-    placeholderData: keepPreviousData,
   })
 }
 
@@ -360,6 +323,9 @@ export function useAdminBookingMutations() {
   const invalidateBadges = useInvalidateBadges()
   const invalidate = () => {
     void qc.invalidateQueries({ queryKey: keys.all })
+    // 場況色格圖走 /public/*(bookingKeys),不在 adminBookings 這一域:漏掉的話
+    // 從格子審完之後那格還是橘的、還點得動,再點一次就撞上「不在目前這一頁」的假錯誤
+    void qc.invalidateQueries({ queryKey: bookingKeys.all })
     invalidateBadges() // 側欄徽章與總覽數字卡
   }
   const post = (path: string, body?: object) =>

@@ -35,13 +35,11 @@ from app.schemas.bookings import (
     EquipmentLoanIn,
     EquipmentLoanOut,
     EquipmentOut,
-    EquipmentUsageOut,
     FixedOccupancyOut,
     RoomBookingIn,
     RoomBookingOut,
     VenueBookingIn,
     VenueBookingOut,
-    VenueOut,
 )
 from app.schemas.common import ApiResponse
 from app.services import activity_service, approvals, audit, notify
@@ -72,6 +70,24 @@ async def _ensure_not_suspended(db, user) -> None:
         )
 
 
+# 802 國際事務處是行政單位,借臨時場地沒有社團活動可綁(D-36)。一個帳號一條例外,
+# 不為它開資料欄位;要放行第二個單位時再改成主檔設定。
+# 前端同一份判定在 features/bookings/VenueBookingPage.tsx
+NO_ACTIVITY_ACCOUNT = ("802", "國際事務處")
+
+
+async def _skips_activity(db, user) -> bool:
+    """帳號代碼與社團名稱兩者皆符才吃這條例外。
+
+    比的是 `Club.name` 而不是 `User.name`:後者是建帳當下的快照,社團改名
+    只寫 `Club.name`(`admin_clubs.update_club`),全系統沒有第二支 API 更新得了它。
+    拿快照比就變成「改完名還繼續免綁」,而且畫面上顯示的一律是活的 `Club.name`,
+    漂移完全看不出來。
+    """
+    club = await db.get(Club, user.club_id)  # _ensure_not_suspended 已載入,不另發 SQL
+    return (user.username, club.name) == NO_ACTIVITY_ACCOUNT
+
+
 async def _approved_activity(db, user, activity_id: int) -> Activity:
     """借用綁定的活動:必須是本社團且審核通過。"""
     activity = await db.scalar(
@@ -95,14 +111,6 @@ def _require_not_ended(activity: Activity, what: str) -> None:
 
 
 # ---- 主檔 ----
-
-
-@router.get("/venues")
-async def list_venues(user: ClubUser, db: DbDep) -> ApiResponse[list[VenueOut]]:
-    rows = await db.scalars(
-        sa.select(Venue).where(Venue.is_active.is_(True)).order_by(Venue.sort, Venue.id)
-    )
-    return ApiResponse(data=[VenueOut.model_validate(v) for v in rows])
 
 
 @router.get("/equipment")
@@ -137,66 +145,6 @@ async def list_equipment(
         item.available = available[eq.id]
         out.append(item)
     return ApiResponse(data=out)
-
-
-# ---- 借用總覽色格 ----
-
-
-@router.get("/bookings/availability")
-async def availability(user: ClubUser, db: DbDep, date: date) -> ApiResponse[dict]:
-    grid = await svc.availability_grid(db, date, user.club_id)
-    return ApiResponse(data={"date": date.isoformat(), "grid": grid})
-
-
-MAX_AVAILABILITY_SPAN_DAYS = 31  # 單一場地 15 天檢視用;上限防範圍濫用
-
-
-@router.get("/bookings/availability-range")
-async def availability_range(
-    user: ClubUser, db: DbDep, start: date, end: date, venue: int | None = None
-) -> ApiResponse[dict]:
-    """區間逐日場況(單一場地多天檢視):取代前端逐日並行請求。
-
-    venue 給定時 SQL 端即縮小到該場地(15 天檢視本就單場地,不必撈全校)。
-    """
-    if end < start:
-        raise validation_error("結束日期不得早於開始日期")
-    if (end - start).days + 1 > MAX_AVAILABILITY_SPAN_DAYS:
-        raise validation_error(f"查詢區間最多 {MAX_AVAILABILITY_SPAN_DAYS} 天")
-    grids = await svc.availability_grids(db, start, end, user.club_id, venue_id=venue)
-    return ApiResponse(
-        data={"days": [{"date": d.isoformat(), "grid": g} for d, g in grids.items()]}
-    )
-
-
-@router.get("/equipment/usage")
-async def equipment_usage(
-    user: ClubUser, db: DbDep, start: date, end: date
-) -> ApiResponse[list[EquipmentUsageOut]]:
-    """借用總覽的器材檢視:區間內每項器材逐日的佔用量(色格依 佔用/總數 上色)。"""
-    if end < start:
-        raise validation_error("結束日期不得早於開始日期")
-    if (end - start).days + 1 > MAX_AVAILABILITY_SPAN_DAYS:
-        raise validation_error(f"查詢區間最多 {MAX_AVAILABILITY_SPAN_DAYS} 天")
-    rows = (
-        await db.scalars(
-            sa.select(Equipment)
-            .where(Equipment.is_active.is_(True))
-            .order_by(Equipment.sort, Equipment.id)
-        )
-    ).all()
-    usage = await svc.equipment_usage_by_day(db, start, end)
-    return ApiResponse(
-        data=[
-            EquipmentUsageOut(
-                id=eq.id,
-                name=eq.name,
-                total_qty=eq.total_qty,
-                used={d.isoformat(): qty for d, qty in sorted(usage.get(eq.id, {}).items())},
-            )
-            for eq in rows
-        ]
-    )
 
 
 # ---- 固定場地借用 ----
@@ -409,8 +357,12 @@ async def create_venue_booking(
     venue = await db.get(Venue, body.venue_id)
     if venue is None or not venue.is_active or not venue.allow_temp:
         raise validation_error("該場地不開放臨時借用")
-    activity = await _approved_activity(db, user, body.activity_id)
-    _require_not_ended(activity, "場地借用")
+    activity = None
+    if body.activity_id is not None:
+        activity = await _approved_activity(db, user, body.activity_id)
+        _require_not_ended(activity, "場地借用")
+    elif not await _skips_activity(db, user):
+        raise validation_error("請選擇借用活動")
 
     # 過去時間全面禁止:過去日期直接擋;
     # 今天則以節次時刻表擋「最早節次已開始」的申請
@@ -443,7 +395,7 @@ async def create_venue_booking(
     row = VenueBooking(
         club_id=user.club_id,
         venue_id=venue.id,
-        activity_id=activity.id,
+        activity_id=activity.id if activity else None,
         date=body.date,
         periods=body.periods,
         purpose=body.purpose,
@@ -461,7 +413,7 @@ async def create_venue_booking(
     )
     out = VenueBookingOut.model_validate(row)
     out.venue_name = venue.name
-    out.activity_name = activity.name
+    out.activity_name = activity.name if activity else None
     return ApiResponse(data=out)
 
 

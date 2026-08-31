@@ -252,7 +252,7 @@ approved 且 end_date + N 天已過且未送結案 → 逾期鎖定(推導,非�
 
 **venue_bookings**(id, club_id NULL, venue_id, activity_id NULL, date, periods varchar(2)[], purpose, phone NULL, status)
 
-臨時場地借用,單日多節次;綁定審核通過的活動。`club_id` NULL = 最高權限手動借用(顯示「學務處」),`activity_id` NULL 僅容舊資料與手動借用。
+臨時場地借用,單日多節次;綁定審核通過的活動。`club_id` NULL = 最高權限手動借用(顯示「學務處」),`activity_id` NULL = 舊資料、手動借用,或 802 國際事務處(D-36)。
 
 **equipment_loans**
 

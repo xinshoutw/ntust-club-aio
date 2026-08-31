@@ -60,7 +60,7 @@ class VenueBooking(Base, TimestampMixin):
     # NULL=最高權限手動借用(行政)
     club_id: Mapped[int | None] = mapped_column(sa.ForeignKey("clubs.id"), index=True)
     venue_id: Mapped[int] = mapped_column(sa.ForeignKey("venues.id"))  # allow_temp
-    # 綁定審核通過活動;NULL 容舊資料,新申請於應用層必填
+    # 綁定審核通過活動;NULL = 舊資料、行政手動借用,或 802 國際事務處(D-36)
     activity_id: Mapped[int | None] = mapped_column(sa.ForeignKey("activities.id"), index=True)
     date: Mapped[dt.date] = mapped_column(sa.Date)
     periods: Mapped[list[str]] = mapped_column(ARRAY(sa.String(2)))  # 複選節次

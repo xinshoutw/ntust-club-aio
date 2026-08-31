@@ -11,7 +11,7 @@
 | 動作 | 端點 |
 |---|---|
 | 開放窗 | `GET /club/room-bookings/window` |
-| 場地主檔 | `GET /club/venues`(取 `allow_fixed`) |
+| 場地主檔 | `GET /public/venues`(取 `allow_fixed`) |
 | 場況(每週佔用) | `GET /club/room-bookings/occupancy?venue_id=`(選了場地才查) |
 | 正在申請 / 最近申請 | `GET /club/room-bookings?active=true\|false` |
 | 送出 | `POST /club/room-bookings` |

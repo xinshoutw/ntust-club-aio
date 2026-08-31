@@ -60,15 +60,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     verify()
   }, [verify])
 
-  // 任一請求收到 401 即視為 session 過期:清掉登入狀態,RequireRole 會導回登入頁
+  // 任一請求收到 401 即視為 session 過期:清掉登入狀態,RequireRole 會導回登入頁。
+  // 快取一起清 —— 未登入的 `/` 是公開頁,不清的話上一位使用者的「我的借用」綠格
+  // 會被原封畫給下一個看畫面的人(login/logout 兩條路徑本來就在清)
   useEffect(() => {
     const expire = () => {
+      qc.clear()
       setUser(null)
       setBootError(null)
     }
     window.addEventListener(UNAUTHORIZED_EVENT, expire)
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, expire)
-  }, [])
+  }, [qc])
 
   const login = useCallback(
     async (username: string, password: string): Promise<SessionUser> => {

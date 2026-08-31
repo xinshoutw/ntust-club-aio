@@ -22,6 +22,8 @@
 - [ ] 阻擋 `SECRET_KEY` = `openssl rand -base64 48`
 - [ ] 阻擋 `POSTGRES_PASSWORD` = 強密碼(compose 以同一個變數插值到 db 與 backend)
 - [ ] 阻擋 `FORWARDED_ALLOW_IPS` = `172.28.0.0/24` + edge VM 內網 IP。**絕不可用 `*`**,否則登入限流可被繞過、稽核 IP 可被投毒。值需與內層 web nginx 的 `set_real_ip_from` 一起核對
+- [ ] 應辦 免登入面 `/api/v1/public/*`(借用情形色格圖)確認走得到內層 nginx 的 `limit_req zone=public`(60r/m、burst 30):
+  這組端點沒有帳號可鎖可停權,唯一的節流就在那裡;edge 的台灣 IP 白名單是第二層,不是替代品
 - [ ] 應辦 `DISCORD_WEBHOOK_URL`:已是正式頻道。收不屬於任何社團的系統事件(行政手動借用、公告蓋板與刪除、報名場次刪除)與 infra 告警(磁碟水位);**絕不入版控**
 - [ ] 阻擋 `SMTP_*`:校方 relay 已實測可寄(`mail.ntust.edu.tw:465`、`SMTP_SECURITY=ssl`)。
   host / username / password 任一為空即降級 log-only(不報錯,但信不會寄出)。

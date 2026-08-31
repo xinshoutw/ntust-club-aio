@@ -4,6 +4,7 @@ import dayjs, { type Dayjs } from 'dayjs'
 import { App, Button, DatePicker, Form, Input, Select } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { useFormUnsavedGuard } from '../../app/unsaved'
+import { useAuth } from '../../app/auth'
 import PageHeader from '../../components/ui/PageHeader'
 import { PHONE_RULE, normalizePhone } from '../../lib/form'
 import { confirmDialog } from '../../lib/confirm'
@@ -33,6 +34,11 @@ export default function VenueBookingPage() {
   const periodAxis = periodKeys(periodCatalogue)
   const [form] = Form.useForm()
   const { suspended } = useClubSuspension()
+  // 802 國際事務處是行政單位,借場地沒有社團活動可綁(D-36);
+  // 後端同一份判定在 api/v1/bookings._skips_activity。
+  // 比社團名稱(`user.club`)而非 `user.name` —— 後者是建帳當下的快照,社團改名不會同步
+  const { user } = useAuth()
+  const noActivity = user?.username === '802' && user.club === '國際事務處'
   // 借用總覽格子點入時自動帶入場地、日期、時段
   const [params] = useSearchParams()
   const qVenueId = Number(params.get('venue'))
@@ -101,7 +107,7 @@ export default function VenueBookingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [venuesQuery.data])
 
-  const submit = (values: { venue: number; activity: number; purpose: string; phone: string; date: Dayjs }) => {
+  const submit = (values: { venue: number; activity?: number; purpose: string; phone: string; date: Dayjs }) => {
     if (!periods.length) {
       setPeriodsError(true)
       message.error('請選擇至少一個時段')
@@ -111,7 +117,7 @@ export default function VenueBookingPage() {
     createVenueBooking.mutate(
       {
         venueId: values.venue,
-        activityId: values.activity,
+        activityId: noActivity ? null : (values.activity ?? null),
         date: values.date,
         periods,
         purpose: values.purpose,
@@ -155,12 +161,13 @@ export default function VenueBookingPage() {
             <Form.Item
               name="activity"
               label="關聯活動"
-              rules={[{ required: true, message: '請選擇活動' }]}
+              rules={noActivity ? [] : [{ required: true, message: '請選擇活動' }]}
               style={{ marginBottom: 0 }}
             >
               <Select
-                placeholder="請選擇活動"
-                loading={activitiesQuery.isPending}
+                disabled={noActivity}
+                placeholder={noActivity ? '無需填寫' : '請選擇活動'}
+                loading={!noActivity && activitiesQuery.isPending}
                 options={approved.map((a) => ({ value: a.id, label: a.name }))}
                 notFoundContent={notFoundText(activitiesQuery, '無審核通過之活動', '活動清單')}
               />

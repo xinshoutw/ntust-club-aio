@@ -1,9 +1,12 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router'
 import { App, Button, DatePicker, Form, Input, InputNumber, Select } from 'antd'
+import type { FormInstance } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
-import { type Dayjs } from 'dayjs'
+import dayjs, { type Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
 import PeriodPicker from '../bookings/PeriodPicker'
+import { periodKeys, usePeriods } from '../../lib/periods'
 import { notFoundText } from '../../lib/selectOptions'
 import { useAdminEquipment } from '../../api/adminEquipment'
 import { useAdminVenues, useManualBookingMutations } from '../../api/adminBookings'
@@ -22,10 +25,38 @@ export default function ManualBookingPage() {
   const { createVenue, createEquipment } = useManualBookingMutations()
   const [venueForm] = Form.useForm()
   const [equipmentForm] = Form.useForm()
-  const [periods, setPeriods] = useState<string[]>([])
 
   const venues = venuesQuery.data ?? [] // /admin/venues 已僅回啟用中場地
   const equipment = (equipmentQuery.data ?? []).filter((e) => e.isActive)
+
+  // 借用情形色格圖點格進來時帶入場地/器材、日期與節次。
+  // **不濾掉過去日期**:補登紙本舊件正是這一頁的用途,後端也刻意放行。
+  // 一次只預填被點的那一張表 —— 手動借用免審直接核准,旁邊那張沒人要求的預填是有代價的
+  const [params, setParams] = useSearchParams()
+  const raw = params.get('date')
+  // 嚴格 parse:非嚴格會把 2026/99/99 正規化成別的日期
+  const qDate =
+    raw && dayjs(raw, 'YYYY/MM/DD', true).isValid() ? dayjs(raw, 'YYYY/MM/DD', true) : undefined
+  // 主檔裡沒有的 id 當沒帶:硬塞給 Select 只會在下拉裡顯示一串裸數字
+  const asId = (name: string, exists: (id: number) => boolean) => {
+    const id = Number(params.get(name)) || undefined
+    return id != null && exists(id) ? id : undefined
+  }
+  const qVenue = asId('venue', (id) => venues.some((v) => v.id === id))
+  const qEquipment = asId('equipment', (id) => equipment.some((e) => e.id === id))
+  const qPeriod = params.get('period')
+  const periodAxis = periodKeys(usePeriods())
+  const [periods, setPeriods] = useState<string[]>(() =>
+    qPeriod && periodAxis.includes(qPeriod) ? [qPeriod] : [],
+  )
+  // 送出成功後回到一張空表。`resetFields` 還原的是**掛載當下**的 initialValues
+  // (AntD 不吃事後變更的 initialValues),所以預填的欄位要自己再清一次;
+  // query 一併清掉,否則網址還說著已經送出去的那一筆
+  const clearPrefill = (form: FormInstance, fields: string[]) => {
+    setParams({}, { replace: true })
+    form.resetFields()
+    form.setFieldsValue(Object.fromEntries(fields.map((f) => [f, undefined])))
+  }
 
   const submitVenue = (v: { venue: number; date: Dayjs; purpose: string; phone?: string }) => {
     if (!periods.length) {
@@ -37,7 +68,7 @@ export default function ManualBookingPage() {
       {
         onSuccess: () => {
           message.success('已建立場地借用(學務處)')
-          venueForm.resetFields()
+          clearPrefill(venueForm, ['venue', 'date'])
           setPeriods([])
         },
         onError: (e) => message.error(errMsg(e)),
@@ -57,7 +88,7 @@ export default function ManualBookingPage() {
       {
         onSuccess: () => {
           message.success('已建立器材借用(學務處)')
-          equipmentForm.resetFields()
+          clearPrefill(equipmentForm, ['equipment', 'range'])
         },
         onError: (e) => message.error(errMsg(e)),
       },
@@ -71,7 +102,12 @@ export default function ManualBookingPage() {
           <div className="card" style={{ padding: 24 }}>
             <div style={sectionTitle}>臨時場地</div>
             <LoadingBlock pending={venuesQuery.isPending} rows={5}>
-            <Form form={venueForm} layout="vertical" onFinish={submitVenue}>
+            <Form
+              form={venueForm}
+              layout="vertical"
+              onFinish={submitVenue}
+              initialValues={{ venue: qVenue, date: qVenue && qDate }}
+            >
               <Form.Item name="venue" label="場地" rules={[{ required: true, message: '請選擇場地' }]}>
                 <Select
                   showSearch
@@ -108,7 +144,12 @@ export default function ManualBookingPage() {
           <div className="card" style={{ padding: 24 }}>
             <div style={sectionTitle}>器材</div>
             <LoadingBlock pending={equipmentQuery.isPending} rows={5}>
-            <Form form={equipmentForm} layout="vertical" onFinish={submitEquipment}>
+            <Form
+              form={equipmentForm}
+              layout="vertical"
+              onFinish={submitEquipment}
+              initialValues={{ equipment: qEquipment, range: qEquipment && qDate && [qDate, qDate] }}
+            >
               <Form.Item name="equipment" label="器材" rules={[{ required: true, message: '請選擇器材' }]}>
                 <Select
                   showSearch

@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.db import get_db
-from app.core.errors import forbidden, unauthenticated
+from app.core.errors import AppError, forbidden, unauthenticated
 from app.core.security import SESSION_RENEW_INTERVAL, SESSION_TTL
 from app.models import Session, User
 from app.models.enums import UserRole
@@ -92,6 +92,26 @@ async def get_auth(request: Request, response: Response, db: DbDep) -> tuple[Ses
 AuthDep = Annotated[tuple[Session, User], Depends(get_auth)]
 
 
+async def get_optional_user(request: Request, response: Response, db: DbDep) -> User | None:
+    """有有效 session 就回使用者,否則 None —— **唯讀 GET** 的免登入端點用。
+
+    只吞 401(沒有 cookie、cookie 壞掉、過期、帳號停用):那些都只是「認不出你」,
+    公開資料照給。403 一律往上拋 —— CSRF 失敗被降級成匿名等於放行,而這個依賴
+    是 export 出去的,擋在這裡才不必指望每個呼叫端都記得。
+    不擋 must_change_password:那是「能不能操作」的閘,唯讀資料不受它管。
+    """
+    try:
+        _, user = await get_auth(request, response, db)
+    except AppError as exc:
+        if exc.status != 401:
+            raise
+        return None
+    return user
+
+
+OptionalUser = Annotated[User | None, Depends(get_optional_user)]
+
+
 async def get_current_user(auth: AuthDep) -> User:
     _, user = auth
     if user.must_change_password:
@@ -137,17 +157,22 @@ def require_permission(*keys: str):
     return dep
 
 
-def _admin_with(key: str, user: User) -> bool:
+def admin_with(key: str, user: User | None) -> bool:
     """持該頁面權限鍵的管理員(super 全通)。
 
     工讀生端與評審端的頁面在行政端整組再掛了一次(core/permissions 的 astaff/aviewer),
     共用同一批端點 —— 承辦要頂得了櫃台、也要看得到評審那三頁。
+    免登入端點(`/public/*`)也拿它決定要不要多給行政才看得到的欄位,所以收 None。
     """
-    return user.role == UserRole.ADMIN and (user.is_super or key in user.permissions)
+    return (
+        user is not None
+        and user.role == UserRole.ADMIN
+        and (user.is_super or key in user.permissions)
+    )
 
 
 async def require_staff(user: CurrentUser) -> User:
-    if user.role != UserRole.STAFF and not _admin_with("astaff", user):
+    if user.role != UserRole.STAFF and not admin_with("astaff", user):
         raise forbidden()
     return user
 
@@ -160,7 +185,7 @@ async def require_viewer(user: CurrentUser) -> User:
     """
     if user.role == UserRole.VIEWER and user.can_view_eval:
         return user
-    if _admin_with("aviewer", user):
+    if admin_with("aviewer", user):
         return user
     raise forbidden()
 

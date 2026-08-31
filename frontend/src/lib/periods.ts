@@ -1,12 +1,37 @@
+import { useQuery } from '@tanstack/react-query'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useAuth } from '../app/auth'
+import { api } from '../api/client'
 import type { Period } from '../api/auth'
 
 // 節次(第 1–10 節、A–D 節)的單一真相在後端 services/booking_service.PERIOD_TIMES,
-// 隨 /auth/me 下發。借用頁全在 RequireRole 之後,取用時 user 必定已就緒。
+// 隨 /auth/me 下發。登入後的借用頁取用時 user 必定已就緒(全在 RequireRole 之後)。
+// 未登入的公開首頁沒有 /auth/me,只好另外跟後端要同一份目錄(不在前端放第二份)。
 
+/** 節次目錄 + 它的載入狀態。只有未登入那條路徑會有 pending/error ——
+ *  拿不到節次的畫面是一張沒有節次欄的空表,和「今天沒有節次」長得一模一樣,
+ *  所以呼叫端必須把這兩個狀態併進自己的載入與錯誤畫面,不能只讀陣列。 */
+export function usePeriodCatalogue() {
+  const { user } = useAuth()
+  const query = useQuery({
+    queryKey: ['public', 'periods'],
+    queryFn: () => api<Period[]>('/public/periods'),
+    enabled: !user,
+    staleTime: Infinity,
+  })
+  return {
+    periods: user?.periods ?? query.data ?? [],
+    // 登入者手上已經有目錄,那支查詢是 disabled(恆為 isPending),不能拿來擋畫面
+    isPending: !user && query.isPending,
+    isLoadingError: !user && query.isLoadingError,
+    error: query.error ?? undefined,
+    refetch: () => void query.refetch(),
+  }
+}
+
+/** 只要節次目錄本身的呼叫端(登入後的借用頁,user.periods 必定就緒) */
 export function usePeriods(): Period[] {
-  return useAuth().user?.periods ?? []
+  return usePeriodCatalogue().periods
 }
 
 /** 節次排序權重:數字節在前、字母節在後。

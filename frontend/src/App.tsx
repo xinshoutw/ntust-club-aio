@@ -11,6 +11,7 @@ import QueryError from './components/ui/QueryError'
 import LoginPage from './features/auth/LoginPage'
 import ChangePasswordPage from './features/auth/ChangePasswordPage'
 import ComingSoonPage from './features/auth/ComingSoonPage'
+import PublicHomePage from './features/public/PublicHomePage'
 import OverviewPage from './features/overview/OverviewPage'
 import ActivityListPage from './features/activities/ActivityListPage'
 import ActivityFormPage from './features/activities/ActivityFormPage'
@@ -103,6 +104,19 @@ function ClubShell() {
   return <AppShell nav={nav} />
 }
 
+// 未登入的首頁是公開的借用情形預覽(Roadmap 的免登入入口);
+// 其餘社團頁沒有公開版本,一律照舊轉登入頁
+function ClubArea() {
+  const { user, booting, bootError } = useAuth()
+  const { pathname } = useLocation()
+  if (!booting && !bootError && !user && pathname === '/') return <PublicHomePage />
+  return (
+    <RequireRole roles={['club']}>
+      <ClubShell />
+    </RequireRole>
+  )
+}
+
 // 側欄徽章:GET /badges 一次回該角色所有頁面的待辦數;
 // 後端已依 permissions 過濾,受限管理員拿不到無權限頁面的數字
 function AdminShell() {
@@ -171,13 +185,7 @@ export default function App() {
         }
       />
 
-      <Route
-        element={
-          <RequireRole roles={['club']}>
-            <ClubShell />
-          </RequireRole>
-        }
-      >
+      <Route element={<ClubArea />}>
         <Route index element={<OverviewPage />} />
         <Route path="activities" element={<ActivityListPage />} />
         <Route path="activities/new" element={<ActivityFormPage />} />

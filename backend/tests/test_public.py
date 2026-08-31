@@ -5,7 +5,9 @@
 
 from datetime import date, timedelta
 
-from app.models import Equipment, Venue, VenueBooking
+import sqlalchemy as sa
+
+from app.models import Equipment, User, Venue, VenueBlockRule, VenueBooking
 from app.models.enums import VenueCategory
 from tests.conftest import login, make_club, make_user
 
@@ -61,6 +63,39 @@ async def test_manual_booking_is_never_mine(client, db):
         await client.get("/api/v1/public/bookings/availability", params={"date": DAY.isoformat()})
     ).json()["data"]["grid"]
     assert grid[str(venue.id)]["5"] == {"status": "temp", "club": "學務處"}
+
+
+async def test_block_reasons_are_admin_free_text_and_stay_private(client, db):
+    """不開放原因是承辦自己打的字,匿名只看得到格色;登入的社團看得到原因。"""
+    venue, _ = await seed(db)
+    admin_id = await db.scalar(sa.select(User.id).order_by(User.id).limit(1))
+    db.add(
+        VenueBlockRule(
+            venue_id=venue.id,
+            start_date=DAY,
+            end_date=DAY,
+            weekdays=[],
+            periods=["7"],
+            reason="熱舞社違規停用",
+            created_by=admin_id,
+        )
+    )
+    await db.commit()
+    iso = DAY.isoformat()
+
+    def blocked(payload: dict) -> dict:
+        return payload["data"]["grid"][str(venue.id)]["7"]
+
+    anon = await client.get("/api/v1/public/bookings/availability", params={"date": iso})
+    assert blocked(anon.json()) == {"status": "blocked", "club": None}
+    anon_range = await client.get(
+        "/api/v1/public/bookings/availability-range", params={"start": iso, "end": iso}
+    )
+    assert anon_range.json()["data"]["days"][0]["grid"][str(venue.id)]["7"]["club"] is None
+
+    await login(client, "club01")
+    signed_in = await client.get("/api/v1/public/bookings/availability", params={"date": iso})
+    assert blocked(signed_in.json()) == {"status": "blocked", "club": "熱舞社違規停用"}
 
 
 async def test_public_endpoints_need_no_login(client, db):

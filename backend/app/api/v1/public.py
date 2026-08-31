@@ -24,6 +24,20 @@ router = APIRouter(prefix="/public", tags=["public"])
 MAX_AVAILABILITY_SPAN_DAYS = 31  # 單一場地 15 天檢視用;上限防範圍濫用
 
 
+def _strip_block_reasons(grid: dict) -> dict:
+    """匿名不給不開放原因。
+
+    借用社團名是主檔上的專有名詞,等同貼在場地門口;`blocked` 格的 `club` 卻是承辦
+    自己打的自由文字(「XX 社違規停用」那一類),沒有任何格式約束,不該對外。
+    格色照舊,只是沒有 hover —— 前端無社名本來就不掛 tooltip。
+    """
+    for cells in grid.values():
+        for cell in cells.values():
+            if cell["status"] == "blocked":
+                cell["club"] = None
+    return grid
+
+
 @router.get("/periods")
 async def periods() -> ApiResponse[list[PeriodOut]]:
     """節次目錄。登入者由 `/auth/me` 帶,未登入的公開首頁只能從這裡拿。"""
@@ -41,6 +55,8 @@ async def list_venues(db: DbDep) -> ApiResponse[list[VenueOut]]:
 @router.get("/bookings/availability")
 async def availability(user: OptionalUser, db: DbDep, date: date) -> ApiResponse[dict]:
     grid = await svc.availability_grid(db, date, user.club_id if user else None)
+    if user is None:
+        _strip_block_reasons(grid)
     return ApiResponse(data={"date": date.isoformat(), "grid": grid})
 
 
@@ -59,6 +75,9 @@ async def availability_range(
     grids = await svc.availability_grids(
         db, start, end, user.club_id if user else None, venue_id=venue
     )
+    if user is None:
+        for grid in grids.values():
+            _strip_block_reasons(grid)
     return ApiResponse(
         data={"days": [{"date": d.isoformat(), "grid": g} for d, g in grids.items()]}
     )

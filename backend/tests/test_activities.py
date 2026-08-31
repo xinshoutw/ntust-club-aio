@@ -5,6 +5,7 @@ import sqlalchemy as sa
 
 from app.core.config import settings
 from app.models import Activity, ApprovalRecord, AuditLog, SystemSetting
+from app.services.activity_service import MIN_PHOTOS
 from tests.conftest import csrf_headers, login, make_club, make_user
 
 JPG = b"\xff\xd8\xff\xe0" + b"\x00" * 64
@@ -65,6 +66,15 @@ async def upload_photo(client, aid: int, content: bytes = JPG, name: str = "phot
     )
     assert resp.status_code == 201, resp.text
     return resp.json()["data"]["id"]
+
+
+async def upload_min_photos(client, aid: int) -> None:
+    """補滿結案照片下限;跨活動 SHA-256 去重,內容以 (活動, 序號) 區隔。
+
+    同一活動只可呼叫一次 —— 第二次會整批撞去重而 409。
+    """
+    for i in range(MIN_PHOTOS):
+        await upload_photo(client, aid, content=JPG + f"{aid}-{i}".encode(), name=f"photo{i}.jpg")
 
 
 def close_payload(**overrides) -> dict:
@@ -410,7 +420,7 @@ async def test_close_eligibility_and_lock_derive_from_end_date(client, db):
     end = (date.today() - timedelta(days=3)).isoformat()
     data = await create_activity(client, name="跨日活動", date=start, end_date=end)
     await approve(db, data["id"])
-    await upload_photo(client, data["id"])
+    await upload_min_photos(client, data["id"])
     listing = (await client.get("/api/v1/club/activities")).json()["data"]
     row = next(a for a in listing if a["id"] == data["id"])
     assert row["close_locked"] is False
@@ -489,7 +499,18 @@ async def test_close_submit_and_report(client, db):
     assert resp.status_code == 422
     assert "照片" in resp.json()["error"]
 
-    await upload_photo(client, aid)
+    # 不足下限 → 一樣 422(不是「有沒有照片」而是「夠不夠張數」)
+    for i in range(MIN_PHOTOS - 1):
+        await upload_photo(client, aid, content=JPG + f"short{i}".encode(), name=f"p{i}.jpg")
+    resp = await client.post(
+        f"/api/v1/club/activities/{aid}/close",
+        json=close_payload(**review),
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    assert f"{MIN_PHOTOS} 張" in resp.json()["error"]
+
+    await upload_min_photos(client, aid)
     resp = await client.post(
         f"/api/v1/club/activities/{aid}/close",
         json=close_payload(**review),
@@ -530,7 +551,7 @@ async def test_close_locked_after_deadline(client, db):
     data = await create_activity(client, date=stale)
     aid = data["id"]
     await approve(db, aid)
-    await upload_photo(client, aid)
+    await upload_min_photos(client, aid)
 
     listing = (await client.get("/api/v1/club/activities")).json()["data"]
     assert listing[0]["close_locked"] is True
@@ -595,6 +616,7 @@ async def test_photo_upload_dedupe_and_delete(client, db):
     a2_file = resp.json()["data"]["id"]
 
     # 結案送出後照片不可再刪(送出 vs 刪除以活動列鎖序列化,先送出者勝)
+    await upload_min_photos(client, a2["id"])  # 補滿送出門檻
     resp = await client.post(
         f"/api/v1/club/activities/{a2['id']}/close",
         json=close_payload(),
@@ -646,7 +668,7 @@ async def test_close_docs_share_the_photo_quota(client, db):
     detail = (await client.get(f"/api/v1/club/activities/{activity['id']}")).json()["data"]
     assert [f["original_name"] for f in detail["close_docs"]] == ["保單.pdf"]
 
-    await upload_photo(client, activity["id"])
+    await upload_min_photos(client, activity["id"])
     resp = await client.post(
         f"/api/v1/club/activities/{activity['id']}/close",
         json=close_payload(),
@@ -953,7 +975,7 @@ async def test_close_actual_times_overnight_rules(client, db):
     past = (date.today() - timedelta(days=3)).isoformat()
     data = await create_activity(client, date=past)
     await approve(db, data["id"])
-    await upload_photo(client, data["id"])
+    await upload_min_photos(client, data["id"])
     resp = await client.post(
         f"/api/v1/club/activities/{data['id']}/close",
         json=close_payload(actual_start="18:10", actual_end="10:00"),
@@ -967,8 +989,7 @@ async def test_close_actual_times_overnight_rules(client, db):
     end = (date.today() - timedelta(days=4)).isoformat()
     data = await create_activity(client, name="跨日宿營", date=start, end_date=end)
     await approve(db, data["id"])
-    # 跨活動 SHA-256 去重:第二個活動的照片須用不同內容
-    await upload_photo(client, data["id"], content=JPG + b"\x01", name="photo2.jpg")
+    await upload_min_photos(client, data["id"])
     resp = await client.post(
         f"/api/v1/club/activities/{data['id']}/close",
         json=close_payload(actual_start="18:10", actual_end="10:00"),

@@ -32,8 +32,9 @@ export interface WorkItem {
 /** 結案送出的心得下限(後端 `CloseSubmitIn.reflections` 的 min_length) */
 export const MIN_REFLECTIONS = 3
 
-/** 評鑑「照片 / 影片」那一項的參考張數:達 5 張或附影片連結,承辦通常會採計。
- *  只是給人看的門檻 —— 計不計分由承辦的繳交確認決定(decisions.md D-14) */
+/** 結案送出的照片下限(後端同值:`activity_service.MIN_PHOTOS`)。
+ *  同時是評鑑「照片 / 影片」那一項的參考張數:達此數或附影片連結,承辦通常會採計 ——
+ *  計不計分仍由承辦的繳交確認決定(decisions.md D-14),遷移件照片可能不足此數 */
 export const MIN_PHOTOS = 5
 
 export interface Reflection {

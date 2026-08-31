@@ -504,7 +504,8 @@ function CloseForm({
     } else if (complete.length < MIN_REFLECTIONS) {
       missing.push(['reflections', `學習心得至少需 ${MIN_REFLECTIONS} 位本校學生`])
     }
-    if (existing.length + photos.length === 0) missing.push(['photos', '請上傳「活動照片」'])
+    if (existing.length + photos.length < MIN_PHOTOS)
+      missing.push(['photos', `「活動照片」請上傳至少 ${MIN_PHOTOS} 張`])
     if (expense == null) missing.push(['expense', '請填寫「實際支出」'])
     if (missing.length === 0) {
       // 時間先後僅單日活動可比較:跨日活動(如 18:00–翌日 10:00)整段合法(後端同規則)
@@ -531,9 +532,6 @@ function CloseForm({
       return
     }
     setErrors(new Set())
-    if (existing.length + photos.length < MIN_PHOTOS && !videoLink.trim()) {
-      message.warning(`照片未達 ${MIN_PHOTOS} 張且無影片連結，承辦審核時可能不予採計`)
-    }
 
     const body: CloseSubmitInput = {
       memberCount: memberCount!,
@@ -854,8 +852,8 @@ function CloseForm({
             <div>
               <div style={label}>
                 活動照片{requiredMark}
-                {/* 送出門檻是 1 張;MIN_PHOTOS 是承辦審核時的參考張數,計不計分看承辦的確認 */}
-                <Tooltip title={`請上傳至少 1 張照片`}>
+                {/* 送出門檻;同時是承辦審核的參考張數,計不計分仍看承辦的確認 */}
+                <Tooltip title={`請上傳至少 ${MIN_PHOTOS} 張照片`}>
                   <InfoCircleOutlined style={{ marginLeft: 6, color: 'var(--steel)' }} />
                 </Tooltip>
               </div>

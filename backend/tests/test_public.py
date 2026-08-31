@@ -8,7 +8,15 @@ from datetime import date, timedelta
 
 import sqlalchemy as sa
 
-from app.models import Equipment, User, Venue, VenueBlockRule, VenueBooking
+from app.models import (
+    Equipment,
+    RoomBookingRequest,
+    RoomBookingSlot,
+    User,
+    Venue,
+    VenueBlockRule,
+    VenueBooking,
+)
 from app.models.enums import VenueCategory
 from tests.conftest import login, make_club, make_user
 
@@ -128,7 +136,13 @@ async def test_pending_list_is_for_the_officer_who_reviews_them(client, db):
     covered = booking(other.id, ["3"])
     # "9" 兩社搶同一格,兩筆都要在;"7" 被不開放規則蓋掉,待審單同樣要留著
     first, second = booking(other.id, ["9", "7"]), booking(None, ["9"])
-    db.add_all([covered, first, second])
+    # "9" 另有一張待審的固定借用:標示得到但沒有申請 id(要到固定場地借用審核才審得了)
+    fixed = RoomBookingRequest(
+        club_id=other.id, venue_id=venue.id, purpose="社課",
+        start_date=DAY - timedelta(days=30), end_date=DAY + timedelta(days=30),
+    )
+    fixed.slots = [RoomBookingSlot(weekday=DAY.isoweekday(), period="9")]
+    db.add_all([covered, first, second, fixed])
     db.add(
         VenueBlockRule(
             venue_id=venue.id, start_date=DAY, end_date=DAY, weekdays=[],
@@ -158,11 +172,28 @@ async def test_pending_list_is_for_the_officer_who_reviews_them(client, db):
     assert cells["3"]["pending"] == [{"id": covered.id, "club": "吉他社", "kind": "temp"}]
     assert cells["7"]["status"] == "blocked"  # 不開放蓋過一切
     assert cells["7"]["pending"] == [{"id": first.id, "club": "吉他社", "kind": "temp"}]
-    # 同一格多筆:依申請 id 即送件序,行政手動借用顯示「學務處」
+    # 同一格多筆:臨時借用在前(依申請 id 即送件序),固定借用在後且沒有申請 id;
+    # 行政手動借用顯示「學務處」
     assert cells["9"]["pending"] == [
         {"id": first.id, "club": "吉他社", "kind": "temp"},
         {"id": second.id, "club": "學務處", "kind": "temp"},
+        {"id": None, "club": "吉他社", "kind": "fixed"},
     ]
+    # 沒有待審單的格子不掛空清單(區間端點一次可回 31 天 × 全校)
+    assert "pending" not in cells["3"] or cells["3"]["pending"]
+
+    # super 不必顯式持鍵;首登未改密的帳號則一律看不到(那不是公開資料)
+    client.cookies.clear()
+    await make_user(db, username="boss", role="admin", is_super=True)
+    assert "pending" in (await grid("boss"))["9"]
+    client.cookies.clear()
+    await make_user(
+        db, username="newadmin", role="admin", permissions=["abooking"],
+        must_change_password=True,
+    )
+    assert "pending" not in (await grid("newadmin"))["9"]
+    client.cookies.clear()
+    await login(client, "bookadmin")
     # 區間端點同一份判定
     days = (
         await client.get(

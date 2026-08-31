@@ -65,6 +65,17 @@ async def test_manual_booking_is_never_mine(client, db):
     assert grid[str(venue.id)]["5"] == {"status": "temp", "club": "學務處"}
 
 
+async def test_stale_session_cookie_still_gets_the_public_grid(client, db):
+    """壞掉/過期的 session 當訪客處理,不是 401 —— 公開頁不該因為舊 cookie 打不開。"""
+    await seed(db)
+    client.cookies.set("session_id", "not-a-uuid")
+    resp = await client.get(
+        "/api/v1/public/bookings/availability", params={"date": DAY.isoformat()}
+    )
+    client.cookies.clear()
+    assert resp.status_code == 200
+
+
 async def test_block_reasons_are_admin_free_text_and_stay_private(client, db):
     """不開放原因是承辦自己打的字,匿名只看得到格色;登入的社團看得到原因。"""
     venue, _ = await seed(db)

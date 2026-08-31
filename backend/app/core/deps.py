@@ -93,14 +93,18 @@ AuthDep = Annotated[tuple[Session, User], Depends(get_auth)]
 
 
 async def get_optional_user(request: Request, response: Response, db: DbDep) -> User | None:
-    """有有效 session 就回使用者,否則 None —— 免登入端點(`/public/*`)用。
+    """有有效 session 就回使用者,否則 None —— **唯讀 GET** 的免登入端點用。
 
-    不擋 must_change_password:那是「能不能操作」的閘,唯讀的公開資料不受它管;
-    首登未改密的社團看首頁的借用情形圖,仍該看得到自己的借用。
+    只吞 401(沒有 cookie、cookie 壞掉、過期、帳號停用):那些都只是「認不出你」,
+    公開資料照給。403 一律往上拋 —— CSRF 失敗被降級成匿名等於放行,而這個依賴
+    是 export 出去的,擋在這裡才不必指望每個呼叫端都記得。
+    不擋 must_change_password:那是「能不能操作」的閘,唯讀資料不受它管。
     """
     try:
         _, user = await get_auth(request, response, db)
-    except AppError:
+    except AppError as exc:
+        if exc.status != 401:
+            raise
         return None
     return user
 

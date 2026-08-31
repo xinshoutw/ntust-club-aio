@@ -10,10 +10,10 @@
 
 | 區塊 | 端點 |
 |---|---|
-| 場地主檔 | `GET /club/venues` |
-| 單日場況 | `GET /club/bookings/availability?date=` |
-| 單一場地多日場況 | `GET /club/bookings/availability-range?start&end&venue`(上限 31 天) |
-| 器材逐日佔用量 | `GET /club/equipment/usage?start&end`(上限 31 天) |
+| 場地主檔 | `GET /public/venues` |
+| 單日場況 | `GET /public/bookings/availability?date=` |
+| 單一場地多日場況 | `GET /public/bookings/availability-range?start&end&venue`(上限 31 天) |
+| 器材逐日佔用量 | `GET /public/equipment/usage?start&end`(上限 31 天) |
 | 正在借用(三類) | `GET /club/{room-bookings,venue-bookings,equipment-loans}?active=true` |
 | 最近歸還 | `GET /club/equipment-loans?status=returned`(伺服器分頁) |
 | 最近申請(三類) | `GET /club/{room-bookings,venue-bookings,equipment-loans}?active=false`(各取第一頁 5 筆) |
@@ -21,7 +21,7 @@
 
 ## 畫面
 
-**借用情形**(色格圖)— 左上角滑桿切換**場地 / 器材**,日期切換鈕(前後一天/一週/今天)+ 日期選擇器兩種檢視共用。
+**借用情形**(色格圖,元件 `features/bookings/BookingGrid.tsx`)— 行政端「臨時場地器材借用」與未登入首頁用的是同一個元件、同一組 `/public/*` 端點,只換點格後去哪一頁。左上角滑桿切換**場地 / 器材**,日期切換鈕(前後一天/一週/今天)+ 日期選擇器兩種檢視共用。
 
 場地兩種檢視:
 
@@ -32,7 +32,7 @@
 
 都可往前看過去日期(查歷史借用紀錄的唯一入口)。
 
-場地格狀態:可借(淺灰)/ 審核中(橘)/ 臨時借用(粉)/ 固定借用(深灰)/ 我的借用(綠)/ 僅固定借用(斜紋)/ 不開放(透明無框)。這張圖是**臨時借用**的視角,只開放固定借用的場地標「僅固定借用」而不是「不開放」。可借格可點,直接帶場地+日期+節次跳到臨時場地借用頁。被佔用格 hover 顯示借用社團名。
+場地格狀態:可借(淺灰)/ 審核中(橘)/ 臨時借用(粉)/ 固定借用(深灰)/ 我的借用(綠)/ 僅固定借用(斜紋)/ 不開放(透明無框)。這張圖是**臨時借用**的視角,只開放固定借用的場地標「僅固定借用」而不是「不開放」。可借格可點,直接帶場地+日期+節次跳到臨時場地借用頁。被佔用格 hover 顯示借用社團名。「我的借用」只有社團帳號判定得出來,行政端與未登入首頁的圖例不列這一格。
 
 器材格依當日**佔用/總數**上色,階別以**上界**判定:未借用(可借色)/ 30%(黃)/ 50%(橘)/ 未額滿(紅)/ 額滿(與固定借用同色)。可借色只留給完全沒借用,借出一件就進黃色;額滿只看件數不看比例,還差一件都算紅。hover 顯示「已借 X / 總數」。未借滿的未來格可點,帶品項與該日跳到器材借用頁(起訖同為該日)。
 

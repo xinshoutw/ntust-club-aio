@@ -773,7 +773,7 @@ export default function ActivityReviewModal({
                         setAdminNote(e.target.value)
                       }}
                       maxLength={1000}
-                      placeholder="給社團看的說明，會印在申請表的意見回饋（可留空）"
+                      placeholder="提供額外資訊給社團，將一併寫入活動申請表中"
                     />
                   ) : (
                     <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>

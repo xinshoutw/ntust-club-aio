@@ -314,7 +314,7 @@ describe('ActivityReviewModal 的簽核章軌', () => {
   })
 })
 
-const NOTE_PLACEHOLDER = '給社團看的說明，會印在申請表的意見回饋（可留空）'
+const NOTE_PLACEHOLDER = '提供額外資訊給社團，將一併寫入活動申請表中'
 
 // 備註會原樣印進申請表的意見回饋,所以「清掉」必須真的清得掉:
 // 沿用經費來源那條 `trim() || null` 的送法,空字串會變成 null=不動,按鈕按了等於沒按

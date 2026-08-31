@@ -18,7 +18,13 @@ describe('index.css 的 prefers-reduced-motion 區塊', () => {
     expect(block).not.toMatch(/(animation(-name)?|transition(-property)?)\s*:\s*none/)
   })
 
-  it('把 infinite 動畫壓成跑一次,避免 0.01ms 狂發事件', () => {
+  it('把 infinite 動畫壓成跑一次,避免 0.01ms 空轉燒 CPU', () => {
     expect(block).toMatch(/animation-iteration-count:\s*1\s*!important/)
+  })
+
+  // 這條同時當哨兵:.anticon-spin 是區塊裡的最後一段,抓得到就代表上面的
+  // regex 沒有在中途被某個寫到行首的 } 截斷。
+  it('讓 loading 圖示繼續轉,否則送出鈕看起來像當掉', () => {
+    expect(block).toMatch(/\.anticon-spin\s*\{[^}]*animation-iteration-count:\s*infinite\s*!important/)
   })
 })

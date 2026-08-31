@@ -259,29 +259,18 @@ body {
   70% { box-shadow: 0 0 0 8px rgba(107, 79, 163, 0); }
   100% { box-shadow: 0 0 0 0 rgba(107, 79, 163, 0); }
 }
-/* OS 關閉動畫(Windows「視覺效果 → 動畫效果」)時不能用 animation/transition: none:
-   AntD 的彈窗、下拉、Tooltip 靠 rc-motion 等 animationend/transitionend 才收尾,
-   動畫壓根沒跑事件就不會觸發,元件卡在半開狀態、透明地蓋住畫面,
-   使用者看到的就是按鈕點不到、hover 沒反應。改成短到看不見但仍會觸發事件的時間。
-   iteration-count 必須壓成 1,否則 infinite 動畫(StampTrail 的 pulse)會以 0.01ms 空轉燒 CPU。 */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-delay: -1ms !important; /* 負延遲:第一幀就已越過終點 */
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    transition-delay: 0.01ms !important;
-  }
-  /* 例外:loading 圖示要繼續轉。凍住的話送出鈕看起來像當掉,
-     但其實正在送出——這比動畫本身更容易被當成壞掉回報。 */
-  .anticon-spin {
-    animation-duration: 1s !important;
-    animation-delay: 0s !important;
-    animation-iteration-count: infinite !important;
-  }
-}
+/* 本站刻意不響應 prefers-reduced-motion,動畫一律照跑。
+
+   2026-08-31:原本這裡是 `* { animation: none !important; transition: none !important }`。
+   Windows 使用者在「協助工具 → 視覺效果」關掉動畫效果後,整個系統的按鈕、hover、彈窗
+   全部壞掉 —— 動畫壓根沒跑,animationend/transitionend 就永遠不觸發,而 AntD 的彈窗、
+   下拉、Tooltip 靠 rc-motion 等這兩個事件才收尾,於是 .ant-modal-wrap(position: fixed;
+   inset: 0,沒有 pointer-events: none)透明地蓋在畫面上吃掉所有點擊。
+
+   要重新響應這個設定前先想清楚:別用 CSS。CSS 只能把動畫改短(改成 0.01ms 讓事件照發),
+   蓋不掉 AntD 那三條 !important,也管不到 JS 明寫的 scrollIntoView behavior。正規做法是
+   ConfigProvider 的 theme token `motion: false`(見 main.tsx),讓 AntD 從源頭就不掛動畫
+   class —— rc-motion 不進動畫流程,自然不必等事件。 */
 
 /* 彈窗進場固定在目的地淡入/縮放,取消自點擊位置飛入的 transform-origin
    (2026-07-21 需求方:過場位移動畫造成不適;AntD 以 inline style 設 origin,需 !important 蓋過) */

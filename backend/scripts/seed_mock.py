@@ -806,8 +806,10 @@ async def _create_activities(
         club_id=csie.id, uploaded_by=csie_user.id,
         original_name="迎新宿營企劃書.pdf", mime="application/pdf",
     )
-    # 結案待審照片 ×3
-    for i, rgb in enumerate([(120, 170, 200), (200, 140, 120), (150, 180, 110)], 1):
+    # 結案待審照片 ×5(送出門檻,activity_service.MIN_PHOTOS)
+    for i, rgb in enumerate(
+        [(120, 170, 200), (200, 140, 120), (150, 180, 110), (170, 130, 190), (110, 190, 175)], 1
+    ):
         files.add(
             f"closing-photo-{i}", _png_bytes(rgb),
             module="reports", slot="report_photo",

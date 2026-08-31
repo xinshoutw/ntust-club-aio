@@ -11,7 +11,12 @@ from app.models import (
     User,
 )
 from tests.conftest import csrf_headers, login, make_club, make_user
-from tests.test_activities import close_payload, create_activity, payload, upload_photo
+from tests.test_activities import (
+    close_payload,
+    create_activity,
+    payload,
+    upload_min_photos,
+)
 
 
 async def club_account(db) -> User:
@@ -332,7 +337,7 @@ async def test_aclose_only_account_sees_only_close_scope(client, db):
     await db.execute(sa.update(Activity).where(Activity.id == closing).values(status="approved"))
     await db.commit()
     await login(client, "club01")
-    await upload_photo(client, closing)
+    await upload_min_photos(client, closing)
     resp = await client.post(
         f"/api/v1/club/activities/{closing}/close",
         json=close_payload(),
@@ -393,7 +398,7 @@ async def test_close_review_flow(client, db):
     await db.commit()
 
     await login(client, "club01")
-    await upload_photo(client, aid)
+    await upload_min_photos(client, aid)
     resp = await client.post(
         f"/api/v1/club/activities/{aid}/close",
         json=close_payload(),
@@ -567,7 +572,7 @@ async def test_close_key_can_actually_close(client, db):
     await db.commit()
 
     await login(client, "club01")
-    await upload_photo(client, aid)
+    await upload_min_photos(client, aid)
     resp = await client.post(
         f"/api/v1/club/activities/{aid}/close",
         json=close_payload(),
@@ -619,7 +624,7 @@ async def test_close_approve_persists_submission_confirmations(client, db):
     await db.commit()
 
     await login(client, "club01")
-    await upload_photo(client, aid)
+    await upload_min_photos(client, aid)
     resp = await client.post(
         f"/api/v1/club/activities/{aid}/close",
         json=close_payload(),

@@ -17,6 +17,9 @@ PHOTO_SLOT = "report_photo"
 DOC_SLOT = "report_doc"
 ATTACHMENT_SLOT = "proposal"
 
+# 送出結案的照片下限(前端同值:frontend/src/features/activities/types.ts MIN_PHOTOS)
+MIN_PHOTOS = 5
+
 # 申請簽核三關,順序即申請表的 初核 / 複核 / 決行 三格
 # (顯示詞是 承辦人 / 組長 / 學務長,見 admin_activities._STAGE_LABEL)
 APPLY_STAGES = ("advisor", "chief", "dean")

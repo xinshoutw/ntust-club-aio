@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { type Dayjs } from 'dayjs'
-import { Button, DatePicker, Segmented, Select, Tooltip } from 'antd'
+import { Button, DatePicker, Dropdown, Segmented, Select, Tooltip } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import {
   ArrowLeftOutlined,
@@ -21,6 +21,7 @@ import {
   type AvailabilityCell,
   type AvailabilityGrid,
   type AvailabilityState,
+  type GridPending,
   type Venue,
 } from '../../api/bookings'
 import { CELL, USAGE_SCALE, emptyCellState, usageStep, type CellState } from './cells'
@@ -47,17 +48,81 @@ function cellOf(
   venue: Venue,
   grid: AvailabilityGrid | undefined,
   period: string,
-): { state: CellState; club?: string } {
+): { state: CellState; club?: string; pending?: GridPending[] } {
   const c: AvailabilityCell | undefined = grid?.[String(venue.id)]?.[period]
-  if (c) return { state: STATE_OF[c.status], club: c.club }
+  if (c) return { state: STATE_OF[c.status], club: c.club, pending: c.pending }
   return { state: emptyCellState(venue) }
+}
+
+/** 底下壓著誰的申請。已核准或不開放蓋掉格色之後,承辦最需要看見的正是這一段 */
+const pendingText = (pending: GridPending[] | undefined): string =>
+  pending?.length
+    ? `・待審:${pending.map((p) => (p.kind === 'fixed' ? `${p.club}(固定借用)` : p.club)).join('、')}`
+    : ''
+
+interface CellProps {
+  state: CellState
+  label: string
+  club?: string
+  /** 該格全部待審單(僅審核端拿得到);有可審的就蓋過「前往借用」變成審核入口 */
+  pending?: GridPending[]
+  bookable: boolean
+  bookLabel: string
+  onBook: () => void
+  onOpenPending?: (booking: GridPending) => void
 }
 
 // 單一場地格:可借才可點(呼叫端決定去哪一頁申請);審核中不可點;不開放不畫方框。
 // 過去日期只供查閱歷史借用,空格不是可申請的入口(bookable=false)。
 // 被佔用格 hover 顯示借用社團名(mine 顯示「我的社團」語意由色塊表達,仍附社名)
-function Cell({ state, label, club, bookable, bookLabel, onBook }: { state: CellState; label: string; club?: string; bookable: boolean; bookLabel: string; onBook: () => void }) {
-  const base: React.CSSProperties = { width: '100%', height: 24, borderRadius: 4, background: CELL[state].bg, display: 'block' }
+function Cell({ state, label, club, pending, bookable, bookLabel, onBook, onOpenPending }: CellProps) {
+  // 點得開的只有臨時借用待審單(有申請 id);固定借用標示得到但要到「固定場地借用審核」審
+  const openable = onOpenPending ? (pending ?? []).filter((p) => p.id != null) : []
+  const base: React.CSSProperties = {
+    width: '100%',
+    height: 24,
+    borderRadius: 4,
+    background: CELL[state].bg,
+    display: 'block',
+    // 格色被更高權重的狀態佔走時,底下壓著的待審單要看得見 —— 不開放格本來就是
+    // 透明無框,不標的話那顆可點的格子在畫面上根本不存在
+    boxShadow:
+      state !== 'reviewing' && pending?.length ? `inset 0 0 0 2px ${CELL.reviewing.bg}` : undefined,
+  }
+  const suffix = pendingText(pending)
+  const title = (club ? `${club}・${CELL[state].label}` : CELL[state].label) + suffix
+
+  if (openable.length > 0) {
+    const button = (
+      <button
+        type="button"
+        aria-label={`${label}${club ? `(${club})` : ''}${suffix},點擊開啟審核`}
+        // 多筆時點擊由 Dropdown 接手,自己不掛 onClick
+        onClick={openable.length === 1 ? () => onOpenPending?.(openable[0]) : undefined}
+        style={{ ...base, border: 'none', padding: 0, cursor: 'pointer' }}
+      />
+    )
+    // 同一格多筆待審(兩社搶同一格):每一筆都要點得到,不能只留一筆
+    const el =
+      openable.length > 1 ? (
+        <Dropdown
+          trigger={['click']}
+          menu={{
+            items: openable.map((p) => ({
+              key: String(p.id),
+              label: `審核 ${p.club} 的申請`,
+              onClick: () => onOpenPending?.(p),
+            })),
+          }}
+        >
+          {button}
+        </Dropdown>
+      ) : (
+        button
+      )
+    return <Tooltip title={title}>{el}</Tooltip>
+  }
+
   if (state === 'free' && bookable) {
     return (
       <button
@@ -68,10 +133,12 @@ function Cell({ state, label, club, bookable, bookLabel, onBook }: { state: Cell
       />
     )
   }
-  const cell = <div role="img" aria-label={club ? `${label}(${club})` : label} style={base} />
-  // 有社名才掛 tooltip:被佔用格是借用社團,不開放格是原因
+  const cell = (
+    <div role="img" aria-label={`${club ? `${label}(${club})` : label}${suffix}`} style={base} />
+  )
+  // 有社名或有待審單才掛 tooltip:被佔用格是借用社團,不開放格是原因
   // (未登入時後端不給原因,那些格就沒有 hover)
-  return club ? <Tooltip title={`${club}・${CELL[state].label}`}>{cell}</Tooltip> : cell
+  return club || pending?.length ? <Tooltip title={title}>{cell}</Tooltip> : cell
 }
 
 function Legend({ items }: { items: readonly { label: string; bg: string }[] }) {
@@ -111,6 +178,8 @@ interface BookingGridProps {
   allowPast?: boolean
   /** 可點格的目的地,唸給螢幕閱讀器聽 —— 三個呼叫端去的不是同一頁 */
   bookLabel?: string
+  /** 點格開該筆待審單的審核(僅行政端);後端只對審這一關的承辦回 `pending` */
+  onOpenPending?: (booking: GridPending) => void
 }
 
 /** 借用情形色格圖:場地(單日全場地 / 單一場地 15 天)與器材(15 天借用程度)兩種檢視。
@@ -120,6 +189,7 @@ export default function BookingGrid({
   onBookEquipment,
   allowPast = false,
   bookLabel = '借用申請',
+  onOpenPending,
 }: BookingGridProps) {
   const periodCatalogue = usePeriodCatalogue()
   const periodAxis = periodKeys(periodCatalogue.periods)
@@ -390,7 +460,7 @@ export default function BookingGrid({
                       )}
                     </td>
                     {periodAxis.map((p) => {
-                      const { state, club } = cellOf(v, dayQuery.data, p)
+                      const { state, club, pending } = cellOf(v, dayQuery.data, p)
                       const label = `${v.name} 第${p}節:${CELL[state].label}`
                       return (
                         <td key={p}>
@@ -398,6 +468,8 @@ export default function BookingGrid({
                             state={state}
                             label={label}
                             club={club}
+                            pending={pending}
+                            onOpenPending={onOpenPending}
                             bookable={canBook(gridDate)}
                             bookLabel={bookLabel}
                             onBook={() => onBookVenue?.(v.id, gridDate, p)}
@@ -429,7 +501,7 @@ export default function BookingGrid({
                         {d.format('MM/DD')}（{WEEKDAY[d.day()]}）
                       </td>
                       {periodAxis.map((p) => {
-                        const { state, club } = cellOf(venueDef, grid, p)
+                        const { state, club, pending } = cellOf(venueDef, grid, p)
                         const label = `${d.format('MM/DD')} 第${p}節:${CELL[state].label}`
                         return (
                           <td key={p}>
@@ -437,6 +509,8 @@ export default function BookingGrid({
                               state={state}
                               label={label}
                               club={club}
+                              pending={pending}
+                              onOpenPending={onOpenPending}
                               bookable={canBook(d)}
                               bookLabel={bookLabel}
                               onBook={() => onBookVenue?.(venueDef.id, d, p)}

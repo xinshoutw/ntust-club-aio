@@ -129,10 +129,19 @@ interface EquipmentUsageOut {
 
 /** 後端僅回傳被佔用/審核中的格子;其餘由前端依場地開放旗標補 可借/不開放 */
 export type AvailabilityState = 'pending' | 'temp' | 'fixed' | 'mine' | 'blocked'
+/** 該格的一筆待審單;id 僅臨時借用有(點格開審核彈窗),固定借用要到 /admin/rooms 審 */
+export interface GridPending {
+  id: number | null
+  club: string
+  kind: 'temp' | 'fixed'
+}
 /** 每格帶狀態與借用社團名(hover 顯示) */
 export interface AvailabilityCell {
   status: AvailabilityState
   club: string
+  /** 該格**全部**待審單,含被已核准/不開放蓋掉的那些。
+   *  只有審這一關的承辦(權限鍵 abooking)拿得到 —— 其餘角色後端不回這個欄位 */
+  pending?: GridPending[]
 }
 export type AvailabilityGrid = Record<string, Partial<Record<string, AvailabilityCell>>>
 

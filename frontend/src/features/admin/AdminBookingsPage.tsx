@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router'
 import { useAuth } from '../../app/auth'
 import { canAccessAdminPath } from '../../lib/permissions'
 import { countText } from '../../lib/counts'
-import { Tooltip } from 'antd'
+import { App, Tooltip } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { RightOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
@@ -12,6 +12,7 @@ import StatusPill from '../../components/ui/StatusPill'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import BookingReviewModal, { type BookingReviewItem } from './BookingReviewModal'
 import BookingGrid from '../bookings/BookingGrid'
+import type { GridPending } from '../../api/bookings'
 import {
   useAdminBookingMutations,
   usePendingEquipmentLoans,
@@ -21,6 +22,7 @@ import {
 const PAGE_SIZE = 50
 
 export default function AdminBookingsPage() {
+  const { message } = App.useApp()
   const navigate = useNavigate()
   // 「看得到」與「動得了」是兩個判定:本頁是 abooking,手動借用是 amanual(一頁一鍵)。
   // 只有 abooking 的承辦點格子只會撞上權限牆,那就別把格子畫成可點的
@@ -44,6 +46,16 @@ export default function AdminBookingsPage() {
     setOpen(true)
   }
 
+  // 場況格點擊:以申請 id 對照待審列表資料開審核彈窗(列表只有本頁,找不到就指路)
+  const openReviewByGrid = (p: GridPending) => {
+    const booking = pendingVenues.find((v) => v.apiId === p.id)
+    if (booking) {
+      openReview({ kind: 'venue', data: booking })
+    } else {
+      message.error(`「${p.club}」的待審申請不在目前這一頁，請於下方待審列表翻頁開啟`)
+    }
+  }
+
   return (
     <div>
       <PageHeader
@@ -55,10 +67,12 @@ export default function AdminBookingsPage() {
         }
       />
 
-      {/* 借用情形:與社團端、公開首頁同一份色格圖。點格直接帶參數去手動借用 */}
+      {/* 借用情形:與社團端、公開首頁同一份色格圖。可借格帶參數去手動借用,
+          有待審單的格子(含被已核准/不開放蓋掉的)則就地開審核彈窗 */}
       <BookingGrid
         allowPast
         bookLabel="手動借用"
+        onOpenPending={openReviewByGrid}
         onBookVenue={
           canManual
             ? (venueId, date, period) =>

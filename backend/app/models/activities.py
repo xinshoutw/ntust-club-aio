@@ -54,6 +54,8 @@ class Activity(Base, TimestampMixin):
     participants_out: Mapped[int] = mapped_column(default=0)  # 非社員人數
     staff_text: Mapped[str] = mapped_column(sa.Text, default="")
     fund_source: Mapped[str | None] = mapped_column(sa.Text)  # 承辦人第一關認定
+    # 審核備註:管理員在申請審核時寫的一段話,社團端看得到(與退回原因無關,核准的單也能留話)
+    admin_note: Mapped[str | None] = mapped_column(sa.Text)
     school_approved: Mapped[int | None] = mapped_column()  # 學校核定補助(元)
     status: Mapped[ActivityStatus] = mapped_column(
         db_enum(ActivityStatus, "activity_status"), default=ActivityStatus.DRAFT

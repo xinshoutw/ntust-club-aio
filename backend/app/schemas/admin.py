@@ -46,6 +46,8 @@ class ApproveActivityIn(BaseModel):
     """
 
     fund_source: str | None = Field(None, max_length=100)
+    # 審核備註:任一關都寫得動(不是第一關的認定),空字串=清空,省略=不動
+    admin_note: str | None = Field(None, max_length=1000)
     budget: list[BudgetApprovalIn] = Field(default_factory=list, max_length=50)
     is_large_approved: bool | None = None  # 大型活動認可(僅 is_large 申請有效)
 

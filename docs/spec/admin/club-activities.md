@@ -36,6 +36,6 @@
 - 換社團同時重設頁碼與學期(回到當前學期)—— 上一社選的學期在新社可能一筆都沒有,留著就是沒有任何說明的空白
 - `clubId` 為 `null` 有兩種原因:還沒選,或社團選項載不到。後者不能叫人「請先選擇社團」,那是做不到的指示
 - 狀態、排序的判定與社團端**同一份**:顯示狀態(含推導的 `locked`)走 `activity_service.display_status_filter`,經費與狀態排序走 `BUDGET_TOTAL_SQL` / `STATUS_ORDER_SQL`。同一個欄名在兩頁點下去要排出同一個順序
-- **申請表 PDF 走行政端那支**:社團端的 `/club/activities/{id}/apply-pdf` 由 session 認社團,承辦讀別社會 404。彈窗以 `pdfBase="admin"` 切換
+- **申請表 PDF 走行政端那支**:社團端的 `/club/activities/{id}/apply-pdf` 由 session 認社團,承辦讀別社會 404。彈窗以 `viewer` 切換(行政端預設 `admin`)
 - 排序鍵 `budget` 走相關子查詢(與社團端同一份)。本頁一律帶 `club_id`,過濾集是單一社團單一學期,成本可接受;`/admin/activities` 不帶社團時排這個鍵會對整個過濾集逐列求值,那頁因此不開這顆鈕
 - 附件與結案照片的下載權限由 `permissions.FILE_SUBJECT_KEYS["activity"]` 涵蓋 `aclubact`(看得到那一頁 = 下載得了那一頁的檔案,decisions.md D-02)

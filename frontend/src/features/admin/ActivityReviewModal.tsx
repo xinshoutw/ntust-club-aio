@@ -367,7 +367,6 @@ export default function ActivityReviewModal({
 
   const submitApprove = async () => {
     if (!item) return
-    const largeNote = isFirstStage && item.type === '活動' ? `(大型活動${largeApproved ? '已認可' : '未認可'})` : ''
     if (onApprove) {
       // 核定不得超過擬請(後端同一條,擬請 0 的列帶非零核定整單 422)。輸入框有 max 擋著,
       // 但預填值來自舊資料 —— 遷移列的核定可以大於擬請,沒有輸入框可改就會卡死送不出去
@@ -400,7 +399,7 @@ export default function ActivityReviewModal({
         setSubmitting(false)
       }
     }
-    message.success(`已核准「${item.name}」${largeNote}`)
+    message.success(`已核准「${item.name}」`)
     onClose()
   }
 

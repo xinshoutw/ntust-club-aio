@@ -13,7 +13,7 @@ from fastapi import APIRouter
 
 from app.core.deps import DbDep, OptionalUser, admin_with
 from app.core.errors import validation_error
-from app.models import Equipment, Venue
+from app.models import Equipment, User, Venue
 from app.schemas.auth import PeriodOut
 from app.schemas.bookings import EquipmentUsageOut, VenueOut
 from app.schemas.common import ApiResponse
@@ -24,13 +24,15 @@ router = APIRouter(prefix="/public", tags=["public"])
 MAX_AVAILABILITY_SPAN_DAYS = 31  # 單一場地 15 天檢視用;上限防範圍濫用
 
 
-def _sees_pending(user) -> bool:
+def _sees_pending(user: User | None) -> bool:
     """待審單清單只給審這一關的承辦(`abooking`)。
 
     社團與匿名不該知道別人送了什麼還沒過 —— 格色已經說了「這個時段有人在等」,
     是誰在等是審核端的事。
+    首登未改密的帳號也不給:`OptionalUser` 刻意不擋那道閘(公開資料不受它管),
+    但這一欄不是公開資料,得自己擋。
     """
-    return admin_with("abooking", user)
+    return admin_with("abooking", user) and not user.must_change_password
 
 
 def _strip_block_reasons(grid: dict) -> dict:

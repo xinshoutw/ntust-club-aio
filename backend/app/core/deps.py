@@ -164,8 +164,10 @@ def admin_with(key: str, user: User | None) -> bool:
     共用同一批端點 —— 承辦要頂得了櫃台、也要看得到評審那三頁。
     免登入端點(`/public/*`)也拿它決定要不要多給行政才看得到的欄位,所以收 None。
     """
-    return user is not None and user.role == UserRole.ADMIN and (
-        user.is_super or key in user.permissions
+    return (
+        user is not None
+        and user.role == UserRole.ADMIN
+        and (user.is_super or key in user.permissions)
     )
 
 

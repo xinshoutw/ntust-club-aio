@@ -71,14 +71,26 @@ hover 顯示「目前未開放」(`lib/nav.EVAL_UNBUILT`)。收的**只有側欄
 社團端的活動詳情**改用行政端那支審核彈窗**(`viewer="club"`),`ActivityPreviewModal` 已刪除 ——
 章軌、大型認可、繳交確認與關卡說明都收掉,footer 換回繼續編輯/前往結案。
 
+**借用情形色格圖三端共用**(2026-08-31):社團端借用總覽那張圖抽成 `features/bookings/BookingGrid.tsx`,
+資料改走免登入的 `/public/*`(節次、場地、場況、器材佔用),社團端、行政端「臨時場地器材借用」
+與**未登入首頁**讀同一份。呼叫端只決定點格去哪一頁:社團去申請頁、行政帶參數去手動借用
+(`allowPast`,補登照樣點得動)、未登入不給入口即純預覽。
+**行政端原本那張專用場況圖連同它的能力一起沒了** —— 點審核中的格子開審核彈窗、hover 看該格
+全部待審單(含被已核准蓋掉的),端點 `/admin/bookings/availability`、`admin_availability_grid`
+與其測試都已刪除。衝突現在要自己對照下方待審表。
+
+**未登入的 `/`**(2026-08-31):借用情形的公開預覽,右上角登入鈕進 `/login`;
+其餘社團路徑未登入仍轉 `/login`。GAP-16 的社團導覽頁還沒做。
+匿名看得到借用社團名與不開放原因 —— 判定為可接受(等同貼在場地門口的資訊),要收就改後端。
+
 **要跑遷移**:D-21/D-22 是 drop column,`alembic upgrade head` 之後舊號碼就沒了。
 D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)—— 走 `--reset` 重灌,
 或把該學期匯出再匯入一次。
 
 ## 驗證現況
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **550 passed**;`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **218 passed**(49 檔)、
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **551 passed**;`ruff check .` 全綠
+- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **226 passed**(51 檔)、
   `pnpm run lint` 8 個既有的 fast-refresh warning
 - 新測試逐一做過 mutation 驗證(改回舊寫法會紅)
 

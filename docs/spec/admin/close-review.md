@@ -48,6 +48,7 @@
 - 逾期清單在 DB 端篩(`activity_service.close_overdue_sql`),與 `is_close_locked` 共用同一條期限與 `close_lock_days`
 
 - **`aclose` 涵蓋核准與退回**(decisions.md D-08):能看就能簽,不必另持 `approve_advisor`
+- **持 `approve_dean` 的帳號本頁也只剩第三關**(D-38):待審結案與逾期表都只列他簽過第三關的活動,側欄徽章(`a-close`)吃同一份 `activity_service.scope_sql` —— 承辦單關核准(D-16)的單從頭到尾沒到過他手上
 - 「逾期未結案」全是 `approved` 狀態:看不到該狀態的帳號查詢直接回 403,**不給一個假的 0 件**
 
 ## 未完成 / 問題

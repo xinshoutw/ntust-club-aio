@@ -101,9 +101,11 @@ def may_see_approved(user) -> bool:
 def actionable_statuses(user) -> set[ActivityStatus]:
     """該帳號**簽得下去**的待審狀態(徽章與待審佇列用;`scope_sql` 是看得到的範圍)。
 
-    與 `_require_stage_key` 同一條規則:學務長關卡即使 super 也要明確持有 `approve_dean`。
+    與 `_require_stage_key` 的共同點只有一條:學務長關卡即使 super 也要明確持有 `approve_dean`。
     只持頁面鍵 `areview` 的帳號看得到全部、一件也簽不了 —— 徽章要跟著佇列是 0。
-    持 `approve_dean` 者只剩第三關(D-38),前端 `adminActivities.canActOn` 同一條。
+    持 `approve_dean` 者這裡只剩第三關(D-38,前端 `adminActivities.canActOn` 同一條),
+    但 **`_require_stage_key` 刻意不跟進**:D-38 收的是視野不是簽核權,唯一的 super 授了
+    這把鍵之後仍簽得下前兩關,否則授鍵當下全校的第一關就沒有人簽得動。
     """
     if dean_scoped(user):
         return {ActivityStatus.PENDING_DEAN}

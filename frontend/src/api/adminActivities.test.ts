@@ -30,6 +30,16 @@ describe('canActOn(申請審核「本關」推導)', () => {
     expect(canActOn(admin({ permissions: ['approve_dean'] }), 'pending_dean')).toBe(true)
   })
 
+  it('持 approve_dean 者只剩第三關(D-38):前兩關不進他的待審佇列,super 亦同', () => {
+    const dean = admin({ permissions: ['approve_advisor', 'approve_chief', 'approve_dean'] })
+    expect(canActOn(dean, 'pending_dean')).toBe(true)
+    expect(canActOn(dean, 'pending_advisor')).toBe(false)
+    expect(canActOn(dean, 'pending_chief')).toBe(false)
+    const rootDean = admin({ isSuper: true, permissions: ['approve_dean'] })
+    expect(canActOn(rootDean, 'pending_advisor')).toBe(false)
+    expect(canActOn(rootDean, 'pending_chief')).toBe(false)
+  })
+
   it('非待審狀態/非管理員/未登入一律不可簽', () => {
     expect(canActOn(admin({ permissions: ['approve_advisor'] }), 'approved')).toBe(false)
     expect(canActOn(admin({ permissions: ['approve_advisor'] }), 'closing_pending_advisor')).toBe(false)

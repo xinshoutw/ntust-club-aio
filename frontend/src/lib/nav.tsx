@@ -264,8 +264,15 @@ const PT_GROUPS: NavGroup[] = [
     },
 ]
 
+// 唯一不鏡射到行政端的工讀生頁:承辦在 /admin/bookings 有同一張圖,而且點得開待審單。
+// 鏡射一份唯讀版只會多一個更弱的重複入口 —— 待審橘框標得出來卻點不動
+const PT_BOOKINGS: NavGroup = {
+  label: '借用查詢',
+  items: [{ key: 'pt-bookings', label: '借用總覽', path: '/pt/bookings', icon: <CalendarOutlined /> }],
+}
+
 export function buildPtNav(badges: Badges = {}): NavGroup[] {
-  return withBadges(PT_GROUPS, badges)
+  return withBadges([...PT_GROUPS, PT_BOOKINGS], badges)
 }
 
 // 評審端

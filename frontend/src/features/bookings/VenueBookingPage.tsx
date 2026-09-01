@@ -4,12 +4,12 @@ import dayjs, { type Dayjs } from 'dayjs'
 import { App, Button, DatePicker, Form, Input, Select } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { useFormUnsavedGuard } from '../../app/unsaved'
-import { useAuth } from '../../app/auth'
 import PageHeader from '../../components/ui/PageHeader'
 import { PHONE_RULE, normalizePhone } from '../../lib/form'
 import { confirmDialog } from '../../lib/confirm'
 import { bookingStarted, periodKeys, startedPeriods, usePeriods } from '../../lib/periods'
 import { notFoundText } from '../../lib/selectOptions'
+import { useNoActivityAccount } from '../../lib/noActivityAccount'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols, Pager } from '../../components/ui/tableControls'
@@ -34,11 +34,7 @@ export default function VenueBookingPage() {
   const periodAxis = periodKeys(periodCatalogue)
   const [form] = Form.useForm()
   const { suspended } = useClubSuspension()
-  // 802 國際事務處是行政單位,借場地沒有社團活動可綁(D-36);
-  // 後端同一份判定在 api/v1/bookings._skips_activity。
-  // 比社團名稱(`user.club`)而非 `user.name` —— 後者是建帳當下的快照,社團改名不會同步
-  const { user } = useAuth()
-  const noActivity = user?.username === '802' && user.club === '國際事務處'
+  const noActivity = useNoActivityAccount()  // 802 國際事務處免綁活動(D-36)
   // 借用總覽格子點入時自動帶入場地、日期、時段
   const [params] = useSearchParams()
   const qVenueId = Number(params.get('venue'))

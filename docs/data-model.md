@@ -259,7 +259,7 @@ approved 且 end_date + N 天已過且未送結案 → 逾期鎖定(推導,非�
 | 欄位 | 說明 |
 |---|---|
 | id, club_id NULL, equipment_id, qty, phone NULL | 一單一品項;多品項=多單,點交與逾期各自獨立 |
-| activity_id | FK activities NULL(容手動借用與舊系統已刪活動;新申請必填) |
+| activity_id | FK activities NULL(容手動借用、舊系統已刪活動,以及 802 國際事務處 D-36) |
 | start_date / end_date | 借用區間;社團自填(含活動前籌備與活動後驗收),行政手動借用亦自填 |
 | purpose | |
 | status | enum(pending, approved, rejected, cancelled, checked_out, returned) |

@@ -1,4 +1,5 @@
-import { App, Button, DatePicker, Form, Input, Select } from 'antd'
+import { App, Button, DatePicker, Form, Input, Select, Tooltip } from 'antd'
+import { InfoCircleOutlined } from '@ant-design/icons'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { useState } from 'react'
 import type { Dayjs } from 'dayjs'
@@ -95,7 +96,20 @@ export default function VenueRulesPage() {
             <Form.Item name="weekdays" label="特定星期" style={{ marginBottom: 12 }}>
               <Select mode="multiple" allowClear options={WEEKDAY_OPTIONS} placeholder="每日" />
             </Form.Item>
-            <Form.Item name="reason" label="原因" rules={[{ required: true, message: '請輸入原因' }]} style={{ marginBottom: 12 }}>
+            {/* 這段字是場況圖不開放格 hover 的唯一說明,且公開首頁的訪客也看得到 —— 承辦下筆前要知道 */}
+            <Form.Item
+              name="reason"
+              label={
+                <>
+                  原因
+                  <Tooltip title="會顯示在場況圖的不開放格上,未登入的訪客也看得到">
+                    <InfoCircleOutlined style={{ marginLeft: 6, color: 'var(--steel)' }} />
+                  </Tooltip>
+                </>
+              }
+              rules={[{ required: true, message: '請輸入原因' }]}
+              style={{ marginBottom: 12 }}
+            >
               <Input placeholder="端午連假不開放、行政徵用" maxLength={200} />
             </Form.Item>
           </div>

@@ -43,7 +43,7 @@ from app.models.enums import (
 )
 from app.services import booking_service as svc
 from app.services import signup_service
-from app.services.activity_service import actionable_statuses, can_close_sql
+from app.services.activity_service import actionable_statuses, can_close_sql, scope_sql
 from app.services.evaluation import get_eval_window
 from app.services.settings_service import get_setting
 
@@ -143,10 +143,15 @@ async def _admin(db: AsyncSession, user: User) -> dict[str, int]:
     # 徽章=待審佇列的筆數,不是「看得到幾件」:只持 areview 的帳號看得到全部卻一件也簽不了,
     # 那個差額正是它無權過問的件數(services/activity_service.actionable_statuses)
     overdue = await _overdue_loan_filter(db)
+    # 兩個活動徽章與各自那頁走同一支 /admin/activities,視野也得是同一份:
+    # 學務長只看得到第三關(D-38),結案待審那張表對他同樣收斂 ——
+    # 少了這一項就是「側欄 3 筆、點進去 0 筆」,而且少掉的那些他連查都查不到
+    scope = scope_sql(user)
+    in_scope: tuple[sa.ColumnElement[bool], ...] = () if scope is None else (scope,)
     columns = {
-        "a-review": _count(Activity.status.in_(actionable_statuses(user)), of=Activity),
+        "a-review": _count(Activity.status.in_(actionable_statuses(user)), *in_scope, of=Activity),
         "a-close": _count(
-            Activity.status == ActivityStatus.CLOSING_PENDING_ADVISOR, of=Activity
+            Activity.status == ActivityStatus.CLOSING_PENDING_ADVISOR, *in_scope, of=Activity
         ),
         "a-booking": _count(VenueBooking.status == BookingStatus.PENDING, of=VenueBooking),
         "a-room": _count(

@@ -29,7 +29,7 @@
 | 編號 | 嚴重度 | 問題 |
 |---|---|---|
 | ISS-105 | 中 | **`PATCH /club/profile` 帶顯式 `null` 一半 500、一半靜默清空必填欄位**:`ClubProfileUpdate` 的欄位型別都是 `X \| None`,而 pydantic 的 `field_validator` 對「有帶且為 null」一樣會執行 —— `intro` 的驗證器擋得下來,`advisor_name` 是 `if v is not None and not v.strip()` 才報錯,`null` 直接放行並清掉那一欄(前端 `ClubSettingsPage` 對它是 `required: true`,後端 fail-open,而 `api/clubProfile.ts` 送的正是 `trim() \|\| null`);`contact_emails` 的驗證器對 `None` 回 `None`,`setattr` 到 NOT NULL 欄位 → IntegrityError 23502 → 不在 `_CONFLICT_SQLSTATES` 內 → 回 500。修法比照 `admin_venues.update_venue`:`model_dump(exclude_unset=True)` 之後濾掉顯式 null,並明列哪幾欄真的可以清空 |
-| ISS-106 | 中 | **場地主檔用 PATCH 造得出「兩種借用型態都不開放」的死列**:`VenueIn._one_mode` 擋得住建立,`VenueUpdateIn` 沒有這個 validator(`schemas/bookings.py`)。那種場地兩邊下拉都不出現,只會在場況圖上多一整列永遠「不開放」—— 正是建立端刻意擋掉的東西 |
+| ISS-106 | 中 | **場地主檔用 PATCH 造得出「兩種借用型態都不開放」的死列**:`VenueIn._one_mode` 擋得住建立,`VenueUpdateIn` 沒有這個 validator(`schemas/bookings.py`)。那種場地兩邊下拉都不出現,只會在場況圖上多一整列永遠「不開放」—— 正是建立端刻意擋掉的東西。不開放格改實心深灰之後那一列看起來像整天被佔用,而它 hover 又沒有原因可講 |
 
 ## 4. 會遺失資料
 

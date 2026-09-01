@@ -42,7 +42,7 @@
 - 社團漏斗以名稱對 id:有選社團但主檔未載入或名稱失效時**強制空集**,不可 fail-open 回全部
 - 分頁只在查詢成功後 clamp:失敗時 `total` 也是 0,一起收斂會把錯誤說明洗掉
 - 一支彈窗吃所有狀態,詳情只發一支(`useAdminActivityDetail`);詳情到齊前以清單列的資料開窗,其餘欄位鋪 Skeleton
-- 受限關卡帳號的視野一樣受限:`aactivity` 在 `activity_service.FULL_VIEW_KEYS` 內、看得到全部狀態;只持 `approve_dean` 這類帳號進不了本頁(側欄與路由都會擋)
+- 受限關卡帳號的視野一樣受限:`aactivity` 在 `activity_service.FULL_VIEW_KEYS` 內、看得到全部狀態;只持 `approve_dean` 這類帳號進不了本頁(側欄與路由都會擋)。**同時持 `aactivity` 與 `approve_dean` 的話,本頁也只剩第三關**(D-38 收的是整個行政端活動讀取面,不是只有申請審核那一頁)
 
 ## 未完成 / 問題
 

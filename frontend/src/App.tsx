@@ -56,6 +56,7 @@ import PtViolationsPage from './features/pt/PtViolationsPage'
 import PtCheckoutPage from './features/pt/PtCheckoutPage'
 import PtCheckinPage from './features/pt/PtCheckinPage'
 import PtOverduePage from './features/pt/PtOverduePage'
+import PtBookingsPage from './features/pt/PtBookingsPage'
 import MyReviewsPage from './features/viewer/MyReviewsPage'
 import ViewerScorePage from './features/viewer/ViewerScorePage'
 import ViewerDonePage from './features/viewer/ViewerDonePage'
@@ -273,6 +274,7 @@ export default function App() {
         <Route path="checkout" element={<PtCheckoutPage />} />
         <Route path="checkin" element={<PtCheckinPage />} />
         <Route path="overdue" element={<PtOverduePage />} />
+        <Route path="bookings" element={<PtBookingsPage />} />
       </Route>
 
       {/* 評審端 */}

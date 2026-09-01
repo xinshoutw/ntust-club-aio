@@ -36,10 +36,32 @@ def end_datetime(activity: Activity) -> datetime:
 FULL_VIEW_KEYS = ("areview", "aactivity", "aclubact")
 
 
+def dean_scoped(user) -> bool:
+    """持學務長簽核鍵 → 行政端的活動視野只剩第三關(decisions.md D-38)。
+
+    連 `super` 與頁面鍵都壓過去:這把鍵只授得給學務長本人(`_require_stage_key` 不讓
+    super 代簽),持有它就代表這是那個人的帳號。
+    """
+    return "approve_dean" in user.permissions
+
+
+def _dean_reviewed() -> sa.ColumnElement[bool]:
+    """這件經過第三關(核准或退回皆算)—— 學務長的「最近審核」就是這一集合。
+
+    不看 `actor_id`:界線是關卡不是人,代理的學務長要接得上前一位簽過的案子。
+    """
+    return sa.exists().where(
+        ApprovalRecord.subject_type == ApprovalSubject.ACTIVITY,
+        ApprovalRecord.subject_id == Activity.id,
+        ApprovalRecord.stage == "dean",
+    )
+
+
 def visible_statuses(user) -> set[ActivityStatus] | None:
     """受限關卡帳號**看得到**哪些狀態;None=不限(super 或持活動審核頁權限)。
 
-    列表與詳情用它。側欄徽章要的是「簽得下去」而非「看得到」,走 `actionable_statuses`。
+    只回答視野的「狀態」那一半 —— 界線的權威是 `scope_sql`(學務長那條是
+    「輪到他的 + 他這關簽過的」,不是一組狀態)。呼叫端一律走 `scope_sql`。
     """
     if user.is_super or any(k in user.permissions for k in FULL_VIEW_KEYS):
         return None
@@ -48,8 +70,6 @@ def visible_statuses(user) -> set[ActivityStatus] | None:
         visible |= {ActivityStatus.PENDING_ADVISOR, ActivityStatus.CLOSING_PENDING_ADVISOR}
     if "approve_chief" in user.permissions:
         visible.add(ActivityStatus.PENDING_CHIEF)
-    if "approve_dean" in user.permissions:
-        visible.add(ActivityStatus.PENDING_DEAN)
     if "aclose" in user.permissions:
         visible |= {
             ActivityStatus.CLOSING_PENDING_ADVISOR,
@@ -59,19 +79,41 @@ def visible_statuses(user) -> set[ActivityStatus] | None:
     return visible
 
 
-def actionable_statuses(user) -> set[ActivityStatus]:
-    """該帳號**簽得下去**的待審狀態(徽章與待審佇列用;`visible_statuses` 是看得到的範圍)。
+def scope_sql(user) -> sa.ColumnElement[bool] | None:
+    """行政端活動清單/詳情的視野界線;None=不限。
 
-    與 `_require_stage_key` 同一條規則:學務長關卡即使 super 也要明確持有 `approve_dean`。
-    只持頁面鍵 `areview` 的帳號看得到全部、一件也簽不了 —— 徽章要跟著佇列是 0。
+    清單、學期下拉與單筆詳情共用這一份:少一處就會出現「列表列得出來、點下去 404」。
     """
+    if dean_scoped(user):
+        return sa.or_(Activity.status == ActivityStatus.PENDING_DEAN, _dean_reviewed())
+    visible = visible_statuses(user)
+    return None if visible is None else Activity.status.in_(visible)
+
+
+def may_see_approved(user) -> bool:
+    """逾期/鎖定清單全是 approved 狀態:看不到那個狀態的帳號要擋在門口,不是回空清單。"""
+    if dean_scoped(user):
+        return True  # 第三關簽過的單正是往 approved 去的;範圍另由 scope_sql 收
+    visible = visible_statuses(user)
+    return visible is None or ActivityStatus.APPROVED in visible
+
+
+def actionable_statuses(user) -> set[ActivityStatus]:
+    """該帳號**簽得下去**的待審狀態(徽章與待審佇列用;`scope_sql` 是看得到的範圍)。
+
+    與 `_require_stage_key` 的共同點只有一條:學務長關卡即使 super 也要明確持有 `approve_dean`。
+    只持頁面鍵 `areview` 的帳號看得到全部、一件也簽不了 —— 徽章要跟著佇列是 0。
+    持 `approve_dean` 者這裡只剩第三關(D-38,前端 `adminActivities.canActOn` 同一條),
+    但 **`_require_stage_key` 刻意不跟進**:D-38 收的是視野不是簽核權,唯一的 super 授了
+    這把鍵之後仍簽得下前兩關,否則授鍵當下全校的第一關就沒有人簽得動。
+    """
+    if dean_scoped(user):
+        return {ActivityStatus.PENDING_DEAN}
     out: set[ActivityStatus] = set()
     if user.is_super or "approve_advisor" in user.permissions:
         out.add(ActivityStatus.PENDING_ADVISOR)
     if user.is_super or "approve_chief" in user.permissions:
         out.add(ActivityStatus.PENDING_CHIEF)
-    if "approve_dean" in user.permissions:
-        out.add(ActivityStatus.PENDING_DEAN)
     return out
 
 

@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.enums import BookingStatus, LoanStatus, VenueCategory
+from app.schemas.common import strip_reason
 from app.services.booking_service import MAX_FIXED_SLOTS, PERIODS
 
 
@@ -250,7 +251,7 @@ class EquipmentLoanIn(BaseModel):
     """借用區間由社團自填:籌備與驗收各活動不同,從活動起訖推導一律不準。"""
 
     equipment_id: int
-    activity_id: int
+    activity_id: int | None = None  # 借用活動(限審核通過);留空僅 NO_ACTIVITY_ACCOUNT 可用
     qty: int = Field(ge=1, le=1000)
     start_date: date
     end_date: date
@@ -272,7 +273,7 @@ class EquipmentLoanOut(BaseModel):
     id: int
     equipment_id: int
     equipment_name: str = ""
-    activity_id: int | None  # NULL=舊系統斷鏈或行政手動借用
+    activity_id: int | None  # NULL=舊系統斷鏈、行政手動借用,或 802 國際事務處(D-36)
     activity_name: str | None = None
     qty: int
     start_date: date
@@ -340,6 +341,9 @@ class VenueBlockRuleIn(BaseModel):
     weekdays: list[int] | None = Field(None, min_length=1, max_length=7)
     periods: list[str] = Field(min_length=1, max_length=14)
     reason: str = Field(min_length=1, max_length=200)
+
+    # 這段原因是不開放格 hover 的唯一說明(連匿名首頁都看得到),全空白會渲染成「不開放・」
+    _strip = field_validator("reason")(strip_reason)
 
     @field_validator("periods")
     @classmethod

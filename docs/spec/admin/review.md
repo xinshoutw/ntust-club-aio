@@ -4,13 +4,13 @@
 
 ## 用途
 
-活動申請的三關簽核(或無補助的單關)。學務長本人也走這頁。
+活動申請的三關簽核(或無補助的單關)。學務長本人也走這頁,而且**這頁對他只有第三關**(D-38)。
 
 ## 資料來源
 
 | 動作 | 端點 |
 |---|---|
-| 待審佇列 | `GET /admin/activities?status=…`(僅登入者可簽核的狀態) |
+| 待審佇列 | `GET /admin/activities?status=…`(僅登入者可簽核的狀態;持 `approve_dean` 者只有 `pending_dean`) |
 | 最近審核 | `GET /admin/activities?status&club_id&type&sort&page`(伺服器分頁) |
 | 詳情 | `GET /admin/activities/{id}` |
 | 核准 / 退回 | `POST /admin/activities/{id}/approve`、`/reject` |
@@ -51,7 +51,8 @@
 - **學務長關卡必須本人操作**:即使 `super` 也要明確持有 `approve_dean`,否則 403
 - 大型活動認可:未申請也可由管理員逕行核定(勾選即 `is_large=true` + `is_large_approved=true`);已申請但不勾 → `is_large_approved=false`
 - 退回原因必填,退回後狀態轉 `rejected`,社團可修改重送
-- 受限關卡帳號的**視野也受限**:只看得到自己關卡相關的狀態,其他狀態的活動連詳情都回 404(避免探測)
+- 受限關卡帳號的**視野也受限**:只看得到自己關卡相關的狀態,其他狀態的活動連詳情都回 404(避免探測)。清單、學期下拉與詳情共用 `activity_service.scope_sql` 那一份判定 —— 兩份遲早會變成「列得出來、點下去 404」
+- **持 `approve_dean` 者整頁只剩第三關**(D-38):待審佇列只有 `pending_dean`,最近審核只有**簽過第三關**的單(核准或退回皆算,看 `approval_records` 的關卡而非狀態 —— 核定 0 元當場核准的單狀態同樣是已核准,卻沒到過學務長手上),側欄徽章數同一個集合。**`super` 與頁面鍵都壓不過這條**:這把鍵只授得給學務長本人。界線看關卡不看人,代理的學務長接得上前一位簽過的案子
 - 每次核准/退回都寫 `approval_records` 與 `audit_logs`,並推 Discord
 
 - **大型活動認可**:第一關是認定點(沒勾即否准),但**組長與學務長關仍改得動**(decisions.md ISS-54);後兩關省略該欄=不動,不會把已給的認可清掉

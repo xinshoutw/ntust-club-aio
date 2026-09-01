@@ -497,6 +497,58 @@ async def test_venue_booking_activity_optional_only_for_802(client, db):
     assert "請選擇借用活動" in resp.text
 
 
+async def test_equipment_loan_activity_optional_only_for_802(client, db):
+    """器材借用與臨時場地同一條例外(D-36):802 免綁活動,其餘社團留空 422。"""
+    club = await make_club(db, name="國際事務處")
+    await make_user(db, username="802", name="國際事務處", club_id=club.id)
+    await login(client, "802")
+    eq = await make_equipment(db, name="帳篷", total_qty=5)
+    start = date.today() + timedelta(days=7)
+    body = {
+        "equipment_id": eq.id,
+        "qty": 1,
+        "start_date": start.isoformat(),
+        "end_date": start.isoformat(),
+        "purpose": "國際生說明會",
+        "phone": "0912000111",
+    }
+    resp = await client.post(
+        "/api/v1/club/equipment-loans", json=body, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["data"]["activity_id"] is None
+    assert resp.json()["data"]["activity_name"] is None
+
+    # 代碼 802、社團改名 → 不再吃這條例外
+    club.name = "國際事務中心"
+    await db.commit()
+    resp = await client.post(
+        "/api/v1/club/equipment-loans", json=body, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 422
+    assert "請選擇借用活動" in resp.text
+
+    # 反之亦然:名稱對但代碼不是 802
+    other = await make_club(db, name="國際事務處")
+    await make_user(db, username="803", name="國際事務處", club_id=other.id)
+    await login(client, "803")
+    resp = await client.post(
+        "/api/v1/club/equipment-loans", json=body, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 422
+    assert "請選擇借用活動" in resp.text
+
+    # 一般社團留空 → 422
+    plain = await make_club(db, name="吉他社")
+    await make_user(db, username="club01", name="吉他社", club_id=plain.id)
+    await login(client, "club01")
+    resp = await client.post(
+        "/api/v1/club/equipment-loans", json=body, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 422
+    assert "請選擇借用活動" in resp.text
+
+
 async def test_venue_booking_requires_approved_activity(client, db):
     club = await setup_session(client, db)
     venue = await make_venue(db, name="精誠廣場", allow_fixed=False, allow_temp=True)
@@ -876,6 +928,18 @@ async def test_equipment_loan_range_is_user_supplied(client, db):
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
+
+    # 已結束的活動不可借:不看時間的話,帶一個去年辦完的活動就能借下個月的器材
+    ended = await make_activity(
+        db, club, name="去年辦完的活動", day=date.today() - timedelta(days=60)
+    )
+    resp = await client.post(
+        "/api/v1/club/equipment-loans",
+        json={**body, "activity_id": ended.id},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    assert "已結束" in resp.json()["error"]
 
 
 async def test_equipment_list_round_trips_do_not_grow_with_equipment_count(client, db):

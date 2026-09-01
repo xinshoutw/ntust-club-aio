@@ -389,11 +389,17 @@ const STAGE_BY_STATUS: Partial<Record<StatusKey, ReviewStage>> = {
 
 export const stageOfStatus = (status: StatusKey): ReviewStage | undefined => STAGE_BY_STATUS[status]
 
+/** 持學務長簽核鍵 → 整頁只剩第三關(decisions.md D-38);後端 `activity_service.dean_scoped` 同一條 */
+export const deanScoped = (user: SessionUser | null): boolean =>
+  !!user && user.role === 'admin' && user.permissions.includes('approve_dean')
+
 /** 申請審核:登入管理員可否簽核此狀態 */
 export function canActOn(user: SessionUser | null, status: StatusKey): boolean {
   const stage = STAGE_BY_STATUS[status]
   if (!user || user.role !== 'admin' || !stage) return false
-  if (stage === 'dean') return user.permissions.includes('approve_dean')
+  // 學務長只簽第三關:前兩關不進他的待審佇列,側欄徽章才數得出同一個數字
+  if (deanScoped(user)) return stage === 'dean'
+  if (stage === 'dean') return false // 學務長關卡=本人操作,super 也不得代簽
   return user.isSuper || user.permissions.includes(`approve_${stage}`)
 }
 

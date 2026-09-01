@@ -86,7 +86,7 @@
 
 | 組 | 路由 | 權限鍵 | 規格 |
 |---|---|---|---|
-| 工讀生作業 | `/admin/pt/*` | `astaff` | 下方「工讀生端」五頁 |
+| 工讀生作業 | `/admin/pt/*` | `astaff` | 下方「工讀生端」五頁(借用總覽不鏡射,見該頁規格) |
 | 評審評分 | `/admin/viewer/*` | `aviewer` | 下方「評審端」三頁 |
 
 ## 工讀生端(`staff`,URL 前綴 `/pt`)
@@ -98,6 +98,7 @@
 | [pt/checkout.md](pt/checkout.md) | `/pt/checkout` |
 | [pt/checkin.md](pt/checkin.md) | `/pt/checkin` |
 | [pt/overdue.md](pt/overdue.md) | `/pt/overdue` |
+| [pt/bookings.md](pt/bookings.md) | `/pt/bookings` |
 
 ## 評審端(`viewer`)
 

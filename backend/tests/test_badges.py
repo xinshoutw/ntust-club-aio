@@ -186,6 +186,9 @@ async def test_review_badge_counts_only_the_stages_the_account_can_sign(client, 
         db, username="advisor2", role="admin", permissions=["areview", "approve_advisor"]
     )
     await make_user(db, username="boss", role="admin", is_super=True)
+    await make_user(
+        db, username="boss_dean", role="admin", is_super=True, permissions=["approve_dean"]
+    )
     await db.commit()
 
     await login(client, "dean")
@@ -197,6 +200,33 @@ async def test_review_badge_counts_only_the_stages_the_account_can_sign(client, 
     # super 也不得代簽學務長關:三關裡只算得到前兩關
     await login(client, "boss")
     assert (await _badges(client))["a-review"] == 2
+    # 反過來,學務長鍵一到手視野就只剩第三關(D-38),super 也不例外
+    await login(client, "boss_dean")
+    assert (await _badges(client))["a-review"] == 1
+
+
+async def test_close_badge_follows_the_dean_view(client, db):
+    """學務長視野(D-38)也收結案待審那張表,徽章要跟著 —— 否則側欄 1 筆、點進去 0 筆。"""
+    club = await make_club(db)
+    creator = await make_user(db, username="club05", role="club", club_id=club.id)
+    past = date.today() - timedelta(days=3)
+    db.add(
+        Activity(
+            club_id=club.id, name="承辦單關核准後送結案", location="x", type="活動", date=past,
+            end_date=past, status="closing_pending_advisor", created_by=creator.id,
+        )
+    )
+    await make_user(db, username="closer", role="admin", permissions=["aclose"])
+    await make_user(
+        db, username="closer_dean", role="admin", permissions=["aclose", "approve_dean"]
+    )
+    await db.commit()
+
+    await login(client, "closer")
+    assert (await _badges(client))["a-close"] == 1
+    # 這件沒有第三關的簽核列:學務長那頁列不出來,徽章也不得數它
+    await login(client, "closer_dean")
+    assert (await _badges(client))["a-close"] == 0
 
 
 async def test_admin_with_the_mirrored_staff_key_gets_the_staff_badges(client, db):

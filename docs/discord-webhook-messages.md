@@ -67,6 +67,7 @@
   `臨時場地借用申請` / `{user.name}:{venue.name}({date} 時段 {periods})`
 - **D3 器材借用申請** `POST /club/equipment-loans` · submit
   `器材借用申請` / `{user.name}:{equipment.name} ×{qty}({start}~{end},活動:{activity.name})`
+  (免綁活動的單沒有「,活動:…」那一段,見 D-36)
 - **D4 臨時借用已核准** `POST /admin/venue-bookings/{id}/approve` · approve
   `臨時場地借用已核准` / `{venue.name}({date} 時段 {periods})`(無社團名)
 - **D5 臨時借用退回** `POST /admin/venue-bookings/{id}/reject` · reject

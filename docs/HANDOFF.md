@@ -91,6 +91,12 @@ hover 顯示「目前未開放」(`lib/nav.EVAL_UNBUILT`)。收的**只有側欄
 (`_CERT_NEXT` / `_ALLOWED_NEXT`),郵局那頁連選項都不列。要跑遷移(`c4e8b17d2f60`)。
 順帶把社團端郵局徽章的 `!= COMPLETED` 改成白名單(值域放寬後那寫法會多算)。
 
+**學務長的視野只有第三關**(2026-09-01,D-38):持 `approve_dean` 的帳號在 `/admin/review`
+待審佇列只有 `pending_dean`、最近審核只有**簽過第三關**的單(`approval_records` 有 dean 那一列,
+核准與退回皆算),側欄徽章數同一個集合。判定不是狀態 —— 核定 0 元當場核准(D-16)的單同樣是
+`approved` 卻沒到過他手上。收的是整個行政端活動讀取面(清單、學期下拉、詳情、申請表 PDF 共用
+`activity_service.scope_sql`),`super` 與頁面鍵都壓不過這條。
+
 **要跑遷移**:D-21/D-22 是 drop column,`alembic upgrade head` 之後舊號碼就沒了。
 D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)—— 走 `--reset` 重灌,
 或把該學期匯出再匯入一次。

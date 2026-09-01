@@ -929,6 +929,18 @@ async def test_equipment_loan_range_is_user_supplied(client, db):
     )
     assert resp.status_code == 422
 
+    # 已結束的活動不可借:不看時間的話,帶一個去年辦完的活動就能借下個月的器材
+    ended = await make_activity(
+        db, club, name="去年辦完的活動", day=date.today() - timedelta(days=60)
+    )
+    resp = await client.post(
+        "/api/v1/club/equipment-loans",
+        json={**body, "activity_id": ended.id},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    assert "已結束" in resp.json()["error"]
+
 
 async def test_equipment_list_round_trips_do_not_grow_with_equipment_count(client, db):
     """可借數逐列查詢時往返次數等於器材數;批次彙整後與器材數無關。"""

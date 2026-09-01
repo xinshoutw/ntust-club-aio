@@ -402,7 +402,7 @@ class AdminEquipmentLoanOut(BaseModel):
     club_name: str = ""
     equipment_id: int
     equipment_name: str = ""
-    activity_id: int | None  # NULL=行政手動借用或舊系統斷鏈
+    activity_id: int | None  # NULL=行政手動借用、舊系統斷鏈,或 802 國際事務處(D-36)
     activity_name: str | None = None
     qty: int
     start_date: date

@@ -272,7 +272,7 @@ class EquipmentLoanOut(BaseModel):
     id: int
     equipment_id: int
     equipment_name: str = ""
-    activity_id: int | None  # NULL=舊系統斷鏈或行政手動借用
+    activity_id: int | None  # NULL=舊系統斷鏈、行政手動借用,或 802 國際事務處(D-36)
     activity_name: str | None = None
     qty: int
     start_date: date

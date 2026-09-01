@@ -104,9 +104,13 @@ describe.each([
     account = { username: 'club01', club: '熱舞社' }
     renderPage(page)
     expect(activityInput().disabled).toBe(false)
-    expect(screen.getByText('請選擇活動')).toBeTruthy()
+    expect(screen.getByText('請選擇活動')).toBeTruthy() // Select 的 placeholder
     submitWithoutActivity(page)
-    await waitFor(() => expect(screen.getByText('請選擇活動')).toBeTruthy())
+    // 驗證訊息要抓 explain-error 那顆節點:「請選擇活動」同時是 placeholder,
+    // 用 getByText 會被 placeholder 搶先命中,錯誤訊息根本沒出現也照樣綠
+    await waitFor(() =>
+      expect(document.querySelector('.ant-form-item-explain-error')?.textContent).toBe('請選擇活動'),
+    )
     expect(mutate).not.toHaveBeenCalled()
   })
 

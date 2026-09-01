@@ -8,6 +8,7 @@ import type { Period } from '../../api/auth'
 // 三個呼叫端的差別只有四件事:格子點不點得動、過去日期放不放行、圖例列不列「我的借用」、
 // 有沒有待審單可以就地審。其餘畫面完全同一份,所以這裡只釘那四件事與拿不到節次目錄的失敗態。
 const P3: Period = { key: '3', start: '10:20', end: '11:10' }
+const P4: Period = { key: '4', start: '11:20', end: '12:10' }
 const EVERY_DAY = { start: '0000-01-01', end: '9999-12-31' } // usageKnown 一律成立
 
 let user: { role: string } | null = null
@@ -18,6 +19,7 @@ let catalogue: {
   error?: Error
   refetch: () => void
 }
+let venues: { id: number; name: string; capacity: number | null; allowFixed: boolean; allowTemp: boolean }[]
 let usage: { start: string; end: string; items: unknown[] } | undefined
 let grid: Record<string, Record<string, unknown>> = {}
 let range: Record<string, Record<string, Record<string, unknown>>> = {}
@@ -28,11 +30,7 @@ vi.mock('../../lib/periods', async (orig) => ({
   usePeriodCatalogue: () => catalogue,
 }))
 vi.mock('../../api/bookings', () => ({
-  useVenues: () => ({
-    data: [{ id: 7, name: '精誠廣場', capacity: 50, allowFixed: false, allowTemp: true }],
-    isPending: false,
-    isError: false,
-  }),
+  useVenues: () => ({ data: venues, isPending: false, isError: false }),
   useAvailability: () => ({ data: grid, isPending: false, isError: false }),
   useAvailabilityDays: () => ({ isPending: false, isError: false, byDate: range, refetchErrored: () => {} }),
   useEquipmentUsage: () => ({ data: usage, isPending: false, isError: false, isLoadingError: false }),
@@ -42,6 +40,7 @@ vi.mock('../../api/bookings', () => ({
 beforeEach(() => {
   user = null
   catalogue = { periods: [P3], isPending: false, isLoadingError: false, refetch: vi.fn() }
+  venues = [{ id: 7, name: '精誠廣場', capacity: 50, allowFixed: false, allowTemp: true }]
   usage = undefined
   grid = {}
   range = {}
@@ -125,6 +124,34 @@ test('節次目錄載不到:換錯誤畫面,不畫一張沒有節次欄的空表
   render(<BookingGrid />)
   expect(screen.getByText('連線失敗')).toBeTruthy()
   expect(screen.queryByRole('table')).toBeNull()
+})
+
+test('不開放格:實心深灰但與固定借用分得開,原因掛在 hover 上(未登入首頁同一份)', async () => {
+  catalogue = { ...catalogue, periods: [P3, P4] }
+  grid = { 7: { 3: { status: 'blocked', club: '場地整修' }, 4: { status: 'fixed', club: '吉他社' } } }
+  render(<BookingGrid />)
+  const closed = screen.getByRole('img', { name: /第3節/ }).style.background
+  const fixed = screen.getByRole('img', { name: /第4節/ }).style.background
+  // 兩格都要是實心色:改回 transparent 這條就紅(jsdom 把 hex 解析成 rgb(),
+  // transparent 原樣保留),不釘住的話「都是空字串」也能讓下面那條無聲通過
+  expect(closed).toMatch(/^rgb\(/)
+  expect(fixed).toMatch(/^rgb\(/)
+  // 但不同色 —— 圖例把兩格並排,格子又不可聚焦、Tooltip 只吃 hover,同色就分不出
+  expect(closed).not.toBe(fixed)
+  const cell = screen.getByRole('img', { name: /第3節/ })
+  expect(cell.getAttribute('aria-label')).toContain('不開放(場地整修)')
+  fireEvent.mouseEnter(cell)
+  // 「不開放・原因」的順序不能反過來
+  expect((await screen.findByRole('tooltip')).textContent).toBe('不開放・場地整修')
+})
+
+test('不開放格:兩種借用型態都關掉的場地沒有原因可講,hover 也不能落單一個「・」', async () => {
+  // 沒有原因的不開放格只有這一種來源:場地主檔兩個旗標都關(ISS-106)。
+  // 不開放規則的 reason 存不進空值,別拿那個當前提
+  venues = [{ id: 7, name: '精誠廣場', capacity: null, allowFixed: false, allowTemp: false }]
+  render(<BookingGrid />)
+  fireEvent.mouseEnter(screen.getByRole('img', { name: /不開放/ }))
+  expect((await screen.findByRole('tooltip')).textContent).toBe('不開放')
 })
 
 test('待審單:格色被已核准蓋掉,底下的申請仍點得開,並在說明裡列出來', () => {

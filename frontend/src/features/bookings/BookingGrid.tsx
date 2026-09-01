@@ -41,7 +41,7 @@ const STATE_OF: Record<AvailabilityState, CellState> = {
   temp: 'temp',
   fixed: 'fixed',
   mine: 'mine',
-  blocked: 'closed', // 不開放規則(Rule Page):不畫方框,hover 顯示原因
+  blocked: 'closed', // 不開放規則(Rule Page):深灰格,hover 顯示原因
 }
 
 function cellOf(
@@ -72,7 +72,7 @@ interface CellProps {
   onOpenPending?: (booking: GridPending) => void
 }
 
-// 單一場地格:可借才可點(呼叫端決定去哪一頁申請);審核中不可點;不開放不畫方框。
+// 單一場地格:可借才可點(呼叫端決定去哪一頁申請);審核中不可點;不開放與固定借用同色。
 // 過去日期只供查閱歷史借用,空格不是可申請的入口(bookable=false)。
 // 被佔用格 hover 顯示借用社團名(mine 顯示「我的社團」語意由色塊表達,仍附社名)
 function Cell({ state, label, club, pending, bookable, bookLabel, onBook, onOpenPending }: CellProps) {
@@ -84,15 +84,21 @@ function Cell({ state, label, club, pending, bookable, bookLabel, onBook, onOpen
     borderRadius: 4,
     background: CELL[state].bg,
     display: 'block',
-    // 格色被更高權重的狀態佔走時,底下壓著的待審單要看得見 —— 不開放格本來就是
-    // 透明無框,不標的話那顆可點的格子在畫面上根本不存在
+    // 格色被更高權重的狀態佔走時,底下壓著的待審單要看得見 —— 不標的話那顆
+    // 可點的格子跟旁邊借滿的格子長得一模一樣
     boxShadow:
       state !== 'reviewing' && pending?.length ? `inset 0 0 0 2px ${CELL.reviewing.bg}` : undefined,
   }
   const suffix = pendingText(pending)
   // 審核中格的社名就是待審單裡那一筆,不再括號重覆一次
   const owner = club && state !== 'reviewing' ? club : undefined
-  const title = (owner ? `${owner}・${CELL[state].label}` : CELL[state].label) + suffix
+  // 不開放格的 club 是承辦寫的原因,不是社名 ——「不開放・原因」才讀得通,反過來不行
+  const title =
+    (state === 'closed'
+      ? [CELL.closed.label, club].filter(Boolean).join('・')
+      : owner
+        ? `${owner}・${CELL[state].label}`
+        : CELL[state].label) + suffix
 
   if (openable.length > 0) {
     const many = openable.length > 1
@@ -145,9 +151,9 @@ function Cell({ state, label, club, pending, bookable, bookLabel, onBook, onOpen
   const cell = (
     <div role="img" aria-label={`${owner ? `${label}(${owner})` : label}${suffix}`} style={base} />
   )
-  // 有社名或有待審單才掛 tooltip:被佔用格是借用社團,不開放格是原因
-  // (未登入時後端不給原因,那些格就沒有 hover)
-  return club || pending?.length ? (
+  // 有社名或有待審單才掛 tooltip:被佔用格是借用社團,不開放格是原因。
+  // 不開放格一律掛(含原因為空的舊列):與固定借用同色,不 hover 就分不出是哪一種
+  return club || pending?.length || state === 'closed' ? (
     <Tooltip title={title} mouseEnterDelay={0}>
       {cell}
     </Tooltip>

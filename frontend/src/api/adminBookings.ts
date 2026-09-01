@@ -57,7 +57,8 @@ export interface AdminVenueBooking {
 
 interface AdminVenueBookingOut {
   id: number
-  club_id: number
+  /** null = 行政手動借用(顯示「學務處」) */
+  club_id: number | null
   club_name: string
   venue_id: number
   venue_name: string
@@ -106,7 +107,8 @@ export interface AdminEquipmentLoan {
 
 interface AdminEquipmentLoanOut {
   id: number
-  club_id: number
+  /** null = 行政手動借用(顯示「學務處」) */
+  club_id: number | null
   club_name: string
   equipment_id: number
   equipment_name: string

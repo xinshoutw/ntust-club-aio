@@ -150,6 +150,32 @@ async def test_venue_block_rules(client, db):
     assert resp.status_code == 201, resp.text
     rule_id = resp.json()["data"]["id"]
 
+    # 全空白原因不受理:那段字是不開放格 hover 的唯一說明(連匿名首頁都看得到),
+    # min_length=1 擋不掉「   」,存進去畫面上只會多一個孤零零的分隔號
+    resp = await client.post(
+        "/api/v1/admin/venue-rules",
+        json={"venue_id": venue.id, "start_date": str(TOMORROW), "end_date": str(TOMORROW),
+              "periods": ["7"], "reason": "   "},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    # 前後空白照收,只是存進去要是修剪過的
+    resp = await client.post(
+        "/api/v1/admin/venue-rules",
+        json={"venue_id": venue.id, "start_date": str(TOMORROW), "end_date": str(TOMORROW),
+              "periods": ["7"], "reason": "  保養  "},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201, resp.text
+    trimmed_id = resp.json()["data"]["id"]
+    resp = await client.get(
+        "/api/v1/public/bookings/availability", params={"date": str(TOMORROW)}
+    )
+    assert resp.json()["data"]["grid"][str(venue.id)]["7"]["club"] == "保養"
+    await client.delete(
+        f"/api/v1/admin/venue-rules/{trimmed_id}", headers=csrf_headers(client)
+    )
+
     # 社團申請命中封鎖節次 → 422;避開則可
     await login(client, "club01")
     body = {"venue_id": venue.id, "activity_id": activity.id, "date": str(TOMORROW),

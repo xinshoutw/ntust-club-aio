@@ -18,19 +18,13 @@ from app.models.enums import (
 from app.schemas.accounts import _USERNAME_RE
 from app.schemas.activities import FileOut
 from app.schemas.bookings import RoomSlotOut
+from app.schemas.common import strip_reason
 from app.services.scoring import AD_KEYS, AD_MAX
 
 
 def _validate_ad_key(v: str) -> str:
     if v not in AD_KEYS:
         raise ValueError("無效的行政分項目")
-    return v
-
-
-def _strip_reason(v: str) -> str:
-    v = v.strip()
-    if not v:
-        raise ValueError("原因不得為空白")
     return v
 
 
@@ -55,7 +49,7 @@ class ApproveActivityIn(BaseModel):
 class RejectIn(BaseModel):
     reason: str = Field(min_length=1, max_length=500)
 
-    _strip = field_validator("reason")(_strip_reason)
+    _strip = field_validator("reason")(strip_reason)
 
 
 class CloseApproveIn(BaseModel):
@@ -77,7 +71,7 @@ class ScoreOverrideIn(BaseModel):
     reason: str = Field(min_length=1, max_length=500)
 
     _key = field_validator("key")(_validate_ad_key)
-    _strip = field_validator("reason")(_strip_reason)
+    _strip = field_validator("reason")(strip_reason)
 
     @model_validator(mode="after")
     def _score_in_range(self):
@@ -93,14 +87,14 @@ class ScoreRevertIn(BaseModel):
     reason: str = Field(min_length=1, max_length=500)
 
     _key = field_validator("key")(_validate_ad_key)
-    _strip = field_validator("reason")(_strip_reason)
+    _strip = field_validator("reason")(strip_reason)
 
 
 class MeritIn(BaseModel):
     score: int = Field(ge=0, le=5)
     reason: str = Field(min_length=1, max_length=500)
 
-    _strip = field_validator("reason")(_strip_reason)
+    _strip = field_validator("reason")(strip_reason)
 
 
 # ---- 報名簽到登錄(評鑑僅採計簽到,活動結束後由管理員登錄) ----
@@ -140,7 +134,7 @@ class SessionOut(BaseModel):
 class ResolveViolationIn(BaseModel):
     note: str = Field(min_length=1, max_length=500)
 
-    _strip = field_validator("note")(_strip_reason)
+    _strip = field_validator("note")(strip_reason)
 
 
 class AdminViolationOut(BaseModel):
@@ -366,7 +360,7 @@ class SuspendIn(BaseModel):
     until: date
     reason: str = Field(min_length=1, max_length=500)
 
-    _strip = field_validator("reason")(_strip_reason)
+    _strip = field_validator("reason")(strip_reason)
 
 
 # ---- 臨時場地與器材借用審核(/admin,權限鍵 abooking) ----

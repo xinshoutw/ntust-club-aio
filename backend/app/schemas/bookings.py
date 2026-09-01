@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.enums import BookingStatus, LoanStatus, VenueCategory
+from app.schemas.common import strip_reason
 from app.services.booking_service import MAX_FIXED_SLOTS, PERIODS
 
 
@@ -340,6 +341,9 @@ class VenueBlockRuleIn(BaseModel):
     weekdays: list[int] | None = Field(None, min_length=1, max_length=7)
     periods: list[str] = Field(min_length=1, max_length=14)
     reason: str = Field(min_length=1, max_length=200)
+
+    # 這段原因是不開放格 hover 的唯一說明(連匿名首頁都看得到),全空白會渲染成「不開放・」
+    _strip = field_validator("reason")(strip_reason)
 
     @field_validator("periods")
     @classmethod

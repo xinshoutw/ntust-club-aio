@@ -45,7 +45,7 @@ _STAGE_BY_STATUS = {
 _STAGE_LABEL = {"advisor": "承辦人", "chief": "組長", "dean": "學務長"}
 
 # aclose=結案審核頁:僅持該鍵的帳號也需要讀列表/詳情(動作端點另有各自關卡檢查),
-# 但視野僅限結案範圍(svc.visible_statuses),不得看到申請中/已退回等非結案狀態
+# 但視野僅限結案範圍(svc.scope_sql),不得看到申請中/已退回等非結案狀態
 _FULL_VIEW_KEYS = svc.FULL_VIEW_KEYS
 _REVIEW_PAGE_KEYS = (*_FULL_VIEW_KEYS, "aclose")
 _REVIEW_KEYS = (*_REVIEW_PAGE_KEYS, "approve_advisor", "approve_chief", "approve_dean")
@@ -116,16 +116,24 @@ async def _require_different_actor(db, activity: Activity, stage: str, user) -> 
         )
 
 
-def _require_visible(user, activity: Activity) -> None:
+async def _require_visible(db, user, activity: Activity) -> None:
     """詳情與 PDF 的視野界線,與清單同一條(一律 404,避免探測)。
 
     **草稿也在這條界線內**:社團還沒送出的東西承辦看不到,清單的
     `status != DRAFT` 若只擋清單,直接打 `/admin/activities/{id}` 就繞過去了。
+
+    界線直接套清單那份 SQL,不另寫一份 Python 版 —— 學務長的界線是「簽過第三關」,
+    狀態集合表達不了,兩份遲早對不上(列得出來、點下去 404)。
     """
     if activity.status == ActivityStatus.DRAFT:
         raise not_found("找不到活動")
-    visible = svc.visible_statuses(user)
-    if visible is not None and activity.status not in visible:
+    scope = svc.scope_sql(user)
+    if scope is None:
+        return
+    in_scope = await db.scalar(
+        sa.select(sa.literal(True)).select_from(Activity).where(Activity.id == activity.id, scope)
+    )
+    if not in_scope:
         raise not_found("找不到活動")
 
 
@@ -239,9 +247,9 @@ async def list_activities(
         .where(Activity.status != ActivityStatus.DRAFT)  # 草稿不進審核視野
         .options(sa.orm.selectinload(Activity.budget_items))
     )
-    visible = svc.visible_statuses(user)
-    if visible is not None:
-        query = query.where(Activity.status.in_(visible))
+    scope = svc.scope_sql(user)
+    if scope is not None:
+        query = query.where(scope)
     lock_days = await get_setting(db, "close_lock_days")
     if status:
         query = query.where(svc.display_status_filter(status, lock_days))
@@ -264,8 +272,7 @@ async def list_activities(
         if "大型活動" in type_:
             conds.append(_large_condition())
         query = query.where(sa.or_(*conds))
-    may_see_approved = visible is None or ActivityStatus.APPROVED in visible
-    if (locked or overdue) and not may_see_approved:
+    if (locked or overdue) and not svc.may_see_approved(user):
         # 逾期未結案全是 approved 狀態。看不到 approved 的帳號(例如只持 approve_advisor)
         # 原本會拿到空清單,畫面顯示「0 件」—— 承辦以為真的沒有逾期案件
         raise forbidden("沒有檢視逾期未結案的權限")
@@ -315,9 +322,9 @@ async def list_semesters(
         .where(Activity.status != ActivityStatus.DRAFT, Activity.date.is_not(None))
         .distinct()
     )
-    visible = svc.visible_statuses(user)
-    if visible is not None:
-        query = query.where(Activity.status.in_(visible))
+    scope = svc.scope_sql(user)
+    if scope is not None:
+        query = query.where(scope)
     if club_id is not None:
         query = query.where(Activity.club_id == club_id)
     dates = await db.scalars(query)
@@ -337,7 +344,7 @@ async def download_apply_pdf(activity_id: int, user: Reviewer, db: DbDep) -> Res
     )
     if activity is None:
         raise not_found("找不到活動")
-    _require_visible(user, activity)
+    await _require_visible(db, user, activity)
     club = await db.get(Club, activity.club_id)
     approvers = await svc.approver_names(db, activity.id)
     content = await run_in_threadpool(pdf.apply_pdf, club, activity, approvers)
@@ -361,7 +368,7 @@ async def get_activity(
     )
     if activity is None:
         raise not_found("找不到活動")
-    _require_visible(user, activity)
+    await _require_visible(db, user, activity)
     lock_days = await get_setting(db, "close_lock_days")
     out = ActivityDetailOut.model_validate(activity)
     svc.decorate(out, activity, lock_days)

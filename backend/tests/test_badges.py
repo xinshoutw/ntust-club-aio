@@ -186,6 +186,9 @@ async def test_review_badge_counts_only_the_stages_the_account_can_sign(client, 
         db, username="advisor2", role="admin", permissions=["areview", "approve_advisor"]
     )
     await make_user(db, username="boss", role="admin", is_super=True)
+    await make_user(
+        db, username="boss_dean", role="admin", is_super=True, permissions=["approve_dean"]
+    )
     await db.commit()
 
     await login(client, "dean")
@@ -197,6 +200,9 @@ async def test_review_badge_counts_only_the_stages_the_account_can_sign(client, 
     # super 也不得代簽學務長關:三關裡只算得到前兩關
     await login(client, "boss")
     assert (await _badges(client))["a-review"] == 2
+    # 反過來,學務長鍵一到手視野就只剩第三關(D-38),super 也不例外
+    await login(client, "boss_dean")
+    assert (await _badges(client))["a-review"] == 1
 
 
 async def test_admin_with_the_mirrored_staff_key_gets_the_staff_badges(client, db):

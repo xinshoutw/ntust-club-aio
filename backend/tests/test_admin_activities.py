@@ -317,6 +317,63 @@ async def test_stage_only_account_visibility_is_scoped(client, db):
     assert (await client.get(f"/api/v1/admin/activities/{aid}")).status_code == 200
 
 
+async def test_dean_view_is_scoped_to_the_third_stage(client, db):
+    """學務長的視野只有第三關(decisions.md D-38)。
+
+    待審佇列=輪到他的,最近審核=他這關簽過的(核准或退回)。承辦人核定 0 元當場核准的
+    單從頭到尾沒到過他手上 —— 狀態同樣是 approved,但一件都不該出現。
+    """
+    await seed(client, db)
+    # 學務長鍵一到手視野就收斂,super 也不例外
+    await make_user(
+        db, username="root_dean", role="admin", is_super=True, permissions=["approve_dean"]
+    )
+    signed = await submit_activity(client, db, name="學務長簽過的")
+    waiting = await submit_activity(client, db, name="輪到學務長")
+    solo = await submit_activity(client, db, name="承辦當場核准")
+
+    await login(client, "advisor")
+    for aid in (signed, waiting):
+        assert (await approve_first_stage(client, aid)).status_code == 200
+    # 核定 0 元即當場核准(D-16):這張單不會送到第三關,狀態卻一樣是 approved
+    items = (await client.get(f"/api/v1/admin/activities/{solo}")).json()["data"]["budget_items"]
+    resp = await client.post(
+        f"/api/v1/admin/activities/{solo}/approve",
+        json={"budget": [{"item_id": i["id"], "approved_subsidy": 0} for i in items]},
+        headers=csrf_headers(client),
+    )
+    assert resp.json()["data"]["status"] == "approved"
+
+    await login(client, "chief")
+    for aid in (signed, waiting):
+        resp = await client.post(
+            f"/api/v1/admin/activities/{aid}/approve", json={}, headers=csrf_headers(client)
+        )
+        assert resp.json()["data"]["status"] == "pending_dean"
+
+    await login(client, "dean")
+    resp = await client.post(
+        f"/api/v1/admin/activities/{signed}/approve", json={}, headers=csrf_headers(client)
+    )
+    assert resp.json()["data"]["status"] == "approved"
+
+    for username in ("dean", "root_dean"):
+        await login(client, username)
+        listing = (await client.get("/api/v1/admin/activities")).json()
+        assert sorted(a["id"] for a in listing["data"]) == sorted([signed, waiting])
+
+        # 待審佇列與側欄徽章是同一個集合:只有輪到他的那一件
+        queue = (await client.get("/api/v1/admin/activities?status=pending_dean")).json()
+        assert [a["id"] for a in queue["data"]] == [waiting]
+        assert (await client.get("/api/v1/badges")).json()["data"]["a-review"] == 1
+
+        # 最近審核:簽過第三關的才在,承辦單關核准的同狀態單不可見(詳情亦視同不存在)
+        recent = (await client.get("/api/v1/admin/activities?status=approved")).json()
+        assert [a["id"] for a in recent["data"]] == [signed]
+        assert (await client.get(f"/api/v1/admin/activities/{solo}")).status_code == 404
+        assert (await client.get(f"/api/v1/admin/activities/{signed}")).status_code == 200
+
+
 async def test_aclose_only_account_sees_only_close_scope(client, db):
     """僅持 aclose 的帳號視野限結案範圍(closing/approved/closed),不得讀申請中/已退回。"""
     await seed(client, db)

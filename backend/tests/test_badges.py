@@ -146,6 +146,21 @@ async def test_postal_with_an_attachment_stops_asking_for_one(client, db):
     assert (await _badges(client))["postal"] == 0
 
 
+async def test_postal_badge_ignores_statuses_outside_the_flow(client, db):
+    """徽章數的是白名單(審核中/處理中),不是「非已完成」。
+
+    值域含幹部證明專用的 declined(D-37),郵局的 API 走不到,但 CHECK 兩張表一起放寬 ——
+    手改 DB 或還原備份留下一列,「非已完成」那種寫法就會讓側欄數 1、頁面卻找不到。
+    """
+    club = await make_club(db)
+    await make_user(db, username="club09", role="club", club_id=club.id)
+    db.add(PostalAccountChange(club_id=club.id, reasons=["結清銷戶"], status="declined"))
+    await db.commit()
+    await login(client, "club09")
+
+    assert (await _badges(client))["postal"] == 0
+
+
 async def test_review_badge_counts_only_the_stages_the_account_can_sign(client, db):
     """徽章=待審佇列的筆數。學務長只有自己那一關;只持頁面鍵的帳號一件也簽不了。"""
     club = await make_club(db)

@@ -20,7 +20,7 @@
 
 ## 規則
 
-- 狀態機與排序同 [certificates.md](certificates.md),兩頁共用 `ApplicationStatusCell`
+- 狀態機與排序同 [certificates.md](certificates.md),但**沒有「已駁回」**(D-37 只給幹部證明):共用 `ApplicationStatusCell`,郵局這頁不列該選項,後端送過來也回 409
 - **事由以外的欄位皆可為空**(decisions.md D-07),空值一律顯示 `—`
 - 局號帳號在行政端走 `mask_account`(前 3 + 末 2);電話遮罩成末 3 碼
 - 存簿影本隨列表一起回(整頁一次查,不逐列);已歸檔的檔案不列

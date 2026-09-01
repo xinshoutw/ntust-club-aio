@@ -316,7 +316,7 @@ interface OfficerCertOut {
   term: string
   position: string
   applicant_name: string
-  status: 'pending' | 'processing' | 'completed'
+  status: 'pending' | 'processing' | 'completed' | 'declined'
   created_at: string
 }
 
@@ -357,13 +357,17 @@ export function useCertificateMutations() {
   return { create }
 }
 
-/** 最近完成的幹部證明:只要第一頁的 RECENT_LIMIT 筆 */
+/** 最近辦完的幹部證明(已完成或已駁回):只要第一頁的 RECENT_LIMIT 筆。
+ *  駁回件不進這裡就等於從社團端整個消失 —— 送出過的單一定要看得到下場 */
 export function useRecentCertificates() {
   return useQuery({
     queryKey: [...keys.certificates, 'recent'],
     queryFn: () =>
       apiPaged<OfficerCertOut[]>(
-        `/club/officer-certificates${qs({ status: 'completed', page_size: RECENT_LIMIT })}`,
+        `/club/officer-certificates${qs({
+          status: ['completed', 'declined'],
+          page_size: RECENT_LIMIT,
+        })}`,
       ).then(({ data }) => data.map(toCertificate)),
   })
 }

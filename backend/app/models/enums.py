@@ -128,11 +128,16 @@ class MaintenanceStatus(StrEnum):
 
 class ApplicationStatus(StrEnum):
     """幹部證明/郵局帳戶異動:
-    審核中 → 處理中 → 已完成(只能往前,可跳過);無退回,學務處線下溝通後直接處理。"""
+    審核中 → 處理中 → 已完成(只能往前,可跳過)。
+
+    `DECLINED`(已駁回)是**幹部證明專用**的另一個終態(D-37);郵局帳戶異動
+    沒有這條路,值域共用只是因為兩張表共用這個 enum。
+    """
 
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"
+    DECLINED = "declined"
 
 
 class SignupKind(StrEnum):

@@ -49,7 +49,7 @@ export default function CertificatePage() {
 
   const listQuery = useCertificates()
   const recentQuery = useRecentCertificates()
-  // 正在申請=未完成全部、最近申請=已完成近 5 筆,兩份都由後端篩好
+  // 正在申請=審核中與處理中、最近申請=已完成或已駁回近 5 筆,兩份都由後端篩好
   const activeRows = listQuery.data?.records ?? []
   const recentRows = recentQuery.data ?? []
   const { create } = useCertificateMutations()

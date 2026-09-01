@@ -84,14 +84,21 @@ hover 顯示「目前未開放」(`lib/nav.EVAL_UNBUILT`)。收的**只有側欄
 其餘社團路徑未登入仍轉 `/login`。GAP-16 的社團導覽頁還沒做。
 匿名看得到借用社團名與不開放原因 —— 判定為可接受(等同貼在場地門口的資訊),要收就改後端。
 
+**幹部證明可駁回**(2026-09-01,D-37):`/admin/certificates` 的狀態下拉多一個終態「已駁回」
+(`ApplicationStatus.DECLINED`),審核中與處理中皆可直接駁回、不附原因,和「已完成」一樣不可再改。
+社團端落在「最近申請」那張表;下拉選了駁回會先跳確認(只有這個選項問,損害不對稱)。
+**郵局帳戶異動不跟進** —— 值域(CHECK)兩張表一起放寬,狀態機分兩份
+(`_CERT_NEXT` / `_ALLOWED_NEXT`),郵局那頁連選項都不列。要跑遷移(`c4e8b17d2f60`)。
+順帶把社團端郵局徽章的 `!= COMPLETED` 改成白名單(值域放寬後那寫法會多算)。
+
 **要跑遷移**:D-21/D-22 是 drop column,`alembic upgrade head` 之後舊號碼就沒了。
 D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)—— 走 `--reset` 重灌,
 或把該學期匯出再匯入一次。
 
 ## 驗證現況
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **555 passed**;`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **234 passed**(51 檔)、
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **557 passed**;`ruff check .` 全綠
+- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **238 passed**(52 檔)、
   `pnpm run lint` 8 個既有的 fast-refresh warning
 - 新測試逐一做過 mutation 驗證(改回舊寫法會紅);借用色格圖那支另在 `TZ=UTC` 與 `TZ=Pacific/Honolulu` 下各跑過一次
 

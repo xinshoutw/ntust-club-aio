@@ -117,9 +117,14 @@ async def _club(db: AsyncSession, club_id: int, lock_days: int) -> dict[str, int
             _missing_attachment(_MAINTENANCE_SUBJECT, MaintenanceRequest),
             of=MaintenanceRequest,
         ),
+        # 白名單而非「非已完成」:值域含幹部證明專用的 declined(D-37),郵局走不到
+        # 但 CHECK 兩張表一起放寬 —— 手改 DB 或還原備份留下一列,側欄就會多算一件
+        # 而頁面上找不到(「正在申請」同樣是白名單,api/applications.usePostalList)
         "postal": _count(
             PostalAccountChange.club_id == club_id,
-            PostalAccountChange.status != ApplicationStatus.COMPLETED,
+            PostalAccountChange.status.in_(
+                (ApplicationStatus.PENDING, ApplicationStatus.PROCESSING)
+            ),
             _missing_attachment(_POSTAL_SUBJECT, PostalAccountChange),
             of=PostalAccountChange,
         ),

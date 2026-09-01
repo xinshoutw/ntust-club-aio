@@ -98,8 +98,9 @@ D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政�
   `郵局帳戶異動申請` / `{user.name}:{reasons 以、連接}`
 - **E3 空間報修申請** `POST /club/maintenance` · submit
   `空間報修申請` / `{user.name}:{location}({items})`
-- **E4 幹部證明狀態更新** `POST /admin/officer-certificates/{id}/status` · 完成 approve、處理中 alert
-  `幹部證明已完成,請洽學務處領取` 或 `幹部證明處理中` / `{club.name}:{term} {position} {applicant_name}`
+- **E4 幹部證明狀態更新** `POST /admin/officer-certificates/{id}/status` · 完成 approve、駁回 reject、處理中 alert
+  `幹部證明已製作完成，請洽學務處領取` / `幹部證明已被駁回` / `幹部證明處理中`
+  · `{club.name}:{term} {position} {applicant_name}`
 - **E5 郵局異動狀態更新** `POST /admin/postal-changes/{id}/status` · 完成 approve、處理中 alert
   `郵局帳戶異動已完成,請洽學務處` 或 `郵局帳戶異動處理中` / `{club.name}:{reasons}`
 - **E6 空間報修狀態更新** `POST /admin/maintenance/{id}/status` · 完成 approve、處理中 alert

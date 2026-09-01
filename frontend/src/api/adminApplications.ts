@@ -6,12 +6,24 @@ import dayjs from 'dayjs'
 import { api, apiPaged, qs } from './client'
 import { useInvalidateBadges } from './badges'
 
-export type ApplicationStatus = 'pending' | 'processing' | 'completed'
+export type ApplicationKind = 'cert' | 'postal'
 
-/** 往前走得到的狀態(與後端 _ALLOWED_NEXT 對齊):審核中可直接跳到已完成 */
-export const ALLOWED_NEXT: Partial<Record<ApplicationStatus, readonly ApplicationStatus[]>> = {
+export type ApplicationStatus = 'pending' | 'processing' | 'completed' | 'declined'
+
+type NextMap = Partial<Record<ApplicationStatus, readonly ApplicationStatus[]>>
+
+/** 往前走得到的狀態(與後端 _ALLOWED_NEXT / _CERT_NEXT 對齊):審核中可直接跳到已完成;
+ *  「已駁回」只有幹部證明有(D-37),郵局帳戶異動走不到 */
+const FORWARD = {
   pending: ['processing', 'completed'],
   processing: ['completed'],
+} as const satisfies NextMap
+export const ALLOWED_NEXT: Record<ApplicationKind, NextMap> = {
+  postal: FORWARD,
+  cert: {
+    pending: [...FORWARD.pending, 'declined'],
+    processing: [...FORWARD.processing, 'declined'],
+  },
 }
 
 export interface OfficerCertRow {
@@ -93,8 +105,6 @@ const keys = {
 }
 
 export const APPLICATIONS_PAGE_SIZE = 50
-
-export type ApplicationKind = 'cert' | 'postal'
 
 const KIND_PATH: Record<ApplicationKind, string> = {
   cert: '/admin/officer-certificates',

@@ -33,10 +33,17 @@ _ALLOWED_NEXT = {
     ApplicationStatus.PROCESSING: (ApplicationStatus.COMPLETED,),
 }
 
+# 幹部證明另有「已駁回」這個終態(D-37):不符資格的申請要有結束的方法,
+# 否則只能一直掛在待處理裡。**郵局帳戶異動不跟進**,那邊沿用 _ALLOWED_NEXT。
+_CERT_NEXT = {
+    src: (*nxt, ApplicationStatus.DECLINED) for src, nxt in _ALLOWED_NEXT.items()
+}
+
 _STATUS_LABELS = {
     ApplicationStatus.PENDING: "審核中",
     ApplicationStatus.PROCESSING: "處理中",
     ApplicationStatus.COMPLETED: "已完成",
+    ApplicationStatus.DECLINED: "已駁回",
 }
 
 
@@ -112,13 +119,13 @@ async def list_postal_changes(
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 
-async def _advance_status(db, row, body: ApplicationStatusIn):
+async def _advance_status(db, row, body: ApplicationStatusIn, allowed=_ALLOWED_NEXT):
     """只准往前的檢核(呼叫端先 with_for_update 取列)。
 
     與 `admin_maintenance` 的單步前進不同:那邊的「處理中」代表師傅真的在修,
     這裡的處理中只是承辦的工作註記,跳過它不會漏掉任何一次真實動作。
     """
-    if body.status not in _ALLOWED_NEXT.get(row.status, ()):
+    if body.status not in allowed.get(row.status, ()):
         raise conflict(
             f"無法從「{_STATUS_LABELS[row.status]}」變更為「{_STATUS_LABELS[body.status]}」",
             code="INVALID_STATUS_TRANSITION",
@@ -140,7 +147,7 @@ async def update_officer_cert_status(
     )
     if row is None:
         raise not_found("找不到幹部證明申請")
-    await _advance_status(db, row, body)
+    await _advance_status(db, row, body, _CERT_NEXT)
     audit.record(
         db,
         action="officer_cert_status_updated",
@@ -151,11 +158,15 @@ async def update_officer_cert_status(
     await db.commit()
 
     club = await db.get(Club, row.club_id)
-    done = body.status == ApplicationStatus.COMPLETED
+    # 駁回不附原因(承辦線下說明),通知只讓社團知道這張單結束了
+    kind, title = {
+        ApplicationStatus.COMPLETED: ("approve", "幹部證明已製作完成，請洽學務處領取"),
+        ApplicationStatus.DECLINED: ("reject", "幹部證明已被駁回"),
+    }.get(body.status, ("alert", "幹部證明處理中"))
     background.add_task(
         notify.club_event,
-        "approve" if done else "alert",
-        "幹部證明已完成,請洽學務處領取" if done else "幹部證明處理中",
+        kind,
+        title,
         f"{club.name}:{row.term} {row.position.value} {row.applicant_name}",
         club.discord_webhook_url,
     )

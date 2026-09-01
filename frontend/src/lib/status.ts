@@ -25,6 +25,7 @@ export type StatusKey =
   | 'done'
   | 'processing'
   | 'completed'
+  | 'declined'
   | 'violation_open'
   | 'violation_resolved'
 
@@ -56,6 +57,8 @@ export const STATUS: Record<StatusKey, StatusStyle> = {
   // 幹部證明/郵局帳戶異動:審核中 → 處理中 → 已完成
   processing: { label: '處理中', fg: '#1D5A9E', bg: '#E8F0FB' },
   completed: { label: '已完成', fg: '#1F6B45', bg: '#E3F2E9', border: 'rgba(31,107,69,.4)' },
+  // 幹部證明專用的終態(D-37);與活動的 rejected(已退回)是兩件事,詞也不同
+  declined: { label: '已駁回', fg: '#B03A2E', bg: '#FBE9E7' },
   open: { label: '開放中', fg: '#1F6B45', bg: '#E3F2E9', border: 'rgba(31,107,69,.4)' },
   ended: { label: '已截止', fg: '#3A3F4A', bg: '#E8EAEE' },
   registered: { label: '已報名', fg: '#1D5A9E', bg: '#E8F0FB' },

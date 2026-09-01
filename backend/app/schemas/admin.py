@@ -225,7 +225,11 @@ class AdminPostalChangeOut(BaseModel):
 
 
 class ApplicationStatusIn(BaseModel):
-    """狀態機:審核中 → 處理中 → 已完成(只能往前,可跳過處理中;D-25)。"""
+    """狀態機:審核中 → 處理中 → 已完成(只能往前,可跳過處理中;D-25)。
+
+    收得下整個 `ApplicationStatus`,但**幹部證明才走得到 `declined`(已駁回)**(D-37);
+    郵局帳戶異動送這個值會被 `_ALLOWED_NEXT` 擋成 409。
+    """
 
     status: ApplicationStatus
 

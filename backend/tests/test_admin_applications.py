@@ -108,6 +108,48 @@ async def test_status_can_skip_processing(client, db):
     assert resp.status_code == 200, resp.text
 
 
+async def test_officer_cert_can_be_declined(client, db):
+    """幹部證明可駁回(D-37):不符資格的申請要有終點,不然只能一直掛在待處理裡。
+
+    郵局帳戶異動沒有這條路 —— 值域共用,狀態機不共用。
+    """
+    _, cert, postal = await seed(client, db)
+
+    resp = await client.post(
+        f"{CERT_URL}/{cert.id}/status",
+        json={"status": "declined"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["status"] == "declined"
+
+    # 終態:駁回之後不能再改
+    resp = await client.post(
+        f"{CERT_URL}/{cert.id}/status",
+        json={"status": "completed"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 409
+    assert resp.json()["meta"]["code"] == "INVALID_STATUS_TRANSITION"
+
+    # 社團端看得到下場(「最近申請」與已完成同一批)
+    await login(client, "clubuser")
+    listing = (
+        await client.get(
+            "/api/v1/club/officer-certificates", params={"status": ["completed", "declined"]}
+        )
+    ).json()["data"]
+    assert [c["status"] for c in listing] == ["declined"]
+
+    await login(client, "applyadmin")
+    resp = await client.post(
+        f"{POSTAL_URL}/{postal.id}/status",
+        json={"status": "declined"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 409, resp.text
+
+
 async def test_postal_change_carries_the_passbook(client, db):
     """存簿影本是核對局號帳號的依據:單子上就要看得到。"""
     club, _, postal = await seed(client, db)

@@ -250,7 +250,7 @@ class EquipmentLoanIn(BaseModel):
     """借用區間由社團自填:籌備與驗收各活動不同,從活動起訖推導一律不準。"""
 
     equipment_id: int
-    activity_id: int
+    activity_id: int | None = None  # 借用活動(限審核通過);留空僅 NO_ACTIVITY_ACCOUNT 可用
     qty: int = Field(ge=1, le=1000)
     start_date: date
     end_date: date

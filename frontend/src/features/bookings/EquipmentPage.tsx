@@ -23,6 +23,7 @@ import {
   type DateRange,
 } from '../../api/bookings'
 import { useApprovedActivities } from '../../api/activities'
+import { useNoActivityAccount } from '../../lib/noActivityAccount'
 import { useDecisionReason } from './DecisionReasonModal'
 import { taipeiToday } from '../../lib/today'
 
@@ -50,6 +51,7 @@ export default function EquipmentPage() {
   // 區間上限的權威在後端(booking_service.MAX_LOAN_DAYS),前端讀 /club/config 即時擋;
   // 組態讀不到就不預檢,交給送出時的後端訊息(不自己編一個數字)
   const maxLoanDays = useClubConfig().data?.equipmentLoanMaxDays
+  const noActivity = useNoActivityAccount()  // 802 國際事務處免綁活動(D-36)
   const activitiesQuery = useApprovedActivities()
   const approved = activitiesQuery.data ?? [] // 已結束的由後端篩掉
   const picked = Form.useWatch('range', form) as [Dayjs | null, Dayjs | null] | null | undefined
@@ -114,7 +116,7 @@ export default function EquipmentPage() {
   }, [equipmentQuery.data])
 
   const submit = (values: {
-    activity: number
+    activity?: number
     range: DateRange
     equipment: number
     qty: number
@@ -126,7 +128,7 @@ export default function EquipmentPage() {
     createEquipmentLoan.mutate(
       {
         equipmentId: values.equipment,
-        activityId: values.activity,
+        activityId: noActivity ? null : (values.activity ?? null),
         qty: values.qty,
         range: values.range,
         purpose: values.purpose,
@@ -134,7 +136,8 @@ export default function EquipmentPage() {
       },
       {
         onSuccess: () => {
-          message.success(`已送出「${equipmentName} ×${values.qty}」借用申請(${activityName})`)
+          const suffix = activityName ? `(${activityName})` : ''
+          message.success(`已送出「${equipmentName} ×${values.qty}」借用申請${suffix}`)
           form.resetFields()
           guard.clear()
         },
@@ -238,10 +241,15 @@ export default function EquipmentPage() {
               if ('range' in changed) form.resetFields(['qty'])
             }}
           >
-            <Form.Item name="activity" label="關聯活動" rules={[{ required: true, message: '請選擇活動' }]}>
+            <Form.Item
+              name="activity"
+              label="關聯活動"
+              rules={noActivity ? [] : [{ required: true, message: '請選擇活動' }]}
+            >
               <Select
-                placeholder="請選擇活動"
-                loading={activitiesQuery.isPending}
+                disabled={noActivity}
+                placeholder={noActivity ? '無需填寫' : '請選擇活動'}
+                loading={!noActivity && activitiesQuery.isPending}
                 options={approved.map((a) => ({ value: a.id, label: a.name }))}
                 notFoundContent={notFoundText(activitiesQuery, '無審核通過之活動', '活動清單')}
               />

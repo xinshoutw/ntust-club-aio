@@ -110,7 +110,7 @@ interface AdminEquipmentLoanOut {
   club_name: string
   equipment_id: number
   equipment_name: string
-  activity_id: number
+  activity_id: number | null
   activity_name: string | null
   qty: number
   start_date: string

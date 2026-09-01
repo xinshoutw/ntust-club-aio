@@ -88,7 +88,7 @@ class EquipmentLoan(Base, TimestampMixin):
     # NULL=最高權限手動借用(行政)
     club_id: Mapped[int | None] = mapped_column(sa.ForeignKey("clubs.id"))
     equipment_id: Mapped[int] = mapped_column(sa.ForeignKey("equipment.id"), index=True)
-    # NULL 容舊系統活動已刪之歷史借用與行政手動借用;新申請應用層必填
+    # NULL = 舊系統活動已刪之歷史借用、行政手動借用,或 802 國際事務處(D-36)
     activity_id: Mapped[int | None] = mapped_column(sa.ForeignKey("activities.id"), index=True)
     qty: Mapped[int] = mapped_column()
     phone: Mapped[str | None] = mapped_column(sa.Text)  # 聯絡電話

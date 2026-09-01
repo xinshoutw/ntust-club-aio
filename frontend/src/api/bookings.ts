@@ -590,7 +590,8 @@ export interface VenueBookingInput {
 
 export interface EquipmentLoanInput {
   equipmentId: number
-  activityId: number
+  /** null = 免綁活動(見 lib/noActivityAccount) */
+  activityId: number | null
   qty: number
   range: DateRange
   purpose: string

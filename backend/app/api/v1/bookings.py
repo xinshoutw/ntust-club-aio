@@ -70,9 +70,9 @@ async def _ensure_not_suspended(db, user) -> None:
         )
 
 
-# 802 國際事務處是行政單位,借臨時場地沒有社團活動可綁(D-36)。一個帳號一條例外,
+# 802 國際事務處是行政單位,借場地與器材都沒有社團活動可綁(D-36)。一個帳號一條例外,
 # 不為它開資料欄位;要放行第二個單位時再改成主檔設定。
-# 前端同一份判定在 features/bookings/VenueBookingPage.tsx
+# 前端同一份判定在 lib/noActivityAccount.useNoActivityAccount
 NO_ACTIVITY_ACCOUNT = ("802", "國際事務處")
 
 
@@ -476,8 +476,12 @@ async def create_equipment_loan(
     # 單次可借上限(NULL=不限)
     if equipment.max_lease_count is not None and body.qty > equipment.max_lease_count:
         raise validation_error(f"{equipment.name} 單次至多借用 {equipment.max_lease_count} 件")
-    activity = await _approved_activity(db, user, body.activity_id)
-    _require_not_ended(activity, "器材借用")
+    activity = None
+    if body.activity_id is not None:
+        activity = await _approved_activity(db, user, body.activity_id)
+        _require_not_ended(activity, "器材借用")
+    elif not await _skips_activity(db, user):
+        raise validation_error("請選擇借用活動")
 
     # 借用區間由社團自填(籌備、驗收各活動不同,不從活動起訖推導);
     # 過去時間全面禁止,與臨時場地借用同一條規則
@@ -498,7 +502,7 @@ async def create_equipment_loan(
     loan = EquipmentLoan(
         club_id=user.club_id,
         equipment_id=equipment.id,
-        activity_id=activity.id,
+        activity_id=activity.id if activity else None,
         qty=body.qty,
         start_date=start,
         end_date=end,
@@ -513,11 +517,12 @@ async def create_equipment_loan(
         db,
         user,
         "器材借用申請",
-        f"{user.name}:{equipment.name} ×{body.qty}({start}~{end},活動:{activity.name})",
+        f"{user.name}:{equipment.name} ×{body.qty}({start}~{end}"
+        + (f",活動:{activity.name})" if activity else ")"),
     )
     out = EquipmentLoanOut.model_validate(loan)
     out.equipment_name = equipment.name
-    out.activity_name = activity.name
+    out.activity_name = activity.name if activity else None
     return ApiResponse(data=out)
 
 

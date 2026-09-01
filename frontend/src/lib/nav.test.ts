@@ -116,6 +116,12 @@ describe('行政端鏡射的工讀生與評審頁', () => {
     expect(findItem(nav, 'v-my')?.path).toBe('/admin/viewer')
   })
 
+  test('借用總覽只在工讀生端,不鏡射到行政端', () => {
+    // 鏡射過去的是唯讀版:承辦看得到待審橘框卻點不動(審核入口在 /admin/bookings)
+    expect(findItem(buildPtNav(), 'pt-bookings')?.path).toBe('/pt/bookings')
+    expect(findItem(buildAdminNav(superUser), 'pt-bookings')).toBeUndefined()
+  })
+
   test('工讀生端與評審端自己的路徑不變', () => {
     expect(findItem(buildPtNav(), 'pt-checkout')?.path).toBe('/pt/checkout')
     expect(findItem(buildViewerNav(), 'v-my')?.path).toBe('/viewer')

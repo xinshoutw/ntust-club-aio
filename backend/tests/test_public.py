@@ -85,8 +85,9 @@ async def test_stale_session_cookie_still_gets_the_public_grid(client, db):
     assert resp.status_code == 200
 
 
-async def test_block_reasons_are_admin_free_text_and_stay_private(client, db):
-    """不開放原因是承辦自己打的字,匿名只看得到格色;登入的社團看得到原因。"""
+async def test_block_reasons_are_public(client, db):
+    """不開放原因匿名也看得到:公開首頁的不開放格與固定借用同色,分不出是哪一種,
+    hover 的原因就是那格唯一的說明(同社團端與行政端)。"""
     venue, _ = await seed(db)
     admin_id = await db.scalar(sa.select(User.id).order_by(User.id).limit(1))
     db.add(
@@ -107,11 +108,14 @@ async def test_block_reasons_are_admin_free_text_and_stay_private(client, db):
         return payload["data"]["grid"][str(venue.id)]["7"]
 
     anon = await client.get("/api/v1/public/bookings/availability", params={"date": iso})
-    assert blocked(anon.json()) == {"status": "blocked", "club": None}
+    assert blocked(anon.json()) == {"status": "blocked", "club": "熱舞社違規停用"}
     anon_range = await client.get(
         "/api/v1/public/bookings/availability-range", params={"start": iso, "end": iso}
     )
-    assert anon_range.json()["data"]["days"][0]["grid"][str(venue.id)]["7"]["club"] is None
+    assert (
+        anon_range.json()["data"]["days"][0]["grid"][str(venue.id)]["7"]["club"]
+        == "熱舞社違規停用"
+    )
 
     await login(client, "club01")
     signed_in = await client.get("/api/v1/public/bookings/availability", params={"date": iso})

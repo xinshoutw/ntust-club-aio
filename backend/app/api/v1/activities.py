@@ -269,8 +269,12 @@ async def delete_activity(
     if activity.status not in _CLUB_DELETABLE or await svc.has_approvals(db, activity.id):
         raise conflict("已進入審核的活動無法刪除,請洽學務處")
     # 整張單連同附件一起實體刪除,比單刪一個檔更該留下紀錄。
-    # 識別欄先抄下來:purge 之後這個實例已排入刪除,屬性讀得到但語意上已經不是活的列
+    # 識別欄先抄下來:purge 之後這個實例已排入刪除,屬性讀得到但語意上已經不是活的列。
+    # 通知要用的社團名與 webhook 也一起抄 —— commit 之後才查 DB 的話,那一查失敗就回 500,
+    # 而活動其實已經刪掉了(前端沒進 onSuccess 不會清快取,重試只拿得到 404)
     name, status = activity.name, activity.status
+    club = await _club_of(db, user)
+    club_name, webhook = club.name, club.discord_webhook_url
     disk_paths = await svc.purge(db, activity)
     audit.record(
         db,
@@ -287,14 +291,7 @@ async def delete_activity(
         file_service.unlink_quiet(path)
     # 刪掉就整份不見(附件一起實體刪除),留一則痕跡(GAP-18 K9)。
     # 「草稿儲存」刻意不發:同一份活動在填寫過程會產生數十則,會淹掉頻道
-    club = await _club_of(db, user)
-    background.add_task(
-        notify.club_event,
-        "alert",
-        "活動已刪除",
-        f"{club.name}:{name}",
-        club.discord_webhook_url,
-    )
+    background.add_task(notify.club_event, "alert", "活動已刪除", f"{club_name}:{name}", webhook)
     return ApiResponse()
 
 

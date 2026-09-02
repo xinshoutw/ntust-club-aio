@@ -28,7 +28,7 @@
 
 - 逾期清單附申請時填的聯絡電話:這頁的主要動作是催還,聯絡方式要在手邊
 
-- 逾期定義與工讀生端一致:`checked_out` 且已過「結束日之隔天上班日 10:30」,以單調門檻日在 SQL 篩選
+- 逾期定義與工讀生端一致:`checked_out` 且已過「結束日之隔天上班日 `equipment_return_time`(預設 10:30)」,以單調門檻日在 SQL 篩選
 - 停權寫 `clubs.suspended_until` / `suspend_reason`;**攔截點在社團端的借用申請**(`_ensure_not_suspended`,回 403 `CLUB_SUSPENDED`),不影響登入與其他功能
 - 解除停權即清空兩個欄位
 - 停權與解除都寫 `audit_logs` 並推 Discord

@@ -79,6 +79,10 @@ class EvalWindowIn(BaseModel):
         return {"year": self.year, "start": self.start.isoformat(), "end": self.end.isoformat()}
 
 
+# HH:MM(24 小時制);呼叫端一律 `int(x) for x in value.split(":")`,格式錯就是 500
+_TIME_RE = r"^([01][0-9]|2[0-3]):[0-5][0-9]$"
+
+
 class HolidayIn(BaseModel):
     """政府行事曆假日一筆(器材逾期「隔天上班日」的判定依據)。"""
 
@@ -141,6 +145,7 @@ class SettingsUpdateIn(BaseModel):
 
     fixed_booking_window: FixedBookingWindowIn | None = None
     close_lock_days: int | None = Field(None, ge=1, le=366)
+    equipment_return_time: str | None = Field(None, pattern=_TIME_RE)
     upload_limits: UploadLimitsIn | None = None
     activity_attachment_total_mb: int | None = Field(None, ge=1, le=1024)
     maintenance_total_mb: int | None = Field(None, ge=1, le=1024)

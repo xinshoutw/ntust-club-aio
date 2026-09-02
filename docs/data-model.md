@@ -392,14 +392,14 @@ approved 且 end_date + N 天已過且未送結案 → 逾期鎖定(推導,非�
 - 學期起訖規則實作在 `core/semesters.py`,後台不可調;`system_settings.current_year` 只存目前學年度
 - 活動只存日期,統計與行政分依當年度區間篩選,學年度規則變動不影響歷史資料
 
-設定分層:**恆不變** → `.env`(DB 連線、SMTP、secret key);**會變/可能變** → `system_settings`。下表為全部的 key,其中可由後台編輯的見 `admin_settings.MANAGED_KEYS`(`equipment_return_time` 與 `current_year` 不在其列,改值需動 DB):
+設定分層:**恆不變** → `.env`(DB 連線、SMTP、secret key);**會變/可能變** → `system_settings`。下表為全部的 key,其中可由後台編輯的見 `admin_settings.MANAGED_KEYS`(`current_year` 不在其列,改值需動 DB):
 
 | key | 內容 |
 |---|---|
 | `budget_categories` | 經費科目九項,`[{name, hint}]`,hint 於社團選到該科目時顯示 |
 | `violation_items` | 違規勸導項目目錄 |
 | `close_lock_days` | 結案鎖定天數(預設 21;可設 1–366) |
-| `equipment_return_time` | 器材歸還時限時刻(預設 10:30) |
+| `equipment_return_time` | 器材歸還時限時刻 `HH:MM`(預設 10:30) |
 | `fixed_booking_window` | `{open_from, open_until}`;未設定=不開放 |
 | `upload_limits` | 單檔上限 `{doc, img, zip, video}` MB |
 | `activity_attachment_total_mb` / `maintenance_total_mb` / `close_photo_total_mb` | 依申請性質的附件加總上限(50 / 250 / 50) |

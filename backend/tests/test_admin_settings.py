@@ -28,6 +28,7 @@ async def test_get_defaults(client, db):
     # 舊鍵(開放月份+手動加開)已移除,固定借用改日期區間
     assert data["fixed_booking_window"] == {"open_from": None, "open_until": None}
     assert data["close_lock_days"] == 21  # DEFAULTS;DB 沒有這一列時的值
+    assert data["equipment_return_time"] == "10:30"  # 器材歸還時限(隔天上班日此時刻)
     assert data["upload_limits"] == {"doc": 50, "img": 10, "zip": 100, "video": 200}
     # 各申請性質的加總上限(2026-07-17 改依性質給總量)
     assert data["activity_attachment_total_mb"] == 50
@@ -116,6 +117,33 @@ async def test_put_validations(client, db):
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
+
+
+async def test_equipment_return_time_update(client, db):
+    """歸還時限改了要立刻反映在逾期判定上(承辦在此頁調,不必進主機改 DB)。"""
+    from datetime import date
+
+    from app.services.booking_service import overdue_deadline
+    from app.services.settings_service import get_setting
+
+    await seed(client, db)
+    resp = await client.put(
+        URL, json={"equipment_return_time": "13:05"}, headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["equipment_return_time"] == "13:05"
+
+    deadline = await overdue_deadline(
+        db, date(2026, 3, 6), await get_setting(db, "equipment_return_time")
+    )
+    assert (deadline.hour, deadline.minute) == (13, 5)
+
+    # 非 HH:MM 一律擋下:呼叫端直接 int(x) 拆冒號,收進來就是 500
+    for bad in ("25:00", "9:30", "10:60", "十點半", ""):
+        resp = await client.put(
+            URL, json={"equipment_return_time": bad}, headers=csrf_headers(client)
+        )
+        assert resp.status_code == 422, bad
 
 
 async def test_storage_limits_update_and_audit(client, db):

@@ -21,7 +21,7 @@
 
 ## 規則
 
-- **逾期定義**:`status=checked_out` 且已過「結束日之隔天**上班日** 10:30」。上班日排除週末與 `holidays` 表的政府行事曆假日 —— 該表由 `scripts/import_holidays.py` 每年匯入一次(decisions.md GAP-06),臨時放假與漏掉的日子由行政端系統設定頁的「放假日」卡片補登;沒匯入的年度會退化成只排除週六日,逢國定假日的逾期判定偏一天
+- **逾期定義**:`status=checked_out` 且已過「結束日之隔天**上班日** `equipment_return_time`(預設 10:30,系統設定頁可調)」。上班日排除週末與 `holidays` 表的政府行事曆假日 —— 該表由 `scripts/import_holidays.py` 每年匯入一次(decisions.md GAP-06),臨時放假與漏掉的日子由行政端系統設定頁的「放假日」卡片補登;沒匯入的年度會退化成只排除週六日,逢國定假日的逾期判定偏一天
 - 後端以單調門檻日(`overdue_threshold_in`)用 SQL 篩選,不逐列計算,分頁才正確
 - 已逾天數由前端以**台北時區**日差計算(使用者可能不在 +08:00)
 - 提醒同時推 Discord 與寄 Email 給社團聯絡人,經確認對話框才送出;與行政端逾期追蹤共用 `services/loan_remind.py`

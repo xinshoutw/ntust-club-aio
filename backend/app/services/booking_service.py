@@ -1,5 +1,6 @@
 """借用領域的推導規則:節次、固定借用規則、器材可借數與借用區間、逾期判定、場地色格。"""
 
+import logging
 from collections.abc import Collection, Sequence
 from datetime import UTC, date, datetime, time, timedelta
 
@@ -17,6 +18,9 @@ from app.models import (
     VenueBooking,
 )
 from app.models.enums import BookingStatus, LoanStatus
+from app.services.settings_service import DEFAULTS
+
+logger = logging.getLogger(__name__)
 
 # 14 節次(原型 PERIODS/BK_SLOTS)
 PERIODS: tuple[str, ...] = ("1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "A", "B", "C", "D")
@@ -620,11 +624,27 @@ def add_workdays(d: date, n: int, holidays: set[date]) -> date:
     return cursor
 
 
+def parse_return_time(value: str) -> time:
+    """`equipment_return_time` → time;壞值退回預設而不是丟例外。
+
+    設定頁的寫入端有 HH:MM 的 pattern,這裡防的是手改 DB 與規則收緊前存下的列 ——
+    逾期判定是側欄徽章、三張點交清單、逾期追蹤與 cron 催還的同一條路徑,
+    一個壞掉的設定值不該讓那一整片變成 500。
+    """
+    try:
+        hour, minute = (int(x) for x in str(value).split(":"))
+        return time(hour, minute)
+    except ValueError:
+        fallback = DEFAULTS["equipment_return_time"]
+        logger.warning("equipment_return_time 不是 HH:MM(%r),改用預設 %s", value, fallback)
+        hour, minute = (int(x) for x in fallback.split(":"))
+        return time(hour, minute)
+
+
 def overdue_deadline_in(end_date: date, return_time: str, holidays: set[date]) -> datetime:
     """歸還期限:結束日之隔天上班日 HH:MM(台北時區)。"""
     workday = next_workday_in(end_date, holidays)
-    hour, minute = (int(x) for x in return_time.split(":"))
-    return datetime.combine(workday, time(hour, minute), tzinfo=TAIPEI)
+    return datetime.combine(workday, parse_return_time(return_time), tzinfo=TAIPEI)
 
 
 def is_overdue_in(loan: EquipmentLoan, return_time: str, holidays: set[date]) -> bool:

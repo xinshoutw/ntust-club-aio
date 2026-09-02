@@ -101,10 +101,8 @@ hover 顯示「目前未開放」(`lib/nav.EVAL_UNBUILT`)。收的**只有側欄
 表都能在 `/admin/settings` 改了 —— 原本前者只能直接動 DB、後者只能進主機跑
 `scripts/import_holidays.py`。整年份仍走腳本(一次 20 幾筆),卡片是補漏與臨時放假(颱風假)用;
 週六日不收(兩端都擋),刪除要先確認。稽核多 `holiday_created`/`updated`/`deleted` 三個動作。
-**留著沒動的一項**:8 個讀取端全匯流到 `booking_service.overdue_deadline_in` 的
-`int(x) for x in return_time.split(":")` —— DB 裡若有壞值(手改、`"10:30:00"`)就是全站 500
-(側欄徽章、三張點交清單、逾期追蹤、cron 催還一起掛)。寫入端有 pattern 擋,讀取端沒有
-`settings_service.get_budget_categories` 那樣的防禦。
+讀取端另補了 fail-safe(`booking_service.parse_return_time`):壞值(手改 DB、`"10:30:00"`)
+退回預設 10:30 並記 warning,不再讓側欄徽章、三張點交清單、逾期追蹤與 cron 催還一起變 500。
 
 **要跑遷移**:D-21/D-22 是 drop column,`alembic upgrade head` 之後舊號碼就沒了。
 D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)—— 走 `--reset` 重灌,

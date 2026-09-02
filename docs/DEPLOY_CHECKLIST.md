@@ -12,7 +12,7 @@
   4.8 GB 的結案照片刪掉就沒了。上線前要嘛掛一支 `rsync`/`tar` 的 cron,要嘛明確接受這個風險
 - [ ] **器材主檔的建立順序**:`scripts/seed.py` 只建 5 獎項 + 19 場地 + superadmin,**器材主檔由 `migration/cc_import.py` 從舊 `Device` 表帶入**(品名、數量、單次上限、啟用與否)。正式流程必須 seed 之後跑過遷移,否則器材借用無品項可選
 - [ ] **帳號開通**:遷移進來的 15 個行政帳號**權限鍵全空**(只有 `super` 看得到頁面),分工由承辦決定後於帳號管理逐一授出;舊系統沒有工讀生角色,`role=staff` 是 0 筆,上線前要開。所有遷移帳號 `must_change_password=True`,明碼在 `migration/out/` 下:遷移當下那份是 `one_time_passwords_*.csv`,事後用 `set_passwords.py --random` 換發的是 `passwords_*.csv`(欄位為 類型/名稱/代號/密碼)—— **發之前先確認拿的是最新一份**,舊的那份在換發後全數失效;交承辦發放後銷毀
-- [ ] **政府行事曆假日**:`holidays` 表未 seed。匯入腳本已就緒(`scripts/import_holidays.py --year <民國年> --yes`,資料源見 decisions.md GAP-06),**每年上線年度都要跑一次**;未匯入的年度 `booking_service.add_workdays` 會退化成只排除週六日,逢國定假日的逾期判定偏一天
+- [ ] **政府行事曆假日**:`holidays` 表未 seed。匯入腳本已就緒(`scripts/import_holidays.py --year <民國年> --yes`,資料源見 decisions.md GAP-06),**每年上線年度都要跑一次**;未匯入的年度 `booking_service.add_workdays` 會退化成只排除週六日,逢國定假日的逾期判定偏一天。臨時放假(颱風假)與漏掉的日子可於系統設定頁的「放假日」卡片補登
 
 ## B. `.env`(prod)
 

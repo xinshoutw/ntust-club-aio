@@ -7,7 +7,7 @@
 from datetime import date
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class FixedBookingWindowIn(BaseModel):
@@ -77,6 +77,38 @@ class EvalWindowIn(BaseModel):
 
     def to_json(self) -> dict[str, Any]:
         return {"year": self.year, "start": self.start.isoformat(), "end": self.end.isoformat()}
+
+
+class HolidayIn(BaseModel):
+    """政府行事曆假日一筆(器材逾期「隔天上班日」的判定依據)。"""
+
+    date: date
+    name: str = Field(min_length=1, max_length=50)
+
+    @field_validator("date")
+    @classmethod
+    def _weekday_only(cls, v: date) -> date:
+        # 週六日不入表:add_workdays 本來就排除週末,登記進來只是把表撐大
+        if v.weekday() >= 5:
+            raise ValueError("週六日本來就不是上班日,不需要登記")
+        return v
+
+    @field_validator("name")
+    @classmethod
+    def _clean_name(cls, v: str) -> str:
+        v = " ".join(v.split())
+        if not v:
+            raise ValueError("名稱不得為空白")
+        return v
+
+
+class HolidayOut(BaseModel):
+    """假日一筆(列表用;主鍵即日期)。"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    date: date
+    name: str
 
 
 def _clean_items(v: list[str], label: str) -> list[str]:

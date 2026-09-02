@@ -134,7 +134,7 @@ erDiagram
 
 場地不開放規則。`weekdays` 為 ISO 1–7,NULL=區間內每天;`periods` 為不開放的節次子集。場況圖標示不開放、社團申請 422、核准 409 `SLOT_BLOCKED`;行政手動借用不受限。刪除為硬刪,異動走 `audit_logs`。
 
-**holidays**(date PK, name)— 政府行事曆假日;器材逾期的「隔天上班日」與催還間隔的工作天推算都依此。**尚無匯入介面**,每年需以 script 或直接操作 DB 灌入;未匯入的年度會退化成只排除週六日。
+**holidays**(date PK, name)— 政府行事曆假日;器材逾期的「隔天上班日」與催還間隔的工作天推算都依此。整年份以 `scripts/import_holidays.py` 匯入,系統設定頁的「放假日」卡片(`/admin/holidays`)供補漏與臨時放假;未匯入的年度會退化成只排除週六日。**週六日不入表**(工作天推算本來就排除週末,後端擋下)。
 
 **system_settings**(key PK, value jsonb)— 見 §4 設定分層。
 

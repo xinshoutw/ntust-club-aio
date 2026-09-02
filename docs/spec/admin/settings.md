@@ -16,6 +16,7 @@
 | 儲存 | `PUT /admin/settings`(部分更新,只寫有帶的鍵) |
 | 場地主檔 | `GET /admin/venues?include_inactive=true`、`POST /admin/venues`、`PATCH /admin/venues/{id}` |
 | 器材主檔 | `GET\|POST /admin/equipment`、`PATCH /admin/equipment/{id}` |
+| 放假日 | `GET\|POST /admin/holidays`、`DELETE /admin/holidays/{date}` |
 
 ## 畫面
 
@@ -30,6 +31,7 @@
 | 經費項目 | 每列名稱 + 提示(選填),可增刪 |
 | 場地主檔 | 名稱 / 類別 / 容納人數(空=未設)/ 開放固定借用 / 開放臨時借用 / 啟用開關,底部一列新增 |
 | 器材主檔 | 名稱 / 點交方式 / 總數 / 單次可借上限(空=不限)/ 啟用開關,底部一列新增 |
+| 放假日 | 依年份分組的 closable Tag(日期 + 名稱),底部一列新增(日期 + 名稱) |
 
 ## 規則
 
@@ -40,7 +42,7 @@
 - `GET /admin/venues` 一支兩用:預設只回啟用中(場況圖與手動借用的列首),主檔維護頁帶 `include_inactive=true`;讀取開給 `VENUE_READ_KEYS`(`abooking`/`asetting`/`amanual`/`arule`),`include_inactive` 與新增修改限 `asetting`
 - 違規項目與經費科目都不可存成空清單
 - 設定變更寫 `audit_logs`:逐鍵記改前改後值(清單型只記增減,值太長會截斷),值沒變的鍵不留紀錄
-- **政府行事曆假日不做後台介面**(decisions.md GAP-06):資料源是人事行政總處辦公日曆表,每年匯入一次:`scripts/import_holidays.py --year <民國年> --yes`(上線檢查表 A 段列為每年必辦;由誰執行見該表 F 段待決 #8)
+- **放假日整年份仍以腳本匯入**(decisions.md GAP-06):資料源是人事行政總處辦公日曆表,每年一次 `scripts/import_holidays.py --year <民國年> --yes`(上線檢查表 A 段列為每年必辦;由誰執行見該表 F 段待決 #8)。本頁的卡片是補漏與臨時放假(颱風假)用,不取代匯入。**刪除要先確認**(刪一天會把所有在借單的歸還期限往前挪一天,而逾期可觸發停權)。**週六日不收**(422):`booking_service.add_workdays` 本來就排除週末,登記進來只是把表撐大 —— 前端 `disabledDate` 也擋一份,後端為權威
 
 ## 未完成 / 問題
 

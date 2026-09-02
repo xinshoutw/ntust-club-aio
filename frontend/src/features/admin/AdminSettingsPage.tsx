@@ -7,6 +7,7 @@ import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import TagListInput from '../../components/ui/TagListInput'
 import AdminEquipmentCard from './AdminEquipmentCard'
+import AdminHolidayCard from './AdminHolidayCard'
 import AdminVenueCard from './AdminVenueCard'
 import type { BudgetCategory } from '../../api/clubConfig'
 import {
@@ -251,6 +252,7 @@ export default function AdminSettingsPage() {
           讓表單的「儲存」按鈕留在整頁最底,不被下方卡片夾在中間 */}
       <AdminVenueCard />
       <AdminEquipmentCard />
+      <AdminHolidayCard />
       {settingsQuery.isPending ? (
         <LoadingBlock pending rows={6} />
       ) : settingsQuery.data ? (

@@ -165,8 +165,11 @@ D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政�
   `公告已取消蓋板` / `{title}`
 - **K8 公告刪除** `DELETE /admin/announcements/{id}` · alert · 僅推系統 webhook
   `公告已刪除` / `{title}`
-- **K9 活動草稿刪除** `DELETE /club/activities/{id}`(草稿狀態)· alert
-  `活動草稿已刪除` / `{club.name}:{activity.name}`
+- **K9 社團自刪活動** `DELETE /club/activities/{id}`(還沒有簽核紀錄的單,D-39)· alert
+  `活動已刪除` / `{club.name}:{activity.name}`
+- **K9b 學務處刪除活動** `DELETE /admin/activities/{id}` · alert
+  `活動已被學務處刪除` / `{activity.name}`
+  —— 整張單連同附件、結案資料與簽核紀錄都不見了,社團看不到自己少了什麼,不說一聲就是無聲消失
 - **K10 行政補登報名** `POST /admin/signup-items/{id}/registrations` · announce
   `學務處已為貴社補登報名` / `{club.name}:{item.name}(現場到場,參加人名單從缺)`
   —— 社團會在「我的報名」看到一筆自己沒送過的紀錄,不說一聲會像是名單不見了

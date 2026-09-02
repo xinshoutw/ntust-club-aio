@@ -1,5 +1,5 @@
 import io
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import sqlalchemy as sa
 
@@ -236,11 +236,14 @@ async def test_deleting_a_draft_is_audited(client, db):
     )
     assert resp.status_code == 200
 
+    # 活動列刪掉之後這一行是唯一線索:社團與刪除當下的狀態都要在
     detail = await db.scalar(
         sa.select(AuditLog.detail).where(AuditLog.action == "activity_deleted")
     )
     assert activity["name"] in detail
     assert "files=1" in detail
+    assert "status=draft" in detail
+    assert "club=" in detail
 
 
 async def test_club_delete_is_blocked_once_the_activity_has_been_reviewed(client, db):
@@ -737,6 +740,13 @@ async def test_deleting_a_draft_sweeps_every_slot(client, db):
         headers=csrf_headers(client),
     )
     await db.execute(sa.update(Activity).where(Activity.id == aid).values(status="draft"))
+    # 歸檔過的檔案也要掃到:`activity_files` 濾掉 archived_at,purge 刻意不濾 ——
+    # 漏掉的話檔案管理頁會留下一列指向不存在的活動
+    await db.execute(
+        sa.update(File)
+        .where(File.slot == "report_doc")
+        .values(archived_at=datetime.now(UTC))
+    )
     await db.commit()
     assert await db.scalar(sa.select(sa.func.count()).select_from(File)) == 3
 

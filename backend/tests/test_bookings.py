@@ -15,7 +15,7 @@ from app.models import (
 )
 from app.models.enums import ActivityStatus, LoanStatus, VenueCategory
 from app.services import booking_service
-from app.services.booking_service import next_workday, overdue_deadline
+from app.services.booking_service import next_workday, overdue_deadline, parse_return_time
 from tests.conftest import csrf_headers, login, make_club, make_user
 
 
@@ -1109,6 +1109,42 @@ async def test_next_workday_skips_weekend_and_holiday(db):
     deadline = await overdue_deadline(db, date(2026, 3, 6), "10:30")
     assert deadline.date() == date(2026, 3, 10)
     assert (deadline.hour, deadline.minute) == (10, 30)
+
+
+def test_broken_return_time_falls_back_to_the_default():
+    """壞值退回預設,不丟例外。
+
+    逾期判定是側欄徽章、三張點交清單、逾期追蹤與 cron 催還的同一條路徑,設定值一壞
+    那一整片就是 500。設定頁的寫入端擋得住 HH:MM 以外的值,這裡防的是手改 DB 與舊列。
+    """
+    assert parse_return_time("13:05").hour == 13
+    for bad in ("10:30:00", "25:00", "10:60", "", "十點半", 1030, None):
+        assert (parse_return_time(bad).hour, parse_return_time(bad).minute) == (10, 30), bad
+
+
+async def test_loan_list_survives_a_broken_return_time(client, db):
+    """壞值下借用清單仍要打得開,而且照樣算得出逾期(退回預設 10:30)。"""
+    club = await setup_session(client, db)
+    eq = await make_equipment(db, name="喇叭", total_qty=1)
+    activity = await make_activity(db, club)
+    db.add(SystemSetting(key="equipment_return_time", value="10:30:00"))  # 手改 DB 的壞值
+    db.add(
+        EquipmentLoan(
+            club_id=club.id,
+            equipment_id=eq.id,
+            activity_id=activity.id,
+            qty=1,
+            start_date=date.today() - timedelta(days=12),
+            end_date=date.today() - timedelta(days=10),
+            purpose="x",
+            status="checked_out",
+        )
+    )
+    await db.commit()
+
+    resp = await client.get("/api/v1/club/equipment-loans")
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"][0]["overdue"] is True
 
 
 async def test_suspended_club_cannot_book(client, db):

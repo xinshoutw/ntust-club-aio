@@ -97,6 +97,13 @@ hover 顯示「目前未開放」(`lib/nav.EVAL_UNBUILT`)。收的**只有側欄
 `approved` 卻沒到過他手上。收的是整個行政端活動讀取面(清單、學期下拉、詳情、申請表 PDF 共用
 `activity_service.scope_sql`),`super` 與頁面鍵都壓不過這條。
 
+**器材歸還時限與放假日進系統設定頁**(2026-09-02):`equipment_return_time`(HH:MM)與 `holidays`
+表都能在 `/admin/settings` 改了 —— 原本前者只能直接動 DB、後者只能進主機跑
+`scripts/import_holidays.py`。整年份仍走腳本(一次 20 幾筆),卡片是補漏與臨時放假(颱風假)用;
+週六日不收(兩端都擋),刪除要先確認。稽核多 `holiday_created`/`updated`/`deleted` 三個動作。
+讀取端另補了 fail-safe(`booking_service.parse_return_time`):壞值(手改 DB、`"10:30:00"`)
+退回預設 10:30 並記 warning,不再讓側欄徽章、三張點交清單、逾期追蹤與 cron 催還一起變 500。
+
 **要跑遷移**:D-21/D-22 是 drop column,`alembic upgrade head` 之後舊號碼就沒了。
 D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)—— 走 `--reset` 重灌,
 或把該學期匯出再匯入一次。

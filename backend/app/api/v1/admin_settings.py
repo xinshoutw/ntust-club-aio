@@ -30,6 +30,7 @@ PageAdmin = Annotated[CurrentUser, Depends(require_permission("asetting"))]
 MANAGED_KEYS = (
     "fixed_booking_window",
     "close_lock_days",
+    "equipment_return_time",
     "upload_limits",
     "activity_attachment_total_mb",
     "maintenance_total_mb",

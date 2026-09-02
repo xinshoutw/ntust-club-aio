@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api } from './client'
 import { keys as bookingKeys } from './adminBookings'
+import { useInvalidateBadges } from './badges'
 import type { BudgetCategory } from './clubConfig'
 
 const DATE_FMT = 'YYYY/MM/DD'
@@ -14,6 +15,8 @@ export interface SystemSettings {
   fixedFrom?: string
   fixedUntil?: string
   closeLockDays: number
+  /** 器材歸還時限 HH:mm(結束日之隔天上班日的此時刻) */
+  returnTime: string
   docMb: number
   imgMb: number
   zipMb: number
@@ -30,6 +33,7 @@ export interface SystemSettings {
 interface SettingsOut {
   fixed_booking_window: { open_from: string | null; open_until: string | null }
   close_lock_days: number
+  equipment_return_time: string
   upload_limits: { doc: number; img: number; zip: number; video: number }
   activity_attachment_total_mb: number
   maintenance_total_mb: number
@@ -48,6 +52,7 @@ const toSettings = (s: SettingsOut): SystemSettings => ({
     ? dayjs(s.fixed_booking_window.open_until).format(DATE_FMT)
     : undefined,
   closeLockDays: s.close_lock_days,
+  returnTime: s.equipment_return_time,
   docMb: s.upload_limits.doc,
   imgMb: s.upload_limits.img,
   zipMb: s.upload_limits.zip,
@@ -86,6 +91,7 @@ export function useSystemSettings() {
 
 export function useUpdateSettings() {
   const qc = useQueryClient()
+  const invalidateBadges = useInvalidateBadges()
   return useMutation({
     mutationFn: (v: SystemSettings) =>
       api<SettingsOut>('/admin/settings', {
@@ -96,6 +102,7 @@ export function useUpdateSettings() {
             open_until: v.fixedUntil ? toIsoDate(v.fixedUntil) : null,
           },
           close_lock_days: v.closeLockDays,
+          equipment_return_time: v.returnTime,
           upload_limits: { doc: v.docMb, img: v.imgMb, zip: v.zipMb, video: v.videoMb },
           activity_attachment_total_mb: v.attachmentTotalMb,
           maintenance_total_mb: v.maintenanceTotalMb,
@@ -110,6 +117,8 @@ export function useUpdateSettings() {
       void qc.invalidateQueries({ queryKey: keys.all })
       // 受理期間也決定側欄「固定場地借用」是否反灰,那份開放窗查詢另屬借用 domain
       void qc.invalidateQueries({ queryKey: bookingKeys.fixedWindow })
+      // 器材歸還時限一改就換一批單子逾期(推導不儲存),側欄逾期徽章要跟著重算
+      invalidateBadges()
     },
   })
 }

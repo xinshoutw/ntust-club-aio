@@ -12,6 +12,7 @@ from app.api.v1 import (
     admin_equipment,
     admin_eval,
     admin_files,
+    admin_holidays,
     admin_maintenance,
     admin_overdue,
     admin_rooms,
@@ -69,6 +70,7 @@ router.include_router(admin_maintenance.router)
 router.include_router(admin_applications.router)
 router.include_router(admin_audit.router)
 router.include_router(admin_files.router)
+router.include_router(admin_holidays.router)
 router.include_router(admin_settings.router)
 router.include_router(admin_accounts.router)
 

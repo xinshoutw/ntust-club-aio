@@ -7,7 +7,7 @@
 from datetime import date
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class FixedBookingWindowIn(BaseModel):
@@ -79,6 +79,42 @@ class EvalWindowIn(BaseModel):
         return {"year": self.year, "start": self.start.isoformat(), "end": self.end.isoformat()}
 
 
+# HH:MM(24 小時制);呼叫端一律 `int(x) for x in value.split(":")`,格式錯就是 500
+_TIME_RE = r"^([01][0-9]|2[0-3]):[0-5][0-9]$"
+
+
+class HolidayIn(BaseModel):
+    """政府行事曆假日一筆(器材逾期「隔天上班日」的判定依據)。"""
+
+    date: date
+    name: str = Field(min_length=1, max_length=50)
+
+    @field_validator("date")
+    @classmethod
+    def _weekday_only(cls, v: date) -> date:
+        # 週六日不入表:add_workdays 本來就排除週末,登記進來只是把表撐大
+        if v.weekday() >= 5:
+            raise ValueError("週六日本來就不是上班日,不需要登記")
+        return v
+
+    @field_validator("name")
+    @classmethod
+    def _clean_name(cls, v: str) -> str:
+        v = " ".join(v.split())
+        if not v:
+            raise ValueError("名稱不得為空白")
+        return v
+
+
+class HolidayOut(BaseModel):
+    """假日一筆(列表用;主鍵即日期)。"""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    date: date
+    name: str
+
+
 def _clean_items(v: list[str], label: str) -> list[str]:
     cleaned = []
     for item in v:
@@ -109,6 +145,7 @@ class SettingsUpdateIn(BaseModel):
 
     fixed_booking_window: FixedBookingWindowIn | None = None
     close_lock_days: int | None = Field(None, ge=1, le=366)
+    equipment_return_time: str | None = Field(None, pattern=_TIME_RE)
     upload_limits: UploadLimitsIn | None = None
     activity_attachment_total_mb: int | None = Field(None, ge=1, le=1024)
     maintenance_total_mb: int | None = Field(None, ge=1, le=1024)

@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { App, Button, DatePicker, Form, Input, InputNumber, Select } from 'antd'
+import { App, Button, DatePicker, Form, Input, InputNumber, Select, TimePicker } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import QueryError from '../../components/ui/QueryError'
 import dayjs, { type Dayjs } from 'dayjs'
@@ -7,6 +7,7 @@ import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
 import PageHeader from '../../components/ui/PageHeader'
 import TagListInput from '../../components/ui/TagListInput'
 import AdminEquipmentCard from './AdminEquipmentCard'
+import AdminHolidayCard from './AdminHolidayCard'
 import AdminVenueCard from './AdminVenueCard'
 import type { BudgetCategory } from '../../api/clubConfig'
 import {
@@ -18,6 +19,7 @@ import {
 
 const sectionTitle: React.CSSProperties = { fontSize: 15, fontWeight: 600, marginBottom: 14 }
 const DATE_FMT = 'YYYY/MM/DD'
+const TIME_FMT = 'HH:mm'
 
 // 經費科目編輯:每列名稱 + 提示(選填);末端「新增科目」補一列。受控元件。
 let budgetRowSeq = 0
@@ -80,6 +82,7 @@ function BudgetCategoriesInput({
 interface FormValues {
   fixedWindow?: [Dayjs, Dayjs] | null
   closeLockDays: number
+  returnTime: Dayjs
   docMb: number
   imgMb: number
   zipMb: number
@@ -118,6 +121,7 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
         fixedFrom: v.fixedWindow?.[0] ? v.fixedWindow[0].format(DATE_FMT) : undefined,
         fixedUntil: v.fixedWindow?.[1] ? v.fixedWindow[1].format(DATE_FMT) : undefined,
         closeLockDays: v.closeLockDays,
+        returnTime: v.returnTime.format(TIME_FMT),
         docMb: v.docMb,
         imgMb: v.imgMb,
         zipMb: v.zipMb,
@@ -151,6 +155,7 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
             ? [dayjs(initial.fixedFrom, DATE_FMT), dayjs(initial.fixedUntil, DATE_FMT)]
             : undefined,
         closeLockDays: initial.closeLockDays,
+        returnTime: dayjs(initial.returnTime, TIME_FMT),
         docMb: initial.docMb,
         imgMb: initial.imgMb,
         zipMb: initial.zipMb,
@@ -167,8 +172,23 @@ function SettingsForm({ initial }: { initial: SystemSettings }) {
       <div className="form-grid-2" style={{ marginTop: 20, alignItems: 'stretch' }}>
         <div className="card" style={{ padding: 24 }}>
           <div style={sectionTitle}>借用</div>
-          <Form.Item name="fixedWindow" label="固定場地借用受理期間" style={{ marginBottom: 0 }}>
+          <Form.Item name="fixedWindow" label="固定場地借用受理期間">
             <DatePicker.RangePicker style={{ width: '100%' }} format={DATE_FMT} allowClear />
+          </Form.Item>
+          <Form.Item
+            name="returnTime"
+            label="器材歸還時限"
+            tooltip="借用結束日之隔天上班日的此時刻前未歸還即為逾期；上班日依上方放假日推算"
+            rules={[{ required: true, message: '請選擇時刻' }]}
+            style={{ marginBottom: 0, maxWidth: 280 }}
+          >
+            <TimePicker
+              format={TIME_FMT}
+              minuteStep={5}
+              needConfirm={false}
+              allowClear={false}
+              style={{ width: '100%' }}
+            />
           </Form.Item>
         </div>
 
@@ -251,6 +271,7 @@ export default function AdminSettingsPage() {
           讓表單的「儲存」按鈕留在整頁最底,不被下方卡片夾在中間 */}
       <AdminVenueCard />
       <AdminEquipmentCard />
+      <AdminHolidayCard />
       {settingsQuery.isPending ? (
         <LoadingBlock pending rows={6} />
       ) : settingsQuery.data ? (

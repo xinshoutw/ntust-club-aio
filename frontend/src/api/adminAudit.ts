@@ -102,6 +102,9 @@ export const ACTION_LABELS: Record<string, string> = {
   activity_close_doc_deleted: '刪除結案附件',
   venue_created: '新增場地',
   venue_updated: '修改場地',
+  holiday_created: '新增放假日',
+  holiday_updated: '修改放假日',
+  holiday_deleted: '刪除放假日',
 }
 
 /** 動作顯示詞;沒對照到就顯示原始鍵(後端新加的動作不會因此消失) */

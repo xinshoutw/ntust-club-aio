@@ -16,12 +16,13 @@
 | 儲存 | `PUT /admin/settings`(部分更新,只寫有帶的鍵) |
 | 場地主檔 | `GET /admin/venues?include_inactive=true`、`POST /admin/venues`、`PATCH /admin/venues/{id}` |
 | 器材主檔 | `GET\|POST /admin/equipment`、`PATCH /admin/equipment/{id}` |
+| 放假日 | `GET\|POST /admin/holidays`、`DELETE /admin/holidays/{date}` |
 
 ## 畫面
 
 | 區塊 | 欄位 |
 |---|---|
-| 借用 | 固定場地借用受理期間(日期區間) |
+| 借用 | 固定場地借用受理期間(日期區間)、器材歸還時限(`HH:mm`,預設 10:30) |
 | 活動與評鑑 | 活動結案期限(N 天,1–366)、評鑑年度 |
 | 各申請性質的附件加總上限(MB) | 活動申請附件、空間報修佐證、活動結案照片與附件(兩者共用同一個額度) |
 | 單檔上限(MB) | 文件、圖片、壓縮檔、影片 |
@@ -30,6 +31,7 @@
 | 經費項目 | 每列名稱 + 提示(選填),可增刪 |
 | 場地主檔 | 名稱 / 類別 / 容納人數(空=未設)/ 開放固定借用 / 開放臨時借用 / 啟用開關,底部一列新增 |
 | 器材主檔 | 名稱 / 點交方式 / 總數 / 單次可借上限(空=不限)/ 啟用開關,底部一列新增 |
+| 放假日 | 依年份分組的 closable Tag(日期 + 名稱),底部一列新增(日期 + 名稱) |
 
 ## 規則
 
@@ -40,7 +42,8 @@
 - `GET /admin/venues` 一支兩用:預設只回啟用中(場況圖與手動借用的列首),主檔維護頁帶 `include_inactive=true`;讀取開給 `VENUE_READ_KEYS`(`abooking`/`asetting`/`amanual`/`arule`),`include_inactive` 與新增修改限 `asetting`
 - 違規項目與經費科目都不可存成空清單
 - 設定變更寫 `audit_logs`:逐鍵記改前改後值(清單型只記增減,值太長會截斷),值沒變的鍵不留紀錄
-- **政府行事曆假日不做後台介面**(decisions.md GAP-06):資料源是人事行政總處辦公日曆表,每年匯入一次:`scripts/import_holidays.py --year <民國年> --yes`(上線檢查表 A 段列為每年必辦;由誰執行見該表 F 段待決 #8)
+- **放假日整年份仍以腳本匯入**(decisions.md GAP-06):資料源是人事行政總處辦公日曆表,每年一次 `scripts/import_holidays.py --year <民國年> --yes`(上線檢查表 A 段列為每年必辦;由誰執行見該表 F 段待決 #8)。本頁的卡片是補漏與臨時放假(颱風假)用,不取代匯入。**刪除要先確認**(刪一天會把所有在借單的歸還期限往前挪一天,而逾期可觸發停權)。**週六日不收**(422):`booking_service.add_workdays` 本來就排除週末,登記進來只是把表撐大 —— 前端 `disabledDate` 也擋一份,後端為權威
+- **器材歸還時限**只收 `HH:MM`(422)。改了立刻影響全站逾期判定(推導不儲存),包含已借出的單。讀取端另有一層 fail-safe:`booking_service.parse_return_time` 遇到壞值(手改 DB、舊列)退回預設 10:30 並記 warning —— 逾期判定是側欄徽章、三張點交清單、逾期追蹤與 cron 催還的同一條路徑,一個壞掉的設定值不該讓那一整片變成 500
 
 ## 未完成 / 問題
 

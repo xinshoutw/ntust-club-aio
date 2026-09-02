@@ -46,6 +46,8 @@ from app.services.settings_service import get_budget_categories, get_setting
 router = APIRouter(prefix="/club/activities", tags=["activities"])
 
 _EDITABLE = {ActivityStatus.DRAFT, ActivityStatus.REJECTED}
+# 社團自刪的狀態上界;真正的界線是簽核紀錄(見 delete_activity)
+_CLUB_DELETABLE = {ActivityStatus.DRAFT, ActivityStatus.PENDING_ADVISOR}
 
 _SORTABLE = {
     "name": Activity.name,
@@ -259,32 +261,37 @@ async def delete_activity(
 ) -> ApiResponse[None]:
     activity = await svc.get_own_activity(db, user, activity_id)
     await db.refresh(activity, attribute_names=["status"], with_for_update=True)
-    if activity.status != ActivityStatus.DRAFT:
-        raise conflict("僅草稿可刪除")
-    disk_paths = []
-    for slot in (svc.PHOTO_SLOT, svc.DOC_SLOT, svc.ATTACHMENT_SLOT):
-        for f in await svc.activity_files(db, activity, slot):
-            disk_paths.append(await file_service.delete_file(db, f))
-    # 整張單連同附件一起實體刪除,比單刪一個檔更該留下紀錄
+    # 界線是「有沒有人動過這張單」(D-39):草稿與剛送出還沒人審的單社團自己收得回去,
+    # 一旦有簽核紀錄(核准/退回/解鎖皆算)就只有承辦刪得掉 —— 退回件裡有承辦寫給社團的話,
+    # 社團刪掉等於把那段紀錄一起帶走。主要判準是簽核紀錄不是狀態:退回重送的單狀態同樣是
+    # `pending_advisor`,卻已經有兩輪紀錄。狀態那半是保險,擋的是簽核紀錄缺漏的遷移件 ——
+    # 現行 snapshot 沒有這種列,但刪掉的是結案照片與心得(評鑑的依據),錯一次沒有回頭路
+    if activity.status not in _CLUB_DELETABLE or await svc.has_approvals(db, activity.id):
+        raise conflict("已進入審核的活動無法刪除,請洽學務處")
+    # 整張單連同附件一起實體刪除,比單刪一個檔更該留下紀錄。
+    # 識別欄先抄下來:purge 之後這個實例已排入刪除,屬性讀得到但語意上已經不是活的列
+    name, status = activity.name, activity.status
+    disk_paths = await svc.purge(db, activity)
     audit.record(
         db,
         action="activity_deleted",
         user=user,
-        detail=f"activity={activity.id};name={activity.name};files={len(disk_paths)}",
+        detail=(
+            f"activity={activity_id};club={user.club_id};name={name}"
+            f";status={status.value};files={len(disk_paths)}"
+        ),
         ip=client_ip(request),
     )
-    name = activity.name
-    await db.delete(activity)
     await db.commit()
     for path in disk_paths:  # commit 成功後才動磁碟
         file_service.unlink_quiet(path)
-    # 草稿刪掉就整份不見(附件一起實體刪除),留一則痕跡(GAP-18 K9)。
+    # 刪掉就整份不見(附件一起實體刪除),留一則痕跡(GAP-18 K9)。
     # 「草稿儲存」刻意不發:同一份活動在填寫過程會產生數十則,會淹掉頻道
     club = await _club_of(db, user)
     background.add_task(
         notify.club_event,
         "alert",
-        "活動草稿已刪除",
+        "活動已刪除",
         f"{club.name}:{name}",
         club.discord_webhook_url,
     )

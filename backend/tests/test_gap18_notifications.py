@@ -304,8 +304,8 @@ async def test_k6_k7_k8_announcement_takeover_and_delete(client, db, monkeypatch
     assert await db.scalar(sa.select(sa.func.count()).select_from(Announcement)) == 0
 
 
-async def test_k9_activity_draft_deleted(client, db, monkeypatch):
-    """草稿刪掉就整份不見(附件一起實體刪除),留一則痕跡。"""
+async def test_k9_activity_deleted(client, db, monkeypatch):
+    """刪掉就整份不見(附件一起實體刪除),留一則痕跡。"""
     spy = Spy(monkeypatch)
     club = await setup_session(client, db)
     activity = await make_activity(db, club, name="尚未送出的草稿", status=ActivityStatus.DRAFT)
@@ -314,7 +314,22 @@ async def test_k9_activity_draft_deleted(client, db, monkeypatch):
         f"/api/v1/club/activities/{activity.id}", headers=csrf_headers(client)
     )
     assert resp.status_code == 200, resp.text
-    assert spy.club == [("alert", "活動草稿已刪除", f"{club.name}:尚未送出的草稿")]
+    assert spy.club == [("alert", "活動已刪除", f"{club.name}:尚未送出的草稿")]
+
+
+async def test_k9b_activity_deleted_by_the_office(client, db, monkeypatch):
+    """學務處刪掉整張單,社團看不到自己少了什麼 —— 不說一聲就是無聲消失(D-39)。"""
+    spy = Spy(monkeypatch)
+    club = await make_club(db)
+    await make_user(db, username="officer", role="admin", permissions=["areview"])
+    activity = await make_activity(db, club, name="迎新宿營", status=ActivityStatus.APPROVED)
+    await login(client, "officer")
+
+    resp = await client.delete(
+        f"/api/v1/admin/activities/{activity.id}", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+    assert spy.club == [("alert", "活動已被學務處刪除", "迎新宿營")]
 
 
 async def test_attendance_only_announces_on_a_real_flip(client, db, monkeypatch):

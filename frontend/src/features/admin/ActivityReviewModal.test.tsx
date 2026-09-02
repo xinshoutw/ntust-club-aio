@@ -408,7 +408,7 @@ describe('刪除活動', () => {
 
   test('社團端:審過的單刪不掉', async () => {
     const li = await openDeleteItem(
-      { detail: { attachments: [], budget: [], approvals: [reviewed] } },
+      { detail: { attachments: [], budget: [], approvals: [reviewed], approvalCount: 1 } },
       'club',
     )
     expect(li.className).toContain('disabled')
@@ -416,7 +416,7 @@ describe('刪除活動', () => {
 
   test('社團端:還沒人審過的單刪得掉', async () => {
     const li = await openDeleteItem(
-      { detail: { attachments: [], budget: [], approvals: [] } },
+      { detail: { attachments: [], budget: [], approvals: [], approvalCount: 0 } },
       'club',
     )
     expect(li.className).not.toContain('disabled')
@@ -425,15 +425,54 @@ describe('刪除活動', () => {
   // 後端那道保險的前端那一半:簽核紀錄缺漏的遷移件不能畫成一顆亮著的刪除鈕
   test('社團端:簽核紀錄是空的,但單子早就過了審核 —— 一樣刪不掉', async () => {
     const li = await openDeleteItem(
-      { status: 'closed', detail: { attachments: [], budget: [], approvals: [] } },
+      { status: 'closed', detail: { attachments: [], budget: [], approvals: [], approvalCount: 0 } },
       'club',
     )
     expect(li.className).toContain('disabled')
   })
 
+  // 端點分流零測試的話,把 admin/club 兩支 URL 對調也全綠 —— 社團按刪除會打到行政端
+  // 那支拿 403,而 403 的文案讀起來像權限被收掉,不像接錯線
+  test.each([
+    ['club', '/api/v1/club/activities/1'],
+    ['admin', '/api/v1/admin/activities/1'],
+  ] as const)('%s 端按下去打的是自己那支端點,成功後關窗', async (viewer, url) => {
+    const calls: [string, string][] = []
+    vi.stubGlobal('fetch', (input: string, init?: RequestInit) => {
+      calls.push([String(input), init?.method ?? 'GET'])
+      return Promise.resolve(
+        new Response(JSON.stringify({ success: true, data: null, error: null }), {
+          headers: { 'content-type': 'application/json' },
+        }),
+      )
+    })
+    const onClose = vi.fn()
+    render(
+      <Providers>
+        <ActivityReviewModal
+          item={{
+            ...item([budgetRow(1, 0)]),
+            detail: { attachments: [], budget: [], approvals: [], approvalCount: 0 },
+          }}
+          viewer={viewer}
+          open
+          onClose={onClose}
+          afterClose={() => {}}
+        />
+      </Providers>,
+    )
+    fireEvent.click(screen.getByLabelText('更多操作'))
+    fireEvent.click(await screen.findByText('刪除活動'))
+    fireEvent.click(await screen.findByText('確認刪除'))
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(calls.filter(([, m]) => m === 'DELETE').map(([u]) => u)).toEqual([url])
+    vi.unstubAllGlobals()
+  })
+
   test('行政端:審過的單照樣刪得掉', async () => {
     const li = await openDeleteItem(
-      { detail: { attachments: [], budget: [], approvals: [reviewed] } },
+      { detail: { attachments: [], budget: [], approvals: [reviewed], approvalCount: 1 } },
       'admin',
     )
     expect(li.className).not.toContain('disabled')

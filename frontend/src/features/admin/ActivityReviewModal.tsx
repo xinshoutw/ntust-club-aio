@@ -517,12 +517,21 @@ export default function ActivityReviewModal({
   // 狀態那半擋的是簽核紀錄缺漏的遷移件。詳情還沒到位就讀不到簽核紀錄,一律不給刪
   const remove = useDeleteActivity(isClub ? 'club' : 'admin')
   const canDelete =
-    !!item && (!isClub || (CLUB_DELETABLE.has(item.status) && d?.approvals?.length === 0))
+    !!item && (!isClub || (CLUB_DELETABLE.has(item.status) && d?.approvalCount === 0))
   const askDelete = () => {
     if (!item) return
     confirmDialog(modal, {
       title: '刪除活動',
-      content: `「${item.name}」的申請內容、附件、結案資料與簽核紀錄都會一併刪除，且無法復原`,
+      content: (
+        <>
+          「{item.name}」的申請內容、附件、結案資料與簽核紀錄都會一併刪除，且無法復原
+          {/* ad1 是現數 closed 件數、不儲存推導值(D-39):刪一件已結案的單就是當場改掉
+              該社那個年度的評鑑行政分,往年已公告的年度也算得出新數字 */}
+          {item.status === 'closed' && (
+            <div style={{ marginTop: 8 }}>該社該學年度的評鑑行政分（ad1）會立即變動</div>
+          )}
+        </>
+      ),
       okText: '確認刪除',
       okButtonProps: { danger: true },
       cancelText: '取消',
@@ -600,7 +609,25 @@ export default function ActivityReviewModal({
                 { key: 'photos', label: '下載照片檔', disabled: photos.length === 0 },
                 { key: 'apply', label: '下載社團活動申請表' },
                 { type: 'divider' },
-                { key: 'delete', label: '刪除活動', danger: true, disabled: !canDelete },
+                {
+                  key: 'delete',
+                  danger: true,
+                  disabled: !canDelete,
+                  // 反灰要說得出原因:社團端看到的是一顆沒有解釋的灰字。
+                  // AntD 的 disabled menu item 不吃滑鼠事件,說明只能放在 label 裡面
+                  label: canDelete ? (
+                    '刪除活動'
+                  ) : (
+                    <span>
+                      刪除活動
+                      {isClub && (
+                        <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--steel)' }}>
+                          已送審核，請洽學務處
+                        </span>
+                      )}
+                    </span>
+                  ),
+                },
               ]}
               onClick={({ key }) => {
                 if (key === 'delete') {

@@ -44,6 +44,10 @@ export interface ReviewItem {
     stamps?: ReviewStamp[]
     /** 完整簽核紀錄(誰於何時核准/退回);章軌只印每一關最後一次核准,退回不入軌 */
     approvals?: ReviewApproval[]
+    /** **未經 `dropAutoUnlock` 過濾**的簽核列數:「這張單被審過沒有」要跟後端
+     *  `activity_service.has_approvals` 數同一批。`approvals` 是給人看的清單,
+     *  拿它的長度當判準就是同一份判定兩份實作,而且兩邊資料源還不一樣 */
+    approvalCount?: number
     location?: string
     participantsIn?: number
     participantsOut?: number
@@ -351,6 +355,7 @@ const toAdminDetail = (o: AdminActivityDetailOut): AdminActivityDetail => ({
     timeRange: timeRangeOf(o),
     stamps: o.stamps.map(toStamp),
     approvals: dropAutoUnlock(o.approvals).map(toApproval),
+    approvalCount: o.approvals.length,
     location: o.location,
     participantsIn: o.participants_in,
     participantsOut: o.participants_out,
@@ -654,13 +659,12 @@ export function useDeleteActivity(viewer: 'admin' | 'club') {
   const base = viewer === 'club' ? '/club/activities' : '/admin/activities'
   return useMutation({
     mutationFn: (id: number) => api<null>(`${base}/${id}`, { method: 'DELETE' }),
-    onSuccess: (_data, id) => {
-      // 先把這張單的詳情從快取拿掉:彈窗要等關閉動畫跑完才卸載,那支查詢這時還是 active,
-      // 只 invalidate 等於固定送一次注定 404 的 GET
-      qc.removeQueries({ queryKey: keys.detail(id) })
-      qc.removeQueries({ queryKey: ['activities', 'review', id] })
-      return qc.invalidateQueries()
-    },
+    // 整站失效,而且**不回傳那個 promise**:回傳的話 mutateAsync 要等全站重抓完才 resolve,
+    // 確認鈕會一路轉圈、列表那顆刪除鈕的 in-flight 窗口也跟著拉長。
+    // 彈窗要等關閉動畫跑完才卸載,所以這裡會連帶重抓一次剛刪掉的詳情(404)——
+    // 那一發省不掉:removeQueries 反而更糟(observer 還在,會立刻重建一支空的再抓一次,
+    // 而且手上的舊資料被清空,關閉動畫中的彈窗會先退回骨架再跳「載入失敗」)
+    onSuccess: () => void qc.invalidateQueries(),
   })
 }
 

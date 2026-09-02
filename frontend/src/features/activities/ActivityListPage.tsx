@@ -247,7 +247,15 @@ export default function ActivityListPage() {
                           })
                         }
                       >
-                        <Button size="small" danger>刪除</Button>
+                        {/* in-flight 要擋:整站 invalidate 跑完前這一列還在畫面上,
+                            再按一次就是第二發 DELETE,拿回來的 404 會蓋掉剛才的成功訊息 */}
+                        <Button
+                          size="small"
+                          danger
+                          loading={remove.isPending && remove.variables === a.id}
+                        >
+                          刪除
+                        </Button>
                       </Popconfirm>
                     </span>,
                   ),

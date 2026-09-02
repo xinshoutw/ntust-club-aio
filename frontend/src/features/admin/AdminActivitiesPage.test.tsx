@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
-import { App } from 'antd'
+import { Providers } from '../../test/providers'
 import { fireEvent, render, screen } from '@testing-library/react'
 import AdminActivitiesPage from './AdminActivitiesPage'
 import type { AdminActivity, AdminActivityDetail } from '../../api/adminActivities'
@@ -87,9 +87,9 @@ const APPROVE = /核\s*准/
 
 const open = (name: string) => {
   render(
-    <App>
+    <Providers>
       <AdminActivitiesPage />
-    </App>,
+    </Providers>,
   )
   fireEvent.click(screen.getByRole('button', { name: `開啟「${name}」詳細資訊` }))
 }

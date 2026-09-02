@@ -96,7 +96,7 @@ export const ACTION_LABELS: Record<string, string> = {
   postal_change_status_updated: '更新郵局異動狀態',
   review_score_saved: '儲存評審評分',
   eval_file_deleted: '刪除評鑑檔案',
-  activity_deleted: '刪除活動草稿',
+  activity_deleted: '刪除活動',
   activity_photo_deleted: '刪除結案照片',
   activity_attachment_deleted: '刪除活動附件',
   activity_close_doc_deleted: '刪除結案附件',

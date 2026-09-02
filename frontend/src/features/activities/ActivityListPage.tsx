@@ -19,7 +19,7 @@ import {
   useActivitySemesters,
   type ClubActivity,
 } from '../../api/activities'
-import { useClubActivityReview } from '../../api/adminActivities'
+import { useClubActivityReview, useDeleteActivity } from '../../api/adminActivities'
 import { LISTED_STATUS_LABELS, approvedText, fmtMoney, statusesForLabels } from './types'
 import ActivityReviewModal from '../admin/ActivityReviewModal'
 import { dateRangeText } from './utils'
@@ -103,7 +103,9 @@ export default function ActivityListPage() {
       return next
     }, { replace: true })
   }, [openParam, setSearchParams])
-  const { submit, remove } = useActivityMutations()
+  const { submit } = useActivityMutations()
+  // 與詳情彈窗那顆「刪除活動」同一支:同一個能力兩個入口,失效範圍不能只有一邊全
+  const remove = useDeleteActivity('club')
 
   const paged = listQuery.data?.rows ?? []
   const total = listQuery.data?.total ?? 0
@@ -234,13 +236,13 @@ export default function ActivityListPage() {
                         送出
                       </Button>
                       <Popconfirm
-                        title={`刪除草稿「${a.name}」?`}
-                        okText="刪除"
+                        title={`刪除草稿「${a.name}」？`}
+                        okText="確認刪除"
                         okButtonProps={{ danger: true }}
                         cancelText="取消"
                         onConfirm={() =>
                           remove.mutate(a.id, {
-                            onSuccess: () => message.success('已刪除草稿'),
+                            onSuccess: () => message.success('已刪除'),
                             onError: (e) => message.error(e.message),
                           })
                         }

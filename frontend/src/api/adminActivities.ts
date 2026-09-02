@@ -641,6 +641,29 @@ export function useAdminActivityMutations() {
   return { approve, reject, closeApprove, closeReject, unlock }
 }
 
+/** 社團自刪的狀態上界(後端 `activities._CLUB_DELETABLE` 同一份);
+ *  真正的界線是「這張單有沒有簽核紀錄」,狀態這半擋的是簽核紀錄缺漏的遷移件 */
+export const CLUB_DELETABLE: ReadonlySet<StatusKey> = new Set(['draft', 'pending_advisor'])
+
+/** 刪除整張活動;端點依開窗端而異(社團端有簽核紀錄就刪不掉,兩邊界線由後端各自把關)。
+ *
+ *  整批 invalidate:刪掉的活動不只從活動清單消失 —— 借用單的活動欄會脫鉤成空、
+ *  徽章與各頁計數都要重數,逐一列出查詢鍵遲早漏一個。刪除本來就少見,重抓一輪不心疼。 */
+export function useDeleteActivity(viewer: 'admin' | 'club') {
+  const qc = useQueryClient()
+  const base = viewer === 'club' ? '/club/activities' : '/admin/activities'
+  return useMutation({
+    mutationFn: (id: number) => api<null>(`${base}/${id}`, { method: 'DELETE' }),
+    onSuccess: (_data, id) => {
+      // 先把這張單的詳情從快取拿掉:彈窗要等關閉動畫跑完才卸載,那支查詢這時還是 active,
+      // 只 invalidate 等於固定送一次注定 404 的 GET
+      qc.removeQueries({ queryKey: keys.detail(id) })
+      qc.removeQueries({ queryKey: ['activities', 'review', id] })
+      return qc.invalidateQueries()
+    },
+  })
+}
+
 // ---- 未銷案違規數(違規管理頁的標題數字;側欄徽章與總覽卡走 GET /badges)----
 
 const countPath = (base: string, status: string): string => `${base}${qs({ status, page_size: 1 })}`

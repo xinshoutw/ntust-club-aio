@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
-import { App } from 'antd'
+import { Providers } from '../../test/providers'
 import { fireEvent, render, screen } from '@testing-library/react'
 import CloseReviewPage from './CloseReviewPage'
 import type { AdminActivity, AdminActivityDetail } from '../../api/adminActivities'
@@ -87,9 +87,9 @@ const openModal = async () => {
   approve.mockClear()
   refetch.mockClear()
   render(
-    <App>
+    <Providers>
       <CloseReviewPage />
-    </App>,
+    </Providers>,
   )
   // AntD 會在兩字按鈕中間插一個空格
   fireEvent.click(screen.getByRole('button', { name: /^審\s*核$/ }))
@@ -141,9 +141,9 @@ describe('結案審核的繳交確認', () => {
     noPermission = true
     try {
       render(
-        <App>
+        <Providers>
           <CloseReviewPage />
-        </App>,
+        </Providers>,
       )
       fireEvent.click(screen.getByRole('button', { name: /^審\s*核$/ }))
       await screen.findByText('結案成果')

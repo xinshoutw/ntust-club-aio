@@ -13,6 +13,7 @@ import DownloadMenu from '../activities/DownloadMenu'
 import { useFilePreview } from '../eval/useFilePreview'
 import { downloadEvalFile, downloadPhotosZip } from '../eval/files'
 import { activityApplyPdf } from '../../api/activities'
+import { confirmDialog } from '../../lib/confirm'
 import {
   MIN_PHOTOS,
   approvedText,
@@ -31,6 +32,8 @@ import {
   type ReviewApproval,
   type ReviewItem,
   type ReviewStage,
+  useDeleteActivity,
+  CLUB_DELETABLE,
 } from '../../api/adminActivities'
 import { SUBMISSION_CHECKS, defaultConfirmations, type CheckKey } from './closeChecks'
 
@@ -273,7 +276,7 @@ export default function ActivityReviewModal({
   onEdit?: () => void
   onGoClose?: () => void
 }) {
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const { user } = useAuth()
   // 社團端開自己的單:全程唯讀(頁面本來就不傳簽核回呼),差別在收掉哪些審核用的東西
   const isClub = viewer === 'club'
@@ -508,6 +511,33 @@ export default function ActivityReviewModal({
     onClose()
   }
 
+  // 刪除活動:社團端與行政端各走自己的端點(界線不同,後端各自把關)。
+  // 社團端的界線是「有沒有人動過這張單」,兩個條件與後端 `activities.delete_activity` 同一份 ——
+  // 簽核紀錄是主要判準(退回重送的單狀態同樣是 pending_advisor,卻已經有兩輪紀錄),
+  // 狀態那半擋的是簽核紀錄缺漏的遷移件。詳情還沒到位就讀不到簽核紀錄,一律不給刪
+  const remove = useDeleteActivity(isClub ? 'club' : 'admin')
+  const canDelete =
+    !!item && (!isClub || (CLUB_DELETABLE.has(item.status) && d?.approvals?.length === 0))
+  const askDelete = () => {
+    if (!item) return
+    confirmDialog(modal, {
+      title: '刪除活動',
+      content: `「${item.name}」的申請內容、附件、結案資料與簽核紀錄都會一併刪除，且無法復原`,
+      okText: '確認刪除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await remove.mutateAsync(Number(item.id))
+          message.success('已刪除')
+          onClose()
+        } catch (e) {
+          message.error(e instanceof Error ? e.message : '刪除失敗')
+        }
+      },
+    })
+  }
+
   // 繳交確認與簽核鈕同一列(靠左):未勾之項目評鑑以 0 分計,承辦是連著這兩顆鈕一起決定的。
   // 只在結案側出現 —— 申請側的 footer 不該長出結案的東西
   const confirmRow =
@@ -569,8 +599,14 @@ export default function ActivityReviewModal({
               items={[
                 { key: 'photos', label: '下載照片檔', disabled: photos.length === 0 },
                 { key: 'apply', label: '下載社團活動申請表' },
+                { type: 'divider' },
+                { key: 'delete', label: '刪除活動', danger: true, disabled: !canDelete },
               ]}
               onClick={({ key }) => {
+                if (key === 'delete') {
+                  askDelete()
+                  return
+                }
                 if (key === 'photos') {
                   downloadPhotosZip(`${item.name}_照片`, photos.map(toEvalFile)).catch((e: unknown) =>
                     message.error(e instanceof Error ? e.message : '照片下載失敗'),

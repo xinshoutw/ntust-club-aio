@@ -452,7 +452,7 @@ export const updateActivity = (id: number, v: ActivityInput): Promise<ClubActivi
 export const submitActivity = (id: number): Promise<ClubActivity> =>
   api<ActivityOut>(`/club/activities/${id}/submit`, { method: 'POST' }).then(toActivity)
 
-// 列表頁動作(送出/刪除草稿)
+// 列表頁動作(送出;刪除走 adminActivities.useDeleteActivity,兩個入口共用一份)
 export function useActivityMutations() {
   const qc = useQueryClient()
   const invalidateBadges = useInvalidateBadges()
@@ -461,11 +461,7 @@ export function useActivityMutations() {
     invalidateBadges()
   }
   const submit = useMutation({ mutationFn: submitActivity, onSuccess: invalidate })
-  const remove = useMutation({
-    mutationFn: (id: number) => api<null>(`/club/activities/${id}`, { method: 'DELETE' }),
-    onSuccess: invalidate,
-  })
-  return { submit, remove }
+  return { submit }
 }
 
 // ---- 檔案(申請附件/結案照片;上傳走 FormData,client.ts 已處理 boundary 與 CSRF)----

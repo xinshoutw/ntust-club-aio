@@ -1,10 +1,11 @@
 import io
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 import sqlalchemy as sa
 
 from app.core.config import settings
 from app.models import Activity, ApprovalRecord, AuditLog, SystemSetting
+from app.models.enums import UserRole
 from app.services.activity_service import MIN_PHOTOS
 from tests.conftest import csrf_headers, login, make_club, make_user
 
@@ -209,12 +210,10 @@ async def test_submit_flow_and_edit_guard(client, db):
     assert resp.status_code == 200
     assert resp.json()["data"]["status"] == "pending_advisor"
 
-    # 送審後不可修改/刪除/重複送審
+    # 送審後不可修改/重複送審(刪除的界線是簽核紀錄,不是狀態,見下一支測試)
     resp = await client.put(
         f"/api/v1/club/activities/{aid}", json=payload(date=future), headers=csrf_headers(client)
     )
-    assert resp.status_code == 409
-    resp = await client.delete(f"/api/v1/club/activities/{aid}", headers=csrf_headers(client))
     assert resp.status_code == 409
     resp = await client.post(
         f"/api/v1/club/activities/{aid}/submit", headers=csrf_headers(client)
@@ -237,11 +236,50 @@ async def test_deleting_a_draft_is_audited(client, db):
     )
     assert resp.status_code == 200
 
+    # 活動列刪掉之後這一行是唯一線索:社團與刪除當下的狀態都要在
     detail = await db.scalar(
         sa.select(AuditLog.detail).where(AuditLog.action == "activity_deleted")
     )
     assert activity["name"] in detail
     assert "files=1" in detail
+    assert "status=draft" in detail
+    assert "club=" in detail
+
+
+async def test_club_delete_is_blocked_once_the_activity_has_been_reviewed(client, db):
+    """社團自刪的界線是簽核紀錄不是狀態:送出但沒人動過的單收得回去,審過的收不回去。"""
+    await setup_session(client, db)
+    future = (date.today() + timedelta(days=30)).isoformat()
+    aid = (await create_activity(client, date=future))["id"]
+    await client.post(f"/api/v1/club/activities/{aid}/submit", headers=csrf_headers(client))
+
+    reviewed = (await create_activity(client, date=future))["id"]
+    await client.post(f"/api/v1/club/activities/{reviewed}/submit", headers=csrf_headers(client))
+    officer = await make_user(db, username="officer", role=UserRole.ADMIN)
+    db.add(
+        ApprovalRecord(
+            subject_type="activity",
+            subject_id=reviewed,
+            stage="advisor",
+            decision="reject",
+            actor_id=officer.id,
+            reason="經費請重編",
+        )
+    )
+    await db.commit()
+
+    resp = await client.delete(f"/api/v1/club/activities/{reviewed}", headers=csrf_headers(client))
+    assert resp.status_code == 409, resp.text
+
+    # 保險那半:簽核紀錄缺漏的遷移件,狀態照樣擋得住(結案照片與心得刪掉沒有回頭路)
+    migrated = (await create_activity(client, date=future))["id"]
+    await db.execute(sa.update(Activity).where(Activity.id == migrated).values(status="approved"))
+    await db.commit()
+    resp = await client.delete(f"/api/v1/club/activities/{migrated}", headers=csrf_headers(client))
+    assert resp.status_code == 409, resp.text
+
+    resp = await client.delete(f"/api/v1/club/activities/{aid}", headers=csrf_headers(client))
+    assert resp.status_code == 200, resp.text
 
 
 async def test_new_application_rejects_past_start_but_a_rejected_one_keeps_its_date(client, db):
@@ -702,6 +740,13 @@ async def test_deleting_a_draft_sweeps_every_slot(client, db):
         headers=csrf_headers(client),
     )
     await db.execute(sa.update(Activity).where(Activity.id == aid).values(status="draft"))
+    # 歸檔過的檔案也要掃到:`activity_files` 濾掉 archived_at,purge 刻意不濾 ——
+    # 漏掉的話檔案管理頁會留下一列指向不存在的活動
+    await db.execute(
+        sa.update(File)
+        .where(File.slot == "report_doc")
+        .values(archived_at=datetime.now(UTC))
+    )
     await db.commit()
     assert await db.scalar(sa.select(sa.func.count()).select_from(File)) == 3
 

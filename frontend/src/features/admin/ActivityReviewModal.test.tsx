@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from 'vitest'
-import { App } from 'antd'
+import { Providers } from '../../test/providers'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import ActivityReviewModal from './ActivityReviewModal'
 import type { ReviewItem } from '../../api/adminActivities'
@@ -37,7 +37,7 @@ const show = (
   onApprove: (p: unknown) => Promise<void> = async () => {},
 ) =>
   render(
-    <App>
+    <Providers>
       <ActivityReviewModal
         item={{ ...item(budget), ...over }}
         open
@@ -45,21 +45,21 @@ const show = (
         afterClose={() => {}}
         onApprove={onApprove}
       />
-    </App>,
+    </Providers>,
   )
 
 // 唯讀開窗(社團活動列表、結案審核的逾期清單)不傳簽核回呼:待審的單也不得長出簽核鈕 ——
 // 沒有回呼的核准會直接跳成功訊息,一個字都沒送到後端
 test('沒有簽核回呼就沒有簽核鈕,核定欄也不可編輯', () => {
   render(
-    <App>
+    <Providers>
       <ActivityReviewModal
         item={item([budgetRow(1, 5000)])}
         open
         onClose={() => {}}
         afterClose={() => {}}
       />
-    </App>,
+    </Providers>,
   )
 
   expect(screen.queryByRole('button', { name: /核\s*准/ })).toBeNull()
@@ -137,7 +137,7 @@ describe('ActivityReviewModal 的核定欄', () => {
   // 列表列與社團端同一筆都印 `—`,彈窗卻印出 5,000 的話,承辦會以為這張單已經核過了
   test('唯讀開窗時未核定的列印 —,合計也不湊數', () => {
     render(
-      <App>
+      <Providers>
         <ActivityReviewModal
           item={{ ...item([budgetRow(1, 5000), budgetRow(2, 3000)]), status: 'pending_dean' }}
           open
@@ -145,7 +145,7 @@ describe('ActivityReviewModal 的核定欄', () => {
           afterClose={() => {}}
           onApprove={async () => {}}
         />
-      </App>,
+      </Providers>,
     )
 
     expect(document.querySelectorAll('tbody input')).toHaveLength(0) // 非第一關,不可編輯
@@ -172,7 +172,7 @@ describe('ActivityReviewModal 的核定欄', () => {
 describe('ActivityReviewModal 的簽核紀錄', () => {
   const showApprovals = (approvals: NonNullable<ReviewItem['detail']>['approvals']) =>
     render(
-      <App>
+      <Providers>
         <ActivityReviewModal
           item={{
             ...item([budgetRow(1, 5000)]),
@@ -183,7 +183,7 @@ describe('ActivityReviewModal 的簽核紀錄', () => {
           onClose={() => {}}
           afterClose={() => {}}
         />
-      </App>,
+      </Providers>,
     )
 
   test('逐列印出關卡、簽核者、時間與決議', () => {
@@ -244,7 +244,7 @@ describe('ActivityReviewModal 的簽核章軌', () => {
 
   const showTrail = (status: ReviewItem['status'], stamps: Stamps) =>
     render(
-      <App>
+      <Providers>
         <ActivityReviewModal
           item={{
             ...item([budgetRow(1, 5000)]),
@@ -255,7 +255,7 @@ describe('ActivityReviewModal 的簽核章軌', () => {
           onClose={() => {}}
           afterClose={() => {}}
         />
-      </App>,
+      </Providers>,
     )
 
   const advisorStamp = {
@@ -334,7 +334,7 @@ test('審核備註清空時送出空字串,不是省略欄位', async () => {
 // (章軌是審核人的簽章,而社團端連姓名都拿不到;大型認可是承辦的決定)
 test('viewer=club:備註看得到,章軌與大型認可都收掉', () => {
   render(
-    <App>
+    <Providers>
       <ActivityReviewModal
         viewer="club"
         item={{
@@ -347,7 +347,7 @@ test('viewer=club:備註看得到,章軌與大型認可都收掉', () => {
         onClose={() => {}}
         afterClose={() => {}}
       />
-    </App>,
+    </Providers>,
   )
 
   expect(screen.getByText('備註')).toBeTruthy()
@@ -376,4 +376,105 @@ test('地點是空字串時印 —,不是留一格空白', () => {
   const labels = [...document.querySelectorAll('div')].filter((d) => d.textContent === '活動地點')
   expect(labels.length).toBeGreaterThan(0)
   expect(labels[0].nextElementSibling?.textContent).toBe('—')
+})
+
+// 刪除活動:社團端只在**沒有簽核紀錄**時刪得掉(後端 activities.delete_activity 同一條界線),
+// 行政端看得到就刪得掉。詳情還沒到位時社團端讀不到簽核紀錄,一律不給刪
+describe('刪除活動', () => {
+  const reviewed = {
+    actor: '王承辦',
+    at: '2026/09/21 10:00',
+    decision: 'reject' as const,
+    isClose: false,
+    stage: 'advisor',
+    reason: '經費請重編',
+  }
+
+  const openDeleteItem = async (over: Partial<ReviewItem>, viewer: 'admin' | 'club') => {
+    render(
+      <Providers>
+        <ActivityReviewModal
+          item={{ ...item([budgetRow(1, 0)]), ...over }}
+          viewer={viewer}
+          open
+          onClose={() => {}}
+          afterClose={() => {}}
+        />
+      </Providers>,
+    )
+    fireEvent.click(screen.getByLabelText('更多操作'))
+    return (await screen.findByText('刪除活動')).closest('li')!
+  }
+
+  test('社團端:審過的單刪不掉', async () => {
+    const li = await openDeleteItem(
+      { detail: { attachments: [], budget: [], approvals: [reviewed], approvalCount: 1 } },
+      'club',
+    )
+    expect(li.className).toContain('disabled')
+  })
+
+  test('社團端:還沒人審過的單刪得掉', async () => {
+    const li = await openDeleteItem(
+      { detail: { attachments: [], budget: [], approvals: [], approvalCount: 0 } },
+      'club',
+    )
+    expect(li.className).not.toContain('disabled')
+  })
+
+  // 後端那道保險的前端那一半:簽核紀錄缺漏的遷移件不能畫成一顆亮著的刪除鈕
+  test('社團端:簽核紀錄是空的,但單子早就過了審核 —— 一樣刪不掉', async () => {
+    const li = await openDeleteItem(
+      { status: 'closed', detail: { attachments: [], budget: [], approvals: [], approvalCount: 0 } },
+      'club',
+    )
+    expect(li.className).toContain('disabled')
+  })
+
+  // 端點分流零測試的話,把 admin/club 兩支 URL 對調也全綠 —— 社團按刪除會打到行政端
+  // 那支拿 403,而 403 的文案讀起來像權限被收掉,不像接錯線
+  test.each([
+    ['club', '/api/v1/club/activities/1'],
+    ['admin', '/api/v1/admin/activities/1'],
+  ] as const)('%s 端按下去打的是自己那支端點,成功後關窗', async (viewer, url) => {
+    const calls: [string, string][] = []
+    vi.stubGlobal('fetch', (input: string, init?: RequestInit) => {
+      calls.push([String(input), init?.method ?? 'GET'])
+      return Promise.resolve(
+        new Response(JSON.stringify({ success: true, data: null, error: null }), {
+          headers: { 'content-type': 'application/json' },
+        }),
+      )
+    })
+    const onClose = vi.fn()
+    render(
+      <Providers>
+        <ActivityReviewModal
+          item={{
+            ...item([budgetRow(1, 0)]),
+            detail: { attachments: [], budget: [], approvals: [], approvalCount: 0 },
+          }}
+          viewer={viewer}
+          open
+          onClose={onClose}
+          afterClose={() => {}}
+        />
+      </Providers>,
+    )
+    fireEvent.click(screen.getByLabelText('更多操作'))
+    fireEvent.click(await screen.findByText('刪除活動'))
+    fireEvent.click(await screen.findByText('確認刪除'))
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    expect(calls.filter(([, m]) => m === 'DELETE').map(([u]) => u)).toEqual([url])
+    vi.unstubAllGlobals()
+  })
+
+  test('行政端:審過的單照樣刪得掉', async () => {
+    const li = await openDeleteItem(
+      { detail: { attachments: [], budget: [], approvals: [reviewed], approvalCount: 1 } },
+      'admin',
+    )
+    expect(li.className).not.toContain('disabled')
+  })
 })

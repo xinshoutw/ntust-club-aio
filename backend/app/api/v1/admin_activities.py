@@ -30,6 +30,7 @@ from app.schemas.admin import ApproveActivityIn, CloseApproveIn, RejectIn
 from app.schemas.common import ApiResponse
 from app.services import activity_service as svc
 from app.services import audit, notify, pdf
+from app.services import files as file_service
 from app.services.settings_service import get_setting
 
 router = APIRouter(prefix="/admin/activities", tags=["admin"])
@@ -702,4 +703,43 @@ async def unlock(
     await _notify_decision(
         background, db, activity.club_id, "alert", "結案鎖定已解除", activity.name
     )
+    return ApiResponse()
+
+
+@router.delete("/{activity_id}")
+async def delete_activity(
+    activity_id: int,
+    user: Reviewer,
+    db: DbDep,
+    request: Request,
+    background: BackgroundTasks,
+) -> ApiResponse[None]:
+    """整張活動實體刪除:看得到就刪得掉(需求方 2026-09-02),不另設權限鍵。
+
+    社團端有簽核紀錄就刪不掉,行政端不受此限 —— 承辦刪的正是自己審過的那些單。
+    """
+    activity = await _get_activity(db, activity_id, for_update=True)
+    await _require_visible(db, user, activity)
+    # 識別欄先抄下來:purge 之後這個實例已排入刪除,屬性讀得到但語意上已經不是活的列。
+    # 通知要用的 webhook 也一起抄 —— commit 之後才查 DB 的話,那一查失敗就回 500,
+    # 而活動其實已經刪掉了(前端沒進 onSuccess 不會清快取,重試只拿得到 404)
+    club_id, name, status = activity.club_id, activity.name, activity.status
+    webhook = (await db.get(Club, club_id)).discord_webhook_url
+    disk_paths = await svc.purge(db, activity)
+    # 活動列刪掉之後這一列是唯一的線索:社團與刪除當下的狀態都要記
+    # ——「迎新宿營」跨社團跨年度重複,只記名字事後查不出是誰少了一張單
+    audit.record(
+        db,
+        action="activity_deleted",
+        user=user,
+        detail=(
+            f"activity={activity_id};club={club_id};name={name}"
+            f";status={status.value};files={len(disk_paths)}"
+        ),
+        ip=client_ip(request),
+    )
+    await db.commit()
+    for path in disk_paths:  # commit 成功後才動磁碟
+        file_service.unlink_quiet(path)
+    background.add_task(notify.club_event, "alert", "活動已被學務處刪除", name, webhook)
     return ApiResponse()

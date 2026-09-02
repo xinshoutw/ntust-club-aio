@@ -1,3 +1,4 @@
+import io
 from datetime import UTC, date, datetime, time, timedelta
 
 import sqlalchemy as sa
@@ -7,9 +8,15 @@ from app.models import (
     ActivityBudgetItem,
     ApprovalRecord,
     AuditLog,
+    Equipment,
+    EquipmentLoan,
+    File,
     SystemSetting,
     User,
+    Venue,
+    VenueBooking,
 )
+from app.models.enums import ApprovalDecision, ApprovalSubject, VenueCategory
 from tests.conftest import csrf_headers, login, make_club, make_user
 from tests.test_activities import (
     close_payload,
@@ -1472,3 +1479,136 @@ async def test_admin_note_is_writable_at_any_stage_and_visible_to_the_club(clien
     )
     assert resp.status_code == 200, resp.text
     assert resp.json()["data"]["admin_note"] is None
+
+
+async def test_delete_removes_the_whole_activity_but_keeps_the_bookings(client, db):
+    """行政端刪除:看得到就刪得掉,簽核紀錄與檔案一起走,借用單留下但脫鉤。"""
+    club = await seed(client, db)
+    aid = await submit_activity(client, db)
+    await login(client, "advisor")
+    resp = await client.post(
+        f"/api/v1/admin/activities/{aid}/reject",
+        json={"reason": "經費請重編"},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    await login(client, "club01")
+    await client.post(
+        f"/api/v1/club/activities/{aid}/attachments",
+        files={"file": ("企劃書.pdf", io.BytesIO(b"%PDF-1.7 "), "application/pdf")},
+        headers=csrf_headers(client),
+    )
+    await login(client, "advisor")
+    other = await submit_activity(client, db)  # 對照組:別的活動
+    await login(client, "advisor")
+    venue = Venue(
+        name="精誠廣場",
+        capacity=40,
+        category=VenueCategory.OUTDOOR,
+        allow_fixed=False,
+        allow_temp=True,
+    )
+    equipment = Equipment(name="帳篷", total_qty=5)
+    db.add_all([venue, equipment])
+    await db.flush()
+    booking = VenueBooking(
+        club_id=club.id,
+        venue_id=venue.id,
+        activity_id=aid,
+        date=date.today() + timedelta(days=30),
+        periods=["1"],
+        purpose="場佈",
+    )
+    loan = EquipmentLoan(
+        club_id=club.id,
+        equipment_id=equipment.id,
+        activity_id=aid,
+        qty=1,
+        start_date=date.today() + timedelta(days=29),
+        end_date=date.today() + timedelta(days=31),
+        purpose="場佈",
+    )
+    # 對照組:purge 的兩個範圍述詞要真的擋得住。`approval_records.subject_id` 是裸 int、
+    # 九種 subject 共用同一個 id 空間 —— 少了 subject_type 那個述詞,刪活動 12 會順手刪掉
+    # 器材借用 12 的簽核軌跡,而且事後查不出來
+    account = await club_account(db)
+    db.add_all(
+        [
+            booking,
+            loan,
+            ApprovalRecord(
+                subject_type=ApprovalSubject.VENUE_BOOKING,
+                subject_id=aid,  # 同號、不同 subject:只有 subject_type 分得開
+                stage="advisor",
+                decision=ApprovalDecision.APPROVE,
+                actor_id=account.id,
+            ),
+            File(
+                club_id=club.id,
+                uploaded_by=account.id,
+                subject_type="activity",
+                subject_id=other,  # 別的活動的檔案
+                slot="proposal",
+                original_name="別的企劃書.pdf",
+                size=9,
+                mime="application/pdf",
+                sha256="deadbeef",
+                path="proposal/2026/09/other.pdf",
+            ),
+        ]
+    )
+    await db.commit()
+    booking_id, loan_id = booking.id, loan.id
+
+    resp = await client.delete(f"/api/v1/admin/activities/{aid}", headers=csrf_headers(client))
+    assert resp.status_code == 200, resp.text
+
+    assert await db.get(Activity, aid) is None
+    assert not await db.scalar(
+        sa.select(sa.func.count())
+        .select_from(ApprovalRecord)
+        .where(
+            ApprovalRecord.subject_id == aid,
+            ApprovalRecord.subject_type.in_(
+                [ApprovalSubject.ACTIVITY, ApprovalSubject.ACTIVITY_CLOSE]
+            ),
+        )
+    )
+    # 對照組原封不動
+    assert await db.scalar(
+        sa.select(sa.func.count())
+        .select_from(ApprovalRecord)
+        .where(ApprovalRecord.subject_type == ApprovalSubject.VENUE_BOOKING)
+    )
+    assert set(await db.scalars(sa.select(File.original_name))) == {"別的企劃書.pdf"}
+    # 借用是獨立單據,只脫鉤不連坐(重查而不 refresh:那兩列剛被別的 session 改過)
+    for model, row_id in ((VenueBooking, booking_id), (EquipmentLoan, loan_id)):
+        assert await db.scalar(sa.select(model.activity_id).where(model.id == row_id)) is None
+    # 活動列刪掉之後這一行是唯一線索:社團與刪除當下的狀態都要在
+    detail = await db.scalar(
+        sa.select(AuditLog.detail).where(AuditLog.action == "activity_deleted")
+    )
+    assert f"activity={aid}" in detail
+    assert f"club={club.id}" in detail
+    assert "status=rejected" in detail
+    assert "files=1" in detail
+
+
+async def test_delete_is_bounded_by_the_same_visibility_as_the_detail(client, db):
+    """刪除的界線與詳情同一條:看不到的單一律 404,沒有審核權限的帳號連門都進不了。"""
+    await seed(client, db)
+    await make_user(db, username="clerk", role="admin", permissions=["aclub"])
+    aid = await submit_activity(client, db)  # pending_advisor:學務長的視野看不到
+
+    await login(client, "dean")
+    resp = await client.delete(f"/api/v1/admin/activities/{aid}", headers=csrf_headers(client))
+    assert resp.status_code == 404, resp.text
+
+    await login(client, "clerk")
+    resp = await client.delete(f"/api/v1/admin/activities/{aid}", headers=csrf_headers(client))
+    assert resp.status_code == 403, resp.text
+
+    await login(client, "club01")
+    resp = await client.delete(f"/api/v1/admin/activities/{aid}", headers=csrf_headers(client))
+    assert resp.status_code == 403, resp.text
+    assert await db.get(Activity, aid) is not None

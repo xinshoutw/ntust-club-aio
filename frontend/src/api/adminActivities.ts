@@ -44,6 +44,10 @@ export interface ReviewItem {
     stamps?: ReviewStamp[]
     /** 完整簽核紀錄(誰於何時核准/退回);章軌只印每一關最後一次核准,退回不入軌 */
     approvals?: ReviewApproval[]
+    /** **未經 `dropAutoUnlock` 過濾**的簽核列數:「這張單被審過沒有」要跟後端
+     *  `activity_service.has_approvals` 數同一批。`approvals` 是給人看的清單,
+     *  拿它的長度當判準就是同一份判定兩份實作,而且兩邊資料源還不一樣 */
+    approvalCount?: number
     location?: string
     participantsIn?: number
     participantsOut?: number
@@ -351,6 +355,7 @@ const toAdminDetail = (o: AdminActivityDetailOut): AdminActivityDetail => ({
     timeRange: timeRangeOf(o),
     stamps: o.stamps.map(toStamp),
     approvals: dropAutoUnlock(o.approvals).map(toApproval),
+    approvalCount: o.approvals.length,
     location: o.location,
     participantsIn: o.participants_in,
     participantsOut: o.participants_out,
@@ -639,6 +644,28 @@ export function useAdminActivityMutations() {
     onSuccess: invalidate,
   })
   return { approve, reject, closeApprove, closeReject, unlock }
+}
+
+/** 社團自刪的狀態上界(後端 `activities._CLUB_DELETABLE` 同一份);
+ *  真正的界線是「這張單有沒有簽核紀錄」,狀態這半擋的是簽核紀錄缺漏的遷移件 */
+export const CLUB_DELETABLE: ReadonlySet<StatusKey> = new Set(['draft', 'pending_advisor'])
+
+/** 刪除整張活動;端點依開窗端而異(社團端有簽核紀錄就刪不掉,兩邊界線由後端各自把關)。
+ *
+ *  整批 invalidate:刪掉的活動不只從活動清單消失 —— 借用單的活動欄會脫鉤成空、
+ *  徽章與各頁計數都要重數,逐一列出查詢鍵遲早漏一個。刪除本來就少見,重抓一輪不心疼。 */
+export function useDeleteActivity(viewer: 'admin' | 'club') {
+  const qc = useQueryClient()
+  const base = viewer === 'club' ? '/club/activities' : '/admin/activities'
+  return useMutation({
+    mutationFn: (id: number) => api<null>(`${base}/${id}`, { method: 'DELETE' }),
+    // 整站失效,而且**不回傳那個 promise**:回傳的話 mutateAsync 要等全站重抓完才 resolve,
+    // 確認鈕會一路轉圈、列表那顆刪除鈕的 in-flight 窗口也跟著拉長。
+    // 彈窗要等關閉動畫跑完才卸載,所以這裡會連帶重抓一次剛刪掉的詳情(404)——
+    // 那一發省不掉:removeQueries 反而更糟(observer 還在,會立刻重建一支空的再抓一次,
+    // 而且手上的舊資料被清空,關閉動畫中的彈窗會先退回骨架再跳「載入失敗」)
+    onSuccess: () => void qc.invalidateQueries(),
+  })
 }
 
 // ---- 未銷案違規數(違規管理頁的標題數字;側欄徽章與總覽卡走 GET /badges)----

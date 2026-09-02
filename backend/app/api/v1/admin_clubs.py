@@ -405,6 +405,14 @@ async def delete_club(
         )
     )
     params = {"club_id": club_id}
+    # 先把這社的活動照 id 鎖起來,再走 FK 圖。**這是鎖序,不是防並發**:
+    # `activity_service.purge`(刪單一活動)是先鎖 activities 再改借用單的 activity_id,
+    # 這裡照 FK 圖走卻是先刪借用單、最後才刪 activities —— 兩條路徑並發就是
+    # 一邊持活動等借用、一邊持借用等活動,PG 砍掉其中一個回 500(decisions.md D-39)
+    await db.execute(
+        sa.text("SELECT id FROM activities WHERE club_id = :club_id ORDER BY id FOR UPDATE"),
+        params,
+    )
     try:
         deleted: Counter = Counter()
         for child, col, ref in await _fk_children(db, "clubs"):

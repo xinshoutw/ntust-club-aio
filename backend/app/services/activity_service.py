@@ -1,6 +1,7 @@
 """活動申請/結案的推導規則與共用查詢。"""
 
 from datetime import UTC, datetime, time, timedelta
+from pathlib import Path
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,8 +9,18 @@ from sqlalchemy.orm import selectinload
 
 from app.core.errors import not_found, validation_error
 from app.core.semesters import TAIPEI, semester_of
-from app.models import Activity, ActivityBudgetItem, ActivityReport, ApprovalRecord, File, User
+from app.models import (
+    Activity,
+    ActivityBudgetItem,
+    ActivityReport,
+    ApprovalRecord,
+    EquipmentLoan,
+    File,
+    User,
+    VenueBooking,
+)
 from app.models.enums import ActivityStatus, ApprovalDecision, ApprovalSubject
+from app.services import files as file_service
 
 # 結案照片、結案附件與申請附件在 files 表的定位
 PHOTO_SUBJECT = "activity"
@@ -295,6 +306,62 @@ async def activity_files(db: AsyncSession, activity: Activity, slot: str) -> lis
         .order_by(File.created_at)
     )
     return list(rows)
+
+
+async def has_approvals(db: AsyncSession, activity_id: int) -> bool:
+    """這張單被審過沒有(申請或結案,核准/退回/解鎖皆算)。
+
+    社團自刪的界線:動過的單只有承辦能刪 —— 退回重送的單留著承辦寫的退回原因,
+    社團刪掉就等於把那段紀錄一起帶走。
+    """
+    return bool(
+        await db.scalar(
+            sa.select(sa.literal(True))
+            .select_from(ApprovalRecord)
+            .where(
+                ApprovalRecord.subject_type.in_(
+                    [ApprovalSubject.ACTIVITY, ApprovalSubject.ACTIVITY_CLOSE]
+                ),
+                ApprovalRecord.subject_id == activity_id,
+            )
+            .limit(1)
+        )
+    )
+
+
+async def purge(db: AsyncSession, activity: Activity) -> list[Path]:
+    """整張活動實體刪除;回傳待 unlink 的磁碟路徑(**呼叫端 commit 成功後才動磁碟**)。
+
+    社團端與行政端刪除共用這一份。經費逐項、結案成果與心得靠 FK cascade,
+    這裡要自己處理的是沒有 cascade 的三類:
+
+    - 檔案(申請附件/結案照片/結案附件):以 subject 對應,不是 FK。**不濾 slot 也不濾
+      `archived_at`** —— 這裡問的是「這個活動名下還有什麼檔」,不是某一頁要顯示哪些檔;
+      照 `activity_files` 的三個 slot 逐一撈,將來多一個 slot 就會靜靜留下孤兒列
+    - 簽核紀錄:同上,不清就留下指向不存在活動的孤兒列(與 `admin_clubs.delete_club`
+      刻意保留簽核紀錄相反 —— 那裡刪的是社團這個對象,簽核紀錄還指得到活動;
+      這裡活動本身沒了,留著就只是指向空號的列。見 decisions.md D-39)
+    - 場地與器材借用:`activity_id` 改 NULL 而**不連坐刪除** —— 借用是獨立單據,
+      該欄位本來就允許 NULL(語意即「活動已刪之歷史借用」);留著 FK 也刪不掉活動
+    """
+    files = await db.scalars(
+        sa.select(File).where(File.subject_type == PHOTO_SUBJECT, File.subject_id == activity.id)
+    )
+    disk_paths = [await file_service.delete_file(db, f) for f in files]
+    for model in (VenueBooking, EquipmentLoan):
+        await db.execute(
+            sa.update(model).where(model.activity_id == activity.id).values(activity_id=None)
+        )
+    await db.execute(
+        sa.delete(ApprovalRecord).where(
+            ApprovalRecord.subject_type.in_(
+                [ApprovalSubject.ACTIVITY, ApprovalSubject.ACTIVITY_CLOSE]
+            ),
+            ApprovalRecord.subject_id == activity.id,
+        )
+    )
+    await db.delete(activity)
+    return disk_paths
 
 
 async def apply_approvals(

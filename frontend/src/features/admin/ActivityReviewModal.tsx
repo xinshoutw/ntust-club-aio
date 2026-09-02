@@ -615,18 +615,7 @@ export default function ActivityReviewModal({
                   disabled: !canDelete,
                   // 反灰要說得出原因:社團端看到的是一顆沒有解釋的灰字。
                   // AntD 的 disabled menu item 不吃滑鼠事件,說明只能放在 label 裡面
-                  label: canDelete ? (
-                    '刪除活動'
-                  ) : (
-                    <span>
-                      刪除活動
-                      {isClub && (
-                        <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--steel)' }}>
-                          已送審核，請洽學務處
-                        </span>
-                      )}
-                    </span>
-                  ),
+                  label: '刪除活動'
                 },
               ]}
               onClick={({ key }) => {

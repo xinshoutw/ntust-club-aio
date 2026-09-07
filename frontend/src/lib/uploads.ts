@@ -57,6 +57,13 @@ export async function isPdfFile(f: File): Promise<boolean> {
   return head.length === 5 && ascii(head, 0, 5) === '%PDF-'
 }
 
+// mp4/mov 都是 ISO BMFF(offset 4 是 ftyp)。webm/avi 改名成 .mp4 在這裡擋下,
+// 不然要到後端才吃 415「檔案內容與副檔名不符」
+async function isBmffVideo(f: File): Promise<boolean> {
+  const head = await headBytes(f, 12)
+  return head.length >= 12 && ascii(head, 4, 8) === 'ftyp' && !BMFF_IMAGE_BRANDS.includes(ascii(head, 8, 12))
+}
+
 // 常見影片:MP4/MOV(ftyp 非影像品牌)、WebM/MKV(EBML)、AVI(RIFF)
 export async function isVideoFile(f: File): Promise<boolean> {
   const head = await headBytes(f, 12)
@@ -82,7 +89,8 @@ export function makeValidateEvidence(imgBytes: number, videoBytes: number) {
       return f.size <= imgBytes ? null : `照片超過 ${Math.round(imgBytes / MB)} MB 上限`
     }
     if (await isVideoFile(f)) {
-      if (!hasAllowedExtension(f.name, VIDEO_EXTENSIONS)) return '影片僅接受 mp4 / mov'
+      if (!hasAllowedExtension(f.name, VIDEO_EXTENSIONS) || !(await isBmffVideo(f)))
+        return '影片僅接受 mp4 / mov'
       return f.size <= videoBytes ? null : `影片超過 ${Math.round(videoBytes / MB)} MB 上限`
     }
     return '不是有效的照片或影片檔'

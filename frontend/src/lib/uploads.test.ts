@@ -20,6 +20,8 @@ describe('makeValidateEvidence', () => {
   test('後端不收的影片格式在選檔時就擋:webm 內容或 .webm 檔名都不放行', async () => {
     expect(await validate(file('a.webm', WEBM))).toBe('影片僅接受 mp4 / mov')
     expect(await validate(file('a.webm', MP4))).toBe('影片僅接受 mp4 / mov')
+    // 改名成 .mp4 的 webm:副檔名過了,容器不對,後端會 415 —— 前端要先擋
+    expect(await validate(file('a.mp4', WEBM))).toBe('影片僅接受 mp4 / mov')
     expect(await validate(file('a.txt', PNG))).toBe('照片副檔名不在支援清單內')
     expect(await validate(file('a.png', new Uint8Array(16)))).toBe('不是有效的照片或影片檔')
   })

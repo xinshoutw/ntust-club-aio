@@ -406,6 +406,14 @@ async def test_equipment_approve_can_adjust_qty(client, db, monkeypatch):
         )
         assert resp.status_code == 422, bad
 
+    # 社團端看得到調整說明(核准說明);同數核准的沒留話就維持 None
+    await make_user(db, username="club01", role="club", club_id=club.id)
+    await login(client, "club01")
+    rows = {r["id"]: r for r in (await client.get("/api/v1/club/equipment-loans")).json()["data"]}
+    assert rows[cut.id]["decision_reason"] == "數量調整:5 → 3"
+    assert rows[cut.id]["decided_at"] is not None
+    assert rows[same.id]["decision_reason"] is None
+
 
 async def test_venue_approve_blocks_approved_overlap(client, db):
     """核准前檢核:同場地同日已有核准單佔用重疊節次 → 409;不重疊照常核准。"""

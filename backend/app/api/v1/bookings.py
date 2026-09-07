@@ -457,7 +457,7 @@ async def list_equipment_loans(
         out.activity_name = activity_name
         out.overdue = svc.is_overdue_in(loan, return_time, holidays)
         data.append(out)
-    await approvals.attach_decisions(db, ApprovalSubject.EQUIPMENT_LOAN, data)
+    await approvals.attach_decisions(db, ApprovalSubject.EQUIPMENT_LOAN, data, approve_notes=True)
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 

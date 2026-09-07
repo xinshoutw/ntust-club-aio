@@ -327,7 +327,9 @@ async def list_equipment_loans(
                 exclude_loan_id=loan.id,
             )
         data.append(out)
-    await approvals.attach_decisions(db, ApprovalSubject.EQUIPMENT_LOAN, data, with_actor=True)
+    await approvals.attach_decisions(
+        db, ApprovalSubject.EQUIPMENT_LOAN, data, with_actor=True, approve_notes=True
+    )
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 

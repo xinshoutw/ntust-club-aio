@@ -1,4 +1,5 @@
-// 承辦退回或撤銷借用時填的原因與時間:四張「最近申請 / 最近借用」表共用同一個彈窗。
+// 承辦退回或撤銷借用時填的原因與時間,以及核准時留的話(器材核准改數量):
+// 四張「最近申請 / 最近借用」表共用同一個彈窗。
 // 只讀,不帶簽核者姓名(社團端看自己的單);Modal 常駐 + afterClose 才留得住退場動畫。
 import { useState, type ReactNode } from 'react'
 import { Modal } from 'antd'
@@ -27,8 +28,13 @@ export function useDecisionReason() {
   const [open, setOpen] = useState(false)
 
   const rowProps = (subject: string, status: StatusKey, info: DecisionInfo | undefined) => {
+    // 核准說明只在承辦真的留了話時可點(通常沒有);退回件即使沒留話也可點,見上
     const title =
-      status === 'rejected' ? '退回原因' : status === 'cancelled' && info ? '撤銷原因' : null
+      status === 'rejected'
+        ? '退回原因'
+        : status === 'cancelled'
+          ? info ? '撤銷原因' : null
+          : info ? '核准說明' : null
     if (title === null) return { tr: {}, wrap: (label: ReactNode) => label }
     const show = () => {
       setShown({ title, subject, info })

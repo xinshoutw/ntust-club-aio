@@ -64,3 +64,17 @@ export async function isVideoFile(f: File): Promise<boolean> {
   if (ascii(head, 0, 4) === 'RIFF' && ascii(head, 8, 12) === 'AVI ') return true
   return false
 }
+
+const MB = 1024 * 1024
+
+/** 佐證檔(照片或影片)的單檔驗證:魔術位元組定型別,再比該型別的上限。
+ *  空間報修與違規勸導附件共用;上限由各端組態供給(後端 system_settings 為權威) */
+export function makeValidateEvidence(imgBytes: number, videoBytes: number) {
+  return async (f: File): Promise<string | null> => {
+    if (await isImageFile(f))
+      return f.size <= imgBytes ? null : `照片超過 ${Math.round(imgBytes / MB)} MB 上限`
+    if (await isVideoFile(f))
+      return f.size <= videoBytes ? null : `影片超過 ${Math.round(videoBytes / MB)} MB 上限`
+    return '不是有效的照片或影片檔'
+  }
+}

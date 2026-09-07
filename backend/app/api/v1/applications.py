@@ -326,17 +326,10 @@ async def upload_evidence(
     if existing_bytes >= cap:
         raise over_cap
 
-    # 佐證接受照片或影片(單檔仍走各自政策的 magic-byte 與單檔上界)
-    ext = (file.filename or "").lower().rsplit(".", 1)
-    policy = (
-        file_service.VIDEO
-        if len(ext) == 2 and f".{ext[1]}" in file_service.VIDEO.extensions
-        else file_service.IMAGE
-    )
     saved = await file_service.save_upload(
         db,
         file,
-        policy=policy,
+        policy=file_service.evidence_policy(file.filename),
         module="maintenance",
         uploaded_by=user.id,
         club_id=user.club_id,

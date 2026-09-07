@@ -269,6 +269,14 @@ ARCHIVE = UploadPolicy("archive", frozenset({".zip"}), 100 * _MB, settings_key="
 VIDEO = UploadPolicy("video", frozenset({".mp4", ".mov"}), 200 * _MB, settings_key="video")
 
 
+def evidence_policy(filename: str | None) -> UploadPolicy:
+    """佐證檔接受照片或影片:副檔名決定套哪一支政策(各自的魔術位元組與單檔上界)。
+
+    報修佐證與違規勸導附件共用;認不出的副檔名走 IMAGE,由 save_upload 回 415。
+    """
+    return VIDEO if _extension(filename or "") in VIDEO.extensions else IMAGE
+
+
 async def _policy_max_size(db: AsyncSession, policy: UploadPolicy) -> int:
     """實際上限:管理員後台可調(upload_limits);查無值回退政策常數。"""
     if policy.settings_key is None:

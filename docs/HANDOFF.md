@@ -104,14 +104,30 @@ hover 顯示「目前未開放」(`lib/nav.EVAL_UNBUILT`)。收的**只有側欄
 讀取端另補了 fail-safe(`booking_service.parse_return_time`):壞值(手改 DB、`"10:30:00"`)
 退回預設 10:30 並記 warning,不再讓側欄徽章、三張點交清單、逾期追蹤與 cron 催還一起變 500。
 
+**器材借用核准可改數量**(2026-09-07):`POST /admin/equipment-loans/{id}/approve` 收選填 `{qty}`
+(1–1000),審核彈窗多一格「核准數量」(預設=申請數,可借數警示改比這個數)。改了就覆寫
+`equipment_loans.qty`,申請數只留在 `approval_records.reason`(「數量調整:5 → 3」)與稽核 detail,
+Discord 通知尾綴「申請 5 件、核准 3 件」。社團總覽那張共用彈窗一併吃到。
+
+**違規勸導可附現場照片/影片**(2026-09-07):`POST /staff/violations/{id}/attachments`,與空間報修
+同一套兩段式(先主體、再逐檔),**選填**、至多 5 檔、不設加總上限(單檔上界 × 5 就是天花板)。
+上限由新開的 `GET /staff/config` 供給(工讀生打不進 `/club/config`)。附件掛在被勸導的社團名下
+(`files.club_id`,`subject_type=violation`),**三端列表都帶**:社團在自己的違規紀錄頁看得到、
+行政端 `aviol` 下載得到(`FILE_SUBJECT_KEYS` 本來就有這一列)、工讀生端「違規紀錄查詢」多一欄
+「附件」給未銷案的單補傳(開立時第二步失敗不必再開一張 —— 每張都扣行政分)。
+只收未銷案的單、不限填寫人。檔案管理多一個模組 `viol`(磁碟前綴 `violations/`);
+nginx 上傳白名單那條 location 改成同時涵蓋報修佐證與勸導附件。
+**待拍板**:社團看得到附件是我判的(被勸導的依據理應給對方看),要收回就把 `club_id` 改 None
+並把社團端 `attachments` 拿掉。
+
 **要跑遷移**:D-21/D-22 是 drop column,`alembic upgrade head` 之後舊號碼就沒了。
 D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)—— 走 `--reset` 重灌,
 或把該學期匯出再匯入一次。
 
 ## 驗證現況
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **557 passed**;`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **238 passed**(52 檔)、
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **577 passed**;`ruff check .` 全綠
+- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **262 passed**(55 檔)、
   `pnpm run lint` 8 個既有的 fast-refresh warning
 - 新測試逐一做過 mutation 驗證(改回舊寫法會紅);借用色格圖那支另在 `TZ=UTC` 與 `TZ=Pacific/Honolulu` 下各跑過一次
 

@@ -9,6 +9,7 @@ import AttachmentArea, { type BagFile } from '../../components/ui/AttachmentArea
 import { EVIDENCE_ACCEPT, makeValidateEvidence } from '../../lib/uploads'
 import {
   MAX_VIOLATION_ATTACHMENTS,
+  ViolationFiledError,
   useStaffClubs,
   useStaffConfig,
   useStaffMutations,
@@ -28,7 +29,7 @@ interface FormValues {
 // 填寫人=登入工讀生(後端取 session),發生日不可未來。現場照片/影片選填,
 // 與空間報修同一套兩段式送出(先主體、再逐檔上傳)
 export default function PtViolationFormPage() {
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const [form] = Form.useForm<FormValues>()
   const [files, setFiles] = useState<BagFile[]>([])
   const clubsQuery = useStaffClubs()
@@ -58,8 +59,20 @@ export default function PtViolationFormPage() {
           form.resetFields()
           setFiles([])
         },
-        // 附件那一步失敗時主體已開立:訊息會說明不要重送,附件留在表單裡不清
-        onError: (e) => message.error(e.message),
+        onError: (e) => {
+          if (e instanceof ViolationFiledError) {
+            // 主體已開立:表單整張清掉,同一張才不會再被按一次送出(每張都扣行政分);
+            // 用彈窗不用 toast —— 這件事要看完才能關,附件到「違規紀錄查詢」補
+            form.resetFields()
+            setFiles([])
+            modal.error({
+              title: '勸導單已開立，但附件上傳失敗',
+              content: `${e.message}。表單已清空，請勿重送；附件請到「違規紀錄查詢」找到該筆補傳。`,
+            })
+            return
+          }
+          message.error(e.message)
+        },
       },
     )
   }

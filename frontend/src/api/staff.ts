@@ -77,6 +77,17 @@ const toViolation = (v: StaffViolationOut): StaffViolation => ({
 /** 每張勸導單附件上限;後端 staff.MAX_VIOLATION_ATTACHMENTS 為權威 */
 export const MAX_VIOLATION_ATTACHMENTS = 5
 
+/** 主體已開立、附件那一步才失敗:呼叫端據此清掉表單,同一張不能再送一次(每張都扣行政分)。
+ *  message 是附件失敗的原因;主體本身失敗走一般 Error */
+export class ViolationFiledError extends Error {
+  violationId: number
+  constructor(message: string, violationId: number) {
+    super(message)
+    this.name = 'ViolationFiledError'
+    this.violationId = violationId
+  }
+}
+
 // ---- 器材借用(點交工作清單) ----
 
 export type StaffLoanStatus = 'approved' | 'checked_out' | 'overdue'
@@ -259,8 +270,7 @@ export function useStaffMutations() {
           await uploadFile(`/staff/violations/${row.id}/attachments`, f)
         }
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e)
-        throw new Error(`勸導單已開立，但附件上傳失敗（${msg}），請勿重送，可至「違規紀錄查詢」補傳`)
+        throw new ViolationFiledError(e instanceof Error ? e.message : String(e), row.id)
       }
       return row
     },

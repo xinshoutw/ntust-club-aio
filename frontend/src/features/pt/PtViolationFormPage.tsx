@@ -108,7 +108,7 @@ export default function PtViolationFormPage() {
               label="地點"
               rules={[{ required: true, whitespace: true, message: '請填寫地點' }]}
             >
-              <Input placeholder="如:學生活動中心 B1" maxLength={100} />
+              <Input placeholder="學生活動中心 B1" maxLength={100} />
             </Form.Item>
             <Form.Item
               name="items"

@@ -30,8 +30,8 @@ export class PartialUploadError extends Error {
   }
 }
 
-/** multipart 單檔上傳(欄位名 file,對應 FastAPI UploadFile) */
-const uploadFile = (path: string, file: File): Promise<FileOut> => {
+/** multipart 單檔上傳(欄位名 file,對應 FastAPI UploadFile);工讀生端的勸導單附件也走這支 */
+export const uploadFile = (path: string, file: File): Promise<FileOut> => {
   const body = new FormData()
   body.append('file', file)
   return api<FileOut>(path, { method: 'POST', body })

@@ -4,6 +4,7 @@ import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
+import AttachmentLinks from '../../components/ui/AttachmentLinks'
 import {
   Cols,
   FilterButton,
@@ -176,6 +177,8 @@ export default function AdminViolationsPage() {
                   <td style={{ fontSize: 13 }}>
                     <div>{v.items.join('、')}</div>
                     {v.other && <div style={{ fontSize: 12, color: 'var(--steel)' }}>{v.other}</div>}
+                    {/* 現場照片/影片是銷案時的判斷依據,不該只在檔案管理找得到 */}
+                    <AttachmentLinks files={v.attachments} />
                     {v.resolveNote && <div style={{ fontSize: 12, color: 'var(--steel)' }}>銷案:{v.resolveNote}</div>}
                   </td>
                   <td className="cell-clip" title={v.filler} style={{ fontSize: 13, color: 'var(--steel)' }}>{v.filler}</td>

@@ -22,6 +22,8 @@ export interface AdminViolation {
   resolveNote?: string
   deadline: string // 銷案期限 YYYY/MM/DD(開立日 +1 個月;後端推導)
   expired: boolean // 已逾銷案期限(後端推導;逾期停用銷案)
+  /** 工讀生附的現場照片/影片(未歸檔者;下載走 GET /files/{id}) */
+  attachments: { id: string; name: string }[]
 }
 
 interface AdminViolationOut {
@@ -36,6 +38,7 @@ interface AdminViolationOut {
   resolve_note: string | null
   resolve_deadline: string | null
   resolve_expired: boolean
+  attachments: { id: string; original_name: string }[]
 }
 
 const toViolation = (v: AdminViolationOut): AdminViolation => ({
@@ -50,6 +53,7 @@ const toViolation = (v: AdminViolationOut): AdminViolation => ({
   resolveNote: v.resolve_note ?? undefined,
   deadline: v.resolve_deadline ? dayjs(v.resolve_deadline).format('YYYY/MM/DD') : '',
   expired: v.resolve_expired,
+  attachments: (v.attachments ?? []).map((f) => ({ id: f.id, name: f.original_name })),
 })
 
 export interface AdminViolationListParams {

@@ -55,6 +55,7 @@ PAGE_READS: list[tuple[str, str]] = [
     ("astaff", "/api/v1/staff/clubs"),
     ("astaff", "/api/v1/staff/violation-items"),
     ("astaff", "/api/v1/staff/violations"),
+    ("astaff", "/api/v1/staff/config"),
     ("astaff", "/api/v1/staff/equipment-loans?status=approved"),
     ("aviewer", "/api/v1/viewer/assignments"),
     ("aviewer", "/api/v1/viewer/done"),

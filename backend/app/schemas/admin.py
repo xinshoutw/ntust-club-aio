@@ -164,6 +164,7 @@ class AdminViolationOut(BaseModel):
     # 銷案期限(推導不儲存):開立日 +1 個月;逾期截止,銷案鈕停用
     resolve_deadline: date | None = None
     resolve_expired: bool = False
+    attachments: list[FileOut] = []  # 工讀生附的現場照片/影片(未歸檔者)
 
 
 class ViolationFillerOut(BaseModel):

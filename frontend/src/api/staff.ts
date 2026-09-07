@@ -6,6 +6,7 @@ import dayjs, { type Dayjs } from 'dayjs'
 import { api, apiPaged, qs } from './client'
 import { taipeiToday } from '../lib/today'
 import { useInvalidateBadges } from './badges'
+import { PartialUploadError, uploadFile } from './applications'
 
 export const STAFF_PAGE_SIZE = 20
 
@@ -41,6 +42,8 @@ export interface StaffViolation {
   status: StaffViolationStatus
   deadline: string // 銷案期限 YYYY/MM/DD(開立日 +1 個月;後端推導)
   expired: boolean // 已逾銷案期限(後端推導)
+  /** 現場照片/影片(未歸檔者;下載走 GET /files/{id}) */
+  attachments: { id: string; name: string }[]
 }
 
 interface StaffViolationOut {
@@ -54,6 +57,7 @@ interface StaffViolationOut {
   status: 'open' | 'resolved'
   resolve_deadline: string | null
   resolve_expired: boolean
+  attachments: { id: string; original_name: string }[]
 }
 
 const toViolation = (v: StaffViolationOut): StaffViolation => ({
@@ -67,7 +71,11 @@ const toViolation = (v: StaffViolationOut): StaffViolation => ({
   status: v.status === 'open' ? 'violation_open' : 'violation_resolved',
   deadline: v.resolve_deadline ? dayjs(v.resolve_deadline).format('YYYY/MM/DD') : '',
   expired: v.resolve_expired,
+  attachments: (v.attachments ?? []).map((f) => ({ id: f.id, name: f.original_name })),
 })
+
+/** 每張勸導單附件上限;後端 staff.MAX_VIOLATION_ATTACHMENTS 為權威 */
+export const MAX_VIOLATION_ATTACHMENTS = 5
 
 // ---- 器材借用(點交工作清單) ----
 
@@ -138,6 +146,7 @@ const toLoan = (l: StaffLoanOut): StaffLoan => ({
 const keys = {
   all: ['staff'] as const,
   clubs: ['staff', 'clubs'] as const,
+  config: ['staff', 'config'] as const,
   violationItems: ['staff', 'violationItems'] as const,
   violations: (page: number, sort: string | undefined) => ['staff', 'violations', page, sort] as const,
   loans: (status: StaffLoanStatus, page: number) => ['staff', 'loans', status, page] as const,
@@ -155,6 +164,28 @@ export function useStaffClubs() {
           isActive: c.is_active,
         })),
       ),
+  })
+}
+
+export interface StaffConfig {
+  /** 勸導單附件的單檔上限(bytes);後端 system_settings upload_limits 為權威 */
+  imgBytes: number
+  videoBytes: number
+}
+
+const MB = 1024 * 1024
+
+export function useStaffConfig() {
+  return useQuery({
+    queryKey: keys.config,
+    queryFn: () =>
+      api<{ upload_limits: { img_mb: number; video_mb: number } }>('/staff/config').then(
+        (o): StaffConfig => ({
+          imgBytes: o.upload_limits.img_mb * MB,
+          videoBytes: o.upload_limits.video_mb * MB,
+        }),
+      ),
+    staleTime: 5 * 60 * 1000, // 組態變動不頻繁,快取 5 分鐘
   })
 }
 
@@ -196,6 +227,8 @@ export interface ViolationInput {
   location: string
   items: string[]
   other?: string
+  /** 現場照片/影片(選填):主體建立後逐檔上傳 */
+  files: File[]
 }
 
 export function useStaffMutations() {
@@ -205,9 +238,11 @@ export function useStaffMutations() {
     void qc.invalidateQueries({ queryKey: keys.all })
     invalidateBadges()
   }
+  // 兩段式(與空間報修同):先 POST 主體,再逐檔上傳附件。第二步失敗時勸導單已經開立,
+  // 訊息要說清楚 —— 再送一張等於重複勸導(每張都扣行政分),補附件要到「違規紀錄查詢」
   const fileViolation = useMutation({
-    mutationFn: (b: ViolationInput) =>
-      api<StaffViolationOut>('/staff/violations', {
+    mutationFn: async (b: ViolationInput) => {
+      const row = await api<StaffViolationOut>('/staff/violations', {
         method: 'POST',
         body: JSON.stringify({
           club_id: b.clubId,
@@ -216,8 +251,34 @@ export function useStaffMutations() {
           items: b.items,
           other: b.other || undefined,
         }),
-      }),
-    onSuccess: invalidate,
+      })
+      try {
+        for (const f of b.files) {
+          await uploadFile(`/staff/violations/${row.id}/attachments`, f)
+        }
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        throw new Error(`勸導單已開立，但附件上傳失敗（${msg}），請勿重送，可至「違規紀錄查詢」補傳`)
+      }
+      return row
+    },
+    // 主體建立後不論附件成敗,列表都已變動
+    onSettled: invalidate,
+  })
+  /** 補傳附件:失敗時回報已上傳成功的檔案,呼叫端把它們移出待傳清單 */
+  const addAttachments = useMutation({
+    mutationFn: async ({ id, files }: { id: number; files: File[] }) => {
+      const done: File[] = []
+      for (const f of files) {
+        try {
+          await uploadFile(`/staff/violations/${id}/attachments`, f)
+        } catch (e) {
+          throw new PartialUploadError(e instanceof Error ? e.message : String(e), done)
+        }
+        done.push(f)
+      }
+    },
+    onSettled: invalidate,
   })
   const checkout = useMutation({
     mutationFn: ({ id, borrower }: { id: number; borrower: string }) =>
@@ -239,5 +300,5 @@ export function useStaffMutations() {
   const remind = useMutation({
     mutationFn: (id: number) => api<null>(`/staff/equipment-loans/${id}/remind`, { method: 'POST' }),
   })
-  return { fileViolation, checkout, checkin, remind }
+  return { fileViolation, addAttachments, checkout, checkin, remind }
 }

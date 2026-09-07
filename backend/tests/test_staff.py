@@ -1,10 +1,11 @@
 """工讀生端(/staff/*):違規開立/查詢、器材借出/歸還點交、逾期追蹤。"""
 
+import uuid
 from datetime import date, timedelta
 
 import sqlalchemy as sa
 
-from app.models import AuditLog, Equipment, EquipmentLoan, Violation
+from app.models import AuditLog, Equipment, EquipmentLoan, File, Violation
 from app.models.enums import ClubAttribute
 from app.services import notify
 from app.services.violation_service import add_months, today_taipei
@@ -208,6 +209,103 @@ async def test_file_violation_and_list(client, db, monkeypatch):
     assert (
         await client.get("/api/v1/staff/violations", params={"sort": "nope"})
     ).status_code == 422
+
+
+async def test_violation_attachments(client, db, monkeypatch):
+    """附件:開立後逐檔上傳(照片或影片);三端列表都帶、各自下載得到;銷案後不收;上限 5。"""
+    from app.api.v1 import staff as staff_mod
+
+    staff, club = await seed(client, db)
+    _mute_club_event(monkeypatch)
+    assert (await client.get("/api/v1/staff/config")).json()["data"]["upload_limits"] == {
+        "img_mb": 10,
+        "video_mb": 200,
+    }
+
+    resp = await client.post(
+        "/api/v1/staff/violations",
+        json={
+            "club_id": club.id,
+            "occurred_on": today_taipei().isoformat(),
+            "location": "社辦",
+            "items": ["其他"],
+        },
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201, resp.text
+    violation_id = resp.json()["data"]["id"]
+    assert resp.json()["data"]["attachments"] == []
+
+    url = f"/api/v1/staff/violations/{violation_id}/attachments"
+    png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+    up = await client.post(
+        url, files={"file": ("現場.png", png, "image/png")}, headers=csrf_headers(client)
+    )
+    assert up.status_code == 201, up.text
+    file_id = up.json()["data"]["id"]
+    # 副檔名不在照片也不在影片集合 → 415;內容與副檔名不符也 415
+    bad_ext = await client.post(
+        url, files={"file": ("note.txt", b"hello", "text/plain")}, headers=csrf_headers(client)
+    )
+    assert bad_ext.status_code == 415
+    fake_mp4 = await client.post(
+        url, files={"file": ("clip.mp4", png, "video/mp4")}, headers=csrf_headers(client)
+    )
+    assert fake_mp4.status_code == 415
+    assert (await client.post("/api/v1/staff/violations/99999/attachments",
+                              files={"file": ("a.png", png, "image/png")},
+                              headers=csrf_headers(client))).status_code == 404
+
+    # 工讀生端列表帶附件、工讀生下載得到
+    rows = (await client.get("/api/v1/staff/violations")).json()["data"]
+    assert [f["original_name"] for f in rows[0]["attachments"]] == ["現場.png"]
+    assert (await client.get(f"/api/v1/files/{file_id}")).status_code == 200
+    saved = await db.get(File, uuid.UUID(file_id))
+    assert (saved.club_id, saved.subject_type, saved.subject_id) == (
+        club.id, "violation", violation_id,
+    )
+    assert saved.path.startswith("violations/")
+
+    # 上限(比照報修佐證)
+    monkeypatch.setattr(staff_mod, "MAX_VIOLATION_ATTACHMENTS", 1)
+    over = await client.post(
+        url, files={"file": ("b.png", png + b"1", "image/png")}, headers=csrf_headers(client)
+    )
+    assert over.status_code == 422
+    monkeypatch.setattr(staff_mod, "MAX_VIOLATION_ATTACHMENTS", 5)
+
+    # 社團端:看得到、下載得到
+    await make_user(db, username="club01", role="club", club_id=club.id)
+    await login(client, "club01")
+    rows = (await client.get("/api/v1/club/violations")).json()["data"]
+    assert rows[0]["attachments"][0]["id"] == file_id
+    assert (await client.get(f"/api/v1/files/{file_id}")).status_code == 200
+    # 別社看不到(權限邊界=club_id)
+    other = await make_club(db, name="吉他社")
+    await make_user(db, username="club02", role="club", club_id=other.id)
+    await login(client, "club02")
+    assert (await client.get(f"/api/v1/files/{file_id}")).status_code == 404
+
+    # 行政端(aviol):列表帶附件、下載得到、銷案回應也帶
+    await make_user(db, username="adm01", role="admin", permissions=["aviol"])
+    await login(client, "adm01")
+    rows = (await client.get("/api/v1/admin/violations")).json()["data"]
+    assert rows[0]["attachments"][0]["id"] == file_id
+    assert (await client.get(f"/api/v1/files/{file_id}")).status_code == 200
+    resolved = await client.post(
+        f"/api/v1/admin/violations/{violation_id}/resolve",
+        json={"note": "已完成愛校服務"},
+        headers=csrf_headers(client),
+    )
+    assert resolved.status_code == 200, resolved.text
+    assert resolved.json()["data"]["attachments"][0]["id"] == file_id
+
+    # 銷案後不再收附件
+    await login(client, "pt01")
+    closed = await client.post(
+        url, files={"file": ("c.png", png + b"2", "image/png")}, headers=csrf_headers(client)
+    )
+    assert closed.status_code == 422
 
 
 async def test_file_violation_validation(client, db):

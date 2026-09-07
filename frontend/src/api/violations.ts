@@ -14,6 +14,8 @@ export interface Violation {
   /** 銷案期限(未銷案才有);逾期即截止,不再受理銷案 */
   deadline?: string
   expired: boolean
+  /** 工讀生附的現場照片/影片(未歸檔者;下載走 GET /files/{id}) */
+  attachments: { id: string; name: string }[]
 }
 
 interface ViolationOut {
@@ -27,6 +29,7 @@ interface ViolationOut {
   created_at: string
   resolve_deadline: string | null
   resolve_expired: boolean
+  attachments: { id: string; original_name: string }[]
 }
 
 const toViolation = (v: ViolationOut): Violation => ({
@@ -38,6 +41,7 @@ const toViolation = (v: ViolationOut): Violation => ({
   status: v.status === 'resolved' ? 'violation_resolved' : 'violation_open',
   deadline: v.resolve_deadline ? dayjs(v.resolve_deadline).format('YYYY/MM/DD') : undefined,
   expired: v.resolve_expired,
+  attachments: (v.attachments ?? []).map((f) => ({ id: f.id, name: f.original_name })),
 })
 
 export function useViolations(p: { page: number; pageSize: number }) {

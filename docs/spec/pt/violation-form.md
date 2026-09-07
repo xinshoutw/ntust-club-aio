@@ -14,11 +14,13 @@
 |---|---|
 | 社團選單 | `GET /staff/clubs`(不分頁;含停用社團與 `attribute`,前端只列啟用中) |
 | 違規項目目錄 | `GET /staff/violation-items`(`system_settings.violation_items`) |
+| 上傳上限 | `GET /staff/config`(`upload_limits.img_mb` / `video_mb`;工讀生打不進 `/club/config`) |
 | 送出 | `POST /staff/violations` |
+| 上傳附件 | `POST /staff/violations/{id}/attachments`(multipart 單檔,逐檔呼叫) |
 
 ## 畫面
 
-表單:社團(**二級選單** `components/ui/ClubCascader`:性質資料夾 → 社團,可搜尋,只列啟用中社團 —— 全站選擇器同一條規則,見 `design-guide.md` §6;選項由本頁自 `/staff/clubs` 取,元件不自己抓 —— 工讀生打不進 `/admin/*`)、發生日期、地點、違規項目(複選,來自目錄)、其他說明(選填,≤500 字)。
+表單:社團(**二級選單** `components/ui/ClubCascader`:性質資料夾 → 社團,可搜尋,只列啟用中社團 —— 全站選擇器同一條規則,見 `design-guide.md` §6;選項由本頁自 `/staff/clubs` 取,元件不自己抓 —— 工讀生打不進 `/admin/*`)、發生日期、地點、違規項目(複選,來自目錄)、其他說明(選填,≤500 字)、現場照片 / 影片(`AttachmentArea`,**選填**,至多 5 檔)。
 
 ## 規則
 
@@ -27,6 +29,9 @@
 - 違規項目必須是目錄的子集,後端逐項比對
 - 開立後推 Discord 給該社,訊息含銷案期限
 - 銷案期限 = 開立日 + 1 個月;**銷案動作屬行政端**,工讀生不能銷案
+- **附件走與空間報修同一套兩段式**:先 `POST` 主體,再逐檔上傳。單檔上界依型別(圖 / 影片,`upload_limits`),副檔名決定套哪一支政策、皆經魔術位元組驗證;每張單至多 5 檔(`staff.MAX_VIOLATION_ATTACHMENTS`),**不設加總上限**(報修那支有 `maintenance_total_mb`,這裡單檔上界 × 5 就是天花板)。上限由 `/staff/config` 供給,載入完成前不開放操作,不放前端 fallback 常數
+- 附件那一步失敗時**勸導單已經開立**:訊息明說「請勿重送」(再送一張等於重複勸導,每張都扣行政分),補傳入口在「違規紀錄查詢」;表單裡的附件不清,主體欄位同樣保留
+- 附件掛在該社名下(`files.club_id`=被勸導的社團,`subject_type=violation`、`slot=evidence`,磁碟前綴 `violations/`):社團在自己的違規紀錄頁看得到、下載得到;也算進該社的儲存額度。只收未銷案的單,不限填寫人(同處室工讀生都可補)
 
 ## 未完成 / 問題
 

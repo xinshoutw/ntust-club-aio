@@ -1,10 +1,19 @@
+import { useState } from 'react'
 import { App, Button, Checkbox, DatePicker, Form, Input } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import dayjs, { type Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import ClubCascader from '../../components/ui/ClubCascader'
-import { useStaffClubs, useStaffMutations, useViolationItems } from '../../api/staff'
+import AttachmentArea, { type BagFile } from '../../components/ui/AttachmentArea'
+import { IMAGE_ACCEPT, makeValidateEvidence } from '../../lib/uploads'
+import {
+  MAX_VIOLATION_ATTACHMENTS,
+  useStaffClubs,
+  useStaffConfig,
+  useStaffMutations,
+  useViolationItems,
+} from '../../api/staff'
 
 interface FormValues {
   /** 二級選單的介面是社團名稱;送出時對回 id */
@@ -16,12 +25,15 @@ interface FormValues {
 }
 
 // 違規勸導填寫:社團與違規項目目錄來自後端(只列啟用中社團,與行政端選擇器同一條規則);
-// 填寫人=登入工讀生(後端取 session),發生日不可未來
+// 填寫人=登入工讀生(後端取 session),發生日不可未來。現場照片/影片選填,
+// 與空間報修同一套兩段式送出(先主體、再逐檔上傳)
 export default function PtViolationFormPage() {
   const { message } = App.useApp()
   const [form] = Form.useForm<FormValues>()
+  const [files, setFiles] = useState<BagFile[]>([])
   const clubsQuery = useStaffClubs()
   const itemsQuery = useViolationItems()
+  const configQuery = useStaffConfig()
   const { fileViolation } = useStaffMutations()
 
   const onFinish = (v: FormValues) => {
@@ -38,41 +50,47 @@ export default function PtViolationFormPage() {
         location: v.location.trim(),
         items: v.items,
         other: v.other?.trim() || undefined,
+        files: files.map((b) => b.file),
       },
       {
         onSuccess: () => {
           message.success('違規勸導已送出')
           form.resetFields()
+          setFiles([])
         },
+        // 附件那一步失敗時主體已開立:訊息會說明不要重送,附件留在表單裡不清
         onError: (e) => message.error(e.message),
       },
     )
   }
 
-  if (clubsQuery.isError || itemsQuery.isError) {
+  if (clubsQuery.isError || itemsQuery.isError || configQuery.isError) {
     return (
       <div>
         <PageHeader title="違規勸導填寫" />
         <div style={{ marginTop: 20 }}>
           <QueryError
             title="基礎資料載入失敗"
-            error={clubsQuery.error ?? itemsQuery.error}
+            error={clubsQuery.error ?? itemsQuery.error ?? configQuery.error}
             onRetry={() => {
               void clubsQuery.refetch()
               void itemsQuery.refetch()
+              void configQuery.refetch()
             }}
           />
         </div>
       </div>
     )
   }
+  // 上限以後端組態為權威:載入完成前不開放操作(比照空間報修),不放前端 fallback 常數
+  const config = configQuery.data
 
   return (
     <div>
       <PageHeader title="違規勸導填寫" />
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
-        <LoadingBlock pending={clubsQuery.isPending || itemsQuery.isPending}>
+        <LoadingBlock pending={clubsQuery.isPending || itemsQuery.isPending || !config}>
           <Form form={form} layout="vertical" requiredMark onFinish={onFinish}>
             <Form.Item name="club" label="社團" rules={[{ required: true, message: '請選擇社團' }]}>
               {/* 60+ 社平鋪讀不完:與全站其餘社團選擇器同一支二級選單(性質資料夾 → 社團) */}
@@ -104,6 +122,18 @@ export default function PtViolationFormPage() {
             </Form.Item>
             <Form.Item name="other" label="其他說明">
               <Input.TextArea rows={3} maxLength={500} placeholder="選填" />
+            </Form.Item>
+            <Form.Item label="現場照片 / 影片">
+              {config && (
+                <AttachmentArea
+                  value={files}
+                  onChange={setFiles}
+                  accept={`${IMAGE_ACCEPT},video/*`}
+                  hint="拖放圖片或影片檔案（選填）"
+                  validate={makeValidateEvidence(config.imgBytes, config.videoBytes)}
+                  maxCount={MAX_VIOLATION_ATTACHMENTS}
+                />
+              )}
             </Form.Item>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <Button type="primary" htmlType="submit" loading={fileViolation.isPending} disabled={fileViolation.isPending}>

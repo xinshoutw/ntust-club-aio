@@ -362,7 +362,7 @@ approved 且 end_date + N 天已過且未送結案 → 逾期鎖定(推導,非�
 
 **announcement_dismissals**(announcement_id, club_id;皆 cascade)— 蓋板「不再顯示」的跨裝置持久化。
 
-**violations**(id, club_id, occurred_on, location, items text[], other NULL, filler_id, status enum(open,resolved), resolve_note NULL)
+**violations**(id, club_id, occurred_on, location, items text[], other NULL, filler_id, status enum(open,resolved), resolve_note NULL)— 工讀生附的現場照片/影片走 files(subject_type=`violation`、slot=`evidence`、club_id=被勸導的社團;至多 5 檔,無加總上限)。
 
 **銷案期限 = 開立日 +1 個月**,逾期即截止(不再受理銷案,−1 扣分成立)。期限與截止皆推導不儲存;管理端逾期後銷案鈕停用。Python 與 SQL 兩端共用 `violation_service.RESOLVE_MONTHS`(`resolve_deadline` / `deadline_sql`),邊界為期限當天仍可銷案。
 

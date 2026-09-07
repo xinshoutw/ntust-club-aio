@@ -115,7 +115,9 @@ FILE_SUBJECT_KEYS: dict[str, tuple[str, ...]] = {
     # 那條分組 × 獎項 × 年度。而且管理員身上沒有評審指派(GAP-01 沒有寫入 API),
     # 那頁一個檔案都列不出來 —— 要開回來,得連同 can_access 的範圍檢查一起做
     "eval_upload": ("aeval",),
-    "violation": ("aviol",),
+    # 工讀生那組頁面鏡射到行政端(astaff):補傳得了附件就要開得了附件,
+    # 與 services/files.can_access 的 STAFF 分支同一條邊界
+    "violation": ("aviol", "astaff"),
 }
 
 

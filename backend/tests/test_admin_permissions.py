@@ -332,11 +332,15 @@ async def test_mirrored_keys_do_not_leak_to_other_roles(client, db):
 
 
 async def test_mirrored_keys_grant_no_file_access(client, db):
-    """鏡射不擴權:兩把鍵都不對上任何檔案類型。
+    """鏡射不擴權:`aviewer` 不對上任何檔案類型;`astaff` 只對上工讀生本來就開得了的違規附件。
 
     `aviewer` 特別要守住 —— admin 分支的下載不做指派範圍檢查,給了它 eval_upload
     就是讓一把「只多三頁」的鍵拿到全校全年度的佐證檔,繞過對評審收緊的那條範圍。
+    `astaff` 補傳得了勸導單附件就要開得了(與 STAFF 角色同一條邊界),但也只有那一類。
     """
+    assert not any("aviewer" in keys for keys in permissions.FILE_SUBJECT_KEYS.values())
+    assert [t for t, keys in permissions.FILE_SUBJECT_KEYS.items() if "astaff" in keys] == [
+        "violation"
+    ]
     for key in ("astaff", "aviewer"):
-        assert not any(key in keys for keys in permissions.FILE_SUBJECT_KEYS.values()), key
         assert not permissions.can_download("eval_upload", [key])

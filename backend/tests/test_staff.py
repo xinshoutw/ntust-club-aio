@@ -286,6 +286,11 @@ async def test_violation_attachments(client, db, monkeypatch):
     await login(client, "club02")
     assert (await client.get(f"/api/v1/files/{file_id}")).status_code == 404
 
+    # 只持 astaff(工讀生作業鏡射)的承辦:補傳得了就要開得了,不能拿到 404
+    await make_user(db, username="adm00", role="admin", permissions=["astaff"])
+    await login(client, "adm00")
+    assert (await client.get(f"/api/v1/files/{file_id}")).status_code == 200
+
     # 行政端(aviol):列表帶附件、下載得到、銷案回應也帶
     await make_user(db, username="adm01", role="admin", permissions=["aviol"])
     await login(client, "adm01")

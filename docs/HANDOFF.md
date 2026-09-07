@@ -118,7 +118,10 @@ Discord 通知尾綴「申請 5 件、核准 3 件」。社團總覽那張共用
 只收未銷案的單、不限填寫人。檔案管理多一個模組 `viol`(磁碟前綴 `violations/`);
 nginx 上傳白名單那條 location 改成同時涵蓋報修佐證與勸導附件。
 **待拍板**:社團看得到附件是我判的(被勸導的依據理應給對方看),要收回就把 `club_id` 改 None
-並把社團端 `attachments` 拿掉。
+並把社團端 `attachments` 拿掉。Opus 交叉審查後補的:`FILE_SUBJECT_KEYS["violation"]` 加 `astaff`
+(鏡射頁補傳得了就要開得了);前端佐證選檔與驗證改成只放行 mp4 / mov(webm/avi 後端本來就不收,
+以前是到後端才 415,報修那頁一併改);核准改數量那句「數量調整:5 → 3」社團端借用列可點開
+「核准說明」看到(`attach_decisions` 連留了話的 APPROVE 一起帶)。
 
 **要跑遷移**:D-21/D-22 是 drop column,`alembic upgrade head` 之後舊號碼就沒了。
 D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)—— 走 `--reset` 重灌,
@@ -127,7 +130,7 @@ D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)
 ## 驗證現況
 
 - 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **577 passed**;`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **262 passed**(55 檔)、
+- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **265 passed**(56 檔)、
   `pnpm run lint` 8 個既有的 fast-refresh warning
 - 新測試逐一做過 mutation 驗證(改回舊寫法會紅);借用色格圖那支另在 `TZ=UTC` 與 `TZ=Pacific/Honolulu` 下各跑過一次
 

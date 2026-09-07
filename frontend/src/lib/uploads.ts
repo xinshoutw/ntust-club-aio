@@ -12,6 +12,8 @@ export const IMAGE_EXTENSIONS = [
   '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff', '.heic', '.heif', '.avif',
 ]
 export const CLOSE_DOC_EXTENSIONS = ['.pdf', '.doc', '.docx', ...IMAGE_EXTENSIONS]
+// 影片只有這兩種,與後端 files.VIDEO 同一組;webm/avi 魔術位元組認得出來但後端不收
+export const VIDEO_EXTENSIONS = ['.mp4', '.mov']
 
 /** 後端以副檔名收口(`files._extension`),魔術位元組驗的是內容 —— 兩道都要過。
  *  內容是 PNG 但檔名 `photo.txt` 的檔前端全放行,送出時才 415、整批回滾 */
@@ -67,14 +69,22 @@ export async function isVideoFile(f: File): Promise<boolean> {
 
 const MB = 1024 * 1024
 
-/** 佐證檔(照片或影片)的單檔驗證:魔術位元組定型別,再比該型別的上限。
+// 佐證(照片或影片)的選檔提示:逐項列舉而不用 `video/*` —— 那會讓選檔器收得下 webm/avi,
+// 前端驗證也放行,到後端才 415;勸導單那條流程主體已先建立,退不回去
+export const EVIDENCE_ACCEPT = [...IMAGE_EXTENSIONS, ...VIDEO_EXTENSIONS].join(',')
+
+/** 佐證檔(照片或影片)的單檔驗證:魔術位元組定型別、副檔名要在後端收的集合裡,再比該型別的上限。
  *  空間報修與違規勸導附件共用;上限由各端組態供給(後端 system_settings 為權威) */
 export function makeValidateEvidence(imgBytes: number, videoBytes: number) {
   return async (f: File): Promise<string | null> => {
-    if (await isImageFile(f))
+    if (await isImageFile(f)) {
+      if (!hasAllowedExtension(f.name, IMAGE_EXTENSIONS)) return '照片副檔名不在支援清單內'
       return f.size <= imgBytes ? null : `照片超過 ${Math.round(imgBytes / MB)} MB 上限`
-    if (await isVideoFile(f))
+    }
+    if (await isVideoFile(f)) {
+      if (!hasAllowedExtension(f.name, VIDEO_EXTENSIONS)) return '影片僅接受 mp4 / mov'
       return f.size <= videoBytes ? null : `影片超過 ${Math.round(videoBytes / MB)} MB 上限`
+    }
     return '不是有效的照片或影片檔'
   }
 }

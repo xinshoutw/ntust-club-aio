@@ -8,7 +8,7 @@ import AttachmentRetryModal from './AttachmentRetryModal'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols } from '../../components/ui/tableControls'
-import { IMAGE_ACCEPT, makeValidateEvidence } from '../../lib/uploads'
+import { EVIDENCE_ACCEPT, makeValidateEvidence } from '../../lib/uploads'
 import {
   PartialUploadError,
   useMaintenanceList,
@@ -99,7 +99,7 @@ export default function MaintenancePage() {
                 setFiles(next)
               }}
               error={filesError}
-              accept={`${IMAGE_ACCEPT},video/*`}
+              accept={EVIDENCE_ACCEPT}
               hint="拖放圖片或影片檔案"
               validate={makeValidateEvidence(config.imgBytes, config.videoBytes)}
               maxTotalBytes={config.maintenanceBytes}
@@ -211,7 +211,7 @@ export default function MaintenancePage() {
       <AttachmentRetryModal
         open={retryId != null}
         title="補傳佐證照片 / 影片"
-        accept={`${IMAGE_ACCEPT},video/*`}
+        accept={EVIDENCE_ACCEPT}
         hint="拖放圖片或影片檔案"
         validate={makeValidateEvidence(config.imgBytes, config.videoBytes)}
         maxTotalBytes={config.maintenanceBytes}

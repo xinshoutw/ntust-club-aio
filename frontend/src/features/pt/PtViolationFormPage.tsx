@@ -6,7 +6,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import ClubCascader from '../../components/ui/ClubCascader'
 import AttachmentArea, { type BagFile } from '../../components/ui/AttachmentArea'
-import { IMAGE_ACCEPT, makeValidateEvidence } from '../../lib/uploads'
+import { EVIDENCE_ACCEPT, makeValidateEvidence } from '../../lib/uploads'
 import {
   MAX_VIOLATION_ATTACHMENTS,
   useStaffClubs,
@@ -64,25 +64,25 @@ export default function PtViolationFormPage() {
     )
   }
 
-  if (clubsQuery.isError || itemsQuery.isError || configQuery.isError) {
+  if (clubsQuery.isError || itemsQuery.isError) {
     return (
       <div>
         <PageHeader title="違規勸導填寫" />
         <div style={{ marginTop: 20 }}>
           <QueryError
             title="基礎資料載入失敗"
-            error={clubsQuery.error ?? itemsQuery.error ?? configQuery.error}
+            error={clubsQuery.error ?? itemsQuery.error}
             onRetry={() => {
               void clubsQuery.refetch()
               void itemsQuery.refetch()
-              void configQuery.refetch()
             }}
           />
         </div>
       </div>
     )
   }
-  // 上限以後端組態為權威:載入完成前不開放操作(比照空間報修),不放前端 fallback 常數
+  // 附件上限以後端組態為權威,不放前端 fallback 常數;但附件是選填,組態沒載到只收不了附件,
+  // 主體照填 —— 不像空間報修(佐證必附)那樣整頁擋住。首載失敗才換說明,refetch 失敗手上還有值
   const config = configQuery.data
 
   return (
@@ -90,7 +90,7 @@ export default function PtViolationFormPage() {
       <PageHeader title="違規勸導填寫" />
 
       <div className="card" style={{ marginTop: 20, padding: 24 }}>
-        <LoadingBlock pending={clubsQuery.isPending || itemsQuery.isPending || !config}>
+        <LoadingBlock pending={clubsQuery.isPending || itemsQuery.isPending}>
           <Form form={form} layout="vertical" requiredMark onFinish={onFinish}>
             <Form.Item name="club" label="社團" rules={[{ required: true, message: '請選擇社團' }]}>
               {/* 60+ 社平鋪讀不完:與全站其餘社團選擇器同一支二級選單(性質資料夾 → 社團) */}
@@ -124,15 +124,24 @@ export default function PtViolationFormPage() {
               <Input.TextArea rows={3} maxLength={500} placeholder="選填" />
             </Form.Item>
             <Form.Item label="現場照片 / 影片">
-              {config && (
+              {config ? (
                 <AttachmentArea
                   value={files}
                   onChange={setFiles}
-                  accept={`${IMAGE_ACCEPT},video/*`}
+                  accept={EVIDENCE_ACCEPT}
                   hint="拖放圖片或影片檔案（選填）"
                   validate={makeValidateEvidence(config.imgBytes, config.videoBytes)}
                   maxCount={MAX_VIOLATION_ATTACHMENTS}
                 />
+              ) : configQuery.isLoadingError ? (
+                <QueryError
+                  compact
+                  title="附件上限載入失敗，本次無法附檔"
+                  error={configQuery.error}
+                  onRetry={() => void configQuery.refetch()}
+                />
+              ) : (
+                <LoadingBlock pending rows={2} />
               )}
             </Form.Item>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>

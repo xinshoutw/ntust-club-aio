@@ -8,7 +8,7 @@ import StatusPill from '../../components/ui/StatusPill'
 import AttachmentLinks from '../../components/ui/AttachmentLinks'
 import AttachmentRetryModal from '../applications/AttachmentRetryModal'
 import { Cols, MultiSortButton, Pager, sortParam, useMultiSort } from '../../components/ui/tableControls'
-import { IMAGE_ACCEPT, makeValidateEvidence } from '../../lib/uploads'
+import { EVIDENCE_ACCEPT, makeValidateEvidence } from '../../lib/uploads'
 import { PartialUploadError } from '../../api/applications'
 import {
   MAX_VIOLATION_ATTACHMENTS,
@@ -97,15 +97,18 @@ export default function PtViolationsPage() {
                   <td className="num" style={{ fontSize: 13 }}>{v.deadline}</td>
                   <td><StatusPill status={v.status} /></td>
                   <td style={{ fontSize: 13 }}>
-                    {/* 已銷案不收附件(後端 422);滿 5 檔也不再給入口 */}
+                    {/* 已銷案不收附件(後端 422);滿 5 檔也不再給入口。附件是選填,0 檔不標紅 ——
+                        刻意沒附的單和上傳失敗的單在這裡分不出來,整頁紅字只會讓紅色失去意義。
+                        上限組態沒載到就先停用:彈窗開不了,點了沒反應比停用更糟 */}
                     {v.status === 'violation_open' && v.attachments.length < MAX_VIOLATION_ATTACHMENTS ? (
                       <button
                         type="button"
                         className="link-btn"
-                        style={{ padding: 0, color: v.attachments.length ? undefined : '#C13B34' }}
+                        style={{ padding: 0 }}
+                        disabled={!configQuery.data}
                         onClick={() => setRetryId(v.id)}
                       >
-                        {v.attachments.length ? '補傳' : '補傳附件'}
+                        補傳
                       </button>
                     ) : (
                       <span className="num" style={{ color: 'var(--steel)' }}>{v.attachments.length} 個</span>
@@ -136,12 +139,12 @@ export default function PtViolationsPage() {
           <Pager page={page} pageSize={STAFF_PAGE_SIZE} total={total} onChange={setPage} />
       </div>
 
-      {/* 上限以後端組態為權威:組態沒載到就不開彈窗(點了只會拿到「載入中」),不放 fallback 常數 */}
+      {/* 上限以後端組態為權威,不放 fallback 常數;組態沒載到時上面的「補傳」是停用的 */}
       {configQuery.data && (
         <AttachmentRetryModal
           open={retryRow != null}
           title="補傳現場照片 / 影片"
-          accept={`${IMAGE_ACCEPT},video/*`}
+          accept={EVIDENCE_ACCEPT}
           hint="拖放圖片或影片檔案"
           validate={makeValidateEvidence(configQuery.data.imgBytes, configQuery.data.videoBytes)}
           maxCount={MAX_VIOLATION_ATTACHMENTS - (retryRow?.attachments.length ?? 0)}

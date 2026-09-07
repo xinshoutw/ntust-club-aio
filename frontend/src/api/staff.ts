@@ -146,7 +146,9 @@ const toLoan = (l: StaffLoanOut): StaffLoan => ({
 const keys = {
   all: ['staff'] as const,
   clubs: ['staff', 'clubs'] as const,
-  config: ['staff', 'config'] as const,
+  // 刻意不掛在 keys.all 底下:mutation 的 invalidate 不必把組態一起重抓(5 分鐘 staleTime 夠了),
+  // 也少一條「refetch 失敗把 isError 翻起來」的路
+  config: ['staffConfig'] as const,
   violationItems: ['staff', 'violationItems'] as const,
   violations: (page: number, sort: string | undefined) => ['staff', 'violations', page, sort] as const,
   loans: (status: StaffLoanStatus, page: number) => ['staff', 'loans', status, page] as const,

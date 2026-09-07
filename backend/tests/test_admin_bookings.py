@@ -334,6 +334,79 @@ async def test_equipment_overdue_filter(client, db):
 # ---- 核准衝突/可借數硬性檢核(2026-07-17 第十二輪) ----
 
 
+async def test_equipment_approve_can_adjust_qty(client, db, monkeypatch):
+    """核准時可改數量:改了寫進 approval_records.reason 與稽核;省略或同數即照原數核准。"""
+    from app.services import notify
+
+    calls: list[tuple] = []
+
+    async def fake_club_event(kind, title, desc, webhook=None):
+        calls.append((kind, title, desc))
+
+    monkeypatch.setattr(notify, "club_event", fake_club_event)
+
+    club, _ = await seed(client, db)
+    eq = await make_equipment(db, total_qty=5)
+    window = dict(start_date=date(2026, 3, 6), end_date=date(2026, 3, 13))
+    loans = [
+        EquipmentLoan(club_id=club.id, equipment_id=eq.id, qty=5, purpose="營隊", **window),
+        EquipmentLoan(club_id=club.id, equipment_id=eq.id, qty=2, purpose="加借", **window),
+    ]
+    db.add_all(loans)
+    await db.commit()
+    for row in loans:
+        await db.refresh(row)
+    cut, same = loans
+
+    resp = await client.post(
+        f"/api/v1/admin/equipment-loans/{cut.id}/approve",
+        json={"qty": 3},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["data"]["qty"] == 3
+    await db.refresh(cut)
+    assert (cut.status, cut.qty) == ("approved", 3)
+    record = await db.scalar(
+        sa.select(ApprovalRecord).where(
+            ApprovalRecord.subject_type == ApprovalSubject.EQUIPMENT_LOAN,
+            ApprovalRecord.subject_id == cut.id,
+        )
+    )
+    assert record.reason == "數量調整:5 → 3"
+    audit_row = await db.scalar(
+        sa.select(AuditLog).where(AuditLog.action == "equipment_loan_approved")
+    )
+    assert "qty=5->3" in audit_row.detail
+    assert "申請 5 件、核准 3 件" in calls[-1][2]
+
+    # 同數 = 未調整:不留調整字樣
+    resp = await client.post(
+        f"/api/v1/admin/equipment-loans/{same.id}/approve",
+        json={"qty": 2},
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 200
+    record = await db.scalar(
+        sa.select(ApprovalRecord).where(ApprovalRecord.subject_id == same.id)
+    )
+    assert record.reason is None
+    assert "申請" not in calls[-1][2]
+
+    # 值域:0 與 1001 都 422
+    extra = EquipmentLoan(club_id=club.id, equipment_id=eq.id, qty=1, purpose="x", **window)
+    db.add(extra)
+    await db.commit()
+    await db.refresh(extra)
+    for bad in (0, 1001):
+        resp = await client.post(
+            f"/api/v1/admin/equipment-loans/{extra.id}/approve",
+            json={"qty": bad},
+            headers=csrf_headers(client),
+        )
+        assert resp.status_code == 422, bad
+
+
 async def test_venue_approve_blocks_approved_overlap(client, db):
     """核准前檢核:同場地同日已有核准單佔用重疊節次 → 409;不重疊照常核准。"""
     club, other_club = await seed(client, db)

@@ -52,6 +52,15 @@ class RejectIn(BaseModel):
     _strip = field_validator("reason")(strip_reason)
 
 
+class ApproveLoanIn(BaseModel):
+    """器材借用核准:可順手改數量(可借數不足時核准較少的量,不必退回讓社團重送)。
+
+    省略或與申請數相同即照原數核准;改了就寫進 approval_records.reason 與稽核。
+    """
+
+    qty: int | None = Field(None, ge=1, le=1000)
+
+
 class CloseApproveIn(BaseModel):
     """結案核准繳交確認:未確認之項目評鑑以 0 分計(照片確認涵蓋影片連結)。
 

@@ -236,10 +236,10 @@ export default function AdminBookingsPage() {
           open={open}
           onClose={() => setOpen(false)}
           afterClose={() => setSelected(null)}
-          onApprove={() =>
+          onApprove={(qty) =>
             selected.kind === 'venue'
               ? approveVenue.mutateAsync(selected.data.apiId)
-              : approveLoan.mutateAsync(selected.data.apiId)
+              : approveLoan.mutateAsync({ id: selected.data.apiId, qty })
           }
           onReject={(reason) =>
             selected.kind === 'venue'

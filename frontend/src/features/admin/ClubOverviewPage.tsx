@@ -153,11 +153,11 @@ export default function ClubOverviewPage() {
   }
 
   // 借用審核動作:依類別打對應 admin API(mutation 成功即 invalidate 借用整域)
-  const approveBooking = (item: BookingReviewItem, apiId: number): Promise<unknown> =>
+  const approveBooking = (item: BookingReviewItem, apiId: number, qty?: number): Promise<unknown> =>
     item.kind === 'venue'
       ? bookingMutations.approveVenue.mutateAsync(apiId)
       : item.kind === 'loan'
-        ? bookingMutations.approveLoan.mutateAsync(apiId)
+        ? bookingMutations.approveLoan.mutateAsync({ id: apiId, qty })
         : bookingMutations.approveRoom.mutateAsync(apiId)
   const rejectBooking = (item: BookingReviewItem, apiId: number, reason: string): Promise<unknown> =>
     item.kind === 'venue'
@@ -399,7 +399,7 @@ export default function ClubOverviewPage() {
           open={bookingOpen}
           onClose={() => setBookingOpen(false)}
           afterClose={() => setBooking(null)}
-          onApprove={() => approveBooking(booking, bookingApiId)}
+          onApprove={(qty) => approveBooking(booking, bookingApiId, qty)}
           onReject={(reason) => rejectBooking(booking, bookingApiId, reason)}
           onRevoke={(reason) => revokeBooking(booking, bookingApiId, reason)}
         />

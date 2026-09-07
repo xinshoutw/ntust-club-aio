@@ -342,8 +342,10 @@ export function useAdminBookingMutations() {
       post(`/admin/venue-bookings/${id}/reject`, { reason }),
     onSuccess: invalidate,
   })
+  // 核准時可改數量(可借數不足時核准較少的量);省略即照申請數
   const approveLoan = useMutation({
-    mutationFn: (id: number) => post(`/admin/equipment-loans/${id}/approve`),
+    mutationFn: ({ id, qty }: { id: number; qty?: number }) =>
+      post(`/admin/equipment-loans/${id}/approve`, qty != null ? { qty } : undefined),
     onSuccess: invalidate,
   })
   const rejectLoan = useMutation({

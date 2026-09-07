@@ -231,15 +231,15 @@ export default function AdminBookingsPage() {
       {/* Modal 常駐至關閉動畫結束(afterClose)才卸載 */}
       {selected && (
         <BookingReviewModal
-          key={selected.data.id}
+          key={`${selected.kind}-${selected.data.id}`}
           item={selected}
           open={open}
           onClose={() => setOpen(false)}
           afterClose={() => setSelected(null)}
-          onApprove={() =>
+          onApprove={(qty) =>
             selected.kind === 'venue'
               ? approveVenue.mutateAsync(selected.data.apiId)
-              : approveLoan.mutateAsync(selected.data.apiId)
+              : approveLoan.mutateAsync({ id: selected.data.apiId, qty })
           }
           onReject={(reason) =>
             selected.kind === 'venue'

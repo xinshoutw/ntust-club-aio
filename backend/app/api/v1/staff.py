@@ -7,17 +7,18 @@
 """
 
 from datetime import UTC, datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 import sqlalchemy as sa
-from fastapi import APIRouter, BackgroundTasks, Depends, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, UploadFile
 
 from app.api.pagination import Pagination, parse_sort
 from app.api.v1.admin_violations import _FILLER, _SORTABLE, _STATUS_ORDER, _to_out
 from app.core.deps import CurrentUser, DbDep, client_ip, require_staff
 from app.core.errors import conflict, not_found, validation_error
-from app.models import Club, Equipment, EquipmentLoan, User, Violation
-from app.models.enums import LoanStatus
+from app.models import Club, Equipment, EquipmentLoan, File, User, Violation
+from app.models.enums import LoanStatus, ViolationStatus
+from app.schemas.activities import FileOut
 from app.schemas.admin import AdminViolationOut
 from app.schemas.common import ApiResponse
 from app.schemas.staff import (
@@ -29,6 +30,7 @@ from app.schemas.staff import (
 )
 from app.services import audit, loan_remind, notify, violation_service
 from app.services import booking_service as svc
+from app.services import files as file_service
 from app.services.settings_service import get_setting
 
 router = APIRouter(prefix="/staff", tags=["staff"])
@@ -36,6 +38,8 @@ router = APIRouter(prefix="/staff", tags=["staff"])
 StaffUser = Annotated[CurrentUser, Depends(require_staff)]
 
 StaffLoanStatus = Literal["approved", "checked_out", "overdue"]
+
+MAX_VIOLATION_ATTACHMENTS = 5  # 每張勸導單附件上限(比照報修佐證;影片 200MB,防磁碟耗盡)
 
 _CHECKOUT_BY = sa.orm.aliased(User)  # 出借人:辦理借出點交的工讀生
 
@@ -57,6 +61,18 @@ async def list_clubs(user: StaffUser, db: DbDep) -> ApiResponse[list[StaffClubOu
 async def list_violation_items(user: StaffUser, db: DbDep) -> ApiResponse[list[str]]:
     """違規項目目錄(system_settings violation_items;行政可調)。"""
     return ApiResponse(data=await get_setting(db, "violation_items"))
+
+
+@router.get("/config")
+async def staff_config(user: StaffUser, db: DbDep) -> ApiResponse[dict[str, Any]]:
+    """工讀生端執行組態:勸導單附件的單檔上限(前端即時檢核用;後端 save_upload 仍權威)。
+
+    工讀生打不進 /club/config,那支又帶經費科目等社團專屬內容,故另開一支只回上傳上限。
+    """
+    single = await get_setting(db, "upload_limits")
+    return ApiResponse(
+        data={"upload_limits": {"img_mb": int(single["img"]), "video_mb": int(single["video"])}}
+    )
 
 
 # ---- 違規勸導 ----
@@ -113,6 +129,52 @@ async def file_violation(
     return ApiResponse(data=_to_out(violation, club.name, user.name, today))
 
 
+@router.post("/violations/{violation_id}/attachments", status_code=201)
+async def upload_violation_attachment(
+    violation_id: int, file: UploadFile, user: StaffUser, db: DbDep
+) -> ApiResponse[FileOut]:
+    """勸導單附件(現場照片或影片):開立後逐檔上傳,與報修佐證同一套兩段式流程。
+
+    只收未銷案的單(銷案是終態,事後補證據沒有意義);不限填寫人,同處室的工讀生都可補。
+    檔案掛在該社名下(club_id):社團看得到自己被勸導的依據,也算進該社的儲存額度。
+    """
+    file_service.enforce_upload_rate(user.id)
+    # 鎖勸導列並在鎖內判定狀態與份數:並發上傳序列化,件數上限不被雙寫繞過
+    violation = await db.scalar(
+        sa.select(Violation).where(Violation.id == violation_id).with_for_update()
+    )
+    if violation is None:
+        raise not_found("找不到違規勸導紀錄")
+    if violation.status != ViolationStatus.OPEN:
+        raise validation_error("此紀錄已銷案,不可再上傳附件")
+    existing = await db.scalar(
+        sa.select(sa.func.count())
+        .select_from(File)
+        .where(
+            File.subject_type == "violation",
+            File.subject_id == violation.id,
+            File.archived_at.is_(None),
+        )
+    )
+    if (existing or 0) >= MAX_VIOLATION_ATTACHMENTS:
+        raise validation_error(f"每張勸導單至多 {MAX_VIOLATION_ATTACHMENTS} 個附件")
+    # ponytail: 不設加總上限(報修那支有 maintenance_total_mb);單檔上界 × 5 檔就是天花板,
+    # 磁碟吃緊再加設定鍵
+    saved = await file_service.save_upload(
+        db,
+        file,
+        policy=file_service.evidence_policy(file.filename),
+        module="violations",
+        uploaded_by=user.id,
+        club_id=violation.club_id,
+        subject_type="violation",
+        subject_id=violation.id,
+        slot="evidence",
+    )
+    await db.commit()
+    return ApiResponse(data=FileOut.model_validate(saved))
+
+
 @router.get("/violations")
 async def list_violations(
     user: StaffUser,
@@ -134,8 +196,12 @@ async def list_violations(
 
     today = violation_service.today_taipei()
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
-    rows = await db.execute(query.offset(page.offset).limit(page.page_size))
-    data = [_to_out(v, club_name, filler_name, today) for v, club_name, filler_name in rows]
+    rows = (await db.execute(query.offset(page.offset).limit(page.page_size))).all()
+    attachments = await file_service.files_by_subject(db, "violation", [v.id for v, _, _ in rows])
+    data = [
+        _to_out(v, club_name, filler_name, today, attachments.get(v.id, ()))
+        for v, club_name, filler_name in rows
+    ]
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 

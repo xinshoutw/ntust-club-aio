@@ -5,6 +5,7 @@ import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
+import AttachmentLinks from '../../components/ui/AttachmentLinks'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import { useViolations } from '../../api/violations'
 
@@ -55,6 +56,7 @@ export default function ViolationsPage() {
                     <td>
                       <div>{v.items.join('、')}</div>
                       {v.note && <div style={{ fontSize: 12, color: 'var(--steel)', marginTop: 2 }}>{v.note}</div>}
+                      <AttachmentLinks files={v.attachments} />
                     </td>
                     <td className="num" style={{ fontSize: 13 }}>
                       {v.status === 'violation_resolved' || !v.deadline ? (

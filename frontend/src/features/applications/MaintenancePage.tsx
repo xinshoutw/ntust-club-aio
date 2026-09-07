@@ -8,7 +8,7 @@ import AttachmentRetryModal from './AttachmentRetryModal'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import { Cols } from '../../components/ui/tableControls'
-import { IMAGE_ACCEPT, isImageFile, isVideoFile } from '../../lib/uploads'
+import { EVIDENCE_ACCEPT, makeValidateEvidence } from '../../lib/uploads'
 import {
   PartialUploadError,
   useMaintenanceList,
@@ -16,20 +16,6 @@ import {
   useRecentMaintenance,
 } from '../../api/applications'
 import { useClubConfig } from '../../api/clubConfig'
-
-const MB = 1024 * 1024
-
-// 佐證加總上限與單檔型別上界皆由後端組態供給(後端 system_settings 為權威值);
-// 這裡依 config 動態產生單檔 magic-byte + 大小驗證
-function makeValidateEvidence(imgBytes: number, videoBytes: number) {
-  return async (f: File): Promise<string | null> => {
-    if (await isImageFile(f))
-      return f.size <= imgBytes ? null : `照片超過 ${Math.round(imgBytes / MB)} MB 上限`
-    if (await isVideoFile(f))
-      return f.size <= videoBytes ? null : `影片超過 ${Math.round(videoBytes / MB)} MB 上限`
-    return '不是有效的照片或影片檔'
-  }
-}
 
 export default function MaintenancePage() {
   const { message } = App.useApp()
@@ -113,7 +99,7 @@ export default function MaintenancePage() {
                 setFiles(next)
               }}
               error={filesError}
-              accept={`${IMAGE_ACCEPT},video/*`}
+              accept={EVIDENCE_ACCEPT}
               hint="拖放圖片或影片檔案"
               validate={makeValidateEvidence(config.imgBytes, config.videoBytes)}
               maxTotalBytes={config.maintenanceBytes}
@@ -225,7 +211,7 @@ export default function MaintenancePage() {
       <AttachmentRetryModal
         open={retryId != null}
         title="補傳佐證照片 / 影片"
-        accept={`${IMAGE_ACCEPT},video/*`}
+        accept={EVIDENCE_ACCEPT}
         hint="拖放圖片或影片檔案"
         validate={makeValidateEvidence(config.imgBytes, config.videoBytes)}
         maxTotalBytes={config.maintenanceBytes}

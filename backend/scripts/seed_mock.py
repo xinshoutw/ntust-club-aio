@@ -982,15 +982,24 @@ async def _create_applications(
     )
 
 
-def _create_violations(db: AsyncSession, clubs: dict[str, Club], users: dict[str, User]) -> None:
+async def _create_violations(
+    db: AsyncSession, files: MockFiles, clubs: dict[str, Club], users: dict[str, User]
+) -> None:
     staff = users["staff_lee"]
-    # 未銷案・期限內(銷案期限=開立日 +1 個月,推導不儲存)
-    db.add(
-        Violation(
-            club_id=clubs["csie_club"].id, occurred_on=date(2026, 7, 1),
-            location="學生活動中心走廊", items=["張貼未核可文宣"],
-            filler_id=staff.id, status=ViolationStatus.OPEN,
-        )
+    # 未銷案・期限內(銷案期限=開立日 +1 個月,推導不儲存);附一張現場照片
+    posted = Violation(
+        club_id=clubs["csie_club"].id, occurred_on=date(2026, 7, 1),
+        location="學生活動中心走廊", items=["張貼未核可文宣"],
+        filler_id=staff.id, status=ViolationStatus.OPEN,
+    )
+    db.add(posted)
+    await db.flush()
+    files.add(  # 勸導單附件(subject_type=violation、slot=evidence,掛在被勸導的社團名下)
+        "violation-evidence-1", _png_bytes((120, 80, 80)),
+        module="violations", slot="evidence",
+        subject_type="violation", subject_id=posted.id,
+        club_id=clubs["csie_club"].id, uploaded_by=staff.id,
+        original_name="走廊文宣.png", mime="image/png",
     )
     # 未銷案・已逾期(2026-05-20 +1 個月 < 今天,不再受理銷案、−1 成立)
     db.add(
@@ -1271,7 +1280,7 @@ async def seed_mock(super_username: str) -> None:
         acts = await _create_activities(db, files, clubs, users, super_user)
         await _create_bookings(db, clubs, users, acts, equipment)
         await _create_applications(db, files, clubs, users)
-        _create_violations(db, clubs, users)
+        await _create_violations(db, files, clubs, users)
         _create_announcements(db, clubs, super_user)
         await _create_signups(db, clubs, users)
         await _create_eval(db, clubs, users, super_user)

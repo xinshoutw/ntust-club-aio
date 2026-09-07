@@ -63,7 +63,9 @@ async def test_usage_summary_with_db_text_and_repair_first(client, db, monkeypat
 
     data = (await client.get("/api/v1/admin/files/usage")).json()["data"]
     # 有報修檔案 → repair 排第一,其餘依固定順序
-    assert [m["key"] for m in data["modules"]] == ["repair", "close", "eval", "apply", "apps"]
+    assert [m["key"] for m in data["modules"]] == [
+        "repair", "close", "eval", "apply", "apps", "viol",
+    ]
     by_key = {m["key"]: m for m in data["modules"]}
     assert (by_key["repair"]["size"], by_key["repair"]["count"]) == (10000, 2)
     assert (by_key["close"]["size"], by_key["close"]["count"]) == (500, 1)  # 已歸檔不計
@@ -80,7 +82,9 @@ async def test_usage_summary_with_db_text_and_repair_first(client, db, monkeypat
 async def test_usage_order_without_repair_files(client, db):
     await seed(client, db, with_repair=False)
     data = (await client.get("/api/v1/admin/files/usage")).json()["data"]
-    assert [m["key"] for m in data["modules"]] == ["close", "eval", "apply", "apps", "repair"]
+    assert [m["key"] for m in data["modules"]] == [
+        "close", "eval", "apply", "apps", "repair", "viol",
+    ]
 
 
 async def test_large_file_list_filter_and_sort(client, db):

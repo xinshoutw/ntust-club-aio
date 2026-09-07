@@ -4,6 +4,7 @@
 預設排序=未銷案在前、時間升冪;逾期後銷案 API 拒絕(RESOLVE_EXPIRED)。
 """
 
+from collections.abc import Sequence
 from datetime import date
 from typing import Annotated
 
@@ -13,8 +14,9 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from app.api.pagination import Pagination, ilike_contains, parse_sort
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, not_found
-from app.models import Club, User, Violation
+from app.models import Club, File, User, Violation
 from app.models.enums import ViolationStatus
+from app.schemas.activities import FileOut
 from app.schemas.admin import (
     AdminViolationOut,
     ResolveViolationIn,
@@ -23,6 +25,7 @@ from app.schemas.admin import (
 )
 from app.schemas.common import ApiResponse
 from app.services import audit, notify, violation_service
+from app.services import files as file_service
 
 router = APIRouter(prefix="/admin/violations", tags=["admin"])
 
@@ -45,12 +48,19 @@ _SORTABLE = {
 }
 
 
-def _to_out(v: Violation, club_name: str, filler_name: str, today: date) -> AdminViolationOut:
+def _to_out(
+    v: Violation,
+    club_name: str,
+    filler_name: str,
+    today: date,
+    attachments: Sequence[File] = (),
+) -> AdminViolationOut:
     out = AdminViolationOut.model_validate(v)
     out.club_name = club_name
     out.filler_name = filler_name
     out.resolve_deadline = violation_service.resolve_deadline(v)
     out.resolve_expired = violation_service.resolve_expired(v, today)
+    out.attachments = [FileOut.model_validate(f) for f in attachments]
     return out
 
 
@@ -122,8 +132,13 @@ async def list_violations(
         query = query.order_by(_STATUS_ORDER, Violation.occurred_on.asc(), Violation.id)
 
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
-    rows = await db.execute(query.offset(page.offset).limit(page.page_size))
-    data = [_to_out(v, club_name, filler_name, today) for v, club_name, filler_name in rows]
+    rows = (await db.execute(query.offset(page.offset).limit(page.page_size))).all()
+    # 工讀生附的現場照片/影片:銷案時的判斷依據(整頁一次查,不逐列)
+    attachments = await file_service.files_by_subject(db, "violation", [v.id for v, _, _ in rows])
+    data = [
+        _to_out(v, club_name, filler_name, today, attachments.get(v.id, ()))
+        for v, club_name, filler_name in rows
+    ]
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 
@@ -168,4 +183,9 @@ async def resolve_violation(
         club.discord_webhook_url,
     )
     filler = await db.get(User, violation.filler_id)
-    return ApiResponse(data=_to_out(violation, club.name, filler.name if filler else "", today))
+    attachments = await file_service.files_by_subject(db, "violation", [violation.id])
+    return ApiResponse(
+        data=_to_out(
+            violation, club.name, filler.name if filler else "", today, attachments[violation.id]
+        )
+    )

@@ -326,17 +326,10 @@ async def upload_evidence(
     if existing_bytes >= cap:
         raise over_cap
 
-    # 佐證接受照片或影片(單檔仍走各自政策的 magic-byte 與單檔上界)
-    ext = (file.filename or "").lower().rsplit(".", 1)
-    policy = (
-        file_service.VIDEO
-        if len(ext) == 2 and f".{ext[1]}" in file_service.VIDEO.extensions
-        else file_service.IMAGE
-    )
     saved = await file_service.save_upload(
         db,
         file,
-        policy=policy,
+        policy=file_service.evidence_policy(file.filename),
         module="maintenance",
         uploaded_by=user.id,
         club_id=user.club_id,
@@ -365,13 +358,16 @@ async def list_violations(
         .order_by(open_first, Violation.occurred_on.asc(), Violation.id)
     )
     total = await db.scalar(sa.select(sa.func.count()).select_from(query.subquery()))
-    rows = await db.scalars(query.offset(page.offset).limit(page.page_size))
+    rows = list(await db.scalars(query.offset(page.offset).limit(page.page_size)))
     today = violation_service.today_taipei()
+    # 工讀生附的現場照片/影片:社團要看得到自己被勸導的依據(整頁一次查,不逐列)
+    attachments = await file_service.files_by_subject(db, "violation", [r.id for r in rows])
     data = []
     for r in rows:
         out = ViolationOut.model_validate(r)
         out.resolve_deadline = violation_service.resolve_deadline(r)
         out.resolve_expired = violation_service.resolve_expired(r, today)
+        out.attachments = [FileOut.model_validate(f) for f in attachments.get(r.id, [])]
         data.append(out)
     return ApiResponse(data=data, meta=page.meta(total or 0))
 

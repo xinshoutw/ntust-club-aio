@@ -17,6 +17,7 @@ vi.mock('../../api/staff', async (orig) => ({
   ...(await orig<typeof import('../../api/staff')>()),
   useStaffClubs: () => ({ ...ok, data: clubs }),
   useViolationItems: () => ({ ...ok, data: ['未經申請使用場地'] }),
+  useStaffConfig: () => ({ ...ok, data: { imgBytes: 10 * 1024 * 1024, videoBytes: 200 * 1024 * 1024 } }),
   useStaffMutations: () => ({ fileViolation: { mutate: vi.fn(), isPending: false } }),
 }))
 
@@ -34,5 +35,18 @@ describe('PtViolationFormPage 的社團選擇', () => {
     expect(screen.queryByText('未分類')).toBeNull()
     // 社團名在展開資料夾前不出現(平鋪下拉會一次全列)
     expect(screen.queryByText('熱舞社')).toBeNull()
+  })
+})
+
+describe('PtViolationFormPage 的附件', () => {
+  test('有現場照片/影片的上傳區,且是選填(不標必填)', () => {
+    render(
+      <App>
+        <PtViolationFormPage />
+      </App>,
+    )
+    expect(screen.getByText('拖放圖片或影片檔案（選填）')).not.toBeNull()
+    const label = screen.getByText('現場照片 / 影片').closest('label')
+    expect(label?.classList.contains('ant-form-item-required')).toBe(false)
   })
 })

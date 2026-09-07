@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { App, Button, Input, Modal } from 'antd'
+import { App, Button, Input, InputNumber, Modal } from 'antd'
 import dayjs from 'dayjs'
 import StatusPill from '../../components/ui/StatusPill'
 import { DOW_TEXT } from '../../api/bookings'
@@ -38,7 +38,8 @@ export default function BookingReviewModal({
   open: boolean
   onClose: () => void
   afterClose: () => void
-  onApprove?: () => Promise<unknown>
+  /** 器材單帶核准數量(承辦改過才有值;場地與固定借用恆為 undefined) */
+  onApprove?: (qty?: number) => Promise<unknown>
   onReject?: (reason: string) => Promise<unknown>
   onRevoke?: (reason: string) => Promise<unknown>
 }) {
@@ -47,6 +48,10 @@ export default function BookingReviewModal({
   const [reasonMode, setReasonMode] = useState<'reject' | 'revoke' | null>(null)
   const [reason, setReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  // 器材核准數量:預設=申請數,承辦可改(可借數不足時核准較少的量,不必退回讓社團重送)
+  const [approveQty, setApproveQty] = useState<number | null>(
+    item.kind === 'loan' ? item.data.qty : null,
+  )
   const canReview = item.data.status === 'pending'
   // 後端對臨時場地擋「日期已過」;過期單顯示撤銷鈕只會換來 409
   const notPast =
@@ -68,10 +73,15 @@ export default function BookingReviewModal({
   }
 
   const submitApprove = async () => {
+    const qtyChanged = item.kind === 'loan' && approveQty != null && approveQty !== item.data.qty
+    if (item.kind === 'loan' && approveQty == null) {
+      message.error('請填寫核准數量')
+      return
+    }
     if (onApprove) {
       setSubmitting(true)
       try {
-        await onApprove()
+        await onApprove(qtyChanged ? (approveQty as number) : undefined)
       } catch (e) {
         message.error(e instanceof Error ? e.message : '操作失敗')
         return
@@ -172,6 +182,28 @@ export default function BookingReviewModal({
           <>
             <div style={detailLabel}>器材</div><div>{item.data.equipment} <span className="num">×{item.data.qty}</span></div>
             <div style={detailLabel}>借用區間</div><div className="num">{item.data.startDate} – {item.data.endDate}</div>
+            {canReview && (
+              <>
+                <div style={detailLabel}>核准數量</div>
+                <div>
+                  <InputNumber
+                    aria-label="核准數量"
+                    min={1}
+                    max={item.data.qty}
+                    precision={0}
+                    size="small"
+                    style={{ width: 96 }}
+                    value={approveQty}
+                    onChange={(v) => setApproveQty(typeof v === 'number' ? v : null)}
+                  />
+                  {approveQty != null && approveQty !== item.data.qty && (
+                    <span style={{ marginLeft: 8, fontSize: 12, color: 'var(--steel)' }}>
+                      申請 <span className="num">{item.data.qty}</span>，將以此數量核准
+                    </span>
+                  )}
+                </div>
+              </>
+            )}
             {item.data.activity && (
               <>
                 <div style={detailLabel}>綁定活動</div><div>{item.data.activity}</div>
@@ -194,11 +226,12 @@ export default function BookingReviewModal({
         canReview &&
         (() => {
           const free = item.data.availableExcludingSelf
-          if (free == null || item.data.qty <= free) return null
+          const qty = approveQty ?? item.data.qty
+          if (free == null || qty <= free) return null
           return (
             <div style={{ marginTop: 14, padding: '10px 12px', background: 'var(--paper)', borderRadius: 6, fontSize: 13, color: '#C13B34' }}>
-              可借數不足：該區間「{item.data.equipment}」可借 <span className="num">{free}</span>，本單申請{' '}
-              <span className="num">{item.data.qty}</span>；核准前請確認歸還排程
+              可借數不足：該區間「{item.data.equipment}」可借 <span className="num">{free}</span>，本單
+              {qty === item.data.qty ? '申請' : '將核准'} <span className="num">{qty}</span>；核准前請確認歸還排程
             </div>
           )
         })()}

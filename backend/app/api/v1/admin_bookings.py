@@ -15,7 +15,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from app.api.pagination import Pagination, parse_sort
 from app.core import permissions
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
-from app.core.errors import conflict, not_found
+from app.core.errors import conflict, not_found, validation_error
 from app.models import (
     Activity,
     ApprovalRecord,
@@ -31,7 +31,12 @@ from app.models.enums import (
     BookingStatus,
     LoanStatus,
 )
-from app.schemas.admin import AdminEquipmentLoanOut, AdminVenueBookingOut, RejectIn
+from app.schemas.admin import (
+    AdminEquipmentLoanOut,
+    AdminVenueBookingOut,
+    ApproveLoanIn,
+    RejectIn,
+)
 from app.schemas.bookings import ManualEquipmentLoanIn, ManualVenueBookingIn
 from app.schemas.common import ApiResponse
 from app.services import approvals, audit, notify
@@ -322,7 +327,9 @@ async def list_equipment_loans(
                 exclude_loan_id=loan.id,
             )
         data.append(out)
-    await approvals.attach_decisions(db, ApprovalSubject.EQUIPMENT_LOAN, data, with_actor=True)
+    await approvals.attach_decisions(
+        db, ApprovalSubject.EQUIPMENT_LOAN, data, with_actor=True, approve_notes=True
+    )
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 
@@ -438,18 +445,30 @@ async def approve_equipment_loan(
     db: DbDep,
     request: Request,
     background: BackgroundTasks,
+    body: ApproveLoanIn | None = None,
 ) -> ApiResponse[AdminEquipmentLoanOut]:
     loan = await _pending_loan(db, loan_id)
     equipment = await db.get(Equipment, loan.equipment_id)
     # 可借數不足仍可核准:屬管理員裁量,列表以紅字警示(decisions.md DEC-04 已定案
-    # 不硬擋)。勿逕行加擋
+    # 不硬擋)。勿逕行加擋。承辦可改數量後核准(常見是核准較少的量),
+    # 改了就留紀錄:申請數只剩 approval_records.reason 與稽核裡看得到
+    requested = loan.qty
+    adjusted = body is not None and body.qty is not None and body.qty != requested
+    if adjusted and body.qty > requested:
+        # 只能往下調:社團沒申請的量不該由承辦替它借走(核准後的 qty 會算進區間佔用)
+        raise validation_error("核准數量不得超過申請數")
+    reason = f"數量調整:{requested} → {body.qty}" if adjusted else None
+    if adjusted:
+        loan.qty = body.qty
     loan.status = LoanStatus.APPROVED
-    _record_approval(db, ApprovalSubject.EQUIPMENT_LOAN, loan.id, ApprovalDecision.APPROVE, user)
+    _record_approval(
+        db, ApprovalSubject.EQUIPMENT_LOAN, loan.id, ApprovalDecision.APPROVE, user, reason
+    )
     audit.record(
         db,
         action="equipment_loan_approved",
         user=user,
-        detail=f"equipment_loan={loan.id}",
+        detail=f"equipment_loan={loan.id}" + (f";qty={requested}->{loan.qty}" if adjusted else ""),
         ip=client_ip(request),
     )
     await db.commit()
@@ -460,7 +479,8 @@ async def approve_equipment_loan(
         loan.club_id,
         "approve",
         "器材借用已核准",
-        f"{equipment.name} ×{loan.qty}({loan.start_date}~{loan.end_date})",
+        f"{equipment.name} ×{loan.qty}({loan.start_date}~{loan.end_date})"
+        + (f",申請 {requested} 件、核准 {loan.qty} 件" if adjusted else ""),
     )
     out = AdminEquipmentLoanOut.model_validate(loan)
     out.equipment_name = equipment.name

@@ -1,10 +1,20 @@
+import { useState } from 'react'
 import { App, Button, Checkbox, DatePicker, Form, Input } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import dayjs, { type Dayjs } from 'dayjs'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import ClubCascader from '../../components/ui/ClubCascader'
-import { useStaffClubs, useStaffMutations, useViolationItems } from '../../api/staff'
+import AttachmentArea, { type BagFile } from '../../components/ui/AttachmentArea'
+import { EVIDENCE_ACCEPT, makeValidateEvidence } from '../../lib/uploads'
+import {
+  MAX_VIOLATION_ATTACHMENTS,
+  ViolationFiledError,
+  useStaffClubs,
+  useStaffConfig,
+  useStaffMutations,
+  useViolationItems,
+} from '../../api/staff'
 
 interface FormValues {
   /** 二級選單的介面是社團名稱;送出時對回 id */
@@ -16,12 +26,15 @@ interface FormValues {
 }
 
 // 違規勸導填寫:社團與違規項目目錄來自後端(只列啟用中社團,與行政端選擇器同一條規則);
-// 填寫人=登入工讀生(後端取 session),發生日不可未來
+// 填寫人=登入工讀生(後端取 session),發生日不可未來。現場照片/影片選填,
+// 與空間報修同一套兩段式送出(先主體、再逐檔上傳)
 export default function PtViolationFormPage() {
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const [form] = Form.useForm<FormValues>()
+  const [files, setFiles] = useState<BagFile[]>([])
   const clubsQuery = useStaffClubs()
   const itemsQuery = useViolationItems()
+  const configQuery = useStaffConfig()
   const { fileViolation } = useStaffMutations()
 
   const onFinish = (v: FormValues) => {
@@ -38,13 +51,28 @@ export default function PtViolationFormPage() {
         location: v.location.trim(),
         items: v.items,
         other: v.other?.trim() || undefined,
+        files: files.map((b) => b.file),
       },
       {
         onSuccess: () => {
           message.success('違規勸導已送出')
           form.resetFields()
+          setFiles([])
         },
-        onError: (e) => message.error(e.message),
+        onError: (e) => {
+          if (e instanceof ViolationFiledError) {
+            // 主體已開立:表單整張清掉,同一張才不會再被按一次送出(每張都扣行政分);
+            // 用彈窗不用 toast —— 這件事要看完才能關,附件到「違規紀錄查詢」補
+            form.resetFields()
+            setFiles([])
+            modal.error({
+              title: '勸導單已開立，但附件上傳失敗',
+              content: `${e.message}。表單已清空，請勿重送；附件請到「違規紀錄查詢」找到該筆補傳。`,
+            })
+            return
+          }
+          message.error(e.message)
+        },
       },
     )
   }
@@ -66,6 +94,9 @@ export default function PtViolationFormPage() {
       </div>
     )
   }
+  // 附件上限以後端組態為權威,不放前端 fallback 常數;但附件是選填,組態沒載到只收不了附件,
+  // 主體照填 —— 不像空間報修(佐證必附)那樣整頁擋住。首載失敗才換說明,refetch 失敗手上還有值
+  const config = configQuery.data
 
   return (
     <div>
@@ -90,7 +121,7 @@ export default function PtViolationFormPage() {
               label="地點"
               rules={[{ required: true, whitespace: true, message: '請填寫地點' }]}
             >
-              <Input placeholder="如:學生活動中心 B1" maxLength={100} />
+              <Input placeholder="學生活動中心 B1" maxLength={100} />
             </Form.Item>
             <Form.Item
               name="items"
@@ -104,6 +135,27 @@ export default function PtViolationFormPage() {
             </Form.Item>
             <Form.Item name="other" label="其他說明">
               <Input.TextArea rows={3} maxLength={500} placeholder="選填" />
+            </Form.Item>
+            <Form.Item label="現場照片 / 影片">
+              {config ? (
+                <AttachmentArea
+                  value={files}
+                  onChange={setFiles}
+                  accept={EVIDENCE_ACCEPT}
+                  hint="拖放圖片或影片檔案（選填）"
+                  validate={makeValidateEvidence(config.imgBytes, config.videoBytes)}
+                  maxCount={MAX_VIOLATION_ATTACHMENTS}
+                />
+              ) : configQuery.isLoadingError ? (
+                <QueryError
+                  compact
+                  title="附件上限載入失敗，本次無法附檔"
+                  error={configQuery.error}
+                  onRetry={() => void configQuery.refetch()}
+                />
+              ) : (
+                <LoadingBlock pending rows={2} />
+              )}
             </Form.Item>
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
               <Button type="primary" htmlType="submit" loading={fileViolation.isPending} disabled={fileViolation.isPending}>

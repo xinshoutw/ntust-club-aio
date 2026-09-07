@@ -34,6 +34,7 @@ _MODULE_BY_PREFIX = {
     "activities": "apply",  # 活動申請附件
     "postal": "apps",  # 線上申請
     "maintenance": "repair",  # 空間報修
+    "violations": "viol",  # 違規勸導附件
 }
 _PREFIX_BY_MODULE = {v: k for k, v in _MODULE_BY_PREFIX.items()}
 _LABELS = {
@@ -42,9 +43,10 @@ _LABELS = {
     "apply": "活動申請附件",
     "apps": "線上申請",
     "repair": "空間報修",
+    "viol": "違規勸導",
 }
 # 無報修檔案時的固定順序;有報修檔案時 repair 提到第一
-_BASE_ORDER = ("close", "eval", "apply", "apps", "repair")
+_BASE_ORDER = ("close", "eval", "apply", "apps", "repair", "viol")
 
 _SORTABLE = {"size": File.size, "created_at": File.created_at}
 

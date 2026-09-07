@@ -9,6 +9,7 @@ from app.models.enums import (
     MaintenanceStatus,
     PostalReason,
 )
+from app.schemas.activities import FileOut
 
 _TERM_RE = re.compile(r"^\d{3}(-[12])?$")  # 114 / 114-1 / 114-2
 
@@ -119,6 +120,7 @@ class ViolationOut(BaseModel):
     # 銷案期限(推導不儲存):開立日 +1 個月;逾期即截止,不再受理銷案
     resolve_deadline: date | None = None
     resolve_expired: bool = False
+    attachments: list[FileOut] = []  # 工讀生附的現場照片/影片(未歸檔者)
 
 
 class AnnouncementOut(BaseModel):

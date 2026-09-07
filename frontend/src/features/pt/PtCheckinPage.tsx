@@ -164,7 +164,7 @@ export default function PtCheckinPage() {
               <Input.TextArea
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
-                placeholder="如:外觀損傷、配件缺漏"
+                placeholder="外觀損傷、配件缺漏"
                 rows={2}
                 maxLength={200}
               />

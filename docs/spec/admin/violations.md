@@ -10,14 +10,14 @@
 
 | 動作 | 端點 |
 |---|---|
-| 列表 | `GET /admin/violations`(伺服器端分頁,每頁 50) |
+| 列表 | `GET /admin/violations`(伺服器端分頁,每頁 50;逐列帶 `attachments`,整頁一次查) |
 | 篩選選項 | `GET /admin/violations/options`(違規項目、填寫人;取自實際紀錄) |
 | 未銷案筆數 | `GET /admin/violations?status=open&page_size=1` 的 `meta.total` |
 | 銷案 | `POST /admin/violations/{id}/resolve` |
 
 ## 畫面
 
-表格:社團、日期、地點、違規項目、填寫人、銷案期限、狀態、動作。多欄可排序;逾期的列銷案鈕停用並附 Tooltip「已逾 1 個月銷案期限,不再受理銷案」。
+表格:社團、日期、地點、違規項目(下方顯示其他說明、工讀生附的現場照片 / 影片連結、銷案說明)、填寫人、銷案期限、狀態、動作。多欄可排序;逾期的列銷案鈕停用並附 Tooltip「已逾 1 個月銷案期限,不再受理銷案」。
 
 銷案彈窗填處理說明。
 
@@ -30,6 +30,7 @@
 - 逾期篩選在 DB 端算(`violation_service.deadline_sql`),與 Python 端的推導共用 `RESOLVE_MONTHS`
 - 預設排序:未銷案在前,各組內發生日升冪(與工讀生端、社團端一致)
 - 銷案寫 `audit_logs` 並推 Discord
+- 附件下載走 `GET /files/{id}`,需 `aviol`(`core/permissions.FILE_SUBJECT_KEYS["violation"]`);行政端不能補附件,那是工讀生端的事
 - 未銷案且發生日落在評鑑視窗內的勸導,每筆扣行政分 1 分、上限 −10
 
 ## 未完成 / 問題

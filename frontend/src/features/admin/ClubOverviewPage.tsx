@@ -393,7 +393,7 @@ export default function ClubOverviewPage() {
       {/* 借用審核彈窗(與臨時場地器材審核頁同版面):審核中可核准/退回,其餘唯讀 */}
       {booking && bookingApiId != null && (
         <BookingReviewModal
-          key={booking.data.id}
+          key={`${booking.kind}-${booking.data.id}`}
           item={booking}
           conflicts={booking.kind === 'room' ? conflictsOf(booking.data) : undefined}
           open={bookingOpen}

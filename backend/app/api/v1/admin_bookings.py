@@ -15,7 +15,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request
 from app.api.pagination import Pagination, parse_sort
 from app.core import permissions
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
-from app.core.errors import conflict, not_found
+from app.core.errors import conflict, not_found, validation_error
 from app.models import (
     Activity,
     ApprovalRecord,
@@ -454,6 +454,9 @@ async def approve_equipment_loan(
     # 改了就留紀錄:申請數只剩 approval_records.reason 與稽核裡看得到
     requested = loan.qty
     adjusted = body is not None and body.qty is not None and body.qty != requested
+    if adjusted and body.qty > requested:
+        # 只能往下調:社團沒申請的量不該由承辦替它借走(核准後的 qty 會算進區間佔用)
+        raise validation_error("核准數量不得超過申請數")
     reason = f"數量調整:{requested} → {body.qty}" if adjusted else None
     if adjusted:
         loan.qty = body.qty

@@ -189,7 +189,7 @@ export default function BookingReviewModal({
                   <InputNumber
                     aria-label="核准數量"
                     min={1}
-                    max={1000}
+                    max={item.data.qty}
                     precision={0}
                     size="small"
                     style={{ width: 96 }}

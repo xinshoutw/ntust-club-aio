@@ -393,12 +393,12 @@ async def test_equipment_approve_can_adjust_qty(client, db, monkeypatch):
     assert record.reason is None
     assert "申請" not in calls[-1][2]
 
-    # 值域:0 與 1001 都 422
+    # 值域:0 與 1001 是 schema 擋;2 > 申請數 1 是端點擋(只能往下調)
     extra = EquipmentLoan(club_id=club.id, equipment_id=eq.id, qty=1, purpose="x", **window)
     db.add(extra)
     await db.commit()
     await db.refresh(extra)
-    for bad in (0, 1001):
+    for bad in (0, 2, 1001):
         resp = await client.post(
             f"/api/v1/admin/equipment-loans/{extra.id}/approve",
             json={"qty": bad},

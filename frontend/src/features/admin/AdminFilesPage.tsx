@@ -25,6 +25,7 @@ const MODULE_COLORS: Record<ModuleKey, string> = {
   apply: '#A9721B',
   apps: '#7B5FA8',
   repair: '#B04A33',
+  viol: '#8A6D1F',
 }
 // 表單等文字內容存於 DB:整個資料庫算一類納入佔用空間(後端以 pg_database_size 估)
 const DB_TEXT = { label: '文字內容', color: '#4E7D8C' }

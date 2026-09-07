@@ -7,7 +7,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import dayjs from 'dayjs'
 import { API_BASE, api, apiPaged, qs } from './client'
 
-export type ModuleKey = 'close' | 'eval' | 'apply' | 'apps' | 'repair'
+export type ModuleKey = 'close' | 'eval' | 'apply' | 'apps' | 'repair' | 'viol'
 
 const toMb = (bytes: number): number => bytes / 1024 / 1024
 
@@ -119,7 +119,7 @@ export function useRepairFiles(page: number) {
 }
 
 /** 報修以外的模組(報修有專屬區,清理入口也不同) */
-const NON_REPAIR: Exclude<ModuleKey, 'repair'>[] = ['close', 'eval', 'apply', 'apps']
+const NON_REPAIR: Exclude<ModuleKey, 'repair'>[] = ['close', 'eval', 'apply', 'apps', 'viol']
 
 /**
  * 大型檔案:伺服器分頁(sort 走後端白名單 size/created_at,未帶=依大小降冪)。

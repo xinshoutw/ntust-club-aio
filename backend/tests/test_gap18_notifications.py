@@ -226,7 +226,7 @@ async def test_k5_attendance_notifies_the_club(client, db, monkeypatch):
         headers=csrf_headers(client),
     )
     assert resp.status_code == 200
-    assert spy.titles() == ["報名簽到已取消"]
+    assert spy.titles() == ["簽到紀錄已取消"]  # 不是「報名已取消」
 
 
 async def test_backfilled_registration_tells_the_club(client, db, monkeypatch):

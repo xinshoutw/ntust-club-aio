@@ -162,7 +162,8 @@ D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政�
 - **K4 行政手動借用建立** `POST /admin/bookings/manual-{venue,equipment}` · alert · **僅推系統 webhook**(無社團)
   `行政手動借用建立` / `{user.name}:{venue 或 equipment 名}(時間)`
 - **K5 報名簽到登錄** `PUT /admin/signup-items/{id}/attendance` · 登錄 approve、取消 alert
-  `報名簽到已登錄` 或 `報名簽到已取消` / `{club.name}:{item.name}({session.name})`
+  `報名簽到已登錄` 或 `簽到紀錄已取消` / `{club.name}:{item.name}({session.name})`
+  —— 取消那半不寫「報名」:「報名簽到已取消」會被讀成報名被取消,而報名一經送出不得更改
   —— **只在真的翻面時推**(同值再送一次不是事件);非場次制的預設場次名就是活動名,那時不重複印
 - **K6 公告蓋板開啟** `PATCH /admin/announcements/{id}`(`takeover_until` 由 null 轉為日期)· announce · 僅推系統 webhook
   `公告已設為蓋板` / `{title}`

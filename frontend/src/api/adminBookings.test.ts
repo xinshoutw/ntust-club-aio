@@ -70,7 +70,8 @@ describe('useBookingList 的查詢字串', () => {
 
 describe('toAdminDecision', () => {
   it('有處置紀錄就回,理由空著也保留時間與經手人;沒紀錄才是 undefined', () => {
-    expect(toAdminDecision({ decision_reason: null, decided_at: '2026-09-02T01:30:00Z', decided_by: '王承辦' })).toEqual({
+    // 不帶時區的 ISO 字串:dayjs 當本地時間解析,CI(UTC)與本機(台北)才會得到同一個字
+    expect(toAdminDecision({ decision_reason: null, decided_at: '2026-09-02T09:30:00', decided_by: '王承辦' })).toEqual({
       reason: '',
       at: '2026/09/02 09:30',
       by: '王承辦',

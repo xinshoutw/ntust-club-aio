@@ -143,10 +143,11 @@ export default function AdminBookingListPage({ kind }: { kind: BookingListKind }
               className="tb dense fixed"
               aria-label={TITLE[kind]}
               aria-busy={listQuery.isPlaceholderData}
-              style={{ minWidth: 960, opacity: listQuery.isPlaceholderData ? 0.55 : 1 }}
+              style={{ minWidth: kind === 'venue' ? 960 : 1040, opacity: listQuery.isPlaceholderData ? 0.55 : 1 }}
             >
-              {/* 社團/場地截斷;器材與數量允許換行(數量須可見);時段用途吃剩餘寬 */}
-              <Cols widths={[96, kind === 'venue' ? 110 : 190, 132, kind === 'venue' ? 160 : 180, 'auto', 140, 32]} />
+              {/* 每一格都單行截斷(hover 看全文):列高恆定,useFitRows 量第一列才算得準 ——
+                  一列換行就把整頁的可放列數算成一半(第一頁空半張、第二頁滿出來) */}
+              <Cols widths={[96, kind === 'venue' ? 110 : 190, 132, kind === 'venue' ? 160 : 240, 'auto', 140, 32]} />
               <thead>
                 <tr>
                   <th scope="col">
@@ -185,6 +186,12 @@ export default function AdminBookingListPage({ kind }: { kind: BookingListKind }
                   const d = row.data
                   const name =
                     row.kind === 'venue' ? row.data.venue || '未命名場地' : row.data.equipment || '未命名器材'
+                  const detail =
+                    row.kind === 'venue'
+                      ? `第 ${row.data.periods.join('、')} 節 · ${row.data.purpose}`
+                      : row.data.activity
+                        ? `${row.data.activity} · ${row.data.purpose}`
+                        : row.data.purpose
                   return (
                     <tr
                       key={d.id}
@@ -196,7 +203,7 @@ export default function AdminBookingListPage({ kind }: { kind: BookingListKind }
                         {row.kind === 'venue' ? row.data.date : `${row.data.startDate} – ${row.data.endDate}`}
                       </td>
                       <td className="cell-clip" title={d.club}>{d.club}</td>
-                      <td className={row.kind === 'venue' ? 'cell-clip' : undefined} title={row.kind === 'venue' ? name : undefined} style={{ fontWeight: 500 }}>
+                      <td className="cell-clip" title={row.kind === 'venue' ? name : `${name} ×${row.data.qty}`} style={{ fontWeight: 500 }}>
                         {/* 鍵盤入口:與整列 onClick 同動作;stopPropagation 避免雙觸發 */}
                         <button
                           type="button"
@@ -211,12 +218,8 @@ export default function AdminBookingListPage({ kind }: { kind: BookingListKind }
                         </button>
                         {row.kind === 'loan' && <> <span className="num">×{row.data.qty}</span></>}
                       </td>
-                      <td style={{ fontSize: 13, color: 'var(--steel)' }}>
-                        {row.kind === 'venue'
-                          ? `第 ${row.data.periods.join('、')} 節 · ${row.data.purpose}`
-                          : row.data.activity
-                            ? `${row.data.activity} · ${row.data.purpose}`
-                            : row.data.purpose}
+                      <td className="cell-clip" title={detail} style={{ fontSize: 13, color: 'var(--steel)' }}>
+                        {detail}
                       </td>
                       <td className="num">{d.createdAt}</td>
                       <td className="r"><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>

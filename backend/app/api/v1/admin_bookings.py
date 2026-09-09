@@ -16,6 +16,7 @@ from app.api.pagination import Pagination, parse_sort
 from app.core import permissions
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, not_found, validation_error
+from app.core.semesters import semester_of, semester_range
 from app.models import (
     Activity,
     ApprovalRecord,
@@ -46,7 +47,11 @@ from app.services.settings_service import get_setting
 router = APIRouter(prefix="/admin", tags=["admin"])
 
 BookingAdmin = Annotated[CurrentUser, Depends(require_permission("abooking"))]
-# 器材借用清單:借用審核頁與逾期追蹤頁共讀(core/permissions.LOAN_READ_KEYS)
+# 兩張借用清單是查閱頁與審核頁共讀的(core/permissions.*_READ_KEYS);
+# 查閱鍵只開 GET,核准/退回/撤銷仍限 abooking —— 看得到與動得了是兩個判定
+VenueReader = Annotated[
+    CurrentUser, Depends(require_permission(*permissions.VENUE_BOOKING_READ_KEYS))
+]
 LoanReader = Annotated[CurrentUser, Depends(require_permission(*permissions.LOAN_READ_KEYS))]
 ManualAdmin = Annotated[CurrentUser, Depends(require_permission("amanual"))]
 
@@ -106,15 +111,17 @@ def _record_approval(db, subject: ApprovalSubject, subject_id: int, decision, us
 
 @router.get("/venue-bookings")
 async def list_venue_bookings(
-    user: BookingAdmin,
+    user: VenueReader,
     db: DbDep,
     page: Pagination,
     sort: str | None = None,
     status: Annotated[list[BookingStatus] | None, Query()] = None,
-    club_id: int | None = Query(None),
+    club_id: Annotated[list[int] | None, Query()] = None,
+    semester: str | None = Query(None, pattern=r"^\d{3}-[12]$"),
     active: bool | None = None,
 ) -> ApiResponse[list[AdminVenueBookingOut]]:
-    # status 可重複帶多值(取聯集);active=進行中(與社團端 /club/venue-bookings 同一條界線),
+    # status / club_id 可重複帶多值(取聯集);semester 以借用日落在哪個學期算;
+    # active=進行中(與社團端 /club/venue-bookings 同一條界線),
     # 社團總覽要的是這個 —— 只篩 status 會把日期已過的已核准單一起算成進行中
     query = (
         sa.select(VenueBooking, Club.name, Venue.name, Activity.name)
@@ -125,7 +132,9 @@ async def list_venue_bookings(
     if status:
         query = query.where(VenueBooking.status.in_(status))
     if club_id:
-        query = query.where(VenueBooking.club_id == club_id)
+        query = query.where(VenueBooking.club_id.in_(club_id))
+    if semester:
+        query = query.where(VenueBooking.date.between(*semester_range(semester)))
     if active is not None:
         ongoing = svc.venue_booking_ongoing_expr()
         query = query.where(ongoing if active else sa.not_(ongoing))
@@ -149,6 +158,13 @@ async def list_venue_bookings(
         data.append(out)
     await approvals.attach_decisions(db, ApprovalSubject.VENUE_BOOKING, data, with_actor=True)
     return ApiResponse(data=data, meta=page.meta(total or 0))
+
+
+@router.get("/venue-bookings/semesters")
+async def list_venue_booking_semesters(user: VenueReader, db: DbDep) -> ApiResponse[list[str]]:
+    """有臨時場地借用的學期(新到舊),供「所有場地借用」的學期下拉。"""
+    dates = await db.scalars(sa.select(VenueBooking.date).distinct())
+    return ApiResponse(data=sorted({semester_of(d) for d in dates}, reverse=True))
 
 
 async def _pending_venue_booking(db, booking_id: int) -> VenueBooking:
@@ -266,10 +282,12 @@ async def list_equipment_loans(
     page: Pagination,
     sort: str | None = None,
     status: Annotated[list[LoanStatusFilter] | None, Query()] = None,
-    club_id: int | None = Query(None),
+    club_id: Annotated[list[int] | None, Query()] = None,
+    semester: str | None = Query(None, pattern=r"^\d{3}-[12]$"),
     active: bool | None = None,
 ) -> ApiResponse[list[AdminEquipmentLoanOut]]:
-    """status 可重複帶多值(取聯集);active=進行中(與社團端 /club/equipment-loans 同一條界線);
+    """status / club_id 可重複帶多值(取聯集);semester 以借用起日落在哪個學期算;
+    active=進行中(與社團端 /club/equipment-loans 同一條界線);
     overdue=checked_out 且過了結束日之隔天上班日 10:30(推導不儲存)。"""
     return_time = await get_setting(db, "equipment_return_time")
     holidays = await svc.load_holidays(db)
@@ -295,7 +313,9 @@ async def list_equipment_loans(
             conds.append(EquipmentLoan.status.in_(plain))
         query = query.where(sa.or_(*conds))
     if club_id:
-        query = query.where(EquipmentLoan.club_id == club_id)
+        query = query.where(EquipmentLoan.club_id.in_(club_id))
+    if semester:
+        query = query.where(EquipmentLoan.start_date.between(*semester_range(semester)))
     if active is not None:
         ongoing = svc.equipment_loan_ongoing_expr()
         query = query.where(ongoing if active else sa.not_(ongoing))
@@ -331,6 +351,13 @@ async def list_equipment_loans(
         db, ApprovalSubject.EQUIPMENT_LOAN, data, with_actor=True, approve_notes=True
     )
     return ApiResponse(data=data, meta=page.meta(total or 0))
+
+
+@router.get("/equipment-loans/semesters")
+async def list_equipment_loan_semesters(user: LoanReader, db: DbDep) -> ApiResponse[list[str]]:
+    """有器材借用的學期(新到舊),供「所有器材借用」的學期下拉。"""
+    dates = await db.scalars(sa.select(EquipmentLoan.start_date).distinct())
+    return ApiResponse(data=sorted({semester_of(d) for d in dates}, reverse=True))
 
 
 async def _pending_loan(db, loan_id: int) -> EquipmentLoan:

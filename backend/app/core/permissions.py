@@ -46,6 +46,9 @@ ADMIN_PAGES: tuple[AdminPage, ...] = (
     AdminPage("aannounce", "發布系統公告", ("/admin/announcements",)),
     AdminPage("abooking", "臨時場地器材借用審核", ("/admin/bookings",)),
     AdminPage("aroom", "固定場地借用審核", ("/admin/rooms",)),
+    # 查閱用:全校、全狀態、依學期(審核動作仍在上面兩頁),與「所有活動」同一種頁
+    AdminPage("avenuelist", "所有場地借用", ("/admin/venue-bookings",)),
+    AdminPage("aloanlist", "所有器材借用", ("/admin/equipment-loans",)),
     AdminPage("amanual", "手動借用", ("/admin/manual-booking",)),
     AdminPage("arule", "場地不開放規則", ("/admin/venue-rules",)),
     AdminPage("aclub", "社團總覽", ("/admin/club-overview",)),
@@ -96,8 +99,11 @@ CLUB_MEMBER_KEYS = ("amember",)
 # 手動借用與不開放規則的場地下拉。`include_inactive` 另限主檔維護頁
 VENUE_READ_KEYS = ("abooking", "asetting", "amanual", "arule")
 
-# GET /admin/equipment-loans 器材借用清單:借用審核、逾期追蹤
-LOAN_READ_KEYS = ("abooking", "aoverdue")
+# GET /admin/venue-bookings 臨時場地借用清單:借用審核、所有場地借用
+VENUE_BOOKING_READ_KEYS = ("abooking", "avenuelist")
+
+# GET /admin/equipment-loans 器材借用清單:借用審核、逾期追蹤、所有器材借用
+LOAN_READ_KEYS = ("abooking", "aoverdue", "aloanlist")
 
 # ---- 檔案下載:看得到那一頁 = 下載得了那一頁的檔案(decisions.md D-02)----
 #

@@ -31,6 +31,12 @@ PAGE_READS: list[tuple[str, str]] = [
     ("abooking", "/api/v1/admin/equipment-loans"),
     ("abooking", "/api/v1/admin/venues"),
     ("aroom", "/api/v1/admin/room-bookings"),
+    ("avenuelist", "/api/v1/admin/venue-bookings"),
+    ("avenuelist", "/api/v1/admin/venue-bookings/semesters"),
+    ("avenuelist", "/api/v1/admin/clubs/options"),
+    ("aloanlist", "/api/v1/admin/equipment-loans"),
+    ("aloanlist", "/api/v1/admin/equipment-loans/semesters"),
+    ("aloanlist", "/api/v1/admin/clubs/options"),
     ("amanual", "/api/v1/admin/venues"),
     ("amanual", "/api/v1/admin/equipment"),
     ("arule", "/api/v1/admin/venues"),
@@ -94,6 +100,25 @@ async def test_page_key_opens_only_its_own_page(client, db, url, key):
     # 持別頁的鍵進不來 —— 若閘門被拿掉,這行才會紅
     await login(client, "stranger")
     assert (await client.get(url)).status_code == 403, url
+
+
+# 查閱鍵只開 GET:所有場地/器材借用那兩頁看得到全狀態,核准/退回/撤銷仍限 abooking
+LIST_ONLY_WRITES = [
+    ("avenuelist", "/api/v1/admin/venue-bookings/1/approve"),
+    ("avenuelist", "/api/v1/admin/venue-bookings/1/reject"),
+    ("avenuelist", "/api/v1/admin/venue-bookings/1/revoke"),
+    ("aloanlist", "/api/v1/admin/equipment-loans/1/approve"),
+    ("aloanlist", "/api/v1/admin/equipment-loans/1/reject"),
+    ("aloanlist", "/api/v1/admin/equipment-loans/1/revoke"),
+]
+
+
+@pytest.mark.parametrize(("key", "url"), LIST_ONLY_WRITES)
+async def test_list_keys_cannot_act_on_bookings(client, db, key, url):
+    await make_user(db, username="holder", role="admin", permissions=[key])
+    await login(client, "holder")
+    resp = await client.post(url, json={"reason": "x"}, headers=csrf_headers(client))
+    assert resp.status_code == 403, f"{key} → {url}: {resp.text}"
 
 
 async def test_catalogue_covers_every_key_the_whitelist_accepts():

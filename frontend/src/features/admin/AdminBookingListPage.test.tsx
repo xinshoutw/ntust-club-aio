@@ -1,7 +1,8 @@
-import { describe, expect, test, vi } from 'vitest'
+import { beforeEach, describe, expect, test, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { Providers } from '../../test/providers'
-import AdminBookingListPage from './AdminBookingListPage'
+import AdminBookingListPage, { STATUSES } from './AdminBookingListPage'
+import { STATUS } from '../../lib/status'
 import type { ListedBooking } from '../../api/adminBookings'
 
 // 持不持 abooking 由各測試切換:看得到(查閱鍵)與動得了(審核鍵)是兩個判定
@@ -64,6 +65,10 @@ const open = (kind: 'venue' | 'loan', row: ListedBooking, name: string) => {
 }
 
 describe('所有場地/器材借用的詳情彈窗', () => {
+  beforeEach(() => {
+    auth.permissions = ['avenuelist', 'aloanlist']
+  })
+
   test('退回件看得到退回原因與經手人,沒有核准鈕', () => {
     open('venue', rejected, '精誠廣場')
     expect(screen.getByText('退回原因')).toBeTruthy()
@@ -83,4 +88,12 @@ describe('所有場地/器材借用的詳情彈窗', () => {
     open('loan', pending, '帳篷')
     expect(screen.getByRole('button', { name: APPROVE })).toBeTruthy()
   })
+})
+
+// 漏斗以顯示標籤反查鍵(lib/status 有多個鍵共用「待審核」「已逾期」):
+// 往 STATUSES 加任何一個共名鍵都會靜默多撈或少撈,這裡先擋
+test('狀態漏斗的標籤不重複,選了才對得回鍵', () => {
+  for (const keys of Object.values(STATUSES)) {
+    expect(new Set(keys.map((k) => STATUS[k].label)).size).toBe(keys.length)
+  }
 })

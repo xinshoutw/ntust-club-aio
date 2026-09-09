@@ -26,7 +26,7 @@ import BookingReviewModal from './BookingReviewModal'
 
 // 兩種借用各自的狀態集合:漏斗的選項就是這一份,送給後端的也是這些鍵
 // (器材的「已逾期」是推導狀態,後端 status=overdue 一併吃)
-const STATUSES: Record<BookingListKind, readonly StatusKey[]> = {
+export const STATUSES: Record<BookingListKind, readonly StatusKey[]> = {
   venue: ['pending', 'approved', 'rejected', 'cancelled'],
   loan: ['pending', 'approved', 'checked_out', 'returned', 'overdue', 'rejected', 'cancelled'],
 }

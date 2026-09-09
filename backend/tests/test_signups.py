@@ -179,8 +179,16 @@ async def test_capacity_and_signup_window(client, db):
     assert accepting["未開始活動"] is False
 
 
-async def test_review_based_signup_pending_until_confirmed(client, db):
-    """審核制活動:報名後待確認(pending),confirmed=False。"""
+async def test_review_based_signup_pending_until_confirmed(client, db, monkeypatch):
+    """審核制活動:報名後待確認(pending),confirmed=False;通知標題也要說得出待確認。"""
+    from app.services import notify
+
+    titles: list[str] = []
+
+    async def fake_club_event(kind, title, description="", club_webhook=None):
+        titles.append(title)
+
+    monkeypatch.setattr(notify, "club_event", fake_club_event)
     club, admin = await setup(client, db)
     item = await make_item(db, admin.id, name="審核制活動", requires_confirmation=True)
 
@@ -194,6 +202,7 @@ async def test_review_based_signup_pending_until_confirmed(client, db):
     detail = (await client.get(f"/api/v1/club/signup-items/{item.id}")).json()["data"]
     assert detail["my_status"] == "pending"
     assert detail["my_signup"]["confirmed"] is False
+    assert titles == ["線上報名已送出(待確認)"]  # 待確認在標題,不是藏在人數後面
 
     # 非審核制:送出即成功
     normal = await make_item(db, admin.id, name="一般活動")
@@ -202,6 +211,7 @@ async def test_review_based_signup_pending_until_confirmed(client, db):
         json={"participants": participants("乙")},
         headers=csrf_headers(client),
     )
+    assert titles[-1] == "線上報名已送出"
     detail = (await client.get(f"/api/v1/club/signup-items/{normal.id}")).json()["data"]
     assert detail["my_status"] == "signed"
     assert detail["my_signup"]["confirmed"] is True

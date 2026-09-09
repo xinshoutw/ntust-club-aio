@@ -114,7 +114,9 @@ D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政�
 **線上報名**
 
 - **F1 線上報名送出** `POST /club/signup-items/{id}/signup` · submit
-  `線上報名` / `{club.name}:{item.name}({n} 人)` —— 審核制時尾綴 `(待確認)`
+  `線上報名已送出` / `{club.name}:{item.name}({n} 人)` —— 審核制時標題作 `線上報名已送出(待確認)`
+  —— 標題帶動作:名詞句看不出是自己送的還是學務處補登的(K10);待確認擺標題,
+  接在人數括號後面會被當成報名已成立
 - **F2 報名已確認** `PUT /admin/signup-items/{id}/registrations/{club_id}/confirm` · approve
   `報名已確認` / `{club.name}:{item.name}`
 

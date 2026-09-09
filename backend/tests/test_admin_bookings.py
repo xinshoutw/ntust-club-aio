@@ -735,11 +735,13 @@ async def test_venue_bookings_filter_by_semester_and_many_clubs(client, db):
     await db.commit()
     for row in rows:
         await db.refresh(row)
-    spring, autumn, third_row, _ = rows
+    spring, autumn, third_row, roc99 = rows
 
-    # 學期下拉:新到舊,學年以數字比
+    # 學期下拉:新到舊,學年以數字比;下拉列得出來的標籤篩選端就要收(兩位數學年)
     sems = (await client.get("/api/v1/admin/venue-bookings/semesters")).json()["data"]
     assert sems == ["115-1", "114-2", "99-1"]
+    data = (await client.get("/api/v1/admin/venue-bookings?semester=99-1")).json()["data"]
+    assert [d["id"] for d in data] == [roc99.id]
 
     data = (await client.get("/api/v1/admin/venue-bookings?semester=114-2")).json()["data"]
     assert [d["id"] for d in data] == [spring.id]

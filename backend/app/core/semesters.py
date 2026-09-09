@@ -8,6 +8,10 @@ from zoneinfo import ZoneInfo
 
 TAIPEI = ZoneInfo("Asia/Taipei")
 
+# 學期標籤的輸入驗證:民國 1–999 年。`semester_of` 對任何日期都吐得出標籤,
+# 篩選端只擋得比它寬才不會出現「下拉列得出來、點下去 422」(遷入資料曾有民國 99 年的借用)
+SEMESTER_LABEL = r"^\d{1,3}-[12]$"
+
 
 def semester_of(d: date) -> str:
     if d.month >= 8:  # 8–12 月:當年度上學期

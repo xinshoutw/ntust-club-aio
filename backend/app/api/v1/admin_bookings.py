@@ -16,7 +16,7 @@ from app.api.pagination import Pagination, parse_sort
 from app.core import permissions
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, not_found, validation_error
-from app.core.semesters import semester_of, semester_range, semester_sort_key
+from app.core.semesters import SEMESTER_LABEL, semester_of, semester_range, semester_sort_key
 from app.models import (
     Activity,
     ApprovalRecord,
@@ -117,7 +117,7 @@ async def list_venue_bookings(
     sort: str | None = None,
     status: Annotated[list[BookingStatus] | None, Query()] = None,
     club_id: Annotated[list[int] | None, Query()] = None,
-    semester: str | None = Query(None, pattern=r"^\d{3}-[12]$"),
+    semester: str | None = Query(None, pattern=SEMESTER_LABEL),
     active: bool | None = None,
 ) -> ApiResponse[list[AdminVenueBookingOut]]:
     # status / club_id 可重複帶多值(取聯集);semester 以借用日落在哪個學期算;
@@ -284,7 +284,7 @@ async def list_equipment_loans(
     sort: str | None = None,
     status: Annotated[list[LoanStatusFilter] | None, Query()] = None,
     club_id: Annotated[list[int] | None, Query()] = None,
-    semester: str | None = Query(None, pattern=r"^\d{3}-[12]$"),
+    semester: str | None = Query(None, pattern=SEMESTER_LABEL),
     active: bool | None = None,
 ) -> ApiResponse[list[AdminEquipmentLoanOut]]:
     """status / club_id 可重複帶多值(取聯集);semester 以借用起日落在哪個學期算;

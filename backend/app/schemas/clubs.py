@@ -3,6 +3,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.core.semesters import SEMESTER_LABEL
 from app.models.enums import MemberKind
 
 _DISCORD_WEBHOOK_RE = re.compile(r"^https://discord\.com/api/webhooks/\d+/[\w-]+$")
@@ -125,7 +126,7 @@ class MemberIn(BaseModel):
     student_id: str = Field(min_length=1, max_length=20)
     kind: MemberKind
     title: str | None = Field(None, max_length=30)
-    semester: str = Field(pattern=r"^\d{3}-[12]$")
+    semester: str = Field(pattern=SEMESTER_LABEL)
 
 
 class MemberUpdate(BaseModel):
@@ -143,7 +144,7 @@ class MemberImportRequest(BaseModel):
     """
 
     csv_text: str = Field(min_length=1, max_length=200_000)
-    semester: str = Field(pattern=r"^\d{3}-[12]$")
+    semester: str = Field(pattern=SEMESTER_LABEL)
 
 
 class MemberImportResult(BaseModel):

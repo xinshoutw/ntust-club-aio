@@ -26,6 +26,7 @@ from app.core import permissions
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission, require_role
 from app.core.errors import conflict, not_found
 from app.core.security import generate_password, hash_password_async
+from app.core.semesters import SEMESTER_LABEL
 from app.models import Club, ClubMember, File, PasswordHistory, Session, User
 from app.models.enums import ClubKind, MemberKind, UserRole
 from app.schemas.accounts import PasswordResetOut
@@ -549,7 +550,7 @@ async def list_club_members(
     user: MemberReader,
     db: DbDep,
     page: Pagination,
-    semester: str | None = Query(None, pattern=r"^\d{3}-[12]$"),
+    semester: str | None = Query(None, pattern=SEMESTER_LABEL),
     kind: Annotated[list[MemberKind] | None, Query()] = None,  # 可重複帶多值(比照 club 端)
     sort: str | None = None,
 ) -> ApiResponse[list[MemberOut]]:

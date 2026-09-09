@@ -18,7 +18,13 @@ from starlette.concurrency import run_in_threadpool
 from app.api.pagination import Pagination, parse_sort
 from app.core.deps import ClubUser, DbDep, client_ip
 from app.core.errors import AppError, conflict, not_found, validation_error
-from app.core.semesters import TAIPEI, semester_of, semester_range, semester_sort_key
+from app.core.semesters import (
+    SEMESTER_LABEL,
+    TAIPEI,
+    semester_of,
+    semester_range,
+    semester_sort_key,
+)
 from app.models import (
     Activity,
     ActivityReflection,
@@ -122,7 +128,7 @@ async def list_activities(
     user: ClubUser,
     db: DbDep,
     page: Pagination,
-    semester: str | None = Query(None, pattern=r"^\d{3}-[12]$"),
+    semester: str | None = Query(None, pattern=SEMESTER_LABEL),
     # 可重複帶多值(總覽頁一次查非 closed 各狀態,避免整表撈取);另收推導狀態 locked
     status: Annotated[list[str] | None, Query()] = None,
     type: Annotated[list[ActivityType] | None, Query()] = None,  # 可重複帶多值

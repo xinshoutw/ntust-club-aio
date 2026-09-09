@@ -16,7 +16,7 @@ from starlette.concurrency import run_in_threadpool
 from app.api.pagination import NullsLast, Pagination, ilike_contains, parse_sort
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, forbidden, not_found, validation_error
-from app.core.semesters import semester_of, semester_range, semester_sort_key
+from app.core.semesters import SEMESTER_LABEL, semester_of, semester_range, semester_sort_key
 from app.models import Activity, ActivityReport, ApprovalRecord, Club, User
 from app.models.enums import (
     ActivityStatus,
@@ -228,7 +228,7 @@ async def list_activities(
     user: Reviewer,
     db: DbDep,
     page: Pagination,
-    semester: str | None = Query(None, pattern=r"^\d{3}-[12]$"),
+    semester: str | None = Query(None, pattern=SEMESTER_LABEL),
     status: Annotated[list[str] | None, Query()] = None,
     club_id: Annotated[list[int] | None, Query()] = None,
     type_: Annotated[list[str] | None, Query(alias="type")] = None,

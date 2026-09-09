@@ -17,6 +17,7 @@ from fastapi import APIRouter, Query, Request
 from app.api.pagination import Pagination, parse_sort
 from app.core.deps import ClubUser, DbDep, client_ip
 from app.core.errors import conflict, not_found, validation_error
+from app.core.semesters import SEMESTER_LABEL
 from app.models import ClubMember
 from app.models.enums import MemberKind
 from app.schemas.clubs import (
@@ -100,7 +101,7 @@ async def list_members(
     user: ClubUser,
     db: DbDep,
     page: Pagination,
-    semester: str | None = Query(None, pattern=r"^\d{3}-[12]$"),
+    semester: str | None = Query(None, pattern=SEMESTER_LABEL),
     kind: Annotated[list[MemberKind] | None, Query()] = None,  # 可重複帶多值(前端多選篩選)
     sort: str | None = None,
 ) -> ApiResponse[list[MemberOut]]:

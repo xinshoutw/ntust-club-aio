@@ -324,6 +324,8 @@ export interface BookingListParams {
   semester?: string
   statuses?: string[]
   clubIds?: number[]
+  /** 只有器材清單吃;場地清單忽略 */
+  equipmentIds?: number[]
   sort?: string
   page: number
   pageSize: number
@@ -339,6 +341,7 @@ export function useBookingList(kind: BookingListKind, p: BookingListParams) {
     semester: p.semester,
     status: p.statuses,
     club_id: p.clubIds?.map(String),
+    equipment_id: kind === 'loan' ? p.equipmentIds?.map(String) : undefined,
     sort: p.sort,
     page: p.page,
     page_size: p.pageSize,

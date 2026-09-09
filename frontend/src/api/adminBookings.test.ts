@@ -45,6 +45,7 @@ describe('useBookingList 的查詢字串', () => {
           semester: '115-1',
           statuses: ['checked_out', 'overdue'],
           clubIds: [7, 9],
+          equipmentIds: [3],
           sort: '-start_date',
           page: 2,
           pageSize: 20,
@@ -53,14 +54,15 @@ describe('useBookingList 的查詢字串', () => {
     )
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(apiPaged).toHaveBeenCalledWith(
-      '/admin/equipment-loans?semester=115-1&status=checked_out&status=overdue&club_id=7&club_id=9&sort=-start_date&page=2&page_size=20',
+      '/admin/equipment-loans?semester=115-1&status=checked_out&status=overdue&club_id=7&club_id=9&equipment_id=3&sort=-start_date&page=2&page_size=20',
     )
   })
 
   it('場地清單走另一支端點;全部學期、沒篩選時只剩分頁', async () => {
     vi.mocked(apiPaged).mockResolvedValueOnce({ data: [], total: 0 })
     const { result } = renderHook(
-      () => useBookingList('venue', { statuses: [], page: 1, pageSize: 30 }),
+      // 場地清單不吃 equipmentIds:傳了也不進網址
+      () => useBookingList('venue', { statuses: [], equipmentIds: [3], page: 1, pageSize: 30 }),
       { wrapper },
     )
     await waitFor(() => expect(result.current.isSuccess).toBe(true))

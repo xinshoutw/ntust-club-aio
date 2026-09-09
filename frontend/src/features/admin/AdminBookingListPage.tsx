@@ -15,6 +15,7 @@ import { useFitRows } from '../../lib/fitRows'
 import { semesterOptions } from '../../lib/semester'
 import { STATUS, type StatusKey } from '../../lib/status'
 import { groupActiveClubs, useClubOptions } from '../../api/adminClubs'
+import { useAdminEquipment } from '../../api/adminEquipment'
 import {
   useAdminBookingMutations,
   useBookingList,
@@ -48,6 +49,7 @@ export default function AdminBookingListPage({ kind }: { kind: BookingListKind }
   const { entries, toggle } = useMultiSort<SortKey>([{ key: dateKey, dir: -1 }])
   const [clubFilter, setClubFilter] = useState<string[]>([])
   const [statusFilter, setStatusFilter] = useState<string[]>([])
+  const [equipmentFilter, setEquipmentFilter] = useState<string[]>([])
   const [current, setCurrent] = useState<ListedBooking | null>(null)
   const [open, setOpen] = useState(false)
   // 「看得到」與「動得了」是兩個判定:核准/退回/撤銷是 abooking 的事(一頁一鍵)
@@ -68,17 +70,29 @@ export default function AdminBookingListPage({ kind }: { kind: BookingListKind }
     : undefined
   const clubIds = clubIdMatches && clubIdMatches.length === 0 ? [-1] : clubIdMatches
 
+  // 器材漏斗(只有器材清單):主檔含停用品項 —— 這是歷史查閱頁,舊單借的器材可能已停用;
+  // 名稱對 id 的空集規則與社團漏斗同一條
+  const equipmentQuery = useAdminEquipment()
+  const equipmentNames = kind === 'loan' ? (equipmentQuery.data ?? []).map((e) => e.name) : []
+  const equipmentIdMatches = equipmentFilter.length
+    ? (equipmentQuery.data ?? []).filter((e) => equipmentFilter.includes(e.name)).map((e) => e.id)
+    : undefined
+  const equipmentIds = equipmentIdMatches && equipmentIdMatches.length === 0 ? [-1] : equipmentIdMatches
+
   const statusKeys = STATUSES[kind]
   const listQuery = useBookingList(kind, {
     semester,
     statuses: statusKeys.filter((k) => statusFilter.includes(STATUS[k].label)),
     clubIds,
+    equipmentIds,
     sort: sortParam(entries),
     page,
     pageSize,
   })
   const rows = listQuery.data?.rows ?? []
   const total = listQuery.data?.total ?? 0
+  // 器材主檔只有器材清單會用到;場地頁那支查詢失敗不該顯示成篩選選項壞掉
+  const optionsError = kind === 'loan' && equipmentQuery.isError
 
   // 只在查詢成功後 clamp:失敗時 total 也是 0,一起收斂會把錯誤說明洗掉
   const listLoaded = listQuery.isSuccess
@@ -174,7 +188,19 @@ export default function AdminBookingListPage({ kind }: { kind: BookingListKind }
                     </span>
                   </th>
                   <th scope="col">
-                    {kind === 'venue' ? sortHeader('場地', 'venue') : sortHeader('器材與數量', 'equipment')}
+                    {kind === 'venue' ? (
+                      sortHeader('場地', 'venue')
+                    ) : (
+                      <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                        {sortHeader('器材與數量', 'equipment')}
+                        <FilterButton
+                          options={equipmentNames}
+                          selected={equipmentFilter}
+                          onChange={(next) => { setEquipmentFilter(next); resetPage() }}
+                          label="篩選器材"
+                        />
+                      </span>
+                    )}
                   </th>
                   <th scope="col">{kind === 'venue' ? '時段與用途' : '活動與用途'}</th>
                   <th scope="col">{sortHeader('送件時間', 'created_at')}</th>
@@ -227,25 +253,26 @@ export default function AdminBookingListPage({ kind }: { kind: BookingListKind }
                   )
                 })}
                 {/* 兩種失敗都要有出口:列表失敗時 rows 是空陣列,不說出來就會顯示成「無符合條件」 */}
-                {(listQuery.isError || clubsQuery.isError) && (
+                {(listQuery.isError || clubsQuery.isError || optionsError) && (
                   <tr className="no-hover">
                     <td colSpan={7}>
                       <QueryError
                         compact
                         title={listQuery.isError ? '借用列表載入失敗' : '篩選選項載入失敗'}
-                        error={listQuery.error ?? clubsQuery.error}
+                        error={listQuery.error ?? clubsQuery.error ?? equipmentQuery.error}
                         onRetry={() => {
                           if (listQuery.isError) void listQuery.refetch()
                           if (clubsQuery.isError) void clubsQuery.refetch()
+                          if (equipmentQuery.isError) void equipmentQuery.refetch()
                         }}
                       />
                     </td>
                   </tr>
                 )}
-                {!listQuery.isFetching && !listQuery.isError && !clubsQuery.isError && rows.length === 0 && (
+                {!listQuery.isFetching && !listQuery.isError && !clubsQuery.isError && !optionsError && rows.length === 0 && (
                   <tr className="no-hover">
                     <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 28 }}>
-                      {clubFilter.length || statusFilter.length
+                      {clubFilter.length || statusFilter.length || equipmentFilter.length
                         ? '無符合條件的借用'
                         : semester
                           ? '本學期尚無借用'

@@ -99,6 +99,9 @@ CLUB_MEMBER_KEYS = ("amember",)
 # 手動借用與不開放規則的場地下拉。`include_inactive` 另限主檔維護頁
 VENUE_READ_KEYS = ("abooking", "asetting", "amanual", "arule")
 
+# GET /admin/equipment 器材主檔:系統設定的器材卡、手動借用的下拉、所有器材借用的篩選
+EQUIPMENT_READ_KEYS = ("asetting", "amanual", "aloanlist")
+
 # GET /admin/venue-bookings 臨時場地借用清單:借用審核、所有場地借用
 VENUE_BOOKING_READ_KEYS = ("abooking", "avenuelist")
 

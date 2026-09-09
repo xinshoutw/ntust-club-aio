@@ -131,6 +131,8 @@ CROSS_READS = [
     ("aloanlist", "/api/v1/admin/venue-bookings"),
     ("aloanlist", "/api/v1/admin/venue-bookings/semesters"),
     ("aoverdue", "/api/v1/admin/venue-bookings"),
+    # 器材主檔只給器材那一頁,場地頁的鍵進不來(前端也不該為場地頁打這支)
+    ("avenuelist", "/api/v1/admin/equipment"),
 ]
 
 

@@ -207,7 +207,7 @@ async def test_notify_expired_routes_by_whether_a_club_can_be_reached(monkeypatc
         loan_expiry.Expired(3, 7, True, "https://hook", "z"),
     ])
     assert sent == [
-        ("system", "reject", loan_expiry.TITLE),
-        ("system", "reject", loan_expiry.TITLE),
-        ("club", "reject", "https://hook"),
+        ("system", "alert", loan_expiry.TITLE),
+        ("system", "alert", loan_expiry.TITLE),
+        ("club", "alert", "https://hook"),  # 沒人審過的單不掛紅色
     ]

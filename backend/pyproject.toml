@@ -16,7 +16,7 @@ dependencies = [
     "python-multipart>=0.0.32",
     "reportlab>=5.0.0",
     "pillow>=12.3.0",
-    "pillow-heif>=1.7.0",
+    "pi-heif>=1.4.0",
 ]
 
 [dependency-groups]

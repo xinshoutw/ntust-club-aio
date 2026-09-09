@@ -9,20 +9,24 @@
 
 import asyncio
 import hashlib
-from concurrent.futures import ThreadPoolExecutor
 import logging
 import shutil
 import uuid
 from collections.abc import Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-import pillow_heif
+import pi_heif
 import sqlalchemy as sa
 from fastapi import UploadFile
 from fastapi.responses import FileResponse
 from PIL import Image, ImageOps
+
+# pi-heif 是 pillow-heif 的 decode-only 版:同一位作者、同一套 API,
+# wheel 只帶 LGPL 的 libheif/libde265,
+# 沒有 GPLv2 的 x265 編碼器 —— 這裡只解不編,映像推上 registry 也不必背 GPL 的散佈義務
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session, SessionTransaction
 
@@ -62,7 +66,7 @@ logger = logging.getLogger(__name__)
 
 # HEIC/HEIF 解碼器只註冊一次(啟動期就暴露相依缺失,不是等第一張 HEIC 才在 except 裡被吞掉);
 # 在 worker thread 裡反覆註冊會併發改 Pillow 的全域表
-pillow_heif.register_heif_opener()
+pi_heif.register_heif_opener()
 
 
 def unlink_quiet(path: Path) -> None:
@@ -572,6 +576,8 @@ def _render_preview(src: Path, dst: Path) -> None:
         with Image.open(src) as img:
             if img.width * img.height > PREVIEW_MAX_PIXELS:
                 raise ValueError(f"image too large to preview: {img.width}x{img.height}")
+            # libheif 與 Pillow 的 TIFF 外掛解碼時就套了方向並把 Orientation 改回 1,
+            # 這行是保險(換解碼器也不會躺著輸出),測試驗的是結果不是這一行
             img = ImageOps.exif_transpose(img) or img
             img.thumbnail((PREVIEW_MAX_EDGE, PREVIEW_MAX_EDGE))
             img.convert("RGB").save(tmp, format="JPEG", quality=85)

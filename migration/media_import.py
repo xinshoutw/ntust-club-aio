@@ -42,6 +42,7 @@ from cms_import import IdMap, _scope_bounds, local_dt
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.core.config import settings
+from app.services.files import unlink_quiet
 from app.core.db import async_session_factory
 from app.models import Activity, File, LegacyIdMap
 from app.models.enums import LegacySystem
@@ -266,7 +267,7 @@ async def reset(db: AsyncSession) -> None:
     for _, rel_path in rows:
         disk = upload_root / rel_path
         if disk.is_file():
-            disk.unlink()
+            unlink_quiet(disk)  # 連 <path>.preview.jpg 的轉檔快取一起清
             unlinked += 1
         else:
             kept += 1

@@ -24,6 +24,7 @@
 ## 規則
 
 - 學期以**借用起日**歸屬;「已逾期」是推導狀態(`booking_service.is_overdue_in`),清單與漏斗都當狀態用
+- **「已借出」不含逾期的**:兩者底層同為 `checked_out`,後端 `status=checked_out` 不帶 `overdue` 時會排除已逾期的列,否則勾一個標籤看到的是另一個標籤的列;兩個都勾就是整批 `checked_out`
 - `aloanlist` 只開 `GET`;`GET /admin/equipment-loans` 是三把鍵共讀的(`core/permissions.LOAN_READ_KEYS`:借用審核、逾期追蹤、本頁)
 - 其餘規則(兩個判定、漏斗空集、clamp、路由 `key`)同場地頁
 

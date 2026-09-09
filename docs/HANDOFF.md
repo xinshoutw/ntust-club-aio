@@ -131,6 +131,12 @@ nginx 上傳白名單那條 location 改成同時涵蓋報修佐證與勸導附�
 退回/撤銷原因(含經手人),而且**沒接 `onApprove` 就不畫審核鈕**(原本會畫出按了只得到假成功的鈕)。
 一個元件 `AdminBookingListPage` 吃 `kind`,兩條路由各帶 `key` 才不會互切時帶著上一頁的排序鍵。
 頁名依 `design-guide.md` §7 用「場地」不用「教室」。
+Opus 交叉審查後補的:`status=checked_out` 不帶 `overdue` 時**排除已逾期的列**(兩者底層同為
+`checked_out`,原本勾「已借出」會連逾期單一起撈回,`test_equipment_overdue_filter` 的那句斷言跟著改);
+固定場地借用那第三份 DTO 也接上 `created_at` 與處置三欄,`/admin/rooms` 與社團總覽的固定借用彈窗
+從此看得到退回原因;新增跨鍵負向測試(`CROSS_READS`,兩個讀取鍵常數對調會紅)與 `useBookingList`
+的查詢字串測試。**沒做**:社團漏斗仍只列啟用中社團(所有活動頁同一份判定,要改就兩頁一起);
+`/admin/room-bookings` 的 `club_id` 仍是單值(三種借用兩支吃多值一支不吃,要用到再改)。
 
 **要跑遷移**:D-21/D-22 是 drop column,`alembic upgrade head` 之後舊號碼就沒了。
 D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)—— 走 `--reset` 重灌,
@@ -138,8 +144,8 @@ D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)
 
 ## 驗證現況
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **577 passed**;`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **265 passed**(56 檔)、
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **597 passed**;`ruff check .` 全綠
+- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **275 passed**(58 檔)、
   `pnpm run lint` 8 個既有的 fast-refresh warning
 - 新測試逐一做過 mutation 驗證(改回舊寫法會紅);借用色格圖那支另在 `TZ=UTC` 與 `TZ=Pacific/Honolulu` 下各跑過一次
 

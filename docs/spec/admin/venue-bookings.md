@@ -26,7 +26,8 @@
 ## 規則
 
 - **看得到與動得了是兩個判定**:`avenuelist` 只開 `GET`,三支 POST 仍限 `abooking`(`tests/test_admin_permissions.LIST_ONLY_WRITES`)。前端據 `canAccessAdminPath(user, '/admin/bookings')` 決定要不要把回呼接進彈窗;彈窗沒收到 `onApprove` 就不畫審核鈕 —— 畫了沒人接,按下去只會得到一句假的「已核准」
-- 學期以**借用日**歸屬(`core/semesters.semester_range`),與活動頁以活動日期歸屬同一條規則
+- 學期以**借用日**歸屬(`core/semesters.semester_range`),與活動頁以活動日期歸屬同一條規則;下拉**以數字排序**(`semester_sort_key` / 前端 `semesterRank`),字串比大小會把民國 99 年排到 100 年前面
+- 遷入資料裡打錯年的借用(2004、0110、2030 這種)會在下拉多出 90-1、-1909-1 這種學期,點下去 422:那是資料不是程式,用 `scripts/fix_booking_dates.py` 修(`DEPLOY_CHECKLIST.md`)
 - 「學務處」列(`club_id` NULL,行政手動借用)不在社團漏斗裡,只能在全部社團時看到
 - 社團漏斗以名稱對 id:有選社團但主檔未載入或名稱失效時**強制空集**,不可 fail-open 回全部
 - 分頁只在查詢成功後 clamp(理由同所有活動頁)

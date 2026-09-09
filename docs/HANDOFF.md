@@ -26,6 +26,7 @@ DEC-01:這學年評鑑在新系統跑,但學年末才用 —— 不擋上線。
 |---|---|
 | 備份排程 | 腳本就緒(`scripts/backup_db.sh`),**cron 未掛** |
 | 政府行事曆假日 | 腳本就緒(`scripts/import_holidays.py`),**上線年度未跑** |
+| 遷入借用的打錯日期 | 腳本就緒(`scripts/fix_booking_dates.py`),開發庫已跑、**正式庫未跑** |
 | `.env` 正式值 | `MAIL_FROM_ADDRESS` 是個人信箱;Uptime Kuma 兩支 push URL 待填 |
 | 借用的遷移範圍 | 活動已依 `SCOPE_FIRST/LAST_SEMESTER` 過濾,借用是否同受此限未定(MIG-10) |
 | 行政帳號權限 | 遷移進來的 15 個 admin 權限鍵全空,只有 `super` 看得到東西;分工由承辦決定 |
@@ -137,6 +138,17 @@ Opus 交叉審查後補的:`status=checked_out` 不帶 `overdue` 時**排除已�
 從此看得到退回原因;新增跨鍵負向測試(`CROSS_READS`,兩個讀取鍵常數對調會紅)與 `useBookingList`
 的查詢字串測試。**沒做**:社團漏斗仍只列啟用中社團(所有活動頁同一份判定,要改就兩頁一起);
 `/admin/room-bookings` 的 `club_id` 仍是單值(三種借用兩支吃多值一支不吃,要用到再改)。
+
+**學期下拉改數字排序、遷入的打錯日期有腳本修**(2026-09-09):所有列學期的端點
+(`/admin/venue-bookings/semesters`、`/admin/equipment-loans/semesters`、`/admin/activities/semesters`、
+`/club/activities/semesters`)與前端 `semesterOptions` 原本都拿字串比大小,民國 99 年會排在 100 年前面;
+現在一律走 `core/semesters.semester_sort_key` / `lib/semester.semesterRank`。下拉裡的 90-1、-1909-1
+這種學期**是資料問題**:clubclass 讓人手打日期,遷入的臨時場地借用有 89 筆借用日離建單時間超過一年
+(2004、0110、2030 這種年),除了一筆已核准全是退回件;器材借用一筆都沒有。
+`scripts/fix_booking_dates.py` 依「月日照舊、年份改成建單之後最先遇到的那一年」改回去,
+不加 `--yes` 只預覽,冪等。**開發庫已跑過**(89 筆,`venue_bookings.date` 現在落在 2020–2026),
+**正式庫還沒跑**(已列入 `DEPLOY_CHECKLIST.md`)。你點名的四組(118-1 → 2023、101-1 兩筆 → 2024、
+105-2 與 106-2 → 2022)規則算出來的年份與你說的一致。
 
 **要跑遷移**:D-21/D-22 是 drop column,`alembic upgrade head` 之後舊號碼就沒了。
 D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)—— 走 `--reset` 重灌,

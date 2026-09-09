@@ -312,11 +312,11 @@ async def test_equipment_overdue_filter(client, db):
     assert [d["purpose"] for d in data] == ["更逾期", "逾期單"]
     assert data[0]["overdue"] is True
 
-    # 一般狀態篩選照舊;未知狀態 → 422
+    # 「已借出」與「已逾期」是清單上的兩個狀態:只勾 checked_out 不撈逾期的;未知狀態 → 422
     data = (
         await client.get("/api/v1/admin/equipment-loans", params={"status": "checked_out"})
     ).json()["data"]
-    assert {d["purpose"] for d in data} == {"逾期單", "借出中", "更逾期"}
+    assert {d["purpose"] for d in data} == {"借出中"}
     assert (
         await client.get("/api/v1/admin/equipment-loans", params={"status": "hack"})
     ).status_code == 422
@@ -786,3 +786,33 @@ async def test_equipment_loans_filter_by_semester_and_many_clubs(client, db):
     await login(client, "lister")
     resp = await client.get("/api/v1/admin/equipment-loans?semester=115-1")
     assert resp.json()["meta"]["total"] == 1
+
+
+async def test_checked_out_filter_leaves_overdue_loans_to_the_overdue_status(client, db):
+    """「已借出」與「已逾期」是清單上的兩個狀態,底層同為 checked_out:只勾已借出不撈逾期的。"""
+    club, _ = await seed(client, db)
+    eq = await make_equipment(db)
+    today = date.today()
+    rows = [
+        EquipmentLoan(club_id=club.id, equipment_id=eq.id, activity_id=None, qty=1,
+                      start_date=today - timedelta(days=12), end_date=today - timedelta(days=10),
+                      purpose="逾期未還", status="checked_out"),
+        EquipmentLoan(club_id=club.id, equipment_id=eq.id, activity_id=None, qty=1,
+                      start_date=today, end_date=today + timedelta(days=10),
+                      purpose="還在借", status="checked_out"),
+    ]
+    db.add_all(rows)
+    await db.commit()
+    for row in rows:
+        await db.refresh(row)
+    overdue, in_use = rows
+
+    data = (await client.get("/api/v1/admin/equipment-loans?status=checked_out")).json()["data"]
+    assert [d["id"] for d in data] == [in_use.id]
+
+    data = (await client.get("/api/v1/admin/equipment-loans?status=overdue")).json()["data"]
+    assert [d["id"] for d in data] == [overdue.id]
+
+    # 兩個都勾就是整批 checked_out
+    resp = await client.get("/api/v1/admin/equipment-loans?status=checked_out&status=overdue")
+    assert sorted(d["id"] for d in resp.json()["data"]) == sorted([overdue.id, in_use.id])

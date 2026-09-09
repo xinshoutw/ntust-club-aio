@@ -300,17 +300,21 @@ async def list_equipment_loans(
     )
     if status:
         conds = []
+        threshold = svc.overdue_threshold_in(datetime.now(UTC), return_time, holidays)
+        overdue = sa.and_(
+            EquipmentLoan.status == LoanStatus.CHECKED_OUT,
+            EquipmentLoan.end_date <= threshold,
+        )
         if "overdue" in status:
-            threshold = svc.overdue_threshold_in(datetime.now(UTC), return_time, holidays)
-            conds.append(
-                sa.and_(
-                    EquipmentLoan.status == LoanStatus.CHECKED_OUT,
-                    EquipmentLoan.end_date <= threshold,
-                )
-            )
+            conds.append(overdue)
         plain = [LoanStatus(s) for s in status if s != "overdue"]
         if plain:
-            conds.append(EquipmentLoan.status.in_(plain))
+            in_plain = EquipmentLoan.status.in_(plain)
+            if LoanStatus.CHECKED_OUT in plain and "overdue" not in status:
+                # 「已借出」與「已逾期」在清單上是兩個狀態,底層都是 checked_out:
+                # 只勾已借出就不能把逾期的一起撈回,否則勾一個標籤看到的是另一個標籤的列
+                in_plain = sa.and_(in_plain, sa.not_(overdue))
+            conds.append(in_plain)
         query = query.where(sa.or_(*conds))
     if club_id:
         query = query.where(EquipmentLoan.club_id.in_(club_id))

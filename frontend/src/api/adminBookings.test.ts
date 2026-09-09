@@ -45,7 +45,7 @@ describe('useBookingList 的查詢字串', () => {
           semester: '115-1',
           statuses: ['checked_out', 'overdue'],
           clubIds: [7, 9],
-          equipmentIds: [3],
+          equipmentIds: [3, 5],
           sort: '-start_date',
           page: 2,
           pageSize: 20,
@@ -54,7 +54,7 @@ describe('useBookingList 的查詢字串', () => {
     )
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(apiPaged).toHaveBeenCalledWith(
-      '/admin/equipment-loans?semester=115-1&status=checked_out&status=overdue&club_id=7&club_id=9&equipment_id=3&sort=-start_date&page=2&page_size=20',
+      '/admin/equipment-loans?semester=115-1&status=checked_out&status=overdue&club_id=7&club_id=9&equipment_id=3&equipment_id=5&sort=-start_date&page=2&page_size=20',
     )
   })
 

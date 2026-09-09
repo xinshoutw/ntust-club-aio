@@ -580,11 +580,18 @@ def _render_preview(src: Path, dst: Path) -> None:
         tmp.unlink(missing_ok=True)
 
 
-async def preview_of(disk: Path) -> Path:
-    """轉檔預覽的磁碟路徑;沒有快取就轉一次(專屬 thread pool,不擋 event loop,同時最多兩張)。"""
+async def preview_of(disk: Path) -> Path | None:
+    """轉檔預覽的磁碟路徑;沒有快取就轉一次(專屬 thread pool,不擋 event loop,同時最多兩張)。
+
+    磁碟到告警水位(90%,與上傳閘同一條線)就**不再建新快取**、回 None 讓呼叫端給原檔:
+    上傳被擋住了,瀏覽幾 GB 的歷史 HEIC 卻還在寫快取,吃掉的是留給 PostgreSQL 與 log 的最後空間。
+    已經轉好的照常給。
+    """
     dst = disk.with_name(disk.name + PREVIEW_SUFFIX)
     if dst.is_file():
         return dst
+    if disk_level() == "alert":
+        return None
     await asyncio.get_running_loop().run_in_executor(_PREVIEW_POOL, _render_preview, disk, dst)
     return dst
 
@@ -611,7 +618,8 @@ async def file_response(
         except Exception:
             # 轉不了(檔案壞了、太大、編碼不支援)就照舊給原檔;破圖總比 500 好,log 才查得到是哪一張
             logger.exception("preview render failed: file=%s mime=%s", file.id, file.mime)
-        else:
+            preview = None
+        if preview is not None:
             response = FileResponse(
                 preview,
                 media_type="image/jpeg",

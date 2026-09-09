@@ -91,9 +91,9 @@ export default function AdminBookingListPage({ kind }: { kind: BookingListKind }
   })
   const rows = listQuery.data?.rows ?? []
   const total = listQuery.data?.total ?? 0
-  // 器材主檔只有器材清單會查(場地頁 enabled=false,恆為 isPending)。
-  // 這裡與社團漏斗一樣用 isError 而非 isLoadingError:背景重抓失敗也顯示錯誤列,與所有活動頁同一份寫法
-  const optionsError = kind === 'loan' && equipmentQuery.isError
+  // 「失敗」的判準是 isLoadingError(design-guide §6):背景重抓失敗時手上還有資料,照常渲染。
+  // 器材主檔只有器材清單會查(場地頁 enabled=false,恆為 isPending)
+  const optionsError = kind === 'loan' && equipmentQuery.isLoadingError
 
   // 只在查詢成功後 clamp:失敗時 total 也是 0,一起收斂會把錯誤說明洗掉
   const listLoaded = listQuery.isSuccess
@@ -255,23 +255,23 @@ export default function AdminBookingListPage({ kind }: { kind: BookingListKind }
                   )
                 })}
                 {/* 兩種失敗都要有出口:列表失敗時 rows 是空陣列,不說出來就會顯示成「無符合條件」 */}
-                {(listQuery.isError || clubsQuery.isError || optionsError) && (
+                {(listQuery.isLoadingError || clubsQuery.isLoadingError || optionsError) && (
                   <tr className="no-hover">
                     <td colSpan={7}>
                       <QueryError
                         compact
-                        title={listQuery.isError ? '借用列表載入失敗' : '篩選選項載入失敗'}
+                        title={listQuery.isLoadingError ? '借用列表載入失敗' : '篩選選項載入失敗'}
                         error={listQuery.error ?? clubsQuery.error ?? equipmentQuery.error}
                         onRetry={() => {
-                          if (listQuery.isError) void listQuery.refetch()
-                          if (clubsQuery.isError) void clubsQuery.refetch()
-                          if (equipmentQuery.isError) void equipmentQuery.refetch()
+                          if (listQuery.isLoadingError) void listQuery.refetch()
+                          if (clubsQuery.isLoadingError) void clubsQuery.refetch()
+                          if (equipmentQuery.isLoadingError) void equipmentQuery.refetch()
                         }}
                       />
                     </td>
                   </tr>
                 )}
-                {!listQuery.isFetching && !listQuery.isError && !clubsQuery.isError && !optionsError && rows.length === 0 && (
+                {!listQuery.isFetching && !listQuery.isLoadingError && !clubsQuery.isLoadingError && !optionsError && rows.length === 0 && (
                   <tr className="no-hover">
                     <td colSpan={7} style={{ textAlign: 'center', color: 'var(--steel)', fontSize: 13, padding: 28 }}>
                       {clubFilter.length || statusFilter.length || equipmentFilter.length

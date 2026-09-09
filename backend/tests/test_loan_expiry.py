@@ -66,7 +66,8 @@ async def test_checkout_list_revokes_loans_whose_window_has_passed(client, db, m
     assert f"equipment_loan={expired.id};club={club.id}" in audit_row.detail
 
     # 推給該社;只推一次
-    assert [(c[1], c[3]) for c in calls] == [(loan_expiry.TITLE, club.discord_webhook_url)]
+    # 字面值:與承辦手動撤銷的「已被學務處撤銷」分開講,用符號比對等於沒釘住
+    assert [(c[1], c[3]) for c in calls] == [("器材借用已自動撤銷", club.discord_webhook_url)]
     assert loan_expiry.REASON in calls[0][2]
 
     # 再載入一次不會重複撤銷(冪等)

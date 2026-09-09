@@ -509,7 +509,15 @@ async def test_temp_and_fixed_approval_cross_check(client, db):
     assert resp.json()["meta"]["code"] == "SLOT_TAKEN"
 
 
-async def test_revoke_approved_venue_booking_and_stale_loan(client, db):
+async def test_revoke_approved_venue_booking_and_stale_loan(client, db, monkeypatch):
+    from app.services import notify
+
+    titles: list[str] = []
+
+    async def fake_club_event(kind, title, description="", club_webhook=None):
+        titles.append(title)
+
+    monkeypatch.setattr(notify, "club_event", fake_club_event)
     club, _ = await seed(client, db)
     venue = await make_venue(db)
     equipment = await make_equipment(db)
@@ -556,6 +564,8 @@ async def test_revoke_approved_venue_booking_and_stale_loan(client, db):
     await db.refresh(loan)
     assert booking.status.value == "cancelled"
     assert loan.status.value == "cancelled"
+    # 社團自己按的取消是「已取消」,只差一個字,不點名主詞就分不出是誰收走的
+    assert titles == ["臨時場地借用已被學務處撤銷", "器材借用已被學務處撤銷"]
     assert await db.scalar(
         sa.select(AuditLog.id).where(AuditLog.action == "venue_booking_revoked")
     ) is not None

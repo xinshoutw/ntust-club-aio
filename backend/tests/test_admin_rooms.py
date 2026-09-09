@@ -227,12 +227,20 @@ async def test_room_approve_blocks_approved_overlap(client, db):
     assert resp.json()["meta"]["code"] == "SLOT_TAKEN"
 
 
-async def test_revoke_frees_the_slot_and_the_quota(client, db):
+async def test_revoke_frees_the_slot_and_the_quota(client, db, monkeypatch):
     """已核准的固定借用要撤得掉。
 
     開始日是學期起日,學期一開就社團取消不了、行政也沒端點 —— 教室時段與該社 10 節
     額度整學期鎖死。撤銷落 cancelled,額度判定本來就排除它,額度自動回歸。
     """
+    from app.services import notify
+
+    titles: list[str] = []
+
+    async def fake_club_event(kind, title, description="", club_webhook=None):
+        titles.append(title)
+
+    monkeypatch.setattr(notify, "club_event", fake_club_event)
     first, _, done = await seed(client, db)
 
     # 已核准單佔著週五第 1 節,同時段的新申請核准不了
@@ -259,6 +267,8 @@ async def test_revoke_frees_the_slot_and_the_quota(client, db):
         f"{URL}/{done.id}/revoke", json={"reason": "誤核"}, headers=csrf_headers(client)
     )
     assert resp.status_code == 200, resp.text
+    # 社團自己按的取消是「已取消」,只差一個字,不點名主詞就分不出是誰收走的
+    assert titles == ["固定場地借用已被學務處撤銷"]
     assert (
         await db.scalar(
             sa.select(RoomBookingRequest.status).where(RoomBookingRequest.id == done.id)

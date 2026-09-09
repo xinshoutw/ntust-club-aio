@@ -25,7 +25,7 @@
 | `submit` | `0xF59E0B` 橙 | 送審/新申請 |
 | `approve` | `0x22C55E` 綠 | 通過/完成 |
 | `reject` | `0xEF4444` 紅 | 退回/拒絕 |
-| `alert` | `0x8B5CF6` 紫 | 系統事件(解鎖、逾期提醒、停權、評鑑調整) |
+| `alert` | `0x8B5CF6` 紫 | 系統事件(解鎖、逾期提醒、停權、評鑑調整、社團自行取消) |
 
 **長度**:程式自截 title 256、description 2000(Discord 上限 4096)、公告 Text Display 3800(上限 4000)。活動名、社團名、退回原因(≤500 字)、公告內文皆為使用者輸入,模板要容忍被截斷。Discord 速率限制約每 2 秒 5 則,公告逐社團推送(60+ 社)可能觸頂;429 會照 `Retry-After` 退避重試(上限 30 秒 × 3 次)。
 
@@ -152,12 +152,13 @@ D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政�
 
 **取消與刪除(GAP-18,2026-08-20 實作)**
 
-- **K1 固定借用社團自行取消** `POST /club/room-bookings/{id}/cancel` · reject
+- **K1 固定借用社團自行取消** `POST /club/room-bookings/{id}/cancel` · alert
   `固定場地借用已取消` / `{user.name}:{venue.name}({n} 個每週時段)`
-- **K2 臨時借用社團自行取消** `POST /club/venue-bookings/{id}/cancel` · reject
+- **K2 臨時借用社團自行取消** `POST /club/venue-bookings/{id}/cancel` · alert
   `臨時場地借用已取消` / `{user.name}:{venue.name}({date} 時段 {periods})`
-- **K3 器材借用社團自行取消** `POST /club/equipment-loans/{id}/cancel` · reject
+- **K3 器材借用社團自行取消** `POST /club/equipment-loans/{id}/cancel` · alert
   `器材借用已取消` / `{user.name}:{equipment.name} ×{qty}({start}~{end})`
+  —— K1–K3 一律 alert:紅色是「退回/拒絕」,社團自己按的取消掛紅色會被讀成申請被駁回
 - **K4 行政手動借用建立** `POST /admin/bookings/manual-{venue,equipment}` · alert · **僅推系統 webhook**(無社團)
   `行政手動借用建立` / `{user.name}:{venue 或 equipment 名}(時間)`
 - **K5 報名簽到登錄** `PUT /admin/signup-items/{id}/attendance` · 登錄 approve、取消 alert

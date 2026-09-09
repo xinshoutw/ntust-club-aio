@@ -55,9 +55,13 @@ async def _notify_submit(background: BackgroundTasks, db, user, title: str, desc
 
 
 async def _notify_cancel(background: BackgroundTasks, db, user, title: str, desc: str) -> None:
-    """社團自行取消(GAP-18 K1–K3):承辦手上的待審單少一張,得知道是誰收回去的。"""
+    """社團自行取消(GAP-18 K1–K3):承辦手上的待審單少一張,得知道是誰收回去的。
+
+    kind 用 alert 不用 reject:紅色在這套配色裡是「退回/拒絕」,社團自己按的取消
+    掛上紅色會被讀成申請被駁回(承辦撤銷才是 reject)。
+    """
     club = await db.get(Club, user.club_id)
-    background.add_task(notify.club_event, "reject", title, desc, club.discord_webhook_url)
+    background.add_task(notify.club_event, "alert", title, desc, club.discord_webhook_url)
 
 
 async def _ensure_not_suspended(db, user) -> None:

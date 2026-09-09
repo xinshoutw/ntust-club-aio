@@ -43,6 +43,9 @@ class Spy:
     def titles(self) -> list[str]:
         return [t for _, t, _ in self.club]
 
+    def kinds(self) -> list[str]:
+        return [k for k, _, _ in self.club]
+
     def global_titles(self) -> list[str]:
         return [t for _, t, _ in self.system_only]
 
@@ -68,7 +71,7 @@ async def test_k1_room_booking_self_cancel(client, db, monkeypatch):
         f"/api/v1/club/room-bookings/{booking_id}/cancel", headers=csrf_headers(client)
     )
     assert resp.status_code == 200
-    assert spy.titles() == ["固定場地借用已取消"]
+    assert (spy.kinds(), spy.titles()) == (["alert"], ["固定場地借用已取消"])  # 自行取消不是被退回
     assert "S304 音樂教室(2 個每週時段)" in spy.club[0][2]
 
 
@@ -97,7 +100,7 @@ async def test_k2_venue_booking_self_cancel(client, db, monkeypatch):
         f"/api/v1/club/venue-bookings/{booking_id}/cancel", headers=csrf_headers(client)
     )
     assert resp.status_code == 200
-    assert spy.titles() == ["臨時場地借用已取消"]
+    assert (spy.kinds(), spy.titles()) == (["alert"], ["臨時場地借用已取消"])  # 自行取消不是被退回
     assert f"精誠廣場({day} 時段 3,4)" in spy.club[0][2]
 
 
@@ -121,7 +124,7 @@ async def test_k3_equipment_loan_self_cancel(client, db, monkeypatch):
         f"/api/v1/club/equipment-loans/{loan_id}/cancel", headers=csrf_headers(client)
     )
     assert resp.status_code == 200
-    assert spy.titles() == ["器材借用已取消"]
+    assert (spy.kinds(), spy.titles()) == (["alert"], ["器材借用已取消"])  # 自行取消不是被退回
     assert "帳篷 ×2" in spy.club[0][2]
 
 

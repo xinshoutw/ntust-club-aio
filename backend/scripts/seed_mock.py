@@ -26,7 +26,7 @@ import struct
 import sys
 import uuid
 import zlib
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
@@ -885,10 +885,10 @@ async def _create_bookings(
             start_date=date(2026, 7, 23), end_date=date(2026, 7, 27),
             purpose="博覽會攤位展示影片", status=LoanStatus.PENDING,
         ),
-        EquipmentLoan(  # 已核准(未借出)
+        EquipmentLoan(  # 已核准(未借出):區間相對真實今天,否則 D-40 一掃就把它撤銷、點交頁永遠空的
             club_id=csie.id, equipment_id=equipment["摺疊桌"].id,
             activity_id=acts["approved_future"].id, qty=10,
-            start_date=date(2026, 7, 23), end_date=date(2026, 7, 27),
+            start_date=date.today() + timedelta(days=7), end_date=date.today() + timedelta(days=11),
             purpose="攤位桌面佈置", status=LoanStatus.APPROVED,
         ),
         EquipmentLoan(  # 借出中(未逾期:區間跨越今天)

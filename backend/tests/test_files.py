@@ -566,11 +566,9 @@ async def test_upload_gate_closes_before_the_body_lands(client, db, monkeypatch)
 
 
 def heic_bytes(width: int = 40, height: int = 30) -> bytes:
-    import pillow_heif
     from PIL import Image
 
-    pillow_heif.register_heif_opener()
-    buf = io.BytesIO()
+    buf = io.BytesIO()  # HEIF 編碼器在 pillow-heif 的 wheel 裡(含 libx265),CI 的 Linux wheel 也有
     Image.new("RGB", (width, height), (200, 30, 30)).save(buf, format="HEIF")
     return buf.getvalue()
 
@@ -622,9 +620,51 @@ async def test_img_requests_get_a_jpeg_preview_and_downloads_keep_the_original(c
     assert resp.status_code == 200
     assert cache.stat().st_mtime_ns == stamp
 
+    # 轉檔不留暫存
+    assert not any(settings.upload_dir.rglob("*.part"))
+
     # 刪原檔連快取一起清
     file_service.unlink_quiet(settings.upload_dir / row.path)
     assert not cache.exists()
+
+
+async def test_preview_is_bounded_and_covers_bmp_too(client, db):
+    """長邊封頂 1600;BMP 這種瀏覽器支援度不一的圖走同一條。"""
+    from PIL import Image
+
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    big = await file_service.save_upload(
+        db, fake_upload("wide.heic", heic_bytes(3200, 800)), policy=file_service.IMAGE,
+        module="reports", uploaded_by=user.id, club_id=club.id, slot="report_photo",
+    )
+    buf = io.BytesIO()
+    Image.new("RGB", (20, 10), (0, 0, 200)).save(buf, format="BMP")
+    bmp = await file_service.save_upload(
+        db, fake_upload("old.bmp", buf.getvalue()), policy=file_service.IMAGE,
+        module="reports", uploaded_by=user.id, club_id=club.id, slot="report_photo",
+    )
+    await db.commit()
+    await login(client, "club01")
+
+    resp = await client.get(f"/api/v1/files/{big.id}", headers={"Sec-Fetch-Dest": "image"})
+    with Image.open(io.BytesIO(resp.content)) as img:
+        assert (img.format, img.size) == ("JPEG", (1600, 400))
+
+    resp = await client.get(f"/api/v1/files/{bmp.id}", headers={"Sec-Fetch-Dest": "image"})
+    assert resp.headers["content-type"] == "image/jpeg"
+
+
+async def test_oversized_sources_are_served_as_is(client, db, monkeypatch):
+    """超過來源上限的圖不轉(解開來會吃掉半台機器),照舊給原檔。"""
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    row = await _heic_upload(db, club, user)
+    await login(client, "club01")
+    monkeypatch.setattr(file_service, "PREVIEW_MAX_SOURCE_BYTES", row.size - 1)
+    resp = await client.get(f"/api/v1/files/{row.id}", headers={"Sec-Fetch-Dest": "image"})
+    assert resp.headers["content-type"] == "image/heic"
+    assert not (settings.upload_dir / (row.path + file_service.PREVIEW_SUFFIX)).exists()
 
 
 async def test_native_images_are_not_transcoded(client, db):

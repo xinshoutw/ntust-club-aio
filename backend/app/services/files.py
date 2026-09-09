@@ -10,7 +10,6 @@
 import asyncio
 import hashlib
 import logging
-import os
 import shutil
 import uuid
 from collections.abc import Sequence
@@ -18,9 +17,11 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pillow_heif
 import sqlalchemy as sa
 from fastapi import UploadFile
 from fastapi.responses import FileResponse
+from PIL import Image, ImageOps
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session, SessionTransaction
 
@@ -58,6 +59,10 @@ DISK_ALERT_RATIO = 0.90
 
 logger = logging.getLogger(__name__)
 
+# HEIC/HEIF 解碼器只註冊一次(啟動期就暴露相依缺失,不是等第一張 HEIC 才在 except 裡被吞掉);
+# 在 worker thread 裡反覆註冊會併發改 Pillow 的全域表
+pillow_heif.register_heif_opener()
+
 
 def unlink_quiet(path: Path) -> None:
     """清理性刪檔:失敗只記 log,不讓清理錯誤蓋掉主要錯誤或已成立的回應。
@@ -65,12 +70,13 @@ def unlink_quiet(path: Path) -> None:
     上傳超額回滾(413)、去重衝突(409)、commit 後的磁碟清理都走這裡;
     刪不掉頂多留孤兒檔(可清掃),換成 500 反而誤導呼叫端。
     """
-    try:
-        path.unlink(missing_ok=True)
-        # 轉檔預覽的快取跟著原檔走(HEIC 等瀏覽器不會解的圖,見 file_response)
-        path.with_name(path.name + PREVIEW_SUFFIX).unlink(missing_ok=True)
-    except OSError:
-        logger.warning("cleanup unlink failed, orphan left on disk: %s", path, exc_info=True)
+    # 轉檔預覽的快取跟著原檔走(HEIC 等瀏覽器不會解的圖,見 file_response);
+    # 各自 try:原檔刪失敗不該連快取也留下,而 log 要指得出到底是哪一個沒刪掉
+    for target in (path.with_name(path.name + PREVIEW_SUFFIX), path):
+        try:
+            target.unlink(missing_ok=True)
+        except OSError:
+            logger.warning("cleanup unlink failed, orphan left on disk: %s", target, exc_info=True)
 
 
 # 已落盤但還沒 commit 的檔案。呼叫端的交易失敗(或整個沒送出)時,
@@ -532,32 +538,48 @@ _INLINE_MIMES = {"image/jpeg", "image/png", "image/gif", "image/webp", "applicat
 
 # <img> 要圖時(瀏覽器帶 `Sec-Fetch-Dest: image`)轉成 JPEG 給它看:iPhone 拍的結案照片是 HEIC,
 # Chrome/Firefox 解不了,縮圖與預覽彈窗就是一片破圖。下載連結與 fetch 不帶這個值,拿到的仍是原檔。
-# 轉檔結果快取在原檔旁(`<path>.preview.jpg`),刪原檔時一併清(unlink_quiet)
+# 轉檔結果快取在原檔旁(`<path>.preview.jpg`),刪原檔時一併清(unlink_quiet);
+# 快取不計入 files.size(配額看的是原檔),實際磁碟佔用會高於檔案管理頁的邏輯總量
 _PREVIEW_CONVERTIBLE = {"image/heic", "image/heif", "image/avif", "image/tiff", "image/bmp"}
 PREVIEW_SUFFIX = ".preview.jpg"
 PREVIEW_MAX_EDGE = 1600  # 預覽彈窗最大 76vh,更大只是白轉
+# 這兩個上限擋的是「解開來會吃掉半台機器」的來源:20MB 的 HEIC 可以是 48MP,解成 RGB 就是 150MB;
+# Pillow 自己的炸彈防護要到 179MP 才真的丟例外,中間那一段照解不誤
+PREVIEW_MAX_SOURCE_BYTES = 20 * 1024 * 1024
+PREVIEW_MAX_PIXELS = 50_000_000
+# 同時最多轉幾張:正式機是 2 vCPU + 4GB 還跟 PostgreSQL 同住,asyncio 預設 thread pool 會放 6 條進去,
+# 結案照片牆一次要 20 張縮圖就是 6 張同時解 —— 兩張已經吃滿兩顆核心
+_PREVIEW_SLOTS = asyncio.Semaphore(2)
 
 
 def _render_preview(src: Path, dst: Path) -> None:
-    """HEIC/AVIF/TIFF/BMP → JPEG(長邊封頂、套 EXIF 方向)。先寫暫存再 rename:
-    兩個請求同時要同一張,各寫各的暫存、誰後 rename 誰的留下,不會有半寫的檔被送出去。"""
-    import pillow_heif
-    from PIL import Image, ImageOps
+    """HEIC/HEIF/TIFF/BMP → JPEG(長邊封頂、套 EXIF 方向)。
 
-    pillow_heif.register_heif_opener()
-    tmp = dst.with_name(f"{dst.name}.{os.getpid()}.part")
-    with Image.open(src) as img:
-        img = ImageOps.exif_transpose(img) or img
-        img.thumbnail((PREVIEW_MAX_EDGE, PREVIEW_MAX_EDGE))
-        img.convert("RGB").save(tmp, format="JPEG", quality=85)
-    tmp.replace(dst)
+    先寫暫存再 rename:暫存名帶 uuid —— 同一張同時被兩個請求轉(preview_of 的檢查與轉檔之間
+    有空窗),各寫各的、誰後 rename 誰的留下;用 pid 命名的話兩條 thread 是同一個 pid,
+    會交錯寫進同一個檔,壞掉的 JPEG 從此被永久快取。失敗或中斷都不留 .part。
+    """
+    tmp = dst.with_name(f"{dst.name}.{uuid.uuid4().hex}.part")
+    try:
+        with Image.open(src) as img:
+            if img.width * img.height > PREVIEW_MAX_PIXELS:
+                raise ValueError(f"image too large to preview: {img.width}x{img.height}")
+            img = ImageOps.exif_transpose(img) or img
+            img.thumbnail((PREVIEW_MAX_EDGE, PREVIEW_MAX_EDGE))
+            img.convert("RGB").save(tmp, format="JPEG", quality=85)
+        tmp.replace(dst)
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 async def preview_of(disk: Path) -> Path:
-    """轉檔預覽的磁碟路徑;沒有快取就轉一次(在 thread 裡,不擋 event loop)。"""
+    """轉檔預覽的磁碟路徑;沒有快取就轉一次(在 thread 裡,不擋 event loop,同時最多兩張)。"""
     dst = disk.with_name(disk.name + PREVIEW_SUFFIX)
-    if not dst.is_file():
-        await asyncio.to_thread(_render_preview, disk, dst)
+    if dst.is_file():
+        return dst
+    async with _PREVIEW_SLOTS:
+        if not dst.is_file():  # 排隊時前一個可能已經轉好同一張
+            await asyncio.to_thread(_render_preview, disk, dst)
     return dst
 
 
@@ -573,19 +595,24 @@ async def file_response(
     disk = Path(settings.upload_dir) / file.path
     if not disk.is_file():
         raise not_found("找不到檔案")
-    if as_image and file.mime in _PREVIEW_CONVERTIBLE:
+    if (
+        as_image
+        and file.mime in _PREVIEW_CONVERTIBLE
+        and file.size <= PREVIEW_MAX_SOURCE_BYTES
+    ):
         try:
             preview = await preview_of(disk)
         except Exception:
-            # 轉不了(檔案壞了、編碼不支援)就照舊給原檔;破圖總比 500 好,log 才查得到是哪一張
+            # 轉不了(檔案壞了、太大、編碼不支援)就照舊給原檔;破圖總比 500 好,log 才查得到是哪一張
             logger.exception("preview render failed: file=%s mime=%s", file.id, file.mime)
         else:
-            return FileResponse(
+            response = FileResponse(
                 preview,
                 media_type="image/jpeg",
                 filename=f"{Path(file.original_name).stem}.jpg",
                 content_disposition_type="inline",
             )
+            return response
     disposition = "inline" if file.mime in _INLINE_MIMES else "attachment"
     response = FileResponse(
         disk,

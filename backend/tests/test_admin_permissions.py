@@ -119,6 +119,27 @@ async def test_list_keys_cannot_act_on_bookings(client, db, key, url):
     await login(client, "holder")
     resp = await client.post(url, json={"reason": "x"}, headers=csrf_headers(client))
     assert resp.status_code == 403, f"{key} → {url}: {resp.text}"
+    # CSRF 失敗也是 403:認錯誤碼才是在測權限
+    assert resp.json()["meta"]["code"] == "FORBIDDEN"
+
+
+# 兩把查閱鍵各開各的一支清單,逾期追蹤也只讀器材那支:互換(或兩個常數對調)不能通
+CROSS_READS = [
+    ("avenuelist", "/api/v1/admin/equipment-loans"),
+    ("avenuelist", "/api/v1/admin/equipment-loans/semesters"),
+    ("aloanlist", "/api/v1/admin/venue-bookings"),
+    ("aloanlist", "/api/v1/admin/venue-bookings/semesters"),
+    ("aoverdue", "/api/v1/admin/venue-bookings"),
+]
+
+
+@pytest.mark.parametrize(("key", "url"), CROSS_READS)
+async def test_list_keys_open_only_their_own_list(client, db, key, url):
+    await make_user(db, username="holder", role="admin", permissions=[key])
+    await login(client, "holder")
+    resp = await client.get(url)
+    assert resp.status_code == 403, f"{key} → {url}: {resp.text}"
+    assert resp.json()["meta"]["code"] == "FORBIDDEN"
 
 
 async def test_catalogue_covers_every_key_the_whitelist_accepts():

@@ -296,8 +296,10 @@ async def delete_activity(
     for path in disk_paths:  # commit 成功後才動磁碟
         file_service.unlink_quiet(path)
     # 刪掉就整份不見(附件一起實體刪除),留一則痕跡(GAP-18 K9)。
-    # 「草稿儲存」刻意不發:同一份活動在填寫過程會產生數十則,會淹掉頻道
-    background.add_task(notify.club_event, "alert", "活動已刪除", f"{club_name}:{name}", webhook)
+    # 「草稿儲存」刻意不發:同一份活動在填寫過程會產生數十則,會淹掉頻道。
+    # 草稿與待審件分開講:同一句話會讓人以為送到承辦手上的申請被撤掉了
+    title = "草稿已刪除" if status == ActivityStatus.DRAFT else "活動已刪除"
+    background.add_task(notify.club_event, "alert", title, f"{club_name}:{name}", webhook)
     return ApiResponse()
 
 

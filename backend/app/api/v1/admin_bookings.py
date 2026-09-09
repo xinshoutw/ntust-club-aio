@@ -322,7 +322,7 @@ async def list_equipment_loans(
     if semester:
         query = query.where(EquipmentLoan.start_date.between(*semester_range(semester)))
     if active is not None:
-        ongoing = svc.equipment_loan_ongoing_expr()
+        ongoing = svc.equipment_loan_ongoing_expr(svc.today_taipei())
         query = query.where(ongoing if active else sa.not_(ongoing))
 
     if sort:
@@ -436,8 +436,9 @@ async def revoke_equipment_loan(
 ) -> ApiResponse[None]:
     """撤銷已核准但尚未借出的器材借用。
 
-    「核准後沒來領」的單子會永遠壓在工讀生的待借出清單最上方,沒有任何操作清得掉。
-    區間過期不算結束(東西還沒交出去),所以這裡不看日期;已借出的要走歸還而非撤銷。
+    區間還沒過就決定不借了(場地整修、社團說不來領)走這裡;區間過了還沒領的單
+    由系統自己撤銷(D-40,`services/loan_expiry`),所以這裡不看日期也不會累積。
+    已借出的要走歸還而非撤銷。
     """
     loan = await db.scalar(
         sa.select(EquipmentLoan).where(EquipmentLoan.id == loan_id).with_for_update()

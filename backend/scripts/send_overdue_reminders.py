@@ -7,7 +7,11 @@
         >> /var/log/club-aio/remind.log 2>&1
 
 假日不必在 cron 排除 —— 逾期判定本身就吃 `holidays` 表,國定假日當天不會有單成立。
+(撤銷那一項不吃假日表,假日就是不跑;各讀取面自己帶日期界線,晚一天收狀態沒有任何一頁會錯。)
 重寄間隔見 `services/loan_remind.REMIND_EVERY_WORKDAYS`;寄到歸還為止,不設次數上限。
+
+同一班順手把「核准後區間過了還沒領」的器材借用撤銷(decisions.md D-40;點交清單載入時也會掃,
+這裡補的是沒人開點交頁的日子)。
 
 刻意不在程序內跑排程器:重啟不會漏班,也不必多裝套件。
 """
@@ -21,13 +25,18 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.core.db import async_session_factory
+from app.services import loan_expiry
 from app.services.loan_remind import send_due_reminders
 
 
 async def main() -> None:
     stamp = datetime.now(UTC).isoformat(timespec="seconds")
     async with async_session_factory() as db:
+        expired = await loan_expiry.revoke_unclaimed(db)
+        await loan_expiry.notify_expired(expired)
         sent = await send_due_reminders(db)
+    if expired:
+        print(f"{stamp} 撤銷 {len(expired)} 筆區間已過未領取的器材借用")
     if not sent:
         print(f"{stamp} 無待提醒的逾期借用")
         return

@@ -6,6 +6,7 @@
 - 提醒與行政端共用 services.loan_remind(audit action 同名)
 """
 
+import logging
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
@@ -28,10 +29,12 @@ from app.schemas.staff import (
     StaffEquipmentLoanOut,
     ViolationFileIn,
 )
-from app.services import audit, loan_remind, notify, violation_service
+from app.services import audit, loan_expiry, loan_remind, notify, violation_service
 from app.services import booking_service as svc
 from app.services import files as file_service
 from app.services.settings_service import get_setting
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/staff", tags=["staff"])
 
@@ -232,11 +235,24 @@ async def list_equipment_loans(
     db: DbDep,
     page: Pagination,
     status: StaffLoanStatus,
+    background: BackgroundTasks,
 ) -> ApiResponse[list[StaffEquipmentLoanOut]]:
     """點交工作清單:approved=待借出、checked_out=待歸還、overdue=逾期未歸還。
 
     overdue=checked_out 且 end_date <= 單調門檻日(SQL 篩選,推導不儲存)。
     """
+    today = svc.today_taipei()
+    if status == "approved":
+        # 區間過了還沒領的單就地撤銷(D-40)。掃描失敗不擋清單 —— 這頁是櫃台現場在用的,
+        # 清單另以日期界線保證不列過期件,撤銷只負責把庫裡的狀態收乾淨
+        try:
+            expired = await loan_expiry.revoke_unclaimed(db, today=today)
+        except Exception:
+            logger.exception("revoke_unclaimed failed; listing without the sweep")
+            await db.rollback()
+        else:
+            if expired:
+                background.add_task(loan_expiry.notify_expired, expired)
     return_time = await get_setting(db, "equipment_return_time")
     holidays = await svc.load_holidays(db)
 
@@ -255,6 +271,10 @@ async def list_equipment_loans(
         )
     else:
         query = query.where(EquipmentLoan.status == LoanStatus(status))
+        if status == "approved":
+            # 待借出=區間還沒過(徽章 pt-checkout 同一條界線);過期件由上面的掃描收掉,
+            # 但清單的正確性不綁在那一次寫入上
+            query = query.where(EquipmentLoan.end_date >= today)
 
     # 排序:待借出依起日(即將領用在前)、待歸還/逾期依結束日(應歸還時限單調)
     if status == "approved":
@@ -311,6 +331,9 @@ async def checkout_equipment_loan(
     loan = await _locked_loan(db, loan_id)
     if loan.status != LoanStatus.APPROVED:
         raise conflict("此借用單不在已核准狀態")
+    # 區間過了的單不該還借得出去(D-40 會撤銷它,但昨天開著的頁面今天照樣按得到)
+    if loan.end_date < svc.today_taipei():
+        raise conflict("借用區間已過，不可借出")
     equipment = await db.get(Equipment, loan.equipment_id)
     loan.status = LoanStatus.CHECKED_OUT
     loan.checkout_by = user.id

@@ -170,5 +170,6 @@ class ApprovalRecord(Base, TimestampMixin):
     decision: Mapped[ApprovalDecision] = mapped_column(
         db_enum(ApprovalDecision, "approval_decision")
     )
-    actor_id: Mapped[int] = mapped_column(sa.ForeignKey("users.id"))
+    # None=系統自動處置(核准後區間過了沒去領的器材借用,services/loan_expiry)
+    actor_id: Mapped[int | None] = mapped_column(sa.ForeignKey("users.id"))
     reason: Mapped[str | None] = mapped_column(sa.Text)  # 退回必填(應用層強制)

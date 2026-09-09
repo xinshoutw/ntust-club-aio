@@ -11,6 +11,8 @@ export const ROLE_LABELS: Record<string, string> = {
   staff: '工讀生',
   club: '社團',
   viewer: '評審',
+  // 排程與系統自動處置(催還、D-40 撤銷)寫的列沒有操作者,角色記 system
+  system: '系統',
 }
 
 // 後端 audit.record 的 action 鍵 → 顯示詞(未知鍵顯示原字串)
@@ -82,6 +84,7 @@ export const ACTION_LABELS: Record<string, string> = {
   equipment_updated: '更新器材',
   equipment_loan_cancelled: '取消器材借用',
   equipment_loan_revoked: '撤銷器材借用',
+  equipment_loan_expired: '系統撤銷器材借用',
   manual_equipment_loan_created: '手動建立器材借用',
   manual_venue_booking_created: '手動建立場地借用',
   room_booking_cancelled: '取消固定借用',

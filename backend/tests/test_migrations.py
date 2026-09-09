@@ -56,10 +56,13 @@ async def migration_db():
     await admin.dispose()
 
 
-def _columns_of(sync_conn) -> dict[str, list[str]]:
+def _columns_of(sync_conn) -> dict[str, list[tuple[str, bool]]]:
     inspector = sa.inspect(sync_conn)
+    # 連 nullable 一起比:只比名稱的話,漏寫「放寬可空」那種 alter_column 的 revision 不會紅
     return {
-        name: sorted(c["name"] for c in inspector.get_columns(name, schema="public"))
+        name: sorted(
+            (c["name"], c["nullable"]) for c in inspector.get_columns(name, schema="public")
+        )
         for name in inspector.get_table_names(schema="public")
         # alembic_version 是遷移鏈自己的簿記表,模型裡沒有
         if name != "alembic_version"
@@ -93,7 +96,8 @@ async def test_upgrade_head_builds_the_same_tables_as_the_models(migration_db):
         checks = await conn.run_sync(_checks_of)
 
     expected = {
-        name: sorted(c.name for c in table.columns) for name, table in Base.metadata.tables.items()
+        name: sorted((c.name, c.nullable) for c in table.columns)
+        for name, table in Base.metadata.tables.items()
     }
     assert actual == expected
     # 索引也要對得起來:少了 revision 的索引不會讓欄位比對分岔,但正式庫就是沒有它

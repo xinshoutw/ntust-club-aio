@@ -52,9 +52,9 @@ export default function BookingReviewModal({
   const [approveQty, setApproveQty] = useState<number | null>(
     item.kind === 'loan' ? item.data.qty : null,
   )
-  // 沒接核准回呼的呼叫端(所有場地/器材借用那兩頁,持查閱鍵的人)一律唯讀:
-  // 畫出核准鈕卻沒有人接,按下去只會得到一句假的「已核准」
-  const canReview = item.data.status === 'pending' && !!onApprove
+  // 兩個回呼都接上才是審核模式(所有場地/器材借用那兩頁,持查閱鍵的人一個都不接):
+  // 畫出核准或退回鈕卻沒有人接,按下去只會得到一句假的「已核准」「已退回」
+  const canReview = item.data.status === 'pending' && !!onApprove && !!onReject
   // 後端對臨時場地擋「日期已過」;過期單顯示撤銷鈕只會換來 409
   const notPast =
     item.kind !== 'venue' || !dayjs(item.data.date, 'YYYY/MM/DD').isBefore(dayjs(), 'day')

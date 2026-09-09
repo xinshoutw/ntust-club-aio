@@ -209,7 +209,7 @@ approved 且 end_date + N 天已過且未送結案 → 逾期鎖定(推導,非�
 | subject_id | int | |
 | stage | text | advisor / chief / dean / single… |
 | decision | enum(approve, reject, unlock, revoke) | |
-| actor_id | FK users | |
+| actor_id | FK users NULL | 空=系統自動處置(D-40 的器材撤銷),稽核那邊對應 role=system |
 | reason | text NULL | 退回必填(應用層) |
 
 三關流程一單多筆紀錄、退回重送會產生多輪歷程,且「待審申請彙整」與稽核要跨單據查「誰核了什麼」——各單據自帶 `reviewed_by` 欄只記得住最後一次。
@@ -268,7 +268,7 @@ approved 且 end_date + N 天已過且未送結案 → 逾期鎖定(推導,非�
 
 **逾期為推導**:status=checked_out 且 now ≥ (end_date 之隔天上班日的 `equipment_return_time`,預設 10:30)。逾期追蹤、停權管理、社團逾期數全查這裡;逾期未還的借用視為持續佔用,不論原區間是否已過。
 
-社團可取消審核中或已核准未開始的借用(狀態 `cancelled`);臨時場地的可取消邊界是申請起始時刻(最早節次起點)。
+社團可取消審核中或已核准未開始的借用(狀態 `cancelled`);臨時場地的可取消邊界是申請起始時刻(最早節次起點)。**器材的 `approved` 另有一條系統轉移**:結束日過了還沒點交借出 → `cancelled`(D-40,`services/loan_expiry`),`approval_records` 留一筆 REVOKE 而 `actor_id` 為空 —— 那一欄因此可空,空就是系統。
 
 固定借用(週期時段)、臨時場地(單日節次)、器材(區間+點交+逾期)的欄位與生命週期完全不同,故拆三表而非單表 + type。
 

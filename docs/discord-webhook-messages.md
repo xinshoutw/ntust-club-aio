@@ -88,6 +88,8 @@
   `臨時場地借用已撤銷` / `{venue.name}({date} 時段 {periods}):{body.reason}`
 - **D13 器材借用已撤銷** `POST /admin/equipment-loans/{id}/revoke` · reject
   `器材借用已撤銷` / `{equipment.name} ×{qty}({start}~{end}):{body.reason}`
+- **D13b 器材借用區間已過未領取,系統撤銷** 點交清單載入時與每日排程(`services/loan_expiry`) · reject
+  `器材借用已撤銷` / `{equipment.name} ×{qty}({start}~{end}):借用區間已過，未領取，系統自動撤銷` · 社團列已不在時推系統 webhook(同 K4b;手動借用本身不掃)。尾句用全形逗號 —— 它同時是社團端「撤銷原因」彈窗顯示的字(`design-guide.md` §7),括號與冒號則照 D13 的 Discord 慣例
 
 D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政手動借用)或社團不存在時推系統 webhook。
 

@@ -150,13 +150,22 @@ Opus 交叉審查後補的:`status=checked_out` 不帶 `overdue` 時**排除已�
 **正式庫還沒跑**(已列入 `DEPLOY_CHECKLIST.md`)。你點名的四組(118-1 → 2023、101-1 兩筆 → 2024、
 105-2 與 106-2 → 2022)規則算出來的年份與你說的一致。
 
+**核准後沒去領的器材借用由系統撤銷**(2026-09-09,D-40):`approved` 且結束日已過 → `cancelled`,
+簽核紀錄一筆 REVOKE(簽核者空=系統;`approval_records.actor_id` 放寬可空,**要跑遷移 `e5a1c9d47b23`**)、
+稽核 `role=system`、Discord D13b。掃的時機:點交清單每次載入(`GET /staff/equipment-loans?status=approved`)
+與每日催還排程 `send_overdue_reminders.py`。實作 `services/loan_expiry.py`;ISS-93 據此收掉 ——
+`equipment_loan_ongoing_expr` 與待借出清單都補了 `end_date >= today`,三份判定從此同一條。
+**手動借用(`club_id` 空)不掃**(補登入口)。Opus 交叉審查後補的:掃描失敗不擋點交清單(rollback + log)、
+點交端擋區間已過的單、`tests/test_migrations` 連 nullable 一起比(原本漏跑這支遷移不會紅)、
+稽核頁補 `equipment_loan_expired` 與 `system` 角色的對照詞、`seed_mock` 的已核准借用改相對真實今天。
+
 **要跑遷移**:D-21/D-22 是 drop column,`alembic upgrade head` 之後舊號碼就沒了。
 D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)—— 走 `--reset` 重灌,
 或把該學期匯出再匯入一次。
 
 ## 驗證現況
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **599 passed**;`ruff check .` 全綠
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **606 passed**;`ruff check .` 全綠
 - 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **278 passed**(58 檔)、
   `pnpm run lint` 8 個既有的 fast-refresh warning
 - 新測試逐一做過 mutation 驗證(改回舊寫法會紅);借用色格圖那支另在 `TZ=UTC` 與 `TZ=Pacific/Honolulu` 下各跑過一次

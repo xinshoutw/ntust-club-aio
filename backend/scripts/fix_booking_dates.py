@@ -17,8 +17,8 @@ clubclass 讓人手打日期,遷入的 15,152 筆臨時場地借用裡有 89 筆
 
     docker compose exec -T backend uv run --no-dev python scripts/fix_booking_dates.py --yes
 
-規則本身冪等:跑過一次之後再跑就是 0 筆。2 月 29 日改到平年會不存在,那種列跳過並列出,
-人工處理。
+規則本身冪等:改過的列不會再被選到,再跑看到「可改 0 筆」即沒有可修的。2 月 29 日改到平年
+會不存在,那種列跳過並列出(每次都會再列),要人工改。
 """
 
 # ruff: noqa: E402 - sys.path 調整必須先於 app 匯入(同 scripts/import_holidays.py)

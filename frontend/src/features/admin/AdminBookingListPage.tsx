@@ -219,6 +219,8 @@ export default function AdminBookingListPage({ kind }: { kind: BookingListKind }
                       : row.data.activity
                         ? `${row.data.activity} · ${row.data.purpose}`
                         : row.data.purpose
+                  const when =
+                    row.kind === 'venue' ? row.data.date : `${row.data.startDate} – ${row.data.endDate}`
                   return (
                     <tr
                       key={d.id}
@@ -226,12 +228,12 @@ export default function AdminBookingListPage({ kind }: { kind: BookingListKind }
                       style={{ cursor: 'pointer', ...(current?.data.id === d.id && open ? { background: 'var(--seal-tint)' } : {}) }}
                     >
                       <td><StatusPill status={d.status} /></td>
-                      {/* 日期欄也截斷:borrow range 中間有空格能斷行,字體 fallback 一換就多一行 */}
-                      <td className="num cell-clip" style={{ fontSize: 13 }}>
-                        {row.kind === 'venue' ? row.data.date : `${row.data.startDate} – ${row.data.endDate}`}
+                      {/* 日期欄也截斷:借用區間中間有空格能斷行,字體 fallback 一換就多一行 */}
+                      <td className="num cell-clip" title={when} style={{ fontSize: 13 }}>
+                        {when}
                       </td>
                       <td className="cell-clip" title={d.club}>{d.club}</td>
-                      <td className="cell-clip" title={row.kind === 'venue' ? name : `${name} ×${row.data.qty}`} style={{ fontWeight: 500 }}>
+                      <td className="cell-clip" title={row.kind === 'venue' ? name : `${name}×${row.data.qty}`} style={{ fontWeight: 500 }}>
                         {/* 鍵盤入口:與整列 onClick 同動作;stopPropagation 避免雙觸發 */}
                         <button
                           type="button"
@@ -244,12 +246,13 @@ export default function AdminBookingListPage({ kind }: { kind: BookingListKind }
                         >
                           {name}
                         </button>
-                        {row.kind === 'loan' && <> <span className="num">×{row.data.qty}</span></>}
+                        {/* 中英數之間不補空格(design-guide §7) */}
+                        {row.kind === 'loan' && <span className="num">×{row.data.qty}</span>}
                       </td>
                       <td className="cell-clip" title={detail} style={{ fontSize: 13, color: 'var(--steel)' }}>
                         {detail}
                       </td>
-                      <td className="num cell-clip">{d.createdAt}</td>
+                      <td className="num cell-clip" title={d.createdAt}>{d.createdAt}</td>
                       <td className="r"><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>
                     </tr>
                   )

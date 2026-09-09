@@ -168,7 +168,8 @@ D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政�
 - **K8 公告刪除** `DELETE /admin/announcements/{id}` · alert · 僅推系統 webhook
   `公告已刪除` / `{title}`
 - **K9 社團自刪活動** `DELETE /club/activities/{id}`(還沒有簽核紀錄的單,D-39)· alert
-  `活動已刪除` / `{club.name}:{activity.name}`
+  `草稿已刪除`(draft)或 `活動已刪除`(pending_advisor)/ `{club.name}:{activity.name}`
+  —— 兩者分開講:同一句話會讓社團以為送到承辦手上的申請被撤掉了
 - **K9b 學務處刪除活動** `DELETE /admin/activities/{id}` · alert
   `活動已被學務處刪除` / `{activity.name}`
   —— 整張單連同附件、結案資料與簽核紀錄都不見了,社團看不到自己少了什麼,不說一聲就是無聲消失

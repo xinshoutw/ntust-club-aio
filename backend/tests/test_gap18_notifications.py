@@ -314,7 +314,20 @@ async def test_k9_activity_deleted(client, db, monkeypatch):
         f"/api/v1/club/activities/{activity.id}", headers=csrf_headers(client)
     )
     assert resp.status_code == 200, resp.text
-    assert spy.club == [("alert", "活動已刪除", f"{club.name}:尚未送出的草稿")]
+    assert spy.club == [("alert", "草稿已刪除", f"{club.name}:尚未送出的草稿")]
+
+
+async def test_k9_pending_activity_deleted(client, db, monkeypatch):
+    """已送出但還沒人審的單收回來,講的是「活動」不是「草稿」。"""
+    spy = Spy(monkeypatch)
+    club = await setup_session(client, db)
+    activity = await make_activity(db, club, name="春季成發", status=ActivityStatus.PENDING_ADVISOR)
+
+    resp = await client.delete(
+        f"/api/v1/club/activities/{activity.id}", headers=csrf_headers(client)
+    )
+    assert resp.status_code == 200, resp.text
+    assert spy.club == [("alert", "活動已刪除", f"{club.name}:春季成發")]
 
 
 async def test_k9b_activity_deleted_by_the_office(client, db, monkeypatch):

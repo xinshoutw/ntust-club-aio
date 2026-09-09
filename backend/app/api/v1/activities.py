@@ -274,14 +274,13 @@ async def delete_activity(
     # 現行 snapshot 沒有這種列,但刪掉的是結案照片與心得(評鑑的依據),錯一次沒有回頭路
     if activity.status not in _CLUB_DELETABLE or await svc.has_approvals(db, activity.id):
         raise conflict("已進入審核的活動無法刪除,請洽學務處")
-    # 整張單連同附件一起實體刪除,比單刪一個檔更該留下紀錄。
-    # 識別欄先抄下來:purge 之後這個實例已排入刪除,屬性讀得到但語意上已經不是活的列。
-    # 通知要用的社團名與 webhook 也一起抄 —— commit 之後才查 DB 的話,那一查失敗就回 500,
-    # 而活動其實已經刪掉了(前端沒進 onSuccess 不會清快取,重試只拿得到 404)
+    # 識別欄與通知要用的社團資料先抄下來:purge 之後屬性仍讀得到,但語意上已經不是活的列;
+    # 而 commit 之後才查 DB 的話,那一查失敗就回 500 —— 活動其實已經刪掉了
     name, status = activity.name, activity.status
     club = await _club_of(db, user)
     club_name, webhook = club.name, club.discord_webhook_url
     disk_paths = await svc.purge(db, activity)
+    # 整張單連同附件一起實體刪除,比單刪一個檔(activity_attachment_deleted)更該留下紀錄
     audit.record(
         db,
         action="activity_deleted",
@@ -295,9 +294,10 @@ async def delete_activity(
     await db.commit()
     for path in disk_paths:  # commit 成功後才動磁碟
         file_service.unlink_quiet(path)
-    # 刪掉就整份不見(附件一起實體刪除),留一則痕跡(GAP-18 K9)。
-    # 「草稿儲存」刻意不發:同一份活動在填寫過程會產生數十則,會淹掉頻道
-    background.add_task(notify.club_event, "alert", "活動已刪除", f"{club_name}:{name}", webhook)
+    # 留一則痕跡(GAP-18 K9);「草稿儲存」刻意不發:填寫過程會產生數十則,會淹掉頻道。
+    # 草稿與待審件分開講:同一句話會讓人以為送到承辦手上的申請被撤掉了
+    title = "草稿已刪除" if status == ActivityStatus.DRAFT else "活動已刪除"
+    background.add_task(notify.club_event, "alert", title, f"{club_name}:{name}", webhook)
     return ApiResponse()
 
 

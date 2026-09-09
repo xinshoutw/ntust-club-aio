@@ -267,10 +267,11 @@ async def reset(db: AsyncSession) -> None:
     for _, rel_path in rows:
         disk = upload_root / rel_path
         if disk.is_file():
-            unlink_quiet(disk)  # 連 <path>.preview.jpg 的轉檔快取一起清
             unlinked += 1
         else:
             kept += 1
+        # 不管原檔在不在都呼叫:原檔早就不見、<path>.preview.jpg 還在的列,快取也要清掉
+        unlink_quiet(disk)
     tail = f"(找不到 {kept} 個)" if kept else ""
     print(f"已清除照片 {len(rows)} 列、盤上檔案 {unlinked} 個{tail}")
 

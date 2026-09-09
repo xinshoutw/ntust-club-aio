@@ -148,7 +148,7 @@ theme: {
 - 送出驗證:errors Set + AntD `status="error"` + 區塊紅框 `.area-error`(常駐透明邊框防位移);修改該欄即解除,並捲動到第一個錯誤
 - 被修改但未儲存的欄位以橘黃外框 `.field-dirty` 標示;dirty 時離開頁面須確認
 - 動態列(經費明細、工作分配、借用時段)自動增列,尾端保證一列空白;空列於 blur 時移除,打字中不消失
-- 上傳一律 `lib/uploads.ts` + `components/ui/AttachmentArea`:魔術位元組驗證、SHA-256 內容去重、單檔與加總容量驗證、顯示「已使用 X/Y MB」。允許圖片處含 HEIC/HEIF/AVIF(評鑑上傳例外,後端只收 jpg/png)
+- 上傳一律 `lib/uploads.ts` + `components/ui/AttachmentArea`:魔術位元組驗證、SHA-256 內容去重、單檔與加總容量驗證、顯示「已使用 X/Y MB」。允許圖片處含 HEIC/HEIF/AVIF(評鑑上傳例外,後端只收 jpg/png)。**預覽不必分網址**:`<img src>` 打 `GET /files/{id}` 時瀏覽器帶 `Sec-Fetch-Dest: image`,後端對 HEIC/HEIF/TIFF/BMP 這些瀏覽器解不了的圖回轉好的 JPEG(長邊 1600、快取在原檔旁;AVIF 三大瀏覽器都原生解得了,直接 inline);下載連結與 fetch 拿到的仍是原檔
 - 上限值讀 `GET /club/config`,前端不放容量常數(郵局與獎項上傳頁仍各自硬編碼 50MB,待收斂)
 - 送出動作一律要擋 in-flight,三種寫法各有各的漏法:`htmlType="submit"` 的鈕 `loading` 與 `disabled` 成對(AntD 的 `loading` 只擋 React onClick、不設 DOM `disabled`);**表單一定要有一顆 submit 鈕**,別用 Modal `onOk` + `form.submit()` 代替 —— 沒有 submit 鈕時 Enter 會直接送 form,`confirmLoading` 攔不到;`onPressEnter` 直接接 mutation 的地方自己擋 `isPending`
 

@@ -1,4 +1,6 @@
+import base64
 import io
+import pathlib
 import uuid
 from datetime import UTC, datetime
 
@@ -560,3 +562,228 @@ async def test_upload_gate_closes_before_the_body_lands(client, db, monkeypatch)
         headers=csrf_headers(client),
     )
     assert blocked.status_code == 507
+
+
+# ---- HEIC 這類瀏覽器解不了的圖:<img> 來要就轉 JPEG ----
+
+
+# 固定的 HEIC 位元組(單色,pillow-heif 編的):正式相依是 decode-only 的 pi-heif,測試裡編不出 HEIF
+HEIC_SMALL = base64.b64decode(  # 40×30
+    "AAAAHGZ0eXBoZWljAAAAAG1pZjFoZWljbWlhZgAAAXxtZXRhAAAAAAAAACFoZGxyAAAAAAAAAABwaWN0AAAAAAAAAAAAAAAAAAAAACJpbG9jAAAAAERAAAEAAQAAAAABoAABAAAAAAAAADMAAAAjaWluZgAAAAAAAQAAABVpbmZlAgAAAAABAABodmMxAAAAAA5waXRtAAAAAAABAAAA/GlwcnAAAADcaXBjbwAAAHVodmNDAQNwAAAAAAAAAAAAHvAA/P34+AAADwNgAAEAGEABDAH//wNwAAADAJAAAAMAAAMAHroCQGEAAQApQgEBA3AAAAMAkAAAAwAAAwAeoCCBBZbqrprm4CGgwIAAAAyAAAADAIRiAAEABkQBwXPBiQAAABNjb2xybmNseAABAA0ABoAAAAAUaXNwZQAAAAAAAABAAAAAQAAAAChjbGFwAAAAKAAAAAEAAAAeAAAAAf///+gAAAAC////3gAAAAIAAAAQcGl4aQAAAAADCAgIAAAAGGlwbWEAAAAAAAAAAQABBYECAwWEAAAAO21kYXQAAAAvKAGvEyFkY0D1JyL//2q6n/rQWf9v9lhZ3K6AwVvy+sD2ZJvA86qRnoCHaacwFXg="
+)
+HEIC_WIDE = base64.b64decode(  # 3200×800
+    "AAAAHGZ0eXBoZWljAAAAAG1pZjFoZWljbWlhZgAAAVhtZXRhAAAAAAAAACFoZGxyAAAAAAAAAABwaWN0AAAAAAAAAAAAAAAAAAAAACJpbG9jAAAAAERAAAEAAQAAAAABfAABAAAAAAAABkkAAAAjaWluZgAAAAAAAQAAABVpbmZlAgAAAAABAABodmMxAAAAAA5waXRtAAAAAAABAAAA2GlwcnAAAAC5aXBjbwAAAHpodmNDAQNwAAAAAAAAAAAAlvAA/P34+AAADwNgAAEAGEABDAH//wNwAAADAJAAAAMAAAMAlroCQGEAAQAtQgEBA3AAAAMAkAAAAwAAAwCWoAGQIAyFlupJKa5uAhoMCAAAAwDIAAADAAhAYgABAAdEAcFysGJAAAAAE2NvbHJuY2x4AAEADQAGgAAAABRpc3BlAAAAAAAADIAAAAMgAAAAEHBpeGkAAAAAAwgICAAAABdpcG1hAAAAAAAAAAEAAQSBAgMEAAAGUW1kYXQAAAZFKAGvExoiTgn9/fXx7enp6enq5TPAn//wUqP/3Ws8Pwd4rVD0Vd3Sbu/HI8G4qAAA8wABigAMIAAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAB96LkeDcVAAAhAAAxQAGEAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADACdgkwAAtgAEWAAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAHtCHAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAACQgAAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAHFAAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwNGAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAADAAA/wAAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAB/QAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAGbAAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAOqAAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAc8AAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwA5oAAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwMa"
+)
+
+
+def encoded(fmt: str, size=(40, 30), **save_kw) -> bytes:
+    """Pillow 自己編得出來的格式(TIFF/BMP)。"""
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", size, (0, 0, 200)).save(buf, format=fmt, **save_kw)
+    return buf.getvalue()
+
+
+async def _image_upload(db, club, user, name: str, content: bytes):
+    row = await file_service.save_upload(
+        db, fake_upload(name, content), policy=file_service.IMAGE, module="reports",
+        uploaded_by=user.id, club_id=club.id, slot="report_photo",
+    )
+    await db.commit()
+    return row
+
+
+async def _heic_upload(db, club, user):
+    row = await file_service.save_upload(
+        db,
+        fake_upload("IMG_0001.HEIC", HEIC_SMALL),
+        policy=file_service.IMAGE,
+        module="reports",
+        uploaded_by=user.id,
+        club_id=club.id,
+        slot="report_photo",
+    )
+    await db.commit()
+    assert row.mime == "image/heic"
+    return row
+
+
+async def test_img_requests_get_a_jpeg_preview_and_downloads_keep_the_original(client, db):
+    from PIL import Image
+
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    row = await _heic_upload(db, club, user)
+    await login(client, "club01")
+    url = f"/api/v1/files/{row.id}"
+
+    # <img src> 帶 Sec-Fetch-Dest: image → JPEG、inline
+    resp = await client.get(url, headers={"Sec-Fetch-Dest": "image"})
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["content-type"] == "image/jpeg"
+    assert resp.headers["content-disposition"].startswith("inline")
+    assert resp.headers["vary"] == "Sec-Fetch-Dest"
+    with Image.open(io.BytesIO(resp.content)) as img:
+        assert img.format == "JPEG"
+        assert img.size == (40, 30)
+    cache = settings.upload_dir / (row.path + file_service.PREVIEW_SUFFIX)
+    assert cache.is_file()
+
+    # 下載連結(document)、fetch(empty)與沒帶標頭的請求拿到的都是原檔,照舊附件下載
+    for headers in ({"Sec-Fetch-Dest": "document"}, {"Sec-Fetch-Dest": "empty"}, {}):
+        resp = await client.get(url, headers=headers)
+        assert resp.headers["content-type"] == "image/heic", headers
+        assert resp.headers["content-disposition"].startswith("attachment")
+        assert resp.headers["vary"] == "Sec-Fetch-Dest"
+        assert resp.content == HEIC_SMALL
+
+    # 快取:第二次 <img> 不再轉檔
+    stamp = cache.stat().st_mtime_ns
+    resp = await client.get(url, headers={"Sec-Fetch-Dest": "image"})
+    assert resp.status_code == 200
+    assert cache.stat().st_mtime_ns == stamp
+
+    # 轉檔不留暫存
+    assert not any(settings.upload_dir.rglob("*.part"))
+
+    # 刪原檔連快取一起清
+    file_service.unlink_quiet(settings.upload_dir / row.path)
+    assert not cache.exists()
+
+
+@pytest.mark.parametrize(
+    ("name", "content", "mime"),
+    [
+        ("a.heic", HEIC_SMALL, "image/heic"),
+        ("a.heif", HEIC_SMALL, "image/heif"),
+        ("a.tif", encoded("TIFF"), "image/tiff"),
+        ("a.bmp", encoded("BMP"), "image/bmp"),
+    ],
+)
+async def test_every_non_browser_image_format_gets_a_preview(client, db, name, content, mime):
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    row = await _image_upload(db, club, user, name, content)
+    assert row.mime == mime
+    await login(client, "club01")
+    resp = await client.get(f"/api/v1/files/{row.id}", headers={"Sec-Fetch-Dest": "image"})
+    assert resp.headers["content-type"] == "image/jpeg", mime
+
+
+async def test_preview_is_bounded_and_honours_exif_orientation(client, db):
+    """長邊封頂 1600;EXIF 方向要套上(iPhone 直拍的照片存的是橫的加旋轉標記)。
+
+    方向是解碼器(libheif、Pillow 的 TIFF 外掛)自己套的,`exif_transpose` 只是保險:
+    這支測的是輸出結果,拿掉那一行不會紅。
+    """
+    from PIL import Image
+
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    wide = await _image_upload(db, club, user, "wide.heic", HEIC_WIDE)
+    # TIFF 的 274 = Orientation,6 = 順時針轉 90°:40×30 看起來該是 30×40
+    rotated = await _image_upload(db, club, user, "rot.tif", encoded("TIFF", tiffinfo={274: 6}))
+    await login(client, "club01")
+
+    resp = await client.get(f"/api/v1/files/{wide.id}", headers={"Sec-Fetch-Dest": "image"})
+    with Image.open(io.BytesIO(resp.content)) as img:
+        assert (img.format, img.size) == ("JPEG", (1600, 400))
+
+    resp = await client.get(f"/api/v1/files/{rotated.id}", headers={"Sec-Fetch-Dest": "image"})
+    with Image.open(io.BytesIO(resp.content)) as img:
+        assert img.size == (30, 40)
+
+
+@pytest.mark.parametrize(
+    ("attr", "value"),
+    [("PREVIEW_MAX_PIXELS", 40 * 30 - 1), ("PREVIEW_MAX_SOURCE_BYTES", len(HEIC_SMALL) - 1)],
+)
+async def test_sources_over_the_caps_are_served_as_is(client, db, monkeypatch, attr, value):
+    """超過像素或位元組上限的圖不轉(解開來會吃掉半台機器),照舊給原檔、不留快取。"""
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    row = await _heic_upload(db, club, user)
+    await login(client, "club01")
+    monkeypatch.setattr(file_service, attr, value)
+    resp = await client.get(f"/api/v1/files/{row.id}", headers={"Sec-Fetch-Dest": "image"})
+    assert resp.headers["content-type"] == "image/heic"
+    assert not (settings.upload_dir / (row.path + file_service.PREVIEW_SUFFIX)).exists()
+
+
+async def test_no_new_preview_cache_at_disk_alert(client, db, monkeypatch):
+    """磁碟到告警水位:上傳被擋,預覽也不再建新快取(已有的照常給)。"""
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    row = await _heic_upload(db, club, user)
+    await login(client, "club01")
+    url = f"/api/v1/files/{row.id}"
+    cache = settings.upload_dir / (row.path + file_service.PREVIEW_SUFFIX)
+
+    monkeypatch.setattr(file_service, "disk_level", lambda usage=None: "alert")
+    resp = await client.get(url, headers={"Sec-Fetch-Dest": "image"})
+    assert resp.headers["content-type"] == "image/heic"
+    assert not cache.exists()
+
+    monkeypatch.setattr(file_service, "disk_level", lambda usage=None: "ok")
+    assert (await client.get(url, headers={"Sec-Fetch-Dest": "image"})).headers[
+        "content-type"
+    ] == "image/jpeg"
+    assert cache.exists()
+    # 快取已在,告警也照給
+    monkeypatch.setattr(file_service, "disk_level", lambda usage=None: "alert")
+    resp = await client.get(url, headers={"Sec-Fetch-Dest": "image"})
+    assert resp.headers["content-type"] == "image/jpeg"
+
+
+def test_unlink_quiet_removes_the_original_even_if_the_preview_will_not_go(tmp_path, monkeypatch):
+    original = tmp_path / "f"
+    preview = tmp_path / ("f" + file_service.PREVIEW_SUFFIX)
+    original.write_bytes(b"x")
+    preview.write_bytes(b"y")
+    real_unlink = pathlib.Path.unlink
+
+    def unlink(self, missing_ok=False):
+        if self == preview:
+            raise OSError("busy")
+        real_unlink(self, missing_ok=missing_ok)
+
+    monkeypatch.setattr(pathlib.Path, "unlink", unlink)
+    file_service.unlink_quiet(original)
+    assert not original.exists()
+    assert preview.exists()
+
+
+
+
+async def test_native_images_are_not_transcoded(client, db):
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    row = await file_service.save_upload(
+        db, fake_upload("a.png", PNG_BYTES), policy=file_service.IMAGE, module="reports",
+        uploaded_by=user.id, club_id=club.id, slot="report_photo",
+    )
+    await db.commit()
+    await login(client, "club01")
+    resp = await client.get(f"/api/v1/files/{row.id}", headers={"Sec-Fetch-Dest": "image"})
+    assert resp.headers["content-type"] == "image/png"
+    assert resp.content == PNG_BYTES
+
+
+async def test_broken_heic_falls_back_to_the_original(client, db):
+    """轉不了就照舊給原檔(破圖總比 500 好),而且不留半寫的快取。"""
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    row = await file_service.save_upload(
+        db,
+        # 魔術位元組是 HEIC、內容不是
+        fake_upload("bad.heic", b"\x00\x00\x00\x18ftypheic" + b"\x00" * 64),
+        policy=file_service.IMAGE, module="reports",
+        uploaded_by=user.id, club_id=club.id, slot="report_photo",
+    )
+    await db.commit()
+    await login(client, "club01")
+    resp = await client.get(f"/api/v1/files/{row.id}", headers={"Sec-Fetch-Dest": "image"})
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "image/heic"
+    assert not (settings.upload_dir / (row.path + file_service.PREVIEW_SUFFIX)).exists()

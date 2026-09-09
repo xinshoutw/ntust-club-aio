@@ -9,6 +9,7 @@ from typing import Annotated
 import sqlalchemy as sa
 from fastapi import APIRouter, Depends, Request
 
+from app.core import permissions
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, not_found, validation_error
 from app.models import Equipment
@@ -20,7 +21,10 @@ router = APIRouter(prefix="/admin/equipment", tags=["admin"])
 
 SettingAdmin = Annotated[CurrentUser, Depends(require_permission("asetting"))]
 # 手動借用頁要挑品項,讀得到主檔即可
-MasterReader = Annotated[CurrentUser, Depends(require_permission("asetting", "amanual"))]
+# 主檔讀取:系統設定、手動借用、所有器材借用的篩選(core/permissions.EQUIPMENT_READ_KEYS)
+MasterReader = Annotated[
+    CurrentUser, Depends(require_permission(*permissions.EQUIPMENT_READ_KEYS))
+]
 
 
 @router.get("")

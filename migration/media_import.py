@@ -46,7 +46,7 @@ from app.core.db import async_session_factory
 from app.models import Activity, File, LegacyIdMap
 from app.models.enums import LegacySystem
 from app.services.activity_service import PHOTO_SLOT, PHOTO_SUBJECT
-from app.services.files import IMAGE, detect_mime
+from app.services.files import IMAGE, detect_mime, unlink_quiet
 
 WORKSPACE = MIGRATION_DIR.parent.parent.parent
 MEDIA_DIR = Path(os.environ.get("CLUB_MEDIA") or WORKSPACE / "legacy" / "club_media")
@@ -266,10 +266,11 @@ async def reset(db: AsyncSession) -> None:
     for _, rel_path in rows:
         disk = upload_root / rel_path
         if disk.is_file():
-            disk.unlink()
             unlinked += 1
         else:
             kept += 1
+        # 不管原檔在不在都呼叫:原檔早就不見、<path>.preview.jpg 還在的列,快取也要清掉
+        unlink_quiet(disk)
     tail = f"(找不到 {kept} 個)" if kept else ""
     print(f"已清除照片 {len(rows)} 列、盤上檔案 {unlinked} 個{tail}")
 

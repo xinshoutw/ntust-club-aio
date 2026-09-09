@@ -762,11 +762,12 @@ async def test_venue_bookings_filter_by_semester_and_many_clubs(client, db):
 async def test_equipment_loans_filter_by_semester_and_many_clubs(client, db):
     club, other_club = await seed(client, db)
     eq = await make_equipment(db)
+    mic = await make_equipment(db, name="麥克風")
     rows = [
         EquipmentLoan(club_id=club.id, equipment_id=eq.id, activity_id=None, qty=1,
                       start_date=date(2026, 3, 7), end_date=date(2026, 3, 8),
                       purpose="上學期", status="returned"),
-        EquipmentLoan(club_id=other_club.id, equipment_id=eq.id, activity_id=None, qty=1,
+        EquipmentLoan(club_id=other_club.id, equipment_id=mic.id, activity_id=None, qty=1,
                       start_date=date(2026, 9, 7), end_date=date(2026, 9, 8),
                       purpose="下學期", status="checked_out"),
     ]
@@ -784,6 +785,14 @@ async def test_equipment_loans_filter_by_semester_and_many_clubs(client, db):
 
     resp = await client.get(
         f"/api/v1/admin/equipment-loans?club_id={club.id}&club_id={other_club.id}&sort=start_date"
+    )
+    assert [d["id"] for d in resp.json()["data"]] == [spring.id, autumn.id]
+
+    # equipment_id 同樣可重複帶
+    resp = await client.get(f"/api/v1/admin/equipment-loans?equipment_id={mic.id}")
+    assert [d["id"] for d in resp.json()["data"]] == [autumn.id]
+    resp = await client.get(
+        f"/api/v1/admin/equipment-loans?equipment_id={mic.id}&equipment_id={eq.id}&sort=start_date"
     )
     assert [d["id"] for d in resp.json()["data"]] == [spring.id, autumn.id]
 

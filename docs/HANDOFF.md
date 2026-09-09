@@ -159,16 +159,33 @@ Opus 交叉審查後補的:`status=checked_out` 不帶 `overdue` 時**排除已�
 點交端擋區間已過的單、`tests/test_migrations` 連 nullable 一起比(原本漏跑這支遷移不會紅)、
 稽核頁補 `equipment_loan_expired` 與 `system` 角色的對照詞、`seed_mock` 的已核准借用改相對真實今天。
 
+**HEIC 預覽、借用清單版面**(2026-09-09):iPhone 拍的結案照片是 HEIC,Chrome 解不了,縮圖與預覽彈窗一片破圖。
+`GET /files/{id}` 現在看 `Sec-Fetch-Dest: image`(`<img>` 才帶)—— HEIC/HEIF/TIFF/BMP 轉成 JPEG 回去(AVIF 瀏覽器原生解得了,直接 inline)
+(`services/files.preview_of`,pi-heif;快取 `<path>.preview.jpg`,`unlink_quiet` 連它一起刪),下載與 fetch 照舊原檔,
+前端一行都沒改。轉失敗、來源超過 20MB 或超過 5,000 萬像素就給原檔並 log;同時最多轉 2 張(正式機 2 vCPU 與 PostgreSQL 同住);
+暫存檔帶 uuid、失敗不留 `.part`;回應帶 `Vary: Sec-Fetch-Dest`。**新相依 `pi-heif`**(pillow-heif 的 decode-only 版:
+wheel 只帶 LGPL 的 libheif/libde265,沒有 GPLv2 的 x265 —— codex 交叉審查抓到 pillow-heif 的 wheel 整個標 GPLv2,
+映像推上 GHCR 就有散佈義務),映像重建即帶入。codex 那輪另補的:磁碟到 90% 告警就不再建新快取(已有的照給)、
+轉檔改用專屬 2 條 thread pool(Semaphore 在請求被取消時會提早放行)、`media_import --reset` 不管原檔在不在都清快取、
+兩頁的載入失敗改用 `isLoadingError`、日期欄補 `title`、「帳篷×2」不留空格;測試的 HEIC 改用固定位元組
+(decode-only 編不出來),EXIF 方向是解碼器套的,那支測試驗的是結果。沒做的:轉檔與刪除同時發生時
+快取可能被放回來(要 per-path 鎖,不值得),記在 `improvements.md`。
+Opus 交叉審查後補的:`media_import --reset` 改走 `unlink_quiet`(原本裸 unlink 會留快取孤兒)、AVIF 改直接 inline、
+場地頁不再打器材主檔(只持 `avenuelist` 會 403)、日期欄也截斷。沒做的(報修/違規/郵局那幾頁仍是下載連結、
+縮圖沒有小尺寸、`<img>` 沒有 onError)記在 `improvements.md` §5。
+「所有場地/器材借用」每一格改單行截斷(`useFitRows` 量第一列,一換行整頁列數算成一半)、器材欄 240px、
+器材頁多一個器材漏斗(`equipment_id=` 可重複,`GET /admin/equipment` 讀取鍵多 `aloanlist`)。
+
 **要跑遷移**:D-21/D-22 是 drop column,`alembic upgrade head` 之後舊號碼就沒了。
 D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)—— 走 `--reset` 重灌,
 或把該學期匯出再匯入一次。
 
 ## 驗證現況
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **606 passed**;`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **278 passed**(58 檔)、
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **620 passed**;`ruff check .` 全綠
+- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **279 passed**(59 檔)、
   `pnpm run lint` 8 個既有的 fast-refresh warning
-- 新測試逐一做過 mutation 驗證(改回舊寫法會紅);借用色格圖那支另在 `TZ=UTC` 與 `TZ=Pacific/Honolulu` 下各跑過一次
+- 新測試做過 mutation 驗證(改回舊寫法會紅;已知例外:`exif_transpose` 那行拿掉不會紅,見測試 docstring);借用色格圖那支另在 `TZ=UTC` 與 `TZ=Pacific/Honolulu` 下各跑過一次
 
 ## 開發庫(正式資料 snapshot,2026-08-29 dump)
 

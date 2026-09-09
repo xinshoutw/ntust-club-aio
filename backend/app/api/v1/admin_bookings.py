@@ -284,10 +284,11 @@ async def list_equipment_loans(
     sort: str | None = None,
     status: Annotated[list[LoanStatusFilter] | None, Query()] = None,
     club_id: Annotated[list[int] | None, Query()] = None,
+    equipment_id: Annotated[list[int] | None, Query()] = None,
     semester: str | None = Query(None, pattern=SEMESTER_LABEL),
     active: bool | None = None,
 ) -> ApiResponse[list[AdminEquipmentLoanOut]]:
-    """status / club_id 可重複帶多值(取聯集);semester 以借用起日落在哪個學期算;
+    """status / club_id / equipment_id 可重複帶多值(取聯集);semester 以借用起日落在哪個學期算;
     active=進行中(與社團端 /club/equipment-loans 同一條界線);
     overdue=checked_out 且過了結束日之隔天上班日 10:30(推導不儲存)。"""
     return_time = await get_setting(db, "equipment_return_time")
@@ -319,6 +320,8 @@ async def list_equipment_loans(
         query = query.where(sa.or_(*conds))
     if club_id:
         query = query.where(EquipmentLoan.club_id.in_(club_id))
+    if equipment_id:
+        query = query.where(EquipmentLoan.equipment_id.in_(equipment_id))
     if semester:
         query = query.where(EquipmentLoan.start_date.between(*semester_range(semester)))
     if active is not None:

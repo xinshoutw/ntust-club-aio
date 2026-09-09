@@ -18,6 +18,14 @@ vi.mock('../../app/auth', () => ({
   }),
 }))
 
+vi.mock('../../api/adminEquipment', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../api/adminEquipment')>()),
+  useAdminEquipment: () => ({
+    data: [{ id: 1, name: '帳篷', totalQty: 5, needsSerial: false, isActive: true }],
+    isError: false,
+  }),
+}))
+
 vi.mock('../../api/adminClubs', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../api/adminClubs')>()),
   useClubOptions: () => ({

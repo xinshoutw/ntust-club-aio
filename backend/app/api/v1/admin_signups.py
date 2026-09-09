@@ -661,7 +661,9 @@ async def mark_attendance(
         background.add_task(
             notify.club_event,
             "approve" if body.attended else "alert",
-            "報名簽到已登錄" if body.attended else "報名簽到已取消",
+            # 取消那半不寫「報名」:社團會把「報名簽到已取消」讀成報名被取消,
+            # 而報名是一經送出不得更改的東西,誤會的代價比講清楚大
+            "報名簽到已登錄" if body.attended else "簽到紀錄已取消",
             f"{club.name}:{item.name}{where}",
             club.discord_webhook_url,
         )

@@ -206,12 +206,14 @@ async def submit_signup(
     await db.commit()
 
     club = await db.get(Club, user.club_id)
+    # 標題帶動作與待確認:名詞句看不出是自己送的還是學務處補登的(K10),
+    # 而「(待確認)」接在人數括號後面會被當成報名已成立
     pending = "(待確認)" if item.requires_confirmation else ""
     background.add_task(
         notify.club_event,
         "submit",
-        "線上報名",
-        f"{club.name}:{item.name}({len(body.participants)} 人){pending}",
+        f"線上報名已送出{pending}",
+        f"{club.name}:{item.name}({len(body.participants)} 人)",
         club.discord_webhook_url,
     )
     return ApiResponse()

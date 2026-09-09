@@ -253,7 +253,7 @@ async def revoke_room_booking(
         db,
         booking.club_id,
         "reject",
-        "固定場地借用已撤銷",
+        "固定場地借用已被學務處撤銷",
         f"{venue.name}({len(booking.slots)} 個每週時段):{body.reason}",
     )
     return ApiResponse()

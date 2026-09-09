@@ -378,6 +378,7 @@ async def test_equipment_approve_can_adjust_qty(client, db, monkeypatch):
         sa.select(AuditLog).where(AuditLog.action == "equipment_loan_approved")
     )
     assert "qty=5->3" in audit_row.detail
+    assert calls[-1][1] == "器材借用已核准(數量已調整)"  # 只看標題也要知道被砍過
     assert "申請 5 件、核准 3 件" in calls[-1][2]
 
     # 同數 = 未調整:不留調整字樣
@@ -391,7 +392,7 @@ async def test_equipment_approve_can_adjust_qty(client, db, monkeypatch):
         sa.select(ApprovalRecord).where(ApprovalRecord.subject_id == same.id)
     )
     assert record.reason is None
-    assert "申請" not in calls[-1][2]
+    assert (calls[-1][1], "申請" in calls[-1][2]) == ("器材借用已核准", False)
 
     # 值域:0 與 1001 是 schema 擋;2 > 申請數 1 是端點擋(只能往下調)
     extra = EquipmentLoan(club_id=club.id, equipment_id=eq.id, qty=1, purpose="x", **window)
@@ -508,7 +509,15 @@ async def test_temp_and_fixed_approval_cross_check(client, db):
     assert resp.json()["meta"]["code"] == "SLOT_TAKEN"
 
 
-async def test_revoke_approved_venue_booking_and_stale_loan(client, db):
+async def test_revoke_approved_venue_booking_and_stale_loan(client, db, monkeypatch):
+    from app.services import notify
+
+    titles: list[str] = []
+
+    async def fake_club_event(kind, title, description="", club_webhook=None):
+        titles.append(title)
+
+    monkeypatch.setattr(notify, "club_event", fake_club_event)
     club, _ = await seed(client, db)
     venue = await make_venue(db)
     equipment = await make_equipment(db)
@@ -555,6 +564,8 @@ async def test_revoke_approved_venue_booking_and_stale_loan(client, db):
     await db.refresh(loan)
     assert booking.status.value == "cancelled"
     assert loan.status.value == "cancelled"
+    # 社團自己按的取消是「已取消」,只差一個字,不點名主詞就分不出是誰收走的
+    assert titles == ["臨時場地借用已被學務處撤銷", "器材借用已被學務處撤銷"]
     assert await db.scalar(
         sa.select(AuditLog.id).where(AuditLog.action == "venue_booking_revoked")
     ) is not None

@@ -28,7 +28,7 @@ from app.services import audit, notify
 from app.services import booking_service as svc
 
 REASON = "借用區間已過，未領取，系統自動撤銷"
-TITLE = "器材借用已撤銷"
+TITLE = "器材借用已自動撤銷"  # 與承辦手動撤銷分開講,社團才知道要找誰
 
 
 @dataclass
@@ -117,8 +117,10 @@ async def revoke_unclaimed(db: AsyncSession, *, today: date | None = None) -> li
 async def notify_expired(expired: list[Expired]) -> None:
     """兩個呼叫端共用(端點排進 BackgroundTasks、排程直接 await):
     沒有社團可推(手動借用、社團列已不在)就推系統 webhook(K4b),其餘推該社自設的。"""
+    # kind 用 alert:紅色是「退回/拒絕」,沒人審過這張單,同一條逾期線上的
+    # 歸還提醒(loan_remind)也是 alert,撤銷沒有理由換色
     for e in expired:
         if e.club_id is None or not e.has_club:
-            await notify.discord("reject", TITLE, e.desc)
+            await notify.discord("alert", TITLE, e.desc)
         else:
-            await notify.club_event("reject", TITLE, e.desc, e.webhook)
+            await notify.club_event("alert", TITLE, e.desc, e.webhook)

@@ -25,7 +25,7 @@
 | `submit` | `0xF59E0B` 橙 | 送審/新申請 |
 | `approve` | `0x22C55E` 綠 | 通過/完成 |
 | `reject` | `0xEF4444` 紅 | 退回/拒絕 |
-| `alert` | `0x8B5CF6` 紫 | 系統事件(解鎖、逾期提醒、停權、評鑑調整) |
+| `alert` | `0x8B5CF6` 紫 | 系統事件(解鎖、逾期提醒與逾期撤銷、停權、評鑑調整、社團自行取消) |
 
 **長度**:程式自截 title 256、description 2000(Discord 上限 4096)、公告 Text Display 3800(上限 4000)。活動名、社團名、退回原因(≤500 字)、公告內文皆為使用者輸入,模板要容忍被截斷。Discord 速率限制約每 2 秒 5 則,公告逐社團推送(60+ 社)可能觸頂;429 會照 `Retry-After` 退避重試(上限 30 秒 × 3 次)。
 
@@ -73,7 +73,9 @@
 - **D5 臨時借用退回** `POST /admin/venue-bookings/{id}/reject` · reject
   `臨時場地借用退回` / `{venue.name}({date}):{body.reason}`(無社團名、無時段)
 - **D6 器材借用已核准** `POST /admin/equipment-loans/{id}/approve` · approve
-  `器材借用已核准` / `{equipment.name} ×{qty}({start}~{end})`(無社團名);承辦改過數量時尾綴 `,申請 {requested} 件、核准 {qty} 件`
+  `器材借用已核准` / `{equipment.name} ×{qty}({start}~{end})`(無社團名);承辦改過數量時標題作
+  `器材借用已核准(數量已調整)`、尾綴 `,申請 {requested} 件、核准 {qty} 件`
+  —— 砍量要進標題:尾綴落在句末,只看標題會以為申請幾件就核准幾件
 - **D7 器材借用退回** `POST /admin/equipment-loans/{id}/reject` · reject
   `器材借用退回` / `{equipment.name} ×{qty}:{body.reason}`(無社團名、無區間)
 - **D8 固定借用已核准** `POST /admin/room-bookings/{id}/approve` · approve
@@ -83,13 +85,16 @@
 - **D10 器材歸還提醒** `POST /admin/equipment-loans/{id}/remind`(super)或 `POST /staff/equipment-loans/{id}/remind`(工讀生),兩者共用 `services/loan_remind` · alert · 另寄 Email
   `器材歸還提醒` / `{club.name}:{equipment.name} ×{qty}(借用區間 {start}~{end},歸還期限 {deadline}),請儘速辦理歸還點交。`
 - **D11 固定借用已撤銷** `POST /admin/room-bookings/{id}/revoke` · reject
-  `固定場地借用已撤銷` / `{venue.name}({n} 個每週時段):{body.reason}`
+  `固定場地借用已被學務處撤銷` / `{venue.name}({n} 個每週時段):{body.reason}`
 - **D12 臨時借用已撤銷** `POST /admin/venue-bookings/{id}/revoke` · reject
-  `臨時場地借用已撤銷` / `{venue.name}({date} 時段 {periods}):{body.reason}`
+  `臨時場地借用已被學務處撤銷` / `{venue.name}({date} 時段 {periods}):{body.reason}`
 - **D13 器材借用已撤銷** `POST /admin/equipment-loans/{id}/revoke` · reject
-  `器材借用已撤銷` / `{equipment.name} ×{qty}({start}~{end}):{body.reason}`
-- **D13b 器材借用區間已過未領取,系統撤銷** 點交清單載入時與每日排程(`services/loan_expiry`) · reject
-  `器材借用已撤銷` / `{equipment.name} ×{qty}({start}~{end}):借用區間已過，未領取，系統自動撤銷` · 社團列已不在時推系統 webhook(同 K4b;手動借用本身不掃)。尾句用全形逗號 —— 它同時是社團端「撤銷原因」彈窗顯示的字(`design-guide.md` §7),括號與冒號則照 D13 的 Discord 慣例
+  `器材借用已被學務處撤銷` / `{equipment.name} ×{qty}({start}~{end}):{body.reason}`
+  —— D11–D13 標題點名學務處(慣例同 K9b):社團自己按取消是 K1–K3 的「已取消」,
+  只差一個字又同一個頻道,不點主詞就分不出這張單是誰收走的
+- **D13b 器材借用區間已過未領取,系統撤銷** 點交清單載入時與每日排程(`services/loan_expiry`) · alert
+  (沒人審過這張單,不掛紅色;同一條逾期線上的 D10 歸還提醒也是 alert)
+  `器材借用已自動撤銷` / `{equipment.name} ×{qty}({start}~{end}):借用區間已過，未領取，系統自動撤銷` · 社團列已不在時推系統 webhook(同 K4b;手動借用本身不掃)。尾句用全形逗號 —— 它同時是社團端「撤銷原因」彈窗顯示的字(`design-guide.md` §7),括號與冒號則照 D13 的 Discord 慣例
 
 D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政手動借用)或社團不存在時推系統 webhook。
 
@@ -112,7 +117,9 @@ D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政�
 **線上報名**
 
 - **F1 線上報名送出** `POST /club/signup-items/{id}/signup` · submit
-  `線上報名` / `{club.name}:{item.name}({n} 人)` —— 審核制時尾綴 `(待確認)`
+  `線上報名已送出` / `{club.name}:{item.name}({n} 人)` —— 審核制時標題作 `線上報名已送出(待確認)`
+  —— 標題帶動作:名詞句看不出是自己送的還是學務處補登的(K10);待確認擺標題,
+  接在人數括號後面會被當成報名已成立
 - **F2 報名已確認** `PUT /admin/signup-items/{id}/registrations/{club_id}/confirm` · approve
   `報名已確認` / `{club.name}:{item.name}`
 
@@ -150,16 +157,18 @@ D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政�
 
 **取消與刪除(GAP-18,2026-08-20 實作)**
 
-- **K1 固定借用社團自行取消** `POST /club/room-bookings/{id}/cancel` · reject
+- **K1 固定借用社團自行取消** `POST /club/room-bookings/{id}/cancel` · alert
   `固定場地借用已取消` / `{user.name}:{venue.name}({n} 個每週時段)`
-- **K2 臨時借用社團自行取消** `POST /club/venue-bookings/{id}/cancel` · reject
+- **K2 臨時借用社團自行取消** `POST /club/venue-bookings/{id}/cancel` · alert
   `臨時場地借用已取消` / `{user.name}:{venue.name}({date} 時段 {periods})`
-- **K3 器材借用社團自行取消** `POST /club/equipment-loans/{id}/cancel` · reject
+- **K3 器材借用社團自行取消** `POST /club/equipment-loans/{id}/cancel` · alert
   `器材借用已取消` / `{user.name}:{equipment.name} ×{qty}({start}~{end})`
+  —— K1–K3 一律 alert:紅色是「退回/拒絕」,社團自己按的取消掛紅色會被讀成申請被駁回
 - **K4 行政手動借用建立** `POST /admin/bookings/manual-{venue,equipment}` · alert · **僅推系統 webhook**(無社團)
   `行政手動借用建立` / `{user.name}:{venue 或 equipment 名}(時間)`
 - **K5 報名簽到登錄** `PUT /admin/signup-items/{id}/attendance` · 登錄 approve、取消 alert
-  `報名簽到已登錄` 或 `報名簽到已取消` / `{club.name}:{item.name}({session.name})`
+  `報名簽到已登錄` 或 `簽到紀錄已取消` / `{club.name}:{item.name}({session.name})`
+  —— 取消那半不寫「報名」:「報名簽到已取消」會被讀成報名被取消,而報名一經送出不得更改
   —— **只在真的翻面時推**(同值再送一次不是事件);非場次制的預設場次名就是活動名,那時不重複印
 - **K6 公告蓋板開啟** `PATCH /admin/announcements/{id}`(`takeover_until` 由 null 轉為日期)· announce · 僅推系統 webhook
   `公告已設為蓋板` / `{title}`

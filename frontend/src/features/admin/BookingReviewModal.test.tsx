@@ -16,6 +16,7 @@ const loan: BookingReviewItem = {
     purpose: '營隊',
     phone: '0912345678',
     status: 'pending',
+    createdAt: '2026/03/01 10:00',
     availableExcludingSelf: 3,
   },
 }

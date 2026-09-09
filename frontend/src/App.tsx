@@ -41,6 +41,7 @@ import CloseReviewPage from './features/admin/CloseReviewPage'
 import SignupManagePage from './features/admin/SignupManagePage'
 import AnnouncementsPage from './features/admin/AnnouncementsPage'
 import AdminBookingsPage from './features/admin/AdminBookingsPage'
+import AdminBookingListPage from './features/admin/AdminBookingListPage'
 import AdminRoomsPage from './features/admin/AdminRoomsPage'
 import AdminMembersPage from './features/admin/AdminMembersPage'
 import AdminClubActivitiesPage from './features/admin/AdminClubActivitiesPage'
@@ -229,6 +230,9 @@ export default function App() {
           <Route path="announcements" element={<AnnouncementsPage />} />
           <Route path="bookings" element={<AdminBookingsPage />} />
           <Route path="rooms" element={<AdminRoomsPage />} />
+          {/* 同一個元件掛兩條路由:key 讓兩頁互切時整頁重掛,否則排序鍵與學期會從上一頁帶過來 */}
+          <Route path="venue-bookings" element={<AdminBookingListPage key="venue" kind="venue" />} />
+          <Route path="equipment-loans" element={<AdminBookingListPage key="loan" kind="loan" />} />
           <Route path="manual-booking" element={<ManualBookingPage />} />
           <Route path="venue-rules" element={<VenueRulesPage />} />
           <Route path="club-overview" element={<ClubOverviewPage />} />

@@ -64,6 +64,33 @@ describe('側欄徽章', () => {
   })
 })
 
+describe('行政端借用查閱的兩頁', () => {
+  test('所有場地借用與所有器材借用接在兩個審核頁之後', () => {
+    expect(keysOf(buildAdminNav(superUser), '借用審核')).toEqual([
+      'a-booking',
+      'a-room',
+      'a-venue-bookings',
+      'a-equipment-loans',
+      'a-manual',
+      'a-venue-rules',
+    ])
+  })
+
+  test('查閱鍵各開各的一頁,沒有審核鍵也進得來', () => {
+    const holder: SessionUser = {
+      ...superUser,
+      isSuper: false,
+      permissions: ['aloanlist'],
+      adminPages: [
+        { key: 'abooking', label: '臨時場地器材借用審核', paths: ['/admin/bookings'], also: [] },
+        { key: 'avenuelist', label: '所有場地借用', paths: ['/admin/venue-bookings'], also: [] },
+        { key: 'aloanlist', label: '所有器材借用', paths: ['/admin/equipment-loans'], also: [] },
+      ],
+    }
+    expect(keysOf(buildAdminNav(holder), '借用審核')).toEqual(['a-equipment-loans'])
+  })
+})
+
 describe('行政端活動查閱的兩頁', () => {
   test('所有活動排在活動審核分組最後', () => {
     expect(keysOf(buildAdminNav(superUser), '活動審核')).toEqual(['a-review', 'a-close', 'a-activities'])

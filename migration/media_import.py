@@ -42,12 +42,11 @@ from cms_import import IdMap, _scope_bounds, local_dt
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 
 from app.core.config import settings
-from app.services.files import unlink_quiet
 from app.core.db import async_session_factory
 from app.models import Activity, File, LegacyIdMap
 from app.models.enums import LegacySystem
 from app.services.activity_service import PHOTO_SLOT, PHOTO_SUBJECT
-from app.services.files import IMAGE, detect_mime
+from app.services.files import IMAGE, detect_mime, unlink_quiet
 
 WORKSPACE = MIGRATION_DIR.parent.parent.parent
 MEDIA_DIR = Path(os.environ.get("CLUB_MEDIA") or WORKSPACE / "legacy" / "club_media")

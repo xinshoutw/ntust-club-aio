@@ -11,7 +11,7 @@
 | 動作 | 端點 |
 |---|---|
 | 借用情形色格圖 | `GET /public/{venues,periods}`、`/public/bookings/availability{,-range}`、`/public/equipment/usage`(與社團端同一組) |
-| 待審場地 / 器材 | `GET /admin/venue-bookings?status=pending`、`/admin/equipment-loans?status=pending`(兩支都逐列帶退回/撤銷的 `decision_reason`、`decided_at`、`decided_by`;本頁只查待審,那三欄一律 null) |
+| 待審場地 / 器材 | `GET /admin/venue-bookings?status=pending`、`/admin/equipment-loans?status=pending`(兩支都逐列帶退回/撤銷的 `decision_reason`、`decided_at`、`decided_by`;本頁只查待審,那三欄一律 null。同兩支清單也供 [venue-bookings.md](venue-bookings.md) / [equipment-loans.md](equipment-loans.md) 查全狀態,讀取鍵在 `core/permissions.VENUE_BOOKING_READ_KEYS` / `LOAN_READ_KEYS`) |
 | 核准 / 退回 | `POST /admin/{venue-bookings,equipment-loans}/{id}/{approve,reject}` |
 
 ## 畫面

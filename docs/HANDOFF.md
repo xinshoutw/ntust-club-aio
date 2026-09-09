@@ -123,6 +123,15 @@ nginx 上傳白名單那條 location 改成同時涵蓋報修佐證與勸導附�
 以前是到後端才 415,報修那頁一併改);核准改數量那句「數量調整:5 → 3」社團端借用列可點開
 「核准說明」看到(`attach_decisions` 連留了話的 APPROVE 一起帶)。
 
+**所有場地借用 / 所有器材借用**(2026-09-09):行政端「借用審核」多兩頁查閱用清單
+(`/admin/venue-bookings`、`/admin/equipment-loans`),全校、全狀態、依學期,與「所有活動」同一種頁;
+各配一把查閱鍵 `avenuelist` / `aloanlist`(帳號管理的權限彈窗自動多兩格)。**只開 GET**,
+核准/退回/撤銷仍是 `abooking` 的事 —— 兩把都持有的人在本頁的彈窗一樣簽得動。後端兩支清單
+多收 `semester=` 與可重複的 `club_id=`,各加一支 `/semesters`。共用彈窗補顯示送件時間與
+退回/撤銷原因(含經手人),而且**沒接 `onApprove` 就不畫審核鈕**(原本會畫出按了只得到假成功的鈕)。
+一個元件 `AdminBookingListPage` 吃 `kind`,兩條路由各帶 `key` 才不會互切時帶著上一頁的排序鍵。
+頁名依 `design-guide.md` §7 用「場地」不用「教室」。
+
 **要跑遷移**:D-21/D-22 是 drop column,`alembic upgrade head` 之後舊號碼就沒了。
 D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)—— 走 `--reset` 重灌,
 或把該學期匯出再匯入一次。

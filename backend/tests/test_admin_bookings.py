@@ -378,6 +378,7 @@ async def test_equipment_approve_can_adjust_qty(client, db, monkeypatch):
         sa.select(AuditLog).where(AuditLog.action == "equipment_loan_approved")
     )
     assert "qty=5->3" in audit_row.detail
+    assert calls[-1][1] == "器材借用已核准(數量已調整)"  # 只看標題也要知道被砍過
     assert "申請 5 件、核准 3 件" in calls[-1][2]
 
     # 同數 = 未調整:不留調整字樣
@@ -391,7 +392,7 @@ async def test_equipment_approve_can_adjust_qty(client, db, monkeypatch):
         sa.select(ApprovalRecord).where(ApprovalRecord.subject_id == same.id)
     )
     assert record.reason is None
-    assert "申請" not in calls[-1][2]
+    assert (calls[-1][1], "申請" in calls[-1][2]) == ("器材借用已核准", False)
 
     # 值域:0 與 1001 是 schema 擋;2 > 申請數 1 是端點擋(只能往下調)
     extra = EquipmentLoan(club_id=club.id, equipment_id=eq.id, qty=1, purpose="x", **window)

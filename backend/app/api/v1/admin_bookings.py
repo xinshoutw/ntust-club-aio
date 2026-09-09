@@ -515,7 +515,8 @@ async def approve_equipment_loan(
         db,
         loan.club_id,
         "approve",
-        "器材借用已核准",
+        # 砍過量就在標題講:尾綴落在句末,只看標題會以為申請幾件就核准幾件
+        "器材借用已核准(數量已調整)" if adjusted else "器材借用已核准",
         f"{equipment.name} ×{loan.qty}({loan.start_date}~{loan.end_date})"
         + (f",申請 {requested} 件、核准 {loan.qty} 件" if adjusted else ""),
     )

@@ -9,6 +9,7 @@
 
 import asyncio
 import hashlib
+from concurrent.futures import ThreadPoolExecutor
 import logging
 import shutil
 import uuid
@@ -551,8 +552,10 @@ PREVIEW_MAX_EDGE = 1600  # 預覽彈窗最大 76vh,更大只是白轉
 PREVIEW_MAX_SOURCE_BYTES = 20 * 1024 * 1024
 PREVIEW_MAX_PIXELS = 50_000_000
 # 同時最多轉幾張:正式機是 2 vCPU + 4GB 還跟 PostgreSQL 同住,asyncio 預設 thread pool 會放 6 條進去,
-# 結案照片牆一次要 20 張縮圖就是 6 張同時解 —— 兩張已經吃滿兩顆核心
-_PREVIEW_SLOTS = asyncio.Semaphore(2)
+# 結案照片牆一次要 20 張縮圖就是 6 張同時解 —— 兩張已經吃滿兩顆核心。用專屬的 2 條 thread pool
+# 而不是 Semaphore:請求被取消時 to_thread 裡的 thread 不會停,Semaphore 卻會先放行下一張,
+# 「最多 2 張」就不是真的;pool 本身封頂,取消只是讓等待的人先走
+_PREVIEW_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="preview")
 
 
 def _render_preview(src: Path, dst: Path) -> None:
@@ -562,6 +565,8 @@ def _render_preview(src: Path, dst: Path) -> None:
     有空窗),各寫各的、誰後 rename 誰的留下;用 pid 命名的話兩條 thread 是同一個 pid,
     會交錯寫進同一個檔,壞掉的 JPEG 從此被永久快取。失敗或中斷都不留 .part。
     """
+    if dst.is_file():
+        return  # 排隊時前一個已經轉好同一張(preview_of 的檢查與這裡之間有空窗)
     tmp = dst.with_name(f"{dst.name}.{uuid.uuid4().hex}.part")
     try:
         with Image.open(src) as img:
@@ -576,13 +581,11 @@ def _render_preview(src: Path, dst: Path) -> None:
 
 
 async def preview_of(disk: Path) -> Path:
-    """轉檔預覽的磁碟路徑;沒有快取就轉一次(在 thread 裡,不擋 event loop,同時最多兩張)。"""
+    """轉檔預覽的磁碟路徑;沒有快取就轉一次(專屬 thread pool,不擋 event loop,同時最多兩張)。"""
     dst = disk.with_name(disk.name + PREVIEW_SUFFIX)
     if dst.is_file():
         return dst
-    async with _PREVIEW_SLOTS:
-        if not dst.is_file():  # 排隊時前一個可能已經轉好同一張
-            await asyncio.to_thread(_render_preview, disk, dst)
+    await asyncio.get_running_loop().run_in_executor(_PREVIEW_POOL, _render_preview, disk, dst)
     return dst
 
 

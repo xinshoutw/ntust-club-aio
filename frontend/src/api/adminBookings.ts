@@ -10,7 +10,7 @@ import type { StatusKey } from '../lib/status'
 import { periodRank } from '../lib/periods'
 
 const toDisplayDate = (iso: string): string => dayjs(iso).format('YYYY/MM/DD')
-const toDisplayDateTime = (iso: string): string => dayjs(iso).format('YYYY/MM/DD HH:mm')
+export const toDisplayDateTime = (iso: string): string => dayjs(iso).format('YYYY/MM/DD HH:mm')
 
 // ---- 承辦的處置(退回/撤銷原因、核准說明)----
 
@@ -185,6 +185,8 @@ export interface AdminRoomRequest {
   /** 目標學期起訖 YYYY/MM/DD(可比大小的格式) */
   startDate: string
   endDate: string
+  createdAt: string // YYYY/MM/DD HH:mm(送件時間)
+  decision?: AdminDecision
   /** 僅待審單:`dow|period` → 衝突種類(後端算,判定與核准端的檢核同一份) */
   conflicts: Map<string, RoomConflictKind>
 }
@@ -194,14 +196,14 @@ interface RoomSlotOut {
   period: string
 }
 
-interface AdminRoomBookingOut {
+interface AdminRoomBookingOut extends DecisionOut {
   id: number
   club_id: number
   club_name: string
   venue_id: number
   venue_name: string
   purpose: string
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled'
   start_date: string
   end_date: string
   created_at: string
@@ -260,6 +262,8 @@ const toRoomRequest = (r: AdminRoomBookingOut): AdminRoomRequest => ({
   status: r.status,
   startDate: toDisplayDate(r.start_date),
   endDate: toDisplayDate(r.end_date),
+  createdAt: toDisplayDateTime(r.created_at),
+  decision: toAdminDecision(r),
   conflicts: new Map(r.conflict_slots.map((c) => [`${c.weekday}|${c.period}`, c.kind])),
 })
 

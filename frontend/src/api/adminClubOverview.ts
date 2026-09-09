@@ -9,6 +9,7 @@ import type { StatusKey } from '../lib/status'
 import {
   slotsToEntries,
   toAdminDecision,
+  toDisplayDateTime,
   type AdminEquipmentLoan,
   type AdminRoomRequest,
   type RoomConflictKind,
@@ -102,15 +103,16 @@ interface AdminVenueBookingOut extends DecisionOut {
   created_at: string
 }
 
-interface AdminRoomBookingOut {
+interface AdminRoomBookingOut extends DecisionOut {
   id: number
   club_name: string
   venue_id: number
   venue_name: string
   purpose: string
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled'
   start_date: string
   end_date: string
+  created_at: string
   slots: { weekday: number; period: string }[]
   conflict_slots: { weekday: number; period: string; kind: RoomConflictKind }[]
 }
@@ -143,7 +145,7 @@ const toVenueBooking = (b: AdminVenueBookingOut): AdminVenueBooking => ({
   phone: b.phone ?? '',
   activity: b.activity_name ?? undefined,
   status: b.status,
-  createdAt: dayjs(b.created_at).format('YYYY/MM/DD HH:mm'),
+  createdAt: toDisplayDateTime(b.created_at),
   decision: toAdminDecision(b),
 })
 
@@ -158,6 +160,8 @@ const toRoomRequest = (r: AdminRoomBookingOut): AdminRoomRequest => ({
   status: r.status,
   startDate: slashDate(r.start_date),
   endDate: slashDate(r.end_date),
+  createdAt: toDisplayDateTime(r.created_at),
+  decision: toAdminDecision(r),
   conflicts: new Map(r.conflict_slots.map((c) => [`${c.weekday}|${c.period}`, c.kind])),
 })
 
@@ -173,7 +177,7 @@ const toEquipmentLoan = (l: AdminEquipmentLoanOut): AdminEquipmentLoan => ({
   phone: l.phone ?? '',
   purpose: l.purpose,
   status: l.overdue ? 'overdue' : l.status, // 逾期為推導旗標,顯示上視為狀態
-  createdAt: dayjs(l.created_at).format('YYYY/MM/DD HH:mm'),
+  createdAt: toDisplayDateTime(l.created_at),
   lastRemindedAt: l.last_reminded_at ? dayjs(l.last_reminded_at).format('MM/DD HH:mm') : undefined,
   availableExcludingSelf: l.available_excluding_self ?? undefined,
   decision: toAdminDecision(l),

@@ -162,7 +162,11 @@ Opus 交叉審查後補的:`status=checked_out` 不帶 `overdue` 時**排除已�
 **HEIC 預覽、借用清單版面**(2026-09-09):iPhone 拍的結案照片是 HEIC,Chrome 解不了,縮圖與預覽彈窗一片破圖。
 `GET /files/{id}` 現在看 `Sec-Fetch-Dest: image`(`<img>` 才帶)—— HEIC/HEIF/AVIF/TIFF/BMP 轉成 JPEG 回去
 (`services/files.preview_of`,pillow-heif;快取 `<path>.preview.jpg`,`unlink_quiet` 連它一起刪),下載與 fetch 照舊原檔,
-前端一行都沒改。轉失敗就給原檔並 log。**新相依 `pillow-heif`**,映像重建即帶入。
+前端一行都沒改。轉失敗、來源超過 20MB 或超過 5,000 萬像素就給原檔並 log;同時最多轉 2 張(正式機 2 vCPU 與 PostgreSQL 同住);
+暫存檔帶 uuid、失敗不留 `.part`;回應帶 `Vary: Sec-Fetch-Dest`。**新相依 `pillow-heif`**,映像重建即帶入(約 +28MB)。
+Opus 交叉審查後補的:`media_import --reset` 改走 `unlink_quiet`(原本裸 unlink 會留快取孤兒)、AVIF 改直接 inline、
+場地頁不再打器材主檔(只持 `avenuelist` 會 403)、日期欄也截斷。沒做的(報修/違規/郵局那幾頁仍是下載連結、
+縮圖沒有小尺寸、`<img>` 沒有 onError)記在 `improvements.md` §5。
 「所有場地/器材借用」每一格改單行截斷(`useFitRows` 量第一列,一換行整頁列數算成一半)、器材欄 240px、
 器材頁多一個器材漏斗(`equipment_id=` 可重複,`GET /admin/equipment` 讀取鍵多 `aloanlist`)。
 
@@ -172,7 +176,7 @@ D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)
 
 ## 驗證現況
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **610 passed**;`ruff check .` 全綠
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **613 passed**;`ruff check .` 全綠
 - 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **278 passed**(58 檔)、
   `pnpm run lint` 8 個既有的 fast-refresh warning
 - 新測試逐一做過 mutation 驗證(改回舊寫法會紅);借用色格圖那支另在 `TZ=UTC` 與 `TZ=Pacific/Honolulu` 下各跑過一次

@@ -56,7 +56,7 @@
 
 - [ ] 應辦 **backend healthcheck**:`compose.yml` 只有 db 有,web 的 `depends_on: backend` 也沒有 `condition: service_healthy`。啟動時可能短暫 502(內層 nginx 變數 upstream + resolver 會自行恢復,不會卡死)
 - [ ] 應辦 **log 輪替與保留**(磁碟使用率見容量告警、backend 存活見 Uptime Kuma)
-- [ ] 應辦 **磁碟容量**:系統總量讀實體磁碟可用空間,不設邏輯容量;實體磁碟還要容 OS/Docker/PostgreSQL/log/multipart temp,以 `df` 與 GCE 實際容量驗證
+- [ ] 應辦 **磁碟容量**:系統總量讀實體磁碟可用空間,不設邏輯容量;HEIC/TIFF/BMP 的轉檔預覽快取(`<path>.preview.jpg`,長邊 1600 的 JPEG)**不計入 `files.size`**,實際佔用會高於檔案管理頁的邏輯總量;實體磁碟還要容 OS/Docker/PostgreSQL/log/multipart temp,以 `df` 與 GCE 實際容量驗證
 - [ ] 待決 **限流與 session**:限流是行程內記憶體(單機可行,重啟歸零);過期 session 於登入時順手清除,不另設排程
 - [ ] 應辦 **逾期提醒排程**:host cron 每上班日 10:35 呼叫 `scripts/send_overdue_reminders.py`(cron 行見該檔 docstring);未設排程則只剩人工按鈕
 - [ ] 應辦 **每日備份**:host cron 03:15 呼叫 `scripts/backup_db.sh`
@@ -141,7 +141,7 @@ CI 只在 `main` 推 GHCR 映像,`dev` 分支沒有可 pull 的映像 —— **`
 1. ~~SMTP relay 最終方案~~ —— 已定案為校方 relay,實測可寄
 3. 上傳檔案儲存位置:`compose.yml` 由 `UPLOADS_PATH` 二選一 —— 留空=具名 volume(預設),給絕對路徑=bind mount。備份做法隨之不同,正式站要挑定一種並與備份腳本對齊
 4. 備份保留天數(腳本預設 14 天,`KEEP_DAYS` 可覆寫)與備份目錄位置(預設 `./backups`)
-5. GCE 實體磁碟大小(`df` 驗證)與 VM 規格(e2-medium + 2GB swap 是否夠)
+5. GCE 實體磁碟大小(`df` 驗證)與 VM 規格(e2-medium + 2GB swap 是否夠;`pillow-heif` 的 wheel 內含 libx265 等原生庫,backend 映像約 +28MB;轉檔同時最多 2 張、來源 20MB 以上不轉,`services/files.py`)
 6. `.env` 的保管與輪替方式
 7. log 輪替與保留方案(容量告警與後端存活已有)
 8. 政府行事曆假日由誰於每年年初執行匯入(腳本已有)

@@ -30,7 +30,7 @@
 - 模組由磁碟路徑前綴推導(`reports`/`eval`/`activities`/`postal`/`maintenance`/`violations`)
 - 大型檔案的「全部模組」= 明列報修以外的五個模組交給後端篩(報修有專屬區);篩選與總數都由後端決定,換模組或換排序都回到第 1 頁,且不沿用上一份查詢結果
 - **只有報修檔案可直接刪除**,其餘依歸檔政策由系統管理(回 403)
-- **歸檔由 infra 執行**(decisions.md GAP-08):系統不做歸檔介面,`archived_at` 由維運直接設定;系統負責的是歸檔之後的行為 —— 已歸檔(`archived_at` 非 NULL)的檔案已離盤,不計佔用、不計補件份數,再下載回 410
+- **歸檔由 infra 執行**(decisions.md GAP-08):系統不做歸檔介面,`archived_at` 由維運直接設定;系統負責的是歸檔之後的行為 —— 已歸檔(`archived_at` 非 NULL)的檔案已離盤,不計佔用、不計補件份數,再下載回 410。**搬檔要連同 `<path>.preview.jpg`**(HEIC 等瀏覽器解不了的圖的轉檔快取,與原檔同目錄;`storage_usage` 與本頁的空間彙總都不計它,留在線上就是帳面歸零、磁碟沒少)
 - 刪除先 commit DB 再 unlink 磁碟,失敗只留孤兒檔不會出現「有列無檔」
 - 刪除寫 `audit_logs`
 - **容量水位**(decisions.md OPS-07):`disk_level` 由後端算,`warn` ≥80%、`alert` ≥90%

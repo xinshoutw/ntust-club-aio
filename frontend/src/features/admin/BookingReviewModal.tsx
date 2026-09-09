@@ -52,7 +52,9 @@ export default function BookingReviewModal({
   const [approveQty, setApproveQty] = useState<number | null>(
     item.kind === 'loan' ? item.data.qty : null,
   )
-  const canReview = item.data.status === 'pending'
+  // 兩個回呼都接上才是審核模式(所有場地/器材借用那兩頁,持查閱鍵的人一個都不接):
+  // 畫出核准或退回鈕卻沒有人接,按下去只會得到一句假的「已核准」「已退回」
+  const canReview = item.data.status === 'pending' && !!onApprove && !!onReject
   // 後端對臨時場地擋「日期已過」;過期單顯示撤銷鈕只會換來 409
   const notPast =
     item.kind !== 'venue' || !dayjs(item.data.date, 'YYYY/MM/DD').isBefore(dayjs(), 'day')
@@ -147,7 +149,9 @@ export default function BookingReviewModal({
             撤銷借用
           </Button>
         ) : (
-          <div style={{ fontSize: 12, color: 'var(--steel)' }}>非待審核申請，僅供查看</div>
+          <div style={{ fontSize: 12, color: 'var(--steel)' }}>
+            {item.data.status === 'pending' ? '僅供查看' : '非待審核申請，僅供查看'}
+          </div>
         )
       }
     >
@@ -217,6 +221,28 @@ export default function BookingReviewModal({
           <>
             <div style={detailLabel}>聯絡電話</div>
             <div className="num">{item.data.phone || '—'}</div>
+          </>
+        )}
+        <div style={detailLabel}>送件時間</div>
+        <div className="num">{item.data.createdAt}</div>
+        {/* 承辦的處置(三種借用的輸出都帶):退回原因、撤銷原因,或核准時留的話(器材改數量)。
+            退回件即使沒留理由也要有一列 —— 舊系統遷入的退回件多半是空的,那也是一個答案 */}
+        {(item.data.decision || item.data.status === 'rejected') && (
+          <>
+            <div style={detailLabel}>
+              {item.data.status === 'rejected' ? '退回原因' : item.data.status === 'cancelled' ? '撤銷原因' : '核准說明'}
+            </div>
+            <div>
+              <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: item.data.decision?.reason ? undefined : 'var(--steel)' }}>
+                {item.data.decision?.reason || '系統未留下退回原因'}
+              </div>
+              {item.data.decision && (
+                <div className="num" style={{ fontSize: 12, color: 'var(--steel)' }}>
+                  {item.data.decision.at}
+                  {item.data.decision.by && ` · ${item.data.decision.by}`}
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>

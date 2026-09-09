@@ -436,7 +436,7 @@ async def list_equipment_loans(
         .where(EquipmentLoan.club_id == user.club_id)
     )
     if active is not None:
-        ongoing = svc.equipment_loan_ongoing_expr()
+        ongoing = svc.equipment_loan_ongoing_expr(svc.today_taipei())
         query = query.where(ongoing if active else sa.not_(ongoing))
     if status is not None:
         query = query.where(EquipmentLoan.status == status)

@@ -195,6 +195,9 @@ export function buildAdminNav(user: SessionUser | null, badges: Badges = {}): Na
       { key: 'a-booking', label: '臨時場地器材借用', path: '/admin/bookings', icon: <EnvironmentOutlined /> },
       // 受理期間外行政端照樣留著:社團送不了新單,承辦仍要審完手上的(decisions.md D-04)
       ADMIN_ROOM_ITEM,
+      // 查閱用:全校、全狀態、依學期(審核動作仍在上面兩頁),與「所有活動」同一種頁
+      { key: 'a-venue-bookings', label: '所有場地借用', path: '/admin/venue-bookings', icon: <UnorderedListOutlined /> },
+      { key: 'a-equipment-loans', label: '所有器材借用', path: '/admin/equipment-loans', icon: <AppstoreOutlined /> },
       // 以下各頁都有自己的權限鍵,由 canAccessAdminPath 逐項過濾(decisions.md D-01)
       { key: 'a-manual', label: '手動借用', path: '/admin/manual-booking', icon: <PlusSquareOutlined /> },
       { key: 'a-venue-rules', label: '場地不開放規則', path: '/admin/venue-rules', icon: <StopOutlined /> },

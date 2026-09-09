@@ -312,11 +312,11 @@ async def test_equipment_overdue_filter(client, db):
     assert [d["purpose"] for d in data] == ["更逾期", "逾期單"]
     assert data[0]["overdue"] is True
 
-    # 一般狀態篩選照舊;未知狀態 → 422
+    # 「已借出」與「已逾期」是清單上的兩個狀態:只勾 checked_out 不撈逾期的;未知狀態 → 422
     data = (
         await client.get("/api/v1/admin/equipment-loans", params={"status": "checked_out"})
     ).json()["data"]
-    assert {d["purpose"] for d in data} == {"逾期單", "借出中", "更逾期"}
+    assert {d["purpose"] for d in data} == {"借出中"}
     assert (
         await client.get("/api/v1/admin/equipment-loans", params={"status": "hack"})
     ).status_code == 422
@@ -711,3 +711,113 @@ async def test_admin_lists_carry_the_decision_reason_and_signer(client, db):
     ).json()["data"]
     assert [d["decision_reason"] for d in data] == [None]
     assert [d["decided_by"] for d in data] == [None]
+
+
+# ---- 所有場地/器材借用(查閱頁):學期與多社團篩選、學期下拉 ----
+
+
+async def test_venue_bookings_filter_by_semester_and_many_clubs(client, db):
+    club, other_club = await seed(client, db)
+    venue = await make_venue(db)
+    third = await make_club(db, name="桌遊社")
+    rows = [
+        VenueBooking(club_id=club.id, venue_id=venue.id, activity_id=None,
+                     date=date(2026, 3, 7), periods=["3"], purpose="上學期尾", status="approved"),
+        VenueBooking(club_id=other_club.id, venue_id=venue.id, activity_id=None,
+                     date=date(2026, 9, 7), periods=["4"], purpose="下學期頭", status="rejected"),
+        VenueBooking(club_id=third.id, venue_id=venue.id, activity_id=None,
+                     date=date(2026, 9, 8), periods=["5"], purpose="第三社"),
+        # 舊系統遷入的打錯年份(民國 99):字串比大小會把它排到最上面
+        VenueBooking(club_id=club.id, venue_id=venue.id, activity_id=None,
+                     date=date(2010, 9, 8), periods=["5"], purpose="打錯年", status="rejected"),
+    ]
+    db.add_all(rows)
+    await db.commit()
+    for row in rows:
+        await db.refresh(row)
+    spring, autumn, third_row, roc99 = rows
+
+    # 學期下拉:新到舊,學年以數字比;下拉列得出來的標籤篩選端就要收(兩位數學年)
+    sems = (await client.get("/api/v1/admin/venue-bookings/semesters")).json()["data"]
+    assert sems == ["115-1", "114-2", "99-1"]
+    data = (await client.get("/api/v1/admin/venue-bookings?semester=99-1")).json()["data"]
+    assert [d["id"] for d in data] == [roc99.id]
+
+    data = (await client.get("/api/v1/admin/venue-bookings?semester=114-2")).json()["data"]
+    assert [d["id"] for d in data] == [spring.id]
+
+    # club_id 可帶多值(取聯集);不帶 status 就是全狀態
+    resp = await client.get(
+        f"/api/v1/admin/venue-bookings?club_id={other_club.id}&club_id={third.id}&sort=date"
+    )
+    assert [d["id"] for d in resp.json()["data"]] == [autumn.id, third_row.id]
+
+    # 查閱鍵讀得到同一支清單
+    await make_user(db, username="lister", role="admin", permissions=["avenuelist"])
+    await login(client, "lister")
+    resp = await client.get("/api/v1/admin/venue-bookings?semester=115-1")
+    assert resp.json()["meta"]["total"] == 2
+
+
+async def test_equipment_loans_filter_by_semester_and_many_clubs(client, db):
+    club, other_club = await seed(client, db)
+    eq = await make_equipment(db)
+    rows = [
+        EquipmentLoan(club_id=club.id, equipment_id=eq.id, activity_id=None, qty=1,
+                      start_date=date(2026, 3, 7), end_date=date(2026, 3, 8),
+                      purpose="上學期", status="returned"),
+        EquipmentLoan(club_id=other_club.id, equipment_id=eq.id, activity_id=None, qty=1,
+                      start_date=date(2026, 9, 7), end_date=date(2026, 9, 8),
+                      purpose="下學期", status="checked_out"),
+    ]
+    db.add_all(rows)
+    await db.commit()
+    for row in rows:
+        await db.refresh(row)
+    spring, autumn = rows
+
+    sems = (await client.get("/api/v1/admin/equipment-loans/semesters")).json()["data"]
+    assert sems == ["115-1", "114-2"]
+
+    data = (await client.get("/api/v1/admin/equipment-loans?semester=114-2")).json()["data"]
+    assert [d["id"] for d in data] == [spring.id]
+
+    resp = await client.get(
+        f"/api/v1/admin/equipment-loans?club_id={club.id}&club_id={other_club.id}&sort=start_date"
+    )
+    assert [d["id"] for d in resp.json()["data"]] == [spring.id, autumn.id]
+
+    await make_user(db, username="lister", role="admin", permissions=["aloanlist"])
+    await login(client, "lister")
+    resp = await client.get("/api/v1/admin/equipment-loans?semester=115-1")
+    assert resp.json()["meta"]["total"] == 1
+
+
+async def test_checked_out_filter_leaves_overdue_loans_to_the_overdue_status(client, db):
+    """「已借出」與「已逾期」是清單上的兩個狀態,底層同為 checked_out:只勾已借出不撈逾期的。"""
+    club, _ = await seed(client, db)
+    eq = await make_equipment(db)
+    today = date.today()
+    rows = [
+        EquipmentLoan(club_id=club.id, equipment_id=eq.id, activity_id=None, qty=1,
+                      start_date=today - timedelta(days=12), end_date=today - timedelta(days=10),
+                      purpose="逾期未還", status="checked_out"),
+        EquipmentLoan(club_id=club.id, equipment_id=eq.id, activity_id=None, qty=1,
+                      start_date=today, end_date=today + timedelta(days=10),
+                      purpose="還在借", status="checked_out"),
+    ]
+    db.add_all(rows)
+    await db.commit()
+    for row in rows:
+        await db.refresh(row)
+    overdue, in_use = rows
+
+    data = (await client.get("/api/v1/admin/equipment-loans?status=checked_out")).json()["data"]
+    assert [d["id"] for d in data] == [in_use.id]
+
+    data = (await client.get("/api/v1/admin/equipment-loans?status=overdue")).json()["data"]
+    assert [d["id"] for d in data] == [overdue.id]
+
+    # 兩個都勾就是整批 checked_out
+    resp = await client.get("/api/v1/admin/equipment-loans?status=checked_out&status=overdue")
+    assert sorted(d["id"] for d in resp.json()["data"]) == sorted([overdue.id, in_use.id])

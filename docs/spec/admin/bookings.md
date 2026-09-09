@@ -11,7 +11,7 @@
 | 動作 | 端點 |
 |---|---|
 | 借用情形色格圖 | `GET /public/{venues,periods}`、`/public/bookings/availability{,-range}`、`/public/equipment/usage`(與社團端同一組) |
-| 待審場地 / 器材 | `GET /admin/venue-bookings?status=pending`、`/admin/equipment-loans?status=pending`(兩支都逐列帶退回/撤銷的 `decision_reason`、`decided_at`、`decided_by`;本頁只查待審,那三欄一律 null) |
+| 待審場地 / 器材 | `GET /admin/venue-bookings?status=pending`、`/admin/equipment-loans?status=pending`(兩支都逐列帶退回/撤銷的 `decision_reason`、`decided_at`、`decided_by`;本頁只查待審,那三欄一律 null。同兩支清單也供 [venue-bookings.md](venue-bookings.md) / [equipment-loans.md](equipment-loans.md) 查全狀態,讀取鍵在 `core/permissions.VENUE_BOOKING_READ_KEYS` / `LOAN_READ_KEYS`) |
 | 核准 / 退回 | `POST /admin/{venue-bookings,equipment-loans}/{id}/{approve,reject}` |
 
 ## 畫面
@@ -35,7 +35,7 @@
 - **器材可借數不足仍可核准**(decisions.md DEC-04):屬管理員裁量,只以紅字警示,不硬擋
 - **核准時可改數量**(`POST /admin/equipment-loans/{id}/approve` 選填 `{qty}`,1 到申請數,多於申請數 422):可借數不足時核准較少的量,不必退回讓社團重送;社團沒申請的量不由承辦替它借走。改了就覆寫 `equipment_loans.qty`,申請數只留在 `approval_records.reason`(「數量調整:5 → 3」)與稽核 detail;Discord 通知附「申請 5 件、核准 3 件」,社團端該筆借用列可點開「核准說明」看到同一句(`approvals.attach_decisions` 連留了話的 APPROVE 一起帶)。省略或同數即照原數核准,不留調整字樣
 - 核准/退回都寫 `approval_records`(stage=`single`)與 `audit_logs`,並推 Discord
-- 行政手動借用(`club_id` 為 NULL)在列表顯示「學務處」;沒有社團可推,建立與撤銷改推系統 webhook(K4 / K4b)
+- 行政手動借用(`club_id` 為 NULL)在列表顯示「學務處」;沒有社團可推,建立與撤銷改推系統 webhook(K4 / K4b);系統依 D-40 撤銷的不會碰到手動借用(補登不掃)
 
 ## 未完成 / 問題
 

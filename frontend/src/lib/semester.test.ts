@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { currentSemester, semesterOf } from './semester'
+import { currentSemester, semesterOf, semesterOptions } from './semester'
 
 afterEach(() => {
   vi.useRealTimers()
@@ -21,5 +21,20 @@ describe('currentSemester', () => {
     expect(currentSemester()).toBe('114-2')
     vi.setSystemTime(new Date(2026, 7, 1)) // 8 月:新學年上學期
     expect(currentSemester()).toBe('115-1')
+  })
+})
+
+describe('semesterOptions', () => {
+  it('新到舊,學年以數字比:民國 99 年排在 100 年之後', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 8, 9)) // 115-1
+    expect(semesterOptions(['99-1', '100-1', '114-2', '99-2']).map((o) => o.value)).toEqual([
+      '115-1',
+      '114-2',
+      '100-1',
+      '99-2',
+      '99-1',
+    ])
+    expect(semesterOptions([], true).map((o) => o.value)).toEqual(['all', '115-1'])
   })
 })

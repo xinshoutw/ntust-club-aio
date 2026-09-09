@@ -26,6 +26,7 @@ DEC-01:這學年評鑑在新系統跑,但學年末才用 —— 不擋上線。
 |---|---|
 | 備份排程 | 腳本就緒(`scripts/backup_db.sh`),**cron 未掛** |
 | 政府行事曆假日 | 腳本就緒(`scripts/import_holidays.py`),**上線年度未跑** |
+| 遷入借用的打錯日期 | 腳本就緒(`scripts/fix_booking_dates.py`),開發庫已跑、**正式庫未跑** |
 | `.env` 正式值 | `MAIL_FROM_ADDRESS` 是個人信箱;Uptime Kuma 兩支 push URL 待填 |
 | 借用的遷移範圍 | 活動已依 `SCOPE_FIRST/LAST_SEMESTER` 過濾,借用是否同受此限未定(MIG-10) |
 | 行政帳號權限 | 遷移進來的 15 個 admin 權限鍵全空,只有 `super` 看得到東西;分工由承辦決定 |
@@ -123,14 +124,49 @@ nginx 上傳白名單那條 location 改成同時涵蓋報修佐證與勸導附�
 以前是到後端才 415,報修那頁一併改);核准改數量那句「數量調整:5 → 3」社團端借用列可點開
 「核准說明」看到(`attach_decisions` 連留了話的 APPROVE 一起帶)。
 
+**所有場地借用 / 所有器材借用**(2026-09-09):行政端「借用審核」多兩頁查閱用清單
+(`/admin/venue-bookings`、`/admin/equipment-loans`),全校、全狀態、依學期,與「所有活動」同一種頁;
+各配一把查閱鍵 `avenuelist` / `aloanlist`(帳號管理的權限彈窗自動多兩格)。**只開 GET**,
+核准/退回/撤銷仍是 `abooking` 的事 —— 兩把都持有的人在本頁的彈窗一樣簽得動。後端兩支清單
+多收 `semester=` 與可重複的 `club_id=`,各加一支 `/semesters`。共用彈窗補顯示送件時間與
+退回/撤銷原因(含經手人),而且**沒接 `onApprove` 就不畫審核鈕**(原本會畫出按了只得到假成功的鈕)。
+一個元件 `AdminBookingListPage` 吃 `kind`,兩條路由各帶 `key` 才不會互切時帶著上一頁的排序鍵。
+頁名依 `design-guide.md` §7 用「場地」不用「教室」。
+Opus 交叉審查後補的:`status=checked_out` 不帶 `overdue` 時**排除已逾期的列**(兩者底層同為
+`checked_out`,原本勾「已借出」會連逾期單一起撈回,`test_equipment_overdue_filter` 的那句斷言跟著改);
+固定場地借用那第三份 DTO 也接上 `created_at` 與處置三欄,`/admin/rooms` 與社團總覽的固定借用彈窗
+從此看得到退回原因;新增跨鍵負向測試(`CROSS_READS`,兩個讀取鍵常數對調會紅)與 `useBookingList`
+的查詢字串測試。**沒做**:社團漏斗仍只列啟用中社團(所有活動頁同一份判定,要改就兩頁一起);
+`/admin/room-bookings` 的 `club_id` 仍是單值(三種借用兩支吃多值一支不吃,要用到再改)。
+
+**學期下拉改數字排序、遷入的打錯日期有腳本修**(2026-09-09):所有列學期的端點
+(`/admin/venue-bookings/semesters`、`/admin/equipment-loans/semesters`、`/admin/activities/semesters`、
+`/club/activities/semesters`)與前端 `semesterOptions` 原本都拿字串比大小,民國 99 年會排在 100 年前面;
+現在一律走 `core/semesters.semester_sort_key` / `lib/semester.semesterRank`。下拉裡的 90-1、-1909-1
+這種學期**是資料問題**:clubclass 讓人手打日期,遷入的臨時場地借用有 89 筆借用日離建單時間超過一年
+(2004、0110、2030 這種年),除了一筆已核准全是退回件;器材借用一筆都沒有。
+`scripts/fix_booking_dates.py` 依「月日照舊、年份改成建單之後最先遇到的那一年」改回去,
+不加 `--yes` 只預覽,冪等。**開發庫已跑過**(89 筆,`venue_bookings.date` 現在落在 2020–2026),
+**正式庫還沒跑**(已列入 `DEPLOY_CHECKLIST.md`)。你點名的四組(118-1 → 2023、101-1 兩筆 → 2024、
+105-2 與 106-2 → 2022)規則算出來的年份與你說的一致。
+
+**核准後沒去領的器材借用由系統撤銷**(2026-09-09,D-40):`approved` 且結束日已過 → `cancelled`,
+簽核紀錄一筆 REVOKE(簽核者空=系統;`approval_records.actor_id` 放寬可空,**要跑遷移 `e5a1c9d47b23`**)、
+稽核 `role=system`、Discord D13b。掃的時機:點交清單每次載入(`GET /staff/equipment-loans?status=approved`)
+與每日催還排程 `send_overdue_reminders.py`。實作 `services/loan_expiry.py`;ISS-93 據此收掉 ——
+`equipment_loan_ongoing_expr` 與待借出清單都補了 `end_date >= today`,三份判定從此同一條。
+**手動借用(`club_id` 空)不掃**(補登入口)。Opus 交叉審查後補的:掃描失敗不擋點交清單(rollback + log)、
+點交端擋區間已過的單、`tests/test_migrations` 連 nullable 一起比(原本漏跑這支遷移不會紅)、
+稽核頁補 `equipment_loan_expired` 與 `system` 角色的對照詞、`seed_mock` 的已核准借用改相對真實今天。
+
 **要跑遷移**:D-21/D-22 是 drop column,`alembic upgrade head` 之後舊號碼就沒了。
 D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)—— 走 `--reset` 重灌,
 或把該學期匯出再匯入一次。
 
 ## 驗證現況
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **577 passed**;`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **265 passed**(56 檔)、
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **606 passed**;`ruff check .` 全綠
+- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **278 passed**(58 檔)、
   `pnpm run lint` 8 個既有的 fast-refresh warning
 - 新測試逐一做過 mutation 驗證(改回舊寫法會紅);借用色格圖那支另在 `TZ=UTC` 與 `TZ=Pacific/Honolulu` 下各跑過一次
 

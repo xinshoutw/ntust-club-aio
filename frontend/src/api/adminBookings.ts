@@ -10,6 +10,30 @@ import type { StatusKey } from '../lib/status'
 import { periodRank } from '../lib/periods'
 
 const toDisplayDate = (iso: string): string => dayjs(iso).format('YYYY/MM/DD')
+export const toDisplayDateTime = (iso: string): string => dayjs(iso).format('YYYY/MM/DD HH:mm')
+
+// ---- 承辦的處置(退回/撤銷原因、核准說明)----
+
+/** 社團端的 DecisionInfo 多一個經手人:行政端要能追到人,不必翻稽核軌跡 */
+export interface AdminDecision {
+  reason: string
+  at: string // YYYY/MM/DD HH:mm
+  by?: string
+}
+
+interface DecisionOut {
+  decision_reason: string | null
+  decided_at: string | null
+  decided_by: string | null
+}
+
+/** 三種借用的輸出共用同一組欄位;沒有處置紀錄(社團自行取消、一般核准)時 decided_at 是 null。
+ *  有紀錄就回,理由可以是空字串 —— 界線是「有沒有人處置過」,不是「有沒有留話」,
+ *  否則沒留理由的退回件連時間與經手人一起不見 */
+export const toAdminDecision = (o: DecisionOut): AdminDecision | undefined =>
+  o.decided_at
+    ? { reason: o.decision_reason ?? '', at: toDisplayDateTime(o.decided_at), by: o.decided_by ?? undefined }
+    : undefined
 
 // ---- 場地主檔(場況圖列首) ----
 
@@ -53,9 +77,11 @@ export interface AdminVenueBooking {
   phone: string
   activity?: string
   status: StatusKey
+  createdAt: string // YYYY/MM/DD HH:mm(送件時間)
+  decision?: AdminDecision
 }
 
-interface AdminVenueBookingOut {
+interface AdminVenueBookingOut extends DecisionOut {
   id: number
   /** null = 行政手動借用(顯示「學務處」) */
   club_id: number | null
@@ -68,7 +94,7 @@ interface AdminVenueBookingOut {
   periods: string[]
   purpose: string
   phone: string | null
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled'
   created_at: string
 }
 
@@ -83,6 +109,8 @@ const toVenueBooking = (b: AdminVenueBookingOut): AdminVenueBooking => ({
   phone: b.phone ?? '',
   activity: b.activity_name ?? undefined,
   status: b.status,
+  createdAt: toDisplayDateTime(b.created_at),
+  decision: toAdminDecision(b),
 })
 
 // ---- 器材借用 ----
@@ -100,12 +128,14 @@ export interface AdminEquipmentLoan {
   purpose: string
   phone: string
   status: StatusKey
+  createdAt: string // YYYY/MM/DD HH:mm(送件時間)
   /** 上次寄出歸還提醒(MM/DD HH:mm);排程每 3 個上班日自動寄一次 */
   lastRemindedAt?: string
   availableExcludingSelf?: number
+  decision?: AdminDecision
 }
 
-interface AdminEquipmentLoanOut {
+interface AdminEquipmentLoanOut extends DecisionOut {
   id: number
   /** null = 行政手動借用(顯示「學務處」) */
   club_id: number | null
@@ -119,7 +149,7 @@ interface AdminEquipmentLoanOut {
   end_date: string
   purpose: string
   phone: string | null
-  status: 'pending' | 'approved' | 'rejected' | 'checked_out' | 'returned'
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled' | 'checked_out' | 'returned'
   created_at: string
   overdue: boolean
   available_excluding_self: number | null
@@ -137,7 +167,9 @@ const toEquipmentLoan = (l: AdminEquipmentLoanOut): AdminEquipmentLoan => ({
   purpose: l.purpose,
   phone: l.phone ?? '',
   status: l.overdue ? 'overdue' : l.status, // 逾期為推導旗標,顯示上視為狀態
+  createdAt: toDisplayDateTime(l.created_at),
   availableExcludingSelf: l.available_excluding_self ?? undefined,
+  decision: toAdminDecision(l),
 })
 
 // ---- 固定場地借用 ----
@@ -155,6 +187,8 @@ export interface AdminRoomRequest {
   /** 目標學期起訖 YYYY/MM/DD(可比大小的格式) */
   startDate: string
   endDate: string
+  createdAt: string // YYYY/MM/DD HH:mm(送件時間)
+  decision?: AdminDecision
   /** 僅待審單:`dow|period` → 衝突種類(後端算,判定與核准端的檢核同一份) */
   conflicts: Map<string, RoomConflictKind>
 }
@@ -164,14 +198,14 @@ interface RoomSlotOut {
   period: string
 }
 
-interface AdminRoomBookingOut {
+interface AdminRoomBookingOut extends DecisionOut {
   id: number
   club_id: number
   club_name: string
   venue_id: number
   venue_name: string
   purpose: string
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled'
   start_date: string
   end_date: string
   created_at: string
@@ -230,6 +264,8 @@ const toRoomRequest = (r: AdminRoomBookingOut): AdminRoomRequest => ({
   status: r.status,
   startDate: toDisplayDate(r.start_date),
   endDate: toDisplayDate(r.end_date),
+  createdAt: toDisplayDateTime(r.created_at),
+  decision: toAdminDecision(r),
   conflicts: new Map(r.conflict_slots.map((c) => [`${c.weekday}|${c.period}`, c.kind])),
 })
 
@@ -242,6 +278,8 @@ export const keys = {
   equipmentLoans: (p: PendingListParams) => ['adminBookings', 'equipmentLoans', p] as const,
   roomBookings: (p: PendingListParams) => ['adminBookings', 'roomBookings', p] as const,
   fixedWindow: ['adminBookings', 'fixedWindow'] as const,
+  list: (kind: BookingListKind, p: BookingListParams) => ['adminBookings', 'list', kind, p] as const,
+  semesters: (kind: BookingListKind) => ['adminBookings', 'semesters', kind] as const,
 }
 
 interface FixedWindowOut {
@@ -271,6 +309,62 @@ export function useAdminFixedWindow() {
 export interface PendingListParams {
   page: number
   pageSize: number
+}
+
+// ---- 所有場地借用 / 所有器材借用(查閱頁:全校、全狀態、依學期)----
+
+export type BookingListKind = 'venue' | 'loan'
+
+/** 與 BookingReviewModal 的 BookingReviewItem 同形(少了固定借用那一支),列可以直接開彈窗 */
+export type ListedBooking =
+  | { kind: 'venue'; data: AdminVenueBooking }
+  | { kind: 'loan'; data: AdminEquipmentLoan }
+
+export interface BookingListParams {
+  semester?: string
+  statuses?: string[]
+  clubIds?: number[]
+  sort?: string
+  page: number
+  pageSize: number
+}
+
+const LIST_PATH: Record<BookingListKind, string> = {
+  venue: '/admin/venue-bookings',
+  loan: '/admin/equipment-loans',
+}
+
+export function useBookingList(kind: BookingListKind, p: BookingListParams) {
+  const query = qs({
+    semester: p.semester,
+    status: p.statuses,
+    club_id: p.clubIds?.map(String),
+    sort: p.sort,
+    page: p.page,
+    page_size: p.pageSize,
+  })
+  return useQuery({
+    queryKey: keys.list(kind, p),
+    queryFn: (): Promise<{ rows: ListedBooking[]; total: number }> =>
+      kind === 'venue'
+        ? apiPaged<AdminVenueBookingOut[]>(`${LIST_PATH.venue}${query}`).then(({ data, total }) => ({
+            rows: data.map((b) => ({ kind: 'venue' as const, data: toVenueBooking(b) })),
+            total,
+          }))
+        : apiPaged<AdminEquipmentLoanOut[]>(`${LIST_PATH.loan}${query}`).then(({ data, total }) => ({
+            rows: data.map((l) => ({ kind: 'loan' as const, data: toEquipmentLoan(l) })),
+            total,
+          })),
+    placeholderData: keepPreviousData,
+  })
+}
+
+/** 有借用的學期(新到舊),供學期下拉;界線與清單同一條 */
+export function useBookingSemesters(kind: BookingListKind) {
+  return useQuery({
+    queryKey: keys.semesters(kind),
+    queryFn: () => api<string[]>(`${LIST_PATH[kind]}/semesters`),
+  })
 }
 
 export function useAdminVenues() {

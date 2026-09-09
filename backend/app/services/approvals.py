@@ -70,7 +70,8 @@ async def attach_decisions(
             uid: name
             for uid, name in await db.execute(
                 sa.select(User.id, User.name).where(
-                    User.id.in_({r.actor_id for r in records})
+                    # 系統自動撤銷的那種 actor 是空的(loan_expiry),不進 IN
+                    User.id.in_({r.actor_id for r in records if r.actor_id is not None})
                 )
             )
         }

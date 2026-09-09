@@ -8,6 +8,10 @@ from zoneinfo import ZoneInfo
 
 TAIPEI = ZoneInfo("Asia/Taipei")
 
+# 學期標籤的輸入驗證:民國 1–999 年。`semester_of` 對任何日期都吐得出標籤,
+# 篩選端只擋得比它寬才不會出現「下拉列得出來、點下去 422」(遷入資料曾有民國 99 年的借用)
+SEMESTER_LABEL = r"^\d{1,3}-[12]$"
+
 
 def semester_of(d: date) -> str:
     if d.month >= 8:  # 8–12 月:當年度上學期
@@ -15,6 +19,16 @@ def semester_of(d: date) -> str:
     if d.month == 1:  # 1 月:前一年度上學期
         return f"{d.year - 1 - 1911}-1"
     return f"{d.year - 1 - 1911}-2"  # 2–7 月:前一年度下學期
+
+
+def semester_sort_key(label: str) -> tuple[int, int]:
+    """學期標籤的排序鍵:(學年, 學期)以數字比。
+
+    字串比大小會把 99-1 排在 100-1 之後(「9」> 「1」);學期下拉是新到舊,
+    民國 100 年以前的標籤一比就跑到最上面。所有列學期的端點一律用這把鍵。
+    """
+    year, term = label.rsplit("-", 1)
+    return int(year), int(term)
 
 
 def semester_range(label: str) -> tuple[date, date]:

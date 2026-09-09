@@ -16,6 +16,7 @@ const loan: BookingReviewItem = {
     purpose: '營隊',
     phone: '0912345678',
     status: 'pending',
+    createdAt: '2026/03/01 10:00',
     availableExcludingSelf: 3,
   },
 }
@@ -23,7 +24,7 @@ const loan: BookingReviewItem = {
 const mount = (onApprove: (qty?: number) => Promise<unknown>) =>
   render(
     <App>
-      <BookingReviewModal item={loan} open onClose={vi.fn()} afterClose={vi.fn()} onApprove={onApprove} />
+      <BookingReviewModal item={loan} open onClose={vi.fn()} afterClose={vi.fn()} onApprove={onApprove} onReject={vi.fn()} />
     </App>,
   )
 
@@ -47,4 +48,14 @@ describe('BookingReviewModal 的器材核准數量', () => {
     fireEvent.click(screen.getByRole('button', { name: '核 准' }))
     await waitFor(() => expect(onApprove).toHaveBeenCalledWith(3))
   })
+})
+
+test('只接核准不接退回不算審核模式:不畫出按了只會假成功的退回鈕', () => {
+  render(
+    <App>
+      <BookingReviewModal item={loan} open onClose={vi.fn()} afterClose={vi.fn()} onApprove={vi.fn()} />
+    </App>,
+  )
+  expect(screen.queryByRole('button', { name: /退\s*回/ })).toBeNull()
+  expect(screen.queryByRole('button', { name: '核 准' })).toBeNull()
 })

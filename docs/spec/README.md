@@ -62,6 +62,8 @@
 | [admin/announcements.md](admin/announcements.md) | `/admin/announcements` | `aannounce` |
 | [admin/bookings.md](admin/bookings.md) | `/admin/bookings` | `abooking` |
 | [admin/rooms.md](admin/rooms.md) | `/admin/rooms` | `aroom` |
+| [admin/venue-bookings.md](admin/venue-bookings.md) | `/admin/venue-bookings` | `avenuelist` |
+| [admin/equipment-loans.md](admin/equipment-loans.md) | `/admin/equipment-loans` | `aloanlist` |
 | [admin/manual-booking.md](admin/manual-booking.md) | `/admin/manual-booking` | `amanual` |
 | [admin/venue-rules.md](admin/venue-rules.md) | `/admin/venue-rules` | `arule` |
 | [admin/club-overview.md](admin/club-overview.md) | `/admin/club-overview` | `aclub` |

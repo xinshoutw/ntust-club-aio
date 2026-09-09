@@ -156,14 +156,16 @@ def venue_booking_upcoming_expr(now: datetime | None = None) -> sa.ColumnElement
     )
 
 
-def equipment_loan_ongoing_expr() -> sa.ColumnElement[bool]:
-    """器材借用進行中:審核中、已核准、借出中。
+def equipment_loan_ongoing_expr(today: date) -> sa.ColumnElement[bool]:
+    """器材借用進行中:審核中、已核准且區間未過、借出中。
 
-    只看狀態即可 —— 器材有點交流程,歸還會把狀態推到 returned,
-    不像場地借用要靠日期才分得出結束。
+    已核准的單有時間軸:結束日過了還沒領就不算進行中(D-40 會把它撤銷,但撤銷是掃描時機的事,
+    讀取面不等它 —— 否則側欄徽章說 0、點進去列得出來)。借出中的不看日期:逾期未還仍是進行中,
+    歸還才結束。
     """
-    return EquipmentLoan.status.in_(
-        [LoanStatus.PENDING, LoanStatus.APPROVED, LoanStatus.CHECKED_OUT]
+    return sa.or_(
+        EquipmentLoan.status.in_([LoanStatus.PENDING, LoanStatus.CHECKED_OUT]),
+        sa.and_(EquipmentLoan.status == LoanStatus.APPROVED, EquipmentLoan.end_date >= today),
     )
 
 # 固定借用規則

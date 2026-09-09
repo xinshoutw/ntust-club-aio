@@ -8,6 +8,8 @@ import { useQuery } from '@tanstack/react-query'
 import type { StatusKey } from '../lib/status'
 import {
   slotsToEntries,
+  toAdminDecision,
+  toDisplayDateTime,
   type AdminEquipmentLoan,
   type AdminRoomRequest,
   type RoomConflictKind,
@@ -81,7 +83,14 @@ export function useAdminClubActivities(clubId: number | null, canView = true) {
 // DTO 介面與 adminBookings.ts 重複宣告:依「src/api 只新建自己檔案」的分工約定,
 // 待平行作業合流後再抽共用(轉換邏輯已透過匯出的型別/slotsToEntries 對齊)
 
-interface AdminVenueBookingOut {
+/** 退回/撤銷原因與經手人:三種借用的輸出都帶,沒有處置紀錄時是 null */
+interface DecisionOut {
+  decision_reason: string | null
+  decided_at: string | null
+  decided_by: string | null
+}
+
+interface AdminVenueBookingOut extends DecisionOut {
   id: number
   club_name: string
   venue_name: string
@@ -90,23 +99,25 @@ interface AdminVenueBookingOut {
   periods: string[]
   purpose: string
   phone: string | null
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+  created_at: string
 }
 
-interface AdminRoomBookingOut {
+interface AdminRoomBookingOut extends DecisionOut {
   id: number
   club_name: string
   venue_id: number
   venue_name: string
   purpose: string
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled'
   start_date: string
   end_date: string
+  created_at: string
   slots: { weekday: number; period: string }[]
   conflict_slots: { weekday: number; period: string; kind: RoomConflictKind }[]
 }
 
-interface AdminEquipmentLoanOut {
+interface AdminEquipmentLoanOut extends DecisionOut {
   id: number
   club_name: string
   equipment_name: string
@@ -116,7 +127,8 @@ interface AdminEquipmentLoanOut {
   end_date: string
   purpose: string
   phone: string | null
-  status: 'pending' | 'approved' | 'rejected' | 'checked_out' | 'returned'
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled' | 'checked_out' | 'returned'
+  created_at: string
   overdue: boolean
   last_reminded_at: string | null
   available_excluding_self: number | null
@@ -133,6 +145,8 @@ const toVenueBooking = (b: AdminVenueBookingOut): AdminVenueBooking => ({
   phone: b.phone ?? '',
   activity: b.activity_name ?? undefined,
   status: b.status,
+  createdAt: toDisplayDateTime(b.created_at),
+  decision: toAdminDecision(b),
 })
 
 const toRoomRequest = (r: AdminRoomBookingOut): AdminRoomRequest => ({
@@ -146,6 +160,8 @@ const toRoomRequest = (r: AdminRoomBookingOut): AdminRoomRequest => ({
   status: r.status,
   startDate: slashDate(r.start_date),
   endDate: slashDate(r.end_date),
+  createdAt: toDisplayDateTime(r.created_at),
+  decision: toAdminDecision(r),
   conflicts: new Map(r.conflict_slots.map((c) => [`${c.weekday}|${c.period}`, c.kind])),
 })
 
@@ -161,8 +177,10 @@ const toEquipmentLoan = (l: AdminEquipmentLoanOut): AdminEquipmentLoan => ({
   phone: l.phone ?? '',
   purpose: l.purpose,
   status: l.overdue ? 'overdue' : l.status, // 逾期為推導旗標,顯示上視為狀態
+  createdAt: toDisplayDateTime(l.created_at),
   lastRemindedAt: l.last_reminded_at ? dayjs(l.last_reminded_at).format('MM/DD HH:mm') : undefined,
   availableExcludingSelf: l.available_excluding_self ?? undefined,
+  decision: toAdminDecision(l),
 })
 
 // 借用類三張表都只顯示「進行中」的單,判定在後端 active=true(與社團端總覽同一支推導):

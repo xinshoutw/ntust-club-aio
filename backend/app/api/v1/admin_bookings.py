@@ -16,7 +16,7 @@ from app.api.pagination import Pagination, parse_sort
 from app.core import permissions
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, not_found, validation_error
-from app.core.semesters import semester_of, semester_range
+from app.core.semesters import semester_of, semester_range, semester_sort_key
 from app.models import (
     Activity,
     ApprovalRecord,
@@ -164,7 +164,8 @@ async def list_venue_bookings(
 async def list_venue_booking_semesters(user: VenueReader, db: DbDep) -> ApiResponse[list[str]]:
     """有臨時場地借用的學期(新到舊),供「所有場地借用」的學期下拉。"""
     dates = await db.scalars(sa.select(VenueBooking.date).distinct())
-    return ApiResponse(data=sorted({semester_of(d) for d in dates}, reverse=True))
+    labels = {semester_of(d) for d in dates}
+    return ApiResponse(data=sorted(labels, key=semester_sort_key, reverse=True))
 
 
 async def _pending_venue_booking(db, booking_id: int) -> VenueBooking:
@@ -361,7 +362,8 @@ async def list_equipment_loans(
 async def list_equipment_loan_semesters(user: LoanReader, db: DbDep) -> ApiResponse[list[str]]:
     """有器材借用的學期(新到舊),供「所有器材借用」的學期下拉。"""
     dates = await db.scalars(sa.select(EquipmentLoan.start_date).distinct())
-    return ApiResponse(data=sorted({semester_of(d) for d in dates}, reverse=True))
+    labels = {semester_of(d) for d in dates}
+    return ApiResponse(data=sorted(labels, key=semester_sort_key, reverse=True))
 
 
 async def _pending_loan(db, loan_id: int) -> EquipmentLoan:

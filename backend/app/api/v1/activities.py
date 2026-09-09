@@ -18,7 +18,7 @@ from starlette.concurrency import run_in_threadpool
 from app.api.pagination import Pagination, parse_sort
 from app.core.deps import ClubUser, DbDep, client_ip
 from app.core.errors import AppError, conflict, not_found, validation_error
-from app.core.semesters import TAIPEI, semester_of, semester_range
+from app.core.semesters import TAIPEI, semester_of, semester_range, semester_sort_key
 from app.models import (
     Activity,
     ActivityReflection,
@@ -165,7 +165,7 @@ async def list_semesters(user: ClubUser, db: DbDep) -> ApiResponse[list[str]]:
         .where(Activity.club_id == user.club_id, Activity.date.is_not(None))
         .distinct()
     )
-    labels = sorted({semester_of(d) for d in dates}, reverse=True)
+    labels = sorted({semester_of(d) for d in dates}, key=semester_sort_key, reverse=True)
     return ApiResponse(data=labels)
 
 

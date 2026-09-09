@@ -727,16 +727,19 @@ async def test_venue_bookings_filter_by_semester_and_many_clubs(client, db):
                      date=date(2026, 9, 7), periods=["4"], purpose="下學期頭", status="rejected"),
         VenueBooking(club_id=third.id, venue_id=venue.id, activity_id=None,
                      date=date(2026, 9, 8), periods=["5"], purpose="第三社"),
+        # 舊系統遷入的打錯年份(民國 99):字串比大小會把它排到最上面
+        VenueBooking(club_id=club.id, venue_id=venue.id, activity_id=None,
+                     date=date(2010, 9, 8), periods=["5"], purpose="打錯年", status="rejected"),
     ]
     db.add_all(rows)
     await db.commit()
     for row in rows:
         await db.refresh(row)
-    spring, autumn, third_row = rows
+    spring, autumn, third_row, _ = rows
 
-    # 學期下拉:新到舊
+    # 學期下拉:新到舊,學年以數字比
     sems = (await client.get("/api/v1/admin/venue-bookings/semesters")).json()["data"]
-    assert sems == ["115-1", "114-2"]
+    assert sems == ["115-1", "114-2", "99-1"]
 
     data = (await client.get("/api/v1/admin/venue-bookings?semester=114-2")).json()["data"]
     assert [d["id"] for d in data] == [spring.id]

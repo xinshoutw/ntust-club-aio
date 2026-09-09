@@ -17,6 +17,16 @@ def semester_of(d: date) -> str:
     return f"{d.year - 1 - 1911}-2"  # 2–7 月:前一年度下學期
 
 
+def semester_sort_key(label: str) -> tuple[int, int]:
+    """學期標籤的排序鍵:(學年, 學期)以數字比。
+
+    字串比大小會把 99-1 排在 100-1 之後(「9」> 「1」);學期下拉是新到舊,
+    民國 100 年以前的標籤一比就跑到最上面。所有列學期的端點一律用這把鍵。
+    """
+    year, term = label.rsplit("-", 1)
+    return int(year), int(term)
+
+
 def semester_range(label: str) -> tuple[date, date]:
     """含頭含尾;label 如 114-1。"""
     year_part, sem = label.split("-")

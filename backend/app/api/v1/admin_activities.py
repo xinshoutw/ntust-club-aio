@@ -16,7 +16,7 @@ from starlette.concurrency import run_in_threadpool
 from app.api.pagination import NullsLast, Pagination, ilike_contains, parse_sort
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission
 from app.core.errors import conflict, forbidden, not_found, validation_error
-from app.core.semesters import semester_of, semester_range
+from app.core.semesters import semester_of, semester_range, semester_sort_key
 from app.models import Activity, ActivityReport, ApprovalRecord, Club, User
 from app.models.enums import (
     ActivityStatus,
@@ -329,7 +329,8 @@ async def list_semesters(
     if club_id is not None:
         query = query.where(Activity.club_id == club_id)
     dates = await db.scalars(query)
-    return ApiResponse(data=sorted({semester_of(d) for d in dates}, reverse=True))
+    labels = {semester_of(d) for d in dates}
+    return ApiResponse(data=sorted(labels, key=semester_sort_key, reverse=True))
 
 
 @router.get("/{activity_id}/apply-pdf")

@@ -72,7 +72,7 @@ export default function AdminBookingListPage({ kind }: { kind: BookingListKind }
 
   // 器材漏斗(只有器材清單):主檔含停用品項 —— 這是歷史查閱頁,舊單借的器材可能已停用;
   // 名稱對 id 的空集規則與社團漏斗同一條
-  const equipmentQuery = useAdminEquipment()
+  const equipmentQuery = useAdminEquipment(kind === 'loan')
   const equipmentNames = kind === 'loan' ? (equipmentQuery.data ?? []).map((e) => e.name) : []
   const equipmentIdMatches = equipmentFilter.length
     ? (equipmentQuery.data ?? []).filter((e) => equipmentFilter.includes(e.name)).map((e) => e.id)
@@ -91,7 +91,8 @@ export default function AdminBookingListPage({ kind }: { kind: BookingListKind }
   })
   const rows = listQuery.data?.rows ?? []
   const total = listQuery.data?.total ?? 0
-  // 器材主檔只有器材清單會用到;場地頁那支查詢失敗不該顯示成篩選選項壞掉
+  // 器材主檔只有器材清單會查(場地頁 enabled=false,恆為 isPending)。
+  // 這裡與社團漏斗一樣用 isError 而非 isLoadingError:背景重抓失敗也顯示錯誤列,與所有活動頁同一份寫法
   const optionsError = kind === 'loan' && equipmentQuery.isError
 
   // 只在查詢成功後 clamp:失敗時 total 也是 0,一起收斂會把錯誤說明洗掉

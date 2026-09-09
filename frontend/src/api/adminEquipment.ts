@@ -39,9 +39,11 @@ export const HANDOVER_OPTIONS = [
 
 const keys = { all: ['adminEquipment'] as const }
 
-export function useAdminEquipment() {
+/** enabled=false 的頁面(所有場地借用)不打這支:那頁的鍵沒有器材主檔的讀取權,打了就是 403 */
+export function useAdminEquipment(enabled = true) {
   return useQuery({
     queryKey: keys.all,
+    enabled,
     queryFn: () => api<EquipmentOut[]>('/admin/equipment').then((rows) => rows.map(toItem)),
   })
 }

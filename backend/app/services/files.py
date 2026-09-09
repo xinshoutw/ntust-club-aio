@@ -7,8 +7,10 @@
 - 下載一律經權限檢查;已歸檔(archived_at)回 410
 """
 
+import asyncio
 import hashlib
 import logging
+import os
 import shutil
 import uuid
 from collections.abc import Sequence
@@ -65,6 +67,8 @@ def unlink_quiet(path: Path) -> None:
     """
     try:
         path.unlink(missing_ok=True)
+        # 轉檔預覽的快取跟著原檔走(HEIC 等瀏覽器不會解的圖,見 file_response)
+        path.with_name(path.name + PREVIEW_SUFFIX).unlink(missing_ok=True)
     except OSError:
         logger.warning("cleanup unlink failed, orphan left on disk: %s", path, exc_info=True)
 
@@ -523,11 +527,44 @@ async def can_access(db: AsyncSession, file: File, user: User) -> bool:
     return False
 
 
-# 瀏覽器可原生預覽的類型;其餘(bmp/tiff/heic 等支援度不一)一律下載
+# 瀏覽器可原生預覽的類型;其餘(bmp/tiff/heic 等支援度不一)一律下載 —— 除非是 <img> 來要圖
 _INLINE_MIMES = {"image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"}
 
+# <img> 要圖時(瀏覽器帶 `Sec-Fetch-Dest: image`)轉成 JPEG 給它看:iPhone 拍的結案照片是 HEIC,
+# Chrome/Firefox 解不了,縮圖與預覽彈窗就是一片破圖。下載連結與 fetch 不帶這個值,拿到的仍是原檔。
+# 轉檔結果快取在原檔旁(`<path>.preview.jpg`),刪原檔時一併清(unlink_quiet)
+_PREVIEW_CONVERTIBLE = {"image/heic", "image/heif", "image/avif", "image/tiff", "image/bmp"}
+PREVIEW_SUFFIX = ".preview.jpg"
+PREVIEW_MAX_EDGE = 1600  # 預覽彈窗最大 76vh,更大只是白轉
 
-async def file_response(db: AsyncSession, file_id: uuid.UUID, user: User) -> FileResponse:
+
+def _render_preview(src: Path, dst: Path) -> None:
+    """HEIC/AVIF/TIFF/BMP → JPEG(長邊封頂、套 EXIF 方向)。先寫暫存再 rename:
+    兩個請求同時要同一張,各寫各的暫存、誰後 rename 誰的留下,不會有半寫的檔被送出去。"""
+    import pillow_heif
+    from PIL import Image, ImageOps
+
+    pillow_heif.register_heif_opener()
+    tmp = dst.with_name(f"{dst.name}.{os.getpid()}.part")
+    with Image.open(src) as img:
+        img = ImageOps.exif_transpose(img) or img
+        img.thumbnail((PREVIEW_MAX_EDGE, PREVIEW_MAX_EDGE))
+        img.convert("RGB").save(tmp, format="JPEG", quality=85)
+    tmp.replace(dst)
+
+
+async def preview_of(disk: Path) -> Path:
+    """轉檔預覽的磁碟路徑;沒有快取就轉一次(在 thread 裡,不擋 event loop)。"""
+    dst = disk.with_name(disk.name + PREVIEW_SUFFIX)
+    if not dst.is_file():
+        await asyncio.to_thread(_render_preview, disk, dst)
+    return dst
+
+
+async def file_response(
+    db: AsyncSession, file_id: uuid.UUID, user: User, *, as_image: bool = False
+) -> FileResponse:
+    """`as_image`=請求來自 <img>(router 由 Sec-Fetch-Dest 判定):瀏覽器解不了的圖改送 JPEG 預覽。"""
     file = await db.get(File, file_id)
     if file is None or not await can_access(db, file, user):
         raise not_found("找不到檔案")  # 無權限與不存在同訊息,避免探測
@@ -536,6 +573,19 @@ async def file_response(db: AsyncSession, file_id: uuid.UUID, user: User) -> Fil
     disk = Path(settings.upload_dir) / file.path
     if not disk.is_file():
         raise not_found("找不到檔案")
+    if as_image and file.mime in _PREVIEW_CONVERTIBLE:
+        try:
+            preview = await preview_of(disk)
+        except Exception:
+            # 轉不了(檔案壞了、編碼不支援)就照舊給原檔;破圖總比 500 好,log 才查得到是哪一張
+            logger.exception("preview render failed: file=%s mime=%s", file.id, file.mime)
+        else:
+            return FileResponse(
+                preview,
+                media_type="image/jpeg",
+                filename=f"{Path(file.original_name).stem}.jpg",
+                content_disposition_type="inline",
+            )
     disposition = "inline" if file.mime in _INLINE_MIMES else "attachment"
     response = FileResponse(
         disk,

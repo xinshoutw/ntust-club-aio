@@ -560,3 +560,101 @@ async def test_upload_gate_closes_before_the_body_lands(client, db, monkeypatch)
         headers=csrf_headers(client),
     )
     assert blocked.status_code == 507
+
+
+# ---- HEIC 這類瀏覽器解不了的圖:<img> 來要就轉 JPEG ----
+
+
+def heic_bytes(width: int = 40, height: int = 30) -> bytes:
+    import pillow_heif
+    from PIL import Image
+
+    pillow_heif.register_heif_opener()
+    buf = io.BytesIO()
+    Image.new("RGB", (width, height), (200, 30, 30)).save(buf, format="HEIF")
+    return buf.getvalue()
+
+
+async def _heic_upload(db, club, user):
+    row = await file_service.save_upload(
+        db,
+        fake_upload("IMG_0001.HEIC", heic_bytes()),
+        policy=file_service.IMAGE,
+        module="reports",
+        uploaded_by=user.id,
+        club_id=club.id,
+        slot="report_photo",
+    )
+    await db.commit()
+    assert row.mime == "image/heic"
+    return row
+
+
+async def test_img_requests_get_a_jpeg_preview_and_downloads_keep_the_original(client, db):
+    from PIL import Image
+
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    row = await _heic_upload(db, club, user)
+    await login(client, "club01")
+    url = f"/api/v1/files/{row.id}"
+
+    # <img src> 帶 Sec-Fetch-Dest: image → JPEG、inline
+    resp = await client.get(url, headers={"Sec-Fetch-Dest": "image"})
+    assert resp.status_code == 200, resp.text
+    assert resp.headers["content-type"] == "image/jpeg"
+    assert resp.headers["content-disposition"].startswith("inline")
+    with Image.open(io.BytesIO(resp.content)) as img:
+        assert img.format == "JPEG"
+        assert img.size == (40, 30)
+    cache = settings.upload_dir / (row.path + file_service.PREVIEW_SUFFIX)
+    assert cache.is_file()
+
+    # 下載連結(document)與 fetch(empty)拿到的是原檔,照舊附件下載
+    resp = await client.get(url)
+    assert resp.headers["content-type"] == "image/heic"
+    assert resp.headers["content-disposition"].startswith("attachment")
+    assert resp.content == heic_bytes()
+
+    # 快取:第二次 <img> 不再轉檔
+    stamp = cache.stat().st_mtime_ns
+    resp = await client.get(url, headers={"Sec-Fetch-Dest": "image"})
+    assert resp.status_code == 200
+    assert cache.stat().st_mtime_ns == stamp
+
+    # 刪原檔連快取一起清
+    file_service.unlink_quiet(settings.upload_dir / row.path)
+    assert not cache.exists()
+
+
+async def test_native_images_are_not_transcoded(client, db):
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    row = await file_service.save_upload(
+        db, fake_upload("a.png", PNG_BYTES), policy=file_service.IMAGE, module="reports",
+        uploaded_by=user.id, club_id=club.id, slot="report_photo",
+    )
+    await db.commit()
+    await login(client, "club01")
+    resp = await client.get(f"/api/v1/files/{row.id}", headers={"Sec-Fetch-Dest": "image"})
+    assert resp.headers["content-type"] == "image/png"
+    assert resp.content == PNG_BYTES
+
+
+async def test_broken_heic_falls_back_to_the_original(client, db):
+    """轉不了就照舊給原檔(破圖總比 500 好),而且不留半寫的快取。"""
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    row = await file_service.save_upload(
+        db,
+        # 魔術位元組是 HEIC、內容不是
+        fake_upload("bad.heic", b"\x00\x00\x00\x18ftypheic" + b"\x00" * 64),
+        policy=file_service.IMAGE, module="reports",
+        uploaded_by=user.id, club_id=club.id, slot="report_photo",
+    )
+    await db.commit()
+    await login(client, "club01")
+    resp = await client.get(f"/api/v1/files/{row.id}", headers={"Sec-Fetch-Dest": "image"})
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "image/heic"
+    assert not (settings.upload_dir / (row.path + file_service.PREVIEW_SUFFIX)).exists()

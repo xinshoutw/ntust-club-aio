@@ -9,7 +9,7 @@ vi.mock('./client', async (orig) => ({
 }))
 
 import { apiPaged } from './client'
-import { slotsToEntries, useBookingList } from './adminBookings'
+import { slotsToEntries, toAdminDecision, useBookingList } from './adminBookings'
 
 const wrapper = ({ children }: { children: ReactNode }) =>
   createElement(QueryClientProvider, { client: new QueryClient() }, children)
@@ -65,5 +65,16 @@ describe('useBookingList 的查詢字串', () => {
     )
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
     expect(apiPaged).toHaveBeenCalledWith('/admin/venue-bookings?page=1&page_size=30')
+  })
+})
+
+describe('toAdminDecision', () => {
+  it('有處置紀錄就回,理由空著也保留時間與經手人;沒紀錄才是 undefined', () => {
+    expect(toAdminDecision({ decision_reason: null, decided_at: '2026-09-02T01:30:00Z', decided_by: '王承辦' })).toEqual({
+      reason: '',
+      at: '2026/09/02 09:30',
+      by: '王承辦',
+    })
+    expect(toAdminDecision({ decision_reason: null, decided_at: null, decided_by: null })).toBeUndefined()
   })
 })

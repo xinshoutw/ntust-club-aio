@@ -26,9 +26,10 @@ interface DecisionOut {
   decided_at: string | null
 }
 
+// 界線是「有沒有人處置過」(decided_at),不是「有沒有留話」:理由可空(行政端 toAdminDecision 同一條)
 const toDecision = (o: DecisionOut): DecisionInfo | undefined =>
-  o.decision_reason && o.decided_at
-    ? { reason: o.decision_reason, at: dayjs(o.decided_at).format('YYYY/MM/DD HH:mm') }
+  o.decided_at
+    ? { reason: o.decision_reason ?? '', at: dayjs(o.decided_at).format('YYYY/MM/DD HH:mm') }
     : undefined
 
 export interface PageParams {

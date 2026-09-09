@@ -27,10 +27,12 @@ interface DecisionOut {
   decided_by: string | null
 }
 
-/** 三種借用的輸出共用同一組欄位;沒有處置紀錄(社團自行取消、一般核准)時是 null */
+/** 三種借用的輸出共用同一組欄位;沒有處置紀錄(社團自行取消、一般核准)時 decided_at 是 null。
+ *  有紀錄就回,理由可以是空字串 —— 界線是「有沒有人處置過」,不是「有沒有留話」,
+ *  否則沒留理由的退回件連時間與經手人一起不見 */
 export const toAdminDecision = (o: DecisionOut): AdminDecision | undefined =>
-  o.decision_reason && o.decided_at
-    ? { reason: o.decision_reason, at: toDisplayDateTime(o.decided_at), by: o.decided_by ?? undefined }
+  o.decided_at
+    ? { reason: o.decision_reason ?? '', at: toDisplayDateTime(o.decided_at), by: o.decided_by ?? undefined }
     : undefined
 
 // ---- 場地主檔(場況圖列首) ----

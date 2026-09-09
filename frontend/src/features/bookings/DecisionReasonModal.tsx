@@ -75,10 +75,10 @@ export function useDecisionReason() {
         style={{
           whiteSpace: 'pre-wrap',
           wordBreak: 'break-word',
-          color: shown?.info ? undefined : 'var(--steel)',
+          color: shown?.info?.reason ? undefined : 'var(--steel)',
         }}
       >
-        {shown?.info?.reason ?? NO_REASON}
+        {shown?.info?.reason || NO_REASON}
       </div>
     </Modal>
   )

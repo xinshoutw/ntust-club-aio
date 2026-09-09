@@ -233,8 +233,8 @@ export default function BookingReviewModal({
               {item.data.status === 'rejected' ? '退回原因' : item.data.status === 'cancelled' ? '撤銷原因' : '核准說明'}
             </div>
             <div>
-              <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: item.data.decision ? undefined : 'var(--steel)' }}>
-                {item.data.decision?.reason ?? '系統未留下退回原因'}
+              <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: item.data.decision?.reason ? undefined : 'var(--steel)' }}>
+                {item.data.decision?.reason || '系統未留下退回原因'}
               </div>
               {item.data.decision && (
                 <div className="num" style={{ fontSize: 12, color: 'var(--steel)' }}>

@@ -422,7 +422,7 @@ async def revoke_venue_booking(
         db,
         booking.club_id,
         "reject",
-        "臨時場地借用已撤銷",
+        "臨時場地借用已被學務處撤銷",
         f"{venue.name}({booking.date} 時段 {','.join(booking.periods)}):{body.reason}",
     )
     return ApiResponse()
@@ -469,7 +469,7 @@ async def revoke_equipment_loan(
         db,
         loan.club_id,
         "reject",
-        "器材借用已撤銷",
+        "器材借用已被學務處撤銷",
         f"{equipment.name} ×{loan.qty}({loan.start_date}~{loan.end_date}):{body.reason}",
     )
     return ApiResponse()

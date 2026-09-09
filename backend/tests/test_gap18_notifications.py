@@ -177,7 +177,7 @@ async def test_k4_manual_booking_notifies_the_office_only(client, db, monkeypatc
         headers=csrf_headers(client),
     )
     assert revoked.status_code == 200, revoked.text
-    assert spy.global_titles(), "撤銷手動借用完全沒有通知"
+    assert spy.global_titles() == ["臨時場地借用已被學務處撤銷"], "撤銷手動借用完全沒有通知"
     assert spy.club == []
 
 

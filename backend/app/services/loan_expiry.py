@@ -28,7 +28,7 @@ from app.services import audit, notify
 from app.services import booking_service as svc
 
 REASON = "借用區間已過，未領取，系統自動撤銷"
-TITLE = "器材借用已撤銷"
+TITLE = "器材借用已自動撤銷"  # 與承辦手動撤銷分開講,社團才知道要找誰
 
 
 @dataclass

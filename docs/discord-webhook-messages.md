@@ -83,13 +83,15 @@
 - **D10 器材歸還提醒** `POST /admin/equipment-loans/{id}/remind`(super)或 `POST /staff/equipment-loans/{id}/remind`(工讀生),兩者共用 `services/loan_remind` · alert · 另寄 Email
   `器材歸還提醒` / `{club.name}:{equipment.name} ×{qty}(借用區間 {start}~{end},歸還期限 {deadline}),請儘速辦理歸還點交。`
 - **D11 固定借用已撤銷** `POST /admin/room-bookings/{id}/revoke` · reject
-  `固定場地借用已撤銷` / `{venue.name}({n} 個每週時段):{body.reason}`
+  `固定場地借用已被學務處撤銷` / `{venue.name}({n} 個每週時段):{body.reason}`
 - **D12 臨時借用已撤銷** `POST /admin/venue-bookings/{id}/revoke` · reject
-  `臨時場地借用已撤銷` / `{venue.name}({date} 時段 {periods}):{body.reason}`
+  `臨時場地借用已被學務處撤銷` / `{venue.name}({date} 時段 {periods}):{body.reason}`
 - **D13 器材借用已撤銷** `POST /admin/equipment-loans/{id}/revoke` · reject
-  `器材借用已撤銷` / `{equipment.name} ×{qty}({start}~{end}):{body.reason}`
+  `器材借用已被學務處撤銷` / `{equipment.name} ×{qty}({start}~{end}):{body.reason}`
+  —— D11–D13 標題點名學務處(慣例同 K9b):社團自己按取消是 K1–K3 的「已取消」,
+  只差一個字又同一個頻道,不點主詞就分不出這張單是誰收走的
 - **D13b 器材借用區間已過未領取,系統撤銷** 點交清單載入時與每日排程(`services/loan_expiry`) · reject
-  `器材借用已撤銷` / `{equipment.name} ×{qty}({start}~{end}):借用區間已過，未領取，系統自動撤銷` · 社團列已不在時推系統 webhook(同 K4b;手動借用本身不掃)。尾句用全形逗號 —— 它同時是社團端「撤銷原因」彈窗顯示的字(`design-guide.md` §7),括號與冒號則照 D13 的 Discord 慣例
+  `器材借用已自動撤銷` / `{equipment.name} ×{qty}({start}~{end}):借用區間已過，未領取，系統自動撤銷` · 社團列已不在時推系統 webhook(同 K4b;手動借用本身不掃)。尾句用全形逗號 —— 它同時是社團端「撤銷原因」彈窗顯示的字(`design-guide.md` §7),括號與冒號則照 D13 的 Discord 慣例
 
 D4–D7、D12、D13 經 `admin_bookings._notify_club`:`club_id` 為 NULL(行政手動借用)或社團不存在時推系統 webhook。
 

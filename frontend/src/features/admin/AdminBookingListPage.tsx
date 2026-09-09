@@ -196,7 +196,7 @@ export default function AdminBookingListPage({ kind }: { kind: BookingListKind }
                         {row.kind === 'venue' ? row.data.date : `${row.data.startDate} – ${row.data.endDate}`}
                       </td>
                       <td className="cell-clip" title={d.club}>{d.club}</td>
-                      <td className={row.kind === 'venue' ? 'cell-clip' : undefined} title={name} style={{ fontWeight: 500 }}>
+                      <td className={row.kind === 'venue' ? 'cell-clip' : undefined} title={row.kind === 'venue' ? name : undefined} style={{ fontWeight: 500 }}>
                         {/* 鍵盤入口:與整列 onClick 同動作;stopPropagation 避免雙觸發 */}
                         <button
                           type="button"

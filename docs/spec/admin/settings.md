@@ -39,7 +39,7 @@
 - **上傳上限的可調範圍貼齊 nginx 的 `client_max_body_size`**(圖/文件 50MB、影片 200MB):調得比它高的話,設定頁收下、`/club/config` 下發、畫面照著顯示新上限,而使用者一送出就吃 nginx 的 413 ——「畫面說 100MB、系統回超過上限」是最難查的一種不一致。`zip` 沒有任何端點在用,不受此限
 - **受理期間一經收到申請就不能換學期**(`INTAKE_SEMESTER_LOCKED`):固定借用的目標學期由受理期間結束日推導,把 `open_until` 從 7/31 延到 8/1 這種「再開三天」會讓它跳到下一個學期 —— 已收到的申請存的是舊學期的起訖快照,每社 10 節額度會歸零、場況圖清空,連核准關的重疊檢核都因為兩段區間不重疊而擋不住雙重核准。同一個學期內調整不受限
 - 兩份主檔的「刪除」都是停用(`is_active=false`),避免既有借用單(場地另含不開放規則)的外鍵斷裂;每列 blur 有差異才 PATCH,離散控制(類別/借用型態/點交方式/啟用)變更即送
-- `GET /admin/venues` 一支兩用:預設只回啟用中(場況圖與手動借用的列首),主檔維護頁帶 `include_inactive=true`;讀取開給 `VENUE_READ_KEYS`(`abooking`/`asetting`/`amanual`/`arule`),`include_inactive` 與新增修改限 `asetting`
+- `GET /admin/venues` 一支兩用:預設只回啟用中(場況圖與手動借用的列首),主檔維護頁帶 `include_inactive=true`;讀取開給 `VENUE_READ_KEYS`(`abooking`/`asetting`/`amanual`/`arule`);`GET /admin/equipment` 同理開給 `EQUIPMENT_READ_KEYS`(`asetting`/`amanual`/`aloanlist`),`include_inactive` 與新增修改限 `asetting`
 - 違規項目與經費科目都不可存成空清單
 - 設定變更寫 `audit_logs`:逐鍵記改前改後值(清單型只記增減,值太長會截斷),值沒變的鍵不留紀錄
 - **放假日整年份仍以腳本匯入**(decisions.md GAP-06):資料源是人事行政總處辦公日曆表,每年一次 `scripts/import_holidays.py --year <民國年> --yes`(上線檢查表 A 段列為每年必辦;由誰執行見該表 F 段待決 #8)。本頁的卡片是補漏與臨時放假(颱風假)用,不取代匯入。**刪除要先確認**(刪一天會把所有在借單的歸還期限往前挪一天,而逾期可觸發停權)。**週六日不收**(422):`booking_service.add_workdays` 本來就排除週末,登記進來只是把表撐大 —— 前端 `disabledDate` 也擋一份,後端為權威

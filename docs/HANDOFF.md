@@ -159,13 +159,20 @@ Opus 交叉審查後補的:`status=checked_out` 不帶 `overdue` 時**排除已�
 點交端擋區間已過的單、`tests/test_migrations` 連 nullable 一起比(原本漏跑這支遷移不會紅)、
 稽核頁補 `equipment_loan_expired` 與 `system` 角色的對照詞、`seed_mock` 的已核准借用改相對真實今天。
 
+**HEIC 預覽、借用清單版面**(2026-09-09):iPhone 拍的結案照片是 HEIC,Chrome 解不了,縮圖與預覽彈窗一片破圖。
+`GET /files/{id}` 現在看 `Sec-Fetch-Dest: image`(`<img>` 才帶)—— HEIC/HEIF/AVIF/TIFF/BMP 轉成 JPEG 回去
+(`services/files.preview_of`,pillow-heif;快取 `<path>.preview.jpg`,`unlink_quiet` 連它一起刪),下載與 fetch 照舊原檔,
+前端一行都沒改。轉失敗就給原檔並 log。**新相依 `pillow-heif`**,映像重建即帶入。
+「所有場地/器材借用」每一格改單行截斷(`useFitRows` 量第一列,一換行整頁列數算成一半)、器材欄 240px、
+器材頁多一個器材漏斗(`equipment_id=` 可重複,`GET /admin/equipment` 讀取鍵多 `aloanlist`)。
+
 **要跑遷移**:D-21/D-22 是 drop column,`alembic upgrade head` 之後舊號碼就沒了。
 D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)—— 走 `--reset` 重灌,
 或把該學期匯出再匯入一次。
 
 ## 驗證現況
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **606 passed**;`ruff check .` 全綠
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **610 passed**;`ruff check .` 全綠
 - 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **278 passed**(58 檔)、
   `pnpm run lint` 8 個既有的 fast-refresh warning
 - 新測試逐一做過 mutation 驗證(改回舊寫法會紅);借用色格圖那支另在 `TZ=UTC` 與 `TZ=Pacific/Honolulu` 下各跑過一次

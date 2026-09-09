@@ -226,7 +226,8 @@ export default function AdminBookingListPage({ kind }: { kind: BookingListKind }
                       style={{ cursor: 'pointer', ...(current?.data.id === d.id && open ? { background: 'var(--seal-tint)' } : {}) }}
                     >
                       <td><StatusPill status={d.status} /></td>
-                      <td className="num" style={{ fontSize: 13 }}>
+                      {/* 日期欄也截斷:borrow range 中間有空格能斷行,字體 fallback 一換就多一行 */}
+                      <td className="num cell-clip" style={{ fontSize: 13 }}>
                         {row.kind === 'venue' ? row.data.date : `${row.data.startDate} – ${row.data.endDate}`}
                       </td>
                       <td className="cell-clip" title={d.club}>{d.club}</td>
@@ -248,7 +249,7 @@ export default function AdminBookingListPage({ kind }: { kind: BookingListKind }
                       <td className="cell-clip" title={detail} style={{ fontSize: 13, color: 'var(--steel)' }}>
                         {detail}
                       </td>
-                      <td className="num">{d.createdAt}</td>
+                      <td className="num cell-clip">{d.createdAt}</td>
                       <td className="r"><RightOutlined style={{ fontSize: 11, color: 'var(--steel)' }} /></td>
                     </tr>
                   )

@@ -608,11 +608,13 @@ async def test_img_requests_get_a_jpeg_preview_and_downloads_keep_the_original(c
     cache = settings.upload_dir / (row.path + file_service.PREVIEW_SUFFIX)
     assert cache.is_file()
 
-    # 下載連結(document)與 fetch(empty)拿到的是原檔,照舊附件下載
-    resp = await client.get(url)
-    assert resp.headers["content-type"] == "image/heic"
-    assert resp.headers["content-disposition"].startswith("attachment")
-    assert resp.content == heic_bytes()
+    # 下載連結(document)、fetch(empty)與沒帶標頭的請求拿到的都是原檔,照舊附件下載
+    for headers in ({"Sec-Fetch-Dest": "document"}, {"Sec-Fetch-Dest": "empty"}, {}):
+        resp = await client.get(url, headers=headers)
+        assert resp.headers["content-type"] == "image/heic", headers
+        assert resp.headers["content-disposition"].startswith("attachment")
+        assert resp.headers["vary"] == "Sec-Fetch-Dest"
+        assert resp.content == heic_bytes()
 
     # 快取:第二次 <img> 不再轉檔
     stamp = cache.stat().st_mtime_ns

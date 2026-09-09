@@ -533,14 +533,17 @@ async def can_access(db: AsyncSession, file: File, user: User) -> bool:
     return False
 
 
-# 瀏覽器可原生預覽的類型;其餘(bmp/tiff/heic 等支援度不一)一律下載 —— 除非是 <img> 來要圖
-_INLINE_MIMES = {"image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf"}
+# 瀏覽器可原生預覽的類型(AVIF 現行三大瀏覽器都解得了);其餘(bmp/tiff/heic 支援度不一)一律下載 ——
+# 除非是 <img> 來要圖
+_INLINE_MIMES = {
+    "image/jpeg", "image/png", "image/gif", "image/webp", "image/avif", "application/pdf",
+}
 
 # <img> 要圖時(瀏覽器帶 `Sec-Fetch-Dest: image`)轉成 JPEG 給它看:iPhone 拍的結案照片是 HEIC,
 # Chrome/Firefox 解不了,縮圖與預覽彈窗就是一片破圖。下載連結與 fetch 不帶這個值,拿到的仍是原檔。
 # 轉檔結果快取在原檔旁(`<path>.preview.jpg`),刪原檔時一併清(unlink_quiet);
 # 快取不計入 files.size(配額看的是原檔),實際磁碟佔用會高於檔案管理頁的邏輯總量
-_PREVIEW_CONVERTIBLE = {"image/heic", "image/heif", "image/avif", "image/tiff", "image/bmp"}
+_PREVIEW_CONVERTIBLE = {"image/heic", "image/heif", "image/tiff", "image/bmp"}
 PREVIEW_SUFFIX = ".preview.jpg"
 PREVIEW_MAX_EDGE = 1600  # 預覽彈窗最大 76vh,更大只是白轉
 # 這兩個上限擋的是「解開來會吃掉半台機器」的來源:20MB 的 HEIC 可以是 48MP,解成 RGB 就是 150MB;
@@ -612,6 +615,9 @@ async def file_response(
                 filename=f"{Path(file.original_name).stem}.jpg",
                 content_disposition_type="inline",
             )
+            # 同一個 URL 依請求標頭回兩種 body:現在全站 no-store 所以沒事,
+            # 哪天有人給檔案回應加上快取,沒有 Vary 就是 <img> 的 JPEG 被下載連結拿到
+            response.headers["Vary"] = "Sec-Fetch-Dest"
             return response
     disposition = "inline" if file.mime in _INLINE_MIMES else "attachment"
     response = FileResponse(
@@ -620,6 +626,7 @@ async def file_response(
         filename=file.original_name,
         content_disposition_type=disposition,
     )
+    response.headers["Vary"] = "Sec-Fetch-Dest"
     if disposition == "inline" and file.mime == "application/pdf":
         # 前端 FilePreview 以 iframe 內嵌 PDF:僅授權成功的 inline PDF 放寬為同源,
         # 其餘 API 回應維持全域 DENY/none(middleware 只補缺漏、不覆寫)

@@ -246,6 +246,7 @@ function CloseForm({
   const budgetTotal = activity.selfFundTotal + activity.requestedTotal
   const [expense, setExpense] = useState<number | null>(d?.expense ?? (budgetTotal === 0 ? 0 : null))
   const [busy, setBusy] = useState<'draft' | 'submit' | null>(null)
+  const confirming = useRef(false)
 
   // 送出驗證未過的欄位集合:對應欄位標紅框,修改該欄即解除
   const [errors, setErrors] = useState<ReadonlySet<string>>(new Set())
@@ -552,12 +553,22 @@ function CloseForm({
       expense: expense!,
       reflections: complete.map(({ name, dept, text }) => ({ name: name.trim(), dept: dept.trim(), text: text.trim() })),
     }
+    // 按下即關窗、送出交給 busy 擋:onOk 回傳 promise 會讓彈窗留到照片上傳完,
+    // 期間「繼續編輯」仍按得動,關掉卻攔不住已經在送的結案
+    if (confirming.current) return // 長按 Enter 會在彈窗搶到焦點前疊出第二個
+    confirming.current = true
     confirmDialog(modal, {
       title: '確認送出結案',
       content: '送出後進入審核流程，審核期間無法修改內容',
       okText: '確認送出',
       cancelText: '繼續編輯',
-      onOk: () => doSubmit(body),
+      onOk: () => {
+        confirming.current = false
+        void doSubmit(body)
+      },
+      onCancel: () => {
+        confirming.current = false
+      },
     })
   }
 

@@ -6,6 +6,7 @@ import { MemoryRouter, Route, Routes } from 'react-router'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import ActivityFormPage from './ActivityFormPage'
 import ActivityClosePage from './ActivityClosePage'
+import ActivityListPage from './ActivityListPage'
 import type { ClubActivityDetail } from '../../api/activities'
 
 // 送出申請與送出結案都是不可逆的一步(送出後社團改不動,只能等退回),誤觸成本高 ——
@@ -64,11 +65,14 @@ const closeDetail = {
   },
 } as unknown as ClubActivityDetail
 
-const { updateActivity, submitActivity, submitClose } = vi.hoisted(() => ({
+const { updateActivity, submitActivity, submitClose, submitFromList } = vi.hoisted(() => ({
   updateActivity: vi.fn(async (_id: number, _input: unknown) => ({ id: 7 })),
   submitActivity: vi.fn(async (_id: number) => {}),
   submitClose: vi.fn(async (_id: number, _body: unknown) => {}),
+  submitFromList: vi.fn((_id: number, _opts?: unknown) => {}),
 }))
+
+const idle = { isPending: false, isError: false, isFetching: false, isPlaceholderData: false }
 
 let detail: ClubActivityDetail = draftDetail
 
@@ -77,9 +81,18 @@ vi.mock('../../api/activities', async (importOriginal) => ({
   useActivityDetail: () => ({ data: detail, isPending: false, isError: false }),
   useClosableActivities: () => ({ data: [closeDetail], isPending: false, isError: false }),
   useInvalidateActivities: () => () => {},
+  useDraftActivities: () => ({ data: [draftDetail], ...idle }),
+  useActivityList: () => ({ data: { rows: [], total: 0 }, ...idle }),
+  useActivitySemesters: () => ({ data: ['188-1'], ...idle }),
+  useActivityMutations: () => ({ submit: { mutate: submitFromList, isPending: false, variables: undefined } }),
   updateActivity,
   submitActivity,
   submitClose,
+}))
+
+vi.mock('../../api/adminActivities', () => ({
+  useDeleteActivity: () => ({ mutate: vi.fn(), isPending: false, variables: undefined }),
+  useClubActivityReview: () => ({ data: undefined, ...idle }),
 }))
 
 vi.mock('../../api/clubConfig', () => ({
@@ -101,6 +114,7 @@ const renderAt = (path: string, element: ReactElement) => {
   updateActivity.mockClear()
   submitActivity.mockClear()
   submitClose.mockClear()
+  submitFromList.mockClear()
   render(
     <QueryClientProvider client={new QueryClient()}>
       <MemoryRouter initialEntries={[path]}>
@@ -108,6 +122,7 @@ const renderAt = (path: string, element: ReactElement) => {
           <Routes>
             <Route path="/activities/:id/edit" element={element} />
             <Route path="/activities/close" element={element} />
+            <Route path="/activities" element={element} />
             <Route path="*" element={<div>離開表單</div>} />
           </Routes>
         </App>
@@ -124,6 +139,11 @@ const renderForm = () => {
 const renderClose = () => {
   detail = closeDetail
   renderAt('/activities/close?id=7', <ActivityClosePage />)
+}
+
+const renderList = () => {
+  detail = draftDetail
+  renderAt('/activities', <ActivityListPage />)
 }
 
 describe('活動申請的送出確認', () => {
@@ -144,6 +164,17 @@ describe('活動申請的送出確認', () => {
     // at(-1):jsdom 不跑離場動畫,取消掉的彈窗節點還留在 DOM
     fireEvent.click(screen.getByRole('button', { name: '送出申請' }))
     fireEvent.click(screen.getAllByRole('button', { name: '確認送出' }).at(-1)!)
+    await waitFor(() => expect(submitActivity).toHaveBeenCalledTimes(1))
+  })
+
+  test('連按送出申請:只會有一個確認窗,確認後只送一份', async () => {
+    renderForm()
+    fireEvent.click(screen.getByRole('button', { name: '送出申請' }))
+    await screen.findByRole('button', { name: '確認送出' })
+    fireEvent.click(screen.getByRole('button', { name: '送出申請' }))
+    fireEvent.click(screen.getByRole('button', { name: '送出申請' }))
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '確認送出' })).toHaveLength(1))
+    fireEvent.click(screen.getByRole('button', { name: '確認送出' }))
     await waitFor(() => expect(submitActivity).toHaveBeenCalledTimes(1))
   })
 
@@ -174,6 +205,17 @@ describe('活動結案的送出確認', () => {
     await waitFor(() => expect(submitClose).toHaveBeenCalledTimes(1))
   })
 
+  test('連按送出結案:只會有一個確認窗,確認後只送一份', async () => {
+    renderClose()
+    fireEvent.click(screen.getByRole('button', { name: '送出結案' }))
+    await screen.findByRole('button', { name: '確認送出' })
+    fireEvent.click(screen.getByRole('button', { name: '送出結案' }))
+    fireEvent.click(screen.getByRole('button', { name: '送出結案' }))
+    await waitFor(() => expect(screen.getAllByRole('button', { name: '確認送出' })).toHaveLength(1))
+    fireEvent.click(screen.getByRole('button', { name: '確認送出' }))
+    await waitFor(() => expect(submitClose).toHaveBeenCalledTimes(1))
+  })
+
   test('選確認送出:才真的送出', async () => {
     renderClose()
     fireEvent.click(screen.getByRole('button', { name: '送出結案' }))
@@ -183,3 +225,34 @@ describe('活動結案的送出確認', () => {
     )
   })
 })
+
+// 草稿列的「送出」打的是同一支 submit,只是入口不同(小鈕、在列表上,更容易誤觸)
+describe('活動列表草稿列的送出確認', () => {
+  // AntD 對兩個中文字的按鈕自動補空格(autoInsertSpace),可及名稱是「送 出」「取 消」
+  const draftSubmit = () => screen.getByRole('button', { name: /^送\s*出$/ })
+  test('按下送出只跳 Popconfirm,不直接送出', async () => {
+    renderList()
+    fireEvent.click(draftSubmit())
+    await screen.findByText('送出申請「迎新宿營」？')
+    expect(submitFromList).not.toHaveBeenCalled()
+  })
+
+  test('選取消:什麼都沒送', async () => {
+    renderList()
+    fireEvent.click(draftSubmit())
+    fireEvent.click(await screen.findByRole('button', { name: /^取\s*消$/ }))
+    // 再走一次完整流程:送出次數仍是 1,證明取消掉的那次沒有偷送
+    fireEvent.click(draftSubmit())
+    fireEvent.click(screen.getAllByRole('button', { name: '確認送出' }).at(-1)!)
+    await waitFor(() => expect(submitFromList).toHaveBeenCalledTimes(1))
+  })
+
+  test('選確認送出:才真的送出,且帶對活動', async () => {
+    renderList()
+    fireEvent.click(draftSubmit())
+    fireEvent.click(await screen.findByRole('button', { name: '確認送出' }))
+    await waitFor(() => expect(submitFromList).toHaveBeenCalledTimes(1))
+    expect(submitFromList.mock.calls[0][0]).toBe(7)
+  })
+})
+

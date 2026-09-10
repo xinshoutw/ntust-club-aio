@@ -147,6 +147,7 @@ function ActivityForm({
   const [existing, setExisting] = useState<EvalFile[]>(editing?.attachments ?? [])
   const [worksError, setWorksError] = useState(false)
   const [busy, setBusy] = useState<'draft' | 'submit' | null>(null)
+  const confirming = useRef(false)
 
   // 自動增列:保證尾端永遠有一列空白;清空的列自動移除
   const workKeyRef = useRef((editing?.works.length ?? 0) + 2)
@@ -336,7 +337,7 @@ function ActivityForm({
     void doSave()
   }
 
-  const onFinish = async (v: FormValues) => {
+  const onFinish = (v: FormValues) => {
     if (!checkTimes(v)) return
     if (!works.some((w) => w.task.trim() !== '' && w.owner.trim() !== '')) {
       setWorksError(true)
@@ -344,6 +345,26 @@ function ActivityForm({
       return
     }
     const input = buildInput(v)
+    // 按下即關窗、送出交給 busy 擋(與站內其餘 confirmDialog 一致):onOk 回傳 promise 會讓
+    // 彈窗留到送完,期間「繼續編輯」仍按得動,關掉卻攔不住已經在送的申請
+    if (confirming.current) return // 長按 Enter 會在彈窗搶到焦點前疊出第二個
+    confirming.current = true
+    confirmDialog(modal, {
+      title: '確認送出申請',
+      content: '送出後進入審核流程，審核期間無法修改內容',
+      okText: '確認送出',
+      cancelText: '繼續編輯',
+      onOk: () => {
+        confirming.current = false
+        void doSubmit(input)
+      },
+      onCancel: () => {
+        confirming.current = false
+      },
+    })
+  }
+
+  const doSubmit = async (input: ActivityInput) => {
     setBusy('submit')
     try {
       // 後端介面:先存草稿(POST/PUT)→ 逐檔上傳附件 → POST submit 送審

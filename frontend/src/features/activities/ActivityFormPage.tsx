@@ -336,7 +336,7 @@ function ActivityForm({
     void doSave()
   }
 
-  const onFinish = async (v: FormValues) => {
+  const onFinish = (v: FormValues) => {
     if (!checkTimes(v)) return
     if (!works.some((w) => w.task.trim() !== '' && w.owner.trim() !== '')) {
       setWorksError(true)
@@ -344,6 +344,16 @@ function ActivityForm({
       return
     }
     const input = buildInput(v)
+    confirmDialog(modal, {
+      title: '確認送出申請',
+      content: '送出後進入審核流程，審核期間無法修改內容',
+      okText: '確認送出',
+      cancelText: '繼續編輯',
+      onOk: () => doSubmit(input),
+    })
+  }
+
+  const doSubmit = async (input: ActivityInput) => {
     setBusy('submit')
     try {
       // 後端介面:先存草稿(POST/PUT)→ 逐檔上傳附件 → POST submit 送審

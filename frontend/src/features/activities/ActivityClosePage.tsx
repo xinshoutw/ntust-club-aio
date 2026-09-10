@@ -7,6 +7,7 @@ import { InfoCircleOutlined, RightOutlined, UploadOutlined } from '@ant-design/i
 import { useUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
+import { confirmDialog } from '../../lib/confirm'
 import { blurLeavesRow } from '../../lib/form'
 import { notFoundText } from '../../lib/selectOptions'
 import {
@@ -221,7 +222,7 @@ function CloseForm({
   imgBytes: number
   onDone: () => void
 }) {
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const invalidate = useInvalidateActivities()
   const d = detail.closeDraft
   const [plannedStart, plannedEnd] = plannedTimes(activity.timeRange)
@@ -551,6 +552,16 @@ function CloseForm({
       expense: expense!,
       reflections: complete.map(({ name, dept, text }) => ({ name: name.trim(), dept: dept.trim(), text: text.trim() })),
     }
+    confirmDialog(modal, {
+      title: '確認送出結案',
+      content: '送出後進入審核流程，審核期間無法修改內容',
+      okText: '確認送出',
+      cancelText: '繼續編輯',
+      onOk: () => doSubmit(body),
+    })
+  }
+
+  const doSubmit = async (body: CloseSubmitInput) => {
     setBusy('submit')
     // 照片在此(送出時)才上傳,不進草稿;送出失敗時回滾本次已上傳的照片,
     // 避免留下孤兒檔並阻擋下次(後端跨活動 sha256 去重)重傳

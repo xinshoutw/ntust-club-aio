@@ -222,19 +222,23 @@ export default function ActivityListPage() {
                   row(
                     a,
                     <span style={{ display: 'inline-flex', gap: 6 }}>
-                      <Button
-                        size="small"
-                        type="primary"
-                        loading={submit.isPending && submit.variables === a.id}
-                        onClick={() =>
+                      {/* 送出即不可修改,與申請頁的送出鈕同樣要先確認(同一支 submit) */}
+                      <Popconfirm
+                        title={`送出申請「${a.name}」？`}
+                        description="送出後進入審核流程，審核期間無法修改內容"
+                        okText="確認送出"
+                        cancelText="取消"
+                        onConfirm={() =>
                           submit.mutate(a.id, {
                             onSuccess: () => message.success('已送出申請'),
                             onError: (e) => message.error(e.message),
                           })
                         }
                       >
-                        送出
-                      </Button>
+                        <Button size="small" type="primary" loading={submit.isPending && submit.variables === a.id}>
+                          送出
+                        </Button>
+                      </Popconfirm>
                       <Popconfirm
                         title={`刪除草稿「${a.name}」？`}
                         okText="確認刪除"

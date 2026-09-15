@@ -34,6 +34,7 @@ export default function ClubDetailPage() {
         <QueryError
           title={notFound ? '找不到這個社團' : '社團資料載入失敗'}
           error={notFound ? new Error('這個社團可能已經停社，或目前未公開') : club.error}
+          retrying={club.isFetching}
           onRetry={valid && !notFound ? () => void club.refetch() : undefined}
         />
       </PublicShell>
@@ -183,6 +184,7 @@ export default function ClubDetailPage() {
                   compact
                   title="活動紀錄載入失敗"
                   error={activities.error}
+                  retrying={activities.isFetching}
                   onRetry={() => void activities.refetch()}
                 />
               ) : (

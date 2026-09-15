@@ -108,7 +108,9 @@ class ClubProfileUpdate(BaseModel):
     tags: list[str] | None = None
     recruit_status: RecruitStatus | None = None
     public_email: str | None = Field(None, max_length=100)
-    # 上限放寬到能容下整串貼上來的網址;真正的 30 字限制由驗證器在剝掉前綴之後才套
+    # 上限放寬到能容下整串貼上來的網址;真正的 30 字限制由驗證器在剝掉前綴之後才套。
+    # 這裡留得住 Field 層的檢查(tags 那邊拿掉了):200 字元以內裝得下任何一種
+    # 貼法,庫裡不會有超過的舊值,所以不存在「舊資料撞欄位層 422」那條路
     instagram: str | None = Field(None, max_length=200)
     office_location: str | None = Field(None, max_length=50)
     regular_schedule: str | None = Field(None, max_length=200)

@@ -91,6 +91,9 @@ async def test_the_list_order_is_stable(client, db):
 
     DB 的 collation 是 `en_US.utf8`,對中文等於碼位序,排不出有意義的順序;
     真正的規則(性質 → 名稱)在 `ClubDirectoryPage`,前端手上本來就是全量。
+
+    下面的 `first == sorted(first)` 因此**同時釘住了那個 collation 假設** ——
+    哪天測試庫換成 `zh_TW` 這條會紅,那時要改的是這個斷言,不是 `order_by`。
     """
     for name in ("熱舞社", "吉他社", "圍棋社"):
         await make_club(db, name=name)

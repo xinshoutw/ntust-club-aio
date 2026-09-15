@@ -106,7 +106,10 @@ def test_instagram_keeps_only_the_last_path_segment():
     代價:`kind` 標成 instagram 卻填了別的平台的舊值(舊 SocialLink 只要求 http(s),
     這是合法舊值)會被當成帳號收下,社團頁連出去是一個不存在的 IG。換來的是不必列舉
     `m.` / `instagr.am` / 未來任何一種分享網域 —— 列舉漏一個就是一個社團被鎖在 422 裡。
-    社團自己在設定頁看得到存成什麼,改掉是一次編輯的事。
+    同理,貼單篇貼文／限動的連結(`instagram.com/p/CxYz123/`)會取到 `CxYz123`。
+    兩者都靠**存檔後把正規化結果回填欄位**讓社團自己看見(`ClubSettingsPage.onFinish`),
+    而不是在這裡維護一份 `p` / `reel` / `tagged` / `explore` 的保留字清單 —— 那種清單
+    漏一個就是一個錯帳號,和「列舉 IG 的分享網域」是同一個坑。
     """
     assert ClubProfileUpdate(instagram="https://www.facebook.com/wrongplatform").instagram == (
         "wrongplatform"

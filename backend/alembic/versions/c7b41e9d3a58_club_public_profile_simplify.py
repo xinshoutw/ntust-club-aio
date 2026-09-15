@@ -43,8 +43,10 @@ def upgrade() -> None:
     op.execute(
         sa.text("""
         UPDATE clubs SET instagram = btrim(regexp_replace(rtrim(regexp_replace(
-            (SELECT l ->> 'url' FROM jsonb_array_elements(social_links) AS l
-              WHERE l ->> 'kind' = 'instagram' LIMIT 1),
+            regexp_replace(
+                (SELECT l ->> 'url' FROM jsonb_array_elements(social_links) AS l
+                  WHERE l ->> 'kind' = 'instagram' LIMIT 1),
+                '^[[:space:]]+|[[:space:]]+$', '', 'g'),
             '[?#].*$', ''), '/'), '^.*/', ''), '@ ')
         WHERE social_links <> '[]'::jsonb
         """)
@@ -59,8 +61,14 @@ def upgrade() -> None:
         sa.text("""
         UPDATE clubs SET tags = COALESCE((
             SELECT array_agg(t ORDER BY ord) FROM (
-                SELECT t, ord FROM unnest(tags) WITH ORDINALITY AS u(t, ord)
-                 WHERE t = ANY(:known) ORDER BY ord LIMIT 3
+                SELECT t, ord FROM (
+                    -- 去重也要做:`_clean_tags` 會去重,這裡不做的話字卡上會並排兩個
+                    -- 一樣的標籤,`tags.map(t => <span key={t}>)` 還會撞 React key
+                    SELECT DISTINCT ON (t) t, ord
+                      FROM unnest(tags) WITH ORDINALITY AS u(t, ord)
+                     WHERE t = ANY(:known)
+                     ORDER BY t, ord
+                ) deduped ORDER BY ord LIMIT 3
             ) kept
         ), '{}')
         WHERE tags <> '{}'

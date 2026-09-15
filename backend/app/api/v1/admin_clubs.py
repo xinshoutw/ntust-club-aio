@@ -456,9 +456,18 @@ async def delete_club(
             )
         # 形象圖在 FK 圖之外,得自己刪;**必須排在 users 之前**,否則它的 uploaded_by
         # 會擋住下一刀。`clubs` 的兩個 FK 是 SET NULL,參照隨之歸零
-        result = await db.execute(sa.text(f"DELETE FROM files WHERE {_CLUB_IMAGE_FILES}"), params)
-        if result.rowcount:
-            deleted["files"] += result.rowcount
+        # RETURNING:上面收集 `paths` 之後、這一刀之前要是有人換了圖(`_replace_image`
+        # 鎖的是社團列,這裡只鎖了活動列),新的那張同樣符合條件會被刪掉,而它的路徑
+        # 不在 `paths` 裡 —— 磁碟上就留一個沒有任何清理路徑管得到的孤兒檔。
+        # 以「這一刀實際刪掉了什麼」為準,不以先前的快照為準
+        rows = (
+            await db.execute(
+                sa.text(f"DELETE FROM files WHERE {_CLUB_IMAGE_FILES} RETURNING path"), params
+            )
+        ).all()
+        if rows:
+            deleted["files"] += len(rows)
+            paths.extend(r[0] for r in rows)
         # 帳號自己不走 FK 圖:從帳號往下追到的是「這個人碰過的東西」,那不等於「這個社團的
         # 東西」—— 真有跨社團的列就讓它撞 FK(回 409),不要順手刪掉別人的資料。
         # 社團自己的資料已在上面清掉,正常情況這一刀不會有東西擋

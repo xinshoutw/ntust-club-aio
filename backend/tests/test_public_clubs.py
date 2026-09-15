@@ -86,21 +86,19 @@ async def test_hidden_and_inactive_clubs_are_absent_everywhere(client, db):
     assert (await client.get(f"{URL}/{listed.id}")).status_code == 200
 
 
-async def test_clubs_with_a_banner_come_first(client, db):
-    await make_club(db, name="吉他社")  # 無橫幅,名稱在前
-    with_banner = await make_club(db, name="熱舞社")
-    owner = await make_user(db, username="club01", club_id=with_banner.id)
-    row = await file_service.save_club_image(
-        db,
-        UploadFile(io.BytesIO(png_bytes()), filename="b.png", size=len(png_bytes())),
-        slot="banner",
-        uploaded_by=owner.id,
-    )
-    with_banner.banner_file_id = row.id
-    await db.commit()
+async def test_the_list_order_is_stable(client, db):
+    """端點只保證一個穩定次序(名稱),**導覽頁的順序由前端決定**。
 
-    names = [c["name"] for c in (await client.get(URL)).json()["data"]]
-    assert names == ["熱舞社", "吉他社"]
+    DB 的 collation 是 `en_US.utf8`,對中文等於碼位序,排不出有意義的順序;
+    真正的規則(性質 → 名稱)在 `ClubDirectoryPage`,前端手上本來就是全量。
+    """
+    for name in ("熱舞社", "吉他社", "圍棋社"):
+        await make_club(db, name=name)
+
+    first = [c["name"] for c in (await client.get(URL)).json()["data"]]
+    second = [c["name"] for c in (await client.get(URL)).json()["data"]]
+    assert first == second
+    assert sorted(first) == sorted(["熱舞社", "吉他社", "圍棋社"])
 
 
 # ---- 回什麼、不回什麼 ----
@@ -201,6 +199,27 @@ async def test_activity_rows_carry_no_content_or_money(client, db):
     # 公開頁回答的是「這個社團在辦什麼」,不是「這張單裡寫了什麼」
     for field in ("content", "school_approved", "admin_note", "fund_source", "status"):
         assert field not in row
+
+
+async def test_only_the_ten_most_recent_activities_are_public(client, db):
+    """公開頁回答的是「這個社團在辦什麼」,不是完整流水帳 —— 只列最近 10 次。"""
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    for day in range(1, 15):
+        await make_activity(
+            db,
+            club,
+            name=f"第 {day} 場",
+            status=ActivityStatus.APPROVED,
+            day=dt.date(2026, 3, day),
+            created_by=user.id,
+        )
+
+    rows = (await client.get(f"{URL}/{club.id}/activities")).json()["data"]
+    assert len(rows) == 10
+    # 截掉的是最舊的,留下的是最近的
+    assert rows[0]["name"] == "第 14 場"
+    assert rows[-1]["name"] == "第 5 場"
 
 
 async def test_activities_are_newest_first_and_filterable_by_semester(client, db):

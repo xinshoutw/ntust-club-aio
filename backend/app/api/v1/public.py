@@ -32,7 +32,8 @@ from app.services import booking_service as svc
 router = APIRouter(prefix="/public", tags=["public"])
 
 MAX_AVAILABILITY_SPAN_DAYS = 31  # 單一場地 15 天檢視用;上限防範圍濫用
-MAX_PUBLIC_ACTIVITIES = 200  # 單一社團的歷年活動;上限防整表拖下來
+# 公開頁只列最近 10 次:導覽頁要回答的是「這個社團在辦什麼」,不是完整流水帳
+MAX_PUBLIC_ACTIVITIES = 10
 
 # 主鍵是 PostgreSQL 的 int4:超界的值會在 asyncpg 綁參數時 OverflowError → 500,
 # 而這些是**匿名打得到**的路徑 —— 未登入、零成本就能一次塞進三十份 traceback。
@@ -158,15 +159,14 @@ async def list_clubs(db: DbDep, response: Response) -> ApiResponse[list[ClubCard
     在校社團約 60 個,導覽頁本質是主檔;搜尋與篩選由前端在手上這份做完,
     再打一次伺服器只是多一次往返。
 
-    排序:有橫幅圖的在前,其次社團名稱 —— 沒有任何一張圖的頁面不會有人看第二次,
-    先讓有備料的社團撐起版面。名稱排序走的是 DB 的 collation(正式庫是 `en_US.utf8`,
-    對中文等於碼位序);要筆畫或注音順序得在前端用 `Intl.Collator('zh-Hant')` 重排 ——
-    手上本來就是全量,但重排時要保住「有橫幅在前」那一段。
+    順序由前端決定(性質 → 名稱,見 spec/shared/club-directory.md):DB 的 collation
+    是 `en_US.utf8`,對中文等於碼位序,排不出有意義的順序。這裡只給一個穩定的次序,
+    讓分頁/快取之間不會跳動。
     """
     rows = await db.scalars(
         sa.select(Club)
         .where(*_VISIBLE)
-        .order_by(Club.banner_file_id.is_(None), Club.name, Club.id)
+        .order_by(Club.name, Club.id)
     )
     # 一份幾乎不變的主檔,沒有理由每次進站、每次上一頁都重查(全域預設是 no-store)
     response.headers["Cache-Control"] = "public, max-age=300"

@@ -9,6 +9,7 @@
 
 import asyncio
 import hashlib
+import io
 import logging
 import shutil
 import uuid
@@ -616,29 +617,36 @@ CLUB_IMAGE_SIZES: dict[str, tuple[int, int]] = {
 _WEBP_QUALITY = 82
 
 
-def _fit_webp(src: Path, size: tuple[int, int]) -> tuple[int, int]:
-    """置中裁切成指定尺寸的 WebP,就地取代原檔;回傳 (檔案大小, 下三分之一平均亮度)。
+def _fit_webp(src: Path, size: tuple[int, int]) -> tuple[bytes, int]:
+    """置中裁切成指定尺寸的 WebP;回傳 (WebP 位元組, 下三分之一平均亮度)。
 
     比例不合一律 `ImageOps.fit` 置中裁切 —— 換一套互動 cropper UI 得不到等值的效果,
     要精準構圖的社團自己先裁好再傳。
 
     亮度只取**下三分之一**:橫幅上的字通常壓在底部,取全圖平均會在「上半天空、
     下半暗地」這種圖上判出相反的字色。
+
+    **回位元組而不是就地覆寫原檔**:`run_in_executor` 取消不會停 thread(見
+    `_PREVIEW_POOL` 的註解)。寫回磁碟的話,請求被取消 → 交易收尾 →
+    `_drop_uncommitted_uploads` 刪掉落盤的檔 → thread 這時才把它重新建回來,
+    留下一個 DB 沒有列、`admin_files` 掃不到、沒有任何清理路徑管得到的孤兒檔。
+    成品是 1600×1200 q82 的 WebP(數百 KB),進記憶體的成本可以忽略。
     """
-    tmp = src.with_name(f"{src.name}.{uuid.uuid4().hex}.part")
-    try:
-        with Image.open(src) as img:
-            if img.width * img.height > PREVIEW_MAX_PIXELS:
-                raise ValueError(f"image too large: {img.width}x{img.height}")
-            img = ImageOps.exif_transpose(img) or img
-            fitted = ImageOps.fit(img.convert("RGB"), size, method=Image.Resampling.LANCZOS)
-            fitted.save(tmp, format="WEBP", quality=_WEBP_QUALITY)
-            bottom = fitted.crop((0, size[1] * 2 // 3, size[0], size[1])).convert("L")
-            luma = round(ImageStat.Stat(bottom).mean[0])
-        tmp.replace(src)
-        return src.stat().st_size, luma
-    finally:
-        tmp.unlink(missing_ok=True)
+    with Image.open(src) as img:
+        if img.width * img.height > PREVIEW_MAX_PIXELS:
+            raise ValueError(f"image too large: {img.width}x{img.height}")
+        # **先縮再轉 RGB**:反過來(`fit(img.convert("RGB"))`)會先把全尺寸解成 RGB,
+        # 一張 50MP 圖的峰值是「解碼 + transpose + RGB」約 3×150MB,而 pool 有兩條 thread,
+        # 正式機是 2 vCPU / 4GB 還跟 PostgreSQL 同住。`thumbnail` 對 JPEG 會自動用
+        # `draft()` 讓 libjpeg 直接以較低倍率解碼,省的是解碼本身。
+        # 邊長取 2× 最長邊(與方向無關):留給 `fit` 的裁切還有餘裕,不會放大失真
+        img.thumbnail((max(size) * 2, max(size) * 2), Image.Resampling.LANCZOS)
+        img = ImageOps.exif_transpose(img) or img
+        fitted = ImageOps.fit(img.convert("RGB"), size, method=Image.Resampling.LANCZOS)
+        buf = io.BytesIO()
+        fitted.save(buf, format="WEBP", quality=_WEBP_QUALITY)
+        bottom = fitted.crop((0, size[1] * 2 // 3, size[0], size[1])).convert("L")
+        return buf.getvalue(), round(ImageStat.Stat(bottom).mean[0])
 
 
 async def save_club_image(
@@ -666,7 +674,7 @@ async def save_club_image(
     )
     disk = Path(settings.upload_dir) / row.path
     try:
-        size, luma = await asyncio.get_running_loop().run_in_executor(
+        data, luma = await asyncio.get_running_loop().run_in_executor(
             _PREVIEW_POOL, _fit_webp, disk, size_spec
         )
     except Exception as exc:
@@ -675,9 +683,11 @@ async def save_club_image(
         logger.warning("club image convert failed: slot=%s file=%s", slot, row.id, exc_info=True)
         raise AppError(415, "UNSUPPORTED_FILE_TYPE", "圖片無法解讀,請換一張") from exc
 
-    row.size = size
+    # 落盤在 await 之後:被取消的請求走不到這裡,也就不會有檔案留在磁碟上
+    disk.write_bytes(data)
+    row.size = len(data)
     row.mime = "image/webp"
-    row.sha256 = hashlib.sha256(disk.read_bytes()).hexdigest()
+    row.sha256 = hashlib.sha256(data).hexdigest()
     row.original_name = f"{slot}.webp"
     row.public = True
     await db.flush()

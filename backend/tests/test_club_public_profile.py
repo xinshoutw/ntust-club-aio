@@ -1,6 +1,7 @@
 """社團對外公開資料:欄位驗證、形象圖轉檔、公開檔案權限、行政端下架閥。"""
 
 import io
+import pathlib
 
 import pytest
 import sqlalchemy as sa
@@ -414,3 +415,27 @@ async def test_club_images_are_counted_in_the_file_management_page(client, db):
     listed = (await client.get("/api/v1/admin/files")).json()["data"]
     mine = next(f for f in listed if f["original_name"] == "avatar.webp")
     assert mine["module"] == "clubimg"  # 不是 fallback 的 apps
+
+
+def test_fit_webp_never_touches_the_source_file():
+    """轉檔只回位元組,不碰磁碟。
+
+    `run_in_executor` 取消不會停 thread:就地覆寫原檔的話,請求被取消後
+    `_drop_uncommitted_uploads` 會先刪掉落盤的檔,thread 這時才把它建回來 ——
+    留下一個 DB 沒有列、檔案管理掃不到、沒有任何清理路徑管得到的孤兒檔。
+    """
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        src = pathlib.Path(tmp) / "source.png"
+        src.write_bytes(png_bytes(900, 900, (200, 200, 200)))
+        before = src.read_bytes()
+
+        data, luma = file_service._fit_webp(src, (256, 256))
+
+        assert src.read_bytes() == before  # 原檔一個位元組都沒動
+        assert list(pathlib.Path(tmp).iterdir()) == [src]  # 也沒留下任何暫存檔
+        with Image.open(io.BytesIO(data)) as out:
+            assert out.format == "WEBP"
+            assert out.size == (256, 256)
+        assert luma > 128  # 淺色來源 → 深色字

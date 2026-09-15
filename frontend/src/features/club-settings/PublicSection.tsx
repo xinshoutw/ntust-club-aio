@@ -129,9 +129,11 @@ function ImagePicker({
             if (file) void pick(file)
           }}
         />
+        {/* 各自轉各自的圈:共用一個 busy 的話,按「移除」時「更換圖片」也跟著轉,
+            看起來像兩件事同時在跑 */}
         <Button
           icon={<UploadOutlined />}
-          loading={upload.isPending || remove.isPending}
+          loading={upload.isPending}
           disabled={upload.isPending || remove.isPending}
           onClick={() => inputRef.current?.click()}
         >
@@ -141,7 +143,7 @@ function ImagePicker({
           <Button
             icon={<DeleteOutlined />}
             danger
-            loading={upload.isPending || remove.isPending}
+            loading={remove.isPending}
             disabled={upload.isPending || remove.isPending}
             onClick={() => void drop()}
           >
@@ -168,6 +170,9 @@ function TagPicker({ value = [], onChange }: { value?: string[]; onChange?: (v: 
             size="small"
             type={on ? 'primary' : 'default'}
             ghost={on}
+            // 選取只用顏色表達的話,螢幕閱讀器聽到的 14 顆按鈕完全一樣(WCAG 1.4.1)
+            aria-pressed={on}
+            title={!on && full ? `最多選 ${MAX_TAGS} 個` : undefined}
             disabled={!on && full}
             onClick={() => onChange?.(on ? value.filter((t) => t !== tag) : [...value, tag])}
           >

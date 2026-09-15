@@ -112,7 +112,7 @@ class ClubProfileUpdate(BaseModel):
     # 這裡留得住 Field 層的檢查(tags 那邊拿掉了):200 字元以內裝得下任何一種
     # 貼法,庫裡不會有超過的舊值,所以不存在「舊資料撞欄位層 422」那條路
     instagram: str | None = Field(None, max_length=200)
-    office_location: str | None = Field(None, max_length=50)
+    office_location: str | None = Field(None, max_length=30)
     regular_schedule: str | None = Field(None, max_length=200)
     join_info: str | None = Field(None, max_length=500)
     signup_url: str | None = Field(None, max_length=500)

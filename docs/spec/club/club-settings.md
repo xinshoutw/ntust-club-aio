@@ -16,8 +16,8 @@
 |---|---|
 | 讀取 | `GET /club/profile` |
 | 儲存 | `PATCH /club/profile` |
-| 上傳頭像 | `POST /club/profile/avatar` |
-| 上傳橫幅 | `POST /club/profile/banner` |
+| 上傳頭像 | `POST /club/profile/avatar/upload` |
+| 上傳橫幅 | `POST /club/profile/banner/upload` |
 | 移除圖片 | `DELETE /club/profile/avatar`、`DELETE /club/profile/banner` |
 
 ## 畫面

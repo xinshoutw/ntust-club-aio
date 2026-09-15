@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
-import { Input, Select } from 'antd'
+import { Button, Input, Select } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import QueryError from '../../components/ui/QueryError'
 import { CLUB_TAGS, RECRUIT_STATUSES } from '../../api/clubProfile'
@@ -75,6 +75,13 @@ export default function ClubDirectoryPage() {
   const [recruit, setRecruit] = useState('')
   useDocumentTitle('社團導覽')
 
+  const clearFilters = () => {
+    setQ('')
+    setAttr('')
+    setTag('')
+    setRecruit('')
+  }
+
   // 全量在手上,搜尋與篩選都在前端做完 —— 再打一次伺服器只是多一次往返
   const rows = useMemo(() => {
     const keyword = q.trim().toLowerCase()
@@ -144,9 +151,16 @@ export default function ClubDirectoryPage() {
               className="card"
               style={{ padding: 48, textAlign: 'center', color: 'var(--steel)' }}
             >
-              {q || attr || tag || recruit
-                ? '沒有符合條件的社團，調整搜尋或篩選再試一次'
-                : '目前沒有公開的社團'}
+              {q || attr || tag || recruit ? (
+                <>
+                  沒有符合條件的社團
+                  <div style={{ marginTop: 16 }}>
+                    <Button onClick={clearFilters}>清除所有篩選</Button>
+                  </div>
+                </>
+              ) : (
+                '目前沒有公開的社團'
+              )}
             </div>
           ) : (
             <div className="dir-grid">

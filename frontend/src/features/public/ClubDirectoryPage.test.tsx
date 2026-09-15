@@ -80,6 +80,14 @@ describe('社團導覽', () => {
     expect(screen.getByText(/沒有符合條件的社團/)).toBeTruthy()
   })
 
+  // 三個下拉一個一個轉回「全部」很煩,空狀態要給得出路
+  test('空狀態的「清除所有篩選」把社團找回來', () => {
+    renderPage()
+    fireEvent.change(screen.getByPlaceholderText('搜尋關鍵字'), { target: { value: '不存在的社團' } })
+    fireEvent.click(screen.getByRole('button', { name: '清除所有篩選' }))
+    expect(shown()).toHaveLength(clubs.length)
+  })
+
   // 校外訪客要能把某個社團的網址複製給別人,搜尋引擎也要爬得到
   test('字卡是連結，網址指到該社團的頁面', () => {
     renderPage()

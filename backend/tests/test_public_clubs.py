@@ -282,3 +282,22 @@ async def test_archived_public_files_are_not_served(client, db):
     await db.commit()
 
     assert (await client.get(f"/api/v1/public/files/{row.id}")).status_code == 404
+
+
+def test_public_images_have_their_own_rate_limit_bucket():
+    """導覽頁一張字卡有頭像+橫幅兩張圖:六十幾個社團首次進站是一秒內一百多個請求。
+
+    與其餘公開端點共用 `zone=public`(60r/m、burst 30)的話,約九成直接 429、
+    整片字卡牆破圖,而 429 不會被快取 —— 桶子以 1r/s 排空,使用者得重整兩分鐘。
+    """
+    import re
+    from pathlib import Path as _Path
+
+    conf = (_Path(__file__).resolve().parents[2] / "frontend" / "nginx.conf").read_text()
+    rates = dict(re.findall(r"limit_req_zone \S+ zone=(\w+):\S+ rate=(\d+)r/m", conf))
+    assert "public_files" in rates, "圖片沒有自己的限流桶"
+    assert int(rates["public_files"]) > int(rates["public"])
+
+    block = re.search(r"location \^~ /api/v1/public/files/ \{(.*?)\n    \}", conf, re.S)
+    assert block, "找不到公開圖片的 location(`^~` 取最長前綴,順序無關)"
+    assert "limit_req zone=public_files" in block[1]

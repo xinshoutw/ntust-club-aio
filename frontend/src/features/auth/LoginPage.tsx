@@ -113,6 +113,10 @@ export default function LoginPage() {
           <Button type="primary" htmlType="submit" loading={submitting} disabled={submitting} style={{ height: 42, marginTop: 4, fontSize: 15 }}>
             登入
           </Button>
+          {/* 首頁是免登入的社團導覽:誤點進登入頁的訪客要有路回去 */}
+          <Button type="link" onClick={() => navigate('/')} style={{ marginTop: -4 }}>
+            返回首頁
+          </Button>
         </form>
       </div>
       <div style={{ marginTop: 28, fontSize: 12, color: 'var(--steel)', display: 'flex', alignItems: 'center', gap: 2 }}>

@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { api, apiPaged, qs } from './client'
 import { fetchAllPages } from './fetchAll'
+import { toPublicProfile, type ClubPublicOut, type ClubPublicProfile } from './clubProfile'
 import type { MemberKind } from '../lib/roles'
 
 export const slashDate = (iso: string): string => dayjs(iso).format('YYYY/MM/DD')
@@ -34,6 +35,10 @@ export interface AdminClubDetail extends AdminClub {
   advisorOutDept: string | null
   advisorOutEmail: string | null
   suspendReason: string | null
+  /** 公開顯示開關(下架閥);與 isActive 是兩個判定 */
+  publicVisible: boolean
+  /** 社團自填的對外公開資料,行政端唯讀 */
+  public: ClubPublicProfile
 }
 
 interface AdminClubOut {
@@ -59,6 +64,8 @@ interface AdminClubDetailOut extends AdminClubOut {
   advisor_out_dept: string | null
   advisor_out_email: string | null
   suspend_reason: string | null
+  public_visible: boolean
+  public: ClubPublicOut
 }
 
 const toClub = (c: AdminClubOut): AdminClub => ({
@@ -85,7 +92,26 @@ const toDetail = (c: AdminClubDetailOut): AdminClubDetail => ({
   advisorOutDept: c.advisor_out_dept,
   advisorOutEmail: c.advisor_out_email,
   suspendReason: c.suspend_reason,
+  publicVisible: c.public_visible,
+  // 公開形狀只有一份定義(api/clubProfile 的 toPublicProfile),兩端共用
+  public: toPublicProfile(c.public),
 })
+
+/** 對外公開資料在行政端是否整段空白(全空時只顯示一句提示,不鋪一排 —) */
+export const hasPublicData = (p: ClubPublicProfile): boolean =>
+  Boolean(
+    p.tagline ||
+      p.tags.length ||
+      p.recruitStatus ||
+      p.publicEmail ||
+      p.instagram ||
+      p.officeLocation ||
+      p.regularSchedule ||
+      p.joinInfo ||
+      p.signupUrl ||
+      p.avatarUrl ||
+      p.bannerUrl,
+  )
 
 export interface AdminMemberParams {
   semester?: string
@@ -274,17 +300,39 @@ export interface AdminClubPatch {
   enName?: string
   username?: string
   isActive?: boolean
+  publicVisible?: boolean
+  /** 關閉公開顯示時必填(後端 422 擋);只寫進稽核軌跡,不入社團主檔 */
+  publicHideReason?: string
 }
 
 export function useAdminClubMutations() {
   const qc = useQueryClient()
   const invalidate = () => void qc.invalidateQueries({ queryKey: adminClubKeys.all })
   const update = useMutation({
-    mutationFn: ({ id, name, kind, attribute, enName, username, isActive }: AdminClubPatch) =>
+    mutationFn: ({
+      id,
+      name,
+      kind,
+      attribute,
+      enName,
+      username,
+      isActive,
+      publicVisible,
+      publicHideReason,
+    }: AdminClubPatch) =>
       api<AdminClubDetailOut>(`/admin/clubs/${id}`, {
         method: 'PATCH',
         // JSON.stringify 會略過 undefined 欄位 → 未變更欄位不送(後端 exclude_unset)
-        body: JSON.stringify({ name, kind, attribute, en_name: enName, username, is_active: isActive }),
+        body: JSON.stringify({
+          name,
+          kind,
+          attribute,
+          en_name: enName,
+          username,
+          is_active: isActive,
+          public_visible: publicVisible,
+          public_hide_reason: publicHideReason,
+        }),
       }).then(toDetail),
     onSuccess: invalidate,
   })

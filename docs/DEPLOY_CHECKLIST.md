@@ -23,8 +23,10 @@
 - [ ] 阻擋 `SECRET_KEY` = `openssl rand -base64 48`
 - [ ] 阻擋 `POSTGRES_PASSWORD` = 強密碼(compose 以同一個變數插值到 db 與 backend)
 - [ ] 阻擋 `FORWARDED_ALLOW_IPS` = `172.28.0.0/24` + edge VM 內網 IP。**絕不可用 `*`**,否則登入限流可被繞過、稽核 IP 可被投毒。值需與內層 web nginx 的 `set_real_ip_from` 一起核對
-- [ ] 應辦 免登入面 `/api/v1/public/*`(借用情形色格圖)確認走得到內層 nginx 的 `limit_req zone=public`(60r/m、burst 30):
-  這組端點沒有帳號可鎖可停權,唯一的節流就在那裡;edge 的台灣 IP 白名單是第二層,不是替代品
+- [ ] 應辦 免登入面 `/api/v1/public/*`(借用情形色格圖、社團導覽)確認走得到內層 nginx 的
+  `limit_req zone=public`(60r/m、burst 30);**圖片另一桶** `zone=public_files`(600r/m、burst 200)——
+  導覽頁一次要一百多張圖,共用一桶會整片破圖。這組端點沒有帳號可鎖可停權,唯一的節流就在那裡;
+  edge 的台灣 IP 白名單是第二層,不是替代品
 - [ ] 應辦 `DISCORD_WEBHOOK_URL`:已是正式頻道。收不屬於任何社團的系統事件(行政手動借用、公告蓋板與刪除、報名場次刪除)與 infra 告警(磁碟水位);**絕不入版控**
 - [ ] 阻擋 `SMTP_*`:校方 relay 已實測可寄(`mail.ntust.edu.tw:465`、`SMTP_SECURITY=ssl`)。
   host / username / password 任一為空即降級 log-only(不報錯,但信不會寄出)。
@@ -73,6 +75,26 @@
 - [ ] 應辦 加 `proxy_request_buffering off`
 - [ ] 應辦 XFF 改覆寫式 `proxy_set_header X-Forwarded-For $remote_addr;` 並補 `X-Forwarded-Proto $scheme`。內層 web nginx 已用 `set_real_ip_from` 還原真實 IP,此項為 defense-in-depth
 - [ ] 待決 台灣 IP 白名單與 `$should_drop` 封鎖 map 沿用現有
+- [ ] **阻擋** 台灣 IP 白名單改成**只套在需要登入的 API 上**,不要列舉要放行的路徑。
+  現況是 `location /` 裡 `include conf.d/taiwan_ips.conf`(結尾 `deny all`),涵蓋
+  每一條路徑;導覽頁一半的價值是給校外看的(新生、家長、交換生、想找社團合作的
+  校外單位),關在白名單裡等於沒做:
+
+  ```nginx
+  location / {                      # SPA 外殼、/assets/*、logo 與 favicon:全放行
+      proxy_pass http://clubs;      # 真正的閘在 API 上,靜態檔擋了只會變成一片空白
+  }
+  location ^~ /api/v1/public/ {     # 公開端點(社團列表、社團頁、公開圖片、借用情形)
+      proxy_pass http://clubs;
+  }
+  location /api/ {                  # 其餘 API 一律要登入 —— 白名單留在這裡
+      include conf.d/taiwan_ips.conf;
+      proxy_pass http://clubs;
+  }
+  ```
+
+  **不要改成逐條列出要放行的頁面**:漏掉 `/assets/<hash>.js` 之類的 bundle,校外
+  訪客會拿到 `index.html` 然後每支 script 403,畫面全白而且**校內測不出來**
 - [ ] 待決 `clubclass.ntust.edu.tw` 是否 307 導向
 - [ ] 上線前演練切換與回滾(回滾 = upstream 改回 `10.140.0.2`)各一次
 
@@ -153,6 +175,14 @@ CI 只在 `main` 推 GHCR 映像,`dev` 分支沒有可 pull 的映像 —— **`
 - **跨過遷移的回滾要先 `alembic downgrade` 再換映像**:舊映像的 `upgrade head` 找不到新 revision,backend 直接起不來
 - 結案期限改天制後固定 30 天/月,月制給的是該月實際天數:切換當下每張單的期限會前後位移(預設 1 個月最多縮短 1 天,設定值越大差越多,6 個月是 4 天),原本剛好在期限邊緣的已核准活動會立刻變成逾期鎖定
 - **`c9a4f1e72d38` 與 `d7b2c85f4a19` 是不可逆的 drop column**(社員電話、指導老師電話,D-21/D-22):部署時 backend 起容器就會自動 `upgrade head`,號碼當場消失。降版只還得回欄位、還不回值 —— 要留底就在升版前另外 dump 一份
+- **`c7b41e9d3a58` 的招生狀態換了整個值域**(`招生中/不定期/暫停招生` → `歡迎加入/暫不開放`),
+  而 `db_enum` 是 VARCHAR + CHECK:SQLAlchemy 讀到值域外的字串是 `LookupError`,Pydantic 擋不住。
+  先上程式後跑遷移,新程式讀到 `招生中` 就是 500;先跑遷移後上程式,舊程式讀到 `歡迎加入` 一樣 500,
+  而且社團導覽現在就是未登入的首頁 —— **遷移與換映像必須在同一次停機內完成**,不要分兩步放著
+- **`c7b41e9d3a58` 也是不可逆的 drop column**(成立年份、橫幅四欄、非 IG 的社群連結):
+  降版還得回欄位、還不回值,`不定期` 併進 `歡迎加入` 之後也分不出來。要留底就在升版前另外 dump 一份
+- **社團橫幅比例由 4:3 改成 3:1**:已落盤的舊橫幅仍是 1600×1200,前端用 3:1 的框去裁會切掉上下。
+  正式庫這批欄位與 HEAD 同日進 repo(應無資料),開發/展示庫要請社團重傳
 - migration 的 enum 欄位用 `native_enum=False, create_constraint=True`,Alembic 於 `add_column` 時會自動補 CHECK。**不要再顯式補**,會 `DuplicateObject`
 - E2E 必須打 web 容器的 `:8080`,直接打 `:8000` 會繞過 nginx 層的上傳上限、登入限流、`auth_request` 與安全標頭
 

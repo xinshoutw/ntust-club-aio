@@ -1,12 +1,32 @@
-// 管理項目 API 層:社團簡介/指導老師/聯絡與通知(GET/PATCH /club/profile)
+// 管理項目 API 層:社團簡介/指導老師/聯絡與通知/對外公開資料(GET/PATCH /club/profile)
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
-import { api } from './client'
+import { API_BASE, api } from './client'
 import { suspendedNow } from '../lib/status'
 
 const slashDate = (iso: string): string => dayjs(iso).format('YYYY/MM/DD')
 
+/** 後端 `schemas/clubs.CLUB_TAGS` 是第一份,改動須同步。社團至多選 3 個。 */
+export const CLUB_TAGS = [
+  '系學會', '技術', '程式', '表演', '音樂', '美術', '遊戲',
+  '聯誼', '服務', '喝酒', '運動', '武術', '戶外', '飲食',
+] as const
+export const MAX_TAGS = 3
+
+/** 後端 `models/enums.RecruitStatus` 是第一份,改動須同步。 */
+export const RECRUIT_STATUSES = ['歡迎加入', '暫不開放', '額滿'] as const
+
+/** 形象圖比例(後端 `services/files.CLUB_IMAGE_SIZES` 是第一份)。
+ *  橫幅的字卡與詳細頁用**同一個**比例,一張圖兩處都不裁切。 */
+export const CLUB_IMAGE_RATIO = { avatar: 1, banner: 3 } as const
+export type ClubImageSlot = keyof typeof CLUB_IMAGE_RATIO
+
+
 export interface ClubProfile {
+  /** 預覽按鈕要用它組 /clubs/:id */
+  id: number
+  /** 唯讀:開關在行政端。社團要知道自己的頁面公不公開,否則預覽只會撞 404 */
+  publicVisible: boolean
   name: string
   /** 社團/學會 */
   kind: string
@@ -25,10 +45,44 @@ export interface ClubProfile {
   /** 停權中才有值(YYYY/MM/DD);社團要看得到自己被停權,而不是送借用撞 403 才知道 */
   suspendedUntil: string | null
   suspendReason: string
+  /** 對外公開資料(社團導覽頁);未填一律空字串/空陣列 */
+  public: ClubPublicProfile
 }
 
-interface ClubProfileOut {
+export interface ClubPublicProfile {
+  tagline: string
+  tags: string[]
+  recruitStatus: string
+  publicEmail: string
+  /** 帳號 ID,不含網址前綴 */
+  instagram: string
+  officeLocation: string
+  regularSchedule: string
+  joinInfo: string
+  signupUrl: string
+  avatarUrl: string | null
+  bannerUrl: string | null
+}
+
+/** 公開欄位的原始形狀。後端的 `ClubPublicOut` 也是巢狀掛在行政端詳情底下,
+ *  兩端共用同一支轉換(`toPublicProfile`)—— 公開範圍只該有一個定義。 */
+export interface ClubPublicOut {
+  tagline: string | null
+  tags: string[]
+  recruit_status: string | null
+  public_email: string | null
+  instagram: string | null
+  office_location: string | null
+  regular_schedule: string | null
+  join_info: string | null
+  signup_url: string | null
+  avatar_file_id: string | null
+  banner_file_id: string | null
+}
+
+interface ClubProfileOut extends ClubPublicOut {
   id: number
+  public_visible: boolean
   name: string
   kind: string
   en_name: string | null
@@ -47,7 +101,26 @@ interface ClubProfileOut {
   suspend_reason: string | null
 }
 
+const imageUrl = (fileId: string | null): string | null =>
+  fileId ? `${API_BASE}/files/${fileId}` : null
+
+export const toPublicProfile = (c: ClubPublicOut): ClubPublicProfile => ({
+  tagline: c.tagline ?? '',
+  tags: c.tags ?? [],
+  recruitStatus: c.recruit_status ?? '',
+  publicEmail: c.public_email ?? '',
+  instagram: c.instagram ?? '',
+  officeLocation: c.office_location ?? '',
+  regularSchedule: c.regular_schedule ?? '',
+  joinInfo: c.join_info ?? '',
+  signupUrl: c.signup_url ?? '',
+  avatarUrl: imageUrl(c.avatar_file_id),
+  bannerUrl: imageUrl(c.banner_file_id),
+})
+
 const toProfile = (c: ClubProfileOut): ClubProfile => ({
+  id: c.id,
+  publicVisible: c.public_visible,
   name: c.name,
   kind: c.kind,
   enName: c.en_name ?? '',
@@ -63,6 +136,7 @@ const toProfile = (c: ClubProfileOut): ClubProfile => ({
   advisorOutEmail: c.advisor_out_email ?? '',
   suspendedUntil: c.suspended_until ? slashDate(c.suspended_until) : null,
   suspendReason: c.suspend_reason ?? '',
+  public: toPublicProfile(c),
 })
 
 export const clubProfileKeys = { profile: ['club-profile'] as const }
@@ -109,6 +183,17 @@ export interface ClubProfileInput {
   advisorOutName: string
   advisorOutDept: string
   advisorOutEmail: string
+  // 對外公開資料
+  tagline: string
+  tags: string[]
+  recruitStatus: string
+  publicEmail: string
+  /** 帳號 ID,不含網址前綴 */
+  instagram: string
+  officeLocation: string
+  regularSchedule: string
+  joinInfo: string
+  signupUrl: string
 }
 
 export function useUpdateClubProfile() {
@@ -129,9 +214,78 @@ export function useUpdateClubProfile() {
           advisor_out_name: b.advisorOutName.trim() || null,
           advisor_out_dept: b.advisorOutDept.trim() || null,
           advisor_out_email: b.advisorOutEmail.trim() || null,
+          tagline: b.tagline.trim() || null,
+          tags: b.tags,
+          recruit_status: b.recruitStatus || null,
+          public_email: b.publicEmail.trim() || null,
+          instagram: b.instagram.trim() || null,
+          office_location: b.officeLocation.trim() || null,
+          regular_schedule: b.regularSchedule.trim() || null,
+          join_info: b.joinInfo.trim() || null,
+          signup_url: b.signupUrl.trim() || null,
         }),
       }).then(toProfile),
     // 儲存成功即以 server 回傳值為新基準
-    onSuccess: (data) => qc.setQueryData(clubProfileKeys.profile, data),
+    onSuccess: (data) => qc.setQueryData(clubProfileKeys.profile, keepImages(data)),
+  })
+}
+
+
+/** 三支 mutation 共用同一份快取,但各自只擁有一部分欄位。
+ *
+ *  整份覆蓋的話,並發時後回的那一份會把先回的蓋掉:表單儲存中順手換了頭像,
+ *  PATCH 的回應(它的 body 根本不含形象圖)會把剛上傳好的圖打回舊值,畫面上圖就消失了,
+ *  要等下次重抓才回來。上傳與移除只動兩個圖欄位,PATCH 只動圖以外的。
+ */
+const IMAGE_FIELD = { avatar: 'avatarUrl', banner: 'bannerUrl' } as const
+
+const mergeImage =
+  (slot: ClubImageSlot, next: ClubProfile) =>
+  (prev: ClubProfile | undefined): ClubProfile => {
+    if (!prev) return next
+    // **只寫自己那一格**:頭像與橫幅是兩個 ImagePicker、兩個 mutation 實例,同時換兩張
+    // 圖時兩份回應都帶著完整的 profile,後回的那份會把先回的另一格打回舊值
+    const field = IMAGE_FIELD[slot]
+    return { ...prev, public: { ...prev.public, [field]: next.public[field] } }
+  }
+
+const keepImages =
+  (next: ClubProfile) =>
+  (prev: ClubProfile | undefined): ClubProfile =>
+    prev
+      ? {
+          ...next,
+          public: {
+            ...next.public,
+            avatarUrl: prev.public.avatarUrl,
+            bannerUrl: prev.public.bannerUrl,
+          },
+        }
+      : next
+
+
+// ---- 形象圖:選檔即上傳,不隨表單儲存(要有預覽可看,壓進 PATCH 就得先傳暫存檔再綁定)----
+
+export function useUploadClubImage() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ slot, file }: { slot: ClubImageSlot; file: File }) => {
+      const fd = new FormData()
+      fd.append('file', file)
+      return api<ClubProfileOut>(`/club/profile/${slot}/upload`, { method: 'POST', body: fd }).then(
+        toProfile,
+      )
+    },
+    onSuccess: (data, { slot }) =>
+      qc.setQueryData(clubProfileKeys.profile, mergeImage(slot, data)),
+  })
+}
+
+export function useRemoveClubImage() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (slot: ClubImageSlot) =>
+      api<ClubProfileOut>(`/club/profile/${slot}`, { method: 'DELETE' }).then(toProfile),
+    onSuccess: (data, slot) => qc.setQueryData(clubProfileKeys.profile, mergeImage(slot, data)),
   })
 }

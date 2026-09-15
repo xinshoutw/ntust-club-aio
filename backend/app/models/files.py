@@ -47,3 +47,6 @@ class File(Base, TimestampMixin):
     sha256: Mapped[str] = mapped_column(sa.Text)  # 評鑑照片以此拒重複(後端驗證)
     path: Mapped[str] = mapped_column(sa.Text)  # {module}/{YYYY}/{MM}/{uuid}
     archived_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+    # 免登入取得(社團形象圖)。can_access() 的四種角色判定管不到匿名 ——
+    # 「公開」必須是檔案自己的屬性,在權限函式裡多開一個匿名分支遲早被下一個 case 漏掉
+    public: Mapped[bool] = mapped_column(default=False, server_default=sa.false())

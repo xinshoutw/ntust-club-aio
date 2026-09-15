@@ -214,6 +214,16 @@
   .topbar-user {
     display: none;
   }
+  /* 社團導覽收成圖示鈕:四個字加圖示會把頁名擠掉。整顆不隱藏 ——
+     抽屜的側欄沒有這一項,藏掉等於手機上沒有入口(aria-label 仍在)。
+     只藏自己那顆 span,不要去猜 AntD 的內部結構:圖示包在 `.ant-btn-icon` 裡
+     而不是 `.anticon`,用 `:not(.anticon)` 會把圖示一起藏掉,剩一顆空按鈕 */
+  .topbar-directory-label {
+    display: none;
+  }
+  .topbar-directory {
+    padding-inline: 10px;
+  }
   .topbar-mobile-title {
     display: block;
   }

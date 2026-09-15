@@ -1,17 +1,20 @@
 import { useState } from 'react'
 import { App, Button, Form, Input } from 'antd'
+import { confirmDialog } from '../../lib/confirm'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import SuspensionNote from '../../components/ui/SuspensionNote'
-import { useAuth } from '../../app/auth'
 import { useUnsavedGuard } from '../../app/unsaved'
-import { changePasswordApi } from '../../api/auth'
 import { useClubProfile, useUpdateClubProfile, type ClubProfile } from '../../api/clubProfile'
-import { fromProfile, profileChanged, type SettingsValues } from './fields'
-
-// 密碼政策(與後端一致):≥10 碼且含大小寫、數字、特殊符號
-const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,}$/
+import PublicSection from './PublicSection'
+import {
+  fromProfile,
+  normalizeValue,
+  profileChanged,
+  toProfileInput,
+  type SettingsValues,
+} from './fields'
 
 const sectionTitle: React.CSSProperties = { fontSize: 16, fontWeight: 600, marginBottom: 16 }
 
@@ -41,8 +44,7 @@ export default function ClubSettingsPage() {
 
 // 全頁單一表單:被修改的欄位以橘黃外框標示(.field-dirty),右下角統一儲存
 function SettingsForm({ profile }: { profile: ClubProfile }) {
-  const { refresh } = useAuth()
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const update = useUpdateClubProfile()
   const [form] = Form.useForm<SettingsValues>()
   const [saved, setSaved] = useState<SettingsValues>(() => fromProfile(profile))
@@ -54,17 +56,33 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
   const recomputeDirty = (baseline: SettingsValues = saved) => {
     const cur = form.getFieldsValue(true) as SettingsValues
     const keys = (Object.keys(baseline) as (keyof SettingsValues)[]).filter(
-      (k) => (cur[k] ?? '') !== (baseline[k] ?? ''),
+      // 標籤是陣列、黑化程度是數字:`?? ''` 比不出差異(見 fields.normalizeValue)
+      (k) => normalizeValue(cur[k]) !== normalizeValue(baseline[k]),
     )
     setDirty(new Set(keys))
   }
 
   const itemClass = (k: keyof SettingsValues) => (dirty.has(k) ? 'field-dirty' : undefined)
 
-  // 網頁連結與簡介必填(D-19),但只在**這次真的要存 profile** 時擋:
-  // 密碼是同一張表單裡的另一支 API,而遷入的社團有一批簡介是空字串、網頁連結是 NULL
-  // (`migration/cms_import.py`)—— 讓那些社團連改個密碼都送不出去,不是這條必填要做的事。
-  // 一旦動到 profile 的任何一欄,這兩欄就得補齊
+  // 預覽開的是公開頁,看到的是**已儲存**的內容 —— 有未存變更時先講清楚
+  const previewPublicPage = () => {
+    const open = () => window.open(`/clubs/${profile.id}`, '_blank', 'noopener')
+    if (dirty.size === 0) {
+      open()
+      return
+    }
+    confirmDialog(modal, {
+      title: '尚有未儲存的變更',
+      content: '預覽顯示的是已儲存的內容，未儲存的修改不會出現',
+      okText: '仍要預覽',
+      cancelText: '取消',
+      onOk: open,
+    })
+  }
+
+  // 網頁連結與詳細介紹必填(D-19),但只在**這次真的要存 profile** 時擋:遷入的社團
+  // 有一批簡介是空字串、網頁連結是 NULL(`migration/cms_import.py`),開頁就擋等於那些
+  // 社團什麼都動不了。一旦動到 profile 的任何一欄,這兩欄就得補齊
   const requiredOnProfileSave = (msg: string) => ({
     validator: (_: unknown, v: string | undefined) => {
       const cur = form.getFieldsValue(true) as SettingsValues
@@ -73,36 +91,24 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
   })
 
   const onFinish = async (v: SettingsValues) => {
-    const changingPw = !!(v.pwCurrent || v.pwNew || v.pwConfirm)
-    const changingProfile = profileChanged(v, saved)
+    if (!profileChanged(v, saved)) {
+      // 一個請求都沒送就說「已儲存」,會讓「真的存了」與「根本沒送」長得一模一樣
+      message.info('沒有變更')
+      recomputeDirty()
+      return
+    }
     let baseline = saved
     setSaving(true)
     try {
-      if (changingProfile) {
-        const next = await update.mutateAsync({
-          intro: v.intro ?? '',
-          url: v.url ?? '',
-          emails: [v.email1, v.email2 ?? '', v.email3 ?? ''],
-          discordWebhook: v.discordWebhook ?? '',
-          advisorName: v.advisorName,
-          advisorDept: v.advisorDept ?? '',
-          advisorEmail: v.advisorEmail ?? '',
-          advisorOutName: v.advisorOutName ?? '',
-          advisorOutDept: v.advisorOutDept ?? '',
-          advisorOutEmail: v.advisorOutEmail ?? '',
-        })
-        baseline = fromProfile(next)
-        setSaved(baseline)
-      }
-      if (changingPw) {
-        await changePasswordApi(v.pwCurrent ?? '', v.pwNew ?? '')
-        form.setFieldsValue({ pwCurrent: '', pwNew: '', pwConfirm: '' })
-        // 首登強制改密等使用者旗標可能變動,原地更新 auth context
-        void refresh()
-      }
-      message.success(changingPw ? '已儲存設定，密碼已更新' : '設定已儲存')
+      const next = await update.mutateAsync(toProfileInput(v))
+      baseline = fromProfile(next)
+      setSaved(baseline)
+      // 欄位要跟著回填:後端會正規化(instagram 取出帳號、主檔外的標籤丟掉、
+      // 空白收成 null),不回填的話畫面上留著的是送出去的原始輸入,而基準已經
+      // 前移 —— dirty 判定從此永遠為真,橘框不消、離頁一直被攔,資料其實早就存好了
+      form.setFieldsValue(baseline)
+      message.success('設定已儲存')
     } catch (e) {
-      // 簡介儲存成功、密碼失敗時:簡介基準已前移,僅密碼欄維持 dirty
       message.error(e instanceof Error ? e.message : '儲存失敗')
     } finally {
       setSaving(false)
@@ -126,7 +132,7 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
         }}
         requiredMark
       >
-        {/* 指導老師與社團簡介並排 */}
+        {/* 指導老師與內部聯絡設定並排 */}
         <div className="form-grid-2" style={{ marginTop: 20, alignItems: 'stretch' }}>
           <div className="card" style={{ padding: 24 }}>
             <div style={sectionTitle}>指導老師</div>
@@ -177,43 +183,7 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
           </div>
 
           <div className="card" style={{ padding: 24 }}>
-            <div style={sectionTitle}>社團簡介</div>
-            <Form.Item label="社團名稱">
-              <Input readOnly value={profile.name} style={{ background: 'var(--paper)' }} />
-            </Form.Item>
-            {/* 英文名稱與社團名稱同樣由學務處維護(行政端管理項目),社團端唯讀 */}
-            <Form.Item label="英文名稱">
-              <Input readOnly value={profile.enName} placeholder="尚未設定" style={{ background: 'var(--paper)' }} />
-            </Form.Item>
-            <Form.Item
-              name="url"
-              label="社團網頁連結"
-              className={itemClass('url')}
-              required // 必填的星號:規則是自訂 validator,AntD 推導不出來
-              rules={[
-                requiredOnProfileSave('請填寫社團網頁連結'),
-                { type: 'url', message: '網址格式不正確' },
-              ]}
-            >
-              <Input placeholder="https://" />
-            </Form.Item>
-            <Form.Item
-              name="intro"
-              label="簡介"
-              className={itemClass('intro')}
-              required
-              rules={[requiredOnProfileSave('請填寫社團簡介')]}
-              style={{ marginBottom: 0 }}
-            >
-              <Input.TextArea rows={3} placeholder="社團宗旨、特色" />
-            </Form.Item>
-          </div>
-        </div>
-
-        {/* 聯絡與通知、更換密碼並排 */}
-        <div className="form-grid-2" style={{ marginTop: 16, alignItems: 'stretch' }}>
-          <div className="card" style={{ padding: 24 }}>
-            <div style={sectionTitle}>聯絡與通知</div>
+            <div style={sectionTitle}>內部聯絡與通知</div>
             <Form.Item
               name="email1"
               label="聯絡通知信箱"
@@ -254,65 +224,18 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
               <Input placeholder="https://discord.com/api/webhooks/…" />
             </Form.Item>
           </div>
-
-          <div className="card" style={{ padding: 24 }}>
-            <div style={sectionTitle}>更換密碼</div>
-            <Form.Item
-              name="pwCurrent"
-              label="目前密碼"
-              className={itemClass('pwCurrent')}
-              dependencies={['pwNew']}
-              rules={[
-                ({ getFieldValue }) => ({
-                  validator: (_, v: string) =>
-                    !v && getFieldValue('pwNew') ? Promise.reject(new Error('請輸入目前密碼')) : Promise.resolve(),
-                }),
-              ]}
-            >
-              <Input.Password autoComplete="current-password" />
-            </Form.Item>
-            <Form.Item
-              name="pwNew"
-              label="新密碼"
-              className={itemClass('pwNew')}
-              dependencies={['pwCurrent']}
-              rules={[
-                ({ getFieldValue }) => ({
-                  validator: (_, v: string) => {
-                    if (!v) {
-                      return getFieldValue('pwCurrent')
-                        ? Promise.reject(new Error('請輸入新密碼'))
-                        : Promise.resolve()
-                    }
-                    return PASSWORD_RULE.test(v)
-                      ? Promise.resolve()
-                      : Promise.reject(new Error('新密碼含大小寫字母、數字與特殊符號，長度至少 10 碼'))
-                  },
-                }),
-              ]}
-            >
-              <Input.Password autoComplete="new-password" />
-            </Form.Item>
-            <Form.Item
-              name="pwConfirm"
-              label="確認新密碼"
-              className={itemClass('pwConfirm')}
-              dependencies={['pwNew']}
-              rules={[
-                ({ getFieldValue }) => ({
-                  validator: (_, v: string) => {
-                    const pwNew = getFieldValue('pwNew')
-                    if (!pwNew && !v) return Promise.resolve()
-                    return v === pwNew ? Promise.resolve() : Promise.reject(new Error('兩次輸入的新密碼不一致'))
-                  },
-                }),
-              ]}
-              style={{ marginBottom: 8 }}
-            >
-              <Input.Password autoComplete="new-password" />
-            </Form.Item>
-          </div>
         </div>
+
+        {/* 對外公開資料:唯一會被校外看到的一段,獨立成全寬區塊擺在對內設定之下 */}
+        <PublicSection
+          image={profile.public}
+          name={profile.name}
+          enName={profile.enName}
+          itemClass={itemClass}
+          onPreview={previewPublicPage}
+          publicVisible={profile.publicVisible}
+          requiredOnSave={requiredOnProfileSave}
+        />
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 16 }}>
           {dirty.size > 0 && (

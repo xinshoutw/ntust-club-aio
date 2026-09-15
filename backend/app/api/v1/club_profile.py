@@ -2,8 +2,10 @@
 
 from pathlib import Path
 
+import sqlalchemy as sa
 from fastapi import APIRouter, Request, UploadFile
 
+from app.core.config import settings
 from app.core.deps import ClubUser, DbDep, client_ip
 from app.core.errors import not_found, validation_error
 from app.models import Club, File
@@ -18,8 +20,17 @@ router = APIRouter(prefix="/club/profile", tags=["club"])
 _IMAGE_FIELDS = {"avatar": "avatar_file_id", "banner": "banner_file_id"}
 
 
-async def _own_club(db: DbDep, user) -> Club:
-    club = await db.get(Club, user.club_id)
+async def _own_club(db: DbDep, user, *, lock: bool = False) -> Club:
+    """`lock=True` 供換圖用:同一個 slot 的並發上傳/移除在此序列化。
+
+    不鎖的話兩個請求會讀到同一個舊 file id,各自去刪同一列,後到的那個在 flush 時
+    配到 0 列 → SQLAlchemy `StaleDataError`,而它不是 `IntegrityError`,
+    全域 handler 接不住 → 500。`clubs` 是這條交易第一個取用的表,鎖序不變。
+    """
+    if lock:
+        club = await db.scalar(sa.select(Club).where(Club.id == user.club_id).with_for_update())
+    else:
+        club = await db.get(Club, user.club_id)
     if club is None or not club.is_active:
         raise not_found("找不到社團資料")
     return club
@@ -60,7 +71,7 @@ async def _replace_image(
     舊檔一律刪掉不留版本 —— 形象圖沒有歷史價值,留著只是無人管理的磁碟佔用。
     磁碟 unlink 排在 commit 之後:反過來的話 rollback 會留下「DB 有列、磁碟無檔」。
     """
-    club = await _own_club(db, user)
+    club = await _own_club(db, user, lock=True)
     field = _IMAGE_FIELDS[slot]
     old_id = getattr(club, field)
 
@@ -79,11 +90,14 @@ async def _replace_image(
 
     stale: Path | None = None
     if old_id is not None:
-        old = await db.get(File, old_id)
-        if old is not None:
-            # 先解掉 clubs 的參照再刪列(FK 是 SET NULL,但同交易內順序要自己顧)
-            await db.flush()
-            stale = await file_service.delete_file(db, old)
+        # 先解掉 clubs 的參照再刪列(FK 是 SET NULL,但同交易內順序要自己顧)
+        await db.flush()
+        # Core 刪除而不是 ORM 的 `db.delete`:配到 0 列即無事,不會丟 StaleDataError。
+        # 上面的列鎖已經擋掉並發,這裡是第二道 —— 刪一個已經不在的檔案本來就不是錯誤
+        old_path = await db.scalar(sa.select(File.path).where(File.id == old_id))
+        if old_path is not None:
+            await db.execute(sa.delete(File).where(File.id == old_id))
+            stale = Path(settings.upload_dir) / old_path
 
     audit.record(
         db,

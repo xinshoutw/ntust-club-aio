@@ -439,3 +439,24 @@ def test_fit_webp_never_touches_the_source_file():
             assert out.format == "WEBP"
             assert out.size == (256, 256)
         assert luma > 128  # 淺色來源 → 深色字
+
+
+async def test_removing_an_image_twice_is_not_an_error(client, db):
+    """換圖與移除在 `clubs` 上取列鎖序列化,刪舊檔走 Core(配到 0 列即無事)。
+
+    用 ORM 的 `db.delete` 的話,後到的請求在 flush 時會丟 `StaleDataError` ——
+    那不是 `IntegrityError`,全域 handler 接不住,使用者拿到的是 500。
+    """
+    club = await make_club(db)
+    await make_user(db, username="club01", club_id=club.id)
+    await login(client, "club01")
+
+    await client.post(
+        "/api/v1/club/profile/avatar/upload",
+        files={"file": ("a.png", png_bytes(300, 300), "image/png")},
+        headers=csrf_headers(client),
+    )
+    first = await client.delete("/api/v1/club/profile/avatar", headers=csrf_headers(client))
+    second = await client.delete("/api/v1/club/profile/avatar", headers=csrf_headers(client))
+    assert (first.status_code, second.status_code) == (200, 200)
+    assert second.json()["data"]["avatar_file_id"] is None

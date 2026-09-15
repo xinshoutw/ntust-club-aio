@@ -32,7 +32,6 @@
 |---|---|---|
 | GAP-14 | 統計與匯出 | 社團活動統計、競賽資料完成度、經費稽核明細、xlsx 匯出全部沒做 |
 | GAP-15 | 待審申請彙整 | 幹部證明與郵局異動已各自成頁(D-11),社團總覽也把單一社團的活動/報修/借用併看了,但沒有一頁**跨社團**把待審件併起來 |
-| GAP-16 | 社團導覽頁 | **資料層與填寫介面已完成**:`clubs` 公開欄位、形象圖上傳、`files.public`、社團端「對外公開資料」區塊、行政端唯讀顯示與下架開關都在。**餵它們的端點也完成了**(`GET /public/clubs`、`/public/clubs/{id}`、`/public/clubs/{id}/activities`、`GET /public/files/{id}`)。缺的只有 `/clubs` 與 `/clubs/:id` 兩頁前端 —— 規格已定案,見 [spec/shared/club-directory.md](spec/shared/club-directory.md) 與 [club-detail.md](spec/shared/club-detail.md)。上線前另須把這兩條路徑排除在 edge 的台灣 IP 白名單外(`../../nginx`) |
 | GAP-21 | 社團相簿 | 公開圖片目前只有頭像與橫幅各一張,多張照片的相簿未做 |
 | GAP-22 | 活動公開行事曆 | 單一社團的活動列表在詳細頁規格內;全校活動總覽與 `.ics` 訂閱未做 |
 | GAP-17 | 公開頁 | 舊系統的公開頁三件套退役後直接 404(網域是復用的)。**已定案暫緩**,其餘完成後再議 |

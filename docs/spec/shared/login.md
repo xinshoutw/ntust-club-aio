@@ -4,7 +4,7 @@
 
 ## 用途
 
-唯一入口。未登入的 `/` 是借用情形的公開預覽([shared/public-home.md](public-home.md)),右上角登入鈕進本頁;其餘社團路徑仍直接導向這裡。
+唯一入口。未登入的 `/` 是借用情形的公開預覽([shared/public-availability.md](public-availability.md)),右上角登入鈕進本頁;其餘社團路徑仍直接導向這裡。
 
 ## 資料來源
 
@@ -25,6 +25,8 @@
 **面板未開放頁**:`homeOf()` 對未知角色的落點,只有姓名與登出鈕。四種角色現皆有面板,實際到不了。
 
 ## 規則
+
+- 登入鈕下方有「返回首頁」:首頁是免登入的社團導覽,誤點進來的訪客要有路回去
 
 - 登入成功後依 `mustChangePassword` 導向 `/change-password`,否則導向 `homeOf(role)`:`admin`→`/admin`、`club`→`/`、`staff`→`/pt`、`viewer`→`/viewer`
 - 未改密時後端 `get_current_user` 對所有業務端點回 403 `PASSWORD_CHANGE_REQUIRED`,只放行 `/auth/me`、改密、登出

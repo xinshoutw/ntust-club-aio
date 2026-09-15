@@ -1,9 +1,6 @@
 # 社團詳細
 
-`/clubs/:id`(免登入) · `features/public/ClubDetailPage.tsx`
-
-> **前端未實作**(GAP-16)。資料層、社團端填寫介面與**下列端點都已完成**,
-> 缺的只有這一頁本身。
+`/clubs/:clubId`(免登入) · `features/public/ClubDetailPage.tsx`
 
 ## 用途
 
@@ -19,13 +16,17 @@
 
 ## 畫面
 
-- 英雄區:橫幅為背景(套 `banner_dim` 黑化與 `banner_blur` 模糊),其上為頭像、社團名稱、英文名稱、一句話介紹、性質 pill、招生狀態 pill、標籤
-- 介紹卡:社團簡介全文、成立年份、社辦位置、例行活動時間
-- 聯絡卡:社團網頁、社群連結(IG / Facebook / Discord / YouTube / Line / 其他)、對外聯絡信箱
-- 入社卡:入社方式與社費說明、報名連結按鈕。三欄皆空時整張卡不出現
-- 活動列表:表格,欄位為日期、活動名稱、地點、類型。端點另帶起訖日與起訖時間(`end_date`、
-  `start_time`、`end_time`)與 `is_large`,畫不畫由版面決定;**`start_time`/`end_time` 會是 null**
-  (只填日期不填時間的活動),照全站慣例畫成 `—`,不可以 `?? '00:00'`
+- 橫幅:3:1 的圖,**上面不壓任何文字**
+- 標題卡:**方形頭像撐滿整張卡的高**(`align-self: stretch` + `aspect-ratio: 1`,上限 148px;
+  560px 以下退回固定 72px,免得長社名把頭像撐爆),右側依序為社團名稱、英文名稱、一句話介紹、
+  性質與標籤,**招生狀態靠這張卡的右上角**
+- 兩欄:左為介紹卡(社團簡介全文、社辦位置、例行活動時間),右為聯絡卡(Email、Instagram、
+  社團網頁)與入社卡(入社方式與社費、報名連結)。**左欄那張卡的高度吃滿右欄兩張卡疊起來的高**
+  (grid 預設 stretch + `flex: 1`);760px 以下改單欄
+- 活動紀錄:**全寬**,放在兩欄下面。欄位為日期、時間、活動名稱、地點,**日期與時間各自一欄且
+  `white-space: nowrap`**。端點另帶 `is_large` 與 `type`,畫面不顯示;
+  **`start_time`/`end_time` 會是 null**(只填日期不填時間的活動),照全站慣例畫成 `—`,
+  不可以 `?? '00:00'`
 
 ## 規則
 
@@ -38,7 +39,8 @@
 - 社團不公開時**連活動都查不到**:`/public/clubs/{id}/activities` 先驗社團再查活動,
   否則下架的社團仍可由活動端點反推存在
 - 對外聯絡信箱是 `public_email`,**不是 `contact_emails`** —— 那三組是公告通知的收件人,屬內部設定
+- Instagram **只顯示帳號**(`@ntust_dance`),不顯示 `instagram.com/` 前綴;庫裡存的也是純 ID
 - 指導老師(`advisor_*`)、幹部與社員名單、停權狀態、Discord webhook 一律不出現在任何公開端點
 - 每一列帶 `id`:前端不顯示單號(design-guide §6),但列表要一個穩定的 key —— 同日同名的
   兩場活動拿「日期+名稱」當 key 會互撞
-- 詳細頁的英雄區是單張大圖,`banner_blur` 在這裡才生效(字卡牆只吃黑化,見 [club-directory.md](club-directory.md))
+- 橫幅與字卡用同一個比例(3:1),兩邊都不裁切,見 [club-directory.md](club-directory.md)

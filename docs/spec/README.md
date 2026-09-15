@@ -21,9 +21,9 @@
 
 | 檔 | 內容 |
 |---|---|
-| [shared/public-home.md](shared/public-home.md) | 未登入首頁(`/`):借用情形公開預覽 |
-| [shared/club-directory.md](shared/club-directory.md) | 社團導覽(`/clubs`,免登入;前端未實作) |
-| [shared/club-detail.md](shared/club-detail.md) | 社團詳細(`/clubs/:id`,免登入;前端未實作) |
+| [shared/club-directory.md](shared/club-directory.md) | 社團導覽(未登入的 `/` 與 `/clubs`,免登入) |
+| [shared/club-detail.md](shared/club-detail.md) | 社團詳細(`/clubs/:clubId`,免登入) |
+| [shared/public-availability.md](shared/public-availability.md) | 借用情形(`/availability`,免登入) |
 | [shared/login.md](shared/login.md) | 登入、強制改密、面板未開放 |
 | [shared/shell.md](shared/shell.md) | 外殼、側欄、通知鈴鐺、蓋板公告、未存檔守衛、權限閘 |
 
@@ -31,7 +31,7 @@
 
 | 頁 | 路由 |
 |---|---|
-| [club/overview.md](club/overview.md) | `/`(登入中的社團;未登入見 shared/public-home.md) |
+| [club/overview.md](club/overview.md) | `/`(登入中的社團;未登入見 shared/public-availability.md) |
 | [club/activity-form.md](club/activity-form.md) | `/activities/new`、`/activities/:id/edit` |
 | [club/activity-close.md](club/activity-close.md) | `/activities/close` |
 | [club/activity-list.md](club/activity-list.md) | `/activities` |

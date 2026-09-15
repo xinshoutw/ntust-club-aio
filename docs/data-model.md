@@ -116,28 +116,24 @@ erDiagram
 | is_active | bool | 退社/未立案=停用 |
 | announcements_read_at | timestamptz NULL | 公告已讀水位線:`created_at` 晚於此者為未讀。一社一帳號故掛在 club |
 
-**clubs 的對外公開欄位**(社團自填,出現在免登入的社團導覽頁;前端未實作見 GAP-16)
+**clubs 的對外公開欄位**(社團自填,出現在免登入的社團導覽頁)
 
 | 欄位 | 型別 | 說明 |
 |---|---|---|
 | public_visible | bool | **行政端下架閥**,預設 true。關掉即該社從所有公開端點消失;與 `is_active` 是兩個判定 |
 | tagline | text NULL | 一句話介紹(≤40),字卡上放不下 `intro` |
-| tags | text[] | 自由填、至多 5 個、每個 ≤8 字。**沒有標籤主檔** —— 篩選取現有標籤的出現次數前 12 名,建主檔要換一整個 CRUD 頁面 |
-| recruit_status | enum(招生中,額滿,不定期,暫停招生) NULL | NULL=未設定,公開頁不顯示 |
+| tags | text[] | **固定主檔**(`schemas/clubs.CLUB_TAGS`,14 個),至多 3 個。自由填寫會讓導覽頁的篩選長歪:同一件事三種寫法,篩選器列不完也對不起來 |
+| recruit_status | enum(歡迎加入,暫不開放,額滿) NULL | NULL=未設定,公開頁不顯示 |
 | public_email | text NULL | 對外窗口。**與 `contact_emails` 是兩回事**,那三組是公告通知收件人 |
-| social_links | jsonb | `[{kind,url}]` 至多 6;kind ∈ instagram/facebook/discord/youtube/line/other。`website_url` 一欄不夠用,社團主戰場是 IG |
+| instagram | text NULL | **只存帳號 ID**(不含網址前綴);貼整串網址或帶 `@` 由 schema 正規化。其餘平台實測沒人填 |
 | office_location | text NULL | 社辦位置(≤50) |
 | regular_schedule | text NULL | 例行社課/練習時間地點(≤200) |
 | join_info | text NULL | 入社方式與社費(≤500) |
 | signup_url | text NULL | 報名連結 |
-| founded_year | int NULL | 成立年份(西元) |
 | avatar_file_id | FK files NULL | 頭像 1:1 |
-| banner_file_id | FK files NULL | 橫幅 4:3 |
-| banner_dim / banner_blur | smallint 0–100 | 黑化與模糊**程度**;顯示參數,不燒進圖片 |
-| banner_text_mode | enum(auto,light,dark) | `auto` 依 `banner_luma` 推導,不存推導值 |
-| banner_luma | smallint NULL | 橫幅**下三分之一**平均亮度 0–255,上傳時算一次。字通常壓在底部,取全圖平均會判錯 |
+| banner_file_id | FK files NULL | 橫幅 3:1 |
 
-形象圖走 `IMAGE` 上傳政策(10MB 內),但**一律轉成 WebP 並縮到目標尺寸後才落盤**(頭像 512×512、橫幅 1600×1200),原圖不留;比例不合由 `ImageOps.fit` 置中裁切。`files.club_id` 刻意留 NULL —— 形象圖不計入社團儲存配額,社團不該為了傳結案照片刪掉自己的橫幅。
+形象圖走 `IMAGE` 上傳政策(10MB 內),但**一律轉成 WebP 並縮到目標尺寸後才落盤**(頭像 512×512、橫幅 1800×600),原圖不留;比例不合由 `ImageOps.fit` 置中裁切。**橫幅上不壓任何文字**,字卡與詳細頁用同一個 3:1 比例,兩邊都不裁切 —— 因此沒有黑化、模糊與字色判定這回事(設計定案時一併移除)。沒傳橫幅的社團由前端以社團 id 當種子生預設圖,不存檔也不佔配額。`files.club_id` 刻意留 NULL —— 形象圖不計入社團儲存配額,社團不該為了傳結案照片刪掉自己的橫幅。
 
 社長不另設欄位,由 `club_members`(kind=負責人)推導;逾期次數同理由 `equipment_loans` 推導 —— 雙寫必然漂移。
 

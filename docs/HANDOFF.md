@@ -10,21 +10,13 @@
 
 接下來挑一整條線做(評鑑鏈最大),或先清上線檢查表的阻擋項。
 
-**進行中的分支 `feat/club-directory`**:社團對外公開資料的**資料層與填寫介面已完成** ——
-`clubs` 的公開欄位、形象圖上傳(轉 WebP、亮度判字色)、`files.public`、社團端
-「對外公開資料」全寬區塊、行政端兩頁的唯讀呈現與公開顯示開關,遷移 `a3f7c9e15b84`。
-規格在 `spec/shared/club-directory.md` 與 `club-detail.md`。
+**分支 `feat/club-directory` 已完成整條線**:`clubs` 的對外公開欄位、形象圖上傳
+(轉 3:1 WebP)、`files.public`、社團端「對外公開資料」區塊、行政端唯讀與下架開關、
+四支公開端點,以及 `/`(社團導覽)、`/clubs/:clubId`、`/availability` 三頁前端。
+規格在 `spec/shared/club-directory.md`、`club-detail.md`、`public-availability.md`。
 
-**端點也完成了**:`GET /public/clubs`、`/public/clubs/{id}`、`/public/clubs/{id}/activities`
-(公開活動=`approved` / `closing_pending_advisor` / `closed`,不另設勾選)、
-`GET /public/files/{id}`(只放行 `files.public`,長快取)。公開範圍的唯一白名單在
-`backend/app/schemas/public.py`。
-
-**這條線還沒做的**(GAP-16 剩下的部分):
-
-1. `/clubs` 與 `/clubs/:id` 兩頁前端 —— 畫面與規則見兩份 spec
-2. 上線前把這兩條路徑與 `/api/v1/public/clubs*`、`/api/v1/public/files/*` 排除在 edge 的
-   台灣 IP 白名單外(`../../nginx`)—— 導覽頁一半的價值是給校外看的
+**上線前還要做一件事**:把 `/`、`/clubs*`、`/api/v1/public/clubs*`、`/api/v1/public/files/*`
+排除在 edge 的台灣 IP 白名單外(`../../nginx`)—— 導覽頁一半的價值是給校外看的。
 
 ## 接下來做什麼
 
@@ -61,7 +53,7 @@ DEC-01:這學年評鑑在新系統跑,但學年末才用 —— 不擋上線。
 | ISS-95 / ISS-96 | 徽章與評鑑卡導向的頁面看不到它們數的東西;要先讓 `/club/activities` 收「全部學期」 |
 | ISS-67 / GAP-18 | 行政/工讀生/評審端的站內鈴鐺永遠是空的(Discord 事件已補齊) |
 | GAP-03 | 全校評分進度總表 —— 行政端「我負責的評分」看的是自己被指派的分組,管理員沒被指派就是空的 |
-| GAP-14 / GAP-16 / GAP-17 | 統計與匯出、社團導覽首頁、公開頁 |
+| GAP-14 / GAP-17 | 統計與匯出、舊系統公開頁三件套 |
 | GAP-15 | 待審申請彙整頁(報修/借用/活動併看) |
 
 不排期的方向見 [`improvements.md`](improvements.md)。
@@ -98,7 +90,7 @@ hover 顯示「目前未開放」(`lib/nav.EVAL_UNBUILT`)。收的**只有側欄
 原本的行政專用端點 `/admin/bookings/availability` 與 `admin_availability_grid` 已刪除。
 
 **未登入的 `/`**(2026-08-31):借用情形的公開預覽,右上角登入鈕進 `/login`;
-其餘社團路徑未登入仍轉 `/login`。GAP-16 的社團導覽頁還沒做。
+其餘社團路徑未登入仍轉 `/login`。
 匿名看得到借用社團名與不開放原因 —— 判定為可接受(等同貼在場地門口的資訊),要收就改後端。
 
 **幹部證明可駁回**(2026-09-01,D-37):`/admin/certificates` 的狀態下拉多一個終態「已駁回」

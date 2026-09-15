@@ -195,6 +195,20 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
       >
         <Sidebar groups={nav} onNavigate={() => setDrawerOpen(false)} />
         <div style={{ borderTop: '1px solid var(--line)', padding: '10px 10px 16px' }}>
+          {/* 手機上頂欄的帳號選單是 display:none(shell.css),抽屜是唯一的出口 ——
+              改密入口只放在那個選單裡的話,手機使用者一個角色都改不了密碼 */}
+          <button
+            type="button"
+            className="sidebar-item"
+            style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', font: 'inherit' }}
+            onClick={() => {
+              setDrawerOpen(false)
+              setPwOpen(true)
+            }}
+          >
+            <span className="sidebar-item-icon" aria-hidden="true"><LockOutlined /></span>
+            <span className="sidebar-item-label">更換密碼</span>
+          </button>
           <button
             type="button"
             className="sidebar-item"

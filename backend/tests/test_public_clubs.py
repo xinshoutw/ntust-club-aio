@@ -230,6 +230,8 @@ async def test_activities_are_newest_first_and_filterable_by_semester(client, db
 
 
 async def make_public_image(db, club, slot: str = "avatar") -> File:
+    """上傳並掛到社團上 —— 公開通道要求「引用它的社團現在是公開的」,
+    沒掛上去的孤兒檔本來就不該送得出去(上傳端點一律在同一個交易內掛好)。"""
     owner = await make_user(db, username=f"club{club.id}", club_id=club.id)
     content = png_bytes()
     row, _ = await file_service.save_club_image(
@@ -238,6 +240,7 @@ async def make_public_image(db, club, slot: str = "avatar") -> File:
         slot=slot,
         uploaded_by=owner.id,
     )
+    setattr(club, f"{slot}_file_id", row.id)
     await db.commit()
     return row
 
@@ -249,9 +252,11 @@ async def test_public_files_are_served_anonymously_and_cached(client, db):
     res = await client.get(f"/api/v1/public/files/{row.id}")
     assert res.status_code == 200, res.text
     assert res.headers["content-type"] == "image/webp"
-    # 路徑是 uuid、內容不可變(換圖會產生新 id):每張字卡每次進站重抓一次沒有道理
-    assert "immutable" in res.headers["cache-control"]
+    # 每張字卡每次進站重抓一次沒有道理,但也不能長到讓下架撤不回來
     assert "no-store" not in res.headers["cache-control"]
+    assert "immutable" not in res.headers["cache-control"]
+    max_age = int(res.headers["cache-control"].split("max-age=")[1].split(",")[0])
+    assert 0 < max_age <= 3600
 
 
 async def test_private_files_are_not_reachable_through_the_public_channel(client, db):
@@ -301,3 +306,42 @@ def test_public_images_have_their_own_rate_limit_bucket():
     block = re.search(r"location \^~ /api/v1/public/files/ \{(.*?)\n    \}", conf, re.S)
     assert block, "找不到公開圖片的 location(`^~` 取最長前綴,順序無關)"
     assert "limit_req zone=public_files" in block[1]
+
+
+@pytest.mark.parametrize("hide", [{"public_visible": False}, {"is_active": False}])
+async def test_images_of_a_hidden_club_stop_being_served(client, db, hide):
+    """形象圖是一個社團最對外的一份資料,而下架的理由常常就是那張圖。
+
+    只問檔案自己的 `public` 旗標的話,社團 404 了但它的橫幅照樣拿得到。
+    """
+    club = await make_club(db)
+    row = await make_public_image(db, club, slot="banner")
+    url = f"/api/v1/public/files/{row.id}"
+    assert (await client.get(url)).status_code == 200
+
+    for field, value in hide.items():
+        setattr(club, field, value)
+    await db.commit()
+
+    assert (await client.get(f"{URL}/{club.id}")).status_code == 404
+    assert (await client.get(url)).status_code == 404  # 圖也要跟著消失
+
+
+async def test_an_unreferenced_public_file_is_not_served(client, db):
+    """公開通道問的是「這張圖是誰的、那個社團公不公開」,沒人引用就沒有答案。
+
+    孤兒檔(上傳成功但綁定失敗之類)不該因為 `public` 旗標還在就送得出去。
+    """
+    club = await make_club(db)
+    owner = await make_user(db, username="club01", club_id=club.id)
+    content = png_bytes()
+    row, _ = await file_service.save_club_image(
+        db,
+        UploadFile(io.BytesIO(content), filename="a.png", size=len(content)),
+        slot="avatar",
+        uploaded_by=owner.id,
+    )
+    await db.commit()  # 刻意不掛到 club 上
+
+    assert row.public is True
+    assert (await client.get(f"/api/v1/public/files/{row.id}")).status_code == 404

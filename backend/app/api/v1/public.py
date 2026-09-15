@@ -202,20 +202,29 @@ async def public_file(file_id: uuid.UUID, db: DbDep) -> FileResponse:
     同一個 match,遲早被下一個新增的 case 漏掉。不公開、已歸檔與不存在同樣回 404,
     不讓人靠狀態碼探測某個 id 存不存在。
 
-    `Cache-Control` 蓋掉全域的 `no-store`(中介層只補缺漏、不覆寫):路徑是 uuid、
-    內容不可變(換圖會產生新的 id),所以 immutable 是對的 —— 否則每張字卡每次
-    進站都要重抓一次。
+    **還要引用它的社團現在是公開的**:形象圖是一個社團最對外的一份資料,而下架的理由
+    常常就是那張圖。這裡用 EXISTS 當場問,而不是在社團下架時反手把 `files.public` 關掉 ——
+    後者是同一份判定的第二份,每一條未來會隱藏社團的路徑都得記得同步一次。
+
+    `Cache-Control` 蓋掉全域的 `no-store`(中介層只補缺漏、不覆寫):否則每張字卡每次
+    進站都要重抓一次。**不用 `immutable`、也不放到一週**:內容確實不可變(換圖會產生新的
+    id),但**授權會變** —— 下架之後還要讓已發出的副本在別人的快取裡活一週,那是這支端點
+    唯一撤不回來的東西。一小時是「省掉重複請求」與「下架多久真的生效」之間的取捨。
     """
+    owned_by_visible_club = sa.select(Club.id).where(
+        sa.or_(Club.avatar_file_id == file_id, Club.banner_file_id == file_id), *_VISIBLE
+    )
     file = await db.scalar(
         sa.select(File).where(
-            File.id == file_id, File.public.is_(True), File.archived_at.is_(None)
+            File.id == file_id,
+            File.public.is_(True),
+            File.archived_at.is_(None),
+            sa.exists(owned_by_visible_club),
         )
     )
     if file is None:
         raise not_found("找不到檔案")
     disk = Path(settings.upload_dir) / file.path
-    if not disk.is_file():
-        raise not_found("找不到檔案")
     response = FileResponse(disk, media_type=file.mime, content_disposition_type="inline")
-    response.headers["Cache-Control"] = "public, max-age=604800, immutable"
+    response.headers["Cache-Control"] = "public, max-age=3600"
     return response

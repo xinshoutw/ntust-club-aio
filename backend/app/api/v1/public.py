@@ -258,5 +258,7 @@ async def public_file(file_id: uuid.UUID, db: DbDep) -> FileResponse:
         media_type=file.mime,
         content_disposition_type="inline",
     )
-    response.headers["Cache-Control"] = "public, max-age=3600"
+    # private:瀏覽器照樣快取,但 CDN 與公司 proxy 不會替**別人**留一份。
+    # 社團下架的理由常常正是那張圖,撤不回來的範圍能小一點是一點
+    response.headers["Cache-Control"] = "private, max-age=3600"
     return response

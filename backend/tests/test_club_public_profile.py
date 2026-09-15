@@ -3,6 +3,7 @@
 import io
 
 import pytest
+import sqlalchemy as sa
 from fastapi import UploadFile
 from PIL import Image
 
@@ -353,3 +354,38 @@ def test_club_image_fks_do_not_break_table_sorting():
         assert Base.metadata.sorted_tables
     cycles = [w for w in caught if "unresolvable cycles" in str(w.message)]
     assert not cycles, [str(w.message) for w in cycles]
+
+
+# ---- 刪除社團(形象圖在 FK 圖之外)----
+
+
+async def test_a_club_with_images_can_still_be_deleted(client, db):
+    """形象圖的 club_id 是 NULL,FK 圖走訪看不到它 —— 留著會擋住 users 那一刀。
+
+    症狀是「傳過頭像的社團永遠刪不掉」,而確認框剛說這個社團沒有資料。
+    """
+    club = await make_club(db)
+    owner = await make_user(db, username="club01", club_id=club.id)
+    row, _ = await file_service.save_club_image(
+        db, upload_of("logo.png", png_bytes(300, 300)), slot="avatar", uploaded_by=owner.id
+    )
+    club.avatar_file_id = row.id
+    await db.commit()
+    disk = settings.upload_dir / row.path
+    assert disk.is_file()
+
+    await make_user(db, username="admin01", role=UserRole.ADMIN, permissions=["aclubset"])
+    await login(client, "admin01")
+
+    # 擋刪清單要數得到它,否則承辦按下去連確認框都不會跳
+    blocked = await client.delete(f"/api/v1/admin/clubs/{club.id}", headers=csrf_headers(client))
+    assert blocked.status_code == 409
+    assert "檔案" in blocked.json()["error"]
+
+    res = await client.delete(
+        f"/api/v1/admin/clubs/{club.id}?force=true", headers=csrf_headers(client)
+    )
+    assert res.status_code == 200, res.text
+    assert await db.scalar(sa.select(Club.id).where(Club.id == club.id)) is None
+    assert await db.scalar(sa.select(File.id).where(File.id == row.id)) is None
+    assert not disk.is_file()  # commit 成功後才動磁碟,但確實要動

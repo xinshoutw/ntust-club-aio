@@ -22,6 +22,8 @@
 | 檔 | 內容 |
 |---|---|
 | [shared/public-home.md](shared/public-home.md) | 未登入首頁(`/`):借用情形公開預覽 |
+| [shared/club-directory.md](shared/club-directory.md) | 社團導覽(`/clubs`,免登入;前端未實作) |
+| [shared/club-detail.md](shared/club-detail.md) | 社團詳細(`/clubs/:id`,免登入;前端未實作) |
 | [shared/login.md](shared/login.md) | 登入、強制改密、面板未開放 |
 | [shared/shell.md](shared/shell.md) | 外殼、側欄、通知鈴鐺、蓋板公告、未存檔守衛、權限閘 |
 

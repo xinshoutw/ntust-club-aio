@@ -389,3 +389,28 @@ async def test_a_club_with_images_can_still_be_deleted(client, db):
     assert await db.scalar(sa.select(Club.id).where(Club.id == club.id)) is None
     assert await db.scalar(sa.select(File.id).where(File.id == row.id)) is None
     assert not disk.is_file()  # commit 成功後才動磁碟,但確實要動
+
+
+async def test_club_images_are_counted_in_the_file_management_page(client, db):
+    """未知模組前綴會被 `usage()` 直接跳過:形象圖既不進任何模組,也不進總量。
+
+    症狀是檔案管理頁上的佔用比磁碟實際少一截,而大型檔案列表把它標成「線上申請」。
+    """
+    club = await make_club(db)
+    owner = await make_user(db, username="club01", club_id=club.id)
+    row, _ = await file_service.save_club_image(
+        db, upload_of("logo.png", png_bytes(600, 600)), slot="avatar", uploaded_by=owner.id
+    )
+    await db.commit()
+
+    await make_user(db, username="admin01", role=UserRole.ADMIN, permissions=["afiles"])
+    await login(client, "admin01")
+
+    usage = (await client.get("/api/v1/admin/files/usage")).json()["data"]
+    by_key = {m["key"]: m for m in usage["modules"]}
+    assert by_key["clubimg"]["count"] == 1
+    assert by_key["clubimg"]["size"] == row.size
+
+    listed = (await client.get("/api/v1/admin/files")).json()["data"]
+    mine = next(f for f in listed if f["original_name"] == "avatar.webp")
+    assert mine["module"] == "clubimg"  # 不是 fallback 的 apps

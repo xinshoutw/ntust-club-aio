@@ -279,6 +279,9 @@ async def test_public_files_are_served_anonymously_and_cached(client, db):
     assert "immutable" not in res.headers["cache-control"]
     max_age = int(res.headers["cache-control"].split("max-age=")[1].split(",")[0])
     assert 0 < max_age <= 3600
+    # **private 不是 public**:社團下架的理由常常正是那張圖,`public` 會讓 CDN 與
+    # 公司 proxy 替別人留一份。瀏覽器自己的快取不受影響
+    assert res.headers["cache-control"].startswith("private")
 
 
 async def test_private_files_are_not_reachable_through_the_public_channel(client, db):

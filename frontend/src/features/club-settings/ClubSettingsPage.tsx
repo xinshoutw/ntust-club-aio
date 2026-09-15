@@ -226,14 +226,6 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
           </div>
         </div>
 
-        {/* 對外公開資料:唯一會被校外看到的一段,獨立成全寬區塊擺在對內設定之上 */}
-        <PublicSection
-          image={profile.public}
-          itemClass={itemClass}
-          onPreview={previewPublicPage}
-          publicVisible={profile.publicVisible}
-        />
-
         {/* 聯絡與通知、更換密碼並排 */}
         <div className="form-grid-2" style={{ marginTop: 16, alignItems: 'stretch' }}>
           <div className="card" style={{ padding: 24 }}>
@@ -337,6 +329,14 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
             </Form.Item>
           </div>
         </div>
+
+        {/* 對外公開資料:唯一會被校外看到的一段,獨立成全寬區塊擺在對內設定之下 */}
+        <PublicSection
+          image={profile.public}
+          itemClass={itemClass}
+          onPreview={previewPublicPage}
+          publicVisible={profile.publicVisible}
+        />
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginTop: 16 }}>
           {dirty.size > 0 && (

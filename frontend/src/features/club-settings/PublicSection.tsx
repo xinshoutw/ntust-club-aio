@@ -23,8 +23,7 @@ import {
 } from '../../lib/uploads'
 import type { SettingsValues } from './fields'
 
-// 後端只收 http(s);AntD 的 type:'url' 連 ftp:// 都放行,訊息卻已經寫死 http(s)
-const HTTP_URL = { pattern: /^https?:\/\//, message: '須為 http(s) 開頭的網址' }
+const HTTP_URL = { pattern: /^https?:\/\//, message: '需以 http(s) 開頭' }
 
 const sectionTitle: React.CSSProperties = { fontSize: 16, fontWeight: 600 }
 const IMAGE_FRAME_HEIGHT = 132
@@ -207,7 +206,7 @@ export default function PublicSection({ image, itemClass, onPreview, publicVisib
         <Tooltip title={publicVisible ? undefined : '學務處已將這個社團從導覽頁下架，公開頁目前不會顯示'}>
           <span>
             <Button icon={<EyeOutlined />} onClick={onPreview} disabled={!publicVisible}>
-              預覽社團頁
+              預覽
             </Button>
           </span>
         </Tooltip>
@@ -231,13 +230,8 @@ export default function PublicSection({ image, itemClass, onPreview, publicVisib
 
       <div style={subhead}>社團資訊</div>
       <div className="form-grid-2">
-        <Form.Item
-          name="tagline"
-          label="一句話介紹"
-          className={itemClass('tagline')}
-          rules={[{ max: 40, message: '一句話介紹最多 40 字' }]}
-        >
-          <Input placeholder="顯示在社團字卡上，例如：每週三晚上一起跳舞" maxLength={40} />
+        <Form.Item name="officeLocation" label="社辦位置" className={itemClass('officeLocation')}>
+          <Input placeholder="S201" maxLength={30} />
         </Form.Item>
         <Form.Item name="recruitStatus" label="招生狀態" className={itemClass('recruitStatus')}>
           <Segmented
@@ -252,41 +246,44 @@ export default function PublicSection({ image, itemClass, onPreview, publicVisib
         name="tags"
         label="標籤"
         className={itemClass('tags')}
-        tooltip={`供導覽頁篩選，最多 ${MAX_TAGS} 個`}
+        tooltip={`最多 ${MAX_TAGS} 個`}
       >
         <TagPicker />
       </Form.Item>
-      <Form.Item name="officeLocation" label="社辦位置" className={itemClass('officeLocation')}>
-        <Input placeholder="例如：綜合教學大樓 B1" maxLength={50} />
+      <Form.Item
+        name="tagline"
+        label="簡短介紹"
+        className={itemClass('tagline')}
+        rules={[{ max: 40, message: '最多 40 字' }]}
+      >
+        <Input placeholder="我們是一群喜愛科技的白帽駭客" maxLength={40} />
       </Form.Item>
 
-      <div style={subhead}>對外聯絡</div>
+      <div style={subhead}>聯絡方式</div>
       <div className="form-grid-2">
         <Form.Item
           name="publicEmail"
-          label="對外聯絡信箱"
+          label="公開聯絡信箱"
           className={itemClass('publicEmail')}
-          tooltip="公開在導覽頁上的窗口，與下方的聯絡通知信箱是兩回事"
           rules={[{ type: 'email', message: '信箱格式不正確' }]}
         >
-          <Input placeholder="校外要找你們時寄的信箱" />
+          <Input placeholder="contact@ntust.edu.tw" />
         </Form.Item>
         <Form.Item
           name="instagram"
           label="Instagram"
           className={itemClass('instagram')}
-          tooltip="只填帳號，貼整串網址也可以，系統會自己取出帳號"
         >
-          <Input prefix="instagram.com /" placeholder="ntust_dance" />
+          <Input prefix="instagram.com/" placeholder="ntust-hacking" />
         </Form.Item>
       </div>
       <Form.Item name="signupUrl" label="報名連結" className={itemClass('signupUrl')} rules={[HTTP_URL]}>
-        <Input placeholder="https://" />
+        <Input placeholder="https://forms.gle/join-us" />
       </Form.Item>
 
-      <div style={subhead}>給想加入的人看的</div>
+      <div style={subhead}>其他資訊</div>
       <Form.Item name="regularSchedule" label="例行活動時間" className={itemClass('regularSchedule')}>
-        <Input.TextArea rows={2} maxLength={200} placeholder="例如：每週三 19:00 於體育館二樓" />
+        <Input.TextArea rows={2} maxLength={200} placeholder="每週三 19:00 於 TR 上課，詳情請見 IG 貼文" />
       </Form.Item>
       <Form.Item
         name="joinInfo"
@@ -294,7 +291,7 @@ export default function PublicSection({ image, itemClass, onPreview, publicVisib
         className={itemClass('joinInfo')}
         style={{ marginBottom: 0 }}
       >
-        <Input.TextArea rows={3} maxLength={500} placeholder="怎麼加入、社費多少、有沒有試上" />
+        <Input.TextArea rows={3} maxLength={500} placeholder="可否試聽、如何加入、社費多少" />
       </Form.Item>
     </div>
   )

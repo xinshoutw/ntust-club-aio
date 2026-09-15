@@ -191,10 +191,12 @@
   color: #5b6472;
   border-color: #dcdfe4;
 }
+/* 額滿是暖色:與「暫不開放」的灰明確分開 —— 兩個都用灰的話,
+   字卡上只能靠讀字分辨「還在收但滿了」與「根本沒在收」 */
 .club-badge.full {
-  background: #e8eaee;
-  color: #3a3f4a;
-  border-color: #d5d9df;
+  background: #fdf1e0;
+  color: #8a5a17;
+  border-color: #f2ddba;
 }
 
 /* 詳細頁的徽章是整顆膠囊,字卡上的是左上／右下不對稱的那一種。

@@ -146,7 +146,9 @@ export default function ClubDetailPage() {
                     </div>
                   </section>
                 )}
-                {(c.joinInfo || c.signupUrl) && (
+                {/* 守衛要同時掛在外層:`joinInfo` 空 + `signupUrl` 不合法時,
+                    卡片會只剩一個「怎麼加入」標題,底下整片空白 */}
+                {(c.joinInfo || (c.signupUrl && HTTP_URL.test(c.signupUrl))) && (
                   <section className="card" style={{ padding: 24 }}>
                     <h2 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 16px' }}>怎麼加入</h2>
                     {c.joinInfo && (

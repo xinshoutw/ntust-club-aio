@@ -111,9 +111,11 @@ function ClubShell() {
 // 未登入的首頁是社團導覽(Roadmap 的免登入入口;借用情形移到 /availability,
 // 由 topbar 的「借用狀態」進去)。其餘社團頁沒有公開版本,一律照舊轉登入頁
 function ClubArea() {
-  const { user, booting, bootError } = useAuth()
+  const { user, booting } = useAuth()
   const { pathname } = useLocation()
-  if (!booting && !bootError && !user && pathname === '/') return <ClubDirectoryPage />
+  // 不看 bootError:導覽頁不需要知道你是誰。`/auth/me` 非 401 失敗(後端抖一下)
+  // 時擋掉的話,一個根本沒有帳號的新生會看到「無法確認登入狀態 / 改用其他帳號登入」
+  if (!booting && !user && pathname === '/') return <ClubDirectoryPage />
   return (
     <RequireRole roles={['club']}>
       <ClubShell />

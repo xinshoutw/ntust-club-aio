@@ -10,9 +10,11 @@
 import uuid
 from datetime import date
 from pathlib import Path
+from typing import Annotated
 
 import sqlalchemy as sa
 from fastapi import APIRouter, Query
+from fastapi import Path as PathParam
 from fastapi.responses import FileResponse
 
 from app.core.config import settings
@@ -31,6 +33,13 @@ router = APIRouter(prefix="/public", tags=["public"])
 
 MAX_AVAILABILITY_SPAN_DAYS = 31  # 單一場地 15 天檢視用;上限防範圍濫用
 MAX_PUBLIC_ACTIVITIES = 200  # 單一社團的歷年活動;上限防整表拖下來
+
+# 主鍵是 PostgreSQL 的 int4:超界的值會在 asyncpg 綁參數時 OverflowError → 500,
+# 而這些是**匿名打得到**的路徑 —— 未登入、零成本就能一次塞進三十份 traceback。
+# 擋在 schema 就回 422,連 DB 都不必碰
+PG_INT_MAX = 2_147_483_647
+ClubId = Annotated[int, PathParam(ge=1, le=PG_INT_MAX)]
+VenueId = Annotated[int | None, Query(ge=1, le=PG_INT_MAX)]
 
 # 通過審核**以後**的都算公開:退回、審核中與草稿一律不回。
 # 舊系統的公開月曆沒過濾狀態,把審核中的草稿全放出去了 —— 這是同一個坑
@@ -79,7 +88,7 @@ async def availability(user: OptionalUser, db: DbDep, date: date) -> ApiResponse
 
 @router.get("/bookings/availability-range")
 async def availability_range(
-    user: OptionalUser, db: DbDep, start: date, end: date, venue: int | None = None
+    user: OptionalUser, db: DbDep, start: date, end: date, venue: VenueId = None
 ) -> ApiResponse[dict]:
     """區間逐日場況(單一場地多天檢視):取代前端逐日並行請求。
 
@@ -165,13 +174,13 @@ async def _public_club(db: DbDep, club_id: int) -> Club:
 
 
 @router.get("/clubs/{club_id}")
-async def club_detail(club_id: int, db: DbDep) -> ApiResponse[ClubDetailOut]:
+async def club_detail(club_id: ClubId, db: DbDep) -> ApiResponse[ClubDetailOut]:
     return ApiResponse(data=ClubDetailOut.model_validate(await _public_club(db, club_id)))
 
 
 @router.get("/clubs/{club_id}/activities")
 async def club_activities(
-    club_id: int,
+    club_id: ClubId,
     db: DbDep,
     semester: str | None = Query(None, pattern=SEMESTER_LABEL),
 ) -> ApiResponse[list[PublicActivityOut]]:

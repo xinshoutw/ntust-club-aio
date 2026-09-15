@@ -345,3 +345,21 @@ async def test_an_unreferenced_public_file_is_not_served(client, db):
 
     assert row.public is True
     assert (await client.get(f"/api/v1/public/files/{row.id}")).status_code == 404
+
+
+@pytest.mark.parametrize("path", ["{}", "{}/activities"])
+@pytest.mark.parametrize("club_id", ["2147483648", "99999999999999999999999999", "0", "-1"])
+async def test_out_of_range_club_ids_never_reach_the_database(client, path, club_id):
+    """主鍵是 int4:超界的值在 asyncpg 綁參數時 OverflowError,全域 handler 回 500
+    並吐一份完整 traceback。這是匿名打得到的路徑,未登入零成本就能灌爆 log。
+    """
+    res = await client.get(f"{URL}/{path.format(club_id)}")
+    assert res.status_code == 422, res.text
+
+
+async def test_out_of_range_venue_id_is_rejected(client):
+    res = await client.get(
+        "/api/v1/public/bookings/availability-range",
+        params={"start": "2026-03-01", "end": "2026-03-02", "venue": 2147483648},
+    )
+    assert res.status_code == 422, res.text

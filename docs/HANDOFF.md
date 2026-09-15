@@ -10,6 +10,21 @@
 
 接下來挑一整條線做(評鑑鏈最大),或先清上線檢查表的阻擋項。
 
+**進行中的分支 `feat/club-directory`**:社團對外公開資料的**資料層與填寫介面已完成** ——
+`clubs` 的公開欄位、形象圖上傳(轉 WebP、亮度判字色)、`files.public`、社團端
+「對外公開資料」全寬區塊、行政端兩頁的唯讀呈現與公開顯示開關,遷移 `a3f7c9e15b84`。
+規格在 `spec/shared/club-directory.md` 與 `club-detail.md`。
+
+**這條線還沒做的**(GAP-16 剩下的部分,依序):
+
+1. `GET /public/clubs`、`GET /public/clubs/{id}`、`GET /public/clubs/{id}/activities`
+   (公開活動=`approved` / `closing_pending_advisor` / `closed` 三個狀態,不另設勾選)
+2. `GET /public/files/{id}`(只放行 `files.public`,可長快取;與 `/files/{id}` 的
+   `Cache-Control: no-store` 不同)
+3. `/clubs` 與 `/clubs/:id` 兩頁前端
+4. 上線前把這些路徑排除在 edge 的台灣 IP 白名單外(`../../nginx`)—— 導覽頁一半的
+   價值是給校外看的
+
 ## 接下來做什麼
 
 ### 一、評鑑彙總鏈(建議當單一開發段落)

@@ -11,7 +11,9 @@ import QueryError from './components/ui/QueryError'
 import LoginPage from './features/auth/LoginPage'
 import ChangePasswordPage from './features/auth/ChangePasswordPage'
 import ComingSoonPage from './features/auth/ComingSoonPage'
-import PublicHomePage from './features/public/PublicHomePage'
+import ClubDetailPage from './features/public/ClubDetailPage'
+import ClubDirectoryPage from './features/public/ClubDirectoryPage'
+import PublicAvailabilityPage from './features/public/PublicAvailabilityPage'
 import OverviewPage from './features/overview/OverviewPage'
 import ActivityListPage from './features/activities/ActivityListPage'
 import ActivityFormPage from './features/activities/ActivityFormPage'
@@ -106,12 +108,12 @@ function ClubShell() {
   return <AppShell nav={nav} />
 }
 
-// 未登入的首頁是公開的借用情形預覽(Roadmap 的免登入入口);
-// 其餘社團頁沒有公開版本,一律照舊轉登入頁
+// 未登入的首頁是社團導覽(Roadmap 的免登入入口;借用情形移到 /availability,
+// 由 topbar 的「借用狀態」進去)。其餘社團頁沒有公開版本,一律照舊轉登入頁
 function ClubArea() {
   const { user, booting, bootError } = useAuth()
   const { pathname } = useLocation()
-  if (!booting && !bootError && !user && pathname === '/') return <PublicHomePage />
+  if (!booting && !bootError && !user && pathname === '/') return <ClubDirectoryPage />
   return (
     <RequireRole roles={['club']}>
       <ClubShell />
@@ -170,6 +172,11 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+
+      {/* 免登入的公開頁:不在 RequireRole 底下,登入中的人照樣看得到 */}
+      <Route path="/clubs" element={<ClubDirectoryPage />} />
+      <Route path="/clubs/:clubId" element={<ClubDetailPage />} />
+      <Route path="/availability" element={<PublicAvailabilityPage />} />
       <Route
         path="/change-password"
         element={

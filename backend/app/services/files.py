@@ -9,6 +9,7 @@
 
 import asyncio
 import hashlib
+import io
 import logging
 import shutil
 import uuid
@@ -36,6 +37,7 @@ from app.core.errors import AppError, not_found, rate_limited
 from app.core.rate_limit import upload_limiter
 from app.models import (
     AwardRubricItem,
+    Club,
     EvalGroup,
     EvalGroupClub,
     EvalGroupReviewer,
@@ -43,6 +45,7 @@ from app.models import (
     File,
     User,
 )
+from app.models.clubs import VISIBLE_CLUB, owns_public_image
 from app.models.enums import UserRole
 from app.services.settings_service import get_setting
 
@@ -490,6 +493,22 @@ async def can_access(db: AsyncSession, file: File, user: User) -> bool:
     admin 原本一律放行,只持「檔案管理」權限的人因此拿得到郵局存簿影本這類個資。
     現在對照 `core/permissions.FILE_SUBJECT_KEYS`,看得到那一頁才下載得了那一頁的檔案。
     """
+    # 公開檔(社團形象圖)在角色判定之**前**處理:它的 club_id 是 NULL(不計社團配額),
+    # 走 CLUB 分支的話社團連自己的頭像都預覽不了
+    if file.public:
+        # 但「公開」不是無條件放行:授權跟著**這張圖現在掛在哪個社團、那個社團公不公開**
+        # 走,與 `/public/files/{id}` 同一份判定。只擋匿名通道的話,任何持有 UUID 的
+        # 校內帳號(別社的社團、評審、沒有檔案管理權限的承辦)照樣下載得到,
+        # 行政端把社團下架等於沒下架
+        owner_id = await db.scalar(sa.select(Club.id).where(owns_public_image(file.id)))
+        if owner_id is None:
+            return False  # 沒有社團在引用它:上傳成功但沒掛上去的孤兒檔
+        if await db.scalar(sa.select(Club.id).where(Club.id == owner_id, *VISIBLE_CLUB)):
+            return True
+        # 下架之後只剩社團自己 —— 下架不表示它管不了自己的形象圖,設定頁還要預覽
+        if user.role is UserRole.CLUB:
+            return user.club_id == owner_id
+        # 其餘角色落到下面的矩陣:行政依 FILE_SUBJECT_KEYS,工讀生與評審照舊擋掉
     match user.role:
         case UserRole.ADMIN:
             if user.is_super:
@@ -600,6 +619,87 @@ async def preview_of(disk: Path) -> Path | None:
         return None
     await asyncio.get_running_loop().run_in_executor(_PREVIEW_POOL, _render_preview, disk, dst)
     return dst
+
+
+# 形象圖尺寸:落盤的就是這個尺寸的 WebP,原圖不留。
+# 前端 `api/clubProfile.ts` 的 CLUB_IMAGE_RATIO 由此推導(比例),改動須同步。
+# 要換尺寸就請社團重傳 —— 留原圖等於每張圖存兩份,而重傳的成本落在幾十個社團、一次
+CLUB_IMAGE_SIZES: dict[str, tuple[int, int]] = {
+    "avatar": (512, 512),  # 1:1
+    "banner": (1800, 600),  # 3:1(字卡與詳細頁同一個比例,兩邊都不裁切)
+}
+_WEBP_QUALITY = 82
+
+
+def _fit_webp(src: Path, size: tuple[int, int]) -> bytes:
+    """置中裁切成指定尺寸的 WebP;回傳 WebP 位元組。
+
+    比例不合一律 `ImageOps.fit` 置中裁切 —— 換一套互動 cropper UI 得不到等值的效果,
+    要精準構圖的社團自己先裁好再傳。
+
+    **回位元組而不是就地覆寫原檔**:`run_in_executor` 取消不會停 thread(見
+    `_PREVIEW_POOL` 的註解)。寫回磁碟的話,請求被取消 → 交易收尾 →
+    `_drop_uncommitted_uploads` 刪掉落盤的檔 → thread 這時才把它重新建回來,
+    留下一個 DB 沒有列、`admin_files` 掃不到、沒有任何清理路徑管得到的孤兒檔。
+    成品是 `CLUB_IMAGE_SIZES` 那一級、q82 的 WebP(數百 KB),進記憶體的成本可以忽略。
+    """
+    with Image.open(src) as img:
+        if img.width * img.height > PREVIEW_MAX_PIXELS:
+            raise ValueError(f"image too large: {img.width}x{img.height}")
+        # **先縮再轉 RGB**:反過來(`fit(img.convert("RGB"))`)會先把全尺寸解成 RGB,
+        # 一張 50MP 圖的峰值是「解碼 + transpose + RGB」約 3×150MB,而 pool 有兩條 thread,
+        # 正式機是 2 vCPU / 4GB 還跟 PostgreSQL 同住。`thumbnail` 對 JPEG 會自動用
+        # `draft()` 讓 libjpeg 直接以較低倍率解碼,省的是解碼本身。
+        # 邊長取 2× 最長邊(與方向無關):留給 `fit` 的裁切還有餘裕,不會放大失真
+        img.thumbnail((max(size) * 2, max(size) * 2), Image.Resampling.LANCZOS)
+        img = ImageOps.exif_transpose(img) or img
+        fitted = ImageOps.fit(img.convert("RGB"), size, method=Image.Resampling.LANCZOS)
+        buf = io.BytesIO()
+        fitted.save(buf, format="WEBP", quality=_WEBP_QUALITY)
+        return buf.getvalue()
+
+
+async def save_club_image(
+    db: AsyncSession, upload: UploadFile, *, slot: str, uploaded_by: int
+) -> File:
+    """社團形象圖:沿用 `save_upload` 的副檔名/魔術位元組/大小/磁碟閘,落盤後就地轉 WebP。
+
+    `club_id` 留 NULL:形象圖**不計入社團儲存配額** —— 社團不該為了傳結案照片
+    刪掉自己的橫幅。權限則由 `public=True` 承接(見 `can_access`)。
+
+    ponytail: 多寫一次原圖再覆寫,換掉一整套重抄的驗證邏輯;真的成為瓶頸再拆成串流轉檔
+    """
+    size_spec = CLUB_IMAGE_SIZES[slot]
+    row = await save_upload(
+        db,
+        upload,
+        policy=IMAGE,
+        module="club_image",
+        uploaded_by=uploaded_by,
+        club_id=None,
+        subject_type="club_image",
+        slot=slot,
+    )
+    disk = Path(settings.upload_dir) / row.path
+    try:
+        data = await asyncio.get_running_loop().run_in_executor(
+            _PREVIEW_POOL, _fit_webp, disk, size_spec
+        )
+    except Exception as exc:
+        # 副檔名與魔術位元組都對了卻解不開(截斷、超大、編碼不支援):
+        # 回 415 讓社團換一張,不是 500
+        logger.warning("club image convert failed: slot=%s file=%s", slot, row.id, exc_info=True)
+        raise AppError(415, "UNSUPPORTED_FILE_TYPE", "圖片無法解讀,請換一張") from exc
+
+    # 落盤在 await 之後:被取消的請求走不到這裡,也就不會有檔案留在磁碟上
+    disk.write_bytes(data)
+    row.size = len(data)
+    row.mime = "image/webp"
+    row.sha256 = hashlib.sha256(data).hexdigest()
+    row.original_name = f"{slot}.webp"
+    row.public = True
+    await db.flush()
+    return row
 
 
 async def file_response(

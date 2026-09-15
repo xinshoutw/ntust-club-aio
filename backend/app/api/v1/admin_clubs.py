@@ -24,7 +24,7 @@ from app.api.v1.members import _DEFAULT_ORDER as _MEMBER_DEFAULT_ORDER
 from app.api.v1.members import _SORTABLE as _MEMBER_SORTABLE
 from app.core import permissions
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission, require_role
-from app.core.errors import conflict, not_found
+from app.core.errors import conflict, not_found, validation_error
 from app.core.security import generate_password, hash_password_async
 from app.core.semesters import SEMESTER_LABEL
 from app.models import Club, ClubMember, File, PasswordHistory, Session, User
@@ -39,7 +39,7 @@ from app.schemas.admin import (
     ClubAccountCreateIn,
     ClubOptionOut,
 )
-from app.schemas.clubs import MemberOut
+from app.schemas.clubs import ClubPublicOut, MemberOut
 from app.schemas.common import ApiResponse
 from app.services import audit
 from app.services import files as file_service
@@ -111,6 +111,17 @@ _TABLE_LABELS = {
 # 不列進擋刪清單的直接子表:
 # - users:社團帳號一律隨社團刪除(建錯了刪掉時不該因為「有帳號」就要求強制)
 # - announcement_dismissals:蓋板公告的「不再顯示」勾選,是個人偏好不是社團的資料
+# 社團形象圖:`club_id` 刻意留 NULL(不計社團配額),所以 FK 圖走訪看不到它們。
+# 少了這一刀,傳過頭像的社團會在 `DELETE FROM users` 撞 `fk_files_uploaded_by_users`
+# (NO ACTION),而確認框剛說「沒有資料」—— 那個社團從此刪不掉也講不出原因。
+# 三條路徑都收:兩個欄位指到的、以及該社帳號上傳過的(涵蓋換圖中斷留下的列)
+_CLUB_IMAGE_FILES = """
+    subject_type = 'club_image'
+    AND (id IN (SELECT avatar_file_id FROM clubs WHERE id = :club_id)
+         OR id IN (SELECT banner_file_id FROM clubs WHERE id = :club_id)
+         OR uploaded_by IN (SELECT id FROM users WHERE club_id = :club_id))
+"""
+
 _NOT_LISTED = frozenset({"users", "announcement_dismissals"})
 _MAX_DEPTH = 8  # FK 圖的深度上限(現況最深 3:clubs → activities → venue_bookings);防自我參照打轉
 
@@ -163,6 +174,11 @@ async def _club_data_counts(db, club_id: int) -> dict[str, int]:
         )
         if n:
             counts[child] = n
+    images = await db.scalar(
+        sa.text(f"SELECT count(*) FROM files WHERE {_CLUB_IMAGE_FILES}"), {"club_id": club_id}
+    )
+    if images:
+        counts["files"] = counts.get("files", 0) + images
     return counts
 
 
@@ -205,6 +221,8 @@ def _detail_out(club: Club, account: User | None) -> AdminClubDetailOut:
         advisor_out_dept=club.advisor_out_dept,
         advisor_out_email=club.advisor_out_email,
         suspend_reason=club.suspend_reason,
+        public_visible=club.public_visible,
+        public=ClubPublicOut.model_validate(club),
     )
 
 
@@ -348,6 +366,15 @@ async def update_club(
             changes.append(f"username:{account.username}→{username}")
             account.username = username
 
+    if "public_visible" in fields and fields["public_visible"] != club.public_visible:
+        visible = fields["public_visible"]
+        reason = (body.public_hide_reason or "").strip()
+        # 下架是對社團的處置,要留得下「為什麼」;開回來不必給理由
+        if not visible and not reason:
+            raise validation_error("關閉公開顯示須填寫原因")
+        club.public_visible = visible
+        changes.append(f"public_visible:{visible}" + (f"({reason})" if not visible else ""))
+
     if "is_active" in fields and fields["is_active"] != club.is_active:
         is_active = fields["is_active"]
         # 社團主檔與帳號同步啟停;停用立即生效(撤銷所有 session)
@@ -396,6 +423,7 @@ async def delete_club(
 
     account = await _club_account(db, club_id)
     # 檔案的實體檔在 commit 成功後才刪(反過來 rollback 會留下「DB 有列、磁碟無檔」)
+    params = {"club_id": club_id}
     paths = list(
         await db.scalars(
             sa.select(File.path).where(
@@ -405,7 +433,11 @@ async def delete_club(
             )
         )
     )
-    params = {"club_id": club_id}
+    # 形象圖走自己的條件(club_id 是 NULL);帳號已被刪掉的社團靠兩個欄位仍找得到
+    paths += list(
+        await db.scalars(sa.text(f"SELECT path FROM files WHERE {_CLUB_IMAGE_FILES}"), params)
+    )
+    paths = list(dict.fromkeys(paths))
     # 先把這社的活動照 id 鎖起來,再走 FK 圖。**這是鎖序,不是防並發**:
     # `activity_service.purge`(刪單一活動)是先鎖 activities 再改借用單的 activity_id,
     # 這裡照 FK 圖走卻是先刪借用單、最後才刪 activities —— 兩條路徑並發就是
@@ -422,6 +454,11 @@ async def delete_club(
             deleted += await _cascade_delete(
                 db, child, f"{col} IN (SELECT {ref} FROM clubs WHERE id = :club_id)", params
             )
+        # 形象圖在 FK 圖之外,得自己刪;**必須排在 users 之前**,否則它的 uploaded_by
+        # 會擋住下一刀。`clubs` 的兩個 FK 是 SET NULL,參照隨之歸零
+        result = await db.execute(sa.text(f"DELETE FROM files WHERE {_CLUB_IMAGE_FILES}"), params)
+        if result.rowcount:
+            deleted["files"] += result.rowcount
         # 帳號自己不走 FK 圖:從帳號往下追到的是「這個人碰過的東西」,那不等於「這個社團的
         # 東西」—— 真有跨社團的列就讓它撞 FK(回 409),不要順手刪掉別人的資料。
         # 社團自己的資料已在上面清掉,正常情況這一刀不會有東西擋

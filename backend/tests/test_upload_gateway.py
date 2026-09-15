@@ -136,3 +136,22 @@ def test_admin_adjustable_limits_stay_under_the_nginx_caps():
     # zip(ARCHIVE)沒有任何端點在用,不對應任何 location
     for key in ("doc", "img"):
         assert bounds[key] <= other_cap, f"{key} 上界 {bounds[key]}MB 超過 nginx 的 {other_cap}m"
+
+
+def test_delete_endpoints_stay_off_the_upload_whitelist():
+    """`location` 是路徑比對、不分方法:移除不能與上傳共用網址。
+
+    共用的話移除也會跑 `auth_request /_upload_precheck`,磁碟到告警水位時社團連把
+    圖**移掉**都會被擋 —— 而那正是此刻該鼓勵的動作。子請求一律是 GET,
+    `$request_method` 在那裡拿不到原方法,只能靠分開路徑。
+    """
+    schema = app.openapi()
+    locations = _upload_locations()
+    blocked = [
+        path
+        for path, methods in schema["paths"].items()
+        if "delete" in methods
+        for sample in _sample_paths(path)
+        if any(rx.match(sample) for rx in locations)
+    ]
+    assert not blocked, f"這些刪除端點落在上傳白名單上:{blocked}"

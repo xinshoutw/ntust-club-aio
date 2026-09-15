@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { App, Button, Input, Select, Switch } from 'antd'
+import { App, Button, Input, Select, Switch, Tooltip } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { confirmDialog } from '../../lib/confirm'
 import PageHeader from '../../components/ui/PageHeader'
@@ -8,10 +8,12 @@ import { suspendedNow } from '../../lib/status'
 import { useUnsavedGuard } from '../../app/unsaved'
 import {
   CLUB_ATTRIBUTES,
+  hasPublicData,
   useAdminClubDetail,
   useAdminClubMutations,
   type AdminClubDetail,
 } from '../../api/adminClubs'
+import ClubPublicSummary from '../../components/ui/ClubPublicSummary'
 import ClubSelect from './ClubSelect'
 import OneTimePasswordModal from './OneTimePasswordModal'
 import { useAdminClub } from './clubContext'
@@ -25,6 +27,8 @@ interface FormState {
   attribute: string // 社團性質;沒有性質的社團不會出現在社團漏斗,選錯了要改得回來
   account: string
   active: boolean
+  publicVisible: boolean // 公開顯示(下架閥);與 active 是兩個判定
+  hideReason: string // 關閉公開顯示時必填;只寫稽核軌跡,不入社團主檔
 }
 
 // 名稱結尾推導 社團/學會;推導不到回 null(與後端 derive_kind 同規則)
@@ -66,7 +70,9 @@ export default function AdminClubSettingsPage() {
       form.kind !== saved.kind ||
       form.attribute !== saved.attribute ||
       form.account !== saved.account ||
-      form.active !== saved.active)
+      form.active !== saved.active ||
+      // 下架原因不算 dirty:沒有動到開關就沒有東西可存,填了字不該攔住離開
+      form.publicVisible !== saved.publicVisible)
   // 未儲存離開警告:側欄/頂欄導航由 shell 攔截,關閉分頁由 beforeunload 攔截
   useUnsavedGuard(dirty)
   const dirtyRef = useRef(dirty)
@@ -107,6 +113,8 @@ export default function AdminClubSettingsPage() {
         attribute: detail.attribute ?? '',
         account: detail.username ?? '',
         active: detail.isActive,
+        publicVisible: detail.publicVisible,
+        hideReason: '',
       }
       setSaved(base)
       setForm(base)
@@ -121,6 +129,11 @@ export default function AdminClubSettingsPage() {
       message.info('內容未變更')
       return
     }
+    // 下架是對社團的處置,要留得下「為什麼」(後端同樣擋,422)
+    if (saved.publicVisible && !form.publicVisible && !form.hideReason.trim()) {
+      message.error('請填寫關閉公開顯示的原因')
+      return
+    }
     const doSave = () => {
       update.mutate(
         {
@@ -132,6 +145,8 @@ export default function AdminClubSettingsPage() {
           attribute: form.attribute !== saved.attribute ? form.attribute : undefined,
           username: form.account.trim() !== saved.account ? form.account.trim() : undefined,
           isActive: form.active !== saved.active ? form.active : undefined,
+          publicVisible: form.publicVisible !== saved.publicVisible ? form.publicVisible : undefined,
+          publicHideReason: form.publicVisible ? undefined : form.hideReason.trim(),
         },
         {
           onSuccess: (res) => {
@@ -142,6 +157,8 @@ export default function AdminClubSettingsPage() {
               attribute: res.attribute ?? '',
               account: res.username ?? '',
               active: res.isActive,
+              publicVisible: res.publicVisible,
+              hideReason: '',
             }
             setSaved(base)
             setForm(base)
@@ -226,6 +243,15 @@ export default function AdminClubSettingsPage() {
               <div style={label}>Discord Webhook</div>
               <div>{detail ? (detail.discordWebhookSet ? '已設定' : '未設定') : '—'}</div>
             </div>
+            {/* 對外公開資料(唯讀):開關在下方「帳號與狀態」 */}
+            <div style={{ fontSize: 13, color: 'var(--steel)', margin: '18px 0 10px' }}>
+              對外公開資料
+            </div>
+            {detail && hasPublicData(detail.public) ? (
+              <ClubPublicSummary data={detail.public} />
+            ) : (
+              <div style={{ fontSize: 13, color: 'var(--steel)' }}>尚未填寫</div>
+            )}
             {/* 背景重抓失敗:資料照舊,底下補一行說明 */}
             {detailQuery.isError && detail && (
               <QueryError
@@ -306,6 +332,34 @@ export default function AdminClubSettingsPage() {
                 </span>
                 {form.active !== saved.active && <span style={{ fontSize: 12, color: '#d48806' }}>未儲存</span>}
               </div>
+              {/* 公開顯示是另一個判定:停用社團本來就不公開,而這裡關掉的社團帳號照常登入做事 */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Tooltip title="關閉後該社團不會出現在免登入的社團導覽頁，社團端仍可照常填寫">
+                  <span style={{ fontSize: 13, fontWeight: 500 }}>公開顯示</span>
+                </Tooltip>
+                <Switch
+                  checked={form.publicVisible}
+                  onChange={(v) => setForm({ ...form, publicVisible: v, hideReason: '' })}
+                />
+                <span style={{ fontSize: 13, color: form.publicVisible ? '#1F6B45' : '#C13B34' }}>
+                  {form.publicVisible ? '導覽頁顯示中' : '已從導覽頁下架'}
+                </span>
+                {form.publicVisible !== saved.publicVisible && (
+                  <span style={{ fontSize: 12, color: '#d48806' }}>未儲存</span>
+                )}
+              </div>
+              {saved.publicVisible && !form.publicVisible && (
+                <div className="field-dirty">
+                  <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 6 }}>下架原因</div>
+                  <Input.TextArea
+                    rows={2}
+                    maxLength={200}
+                    value={form.hideReason}
+                    placeholder="例如：橫幅圖片不妥，已通知社團更換"
+                    onChange={(e) => setForm({ ...form, hideReason: e.target.value })}
+                  />
+                </div>
+              )}
               {/* 解除停權才會把日期清成 NULL,過期未清的殘留值不該一直顯示成停權中 */}
               {detail && suspendedNow(detail.suspendedUntil) && (
                 <div style={{ fontSize: 12, color: '#C13B34' }}>

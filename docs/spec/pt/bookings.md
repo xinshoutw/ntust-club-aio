@@ -15,11 +15,11 @@
 
 ## 畫面
 
-`BookingGrid` 一張卡 —— 與社團端借用總覽、行政端臨時場地器材借用、未登入首頁同一個元件,場地/器材切換、日期前後、單一場地 15 天下鑽全都在。
+`BookingGrid` 一張卡 —— 與社團端借用總覽、行政端臨時場地器材借用、免登入的 `/availability` 同一個元件,場地/器材切換、日期前後、單一場地 15 天下鑽全都在。
 
 ## 規則
 
-- **點不動**:沒給 `onBookVenue` / `onBookEquipment` 就不畫可點的格子(同 [shared/public-home.md](../shared/public-home.md))
+- **點不動**:沒給 `onBookVenue` / `onBookEquipment` 就不畫可點的格子(同 [shared/public-availability.md](../shared/public-availability.md))
 - 圖例不列「我的借用」(要有社團身分才判定得出來);格子也不帶待審單清單(那只給持 `abooking` 的承辦)
 - 資料走免登入的 `/public/*`,工讀生身分不影響看得到什麼
 - **工讀生端唯一不鏡射到行政端的頁**(其餘五頁見 [README](../README.md) 的 D-26):承辦在

@@ -32,6 +32,17 @@ class ClubAttribute(StrEnum):
     SPORTS = "體育性"
 
 
+class RecruitStatus(StrEnum):
+    """招生狀態;NULL=未設定(公開頁不顯示這顆標籤)。
+
+    前端 `api/clubProfile.ts` 的 RECRUIT_STATUSES 是第二份,改動須同步。
+    """
+
+    WELCOME = "歡迎加入"
+    CLOSED = "暫不開放"
+    FULL = "額滿"
+
+
 class MemberKind(StrEnum):
     """標準身份值;正副負責人顯示時依社團名稱末字推導(社→社長、會→會長)。"""
 

@@ -35,6 +35,7 @@ _MODULE_BY_PREFIX = {
     "postal": "apps",  # 線上申請
     "maintenance": "repair",  # 空間報修
     "violations": "viol",  # 違規勸導附件
+    "club_image": "clubimg",  # 社團形象圖(頭像/橫幅)
 }
 _PREFIX_BY_MODULE = {v: k for k, v in _MODULE_BY_PREFIX.items()}
 _LABELS = {
@@ -44,9 +45,10 @@ _LABELS = {
     "apps": "線上申請",
     "repair": "空間報修",
     "viol": "違規勸導",
+    "clubimg": "社團形象圖",
 }
 # 無報修檔案時的固定順序;有報修檔案時 repair 提到第一
-_BASE_ORDER = ("close", "eval", "apply", "apps", "repair", "viol")
+_BASE_ORDER = ("close", "eval", "apply", "apps", "repair", "viol", "clubimg")
 
 _SORTABLE = {"size": File.size, "created_at": File.created_at}
 
@@ -69,7 +71,8 @@ async def usage(user: FilesAdmin, db: DbDep) -> ApiResponse[FileUsageOut]:
     for prefix, count, size in rows:
         key = _MODULE_BY_PREFIX.get(prefix)
         if key is None:
-            continue  # 未知模組前綴(目前不存在)不計入
+            continue  # 未知模組前綴不計入 —— 新增一種上傳就要記得補 `_MODULE_BY_PREFIX`,
+            # 否則那批檔案既不進任何模組、也不進總量,畫面上的佔用會比磁碟少一截
         stats[key]["size"] += int(size)
         stats[key]["count"] += int(count)
 
@@ -136,7 +139,12 @@ async def list_files(
             mime=f.mime,
             created_at=f.created_at,
             archived=f.archived_at is not None,
+            # 公開檔(社團形象圖)全世界都拿得到,收起下載鈕只是讓畫面與事實相反:
+            # `can_access` 對 `public` 早退,同一個人打 /files/{id} 一樣拿得到。
+            # 不把 club_image 加進 FILE_SUBJECT_KEYS —— 那張表問的是「哪一頁的權限
+            # 開得了這一類檔」,公開檔不屬於任何一頁
             can_download=may_download
+            or f.public
             or permissions.can_download(f.subject_type, user.permissions),
         )
         for f, club_name in rows

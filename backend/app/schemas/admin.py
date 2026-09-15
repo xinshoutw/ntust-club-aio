@@ -18,6 +18,7 @@ from app.models.enums import (
 from app.schemas.accounts import _USERNAME_RE
 from app.schemas.activities import FileOut
 from app.schemas.bookings import RoomSlotOut
+from app.schemas.clubs import ClubPublicOut
 from app.schemas.common import strip_reason
 from app.services.scoring import AD_KEYS, AD_MAX
 
@@ -269,7 +270,13 @@ class AdminClubDetailOut(AdminClubOut):
     """單一社團:社團自管資料唯讀呈現 + 帳號與停權資訊。
 
     webhook 僅回是否已設定(布林),不回傳實值。
+
+    對外公開資料以巢狀的 `public` 帶出,**重用 `ClubPublicOut`** 而不是在這裡再抄一份欄位:
+    公開範圍只該有一個定義,兩份遲早一份漏改。
     """
+
+    public_visible: bool  # 行政端下架閥;社團端看不到也改不動
+    public: ClubPublicOut
 
     en_name: str | None
     intro: str
@@ -321,6 +328,11 @@ class AdminClubUpdate(BaseModel):
     en_name: str | None = Field(None, max_length=200)
     username: str | None = None
     is_active: bool | None = None
+    # 公開顯示開關(下架閥)。與 is_active 是**兩個判定**:停用社團本來就不公開,
+    # 而這裡關掉的社團帳號照常登入做事
+    public_visible: bool | None = None
+    # 關閉時必填,只寫進 audit_logs(不入 clubs —— 它是處置紀錄不是社團屬性)
+    public_hide_reason: str | None = Field(None, max_length=200)
 
     @field_validator("name")
     @classmethod

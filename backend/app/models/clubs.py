@@ -1,3 +1,4 @@
+import uuid
 from datetime import date, datetime
 
 import sqlalchemy as sa
@@ -5,7 +6,7 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, db_enum
-from app.models.enums import ClubAttribute, ClubKind, MemberKind
+from app.models.enums import ClubAttribute, ClubKind, MemberKind, RecruitStatus
 
 
 class Club(Base, TimestampMixin):
@@ -17,7 +18,8 @@ class Club(Base, TimestampMixin):
     # 負責人顯示詞(社長/會長)由此決定
     kind: Mapped[ClubKind] = mapped_column(db_enum(ClubKind, "club_kind"))
     en_name: Mapped[str | None] = mapped_column(sa.Text)  # 英文名(舊系統遷入)
-    # 停社的舊社團原性質不可考 → NULL(僅 is_active=false 者)
+    # 原性質不可考 → NULL:停社的舊社團,以及遷入時性質對不到 enum 的在校社團
+    # (`migration/cms_import.py` 只記數不中止)。導覽頁的「未分類」不是死 UI
     attribute: Mapped[ClubAttribute | None] = mapped_column(
         db_enum(ClubAttribute, "club_attribute")
     )
@@ -42,6 +44,55 @@ class Club(Base, TimestampMixin):
     # 公告已讀水位線(鈴鐺紅點):created_at 晚於此者未讀;NULL=全部未讀。
     # 一社一帳號,故掛在 club;鈴鐺開啟或進入總覽(公告所在頁)時前移
     announcements_read_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+
+    # --- 對外公開(社團導覽頁;社團自填,行政端唯讀) ---
+    # 行政端下架閥。與 is_active 是**兩個判定**:停用社團本來就不公開,
+    # 而這裡關掉的社團帳號仍照常登入做事
+    public_visible: Mapped[bool] = mapped_column(default=True, server_default=sa.true())
+    tagline: Mapped[str | None] = mapped_column(sa.Text)  # 一句話介紹(字卡塞不下 intro)
+    # 固定主檔(`schemas/clubs.CLUB_TAGS`),社團至多選 3 個 —— 自由填寫會讓導覽頁的
+    # 篩選長歪:同一件事會出現「程式」「寫程式」「Coding」三種寫法,篩選器列不完也對不起來
+    tags: Mapped[list[str]] = mapped_column(
+        ARRAY(sa.Text), default=list, server_default=sa.text("'{}'::text[]")
+    )
+    recruit_status: Mapped[RecruitStatus | None] = mapped_column(
+        db_enum(RecruitStatus, "recruit_status")
+    )
+    # 對外窗口。**不是 contact_emails** —— 那三組是公告通知收件人,屬內部設定
+    public_email: Mapped[str | None] = mapped_column(sa.Text)
+    # 只存帳號 ID(不含網址前綴):社團的對外主戰場是 IG,其餘平台實測沒人填
+    instagram: Mapped[str | None] = mapped_column(sa.Text)
+    office_location: Mapped[str | None] = mapped_column(sa.Text)
+    regular_schedule: Mapped[str | None] = mapped_column(sa.Text)  # 例行社課/練習
+    join_info: Mapped[str | None] = mapped_column(sa.Text)  # 入社方式與社費
+    signup_url: Mapped[str | None] = mapped_column(sa.Text)
+
+    # 形象圖:落盤的已是轉好的 WebP(頭像 1:1、橫幅 3:1),原圖不留。
+    # 刪檔時這兩欄要跟著清,故 ondelete=SET NULL 而非 RESTRICT。
+    # use_alter:這兩個 FK 讓 clubs → files → clubs(files.club_id)成環,
+    # 少了它 metadata.sorted_tables 會警告「unresolvable cycles」並放棄排序 ——
+    # create_all/drop_all 的順序從此不可靠(SQLAlchemy 亦預告未來版本會改成錯誤)。
+    # 帶 use_alter 就改以獨立的 ALTER TABLE 建立,環被切開
+    avatar_file_id: Mapped[uuid.UUID | None] = mapped_column(
+        sa.ForeignKey("files.id", ondelete="SET NULL", use_alter=True)
+    )
+    banner_file_id: Mapped[uuid.UUID | None] = mapped_column(
+        sa.ForeignKey("files.id", ondelete="SET NULL", use_alter=True)
+    )
+
+
+# 「這個社團現在對外看得到嗎」:停社與被行政端下架的都不算。
+# 公開端點與檔案授權共用這一份 —— 兩邊各寫一份的話,下架只會擋掉其中一條路
+VISIBLE_CLUB = (Club.is_active.is_(True), Club.public_visible.is_(True))
+
+
+def owns_public_image(file_id: uuid.UUID) -> sa.ColumnElement[bool]:
+    """這張圖現在還掛在哪個社團的頭像或橫幅上。
+
+    用「現在還被誰引用」當權威,而不是在社團下架時反手把 `files.public` 關掉 ——
+    後者是同一份判定的第二份,每一條未來會隱藏社團的路徑都得記得同步一次。
+    """
+    return sa.or_(Club.avatar_file_id == file_id, Club.banner_file_id == file_id)
 
 
 class ClubMember(Base, TimestampMixin):

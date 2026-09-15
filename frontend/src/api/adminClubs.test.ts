@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fetchAllAdminMembers, groupActiveClubs, type ClubOption } from './adminClubs'
+import { fetchAllAdminMembers, groupActiveClubs, hasPublicData, type ClubOption } from './adminClubs'
+import type { ClubPublicProfile } from './clubProfile'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -59,4 +60,33 @@ describe('groupActiveClubs', () => {
       { label: '未分類', options: ['待補性質社'] },
     ])
   })
+})
+
+describe('hasPublicData', () => {
+  const empty: ClubPublicProfile = {
+    tagline: '',
+    tags: [],
+    recruitStatus: '',
+    publicEmail: '',
+    instagram: '',
+    officeLocation: '',
+    regularSchedule: '',
+    joinInfo: '',
+    signupUrl: '',
+    avatarUrl: null,
+    bannerUrl: null,
+  }
+
+  // 全空時行政端只顯示一句「尚未填寫」,不鋪一排 —— 整排 `—` 看起來像載入壞了
+  it('一欄都沒填就是沒有公開資料', () => {
+    expect(hasPublicData(empty)).toBe(false)
+  })
+
+  it('任何一欄有值就算有', () => {
+    expect(hasPublicData({ ...empty, tagline: '每週三一起跳舞' })).toBe(true)
+    expect(hasPublicData({ ...empty, tags: ['運動'] })).toBe(true)
+    expect(hasPublicData({ ...empty, instagram: 'ntust_dance' })).toBe(true)
+    expect(hasPublicData({ ...empty, bannerUrl: '/api/v1/files/x' })).toBe(true)
+  })
+
 })

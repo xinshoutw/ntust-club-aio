@@ -1,21 +1,69 @@
 import re
+import uuid
 from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.semesters import SEMESTER_LABEL
-from app.models.enums import MemberKind
+from app.models.enums import MemberKind, RecruitStatus
 
 _DISCORD_WEBHOOK_RE = re.compile(r"^https://discord\.com/api/webhooks/\d+/[\w-]+$")
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 MAX_CONTACT_EMAILS = 3
+MAX_TAGS = 3
+
+# 標籤主檔:社團只能從這裡挑,至多 3 個。自由填寫會讓導覽頁的篩選長歪 ——
+# 同一件事會出現「程式」「寫程式」「Coding」三種寫法,篩選器列不完也對不起來。
+# 前端 `api/clubProfile.ts` 的 CLUB_TAGS 是第二份,改動須同步
+CLUB_TAGS: tuple[str, ...] = (
+    "系學會", "技術", "程式", "表演", "音樂", "美術", "遊戲",
+    "聯誼", "服務", "喝酒", "運動", "武術", "戶外", "飲食",
+)
+
+# Instagram 帳號 ID(不含網址):IG 自己的規則是英數、底線與句點,最長 30。
+# 搭配 fullmatch —— `$` 會放行結尾換行,而這一欄遲早會進信件或 CSV
+_INSTAGRAM_RE = re.compile(r"[A-Za-z0-9._]{1,30}")
 
 
-class ClubProfileOut(BaseModel):
+def _http_url(v: str, label: str) -> str:
+    if not v.startswith(("http://", "https://")):
+        raise ValueError(f"{label}須為 http(s) 網址")
+    return v
+
+
+class ClubPublicOut(BaseModel):
+    """社團端表單與行政端唯讀區共用的「公開範圍」投影。
+
+    不從 `ClubProfileOut` 挑減 —— 那樣的話以後往 profile 加一欄內部欄位,它會自己
+    跟著跑出來。**真正對外曝光的形狀以 `schemas/public.py` 為準**(那邊是另一份逐欄
+    白名單),這裡加欄位不等於公開端點就會送出去。
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
+    tagline: str | None
+    tags: list[str]
+    recruit_status: RecruitStatus | None
+    public_email: str | None
+    instagram: str | None  # 帳號 ID,不含網址前綴
+    office_location: str | None
+    regular_schedule: str | None
+    join_info: str | None
+    signup_url: str | None
+    avatar_file_id: uuid.UUID | None
+    banner_file_id: uuid.UUID | None
+
+
+class ClubProfileOut(ClubPublicOut):
+    """社團看自己的全部欄位 = 公開欄位 + 對內欄位。
+
+    `public_visible` **唯讀**帶給社團:開關仍只在行政端,但社團要知道自己的頁面
+    現在公不公開 —— 否則按「預覽社團頁」只會撞上 404,看起來像系統壞了。
+    """
+
     id: int
+    public_visible: bool
     name: str
     kind: str  # 社團/學會(負責人顯示詞推導依據)
     en_name: str | None
@@ -49,6 +97,75 @@ class ClubProfileUpdate(BaseModel):
     advisor_out_name: str | None = Field(None, max_length=50)
     advisor_out_dept: str | None = Field(None, max_length=50)
     advisor_out_email: str | None = Field(None, max_length=100)
+
+    # --- 對外公開(社團導覽頁);形象圖不在此,走自己的上傳端點 ---
+    # 這一組每一欄都可以是空的:空白就是那一段不出現在公開頁。因此顯式 null
+    # 一律當成「清空」而非錯誤 —— 但 tags 落在 NOT NULL 欄位上,不能就這樣寫進去,
+    # 由 `_clean_tags` 把 null 收成空陣列(見 ISS-105)
+    tagline: str | None = Field(None, max_length=40)
+    # 上限不寫在 Field 上:欄位層的 max_length 會搶在 _clean_tags 之前 422,
+    # 那正是下面那段註解要避免的事。裁切由驗證器負責
+    tags: list[str] | None = None
+    recruit_status: RecruitStatus | None = None
+    public_email: str | None = Field(None, max_length=100)
+    # 上限放寬到能容下整串貼上來的網址;真正的 30 字限制由驗證器在剝掉前綴之後才套。
+    # 這裡留得住 Field 層的檢查(tags 那邊拿掉了):200 字元以內裝得下任何一種
+    # 貼法,庫裡不會有超過的舊值,所以不存在「舊資料撞欄位層 422」那條路
+    instagram: str | None = Field(None, max_length=200)
+    office_location: str | None = Field(None, max_length=50)
+    regular_schedule: str | None = Field(None, max_length=200)
+    join_info: str | None = Field(None, max_length=500)
+    signup_url: str | None = Field(None, max_length=500)
+
+    @field_validator("tagline", "office_location", "regular_schedule", "join_info")
+    @classmethod
+    def _blank_to_none(cls, v: str | None) -> str | None:
+        # 空字串與 NULL 是同一件事(「沒填」),同一欄不要有兩種「沒填」
+        return (v or "").strip() or None
+
+    @field_validator("tags")
+    @classmethod
+    def _clean_tags(cls, v: list[str] | None) -> list[str]:
+        # NOT NULL 欄位:顯式 null 收成空陣列,不讓它撞 IntegrityError
+        cleaned: list[str] = []
+        for tag in v or []:
+            tag = tag.strip()
+            if not tag or tag in cleaned:
+                continue
+            # **丟掉而不是 raise**:主檔以後改動(或庫裡本來就有舊值)的話,
+            # 前端每次 PATCH 都原樣送回整個 tags,而 TagPicker 只畫得出主檔裡的按鈕 ——
+            # 那個社團從此連改一句 tagline 都會吃 422,而畫面上看不到也刪不掉那個標籤
+            if tag in CLUB_TAGS:
+                cleaned.append(tag)
+        return cleaned[:MAX_TAGS]
+
+    @field_validator("instagram")
+    @classmethod
+    def _clean_instagram(cls, v: str | None) -> str | None:
+        """只存帳號 ID:貼整串網址、省略 scheme、帶 @ 或帶 `?igsh=` 都收得下來。
+
+        取最後一個 `/` 之後那一段就好 —— 不必列舉 `m.` / `instagr.am` 這些子網域,
+        列舉漏一個就是一個 422。**剝不出合法帳號時丟掉而不是 raise**,理由同
+        `_clean_tags`:前端每次 PATCH 都原樣送回這一欄,庫裡留著一個舊格式的值,
+        那個社團從此連改一句 tagline 都送不出去,而畫面上那一欄看起來完全正常。
+        """
+        v = re.split(r"[?#]", (v or "").strip(), maxsplit=1)[0]
+        v = v.rstrip("/").rpartition("/")[2].strip("@ ")
+        return v if _INSTAGRAM_RE.fullmatch(v) else None
+
+    @field_validator("public_email")
+    @classmethod
+    def _valid_public_email(cls, v: str | None) -> str | None:
+        v = (v or "").strip()
+        if v and not _EMAIL_RE.match(v):
+            raise ValueError(f"對外聯絡信箱格式不正確:{v}")
+        return v or None
+
+    @field_validator("signup_url")
+    @classmethod
+    def _valid_signup_url(cls, v: str | None) -> str | None:
+        v = (v or "").strip()
+        return _http_url(v, "報名連結") if v else None
 
     @field_validator("intro")
     @classmethod

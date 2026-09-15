@@ -116,6 +116,25 @@ erDiagram
 | is_active | bool | 退社/未立案=停用 |
 | announcements_read_at | timestamptz NULL | 公告已讀水位線:`created_at` 晚於此者為未讀。一社一帳號故掛在 club |
 
+**clubs 的對外公開欄位**(社團自填,出現在免登入的社團導覽頁)
+
+| 欄位 | 型別 | 說明 |
+|---|---|---|
+| public_visible | bool | **行政端下架閥**,預設 true。關掉即該社從所有公開端點消失;與 `is_active` 是兩個判定 |
+| tagline | text NULL | 一句話介紹(≤40),字卡上放不下 `intro` |
+| tags | text[] | **固定主檔**(`schemas/clubs.CLUB_TAGS`,14 個),至多 3 個。自由填寫會讓導覽頁的篩選長歪:同一件事三種寫法,篩選器列不完也對不起來 |
+| recruit_status | enum(歡迎加入,暫不開放,額滿) NULL | NULL=未設定,公開頁不顯示 |
+| public_email | text NULL | 對外窗口。**與 `contact_emails` 是兩回事**,那三組是公告通知收件人 |
+| instagram | text NULL | **只存帳號 ID**(不含網址前綴);貼整串網址或帶 `@` 由 schema 正規化。其餘平台實測沒人填 |
+| office_location | text NULL | 社辦位置(≤50) |
+| regular_schedule | text NULL | 例行社課/練習時間地點(≤200) |
+| join_info | text NULL | 入社方式與社費(≤500) |
+| signup_url | text NULL | 報名連結 |
+| avatar_file_id | FK files NULL | 頭像 1:1 |
+| banner_file_id | FK files NULL | 橫幅 3:1 |
+
+形象圖走 `IMAGE` 上傳政策(10MB 內),但**一律轉成 WebP 並縮到目標尺寸後才落盤**(頭像 512×512、橫幅 1800×600),原圖不留;比例不合由 `ImageOps.fit` 置中裁切。**橫幅上不壓任何文字**,字卡與詳細頁用同一個 3:1 比例,兩邊都不裁切 —— 因此沒有黑化、模糊與字色判定這回事(設計定案時一併移除)。沒傳橫幅的社團由前端以社團 id 當種子生預設圖,不存檔也不佔配額。`files.club_id` 刻意留 NULL —— 形象圖不計入社團儲存配額,社團不該為了傳結案照片刪掉自己的橫幅。
+
 社長不另設欄位,由 `club_members`(kind=負責人)推導;逾期次數同理由 `equipment_loans` 推導 —— 雙寫必然漂移。
 
 **club_members**(id, club_id, name, student_id, kind enum(負責人,副負責人,幹部,社員), title text NULL, semester text;UNIQUE(club_id, student_id, semester))
@@ -229,6 +248,7 @@ approved 且 end_date + N 天已過且未送結案 → 逾期鎖定(推導,非�
 | sha256 | text | 前端先算、後端驗證 |
 | path | text | `{module}/{YYYY}/{MM}/{uuid}` |
 | archived_at | timestamptz NULL | 已備份下載並自磁碟刪除;非 NULL 時下載回 410、不計配額 |
+| public | bool | 免登入取得。**只有社團形象圖會是 true**;`can_access()` 的四種角色判定管不到匿名,公開檔必須是檔案自己的屬性而不是在權限函式裡多開一個分支 |
 
 兩個 partial unique index 把去重收口在 DB 層,併發的先查後寫由索引攔下並回 409:
 

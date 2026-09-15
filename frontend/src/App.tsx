@@ -1,5 +1,5 @@
-import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router'
-import { useMemo, type ReactNode } from 'react'
+import { Navigate, NavigationType, Outlet, Route, Routes, useLocation, useNavigationType } from 'react-router'
+import { useEffect, useMemo, type ReactNode } from 'react'
 import { useAuth, type Role } from './app/auth'
 import { buildAdminNav, buildClubNav, buildPtNav, buildViewerNav } from './lib/nav'
 import { canAccessAdminPath } from './lib/permissions'
@@ -11,7 +11,9 @@ import QueryError from './components/ui/QueryError'
 import LoginPage from './features/auth/LoginPage'
 import ChangePasswordPage from './features/auth/ChangePasswordPage'
 import ComingSoonPage from './features/auth/ComingSoonPage'
-import PublicHomePage from './features/public/PublicHomePage'
+import ClubDetailPage from './features/public/ClubDetailPage'
+import ClubDirectoryPage from './features/public/ClubDirectoryPage'
+import PublicAvailabilityPage from './features/public/PublicAvailabilityPage'
 import OverviewPage from './features/overview/OverviewPage'
 import ActivityListPage from './features/activities/ActivityListPage'
 import ActivityFormPage from './features/activities/ActivityFormPage'
@@ -106,12 +108,14 @@ function ClubShell() {
   return <AppShell nav={nav} />
 }
 
-// 未登入的首頁是公開的借用情形預覽(Roadmap 的免登入入口);
-// 其餘社團頁沒有公開版本,一律照舊轉登入頁
+// 未登入的首頁是社團導覽(Roadmap 的免登入入口;借用情形移到 /availability,
+// 由 topbar 的「借用情形」進去)。其餘社團頁沒有公開版本,一律照舊轉登入頁
 function ClubArea() {
-  const { user, booting, bootError } = useAuth()
+  const { user, booting } = useAuth()
   const { pathname } = useLocation()
-  if (!booting && !bootError && !user && pathname === '/') return <PublicHomePage />
+  // 不看 bootError:導覽頁不需要知道你是誰。`/auth/me` 非 401 失敗(後端抖一下)
+  // 時擋掉的話,一個根本沒有帳號的新生會看到「無法確認登入狀態 / 改用其他帳號登入」
+  if (!booting && !user && pathname === '/') return <ClubDirectoryPage />
   return (
     <RequireRole roles={['club']}>
       <ClubShell />
@@ -166,10 +170,31 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return children
 }
 
+/** 換頁時捲回頁首。
+ *
+ *  `BrowserRouter` 不像 data router 有 `ScrollRestoration`,一般的換頁會原地留在原本的
+ *  高度:在導覽頁捲到第 40 個社團點進去,社團頁會從中段開始,看不到橫幅也看不到社團名。
+ *
+ *  **POP 除外** —— 上一頁／下一頁的捲動位置是瀏覽器自己還原的,一律歸零等於把
+ *  「回到剛才看的那張卡」變成「回到最頂端」。 */
+function useScrollToTop(): void {
+  const { pathname } = useLocation()
+  const navType = useNavigationType()
+  useEffect(() => {
+    if (navType !== NavigationType.Pop) window.scrollTo(0, 0)
+  }, [pathname, navType])
+}
+
 export default function App() {
+  useScrollToTop()
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+
+      {/* 免登入的公開頁:不在 RequireRole 底下,登入中的人照樣看得到 */}
+      <Route path="/clubs" element={<ClubDirectoryPage />} />
+      <Route path="/clubs/:clubId" element={<ClubDetailPage />} />
+      <Route path="/availability" element={<PublicAvailabilityPage />} />
       <Route
         path="/change-password"
         element={

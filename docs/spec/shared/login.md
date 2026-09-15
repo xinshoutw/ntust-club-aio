@@ -4,7 +4,7 @@
 
 ## 用途
 
-唯一入口。未登入的 `/` 是借用情形的公開預覽([shared/public-home.md](public-home.md)),右上角登入鈕進本頁;其餘社團路徑仍直接導向這裡。
+唯一入口。未登入的 `/` 是社團導覽([club-directory.md](club-directory.md)),右上角登入鈕進本頁;其餘社團路徑仍直接導向這裡。
 
 ## 資料來源
 
@@ -20,11 +20,15 @@
 
 **登入頁**:標題「社團管理系統」、帳號、密碼、登入鈕;頁尾 `Copyright © 2026 國立臺灣科技大學` + 維護者資訊 Popover(姓名、Discord、信箱)。跨年後自動顯示 `2026-{今年}`。
 
-**改密頁**:目前密碼、新密碼、確認新密碼;副標依 `mustChangePassword` 切換為「首次登入需變更密碼後才能繼續使用」或「變更登入密碼」。密碼規則以說明文字呈現。底部「改用其他帳號登入」= 登出。
+**改密頁**(整頁版,`/change-password`):目前密碼、新密碼、確認新密碼;副標依 `mustChangePassword` 切換為「首次登入請更新密碼」或「變更登入密碼」。密碼規則以說明文字呈現。底部「改用其他帳號登入」= 登出。
+
+已登入的人平常改密走的是**頂欄帳號選單的對話框**(`features/auth/ChangePasswordModal`,每個角色都有);這一頁留給 `mustChangePassword` 的情形 —— 那時後端擋著所有業務端點,使用者根本到不了頂欄。
 
 **面板未開放頁**:`homeOf()` 對未知角色的落點,只有姓名與登出鈕。四種角色現皆有面板,實際到不了。
 
 ## 規則
+
+- 登入鈕下方有「返回首頁」:首頁是免登入的社團導覽,誤點進來的訪客要有路回去
 
 - 登入成功後依 `mustChangePassword` 導向 `/change-password`,否則導向 `homeOf(role)`:`admin`→`/admin`、`club`→`/`、`staff`→`/pt`、`viewer`→`/viewer`
 - 未改密時後端 `get_current_user` 對所有業務端點回 403 `PASSWORD_CHANGE_REQUIRED`,只放行 `/auth/me`、改密、登出

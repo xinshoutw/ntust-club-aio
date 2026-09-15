@@ -37,6 +37,13 @@ MAX_PUBLIC_ACTIVITIES = 200  # 單一社團的歷年活動;上限防整表拖下
 # 主鍵是 PostgreSQL 的 int4:超界的值會在 asyncpg 綁參數時 OverflowError → 500,
 # 而這些是**匿名打得到**的路徑 —— 未登入、零成本就能一次塞進三十份 traceback。
 # 擋在 schema 就回 422,連 DB 都不必碰
+# 公開通道只送形象圖。`media_type` 取自 DB 的 `files.mime`,而唯一的 writer
+# (`save_club_image`)無條件寫 image/webp —— 但那是一條靠人記住的約定,不是程式收口。
+# 真的被改成 text/html 的話,`content_disposition_type="inline"` 會讓它以同源 HTML 渲染;
+# 全域的 `default-src 'none'` 擋得下 script,**但 CSP3 的 form-action 不 fallback 到
+# default-src**,一份純 HTML 表單仍然可以是釣魚頁
+PUBLIC_IMAGE_MIMES = frozenset({"image/webp", "image/png", "image/jpeg", "image/avif"})
+
 PG_INT_MAX = 2_147_483_647
 ClubId = Annotated[int, PathParam(ge=1, le=PG_INT_MAX)]
 VenueId = Annotated[int | None, Query(ge=1, le=PG_INT_MAX)]
@@ -231,9 +238,21 @@ async def public_file(file_id: uuid.UUID, db: DbDep) -> FileResponse:
             sa.exists(owned_by_visible_club),
         )
     )
-    if file is None:
+    if file is None or file.mime not in PUBLIC_IMAGE_MIMES:
         raise not_found("找不到檔案")
     disk = Path(settings.upload_dir) / file.path
-    response = FileResponse(disk, media_type=file.mime, content_disposition_type="inline")
+    # 一次 stat 交給 Starlette,不做 check-then-open:兩者之間檔案消失的話
+    # `FileResponse` 會丟 RuntimeError 變成 500,而「社團在換圖、同時有人在看導覽頁」
+    # 正是這支端點最常見的併發組合(`_replace_image` 的 unlink 排在 commit 之後)
+    try:
+        stat_result = disk.stat()
+    except OSError:
+        raise not_found("找不到檔案") from None
+    response = FileResponse(
+        disk,
+        stat_result=stat_result,
+        media_type=file.mime,
+        content_disposition_type="inline",
+    )
     response.headers["Cache-Control"] = "public, max-age=3600"
     return response

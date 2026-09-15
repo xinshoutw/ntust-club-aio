@@ -10,6 +10,7 @@ import pytest
 from fastapi import UploadFile
 from PIL import Image
 
+from app.core.config import settings
 from app.models import Activity, File
 from app.models.enums import ActivityStatus, ActivityType
 from app.services import files as file_service
@@ -363,3 +364,27 @@ async def test_out_of_range_venue_id_is_rejected(client):
         params={"start": "2026-03-01", "end": "2026-03-02", "venue": 2147483648},
     )
     assert res.status_code == 422, res.text
+
+
+async def test_the_public_channel_only_serves_image_media_types(client, db):
+    """`media_type` 取自 DB;唯一的 writer 寫 image/webp,但那是約定不是收口。
+
+    真被改成 text/html 就會以同源 HTML 內嵌渲染 —— `default-src 'none'` 擋得下 script,
+    但 CSP3 的 `form-action` 不 fallback 到 default-src,純表單釣魚頁照樣成立。
+    """
+    club = await make_club(db)
+    row = await make_public_image(db, club)
+    row.mime = "text/html"
+    await db.commit()
+
+    assert (await client.get(f"/api/v1/public/files/{row.id}")).status_code == 404
+
+
+async def test_a_vanished_file_is_404_not_500(client, db):
+    """check-then-open 的窗口:社團換圖的 unlink 排在 commit 之後,
+    而這支是全站請求量最高的檔案端點。"""
+    club = await make_club(db)
+    row = await make_public_image(db, club)
+    (settings.upload_dir / row.path).unlink()
+
+    assert (await client.get(f"/api/v1/public/files/{row.id}")).status_code == 404

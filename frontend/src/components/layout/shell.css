@@ -214,6 +214,14 @@
   .topbar-user {
     display: none;
   }
+  /* 社團導覽收成圖示鈕:四個字加圖示會把頁名擠掉。整顆不隱藏 ——
+     抽屜的側欄沒有這一項,藏掉等於手機上沒有入口(aria-label 仍在) */
+  .topbar-directory > span:not(.anticon) {
+    display: none;
+  }
+  .topbar-directory {
+    padding-inline: 10px;
+  }
   .topbar-mobile-title {
     display: block;
   }

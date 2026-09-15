@@ -38,6 +38,21 @@ class SocialLink(BaseModel):
         return _http_url(v.strip(), "社群連結")
 
 
+class SocialLinkOut(BaseModel):
+    """輸出側的社群連結:**刻意不掛 `SocialLink` 的驗證**。
+
+    輸出 schema 沿用輸入的限制,等於把「使用者現在能送什麼」變成「庫裡准許存在什麼」。
+    `SocialKind` 的值日後改名或移除、`max_length` 收緊、或有人直接改 DB,
+    這一列就會讓 `ClubProfileOut.model_validate` 整個 500 —— 社團連自己的管理項目
+    都打不開,行政端也看不到那一社。
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    kind: str
+    url: str
+
+
 class ClubPublicOut(BaseModel):
     """對外公開的社團欄位。
 
@@ -51,7 +66,7 @@ class ClubPublicOut(BaseModel):
     tags: list[str]
     recruit_status: RecruitStatus | None
     public_email: str | None
-    social_links: list[SocialLink]
+    social_links: list[SocialLinkOut]
     office_location: str | None
     regular_schedule: str | None
     join_info: str | None
@@ -147,7 +162,12 @@ class ClubProfileUpdate(BaseModel):
     @field_validator("social_links")
     @classmethod
     def _clean_social(cls, v: list[SocialLink] | None) -> list[SocialLink]:
-        return v or []  # 同 tags:NOT NULL 欄位不吃 null
+        # 同 tags:NOT NULL 欄位不吃 null。一平台一格 —— 前端本來就是六個固定欄位,
+        # 但直呼 API 送得出兩筆 instagram,而讀回來時只有最後一筆活得下來
+        seen: dict[str, SocialLink] = {}
+        for link in v or []:
+            seen[link.kind] = link
+        return list(seen.values())
 
     @field_validator("banner_dim", "banner_blur")
     @classmethod

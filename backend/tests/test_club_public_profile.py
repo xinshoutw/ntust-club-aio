@@ -460,3 +460,35 @@ async def test_removing_an_image_twice_is_not_an_error(client, db):
     second = await client.delete("/api/v1/club/profile/avatar", headers=csrf_headers(client))
     assert (first.status_code, second.status_code) == (200, 200)
     assert second.json()["data"]["avatar_file_id"] is None
+
+
+async def test_stale_social_links_do_not_break_reading_the_profile(db, client):
+    """輸出 schema 不沿用輸入的限制:庫裡的舊值不該讓社團連管理項目都打不開。
+
+    `SocialKind` 改名或移除、`max_length` 收緊、或有人直接改 DB,只要輸出側掛著
+    輸入的驗證,那一列一讀就 500(AGENTS.md 記下的坑,實測過 60 個活動打不開)。
+    """
+    club = await make_club(db)
+    await make_user(db, username="club01", club_id=club.id)
+    # 直接寫進庫:模擬「規則收緊前存下的值」
+    club.social_links = [{"kind": "plurk", "url": "noturl"}]
+    await db.commit()
+
+    await login(client, "club01")
+    res = await client.get("/api/v1/club/profile")
+    assert res.status_code == 200, res.text
+    assert res.json()["data"]["social_links"] == [{"kind": "plurk", "url": "noturl"}]
+
+
+def test_social_links_are_deduped_by_platform():
+    links = ClubProfileUpdate(
+        social_links=[
+            {"kind": "instagram", "url": "https://instagram.com/old"},
+            {"kind": "instagram", "url": "https://instagram.com/new"},
+            {"kind": "line", "url": "https://line.me/x"},
+        ]
+    ).social_links
+    assert [(link.kind, link.url) for link in links] == [
+        ("instagram", "https://instagram.com/new"),
+        ("line", "https://line.me/x"),
+    ]

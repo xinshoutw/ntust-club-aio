@@ -6,6 +6,7 @@ import { Cols } from '../../components/ui/tableControls'
 import QueryError from '../../components/ui/QueryError'
 import { ApiError } from '../../api/client'
 import { usePublicClub, usePublicClubActivities } from '../../api/publicClubs'
+import useDocumentTitle from './useDocumentTitle'
 import ClubArt, { BADGE_CLASS } from './clubArt'
 import PublicShell from './PublicShell'
 import './publicClubs.css'
@@ -20,6 +21,7 @@ export default function ClubDetailPage() {
   const valid = Number.isInteger(id) && id > 0 && id <= 2_147_483_647
   const club = usePublicClub(valid ? id : null)
   const activities = usePublicClubActivities(valid ? id : null)
+  useDocumentTitle(club.data?.name ?? null)
 
   if (!valid || club.isLoadingError) {
     // 後端對停社與下架的社團一律 404(不交代它曾經存在),所以這裡不能只說「載入失敗」。
@@ -74,8 +76,7 @@ export default function ClubDetailPage() {
                   </div>
                   {c.recruitStatus && (
                     <span
-                      className={`club-badge ${BADGE_CLASS[c.recruitStatus] ?? 'closed'}`}
-                      style={{ borderRadius: 999, border: '1px solid' }}
+                      className={`club-badge pill ${BADGE_CLASS[c.recruitStatus] ?? 'closed'}`}
                     >
                       {c.recruitStatus}
                     </span>
@@ -203,8 +204,10 @@ export default function ClubDetailPage() {
                     <div style={{ overflowX: 'auto' }}>
                       {/* `tb fixed` + <Cols> 是全站表格慣例:欄寬固定,日期與時間才不會被
                           內容擠到換行;minWidth 讓窄螢幕產生水平捲軸而不是壓縮欄位 */}
-                      <table className="tb fixed" style={{ minWidth: 560 }} aria-label="活動紀錄">
-                        <Cols widths={[150, 130, 'auto', 200]} />
+                      <table className="tb fixed" style={{ minWidth: 600 }} aria-label="活動紀錄">
+                        {/* 190/120:扣掉 td 的 32px padding 還容得下跨日的
+                            「2026/09/15 – 2026/09/16」與「19:00 – 21:00」 */}
+                        <Cols widths={[190, 120, 'auto', 200]} />
                         <thead>
                           <tr>
                             <th scope="col">日期</th>
@@ -216,9 +219,9 @@ export default function ClubDetailPage() {
                         <tbody>
                           {(activities.data ?? []).map((a) => (
                             <tr key={a.id}>
-                              <td className="num">{a.dateSpan}</td>
+                              <td className="num nowrap">{a.dateSpan}</td>
                               {/* 起訖時間是選填:拿不到值顯示 —,不用 00:00 頂替 */}
-                              <td className="num">{a.timeSpan || '—'}</td>
+                              <td className="num nowrap">{a.timeSpan || '—'}</td>
                               <td>{a.name}</td>
                               <td>{a.location}</td>
                             </tr>

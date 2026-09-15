@@ -188,6 +188,20 @@
   border-color: #d5d9df;
 }
 
+/* 詳細頁的徽章是整顆膠囊,字卡上的是左上／右下不對稱的那一種。
+   只覆寫圓角與邊框的粗細樣式 —— 邊色留給上面三個 class,`border: 1px solid`
+   這個 shorthand 會順手把 border-color 打回 currentColor */
+.club-badge.pill {
+  border-radius: 999px;
+  border-width: 1px;
+  border-style: solid;
+}
+
+/* 日期與時間不換行(club-detail.md);`.tb.fixed td` 預設是 break-word */
+.tb.fixed td.nowrap {
+  white-space: nowrap;
+}
+
 /* ---- 詳細頁 ---- */
 .club-hero {
   aspect-ratio: 3 / 1;

@@ -23,6 +23,13 @@ def png_bytes(width: int, height: int, color: tuple[int, int, int] = (10, 10, 10
     return buf.getvalue()
 
 
+def transparent_png_bytes(size: int = 300) -> bytes:
+    """全透明的 PNG:社團上傳的 logo 最常見就是這種去背圖。"""
+    buf = io.BytesIO()
+    Image.new("RGBA", (size, size), (0, 0, 0, 0)).save(buf, format="PNG")
+    return buf.getvalue()
+
+
 def upload_of(name: str, content: bytes) -> UploadFile:
     return UploadFile(io.BytesIO(content), filename=name, size=len(content))
 
@@ -217,6 +224,24 @@ async def test_a_hidden_clubs_image_stops_being_readable_by_others(db, hide):
     assert await file_service.can_access(db, row, stranger) is False
     assert await file_service.can_access(db, row, viewer) is False
     assert await file_service.can_access(db, row, owner) is True
+
+
+async def test_a_transparent_logo_is_flattened_onto_white(db):
+    """透明底不能變黑底。
+
+    `convert("RGB")` 是直接丟掉 alpha —— 透明像素留下的是底層 RGB,而多數編碼器
+    在那裡寫 0。字卡與社團頁的底都是白的,壓到白底才和社團看到的原圖一樣。
+    """
+    club = await make_club(db)
+    owner = await make_user(db, username="club01", club_id=club.id)
+
+    row = await file_service.save_club_image(
+        db, upload_of("logo.png", transparent_png_bytes()), slot="avatar", uploaded_by=owner.id
+    )
+    await db.commit()
+
+    with Image.open(pathlib.Path(settings.upload_dir) / row.path) as out:
+        assert out.convert("RGB").getpixel((5, 5)) == (255, 255, 255)
 
 
 async def test_an_unreferenced_public_image_is_readable_by_nobody(db):

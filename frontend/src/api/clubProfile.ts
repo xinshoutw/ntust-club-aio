@@ -226,9 +226,44 @@ export function useUpdateClubProfile() {
         }),
       }).then(toProfile),
     // 儲存成功即以 server 回傳值為新基準
-    onSuccess: (data) => qc.setQueryData(clubProfileKeys.profile, data),
+    onSuccess: (data) => qc.setQueryData(clubProfileKeys.profile, keepImages(data)),
   })
 }
+
+
+/** 三支 mutation 共用同一份快取,但各自只擁有一部分欄位。
+ *
+ *  整份覆蓋的話,並發時後回的那一份會把先回的蓋掉:表單儲存中順手換了頭像,
+ *  PATCH 的回應(它的 body 根本不含形象圖)會把剛上傳好的圖打回舊值,畫面上圖就消失了,
+ *  要等下次重抓才回來。上傳與移除只動兩個圖欄位,PATCH 只動圖以外的。
+ */
+const mergeImages =
+  (next: ClubProfile) =>
+  (prev: ClubProfile | undefined): ClubProfile =>
+    prev
+      ? {
+          ...prev,
+          public: {
+            ...prev.public,
+            avatarUrl: next.public.avatarUrl,
+            bannerUrl: next.public.bannerUrl,
+          },
+        }
+      : next
+
+const keepImages =
+  (next: ClubProfile) =>
+  (prev: ClubProfile | undefined): ClubProfile =>
+    prev
+      ? {
+          ...next,
+          public: {
+            ...next.public,
+            avatarUrl: prev.public.avatarUrl,
+            bannerUrl: prev.public.bannerUrl,
+          },
+        }
+      : next
 
 
 // ---- 形象圖:選檔即上傳,不隨表單儲存(要有預覽可看,壓進 PATCH 就得先傳暫存檔再綁定)----
@@ -243,7 +278,7 @@ export function useUploadClubImage() {
         toProfile,
       )
     },
-    onSuccess: (data) => qc.setQueryData(clubProfileKeys.profile, data),
+    onSuccess: (data) => qc.setQueryData(clubProfileKeys.profile, mergeImages(data)),
   })
 }
 
@@ -252,6 +287,6 @@ export function useRemoveClubImage() {
   return useMutation({
     mutationFn: (slot: ClubImageSlot) =>
       api<ClubProfileOut>(`/club/profile/${slot}`, { method: 'DELETE' }).then(toProfile),
-    onSuccess: (data) => qc.setQueryData(clubProfileKeys.profile, data),
+    onSuccess: (data) => qc.setQueryData(clubProfileKeys.profile, mergeImages(data)),
   })
 }

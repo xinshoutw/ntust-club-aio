@@ -146,6 +146,7 @@ export default function ClubDirectoryPage() {
         <QueryError
           title="社團清單載入失敗"
           error={query.error}
+          retrying={query.isFetching}
           onRetry={() => void query.refetch()}
         />
       ) : (

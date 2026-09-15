@@ -21,16 +21,20 @@ export default function ClubDetailPage() {
   const activities = usePublicClubActivities(valid ? id : null)
   useDocumentTitle(club.data?.name ?? null)
 
-  if (!valid || club.isLoadingError) {
-    // 後端對停社與下架的社團一律 404(不交代它曾經存在),所以這裡不能只說「載入失敗」。
-    // 認 status 不認訊息字串:後端把「找不到社團」改成別的說法,這裡就會變成無限重試
-    // 一個永久 404;反過來任何含「找不到」的 5xx 會被當成停社而藏掉重試鈕
-    const notFound = !valid || (club.error instanceof ApiError && club.error.status === 404)
+  // 認 status 不認訊息字串:後端把「找不到社團」改成別的說法,這裡就會變成無限重試
+  // 一個永久 404;反過來任何含「找不到」的 5xx 會被當成停社而藏掉重試鈕
+  const notFound = !valid || (club.error instanceof ApiError && club.error.status === 404)
+  // `isLoadingError` 只認首載失敗,手上已有資料時重抓失敗走的是 `isRefetchError` ——
+  // 那條規則是為了「暫時失敗不要換掉已知事實」,但 **404 是新的事實不是失敗**:
+  // 行政端把社團下架後,開著這一頁的人會繼續看到舊 profile,下架對他等於沒發生
+  if (!valid || club.isLoadingError || notFound) {
+    // 後端對停社與下架的社團一律 404(不交代它曾經存在),所以這裡不能只說「載入失敗」
     return (
       <PublicShell mobileTitle="社團">
         <QueryError
           title={notFound ? '找不到這個社團' : '社團資料載入失敗'}
           error={notFound ? new Error('這個社團可能已經停社，或目前未公開') : club.error}
+          retrying={club.isFetching}
           onRetry={valid && !notFound ? () => void club.refetch() : undefined}
         />
       </PublicShell>
@@ -180,6 +184,7 @@ export default function ClubDetailPage() {
                   compact
                   title="活動紀錄載入失敗"
                   error={activities.error}
+                  retrying={activities.isFetching}
                   onRetry={() => void activities.refetch()}
                 />
               ) : (

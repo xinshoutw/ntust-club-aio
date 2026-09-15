@@ -4,6 +4,7 @@ import { ArrowLeftOutlined } from '@ant-design/icons'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { Cols } from '../../components/ui/tableControls'
 import QueryError from '../../components/ui/QueryError'
+import { ApiError } from '../../api/client'
 import { usePublicClub, usePublicClubActivities } from '../../api/publicClubs'
 import ClubArt, { BADGE_CLASS } from './clubArt'
 import PublicShell from './PublicShell'
@@ -21,8 +22,10 @@ export default function ClubDetailPage() {
   const activities = usePublicClubActivities(valid ? id : null)
 
   if (!valid || club.isLoadingError) {
-    // 後端對停社與下架的社團一律 404(不交代它曾經存在),所以這裡不能只說「載入失敗」
-    const notFound = !valid || /404|找不到/.test(String(club.error?.message ?? ''))
+    // 後端對停社與下架的社團一律 404(不交代它曾經存在),所以這裡不能只說「載入失敗」。
+    // 認 status 不認訊息字串:後端把「找不到社團」改成別的說法,這裡就會變成無限重試
+    // 一個永久 404;反過來任何含「找不到」的 5xx 會被當成停社而藏掉重試鈕
+    const notFound = !valid || (club.error instanceof ApiError && club.error.status === 404)
     return (
       <PublicShell mobileTitle="社團">
         <QueryError
@@ -164,7 +167,9 @@ export default function ClubDetailPage() {
                     {c.joinInfo && (
                       <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{c.joinInfo}</p>
                     )}
-                    {c.signupUrl && (
+                    {/* 守衛同 websiteUrl:輸出端刻意不驗證(後端只收口輸入),
+                        遷入或匯入腳本塞進來的值會直接變成一顆可點的連結 */}
+                    {c.signupUrl && HTTP_URL.test(c.signupUrl) && (
                       <Button
                         type="primary"
                         href={c.signupUrl}

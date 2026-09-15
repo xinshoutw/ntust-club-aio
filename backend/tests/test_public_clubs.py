@@ -98,6 +98,8 @@ async def test_the_list_order_is_stable(client, db):
     first = [c["name"] for c in (await client.get(URL)).json()["data"]]
     second = [c["name"] for c in (await client.get(URL)).json()["data"]]
     assert first == second
+    # 釘住次序本身,不只是「兩次一樣」—— 後者把 order_by 整條刪掉也會綠
+    assert first == sorted(first)
     assert sorted(first) == sorted(["熱舞社", "吉他社", "圍棋社"])
 
 

@@ -1,6 +1,6 @@
 // 管理項目的「對外公開資料」全寬區塊:這裡填的每一欄都會出現在免登入的社團導覽頁,
 // 因此獨立成一段擺在對內設定之上 —— 與聯絡通知並排會讓人分不出哪些欄位校外看得到。
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { App, Button, Form, Input, Segmented, Tooltip } from 'antd'
 import { DeleteOutlined, EyeOutlined, UploadOutlined } from '@ant-design/icons'
 import { useClubConfig } from '../../api/clubConfig'
@@ -63,7 +63,6 @@ function ImagePicker({
   const inputRef = useRef<HTMLInputElement>(null)
   const upload = useUploadClubImage()
   const remove = useRemoveClubImage()
-  const [busy, setBusy] = useState(false)
 
   const pick = async (file: File) => {
     // 副檔名與魔術位元組都先驗:後端一樣會擋,但那要跑完一趟往返才知道
@@ -75,39 +74,33 @@ function ImagePicker({
       message.error(`圖片不得超過 ${fmtMB(maxBytes)}`)
       return
     }
-    setBusy(true)
     try {
       await upload.mutateAsync({ slot, file })
       message.success(`${label}已更新`)
     } catch (e) {
       message.error(e instanceof Error ? e.message : '上傳失敗')
-    } finally {
-      setBusy(false)
     }
   }
 
   const drop = async () => {
-    setBusy(true)
     try {
       await remove.mutateAsync(slot)
       message.success(`${label}已移除`)
     } catch (e) {
       message.error(e instanceof Error ? e.message : '移除失敗')
-    } finally {
-      setBusy(false)
     }
   }
 
   return (
     <div style={{ display: 'grid', gap: 8 }}>
       <div style={{ fontSize: 13, color: 'var(--steel)' }}>{label}</div>
-      {/* 兩個框等高,寬度由各自的比例推出來(頭像 1:1 → 132、橫幅 3:1 → 396),
-          並排時上下緣才對得齊 */}
+      {/* 寬度由各自的比例推出來(頭像 1:1 → 132、橫幅 3:1 → 396),欄夠寬時兩個框等高。
+          `height` + `maxWidth` 的寫法在欄寬不足時會把比例壓掉,社團看到的裁切就不是
+          公開頁上的那一張 —— 比例要優先於上下緣對齊 */}
       <div
         style={{
-          height: IMAGE_FRAME_HEIGHT,
+          width: `min(100%, ${IMAGE_FRAME_HEIGHT * CLUB_IMAGE_RATIO[slot]}px)`,
           aspectRatio: String(CLUB_IMAGE_RATIO[slot]),
-          maxWidth: '100%',
           border: '1px solid var(--line)',
           borderRadius: 6,
           overflow: 'hidden',
@@ -138,8 +131,8 @@ function ImagePicker({
         />
         <Button
           icon={<UploadOutlined />}
-          loading={busy}
-          disabled={busy}
+          loading={upload.isPending || remove.isPending}
+          disabled={upload.isPending || remove.isPending}
           onClick={() => inputRef.current?.click()}
         >
           {url ? '更換圖片' : '選擇圖片'}
@@ -148,8 +141,8 @@ function ImagePicker({
           <Button
             icon={<DeleteOutlined />}
             danger
-            loading={busy}
-            disabled={busy}
+            loading={upload.isPending || remove.isPending}
+            disabled={upload.isPending || remove.isPending}
             onClick={() => void drop()}
           >
             移除
@@ -204,10 +197,14 @@ export default function PublicSection({ image, itemClass, onPreview, publicVisib
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
           <span style={sectionTitle}>公開資料</span>
         </div>
-        <Tooltip title={publicVisible ? '' : '學務處已將這個社團從導覽頁下架，公開頁目前不會顯示'}>
-          <Button icon={<EyeOutlined />} onClick={onPreview} disabled={!publicVisible}>
-            預覽社團頁
-          </Button>
+        {/* span:disabled 的 form control 收不到滑鼠事件,tooltip 永遠不會出現 ——
+            而按不動的時候正是唯一需要解釋原因的時候(同 AccountsPage 的權限鈕) */}
+        <Tooltip title={publicVisible ? undefined : '學務處已將這個社團從導覽頁下架，公開頁目前不會顯示'}>
+          <span>
+            <Button icon={<EyeOutlined />} onClick={onPreview} disabled={!publicVisible}>
+              預覽社團頁
+            </Button>
+          </span>
         </Tooltip>
       </div>
 

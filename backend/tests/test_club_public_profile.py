@@ -336,3 +336,20 @@ async def test_public_out_never_leaks_internal_columns():
               "is_active", "public_visible"}
     assert leaked.isdisjoint(ClubPublicOut.model_fields)
     assert set(ClubPublicOut.model_fields) <= {c.name for c in Club.__table__.columns}
+
+
+def test_club_image_fks_do_not_break_table_sorting():
+    """clubs → files → clubs 是一個環:少了 use_alter,`sorted_tables` 會放棄排序。
+
+    症狀不是紅燈而是一行 SAWarning —— create_all/drop_all 的順序從此不可靠,
+    而 conftest 的 TRUNCATE 清單正是由它產生的。
+    """
+    import warnings
+
+    from app.models.base import Base
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        assert Base.metadata.sorted_tables
+    cycles = [w for w in caught if "unresolvable cycles" in str(w.message)]
+    assert not cycles, [str(w.message) for w in cycles]

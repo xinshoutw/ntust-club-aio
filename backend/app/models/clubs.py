@@ -77,12 +77,16 @@ class Club(Base, TimestampMixin):
     founded_year: Mapped[int | None] = mapped_column(sa.SmallInteger)
 
     # 形象圖:落盤的已是轉好的 WebP(頭像 1:1、橫幅 4:3),原圖不留。
-    # 刪檔時這兩欄要跟著清,故 ondelete=SET NULL 而非 RESTRICT
+    # 刪檔時這兩欄要跟著清,故 ondelete=SET NULL 而非 RESTRICT。
+    # use_alter:這兩個 FK 讓 clubs → files → clubs(files.club_id)成環,
+    # 少了它 metadata.sorted_tables 會警告「unresolvable cycles」並放棄排序 ——
+    # create_all/drop_all 的順序從此不可靠(SQLAlchemy 亦預告未來版本會改成錯誤)。
+    # 帶 use_alter 就改以獨立的 ALTER TABLE 建立,環被切開
     avatar_file_id: Mapped[uuid.UUID | None] = mapped_column(
-        sa.ForeignKey("files.id", ondelete="SET NULL")
+        sa.ForeignKey("files.id", ondelete="SET NULL", use_alter=True)
     )
     banner_file_id: Mapped[uuid.UUID | None] = mapped_column(
-        sa.ForeignKey("files.id", ondelete="SET NULL")
+        sa.ForeignKey("files.id", ondelete="SET NULL", use_alter=True)
     )
     # 黑化與模糊是**顯示參數**,不燒進圖片 —— 調整不必重新上傳
     banner_dim: Mapped[int] = mapped_column(sa.SmallInteger, default=0, server_default="0")

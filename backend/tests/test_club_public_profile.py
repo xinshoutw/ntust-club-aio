@@ -50,6 +50,17 @@ def test_unknown_tags_are_dropped_not_rejected():
     assert ClubProfileUpdate(tags=["程式", "街舞"]).tags == ["程式"]
 
 
+def test_too_many_tags_are_trimmed_not_rejected():
+    """上限也一樣:超量的**裁掉**而不是 422。
+
+    上限寫在 `Field(max_length=...)` 上的話,欄位層檢查會搶在 `_clean_tags` 之前跑,
+    上面那條規則就只在「剛好不超量」時成立 —— 而主檔這一版才收斂,庫裡本來就有
+    選了四五個的社團。
+    """
+    body = ClubProfileUpdate(tagline="改一句話", tags=["程式", "運動", "戶外", "音樂", "街舞"])
+    assert body.tags == ["程式", "運動", "戶外"]
+
+
 @pytest.mark.parametrize(
     "raw",
     [
@@ -70,10 +81,36 @@ def test_instagram_is_stored_as_a_bare_id(raw):
     assert ClubProfileUpdate(instagram=raw).instagram == "ntust_dance"
 
 
-def test_instagram_rejects_what_is_not_a_handle():
-    assert ClubProfileUpdate(instagram="  ").instagram is None
-    with pytest.raises(ValueError, match="Instagram"):
-        ClubProfileUpdate(instagram="not a handle")
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "  ",
+        "not a handle",
+        "這不是合法帳號",
+        # `$` 會放行結尾換行,fullmatch 不會
+        "abc\n/",
+    ],
+)
+def test_an_unusable_instagram_value_is_dropped_not_rejected(raw):
+    """剝不出帳號就當沒填。
+
+    raise 的話,庫裡留著一個舊格式的值就會讓那個社團的管理項目表單每次 PATCH 都 422
+    (前端原樣送回這一欄),而畫面上那一欄看起來完全正常 —— 與 tags 同一個理由。
+    """
+    assert ClubProfileUpdate(instagram=raw).instagram is None
+
+
+def test_instagram_keeps_only_the_last_path_segment():
+    """規則就是「`/` 後面那一段」,不認網域。
+
+    代價:`kind` 標成 instagram 卻填了別的平台的舊值(舊 SocialLink 只要求 http(s),
+    這是合法舊值)會被當成帳號收下,社團頁連出去是一個不存在的 IG。換來的是不必列舉
+    `m.` / `instagr.am` / 未來任何一種分享網域 —— 列舉漏一個就是一個社團被鎖在 422 裡。
+    社團自己在設定頁看得到存成什麼,改掉是一次編輯的事。
+    """
+    assert ClubProfileUpdate(instagram="https://www.facebook.com/wrongplatform").instagram == (
+        "wrongplatform"
+    )
 
 
 

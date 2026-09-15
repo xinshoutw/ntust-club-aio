@@ -21,13 +21,9 @@ CLUB_TAGS: tuple[str, ...] = (
     "聯誼", "服務", "喝酒", "運動", "武術", "戶外", "飲食",
 )
 
-# Instagram 帳號 ID(不含網址):IG 自己的規則是英數、底線與句點,最長 30
-_INSTAGRAM_RE = re.compile(r"^[A-Za-z0-9._]{1,30}$")
-# 貼上來的網址:IG 自己的分享連結一律帶 ?igsh=…,也可能是 m. / instagr.am,
-# 而輸入框的 `instagram.com /` 前綴正好在暗示可以省略 scheme
-_INSTAGRAM_URL_RE = re.compile(
-    r"^(?:https?://)?(?:[a-z0-9-]+\.)?instagr(?:am\.com|\.am)/", re.IGNORECASE
-)
+# Instagram 帳號 ID(不含網址):IG 自己的規則是英數、底線與句點,最長 30。
+# 搭配 fullmatch —— `$` 會放行結尾換行,而這一欄遲早會進信件或 CSV
+_INSTAGRAM_RE = re.compile(r"[A-Za-z0-9._]{1,30}")
 
 
 def _http_url(v: str, label: str) -> str:
@@ -103,10 +99,12 @@ class ClubProfileUpdate(BaseModel):
 
     # --- 對外公開(社團導覽頁);形象圖不在此,走自己的上傳端點 ---
     # 這一組每一欄都可以是空的:空白就是那一段不出現在公開頁。因此顯式 null
-    # 一律當成「清空」而非錯誤 —— 但落到 NOT NULL 欄位的那幾個(tags、social_links、
-    # banner_*)不能就這樣寫進去,各自的驗證器負責把 null 收成合法值(見 ISS-105)
+    # 一律當成「清空」而非錯誤 —— 但 tags 落在 NOT NULL 欄位上,不能就這樣寫進去,
+    # 由 `_clean_tags` 把 null 收成空陣列(見 ISS-105)
     tagline: str | None = Field(None, max_length=40)
-    tags: list[str] | None = Field(None, max_length=MAX_TAGS)
+    # 上限不寫在 Field 上:欄位層的 max_length 會搶在 _clean_tags 之前 422,
+    # 那正是下面那段註解要避免的事。裁切由驗證器負責
+    tags: list[str] | None = None
     recruit_status: RecruitStatus | None = None
     public_email: str | None = Field(None, max_length=100)
     # 上限放寬到能容下整串貼上來的網址;真正的 30 字限制由驗證器在剝掉前綴之後才套
@@ -136,22 +134,21 @@ class ClubProfileUpdate(BaseModel):
             # 那個社團從此連改一句 tagline 都會吃 422,而畫面上看不到也刪不掉那個標籤
             if tag in CLUB_TAGS:
                 cleaned.append(tag)
-        return cleaned
+        return cleaned[:MAX_TAGS]
 
     @field_validator("instagram")
     @classmethod
     def _clean_instagram(cls, v: str | None) -> str | None:
         """只存帳號 ID:貼整串網址、省略 scheme、帶 @ 或帶 `?igsh=` 都收得下來。
 
-        前端的欄位提示寫著「貼整串網址也可以」,而 IG 的分享連結一律帶 query ——
-        少剝這一段,最常見的那種貼法就換來一個 422。
+        取最後一個 `/` 之後那一段就好 —— 不必列舉 `m.` / `instagr.am` 這些子網域,
+        列舉漏一個就是一個 422。**剝不出合法帳號時丟掉而不是 raise**,理由同
+        `_clean_tags`:前端每次 PATCH 都原樣送回這一欄,庫裡留著一個舊格式的值,
+        那個社團從此連改一句 tagline 都送不出去,而畫面上那一欄看起來完全正常。
         """
-        v = (v or "").strip()
-        v = _INSTAGRAM_URL_RE.sub("", v)
-        v = re.split(r"[?#]", v, maxsplit=1)[0].strip("/@ ")
-        if v and not _INSTAGRAM_RE.match(v):
-            raise ValueError(f"Instagram 帳號格式不正確:{v}")
-        return v or None
+        v = re.split(r"[?#]", (v or "").strip(), maxsplit=1)[0]
+        v = v.rstrip("/").rpartition("/")[2].strip("@ ")
+        return v if _INSTAGRAM_RE.fullmatch(v) else None
 
     @field_validator("public_email")
     @classmethod

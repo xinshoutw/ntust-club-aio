@@ -23,6 +23,11 @@ CLUB_TAGS: tuple[str, ...] = (
 
 # Instagram 帳號 ID(不含網址):IG 自己的規則是英數、底線與句點,最長 30
 _INSTAGRAM_RE = re.compile(r"^[A-Za-z0-9._]{1,30}$")
+# 貼上來的網址:IG 自己的分享連結一律帶 ?igsh=…,也可能是 m. / instagr.am,
+# 而輸入框的 `instagram.com /` 前綴正好在暗示可以省略 scheme
+_INSTAGRAM_URL_RE = re.compile(
+    r"^(?:https?://)?(?:[a-z0-9-]+\.)?instagr(?:am\.com|\.am)/", re.IGNORECASE
+)
 
 
 def _http_url(v: str, label: str) -> str:
@@ -56,10 +61,12 @@ class ClubPublicOut(BaseModel):
 class ClubProfileOut(ClubPublicOut):
     """社團看自己的全部欄位 = 公開欄位 + 對內欄位。
 
-    `public_visible` 不在此:下架是行政端的處置,社團端沒有這顆開關也沒有入口。
+    `public_visible` **唯讀**帶給社團:開關仍只在行政端,但社團要知道自己的頁面
+    現在公不公開 —— 否則按「預覽社團頁」只會撞上 404,看起來像系統壞了。
     """
 
     id: int
+    public_visible: bool
     name: str
     kind: str  # 社團/學會(負責人顯示詞推導依據)
     en_name: str | None
@@ -124,17 +131,24 @@ class ClubProfileUpdate(BaseModel):
             tag = tag.strip()
             if not tag or tag in cleaned:
                 continue
-            if tag not in CLUB_TAGS:
-                raise ValueError(f"不是可選的標籤:{tag}")
-            cleaned.append(tag)
+            # **丟掉而不是 raise**:主檔以後改動(或庫裡本來就有舊值)的話,
+            # 前端每次 PATCH 都原樣送回整個 tags,而 TagPicker 只畫得出主檔裡的按鈕 ——
+            # 那個社團從此連改一句 tagline 都會吃 422,而畫面上看不到也刪不掉那個標籤
+            if tag in CLUB_TAGS:
+                cleaned.append(tag)
         return cleaned
 
     @field_validator("instagram")
     @classmethod
     def _clean_instagram(cls, v: str | None) -> str | None:
-        # 只存帳號 ID:貼整串網址或帶 @ 都收得下來,存進去的一律是純 ID
+        """只存帳號 ID:貼整串網址、省略 scheme、帶 @ 或帶 `?igsh=` 都收得下來。
+
+        前端的欄位提示寫著「貼整串網址也可以」,而 IG 的分享連結一律帶 query ——
+        少剝這一段,最常見的那種貼法就換來一個 422。
+        """
         v = (v or "").strip()
-        v = re.sub(r"^https?://(?:www\.)?instagram\.com/", "", v).strip("/@")
+        v = _INSTAGRAM_URL_RE.sub("", v)
+        v = re.split(r"[?#]", v, maxsplit=1)[0].strip("/@ ")
         if v and not _INSTAGRAM_RE.match(v):
             raise ValueError(f"Instagram 帳號格式不正確:{v}")
         return v or None

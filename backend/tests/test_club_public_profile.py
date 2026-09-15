@@ -38,15 +38,39 @@ def test_tags_take_explicit_null_as_empty():
 def test_tags_must_come_from_the_master_list():
     """自由填寫會讓導覽頁的篩選長歪:同一件事三種寫法,篩選器列不完也對不起來。"""
     assert ClubProfileUpdate(tags=["  程式 ", "程式", "運動"]).tags == ["程式", "運動"]
-    with pytest.raises(ValueError, match="不是可選的標籤"):
-        ClubProfileUpdate(tags=["街舞"])
 
 
-def test_instagram_is_stored_as_a_bare_id():
-    """貼整串網址或帶 @ 都收得下來,存進去的一律是純 ID。"""
-    full = "https://www.instagram.com/ntust_dance/"
-    assert ClubProfileUpdate(instagram=full).instagram == "ntust_dance"
-    assert ClubProfileUpdate(instagram="@ntust_dance").instagram == "ntust_dance"
+def test_unknown_tags_are_dropped_not_rejected():
+    """主檔外的值**丟掉**而不是 422。
+
+    前端每次 PATCH 都原樣送回整個 tags,而挑選器只畫得出主檔裡的按鈕 ——
+    raise 的話,庫裡有舊標籤的社團從此連改一句 tagline 都送不出去,
+    而那個標籤在畫面上看不到也刪不掉。
+    """
+    assert ClubProfileUpdate(tags=["程式", "街舞"]).tags == ["程式"]
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "ntust_dance",
+        "@ntust_dance",
+        "https://www.instagram.com/ntust_dance/",
+        "https://instagram.com/ntust_dance",
+        # IG 自己的分享連結一律帶 query —— 少剝這一段,最常見的貼法就換來 422
+        "https://www.instagram.com/ntust_dance?igsh=MzRlODBiNWFlZA==",
+        "https://www.instagram.com/ntust_dance/?igsh=MzRlODBiNWFlZA%3D%3D",
+        # 輸入框的 `instagram.com /` 前綴正好在暗示可以省略 scheme
+        "instagram.com/ntust_dance",
+        "m.instagram.com/ntust_dance",
+        "https://instagr.am/ntust_dance",
+    ],
+)
+def test_instagram_is_stored_as_a_bare_id(raw):
+    assert ClubProfileUpdate(instagram=raw).instagram == "ntust_dance"
+
+
+def test_instagram_rejects_what_is_not_a_handle():
     assert ClubProfileUpdate(instagram="  ").instagram is None
     with pytest.raises(ValueError, match="Instagram"):
         ClubProfileUpdate(instagram="not a handle")
@@ -224,8 +248,8 @@ async def test_club_profile_round_trips_the_public_fields(client, db):
     assert data["tagline"] == "每週三晚上一起跳舞"
     assert data["tags"] == ["運動", "表演"]
     assert data["instagram"] == "ntustdance"
-    # 下架閥是行政端的處置,社團端看不到也改不動
-    assert "public_visible" not in data
+    # 下架閥**唯讀**帶給社團:開關仍只在行政端,但社團要知道自己公不公開
+    assert data["public_visible"] is True
 
     await db.refresh(club)
     assert club.public_visible is True
@@ -483,3 +507,21 @@ async def test_image_changes_are_traceable_in_the_audit_trail(client, db):
     row = await db.scalar(sa.select(AuditLog).where(AuditLog.action == "club_avatar_updated"))
     assert row is not None
     assert f"club={club.id}" in row.detail and file_id in row.detail
+
+
+async def test_the_club_can_see_whether_its_page_is_public(client, db):
+    """開關只在行政端,但社團要知道自己公不公開 ——
+    否則按「預覽社團頁」撞上 404,看起來像系統壞了。"""
+    club = await make_club(db, public_visible=False)
+    await make_user(db, username="club01", club_id=club.id)
+    await login(client, "club01")
+
+    data = (await client.get("/api/v1/club/profile")).json()["data"]
+    assert data["public_visible"] is False
+
+    # 唯讀:社團端送這一欄不會生效(ClubProfileUpdate 沒有它)
+    await client.patch(
+        "/api/v1/club/profile", json={"public_visible": True}, headers=csrf_headers(client)
+    )
+    await db.refresh(club)
+    assert club.public_visible is False

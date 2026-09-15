@@ -66,7 +66,7 @@
   background: var(--line);
   overflow: hidden;
 }
-.club-banner :is(img, canvas) {
+.club-banner :is(img, .club-art) {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -87,6 +87,7 @@
   min-width: 0;
 }
 .club-avatar {
+  container-type: size;
   border-radius: 6px;
   overflow: hidden;
   background: var(--line);
@@ -95,11 +96,21 @@
   width: 40px;
   height: 40px;
 }
-.club-avatar :is(img, canvas) {
+.club-avatar :is(img, .club-art) {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
+}
+.club-art-avatar {
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-weight: 600;
+  /* cqmin:同一條規則吃 40 / 72 / 148px 三種框,不必各自寫一個字級 */
+  font-size: 46cqmin;
+  line-height: 1;
+  user-select: none;
 }
 .club-ident .names {
   min-width: 0;
@@ -186,7 +197,7 @@
   background: var(--line);
   margin-bottom: 16px;
 }
-.club-hero :is(img, canvas) {
+.club-hero :is(img, .club-art) {
   width: 100%;
   height: 100%;
   object-fit: cover;

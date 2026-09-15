@@ -195,7 +195,7 @@ async def club_activities(
     db: DbDep,
     semester: str | None = Query(None, pattern=SEMESTER_LABEL),
 ) -> ApiResponse[list[PublicActivityOut]]:
-    """該社通過審核以後的活動,開始日新到舊;`semester` 不帶即全部。
+    """該社通過審核以後的活動,開始日新到舊,一律只回最近十筆。
 
     學期不是欄位而是由開始日推導(`core/semesters`),所以這裡篩的是日期區間。
     """

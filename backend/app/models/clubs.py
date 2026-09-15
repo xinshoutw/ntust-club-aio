@@ -18,7 +18,8 @@ class Club(Base, TimestampMixin):
     # 負責人顯示詞(社長/會長)由此決定
     kind: Mapped[ClubKind] = mapped_column(db_enum(ClubKind, "club_kind"))
     en_name: Mapped[str | None] = mapped_column(sa.Text)  # 英文名(舊系統遷入)
-    # 停社的舊社團原性質不可考 → NULL(僅 is_active=false 者)
+    # 原性質不可考 → NULL:停社的舊社團,以及遷入時性質對不到 enum 的在校社團
+    # (`migration/cms_import.py` 只記數不中止)。導覽頁的「未分類」不是死 UI
     attribute: Mapped[ClubAttribute | None] = mapped_column(
         db_enum(ClubAttribute, "club_attribute")
     )

@@ -628,7 +628,7 @@ def _fit_webp(src: Path, size: tuple[int, int]) -> bytes:
     `_PREVIEW_POOL` 的註解)。寫回磁碟的話,請求被取消 → 交易收尾 →
     `_drop_uncommitted_uploads` 刪掉落盤的檔 → thread 這時才把它重新建回來,
     留下一個 DB 沒有列、`admin_files` 掃不到、沒有任何清理路徑管得到的孤兒檔。
-    成品是 1600×1200 q82 的 WebP(數百 KB),進記憶體的成本可以忽略。
+    成品是 `CLUB_IMAGE_SIZES` 那一級、q82 的 WebP(數百 KB),進記憶體的成本可以忽略。
     """
     with Image.open(src) as img:
         if img.width * img.height > PREVIEW_MAX_PIXELS:

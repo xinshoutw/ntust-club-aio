@@ -33,10 +33,11 @@ def _http_url(v: str, label: str) -> str:
 
 
 class ClubPublicOut(BaseModel):
-    """對外公開的社團欄位。
+    """社團端表單與行政端唯讀區共用的「公開範圍」投影。
 
-    **這是唯一允許出現在公開端點的形狀**:不從 `ClubProfileOut` 挑減 —— 那樣的話
-    以後往 profile 加一欄內部欄位,它會自己漏到校外去。
+    不從 `ClubProfileOut` 挑減 —— 那樣的話以後往 profile 加一欄內部欄位,它會自己
+    跟著跑出來。**真正對外曝光的形狀以 `schemas/public.py` 為準**(那邊是另一份逐欄
+    白名單),這裡加欄位不等於公開端點就會送出去。
     """
 
     model_config = ConfigDict(from_attributes=True)

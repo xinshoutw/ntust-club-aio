@@ -12,10 +12,10 @@ from datetime import date
 from pathlib import Path
 from typing import Annotated
 
+import anyio
 import sqlalchemy as sa
 from fastapi import APIRouter, Query, Response
 from fastapi import Path as PathParam
-from fastapi.responses import FileResponse
 
 from app.core.config import settings
 from app.core.deps import DbDep, OptionalUser, admin_with
@@ -216,7 +216,7 @@ async def club_activities(
 
 
 @router.get("/files/{file_id}")
-async def public_file(file_id: uuid.UUID, db: DbDep) -> FileResponse:
+async def public_file(file_id: uuid.UUID, db: DbDep) -> Response:
     """免登入的檔案通道:**只放行 `files.public`**(目前只有社團形象圖)。
 
     走自己的路由而不是在 `can_access` 開一個匿名分支:那會變成第五種角色判定混進
@@ -244,18 +244,20 @@ async def public_file(file_id: uuid.UUID, db: DbDep) -> FileResponse:
     if file is None or file.mime not in PUBLIC_IMAGE_MIMES:
         raise not_found("找不到檔案")
     disk = Path(settings.upload_dir) / file.path
-    # 一次 stat 交給 Starlette,不做 check-then-open:兩者之間檔案消失的話
-    # `FileResponse` 會丟 RuntimeError 變成 500,而「社團在換圖、同時有人在看導覽頁」
-    # 正是這支端點最常見的併發組合(`_replace_image` 的 unlink 排在 commit 之後)
+    # **當場讀進來**,不交給 `FileResponse` 事後開檔:傳了 `stat_result` 只是讓 Starlette
+    # 跳過存在檢查,它仍然在回應階段才 open —— 那之間檔案被刪掉就是 RuntimeError 變 500。
+    # 而「社團在換圖、同時有人在看導覽頁」正是這支端點最常見的併發組合
+    # (`_replace_image` 的 unlink 排在 commit 之後)。讀失敗就是 404,沒有中間狀態。
+    # 成品是 `CLUB_IMAGE_SIZES` 那一級的 WebP(數百 KB),而且這支端點快取一小時,
+    # 放棄 sendfile 換掉一個偶發 500 划得來;走 thread 不擋 event loop
     try:
-        stat_result = disk.stat()
+        content = await anyio.to_thread.run_sync(disk.read_bytes)
     except OSError:
         raise not_found("找不到檔案") from None
-    response = FileResponse(
-        disk,
-        stat_result=stat_result,
+    response = Response(
+        content=content,
         media_type=file.mime,
-        content_disposition_type="inline",
+        headers={"content-disposition": "inline"},
     )
     # private:瀏覽器照樣快取,但 CDN 與公司 proxy 不會替**別人**留一份。
     # 社團下架的理由常常正是那張圖,撤不回來的範圍能小一點是一點

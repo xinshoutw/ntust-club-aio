@@ -1,10 +1,39 @@
-// 管理項目 API 層:社團簡介/指導老師/聯絡與通知(GET/PATCH /club/profile)
+// 管理項目 API 層:社團簡介/指導老師/聯絡與通知/對外公開資料(GET/PATCH /club/profile)
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
-import { api } from './client'
+import { API_BASE, api } from './client'
 import { suspendedNow } from '../lib/status'
 
 const slashDate = (iso: string): string => dayjs(iso).format('YYYY/MM/DD')
+
+/** 後端 `schemas/clubs.SocialKind` 是第一份,改動須同步。 */
+export const SOCIAL_KINDS = ['instagram', 'facebook', 'discord', 'youtube', 'line', 'other'] as const
+export type SocialKind = (typeof SOCIAL_KINDS)[number]
+
+export const SOCIAL_LABELS: Record<SocialKind, string> = {
+  instagram: 'Instagram',
+  facebook: 'Facebook',
+  discord: 'Discord',
+  youtube: 'YouTube',
+  line: 'Line',
+  other: '其他',
+}
+
+export const RECRUIT_STATUSES = ['招生中', '額滿', '不定期', '暫停招生'] as const
+export const BANNER_TEXT_MODES = ['auto', 'light', 'dark'] as const
+export type BannerTextMode = (typeof BANNER_TEXT_MODES)[number]
+
+/** 形象圖尺寸(後端 `services/files.CLUB_IMAGE_SIZES` 是第一份);預覽容器據此定比例。 */
+export const CLUB_IMAGE_RATIO = { avatar: 1, banner: 4 / 3 } as const
+export type ClubImageSlot = keyof typeof CLUB_IMAGE_RATIO
+
+/** auto 字色的判定:亮度過半用深色字。後端只存亮度,推導結果不入庫。 */
+export const LUMA_MIDPOINT = 128
+export const resolveTextMode = (mode: BannerTextMode, luma: number | null): 'light' | 'dark' => {
+  if (mode !== 'auto') return mode
+  // 拿不到亮度(沒有橫幅,或舊資料)時用淺色字:預設底色是深的
+  return luma != null && luma > LUMA_MIDPOINT ? 'dark' : 'light'
+}
 
 export interface ClubProfile {
   name: string
@@ -25,6 +54,28 @@ export interface ClubProfile {
   /** 停權中才有值(YYYY/MM/DD);社團要看得到自己被停權,而不是送借用撞 403 才知道 */
   suspendedUntil: string | null
   suspendReason: string
+  /** 對外公開資料(社團導覽頁);未填一律空字串/空陣列 */
+  public: ClubPublicProfile
+}
+
+export interface ClubPublicProfile {
+  tagline: string
+  tags: string[]
+  recruitStatus: string
+  publicEmail: string
+  /** 一平台一格(表單是六個固定欄位);未填的平台不進陣列 */
+  socialLinks: Partial<Record<SocialKind, string>>
+  officeLocation: string
+  regularSchedule: string
+  joinInfo: string
+  signupUrl: string
+  foundedYear: number | null
+  avatarUrl: string | null
+  bannerUrl: string | null
+  bannerDim: number
+  bannerBlur: number
+  bannerTextMode: BannerTextMode
+  bannerLuma: number | null
 }
 
 interface ClubProfileOut {
@@ -45,7 +96,45 @@ interface ClubProfileOut {
   advisor_out_email: string | null
   suspended_until: string | null
   suspend_reason: string | null
+  tagline: string | null
+  tags: string[]
+  recruit_status: string | null
+  public_email: string | null
+  social_links: { kind: SocialKind; url: string }[]
+  office_location: string | null
+  regular_schedule: string | null
+  join_info: string | null
+  signup_url: string | null
+  founded_year: number | null
+  avatar_file_id: string | null
+  banner_file_id: string | null
+  banner_dim: number
+  banner_blur: number
+  banner_text_mode: BannerTextMode
+  banner_luma: number | null
 }
+
+const imageUrl = (fileId: string | null): string | null =>
+  fileId ? `${API_BASE}/files/${fileId}` : null
+
+export const toPublicProfile = (c: ClubProfileOut): ClubPublicProfile => ({
+  tagline: c.tagline ?? '',
+  tags: c.tags ?? [],
+  recruitStatus: c.recruit_status ?? '',
+  publicEmail: c.public_email ?? '',
+  socialLinks: Object.fromEntries((c.social_links ?? []).map((l) => [l.kind, l.url])),
+  officeLocation: c.office_location ?? '',
+  regularSchedule: c.regular_schedule ?? '',
+  joinInfo: c.join_info ?? '',
+  signupUrl: c.signup_url ?? '',
+  foundedYear: c.founded_year,
+  avatarUrl: imageUrl(c.avatar_file_id),
+  bannerUrl: imageUrl(c.banner_file_id),
+  bannerDim: c.banner_dim,
+  bannerBlur: c.banner_blur,
+  bannerTextMode: c.banner_text_mode,
+  bannerLuma: c.banner_luma,
+})
 
 const toProfile = (c: ClubProfileOut): ClubProfile => ({
   name: c.name,
@@ -63,6 +152,7 @@ const toProfile = (c: ClubProfileOut): ClubProfile => ({
   advisorOutEmail: c.advisor_out_email ?? '',
   suspendedUntil: c.suspended_until ? slashDate(c.suspended_until) : null,
   suspendReason: c.suspend_reason ?? '',
+  public: toPublicProfile(c),
 })
 
 export const clubProfileKeys = { profile: ['club-profile'] as const }
@@ -109,6 +199,20 @@ export interface ClubProfileInput {
   advisorOutName: string
   advisorOutDept: string
   advisorOutEmail: string
+  // 對外公開資料;表單是一平台一欄,送出時才收成 [{kind,url}]
+  tagline: string
+  tags: string[]
+  recruitStatus: string
+  publicEmail: string
+  socialLinks: Partial<Record<SocialKind, string>>
+  officeLocation: string
+  regularSchedule: string
+  joinInfo: string
+  signupUrl: string
+  foundedYear: number | null
+  bannerDim: number
+  bannerBlur: number
+  bannerTextMode: BannerTextMode
 }
 
 export function useUpdateClubProfile() {
@@ -129,9 +233,52 @@ export function useUpdateClubProfile() {
           advisor_out_name: b.advisorOutName.trim() || null,
           advisor_out_dept: b.advisorOutDept.trim() || null,
           advisor_out_email: b.advisorOutEmail.trim() || null,
+          tagline: b.tagline.trim() || null,
+          tags: b.tags,
+          recruit_status: b.recruitStatus || null,
+          public_email: b.publicEmail.trim() || null,
+          // 空欄=沒有那個平台的連結,不送空字串進陣列(後端的 url 是必填)
+          social_links: SOCIAL_KINDS.flatMap((kind) => {
+            const url = (b.socialLinks[kind] ?? '').trim()
+            return url ? [{ kind, url }] : []
+          }),
+          office_location: b.officeLocation.trim() || null,
+          regular_schedule: b.regularSchedule.trim() || null,
+          join_info: b.joinInfo.trim() || null,
+          signup_url: b.signupUrl.trim() || null,
+          founded_year: b.foundedYear,
+          banner_dim: b.bannerDim,
+          banner_blur: b.bannerBlur,
+          banner_text_mode: b.bannerTextMode,
         }),
       }).then(toProfile),
     // 儲存成功即以 server 回傳值為新基準
+    onSuccess: (data) => qc.setQueryData(clubProfileKeys.profile, data),
+  })
+}
+
+
+// ---- 形象圖:選檔即上傳,不隨表單儲存(要有預覽可看,壓進 PATCH 就得先傳暫存檔再綁定)----
+
+export function useUploadClubImage() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ slot, file }: { slot: ClubImageSlot; file: File }) => {
+      const fd = new FormData()
+      fd.append('file', file)
+      return api<ClubProfileOut>(`/club/profile/${slot}`, { method: 'POST', body: fd }).then(
+        toProfile,
+      )
+    },
+    onSuccess: (data) => qc.setQueryData(clubProfileKeys.profile, data),
+  })
+}
+
+export function useRemoveClubImage() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (slot: ClubImageSlot) =>
+      api<ClubProfileOut>(`/club/profile/${slot}`, { method: 'DELETE' }).then(toProfile),
     onSuccess: (data) => qc.setQueryData(clubProfileKeys.profile, data),
   })
 }

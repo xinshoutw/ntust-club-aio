@@ -8,7 +8,14 @@ import { useAuth } from '../../app/auth'
 import { useUnsavedGuard } from '../../app/unsaved'
 import { changePasswordApi } from '../../api/auth'
 import { useClubProfile, useUpdateClubProfile, type ClubProfile } from '../../api/clubProfile'
-import { fromProfile, profileChanged, type SettingsValues } from './fields'
+import PublicSection from './PublicSection'
+import {
+  fromProfile,
+  normalizeValue,
+  profileChanged,
+  toProfileInput,
+  type SettingsValues,
+} from './fields'
 
 // 密碼政策(與後端一致):≥10 碼且含大小寫、數字、特殊符號
 const PASSWORD_RULE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{10,}$/
@@ -54,12 +61,19 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
   const recomputeDirty = (baseline: SettingsValues = saved) => {
     const cur = form.getFieldsValue(true) as SettingsValues
     const keys = (Object.keys(baseline) as (keyof SettingsValues)[]).filter(
-      (k) => (cur[k] ?? '') !== (baseline[k] ?? ''),
+      // 標籤是陣列、黑化程度是數字:`?? ''` 比不出差異(見 fields.normalizeValue)
+      (k) => normalizeValue(cur[k]) !== normalizeValue(baseline[k]),
     )
     setDirty(new Set(keys))
   }
 
   const itemClass = (k: keyof SettingsValues) => (dirty.has(k) ? 'field-dirty' : undefined)
+
+  // 橫幅預覽要跟著滑桿即時走,所以讀的是表單當下的值而不是 saved。
+  // 首次 render 時 useWatch 還沒有值,退回 saved(`??` 不會把 0 當成沒有值)
+  const bannerDim = Form.useWatch('bannerDim', form) ?? saved.bannerDim
+  const bannerBlur = Form.useWatch('bannerBlur', form) ?? saved.bannerBlur
+  const bannerTextMode = Form.useWatch('bannerTextMode', form) ?? saved.bannerTextMode
 
   // 網頁連結與簡介必填(D-19),但只在**這次真的要存 profile** 時擋:
   // 密碼是同一張表單裡的另一支 API,而遷入的社團有一批簡介是空字串、網頁連結是 NULL
@@ -79,18 +93,7 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
     setSaving(true)
     try {
       if (changingProfile) {
-        const next = await update.mutateAsync({
-          intro: v.intro ?? '',
-          url: v.url ?? '',
-          emails: [v.email1, v.email2 ?? '', v.email3 ?? ''],
-          discordWebhook: v.discordWebhook ?? '',
-          advisorName: v.advisorName,
-          advisorDept: v.advisorDept ?? '',
-          advisorEmail: v.advisorEmail ?? '',
-          advisorOutName: v.advisorOutName ?? '',
-          advisorOutDept: v.advisorOutDept ?? '',
-          advisorOutEmail: v.advisorOutEmail ?? '',
-        })
+        const next = await update.mutateAsync(toProfileInput(v))
         baseline = fromProfile(next)
         setSaved(baseline)
       }
@@ -209,6 +212,15 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
             </Form.Item>
           </div>
         </div>
+
+        {/* 對外公開資料:唯一會被校外看到的一段,獨立成全寬區塊擺在對內設定之上 */}
+        <PublicSection
+          image={profile.public}
+          itemClass={itemClass}
+          dim={bannerDim}
+          blur={bannerBlur}
+          textMode={bannerTextMode}
+        />
 
         {/* 聯絡與通知、更換密碼並排 */}
         <div className="form-grid-2" style={{ marginTop: 16, alignItems: 'stretch' }}>

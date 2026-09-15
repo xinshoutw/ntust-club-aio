@@ -1,5 +1,12 @@
 /* 社團導覽(免登入)。其餘顏色、圓角與陰影一律走 index.css 的代幣。 */
 
+/* 公開頁的單一內容容器:寬度由 shell 統一約束(design-guide §4.2),
+   頁面自己不設 maxWidth */
+.public-page {
+  display: block;
+  min-width: 0;
+}
+
 .dir-toolbar {
   display: flex;
   align-items: center;
@@ -13,11 +20,8 @@
   margin: 0;
   margin-right: auto;
 }
-.dir-toolbar .ant-select,
-.dir-toolbar .ant-input-affix-wrapper,
-.dir-toolbar .ant-input {
-  height: 40px;
-}
+/* 不自己設高:AntD 主題的 controlHeight 已經是 40(design-guide §3.5)。
+   同時設在 affix wrapper 與內層 input 上,內層被撐滿又帶自己的 padding,字就掉下去了 */
 .dir-search {
   width: 240px;
 }
@@ -62,7 +66,7 @@
   background: var(--line);
   overflow: hidden;
 }
-.club-banner img {
+.club-banner :is(img, canvas) {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -91,7 +95,7 @@
   width: 40px;
   height: 40px;
 }
-.club-avatar img {
+.club-avatar :is(img, canvas) {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -182,7 +186,7 @@
   background: var(--line);
   margin-bottom: 16px;
 }
-.club-hero img {
+.club-hero :is(img, canvas) {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -201,13 +205,11 @@
   align-items: stretch;
   gap: 20px;
 }
+/* 固定尺寸而不是 align-self:stretch + aspect-ratio:後者的主軸尺寸是從 <img> 的
+   內在寬度推的,圖一載好頭像就從 88px 跳到 148px,底下整批內容跟著位移 38px */
 .club-head .club-avatar {
-  align-self: stretch;
-  aspect-ratio: 1 / 1;
-  width: auto;
-  height: auto;
-  min-width: 88px;
-  max-width: 148px;
+  width: 148px;
+  height: 148px;
 }
 .club-head .main {
   flex: 1;

@@ -2,32 +2,33 @@ import { useNavigate, useParams } from 'react-router'
 import { Button } from 'antd'
 import { ArrowLeftOutlined } from '@ant-design/icons'
 import LoadingBlock from '../../components/ui/LoadingBlock'
+import { Cols } from '../../components/ui/tableControls'
 import QueryError from '../../components/ui/QueryError'
 import { usePublicClub, usePublicClubActivities } from '../../api/publicClubs'
+import ClubArt, { BADGE_CLASS } from './clubArt'
 import PublicShell from './PublicShell'
 import './publicClubs.css'
 
-const BADGE_CLASS: Record<string, string> = {
-  歡迎加入: 'welcome',
-  暫不開放: 'closed',
-  額滿: 'full',
-}
+const HTTP_URL = /^https?:\/\//
 
 export default function ClubDetailPage() {
   const navigate = useNavigate()
   const { clubId } = useParams()
   const id = Number(clubId)
-  const valid = Number.isInteger(id) && id > 0
+  // 主鍵是 int4:超界的值後端回 422,不必多打一趟才知道
+  const valid = Number.isInteger(id) && id > 0 && id <= 2_147_483_647
   const club = usePublicClub(valid ? id : null)
   const activities = usePublicClubActivities(valid ? id : null)
 
   if (!valid || club.isLoadingError) {
+    // 後端對停社與下架的社團一律 404(不交代它曾經存在),所以這裡不能只說「載入失敗」
+    const notFound = !valid || /404|找不到/.test(String(club.error?.message ?? ''))
     return (
       <PublicShell mobileTitle="社團">
         <QueryError
-          title={valid ? '找不到這個社團' : '網址不正確'}
-          error={club.error}
-          onRetry={valid ? () => void club.refetch() : undefined}
+          title={notFound ? '找不到這個社團' : '社團資料載入失敗'}
+          error={notFound ? new Error('這個社團可能已經停社，或目前未公開') : club.error}
+          onRetry={valid && !notFound ? () => void club.refetch() : undefined}
         />
       </PublicShell>
     )
@@ -36,18 +37,32 @@ export default function ClubDetailPage() {
   const c = club.data
   return (
     <PublicShell mobileTitle={c?.name ?? '社團'}>
-      <Button type="link" icon={<ArrowLeftOutlined />} style={{ paddingLeft: 0 }} onClick={() => navigate('/')}>
-        回社團導覽
-      </Button>
+      {/* 包一層:`.shell-main > *` 會把直接子元素撐成 1200px 置中,而 antd 的 Button 是
+          置中對齊的 inline-flex —— 這顆鈕會變成整列正中間的一個字。
+          導向 `/clubs` 而不是 `/`:`/` 只有未登入時才是導覽頁,社團從預覽點進來會被丟回總覽 */}
+      <div>
+        <Button
+          type="link"
+          icon={<ArrowLeftOutlined />}
+          style={{ paddingLeft: 0 }}
+          onClick={() => navigate('/clubs')}
+        >
+          回社團導覽
+        </Button>
+      </div>
 
       <LoadingBlock pending={club.isPending} rows={8}>
         {c && (
           <>
-            <div className="club-hero">{c.bannerUrl && <img src={c.bannerUrl} alt="" />}</div>
+            <div className="club-hero">
+              <ClubArt kind="banner" url={c.bannerUrl} clubId={c.id} clubName={c.name} />
+            </div>
 
             {/* 標題卡:頭像撐滿卡高、說明與標籤在右、招生狀態靠右上 */}
             <section className="club-head">
-              <div className="club-avatar">{c.avatarUrl && <img src={c.avatarUrl} alt="" />}</div>
+              <div className="club-avatar">
+                <ClubArt kind="avatar" url={c.avatarUrl} clubId={c.id} clubName={c.name} />
+              </div>
               <div className="main">
                 <div className="title-row">
                   <div>
@@ -122,10 +137,23 @@ export default function ClubDetailPage() {
                         </a>
                       )}
                       {c.websiteUrl && (
-                        <a href={c.websiteUrl} target="_blank" rel="noopener noreferrer">
+                        /* 遷入的網址有一批沒有 scheme(`cms_import` 原樣搬舊系統的自由輸入),
+                           當成 href 會被解析成站內相對路徑,一點就彈回首頁 —— 那種只顯示文字 */
+                        <div style={{ display: 'flex', gap: 10, alignItems: 'baseline' }}>
                           <span className="kind">社團網頁</span>
-                          <span className="val">{c.websiteUrl.replace(/^https?:\/\//, '')}</span>
-                        </a>
+                          {HTTP_URL.test(c.websiteUrl) ? (
+                            <a
+                              className="val"
+                              href={c.websiteUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {c.websiteUrl.replace(HTTP_URL, '')}
+                            </a>
+                          ) : (
+                            <span className="val">{c.websiteUrl}</span>
+                          )}
+                        </div>
                       )}
                     </div>
                   </section>
@@ -168,11 +196,14 @@ export default function ClubDetailPage() {
                     <p style={{ margin: 0, color: 'var(--steel)' }}>這個社團還沒有公開的活動紀錄</p>
                   ) : (
                     <div style={{ overflowX: 'auto' }}>
-                      <table className="tb">
+                      {/* `tb fixed` + <Cols> 是全站表格慣例:欄寬固定,日期與時間才不會被
+                          內容擠到換行;minWidth 讓窄螢幕產生水平捲軸而不是壓縮欄位 */}
+                      <table className="tb fixed" style={{ minWidth: 560 }} aria-label="活動紀錄">
+                        <Cols widths={[150, 130, 'auto', 200]} />
                         <thead>
                           <tr>
-                            <th scope="col" style={{ whiteSpace: 'nowrap' }}>日期</th>
-                            <th scope="col" style={{ whiteSpace: 'nowrap' }}>時間</th>
+                            <th scope="col">日期</th>
+                            <th scope="col">時間</th>
                             <th scope="col">活動名稱</th>
                             <th scope="col">地點</th>
                           </tr>
@@ -180,9 +211,9 @@ export default function ClubDetailPage() {
                         <tbody>
                           {(activities.data ?? []).map((a) => (
                             <tr key={a.id}>
-                              <td className="num" style={{ whiteSpace: 'nowrap' }}>{a.dateSpan}</td>
+                              <td className="num">{a.dateSpan}</td>
                               {/* 起訖時間是選填:拿不到值顯示 —,不用 00:00 頂替 */}
-                              <td className="num" style={{ whiteSpace: 'nowrap' }}>{a.timeSpan || '—'}</td>
+                              <td className="num">{a.timeSpan || '—'}</td>
                               <td>{a.name}</td>
                               <td>{a.location}</td>
                             </tr>

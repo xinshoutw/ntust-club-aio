@@ -5,16 +5,18 @@ import LoadingBlock from '../../components/ui/LoadingBlock'
 import QueryError from '../../components/ui/QueryError'
 import { CLUB_TAGS, RECRUIT_STATUSES } from '../../api/clubProfile'
 import { usePublicClubs, type ClubCard } from '../../api/publicClubs'
+import ClubArt, { BADGE_CLASS } from './clubArt'
 import PublicShell from './PublicShell'
 import './publicClubs.css'
 
 // 導覽頁的預設排序:性質先,同性質內依名稱
 const ATTR_ORDER = ['學藝性', '藝術性', '體育性', '聯誼性', '服務性', '自治性'] as const
-
-const BADGE_CLASS: Record<string, string> = {
-  歡迎加入: 'welcome',
-  暫不開放: 'closed',
-  額滿: 'full',
+// 遷入的社團有一批性質不可考(`migration/cms_import.py` 認不得就寫 NULL),
+// 直接用 indexOf 會回 -1 —— 那批社團會被釘在導覽頁最顯眼的第一格
+const UNCLASSIFIED = '未分類'
+const rank = (attr: string | null): number => {
+  const i = ATTR_ORDER.indexOf(attr as (typeof ATTR_ORDER)[number])
+  return i < 0 ? ATTR_ORDER.length : i
 }
 
 const options = (values: readonly string[], all: string) => [
@@ -26,12 +28,12 @@ export function ClubCardTile({ club, onOpen }: { club: ClubCard; onOpen: () => v
   return (
     <button type="button" className="club-card" onClick={onOpen}>
       <div className="club-banner">
-        {club.bannerUrl && <img src={club.bannerUrl} alt="" loading="lazy" />}
+        <ClubArt kind="banner" url={club.bannerUrl} clubId={club.id} clubName={club.name} />
       </div>
       <div className="club-card-body">
         <div className="club-ident">
           <div className="club-avatar">
-            {club.avatarUrl && <img src={club.avatarUrl} alt="" loading="lazy" />}
+            <ClubArt kind="avatar" url={club.avatarUrl} clubId={club.id} clubName={club.name} />
           </div>
           <div className="names">
             <div className="zh">{club.name}</div>
@@ -74,15 +76,15 @@ export default function ClubDirectoryPage() {
       .filter((c) => {
         if (keyword && ![c.name, c.enName, c.tagline].some((v) => v.toLowerCase().includes(keyword)))
           return false
-        if (attr && c.attribute !== attr) return false
+        if (attr && (attr === UNCLASSIFIED ? c.attribute !== null : c.attribute !== attr))
+          return false
         if (tag && !c.tags.includes(tag)) return false
         if (recruit && c.recruitStatus !== recruit) return false
         return true
       })
       .sort(
         (a, b) =>
-          ATTR_ORDER.indexOf(a.attribute as (typeof ATTR_ORDER)[number]) -
-            ATTR_ORDER.indexOf(b.attribute as (typeof ATTR_ORDER)[number]) ||
+          rank(a.attribute) - rank(b.attribute) ||
           // DB 的 collation 對中文是碼位序,這裡用 zh-Hant 重排
           a.name.localeCompare(b.name, 'zh-Hant'),
       )
@@ -95,7 +97,7 @@ export default function ClubDirectoryPage() {
         <Select
           value={attr}
           onChange={setAttr}
-          options={options(ATTR_ORDER, '全部性質')}
+          options={options([...ATTR_ORDER, UNCLASSIFIED], '全部性質')}
           aria-label="依性質篩選"
           style={{ width: 132 }}
         />
@@ -136,7 +138,9 @@ export default function ClubDirectoryPage() {
               className="card"
               style={{ padding: 48, textAlign: 'center', color: 'var(--steel)' }}
             >
-              沒有符合條件的社團，調整搜尋或篩選再試一次
+              {q || attr || tag || recruit
+                ? '沒有符合條件的社團，調整搜尋或篩選再試一次'
+                : '目前沒有公開的社團'}
             </div>
           ) : (
             <div className="dir-grid">

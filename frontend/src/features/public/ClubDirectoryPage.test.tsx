@@ -22,9 +22,15 @@ const clubs: ClubCard[] = [
   card({ id: 2, name: '書法社', attribute: '藝術性', tags: ['美術'], recruitStatus: '暫不開放' }),
   card({ id: 3, name: '開源技術開發研究社', attribute: '學藝性', tags: ['程式'], enName: 'Open Source Club' }),
   card({ id: 4, name: '合氣道社', attribute: '體育性', tags: ['武術'], recruitStatus: '額滿' }),
+  // 遷入時認不得性質的社團(`cms_import` 寫 NULL);照樣公開,但不該佔住第一格
+  card({ id: 5, name: '性質不可考社', attribute: null }),
 ]
 
 const ok = { isPending: false, isLoadingError: false, error: null, refetch: vi.fn() }
+
+// PublicShell 讀 useAuth 判斷右上角該給「登入」還是「回我的頁面」;
+// 這一組測試只驗導覽頁的篩選與排序,不拉整個 AuthProvider 進來
+vi.mock('../../app/auth', () => ({ useAuth: () => ({ user: null }) }))
 
 vi.mock('../../api/publicClubs', async (orig) => ({
   ...(await orig<typeof import('../../api/publicClubs')>()),
@@ -50,7 +56,14 @@ describe('社團導覽', () => {
   // 需求方指定的順序:學藝 → 藝術 → 體育 → 聯誼 → 服務 → 自治,同性質內依名稱
   test('預設依性質排序，同性質內依名稱', () => {
     renderPage()
-    expect(shown()).toEqual(['開源技術開發研究社', '書法社', '合氣道社', '熱門舞蹈研習社'])
+    expect(shown()).toEqual([
+      '開源技術開發研究社',
+      '書法社',
+      '合氣道社',
+      '熱門舞蹈研習社',
+      // indexOf 回 -1 的話這一筆會被釘在最前面
+      '性質不可考社',
+    ])
   })
 
   test('搜尋比對名稱與英文名稱', () => {

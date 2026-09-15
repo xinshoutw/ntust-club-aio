@@ -26,9 +26,7 @@
 
 ## 畫面
 
-外殼與 [public-availability.md](public-availability.md) 同一套:topbar 有系統名與右上角「登入」鈕,沒有側欄、鈴鐺與帳號選單。
-
-外殼是 `PublicShell`(與 [public-availability.md](public-availability.md) 共用):左上系統名,右上「借用狀態」與「登入」兩顆鈕,**沒有側欄、鈴鐺與帳號選單**。
+外殼是 `PublicShell`(與 [public-availability.md](public-availability.md) 共用):左上系統名,右上「借用狀態」與「登入」兩顆鈕(**登入中時「登入」換成「控制台」**,導向該角色自己的首頁 —— 公開頁不在角色閘底下,登入的人照樣進得來),**沒有側欄、鈴鐺與帳號選單**。
 
 - 工具列一行:標題「社團導覽」靠左,三個下拉(性質 / 標籤 / 招生)與搜尋框靠右,**一律 40px 同高**,搜尋在最右。不顯示社團數
 - 字卡牆:`grid` 自適應,最小卡寬 260px

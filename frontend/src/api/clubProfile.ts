@@ -237,19 +237,17 @@ export function useUpdateClubProfile() {
  *  PATCH 的回應(它的 body 根本不含形象圖)會把剛上傳好的圖打回舊值,畫面上圖就消失了,
  *  要等下次重抓才回來。上傳與移除只動兩個圖欄位,PATCH 只動圖以外的。
  */
-const mergeImages =
-  (next: ClubProfile) =>
-  (prev: ClubProfile | undefined): ClubProfile =>
-    prev
-      ? {
-          ...prev,
-          public: {
-            ...prev.public,
-            avatarUrl: next.public.avatarUrl,
-            bannerUrl: next.public.bannerUrl,
-          },
-        }
-      : next
+const IMAGE_FIELD = { avatar: 'avatarUrl', banner: 'bannerUrl' } as const
+
+const mergeImage =
+  (slot: ClubImageSlot, next: ClubProfile) =>
+  (prev: ClubProfile | undefined): ClubProfile => {
+    if (!prev) return next
+    // **只寫自己那一格**:頭像與橫幅是兩個 ImagePicker、兩個 mutation 實例,同時換兩張
+    // 圖時兩份回應都帶著完整的 profile,後回的那份會把先回的另一格打回舊值
+    const field = IMAGE_FIELD[slot]
+    return { ...prev, public: { ...prev.public, [field]: next.public[field] } }
+  }
 
 const keepImages =
   (next: ClubProfile) =>
@@ -278,7 +276,8 @@ export function useUploadClubImage() {
         toProfile,
       )
     },
-    onSuccess: (data) => qc.setQueryData(clubProfileKeys.profile, mergeImages(data)),
+    onSuccess: (data, { slot }) =>
+      qc.setQueryData(clubProfileKeys.profile, mergeImage(slot, data)),
   })
 }
 
@@ -287,6 +286,6 @@ export function useRemoveClubImage() {
   return useMutation({
     mutationFn: (slot: ClubImageSlot) =>
       api<ClubProfileOut>(`/club/profile/${slot}`, { method: 'DELETE' }).then(toProfile),
-    onSuccess: (data) => qc.setQueryData(clubProfileKeys.profile, mergeImages(data)),
+    onSuccess: (data, slot) => qc.setQueryData(clubProfileKeys.profile, mergeImage(slot, data)),
   })
 }

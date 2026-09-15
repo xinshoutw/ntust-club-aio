@@ -14,7 +14,7 @@ from app.core.config import settings
 from app.models import Activity, File
 from app.models.enums import ActivityStatus, ActivityType
 from app.services import files as file_service
-from tests.conftest import make_club, make_user
+from tests.conftest import login, make_club, make_user
 
 URL = "/api/v1/public/clubs"
 
@@ -388,3 +388,22 @@ async def test_a_vanished_file_is_404_not_500(client, db):
     (settings.upload_dir / row.path).unlink()
 
     assert (await client.get(f"/api/v1/public/files/{row.id}")).status_code == 404
+
+
+async def test_file_management_offers_to_download_what_anyone_can_already_fetch(client, db):
+    """公開檔對全世界開著,檔案管理頁卻收起下載鈕 —— 畫面與事實相反。
+
+    `FILE_SUBJECT_KEYS` 沒有 `club_image`,`can_download()` 因此 fail-closed,
+    而同一個人打 `/files/{id}` 拿得到(`can_access` 對 public 早退)。
+    """
+    from app.models.enums import UserRole
+
+    club = await make_club(db)
+    row = await make_public_image(db, club)
+    await make_user(db, username="admin01", role=UserRole.ADMIN, permissions=["afiles"])
+    await login(client, "admin01")
+
+    listed = (await client.get("/api/v1/admin/files")).json()["data"]
+    mine = next(f for f in listed if f["original_name"] == "avatar.webp")
+    assert mine["can_download"] is True
+    assert (await client.get(f"/api/v1/files/{row.id}")).status_code == 200

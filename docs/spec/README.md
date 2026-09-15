@@ -31,7 +31,7 @@
 
 | 頁 | 路由 |
 |---|---|
-| [club/overview.md](club/overview.md) | `/`(登入中的社團;未登入見 shared/public-availability.md) |
+| [club/overview.md](club/overview.md) | `/`(登入中的社團;未登入見 shared/club-directory.md) |
 | [club/activity-form.md](club/activity-form.md) | `/activities/new`、`/activities/:id/edit` |
 | [club/activity-close.md](club/activity-close.md) | `/activities/close` |
 | [club/activity-list.md](club/activity-list.md) | `/activities` |

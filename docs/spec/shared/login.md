@@ -4,7 +4,7 @@
 
 ## 用途
 
-唯一入口。未登入的 `/` 是借用情形的公開預覽([shared/public-availability.md](public-availability.md)),右上角登入鈕進本頁;其餘社團路徑仍直接導向這裡。
+唯一入口。未登入的 `/` 是社團導覽([club-directory.md](club-directory.md)),右上角登入鈕進本頁;其餘社團路徑仍直接導向這裡。
 
 ## 資料來源
 

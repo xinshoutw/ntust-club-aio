@@ -75,6 +75,10 @@
 - [ ] 應辦 加 `proxy_request_buffering off`
 - [ ] 應辦 XFF 改覆寫式 `proxy_set_header X-Forwarded-For $remote_addr;` 並補 `X-Forwarded-Proto $scheme`。內層 web nginx 已用 `set_real_ip_from` 還原真實 IP,此項為 defense-in-depth
 - [ ] 待決 台灣 IP 白名單與 `$should_drop` 封鎖 map 沿用現有
+- [ ] **阻擋** 台灣 IP 白名單要把**社團導覽**排除在外:`/`、`/clubs`、`/clubs/*`、
+  `/api/v1/public/clubs*`、`/api/v1/public/files/*`。導覽頁一半的價值是給校外看的
+  (新生、家長、交換生、想找社團合作的校外單位),關在白名單裡等於沒做。
+  白名單本身仍保留給其餘所有路徑
 - [ ] 待決 `clubclass.ntust.edu.tw` 是否 307 導向
 - [ ] 上線前演練切換與回滾(回滾 = upstream 改回 `10.140.0.2`)各一次
 

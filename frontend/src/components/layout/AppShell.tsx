@@ -3,13 +3,14 @@ import { Outlet, useLocation, useNavigate } from 'react-router'
 import { App, Badge, Drawer, Dropdown, Popover } from 'antd'
 import { confirmDialog } from '../../lib/confirm'
 import QueryError from '../ui/QueryError'
-import { BellOutlined, DownOutlined, HistoryOutlined, LogoutOutlined, MenuOutlined, SettingOutlined } from '@ant-design/icons'
+import { BellOutlined, DownOutlined, HistoryOutlined, LockOutlined, LogoutOutlined, MenuOutlined, SettingOutlined } from '@ant-design/icons'
 import { useAuth } from '../../app/auth'
 import { homeOf } from '../../lib/home'
 import { useAnnouncements, useMarkAnnouncementsRead } from '../../api/announcements'
 import { UnsavedProvider, useHasUnsaved } from '../../app/unsaved'
 import type { NavGroup } from '../../lib/nav'
 import { canAccessAdminPath } from '../../lib/permissions'
+import ChangePasswordModal from '../../features/auth/ChangePasswordModal'
 import Sidebar from './Sidebar'
 import TakeoverOverlay from './TakeoverOverlay'
 import './shell.css'
@@ -38,6 +39,7 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
   const navigate = useNavigate()
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [pwOpen, setPwOpen] = useState(false)
   // 公告即通知來源:與總覽/蓋板共用同一查詢,非社團角色不打 /club/* API
   const announcementsQuery = useAnnouncements(user?.role === 'club')
   const notifications = (announcementsQuery.data?.announcements ?? []).slice(0, BELL_COUNT)
@@ -79,12 +81,16 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
       ...(canAccessAdminPath(user, '/admin/settings')
         ? [{ key: 'admin-settings', icon: <SettingOutlined />, label: '設定' }]
         : []),
+      // 每個角色都要改密,而在這之前只有社團有入口(管理項目裡的一張卡)
+      { key: 'change-password', icon: <LockOutlined />, label: '更換密碼' },
       { key: 'logout', icon: <LogoutOutlined />, label: '登出' },
     ],
     onClick: ({ key }: { key: string }) => {
       if (key === 'settings') guarded(() => navigate('/club-settings'))
       if (key === 'admin-settings') guarded(() => navigate('/admin/settings'))
       if (key === 'admin-audit') guarded(() => navigate('/admin/audit'))
+      // 不走 guarded:對話框開在原地,沒有離開這一頁,未儲存的東西也還在
+      if (key === 'change-password') setPwOpen(true)
       if (key === 'logout') {
         guarded(() => {
           void logout().then(() => navigate('/login', { replace: true }))
@@ -165,6 +171,7 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
           </button>
         </Dropdown>
       </header>
+      <ChangePasswordModal open={pwOpen} onClose={() => setPwOpen(false)} />
 
       <div className="shell-body">
         <aside className="shell-sidebar">

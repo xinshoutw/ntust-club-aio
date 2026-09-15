@@ -69,7 +69,7 @@ interface DetailOut extends CardOut {
   signup_url: string | null
 }
 
-interface ActivityOut {
+export interface ActivityOut {
   id: number
   name: string
   date: string | null
@@ -107,7 +107,9 @@ const toDetail = (c: DetailOut): ClubDetail => ({
 const slash = (iso: string): string => dayjs(iso).format('YYYY/MM/DD')
 const hhmm = (t: string): string => t.slice(0, 5)
 
-const toActivity = (a: ActivityOut): PublicActivity => ({
+/** export 給 `publicClubs.test.ts`:日期與時間的組法是這一層唯一的規則,
+ *  而它的三種情形(單日／跨日／沒有時間)在畫面上分不出對錯 */
+export const toActivity = (a: ActivityOut): PublicActivity => ({
   id: a.id,
   name: a.name,
   dateSpan:

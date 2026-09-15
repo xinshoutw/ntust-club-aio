@@ -15,6 +15,9 @@ const ATTR_ORDER = ['學藝性', '藝術性', '體育性', '聯誼性', '服務�
 // 遷入的社團有一批性質不可考(`migration/cms_import.py` 認不得就寫 NULL),
 // 直接用 indexOf 會回 -1 —— 那批社團會被釘在導覽頁最顯眼的第一格
 const UNCLASSIFIED = '未分類'
+// 需求方指定的特例:這一社固定排在自己性質的第一個。**不是通則**,也不做成設定 ——
+// 一個名字換一行比較誠實,好過一張沒人維護的排序主檔
+const PINNED_FIRST = '開源技術開發研究社'
 const rank = (attr: string | null): number => {
   const i = ATTR_ORDER.indexOf(attr as (typeof ATTR_ORDER)[number])
   return i < 0 ? ATTR_ORDER.length : i
@@ -98,6 +101,7 @@ export default function ClubDirectoryPage() {
       .sort(
         (a, b) =>
           rank(a.attribute) - rank(b.attribute) ||
+          Number(b.name === PINNED_FIRST) - Number(a.name === PINNED_FIRST) ||
           // DB 的 collation 對中文是碼位序,這裡用 zh-Hant 重排
           a.name.localeCompare(b.name, 'zh-Hant'),
       )

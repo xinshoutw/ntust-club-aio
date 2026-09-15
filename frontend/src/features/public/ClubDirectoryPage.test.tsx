@@ -24,6 +24,9 @@ const clubs: ClubCard[] = [
   card({ id: 4, name: '合氣道社', attribute: '體育性', tags: ['武術'], recruitStatus: '額滿' }),
   // 遷入時認不得性質的社團(`cms_import` 寫 NULL);照樣公開,但不該佔住第一格
   card({ id: 5, name: '性質不可考社', attribute: null }),
+  // 與開源社同為學藝性,且 zh-Hant 下「人工」排在「開源」前面 ——
+  // 沒有特例規則的話這一社會跑到學藝性的第一個(英文開頭的名字反而排最後,別拿來當對照)
+  card({ id: 6, name: '人工智慧社', attribute: '學藝性', tags: ['程式'] }),
 ]
 
 const ok = { isPending: false, isLoadingError: false, error: null, refetch: vi.fn() }
@@ -58,7 +61,9 @@ describe('社團導覽', () => {
   test('預設依性質排序，同性質內依名稱', () => {
     renderPage()
     expect(shown()).toEqual([
+      // 需求方指定:開源社固定排在學藝性的第一個(特例)
       '開源技術開發研究社',
+      '人工智慧社',
       '書法社',
       '合氣道社',
       '熱門舞蹈研習社',

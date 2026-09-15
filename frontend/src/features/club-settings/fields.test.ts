@@ -42,9 +42,10 @@ const migrated: ClubProfile = {
 describe('profileChanged', () => {
   const saved = fromProfile(migrated)
 
-  // 網頁連結與簡介的必填掛在這個判定上:一律擋的話,這些社團連改密碼都送不出去
-  it('只填了密碼欄不算動到 profile', () => {
-    expect(profileChanged({ ...saved, pwCurrent: 'a', pwNew: 'b', pwConfirm: 'b' }, saved)).toBe(false)
+  // 網頁連結與詳細介紹的必填掛在這個判定上:一律擋的話,遷入時這兩欄是空的社團
+  // (`migration/cms_import.py`)連碰都不能碰
+  it('什麼都沒改不算動過', () => {
+    expect(profileChanged({ ...saved }, saved)).toBe(false)
   })
 
   it('動到 profile 的任何一欄都算', () => {

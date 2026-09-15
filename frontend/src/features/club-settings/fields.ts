@@ -1,5 +1,5 @@
-// 管理項目表單的欄位形狀:哪些欄位屬於 profile(另一支 API 是改密碼)、
-// 以及「這次到底有沒有動到 profile」—— 送出與必填驗證都問同一個問題,只能有一份答案
+// 管理項目表單的欄位形狀,以及「這次到底有沒有動到 profile」—— 送出與必填驗證
+// 都問同一個問題,只能有一份答案。改密不在這張表單裡(頂欄帳號選單的對話框)
 import type { ClubProfile } from '../../api/clubProfile'
 
 export interface SettingsValues {
@@ -25,12 +25,9 @@ export interface SettingsValues {
   regularSchedule?: string
   joinInfo?: string
   signupUrl?: string
-  pwCurrent?: string
-  pwNew?: string
-  pwConfirm?: string
 }
 
-// PATCH /club/profile 涵蓋的欄位(密碼另走 /auth/change-password;形象圖另走上傳端點)
+// PATCH /club/profile 涵蓋的欄位(形象圖另走上傳端點,選檔即上傳不隨表單儲存)
 export const PROFILE_KEYS = [
   'advisorName',
   'advisorDept',
@@ -62,7 +59,7 @@ export const PROFILE_KEYS = [
 export const normalizeValue = (v: unknown): string =>
   v == null ? '' : typeof v === 'string' ? v : JSON.stringify(v)
 
-// dirty 基準=最後載入/儲存的 server 值;密碼欄基準恆為空
+// dirty 基準=最後載入/儲存的 server 值
 export const fromProfile = (p: ClubProfile): SettingsValues => ({
   advisorName: p.advisorName,
   advisorDept: p.advisorDept,
@@ -85,9 +82,6 @@ export const fromProfile = (p: ClubProfile): SettingsValues => ({
   regularSchedule: p.public.regularSchedule,
   joinInfo: p.public.joinInfo,
   signupUrl: p.public.signupUrl,
-  pwCurrent: '',
-  pwNew: '',
-  pwConfirm: '',
 })
 
 /** 表單值 → PATCH /club/profile 的輸入。 */
@@ -115,8 +109,7 @@ export const toProfileInput = (v: SettingsValues) => ({
 
 /** 這次有沒有動到 profile 的任何一欄。
  *
- *  必填(網頁連結、簡介)只在這裡為 true 時才擋:密碼是同一張表單裡的另一支 API,
- *  而遷入的社團有一批簡介是空字串、網頁連結是 NULL(`migration/cms_import.py`),
- *  一律擋下去等於那些社團連改個密碼都送不出去。 */
+ *  必填(網頁連結、詳細介紹)只在這裡為 true 時才擋:遷入的社團有一批簡介是空字串、
+ *  網頁連結是 NULL(`migration/cms_import.py`),開頁就擋等於那些社團什麼都動不了。 */
 export const profileChanged = (cur: SettingsValues, saved: SettingsValues): boolean =>
   PROFILE_KEYS.some((k) => normalizeValue(cur[k]) !== normalizeValue(saved[k]))

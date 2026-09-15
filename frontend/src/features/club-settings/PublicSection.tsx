@@ -38,11 +38,16 @@ const subhead: React.CSSProperties = {
 
 interface Props {
   image: ClubPublicProfile
+  /** 社團名稱與英文名稱:學務處維護(行政端管理項目),這裡唯讀 */
+  name: string
+  enName: string
   itemClass: (k: keyof SettingsValues) => string | undefined
   /** 開公開頁預覽;有未儲存變更時由呼叫端先提醒 */
   onPreview: () => void
   /** false = 已被行政端下架,公開頁一律 404,預覽沒有東西可看 */
   publicVisible: boolean
+  /** 網頁連結與詳細介紹的必填規則(D-19);只在這次真的要存 profile 時擋 */
+  requiredOnSave: (msg: string) => { validator: (_: unknown, v: string | undefined) => Promise<void> }
 }
 
 /** 頭像或橫幅的選檔 / 移除。選檔即上傳,不隨表單儲存 —— 要有預覽可看。 */
@@ -183,7 +188,15 @@ function TagPicker({ value = [], onChange }: { value?: string[]; onChange?: (v: 
   )
 }
 
-export default function PublicSection({ image, itemClass, onPreview, publicVisible }: Props) {
+export default function PublicSection({
+  image,
+  name,
+  enName,
+  itemClass,
+  onPreview,
+  publicVisible,
+  requiredOnSave,
+}: Props) {
   // 上限是後台可調的設定值,不是前端常數(design-guide §6)
   const maxBytes = useClubConfig().data?.uploadLimits.imgBytes
 
@@ -230,26 +243,13 @@ export default function PublicSection({ image, itemClass, onPreview, publicVisib
 
       <div style={subhead}>社團資訊</div>
       <div className="form-grid-2">
-        <Form.Item name="officeLocation" label="社辦位置" className={itemClass('officeLocation')}>
-          <Input placeholder="S201" maxLength={30} />
+        <Form.Item label="社團名稱">
+          <Input readOnly value={name} style={{ background: 'var(--paper)' }} />
         </Form.Item>
-        <Form.Item name="recruitStatus" label="招生狀態" className={itemClass('recruitStatus')}>
-          <Segmented
-            options={[
-              { label: '未設定', value: '' },
-              ...RECRUIT_STATUSES.map((s) => ({ label: s, value: s })),
-            ]}
-          />
+        <Form.Item label="英文名稱">
+          <Input readOnly value={enName} placeholder="尚未設定" style={{ background: 'var(--paper)' }} />
         </Form.Item>
       </div>
-      <Form.Item
-        name="tags"
-        label="標籤"
-        className={itemClass('tags')}
-        tooltip={`最多 ${MAX_TAGS} 個`}
-      >
-        <TagPicker />
-      </Form.Item>
       <Form.Item
         name="tagline"
         label="簡短介紹"
@@ -257,6 +257,23 @@ export default function PublicSection({ image, itemClass, onPreview, publicVisib
         rules={[{ max: 40, message: '最多 40 字' }]}
       >
         <Input placeholder="我們是一群喜愛科技的白帽駭客" maxLength={40} />
+      </Form.Item>
+      <Form.Item
+        name="intro"
+        label="詳細介紹"
+        className={itemClass('intro')}
+        required // 必填的星號:規則是自訂 validator,AntD 推導不出來
+        rules={[requiredOnSave('請填寫詳細介紹')]}
+      >
+        <Input.TextArea rows={3} placeholder="社團宗旨、特色" />
+      </Form.Item>
+      <Form.Item
+        name="tags"
+        label="標籤"
+        className={itemClass('tags')}
+        tooltip={`最多 ${MAX_TAGS} 個`}
+      >
+        <TagPicker />
       </Form.Item>
 
       <div style={subhead}>聯絡方式</div>
@@ -277,11 +294,33 @@ export default function PublicSection({ image, itemClass, onPreview, publicVisib
           <Input prefix="instagram.com/" placeholder="ntust-hacking" />
         </Form.Item>
       </div>
+      <Form.Item
+        name="url"
+        label="網頁連結"
+        className={itemClass('url')}
+        required
+        rules={[requiredOnSave('請填寫社團網頁連結'), { type: 'url', message: '網址格式不正確' }]}
+      >
+        <Input placeholder="https://ntust.edu.tw" />
+      </Form.Item>
       <Form.Item name="signupUrl" label="報名連結" className={itemClass('signupUrl')} rules={[HTTP_URL]}>
         <Input placeholder="https://forms.gle/join-us" />
       </Form.Item>
 
       <div style={subhead}>其他資訊</div>
+      <div className="form-grid-2">
+        <Form.Item name="officeLocation" label="社辦位置" className={itemClass('officeLocation')}>
+          <Input placeholder="S201" maxLength={30} />
+        </Form.Item>
+        <Form.Item name="recruitStatus" label="招生狀態" className={itemClass('recruitStatus')}>
+          <Segmented
+            options={[
+              { label: '未設定', value: '' },
+              ...RECRUIT_STATUSES.map((s) => ({ label: s, value: s })),
+            ]}
+          />
+        </Form.Item>
+      </div>
       <Form.Item name="regularSchedule" label="例行活動時間" className={itemClass('regularSchedule')}>
         <Input.TextArea rows={2} maxLength={200} placeholder="每週三 19:00 於 TR 上課，詳情請見 IG 貼文" />
       </Form.Item>

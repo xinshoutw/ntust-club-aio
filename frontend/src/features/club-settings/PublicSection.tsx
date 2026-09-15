@@ -15,11 +15,14 @@ import {
   type ClubImageSlot,
   type ClubPublicProfile,
 } from '../../api/clubProfile'
+import { useClubConfig } from '../../api/clubConfig'
+import { IMAGE_ACCEPT, IMAGE_EXTENSIONS, fmtMB, hasAllowedExtension, isImageFile } from '../../lib/uploads'
 import { SOCIAL_FIELDS, type SettingsValues } from './fields'
 
-const MAX_IMAGE_MB = 10
 const MAX_TAGS = 5
 const MAX_TAG_LEN = 8
+// 後端只收 http(s);AntD 的 type:'url' 連 ftp:// 都放行,錯誤訊息卻已經寫死 http(s)
+const HTTP_URL = { pattern: /^https?:\/\//, message: '須為 http(s) 開頭的網址' }
 
 const sectionTitle: React.CSSProperties = { fontSize: 16, fontWeight: 600, marginBottom: 16 }
 const groupTitle: React.CSSProperties = { fontSize: 13, color: 'var(--steel)', marginBottom: 8 }
@@ -109,11 +112,14 @@ function ImagePicker({
   slot,
   label,
   url,
+  maxBytes,
   children,
 }: {
   slot: ClubImageSlot
   label: string
   url: string | null
+  /** 上限走 `GET /club/config`(承辦後台調得動);拿不到時不自己編一個數字 */
+  maxBytes: number | undefined
   children?: React.ReactNode
 }) {
   const { message } = App.useApp()
@@ -123,8 +129,13 @@ function ImagePicker({
   const [busy, setBusy] = useState(false)
 
   const pick = async (file: File) => {
-    if (file.size > MAX_IMAGE_MB * 1024 * 1024) {
-      message.error(`圖片不得超過 ${MAX_IMAGE_MB}MB`)
+    // 副檔名與魔術位元組都先驗:後端一樣會擋,但那要跑完一趟往返才知道
+    if (!hasAllowedExtension(file.name, IMAGE_EXTENSIONS) || !(await isImageFile(file))) {
+      message.error('請選擇圖片檔案')
+      return
+    }
+    if (maxBytes != null && file.size > maxBytes) {
+      message.error(`圖片不得超過 ${fmtMB(maxBytes)}`)
       return
     }
     setBusy(true)
@@ -158,7 +169,7 @@ function ImagePicker({
         <input
           ref={inputRef}
           type="file"
-          accept="image/*"
+          accept={IMAGE_ACCEPT}
           hidden
           onChange={(e) => {
             const file = e.target.files?.[0]
@@ -166,7 +177,9 @@ function ImagePicker({
             if (file) void pick(file)
           }}
         />
-        <Tooltip title={`${MAX_IMAGE_MB}MB 以內，系統會置中裁切並轉為固定尺寸`}>
+        <Tooltip
+          title={`${maxBytes != null ? `${fmtMB(maxBytes)} 以內，` : ''}系統會置中裁切並轉為固定尺寸`}
+        >
           <Button
             icon={<UploadOutlined />}
             loading={busy}
@@ -187,6 +200,8 @@ function ImagePicker({
 }
 
 export default function PublicSection({ image, itemClass, dim, blur, textMode }: Props) {
+  // 上限是後台可調的設定值,不是前端常數(design-guide §6)
+  const maxBytes = useClubConfig().data?.uploadLimits.imgBytes
   return (
     <div className="card" style={{ padding: 24, marginTop: 16 }}>
       <div style={sectionTitle}>
@@ -200,7 +215,7 @@ export default function PublicSection({ image, itemClass, dim, blur, textMode }:
 
       {/* ---- 形象圖 ---- */}
       <div className="form-grid-2" style={{ alignItems: 'start' }}>
-        <ImagePicker slot="avatar" label="頭像" url={image.avatarUrl}>
+        <ImagePicker slot="avatar" label="頭像" url={image.avatarUrl} maxBytes={maxBytes}>
           <div
             style={{
               width: 120,
@@ -223,7 +238,7 @@ export default function PublicSection({ image, itemClass, dim, blur, textMode }:
           </div>
         </ImagePicker>
 
-        <ImagePicker slot="banner" label="橫幅" url={image.bannerUrl}>
+        <ImagePicker slot="banner" label="橫幅" url={image.bannerUrl} maxBytes={maxBytes}>
           {/* 兩塊預覽都要給:模糊在字卡上不生效,只給一種會讓人調出對不上的效果 */}
           <div className="form-grid-2">
             <BannerPreview
@@ -331,7 +346,7 @@ export default function PublicSection({ image, itemClass, dim, blur, textMode }:
             name={SOCIAL_FIELDS[kind]}
             label={SOCIAL_LABELS[kind]}
             className={itemClass(SOCIAL_FIELDS[kind])}
-            rules={[{ type: 'url', message: '須為 http(s) 開頭的網址' }]}
+            rules={[HTTP_URL]}
           >
             <Input placeholder="https://" />
           </Form.Item>
@@ -361,7 +376,7 @@ export default function PublicSection({ image, itemClass, dim, blur, textMode }:
         name="signupUrl"
         label="報名連結"
         className={itemClass('signupUrl')}
-        rules={[{ type: 'url', message: '須為 http(s) 開頭的網址' }]}
+        rules={[HTTP_URL]}
         style={{ marginBottom: 0 }}
       >
         <Input placeholder="https://" />

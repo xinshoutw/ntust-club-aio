@@ -49,15 +49,24 @@
   border-radius: 6px;
   box-shadow: var(--shadow-card);
   overflow: hidden;
-  cursor: pointer;
   text-align: left;
-  padding: 0;
   font: inherit;
   color: inherit;
-  transition: border-color 0.12s ease;
+  transition:
+    border-color 0.12s ease,
+    transform 0.12s ease;
 }
 .club-card:hover {
   border-color: var(--seal);
+}
+/* 六十幾張卡是鍵盤使用者 Tab 過去的主要路徑,瀏覽器預設焦點框對不上站內樣式 */
+.club-card:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-color: var(--seal);
+}
+.club-card:active {
+  transform: translateY(1px);
 }
 
 /* 字卡與社團頁用同一個比例:一張圖兩處都不裁切。圖上不壓任何文字 */

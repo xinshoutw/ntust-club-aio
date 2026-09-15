@@ -1,10 +1,11 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { Link } from 'react-router'
 import { Input, Select } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import QueryError from '../../components/ui/QueryError'
 import { CLUB_TAGS, RECRUIT_STATUSES } from '../../api/clubProfile'
 import { usePublicClubs, type ClubCard } from '../../api/publicClubs'
+import useDocumentTitle from './useDocumentTitle'
 import ClubArt, { BADGE_CLASS } from './clubArt'
 import PublicShell from './PublicShell'
 import './publicClubs.css'
@@ -24,9 +25,14 @@ const options = (values: readonly string[], all: string) => [
   ...values.map((v) => ({ value: v, label: v })),
 ]
 
-export function ClubCardTile({ club, onOpen }: { club: ClubCard; onOpen: () => void }) {
+/** 整張卡是一個連結,不是按鈕。
+ *
+ *  `<button onClick={navigate}>` 看起來一樣,但不能 ⌘-click 開新分頁、不能右鍵複製
+ *  連結,搜尋引擎也爬不到任何一個社團頁 —— 對一個明說要給校外看的目錄是實質損失。
+ *  `<Link>` 自己處理修飾鍵與中鍵,SPA 導航照舊。 */
+function ClubCardTile({ club }: { club: ClubCard }) {
   return (
-    <button type="button" className="club-card" onClick={onOpen}>
+    <Link className="club-card" to={`/clubs/${club.id}`}>
       <div className="club-banner">
         <ClubArt kind="banner" url={club.bannerUrl} clubId={club.id} clubName={club.name} />
       </div>
@@ -57,17 +63,17 @@ export function ClubCardTile({ club, onOpen }: { club: ClubCard; onOpen: () => v
           )}
         </div>
       </div>
-    </button>
+    </Link>
   )
 }
 
 export default function ClubDirectoryPage() {
-  const navigate = useNavigate()
   const query = usePublicClubs()
   const [q, setQ] = useState('')
   const [attr, setAttr] = useState('')
   const [tag, setTag] = useState('')
   const [recruit, setRecruit] = useState('')
+  useDocumentTitle('社團導覽')
 
   // 全量在手上,搜尋與篩選都在前端做完 —— 再打一次伺服器只是多一次往返
   const rows = useMemo(() => {
@@ -145,7 +151,7 @@ export default function ClubDirectoryPage() {
           ) : (
             <div className="dir-grid">
               {rows.map((club) => (
-                <ClubCardTile key={club.id} club={club} onOpen={() => navigate(`/clubs/${club.id}`)} />
+                <ClubCardTile key={club.id} club={club} />
               ))}
             </div>
           )}

@@ -37,10 +37,11 @@ vi.mock('../../api/publicClubs', async (orig) => ({
   usePublicClubs: () => ({ ...ok, data: clubs }),
 }))
 
+// 字卡是連結而不是按鈕 —— 校外訪客要能複製網址、⌘-click 開新分頁
+const cards = () => screen.queryAllByRole('link').filter((a) => a.querySelector('.zh'))
 const shown = () =>
-  screen
-    .getAllByRole('button')
-    .map((b) => b.querySelector('.zh')?.textContent)
+  cards()
+    .map((a) => a.querySelector('.zh')?.textContent)
     .filter((v): v is string => !!v)
 
 const renderPage = () =>
@@ -77,6 +78,12 @@ describe('社團導覽', () => {
     fireEvent.change(screen.getByPlaceholderText('搜尋關鍵字'), { target: { value: '不存在的社團' } })
     expect(shown()).toEqual([])
     expect(screen.getByText(/沒有符合條件的社團/)).toBeTruthy()
+  })
+
+  // 校外訪客要能把某個社團的網址複製給別人,搜尋引擎也要爬得到
+  test('字卡是連結，網址指到該社團的頁面', () => {
+    renderPage()
+    expect(cards().map((a) => a.getAttribute('href'))).toContain('/clubs/3')
   })
 
   // 性質不上字卡(它在篩選器裡),招生狀態則貼在字卡右下角

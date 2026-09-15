@@ -609,6 +609,7 @@ async def preview_of(disk: Path) -> Path | None:
 
 
 # 形象圖尺寸:落盤的就是這個尺寸的 WebP,原圖不留。
+# 前端 `api/clubProfile.ts` 的 CLUB_IMAGE_RATIO 由此推導(比例),改動須同步。
 # 要換尺寸就請社團重傳 —— 留原圖等於每張圖存兩份,而重傳的成本落在幾十個社團、一次
 CLUB_IMAGE_SIZES: dict[str, tuple[int, int]] = {
     "avatar": (512, 512),  # 1:1

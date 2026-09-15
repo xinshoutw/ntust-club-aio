@@ -33,7 +33,10 @@ class ClubAttribute(StrEnum):
 
 
 class RecruitStatus(StrEnum):
-    """招生狀態;NULL=未設定(公開頁不顯示這顆 pill)。"""
+    """招生狀態;NULL=未設定(公開頁不顯示這顆 pill)。
+
+    前端 `api/clubProfile.ts` 的 RECRUIT_STATUSES 是第二份,改動須同步。
+    """
 
     OPEN = "招生中"
     FULL = "額滿"
@@ -42,7 +45,10 @@ class RecruitStatus(StrEnum):
 
 
 class BannerTextMode(StrEnum):
-    """橫幅上的字色。AUTO 依 clubs.banner_luma 推導,推導值不入庫。"""
+    """橫幅上的字色。AUTO 依 clubs.banner_luma 推導,推導值不入庫。
+
+    前端 `api/clubProfile.ts` 的 BANNER_TEXT_MODES 是第二份,改動須同步。
+    """
 
     AUTO = "auto"
     LIGHT = "light"

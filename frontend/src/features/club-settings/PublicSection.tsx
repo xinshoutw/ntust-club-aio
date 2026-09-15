@@ -19,6 +19,7 @@ import { useClubConfig } from '../../api/clubConfig'
 import { IMAGE_ACCEPT, IMAGE_EXTENSIONS, fmtMB, hasAllowedExtension, isImageFile } from '../../lib/uploads'
 import { SOCIAL_FIELDS, type SettingsValues } from './fields'
 
+// 後端 `schemas/clubs.py` 的 MAX_TAGS / MAX_TAG_LEN 是第一份,改動須同步
 const MAX_TAGS = 5
 const MAX_TAG_LEN = 8
 // 後端只收 http(s);AntD 的 type:'url' 連 ftp:// 都放行,錯誤訊息卻已經寫死 http(s)

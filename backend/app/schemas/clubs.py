@@ -12,6 +12,8 @@ _DISCORD_WEBHOOK_RE = re.compile(r"^https://discord\.com/api/webhooks/\d+/[\w-]+
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 MAX_CONTACT_EMAILS = 3
+# 前端 `features/club-settings/PublicSection.tsx` 的 MAX_TAGS / MAX_TAG_LEN 是第二份,
+# 社群連結的上限在前端是「六個固定平台欄位」的結構本身,改動須同步
 MAX_TAGS = 5
 MAX_TAG_LEN = 8
 MAX_SOCIAL_LINKS = 6

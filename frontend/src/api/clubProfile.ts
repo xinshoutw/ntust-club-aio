@@ -19,7 +19,9 @@ export const SOCIAL_LABELS: Record<SocialKind, string> = {
   other: '其他',
 }
 
+/** 後端 `models/enums.RecruitStatus` 是第一份,改動須同步。 */
 export const RECRUIT_STATUSES = ['招生中', '額滿', '不定期', '暫停招生'] as const
+/** 後端 `models/enums.BannerTextMode` 是第一份,改動須同步。 */
 export const BANNER_TEXT_MODES = ['auto', 'light', 'dark'] as const
 export type BannerTextMode = (typeof BANNER_TEXT_MODES)[number]
 

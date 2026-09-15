@@ -6,7 +6,7 @@
 
 社團自己維護的資料:指導老師、社團簡介、聯絡與通知、對外公開資料、社團形象圖、更換密碼。頂欄帳號選單的「設定」也指到這裡。
 
-**對外公開資料**與**社團形象圖**兩張卡填的東西會出現在免登入的社團導覽頁(見 [../shared/club-directory.md](../shared/club-directory.md)、[../shared/club-detail.md](../shared/club-detail.md)),其餘各卡一律不對外。
+**對外公開資料**這張全寬卡(形象圖收在卡內)填的東西會出現在免登入的社團導覽頁(見 [../shared/club-directory.md](../shared/club-directory.md)、[../shared/club-detail.md](../shared/club-detail.md)),其餘各卡一律不對外。
 
 ## 資料來源
 

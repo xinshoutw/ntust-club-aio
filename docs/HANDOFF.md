@@ -15,8 +15,8 @@
 四支公開端點,以及 `/`(社團導覽)、`/clubs/:clubId`、`/availability` 三頁前端。
 規格在 `spec/shared/club-directory.md`、`club-detail.md`、`public-availability.md`。
 
-**上線前還要做一件事**:把 `/`、`/clubs*`、`/api/v1/public/clubs*`、`/api/v1/public/files/*`
-排除在 edge 的台灣 IP 白名單外(`../../nginx`)—— 導覽頁一半的價值是給校外看的。
+**上線前還要做一件事**:edge 的台灣 IP 白名單要改成只套在需要登入的 API 上
+(`../../nginx`),導覽頁一半的價值是給校外看的。設定寫法見 `DEPLOY_CHECKLIST.md` E 段。
 
 ## 接下來做什麼
 

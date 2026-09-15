@@ -75,10 +75,26 @@
 - [ ] 應辦 加 `proxy_request_buffering off`
 - [ ] 應辦 XFF 改覆寫式 `proxy_set_header X-Forwarded-For $remote_addr;` 並補 `X-Forwarded-Proto $scheme`。內層 web nginx 已用 `set_real_ip_from` 還原真實 IP,此項為 defense-in-depth
 - [ ] 待決 台灣 IP 白名單與 `$should_drop` 封鎖 map 沿用現有
-- [ ] **阻擋** 台灣 IP 白名單要把**社團導覽**排除在外:`/`、`/clubs`、`/clubs/*`、
-  `/api/v1/public/clubs*`、`/api/v1/public/files/*`。導覽頁一半的價值是給校外看的
-  (新生、家長、交換生、想找社團合作的校外單位),關在白名單裡等於沒做。
-  白名單本身仍保留給其餘所有路徑
+- [ ] **阻擋** 台灣 IP 白名單改成**只套在需要登入的 API 上**,不要列舉要放行的路徑。
+  現況是 `location /` 裡 `include conf.d/taiwan_ips.conf`(結尾 `deny all`),涵蓋
+  每一條路徑;導覽頁一半的價值是給校外看的(新生、家長、交換生、想找社團合作的
+  校外單位),關在白名單裡等於沒做:
+
+  ```nginx
+  location / {                      # SPA 外殼、/assets/*、logo 與 favicon:全放行
+      proxy_pass http://clubs;      # 真正的閘在 API 上,靜態檔擋了只會變成一片空白
+  }
+  location ^~ /api/v1/public/ {     # 公開端點(社團列表、社團頁、公開圖片、借用狀態)
+      proxy_pass http://clubs;
+  }
+  location /api/ {                  # 其餘 API 一律要登入 —— 白名單留在這裡
+      include conf.d/taiwan_ips.conf;
+      proxy_pass http://clubs;
+  }
+  ```
+
+  **不要改成逐條列出要放行的頁面**:漏掉 `/assets/<hash>.js` 之類的 bundle,校外
+  訪客會拿到 `index.html` 然後每支 script 403,畫面全白而且**校內測不出來**
 - [ ] 待決 `clubclass.ntust.edu.tw` 是否 307 導向
 - [ ] 上線前演練切換與回滾(回滾 = upstream 改回 `10.140.0.2`)各一次
 

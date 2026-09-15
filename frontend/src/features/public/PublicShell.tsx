@@ -59,7 +59,14 @@ export default function PublicShell({
                 type="link"
                 icon={<ArrowLeftOutlined />}
                 style={{ paddingLeft: 0 }}
-                onClick={() => navigate('/clubs')}
+                href="/clubs"
+                onClick={(e) => {
+                  // 帶 href 才有 <a> 的那些好處(hover 看得到目標、⌘-click 開新分頁);
+                  // 沒按修飾鍵時仍走 SPA 導航,不整頁重載
+                  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+                  e.preventDefault()
+                  navigate('/clubs')
+                }}
               >
                 回社團導覽
               </Button>

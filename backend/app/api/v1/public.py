@@ -22,6 +22,7 @@ from app.core.deps import DbDep, OptionalUser, admin_with
 from app.core.errors import not_found, validation_error
 from app.core.semesters import SEMESTER_LABEL, semester_range
 from app.models import Activity, Club, Equipment, File, User, Venue
+from app.models.clubs import VISIBLE_CLUB, owns_public_image
 from app.models.enums import ActivityStatus
 from app.schemas.auth import PeriodOut
 from app.schemas.bookings import EquipmentUsageOut, VenueOut
@@ -58,7 +59,7 @@ PUBLIC_ACTIVITY_STATUSES = (
 )
 
 # 公開社團的唯一判定:停社與行政端下架的一筆都不回(不是灰掉,是不存在)
-_VISIBLE = (Club.is_active.is_(True), Club.public_visible.is_(True))
+_VISIBLE = VISIBLE_CLUB
 
 
 def _sees_pending(user: User | None) -> bool:
@@ -231,9 +232,7 @@ async def public_file(file_id: uuid.UUID, db: DbDep) -> FileResponse:
     id),但**授權會變** —— 下架之後還要讓已發出的副本在別人的快取裡活一週,那是這支端點
     唯一撤不回來的東西。一小時是「省掉重複請求」與「下架多久真的生效」之間的取捨。
     """
-    owned_by_visible_club = sa.select(Club.id).where(
-        sa.or_(Club.avatar_file_id == file_id, Club.banner_file_id == file_id), *_VISIBLE
-    )
+    owned_by_visible_club = sa.select(Club.id).where(owns_public_image(file_id), *_VISIBLE)
     file = await db.scalar(
         sa.select(File).where(
             File.id == file_id,

@@ -170,20 +170,66 @@ async def test_undecodable_image_is_rejected_as_415_not_500(db):
 # ---- 公開檔案的權限邊界 ----
 
 
-async def test_public_files_bypass_the_role_matrix(db):
-    """形象圖的 club_id 是 NULL:走 CLUB 分支的話社團連自己的頭像都預覽不了。"""
+async def _avatar_of(db, club, owner):
+    row = await file_service.save_club_image(
+        db, upload_of("logo.png", png_bytes(300, 300)), slot="avatar", uploaded_by=owner.id
+    )
+    club.avatar_file_id = row.id
+    await db.commit()
+    return row
+
+
+async def test_a_visible_clubs_image_is_readable_by_any_account(db):
+    """形象圖的 club_id 是 NULL:走 CLUB 分支的話社團連自己的頭像都預覽不了。
+
+    公開的社團,它的形象圖匿名都拿得到了,校內帳號自然也可以。
+    """
     club = await make_club(db)
     other = await make_club(db, name="吉他社")
     owner = await make_user(db, username="club01", club_id=club.id)
     stranger = await make_user(db, username="club02", club_id=other.id)
+
+    row = await _avatar_of(db, club, owner)
+
+    assert await file_service.can_access(db, row, owner) is True
+    assert await file_service.can_access(db, row, stranger) is True
+
+
+@pytest.mark.parametrize("hide", [{"public_visible": False}, {"is_active": False}])
+async def test_a_hidden_clubs_image_stops_being_readable_by_others(db, hide):
+    """下架要擋住**兩條**通道。
+
+    只擋 `/public/files/{id}` 的話,任何持有這個 UUID 的校內帳號(別社的社團、評審、
+    沒有檔案管理權限的承辦)照樣從 `/files/{id}` 下載得到 —— 行政端按下下架等於沒按。
+    社團自己不受影響:下架不表示它管不了自己的形象圖,設定頁還要預覽。
+    """
+    club = await make_club(db)
+    other = await make_club(db, name="吉他社")
+    owner = await make_user(db, username="club01", club_id=club.id)
+    stranger = await make_user(db, username="club02", club_id=other.id)
+    viewer = await make_user(db, username="judge01", role="viewer")
+
+    row = await _avatar_of(db, club, owner)
+    for k, v in hide.items():
+        setattr(club, k, v)
+    await db.commit()
+
+    assert await file_service.can_access(db, row, stranger) is False
+    assert await file_service.can_access(db, row, viewer) is False
+    assert await file_service.can_access(db, row, owner) is True
+
+
+async def test_an_unreferenced_public_image_is_readable_by_nobody(db):
+    """上傳成功但沒掛到任何社團上的孤兒檔,不因為 `public` 三個字就人人可取。"""
+    club = await make_club(db)
+    owner = await make_user(db, username="club01", club_id=club.id)
 
     row = await file_service.save_club_image(
         db, upload_of("logo.png", png_bytes(300, 300)), slot="avatar", uploaded_by=owner.id
     )
     await db.commit()
 
-    assert await file_service.can_access(db, row, owner) is True
-    assert await file_service.can_access(db, row, stranger) is True
+    assert await file_service.can_access(db, row, owner) is False
 
 
 async def test_non_public_files_still_obey_the_club_boundary(db):

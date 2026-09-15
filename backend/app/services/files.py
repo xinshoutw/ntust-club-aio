@@ -37,6 +37,7 @@ from app.core.errors import AppError, not_found, rate_limited
 from app.core.rate_limit import upload_limiter
 from app.models import (
     AwardRubricItem,
+    Club,
     EvalGroup,
     EvalGroupClub,
     EvalGroupReviewer,
@@ -44,6 +45,7 @@ from app.models import (
     File,
     User,
 )
+from app.models.clubs import VISIBLE_CLUB, owns_public_image
 from app.models.enums import UserRole
 from app.services.settings_service import get_setting
 
@@ -491,11 +493,22 @@ async def can_access(db: AsyncSession, file: File, user: User) -> bool:
     admin 原本一律放行,只持「檔案管理」權限的人因此拿得到郵局存簿影本這類個資。
     現在對照 `core/permissions.FILE_SUBJECT_KEYS`,看得到那一頁才下載得了那一頁的檔案。
     """
-    # 公開檔(社團形象圖)在角色判定之**前**放行:它的 club_id 是 NULL(不計社團配額),
-    # 走 CLUB 分支的話社團連自己的頭像都預覽不了。公開與否是檔案自己的屬性,
-    # 不是第五個角色分支 —— 後者遲早被下一個新增的 case 漏掉
+    # 公開檔(社團形象圖)在角色判定之**前**處理:它的 club_id 是 NULL(不計社團配額),
+    # 走 CLUB 分支的話社團連自己的頭像都預覽不了
     if file.public:
-        return True
+        # 但「公開」不是無條件放行:授權跟著**這張圖現在掛在哪個社團、那個社團公不公開**
+        # 走,與 `/public/files/{id}` 同一份判定。只擋匿名通道的話,任何持有 UUID 的
+        # 校內帳號(別社的社團、評審、沒有檔案管理權限的承辦)照樣下載得到,
+        # 行政端把社團下架等於沒下架
+        owner_id = await db.scalar(sa.select(Club.id).where(owns_public_image(file.id)))
+        if owner_id is None:
+            return False  # 沒有社團在引用它:上傳成功但沒掛上去的孤兒檔
+        if await db.scalar(sa.select(Club.id).where(Club.id == owner_id, *VISIBLE_CLUB)):
+            return True
+        # 下架之後只剩社團自己 —— 下架不表示它管不了自己的形象圖,設定頁還要預覽
+        if user.role is UserRole.CLUB:
+            return user.club_id == owner_id
+        # 其餘角色落到下面的矩陣:行政依 FILE_SUBJECT_KEYS,工讀生與評審照舊擋掉
     match user.role:
         case UserRole.ADMIN:
             if user.is_super:

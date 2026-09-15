@@ -81,6 +81,20 @@ class Club(Base, TimestampMixin):
     )
 
 
+# 「這個社團現在對外看得到嗎」:停社與被行政端下架的都不算。
+# 公開端點與檔案授權共用這一份 —— 兩邊各寫一份的話,下架只會擋掉其中一條路
+VISIBLE_CLUB = (Club.is_active.is_(True), Club.public_visible.is_(True))
+
+
+def owns_public_image(file_id: uuid.UUID) -> sa.ColumnElement[bool]:
+    """這張圖現在還掛在哪個社團的頭像或橫幅上。
+
+    用「現在還被誰引用」當權威,而不是在社團下架時反手把 `files.public` 關掉 ——
+    後者是同一份判定的第二份,每一條未來會隱藏社團的路徑都得記得同步一次。
+    """
+    return sa.or_(Club.avatar_file_id == file_id, Club.banner_file_id == file_id)
+
+
 class ClubMember(Base, TimestampMixin):
     """社員名單:按學期各自一份快照(同學號可跨學期出現)。"""
 

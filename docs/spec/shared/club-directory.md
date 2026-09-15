@@ -7,7 +7,7 @@
 免登入就看得到全校社團:字卡牆 + 篩選,點進去是 [club-detail.md](club-detail.md)。
 
 取代舊系統的 `/Introduction/`(純文字三欄表格)。**未登入的 `/` 就是這一頁** ——
-借用情形色格圖移到 `/availability`,由 topbar 的「借用狀態」進去
+借用情形色格圖移到 `/availability`,由 topbar 的「借用情形」進去
 (見 [public-availability.md](public-availability.md))。
 
 ## 資料來源
@@ -26,7 +26,7 @@
 
 ## 畫面
 
-外殼是 `PublicShell`(與 [public-availability.md](public-availability.md) 共用):左上系統名,右上「借用狀態」與「登入」兩顆鈕(**登入中時「登入」換成「控制台」**,導向該角色自己的首頁 —— 公開頁不在角色閘底下,登入的人照樣進得來),**沒有側欄、鈴鐺與帳號選單**。
+外殼是 `PublicShell`(與 [public-availability.md](public-availability.md) 共用):左上系統名,右上「借用情形」與「登入」兩顆鈕(前者在 `/availability` 上會換成「社團導覽」—— 同一顆鈕永遠指向另一個公開頁;**登入中時「登入」換成「控制台」**,導向該角色自己的首頁 —— 公開頁不在角色閘底下,登入的人照樣進得來),**沒有側欄、鈴鐺與帳號選單**。
 
 - 工具列一行:標題「社團導覽」靠左,三個下拉(性質 / 標籤 / 招生)與搜尋框靠右,**一律 40px 同高**,搜尋在最右。不顯示社團數
 - 字卡牆:`grid` 自適應,最小卡寬 260px

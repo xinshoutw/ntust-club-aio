@@ -89,7 +89,7 @@ hover 顯示「目前未開放」(`lib/nav.EVAL_UNBUILT`)。收的**只有側欄
 的承辦**(`api/v1/public._sees_pending`);有可審的格子就地開審核彈窗,多筆出選單。
 原本的行政專用端點 `/admin/bookings/availability` 與 `admin_availability_grid` 已刪除。
 
-**未登入的 `/`**:社團導覽(借用情形移到 `/availability`,由 topbar 的「借用狀態」進去);
+**未登入的 `/`**:社團導覽(借用情形移到 `/availability`,由 topbar 的「借用情形」進去);
 其餘社團路徑未登入仍轉 `/login`。
 匿名看得到借用社團名與不開放原因 —— 判定為可接受(等同貼在場地門口的資訊),要收就改後端。
 

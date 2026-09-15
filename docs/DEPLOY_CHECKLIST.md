@@ -84,7 +84,7 @@
   location / {                      # SPA 外殼、/assets/*、logo 與 favicon:全放行
       proxy_pass http://clubs;      # 真正的閘在 API 上,靜態檔擋了只會變成一片空白
   }
-  location ^~ /api/v1/public/ {     # 公開端點(社團列表、社團頁、公開圖片、借用狀態)
+  location ^~ /api/v1/public/ {     # 公開端點(社團列表、社團頁、公開圖片、借用情形)
       proxy_pass http://clubs;
   }
   location /api/ {                  # 其餘 API 一律要登入 —— 白名單留在這裡

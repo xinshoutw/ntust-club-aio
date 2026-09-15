@@ -1,6 +1,6 @@
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { Button } from 'antd'
-import { ArrowLeftOutlined, CalendarOutlined, HomeOutlined, LoginOutlined } from '@ant-design/icons'
+import { AppstoreOutlined, ArrowLeftOutlined, CalendarOutlined, HomeOutlined, LoginOutlined } from '@ant-design/icons'
 import { useAuth } from '../../app/auth'
 import { homeOf } from '../../lib/home'
 import '../../components/layout/shell.css'
@@ -8,7 +8,7 @@ import '../../components/layout/shell.css'
 /** 免登入頁面共用的外殼。
  *
  *  借用 shell 的 topbar 與內容寬(不另開一套 CSS),但**沒有側欄、鈴鐺與帳號選單** ——
- *  匿名訪客沒有那些東西可以按。右上角固定兩顆:借用狀態與登入。 */
+ *  匿名訪客沒有那些東西可以按。右上角固定兩顆:另一邊的公開頁與登入。 */
 export default function PublicShell({
   mobileTitle,
   back,
@@ -21,9 +21,12 @@ export default function PublicShell({
   children: React.ReactNode
 }) {
   const navigate = useNavigate()
+  const { pathname } = useLocation()
   // 公開頁不在角色閘底下,登入中的人照樣進得來(社團按「預覽社團頁」就是)。
   // 對他們顯示「登入」會把人送去一張自己已經不需要的表單
   const { user } = useAuth()
+  // 這顆鈕永遠指向**另外那一邊**:兩個公開面互為對方的出口,不必再各自放返回鈕
+  const onAvailability = pathname === '/availability'
   return (
     <div className="shell">
       <header className="topbar">
@@ -33,9 +36,15 @@ export default function PublicShell({
         </button>
         <div className="topbar-mobile-title">{mobileTitle}</div>
         <div className="topbar-spacer" />
-        <Button icon={<CalendarOutlined />} onClick={() => navigate('/availability')}>
-          借用狀態
-        </Button>
+        {onAvailability ? (
+          <Button icon={<AppstoreOutlined />} onClick={() => navigate('/clubs')}>
+            社團導覽
+          </Button>
+        ) : (
+          <Button icon={<CalendarOutlined />} onClick={() => navigate('/availability')}>
+            借用情形
+          </Button>
+        )}
         {user ? (
           <Button icon={<HomeOutlined />} onClick={() => navigate(homeOf(user.role))}>
             控制台

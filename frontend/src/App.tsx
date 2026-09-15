@@ -109,7 +109,7 @@ function ClubShell() {
 }
 
 // 未登入的首頁是社團導覽(Roadmap 的免登入入口;借用情形移到 /availability,
-// 由 topbar 的「借用狀態」進去)。其餘社團頁沒有公開版本,一律照舊轉登入頁
+// 由 topbar 的「借用情形」進去)。其餘社團頁沒有公開版本,一律照舊轉登入頁
 function ClubArea() {
   const { user, booting } = useAuth()
   const { pathname } = useLocation()

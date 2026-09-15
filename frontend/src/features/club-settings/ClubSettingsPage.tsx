@@ -109,6 +109,16 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
         const next = await update.mutateAsync(toProfileInput(v))
         baseline = fromProfile(next)
         setSaved(baseline)
+        // 欄位要跟著回填:後端會正規化(instagram 取出帳號、主檔外的標籤丟掉、
+        // 空白收成 null),不回填的話畫面上留著的是送出去的原始輸入,而基準已經
+        // 前移 —— dirty 判定從此永遠為真,橘框不消、離頁一直被攔,資料其實早就存好了。
+        // 密碼欄不歸 baseline 管,原樣留著(改密成功時下面那段才清)
+        form.setFieldsValue({
+          ...baseline,
+          pwCurrent: v.pwCurrent,
+          pwNew: v.pwNew,
+          pwConfirm: v.pwConfirm,
+        })
       }
       if (changingPw) {
         await changePasswordApi(v.pwCurrent ?? '', v.pwNew ?? '')

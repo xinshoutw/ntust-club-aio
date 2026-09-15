@@ -492,3 +492,30 @@ def test_social_links_are_deduped_by_platform():
         ("instagram", "https://instagram.com/new"),
         ("line", "https://line.me/x"),
     ]
+
+
+async def test_image_changes_are_traceable_in_the_audit_trail(client, db):
+    from app.models import AuditLog
+
+    club = await make_club(db)
+    await make_user(db, username="club01", club_id=club.id)
+    await login(client, "club01")
+
+    image_logs = (
+        sa.select(sa.func.count())
+        .select_from(AuditLog)
+        .where(AuditLog.action.like("club_avatar_%"))
+    )
+    # 本來就沒圖時按移除:什麼都沒發生,不該留下一筆紀錄(登入自己有一筆,不算)
+    await client.delete("/api/v1/club/profile/avatar", headers=csrf_headers(client))
+    assert await db.scalar(image_logs) == 0
+
+    res = await client.post(
+        "/api/v1/club/profile/avatar/upload",
+        files={"file": ("a.png", png_bytes(300, 300), "image/png")},
+        headers=csrf_headers(client),
+    )
+    file_id = res.json()["data"]["avatar_file_id"]
+    row = await db.scalar(sa.select(AuditLog).where(AuditLog.action == "club_avatar_updated"))
+    assert row is not None
+    assert f"club={club.id}" in row.detail and file_id in row.detail

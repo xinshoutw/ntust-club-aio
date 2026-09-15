@@ -99,12 +99,20 @@ async def _replace_image(
             await db.execute(sa.delete(File).where(File.id == old_id))
             stale = Path(settings.upload_dir) / old_path
 
-    audit.record(
-        db,
-        action=f"club_{slot}_{'updated' if new_row else 'removed'}",
-        user=user,
-        ip=client_ip(request),
-    )
+    # 沒圖也沒傳新圖 = 什麼都沒發生,不留無事件的稽核噪音
+    if new_row is not None or old_id is not None:
+        audit.record(
+            db,
+            action=f"club_{slot}_{'updated' if new_row else 'removed'}",
+            user=user,
+            # 查「這社的橫幅換過幾次、被換掉的是哪一個檔」要看得到 id,
+            # 比照同檔的 club_profile_updated 與 admin_files 的刪除紀錄
+            detail=(
+                f"club={club.id};slot={slot}"
+                f";file={new_row.id if new_row else '-'};old={old_id or '-'}"
+            ),
+            ip=client_ip(request),
+        )
     await db.commit()
     if stale is not None:
         file_service.unlink_quiet(stale)

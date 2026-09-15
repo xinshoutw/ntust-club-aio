@@ -92,7 +92,9 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
 
   const onFinish = async (v: SettingsValues) => {
     if (!profileChanged(v, saved)) {
-      message.success('設定已儲存')
+      // 一個請求都沒送就說「已儲存」,會讓「真的存了」與「根本沒送」長得一模一樣
+      message.info('沒有變更')
+      recomputeDirty()
       return
     }
     let baseline = saved
@@ -223,7 +225,6 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
             </Form.Item>
           </div>
         </div>
-
 
         {/* 對外公開資料:唯一會被校外看到的一段,獨立成全寬區塊擺在對內設定之下 */}
         <PublicSection

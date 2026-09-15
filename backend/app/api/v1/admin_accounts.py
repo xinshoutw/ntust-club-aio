@@ -194,7 +194,7 @@ async def reset_password(
 ) -> ApiResponse[PasswordResetOut]:
     target = await _managed_account(db, account_id)
     if target.id == user.id:
-        raise conflict("請由「變更密碼」修改自己的密碼")
+        raise conflict("請由「更換密碼」修改自己的密碼")
     _guard_target(user, target, "重設密碼")
 
     password = generate_password()

@@ -20,6 +20,7 @@ const emptyPublic: ClubPublicProfile = {
 // 遷入的社團有一批是這樣的:簡介空字串、網頁連結 NULL(migration/cms_import.py)
 const migrated: ClubProfile = {
   id: 1,
+  publicVisible: true,
   name: '熱舞社',
   kind: '社團',
   enName: '',
@@ -67,7 +68,7 @@ describe('profileChanged', () => {
 
   it('形象圖不是表單欄位,換圖不會讓表單變 dirty', () => {
     expect(Object.keys(saved)).not.toContain('avatarUrl')
-    expect(Object.keys(saved)).not.toContain('bannerLuma')
+    expect(Object.keys(saved)).not.toContain('bannerUrl')
   })
 })
 

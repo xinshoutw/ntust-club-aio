@@ -27,6 +27,7 @@ import type { SettingsValues } from './fields'
 const HTTP_URL = { pattern: /^https?:\/\//, message: '須為 http(s) 開頭的網址' }
 
 const sectionTitle: React.CSSProperties = { fontSize: 16, fontWeight: 600 }
+const IMAGE_FRAME_HEIGHT = 132
 const subhead: React.CSSProperties = {
   fontSize: 13,
   color: 'var(--steel)',
@@ -41,19 +42,19 @@ interface Props {
   itemClass: (k: keyof SettingsValues) => string | undefined
   /** 開公開頁預覽;有未儲存變更時由呼叫端先提醒 */
   onPreview: () => void
+  /** false = 已被行政端下架,公開頁一律 404,預覽沒有東西可看 */
+  publicVisible: boolean
 }
 
 /** 頭像或橫幅的選檔 / 移除。選檔即上傳,不隨表單儲存 —— 要有預覽可看。 */
 function ImagePicker({
   slot,
   label,
-  hint,
   url,
   maxBytes,
 }: {
   slot: ClubImageSlot
   label: string
-  hint: string
   url: string | null
   /** 上限走 `GET /club/config`(承辦後台調得動);拿不到時不自己編一個數字 */
   maxBytes: number | undefined
@@ -100,11 +101,13 @@ function ImagePicker({
   return (
     <div style={{ display: 'grid', gap: 8 }}>
       <div style={{ fontSize: 13, color: 'var(--steel)' }}>{label}</div>
+      {/* 兩個框等高,寬度由各自的比例推出來(頭像 1:1 → 132、橫幅 3:1 → 396),
+          並排時上下緣才對得齊 */}
       <div
         style={{
-          width: slot === 'avatar' ? 132 : '100%',
-          maxWidth: slot === 'avatar' ? 132 : 480,
+          height: IMAGE_FRAME_HEIGHT,
           aspectRatio: String(CLUB_IMAGE_RATIO[slot]),
+          maxWidth: '100%',
           border: '1px solid var(--line)',
           borderRadius: 6,
           overflow: 'hidden',
@@ -124,7 +127,9 @@ function ImagePicker({
           ref={inputRef}
           type="file"
           accept={IMAGE_ACCEPT}
-          hidden
+          // `hidden` 屬性會被 antd 的 `input { display: inline-block }` 蓋掉,
+          // 原生的「選擇檔案」鈕就整顆露出來,畫面上變成兩顆按鈕
+          style={{ display: 'none' }}
           onChange={(e) => {
             const file = e.target.files?.[0]
             e.target.value = '' // 選同一個檔案兩次也要觸發
@@ -151,7 +156,6 @@ function ImagePicker({
           </Button>
         )}
       </div>
-      <div style={{ fontSize: 12, color: 'var(--muted)' }}>{hint}</div>
     </div>
   )
 }
@@ -182,10 +186,9 @@ function TagPicker({ value = [], onChange }: { value?: string[]; onChange?: (v: 
   )
 }
 
-export default function PublicSection({ image, itemClass, onPreview }: Props) {
+export default function PublicSection({ image, itemClass, onPreview, publicVisible }: Props) {
   // 上限是後台可調的設定值,不是前端常數(design-guide §6)
   const maxBytes = useClubConfig().data?.uploadLimits.imgBytes
-  const sizeHint = maxBytes != null ? `${fmtMB(maxBytes)} 以內，` : ''
 
   return (
     <div className="card" style={{ padding: 24, marginTop: 16 }}>
@@ -199,14 +202,13 @@ export default function PublicSection({ image, itemClass, onPreview }: Props) {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-          <span style={sectionTitle}>對外公開資料</span>
-          <Tooltip title="這一段填的內容會出現在免登入的社團導覽頁，空白的欄位不會顯示">
-            <span style={{ fontSize: 13, color: 'var(--steel)' }}>校外看得到</span>
-          </Tooltip>
+          <span style={sectionTitle}>公開資料</span>
         </div>
-        <Button icon={<EyeOutlined />} onClick={onPreview}>
-          預覽社團頁
-        </Button>
+        <Tooltip title={publicVisible ? '' : '學務處已將這個社團從導覽頁下架，公開頁目前不會顯示'}>
+          <Button icon={<EyeOutlined />} onClick={onPreview} disabled={!publicVisible}>
+            預覽社團頁
+          </Button>
+        </Tooltip>
       </div>
 
       <div style={subhead}>形象圖</div>
@@ -214,14 +216,12 @@ export default function PublicSection({ image, itemClass, onPreview }: Props) {
         <ImagePicker
           slot="avatar"
           label="頭像（1:1）"
-          hint={`${sizeHint}系統會置中裁切為正方形`}
           url={image.avatarUrl}
           maxBytes={maxBytes}
         />
         <ImagePicker
           slot="banner"
           label="橫幅（3:1）"
-          hint={`${sizeHint}字卡與社團頁用同一張，兩邊都不裁切`}
           url={image.bannerUrl}
           maxBytes={maxBytes}
         />

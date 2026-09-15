@@ -25,6 +25,8 @@ export type ClubImageSlot = keyof typeof CLUB_IMAGE_RATIO
 export interface ClubProfile {
   /** 預覽按鈕要用它組 /clubs/:id */
   id: number
+  /** 唯讀:開關在行政端。社團要知道自己的頁面公不公開,否則預覽只會撞 404 */
+  publicVisible: boolean
   name: string
   /** 社團/學會 */
   kind: string
@@ -52,7 +54,6 @@ export interface ClubPublicProfile {
   tags: string[]
   recruitStatus: string
   publicEmail: string
-  /** 一平台一格(表單是六個固定欄位);未填的平台不進陣列 */
   /** 帳號 ID,不含網址前綴 */
   instagram: string
   officeLocation: string
@@ -81,6 +82,7 @@ export interface ClubPublicOut {
 
 interface ClubProfileOut extends ClubPublicOut {
   id: number
+  public_visible: boolean
   name: string
   kind: string
   en_name: string | null
@@ -118,6 +120,7 @@ export const toPublicProfile = (c: ClubPublicOut): ClubPublicProfile => ({
 
 const toProfile = (c: ClubProfileOut): ClubProfile => ({
   id: c.id,
+  publicVisible: c.public_visible,
   name: c.name,
   kind: c.kind,
   enName: c.en_name ?? '',

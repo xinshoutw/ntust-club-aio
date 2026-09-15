@@ -73,7 +73,9 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
   // 預覽開的是公開頁,看到的是**已儲存**的內容 —— 有未存變更時先講清楚
   const previewPublicPage = () => {
     const open = () => window.open(`/clubs/${profile.id}`, '_blank', 'noopener')
-    if (dirty.size === 0) {
+    // 密碼欄與公開頁無關,不該為了它跳「尚未儲存」的確認
+    const pending = [...dirty].some((k) => !k.startsWith('pw'))
+    if (!pending) {
       open()
       return
     }
@@ -225,7 +227,12 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
         </div>
 
         {/* 對外公開資料:唯一會被校外看到的一段,獨立成全寬區塊擺在對內設定之上 */}
-        <PublicSection image={profile.public} itemClass={itemClass} onPreview={previewPublicPage} />
+        <PublicSection
+          image={profile.public}
+          itemClass={itemClass}
+          onPreview={previewPublicPage}
+          publicVisible={profile.publicVisible}
+        />
 
         {/* 聯絡與通知、更換密碼並排 */}
         <div className="form-grid-2" style={{ marginTop: 16, alignItems: 'stretch' }}>

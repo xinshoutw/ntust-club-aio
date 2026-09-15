@@ -32,6 +32,23 @@ class ClubAttribute(StrEnum):
     SPORTS = "體育性"
 
 
+class RecruitStatus(StrEnum):
+    """招生狀態;NULL=未設定(公開頁不顯示這顆 pill)。"""
+
+    OPEN = "招生中"
+    FULL = "額滿"
+    IRREGULAR = "不定期"
+    PAUSED = "暫停招生"
+
+
+class BannerTextMode(StrEnum):
+    """橫幅上的字色。AUTO 依 clubs.banner_luma 推導,推導值不入庫。"""
+
+    AUTO = "auto"
+    LIGHT = "light"
+    DARK = "dark"
+
+
 class MemberKind(StrEnum):
     """標準身份值;正副負責人顯示時依社團名稱末字推導(社→社長、會→會長)。"""
 

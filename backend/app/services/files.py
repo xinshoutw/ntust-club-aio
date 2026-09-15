@@ -22,7 +22,7 @@ import pi_heif
 import sqlalchemy as sa
 from fastapi import UploadFile
 from fastapi.responses import FileResponse
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, ImageStat
 
 # pi-heif 是 pillow-heif 的 decode-only 版:同一位作者、同一套 API,
 # wheel 只帶 LGPL 的 libheif/libde265,
@@ -490,6 +490,11 @@ async def can_access(db: AsyncSession, file: File, user: User) -> bool:
     admin 原本一律放行,只持「檔案管理」權限的人因此拿得到郵局存簿影本這類個資。
     現在對照 `core/permissions.FILE_SUBJECT_KEYS`,看得到那一頁才下載得了那一頁的檔案。
     """
+    # 公開檔(社團形象圖)在角色判定之**前**放行:它的 club_id 是 NULL(不計社團配額),
+    # 走 CLUB 分支的話社團連自己的頭像都預覽不了。公開與否是檔案自己的屬性,
+    # 不是第五個角色分支 —— 後者遲早被下一個新增的 case 漏掉
+    if file.public:
+        return True
     match user.role:
         case UserRole.ADMIN:
             if user.is_super:
@@ -600,6 +605,83 @@ async def preview_of(disk: Path) -> Path | None:
         return None
     await asyncio.get_running_loop().run_in_executor(_PREVIEW_POOL, _render_preview, disk, dst)
     return dst
+
+
+# 形象圖尺寸:落盤的就是這個尺寸的 WebP,原圖不留。
+# 要換尺寸就請社團重傳 —— 留原圖等於每張圖存兩份,而重傳的成本落在幾十個社團、一次
+CLUB_IMAGE_SIZES: dict[str, tuple[int, int]] = {
+    "avatar": (512, 512),  # 1:1
+    "banner": (1600, 1200),  # 4:3
+}
+_WEBP_QUALITY = 82
+
+
+def _fit_webp(src: Path, size: tuple[int, int]) -> tuple[int, int]:
+    """置中裁切成指定尺寸的 WebP,就地取代原檔;回傳 (檔案大小, 下三分之一平均亮度)。
+
+    比例不合一律 `ImageOps.fit` 置中裁切 —— 換一套互動 cropper UI 得不到等值的效果,
+    要精準構圖的社團自己先裁好再傳。
+
+    亮度只取**下三分之一**:橫幅上的字通常壓在底部,取全圖平均會在「上半天空、
+    下半暗地」這種圖上判出相反的字色。
+    """
+    tmp = src.with_name(f"{src.name}.{uuid.uuid4().hex}.part")
+    try:
+        with Image.open(src) as img:
+            if img.width * img.height > PREVIEW_MAX_PIXELS:
+                raise ValueError(f"image too large: {img.width}x{img.height}")
+            img = ImageOps.exif_transpose(img) or img
+            fitted = ImageOps.fit(img.convert("RGB"), size, method=Image.Resampling.LANCZOS)
+            fitted.save(tmp, format="WEBP", quality=_WEBP_QUALITY)
+            bottom = fitted.crop((0, size[1] * 2 // 3, size[0], size[1])).convert("L")
+            luma = round(ImageStat.Stat(bottom).mean[0])
+        tmp.replace(src)
+        return src.stat().st_size, luma
+    finally:
+        tmp.unlink(missing_ok=True)
+
+
+async def save_club_image(
+    db: AsyncSession, upload: UploadFile, *, slot: str, uploaded_by: int
+) -> tuple[File, int]:
+    """社團形象圖:沿用 `save_upload` 的副檔名/魔術位元組/大小/磁碟閘,落盤後就地轉 WebP。
+
+    `club_id` 留 NULL:形象圖**不計入社團儲存配額** —— 社團不該為了傳結案照片
+    刪掉自己的橫幅。權限則由 `public=True` 承接(見 `can_access`)。
+
+    回傳 (File, 下三分之一平均亮度) —— 亮度屬於「這一張圖」,由呼叫端寫進 clubs.banner_luma。
+
+    ponytail: 多寫一次原圖再覆寫,換掉一整套重抄的驗證邏輯;真的成為瓶頸再拆成串流轉檔
+    """
+    size_spec = CLUB_IMAGE_SIZES[slot]
+    row = await save_upload(
+        db,
+        upload,
+        policy=IMAGE,
+        module="club_image",
+        uploaded_by=uploaded_by,
+        club_id=None,
+        subject_type="club_image",
+        slot=slot,
+    )
+    disk = Path(settings.upload_dir) / row.path
+    try:
+        size, luma = await asyncio.get_running_loop().run_in_executor(
+            _PREVIEW_POOL, _fit_webp, disk, size_spec
+        )
+    except Exception as exc:
+        # 副檔名與魔術位元組都對了卻解不開(截斷、超大、編碼不支援):
+        # 回 415 讓社團換一張,不是 500
+        logger.warning("club image convert failed: slot=%s file=%s", slot, row.id, exc_info=True)
+        raise AppError(415, "UNSUPPORTED_FILE_TYPE", "圖片無法解讀,請換一張") from exc
+
+    row.size = size
+    row.mime = "image/webp"
+    row.sha256 = hashlib.sha256(disk.read_bytes()).hexdigest()
+    row.original_name = f"{slot}.webp"
+    row.public = True
+    await db.flush()
+    return row, luma
 
 
 async def file_response(

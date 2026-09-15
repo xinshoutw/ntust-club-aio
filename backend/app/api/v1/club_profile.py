@@ -1,15 +1,21 @@
-"""社團端:管理項目(簡介/網頁/指導老師/Discord webhook)。"""
+"""社團端:管理項目(簡介/網頁/指導老師/Discord webhook/對外公開資料/形象圖)。"""
 
-from fastapi import APIRouter, Request
+from pathlib import Path
+
+from fastapi import APIRouter, Request, UploadFile
 
 from app.core.deps import ClubUser, DbDep, client_ip
-from app.core.errors import not_found
-from app.models import Club
+from app.core.errors import not_found, validation_error
+from app.models import Club, File
 from app.schemas.clubs import ClubProfileOut, ClubProfileUpdate
 from app.schemas.common import ApiResponse
 from app.services import audit
+from app.services import files as file_service
 
 router = APIRouter(prefix="/club/profile", tags=["club"])
+
+# 形象圖欄位:slot → clubs 上存 file id 的那一欄
+_IMAGE_FIELDS = {"avatar": "avatar_file_id", "banner": "banner_file_id"}
 
 
 async def _own_club(db: DbDep, user) -> Club:
@@ -44,3 +50,88 @@ async def update_profile(
     await db.commit()
     await db.refresh(club)
     return ApiResponse(data=ClubProfileOut.model_validate(club))
+
+
+async def _replace_image(
+    db: DbDep, user, request: Request, *, slot: str, upload: UploadFile | None
+) -> ClubProfileOut:
+    """換圖與移除走同一條路:兩者都是「舊檔下架 + 欄位改寫」,只差有沒有新檔。
+
+    舊檔一律刪掉不留版本 —— 形象圖沒有歷史價值,留著只是無人管理的磁碟佔用。
+    磁碟 unlink 排在 commit 之後:反過來的話 rollback 會留下「DB 有列、磁碟無檔」。
+    """
+    club = await _own_club(db, user)
+    field = _IMAGE_FIELDS[slot]
+    old_id = getattr(club, field)
+
+    new_row, luma = None, None
+    if upload is not None:
+        file_service.enforce_upload_rate(user.id)
+        new_row, luma = await file_service.save_club_image(
+            db, upload, slot=slot, uploaded_by=user.id
+        )
+
+    setattr(club, field, new_row.id if new_row else None)
+    if slot == "banner":
+        # 亮度屬於「目前這張橫幅」,換圖與移除都要跟著走 ——
+        # 留著上一張的值,auto 字色就會拿舊圖的亮度判新圖
+        club.banner_luma = luma
+
+    stale: Path | None = None
+    if old_id is not None:
+        old = await db.get(File, old_id)
+        if old is not None:
+            # 先解掉 clubs 的參照再刪列(FK 是 SET NULL,但同交易內順序要自己顧)
+            await db.flush()
+            stale = await file_service.delete_file(db, old)
+
+    audit.record(
+        db,
+        action=f"club_{slot}_{'updated' if new_row else 'removed'}",
+        user=user,
+        ip=client_ip(request),
+    )
+    await db.commit()
+    if stale is not None:
+        file_service.unlink_quiet(stale)
+    await db.refresh(club)
+    return ClubProfileOut.model_validate(club)
+
+
+# 路由寫死 avatar / banner 而不是收一個 `{slot}` 參數:nginx 的上傳白名單是正規式比對,
+# 路徑上有自由參數就沒辦法保證它配得上(tests/test_upload_gateway.py 擋的正是這件事),
+# 而且路由本身就把不存在的欄位擋成 404,省掉一次執行期檢查
+
+
+async def _upload(slot: str, file: UploadFile, user, db, request) -> ApiResponse[ClubProfileOut]:
+    if not file.filename:
+        raise validation_error("請選擇圖片檔案")
+    return ApiResponse(data=await _replace_image(db, user, request, slot=slot, upload=file))
+
+
+@router.post("/avatar", status_code=201)
+async def upload_avatar(
+    file: UploadFile, user: ClubUser, db: DbDep, request: Request
+) -> ApiResponse[ClubProfileOut]:
+    return await _upload("avatar", file, user, db, request)
+
+
+@router.post("/banner", status_code=201)
+async def upload_banner(
+    file: UploadFile, user: ClubUser, db: DbDep, request: Request
+) -> ApiResponse[ClubProfileOut]:
+    return await _upload("banner", file, user, db, request)
+
+
+@router.delete("/avatar")
+async def remove_avatar(
+    user: ClubUser, db: DbDep, request: Request
+) -> ApiResponse[ClubProfileOut]:
+    return ApiResponse(data=await _replace_image(db, user, request, slot="avatar", upload=None))
+
+
+@router.delete("/banner")
+async def remove_banner(
+    user: ClubUser, db: DbDep, request: Request
+) -> ApiResponse[ClubProfileOut]:
+    return ApiResponse(data=await _replace_image(db, user, request, slot="banner", upload=None))

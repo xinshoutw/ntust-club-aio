@@ -24,7 +24,7 @@ from app.api.v1.members import _DEFAULT_ORDER as _MEMBER_DEFAULT_ORDER
 from app.api.v1.members import _SORTABLE as _MEMBER_SORTABLE
 from app.core import permissions
 from app.core.deps import CurrentUser, DbDep, client_ip, require_permission, require_role
-from app.core.errors import conflict, not_found
+from app.core.errors import conflict, not_found, validation_error
 from app.core.security import generate_password, hash_password_async
 from app.core.semesters import SEMESTER_LABEL
 from app.models import Club, ClubMember, File, PasswordHistory, Session, User
@@ -39,7 +39,7 @@ from app.schemas.admin import (
     ClubAccountCreateIn,
     ClubOptionOut,
 )
-from app.schemas.clubs import MemberOut
+from app.schemas.clubs import ClubPublicOut, MemberOut
 from app.schemas.common import ApiResponse
 from app.services import audit
 from app.services import files as file_service
@@ -205,6 +205,8 @@ def _detail_out(club: Club, account: User | None) -> AdminClubDetailOut:
         advisor_out_dept=club.advisor_out_dept,
         advisor_out_email=club.advisor_out_email,
         suspend_reason=club.suspend_reason,
+        public_visible=club.public_visible,
+        public=ClubPublicOut.model_validate(club),
     )
 
 
@@ -347,6 +349,15 @@ async def update_club(
                 raise conflict("此帳號已存在")
             changes.append(f"username:{account.username}→{username}")
             account.username = username
+
+    if "public_visible" in fields and fields["public_visible"] != club.public_visible:
+        visible = fields["public_visible"]
+        reason = (body.public_hide_reason or "").strip()
+        # 下架是對社團的處置,要留得下「為什麼」;開回來不必給理由
+        if not visible and not reason:
+            raise validation_error("關閉公開顯示須填寫原因")
+        club.public_visible = visible
+        changes.append(f"public_visible:{visible}" + (f"({reason})" if not visible else ""))
 
     if "is_active" in fields and fields["is_active"] != club.is_active:
         is_active = fields["is_active"]

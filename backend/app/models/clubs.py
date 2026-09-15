@@ -1,11 +1,19 @@
+import uuid
 from datetime import date, datetime
+from typing import Any
 
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import ARRAY
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base, TimestampMixin, db_enum
-from app.models.enums import ClubAttribute, ClubKind, MemberKind
+from app.models.enums import (
+    BannerTextMode,
+    ClubAttribute,
+    ClubKind,
+    MemberKind,
+    RecruitStatus,
+)
 
 
 class Club(Base, TimestampMixin):
@@ -42,6 +50,51 @@ class Club(Base, TimestampMixin):
     # 公告已讀水位線(鈴鐺紅點):created_at 晚於此者未讀;NULL=全部未讀。
     # 一社一帳號,故掛在 club;鈴鐺開啟或進入總覽(公告所在頁)時前移
     announcements_read_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True))
+
+    # --- 對外公開(社團導覽頁;社團自填,行政端唯讀) ---
+    # 行政端下架閥。與 is_active 是**兩個判定**:停用社團本來就不公開,
+    # 而這裡關掉的社團帳號仍照常登入做事
+    public_visible: Mapped[bool] = mapped_column(default=True, server_default=sa.true())
+    tagline: Mapped[str | None] = mapped_column(sa.Text)  # 一句話介紹(字卡塞不下 intro)
+    # 自由填,沒有標籤主檔:篩選取現有標籤的出現次數前 N 名。
+    # ponytail: 建主檔要換一整個 admin CRUD 頁;真的長歪了再收成主檔
+    tags: Mapped[list[str]] = mapped_column(
+        ARRAY(sa.Text), default=list, server_default=sa.text("'{}'::text[]")
+    )
+    recruit_status: Mapped[RecruitStatus | None] = mapped_column(
+        db_enum(RecruitStatus, "recruit_status")
+    )
+    # 對外窗口。**不是 contact_emails** —— 那三組是公告通知收件人,屬內部設定
+    public_email: Mapped[str | None] = mapped_column(sa.Text)
+    # [{kind, url}];website_url 一欄不夠用,社團主戰場是 IG
+    social_links: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, default=list, server_default=sa.text("'[]'::jsonb")
+    )
+    office_location: Mapped[str | None] = mapped_column(sa.Text)
+    regular_schedule: Mapped[str | None] = mapped_column(sa.Text)  # 例行社課/練習
+    join_info: Mapped[str | None] = mapped_column(sa.Text)  # 入社方式與社費
+    signup_url: Mapped[str | None] = mapped_column(sa.Text)
+    founded_year: Mapped[int | None] = mapped_column(sa.SmallInteger)
+
+    # 形象圖:落盤的已是轉好的 WebP(頭像 1:1、橫幅 4:3),原圖不留。
+    # 刪檔時這兩欄要跟著清,故 ondelete=SET NULL 而非 RESTRICT
+    avatar_file_id: Mapped[uuid.UUID | None] = mapped_column(
+        sa.ForeignKey("files.id", ondelete="SET NULL")
+    )
+    banner_file_id: Mapped[uuid.UUID | None] = mapped_column(
+        sa.ForeignKey("files.id", ondelete="SET NULL")
+    )
+    # 黑化與模糊是**顯示參數**,不燒進圖片 —— 調整不必重新上傳
+    banner_dim: Mapped[int] = mapped_column(sa.SmallInteger, default=0, server_default="0")
+    banner_blur: Mapped[int] = mapped_column(sa.SmallInteger, default=0, server_default="0")
+    banner_text_mode: Mapped[BannerTextMode] = mapped_column(
+        db_enum(BannerTextMode, "banner_text_mode"),
+        default=BannerTextMode.AUTO,
+        server_default=BannerTextMode.AUTO.value,
+    )
+    # 橫幅**下三分之一**的平均亮度 0–255(上傳時算一次)。字通常壓在底部,
+    # 取全圖平均會在「上半天空下半暗地」這種圖上判錯
+    banner_luma: Mapped[int | None] = mapped_column(sa.SmallInteger)
 
 
 class ClubMember(Base, TimestampMixin):

@@ -1,19 +1,75 @@
 import re
+import uuid
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.semesters import SEMESTER_LABEL
-from app.models.enums import MemberKind
+from app.models.enums import BannerTextMode, MemberKind, RecruitStatus
 
 _DISCORD_WEBHOOK_RE = re.compile(r"^https://discord\.com/api/webhooks/\d+/[\w-]+$")
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 MAX_CONTACT_EMAILS = 3
+MAX_TAGS = 5
+MAX_TAG_LEN = 8
+MAX_SOCIAL_LINKS = 6
+
+# 前端 `api/clubProfile.ts` 的 SOCIAL_KINDS 是第二份,改動須同步
+SocialKind = Literal["instagram", "facebook", "discord", "youtube", "line", "other"]
 
 
-class ClubProfileOut(BaseModel):
+def _http_url(v: str, label: str) -> str:
+    if not v.startswith(("http://", "https://")):
+        raise ValueError(f"{label}須為 http(s) 網址")
+    return v
+
+
+class SocialLink(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
+    kind: SocialKind
+    url: str = Field(min_length=1, max_length=300)
+
+    @field_validator("url")
+    @classmethod
+    def _valid_url(cls, v: str) -> str:
+        return _http_url(v.strip(), "社群連結")
+
+
+class ClubPublicOut(BaseModel):
+    """對外公開的社團欄位。
+
+    **這是唯一允許出現在公開端點的形狀**:不從 `ClubProfileOut` 挑減 —— 那樣的話
+    以後往 profile 加一欄內部欄位,它會自己漏到校外去。
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    tagline: str | None
+    tags: list[str]
+    recruit_status: RecruitStatus | None
+    public_email: str | None
+    social_links: list[SocialLink]
+    office_location: str | None
+    regular_schedule: str | None
+    join_info: str | None
+    signup_url: str | None
+    founded_year: int | None
+    avatar_file_id: uuid.UUID | None
+    banner_file_id: uuid.UUID | None
+    banner_dim: int
+    banner_blur: int
+    banner_text_mode: BannerTextMode
+    banner_luma: int | None  # auto 字色的推導依據;推導結果不入庫
+
+
+class ClubProfileOut(ClubPublicOut):
+    """社團看自己的全部欄位 = 公開欄位 + 對內欄位。
+
+    `public_visible` 不在此:下架是行政端的處置,社團端沒有這顆開關也沒有入口。
+    """
 
     id: int
     name: str
@@ -49,6 +105,78 @@ class ClubProfileUpdate(BaseModel):
     advisor_out_name: str | None = Field(None, max_length=50)
     advisor_out_dept: str | None = Field(None, max_length=50)
     advisor_out_email: str | None = Field(None, max_length=100)
+
+    # --- 對外公開(社團導覽頁);形象圖不在此,走自己的上傳端點 ---
+    # 這一組每一欄都可以是空的:空白就是那一段不出現在公開頁。因此顯式 null
+    # 一律當成「清空」而非錯誤 —— 但落到 NOT NULL 欄位的那幾個(tags、social_links、
+    # banner_*)不能就這樣寫進去,各自的驗證器負責把 null 收成合法值(見 ISS-105)
+    tagline: str | None = Field(None, max_length=40)
+    tags: list[str] | None = Field(None, max_length=MAX_TAGS)
+    recruit_status: RecruitStatus | None = None
+    public_email: str | None = Field(None, max_length=100)
+    social_links: list[SocialLink] | None = Field(None, max_length=MAX_SOCIAL_LINKS)
+    office_location: str | None = Field(None, max_length=50)
+    regular_schedule: str | None = Field(None, max_length=200)
+    join_info: str | None = Field(None, max_length=500)
+    signup_url: str | None = Field(None, max_length=500)
+    founded_year: int | None = Field(None, ge=1900, le=2100)
+    banner_dim: int | None = Field(None, ge=0, le=100)
+    banner_blur: int | None = Field(None, ge=0, le=100)
+    banner_text_mode: BannerTextMode | None = None
+
+    @field_validator("tagline", "office_location", "regular_schedule", "join_info")
+    @classmethod
+    def _blank_to_none(cls, v: str | None) -> str | None:
+        # 空字串與 NULL 是同一件事(「沒填」),同一欄不要有兩種「沒填」
+        return (v or "").strip() or None
+
+    @field_validator("tags")
+    @classmethod
+    def _clean_tags(cls, v: list[str] | None) -> list[str]:
+        # NOT NULL 欄位:顯式 null 收成空陣列,不讓它撞 IntegrityError
+        cleaned: list[str] = []
+        for tag in v or []:
+            tag = tag.strip()
+            if not tag or tag in cleaned:
+                continue
+            if len(tag) > MAX_TAG_LEN:
+                raise ValueError(f"標籤長度不得超過 {MAX_TAG_LEN} 字:{tag}")
+            cleaned.append(tag)
+        return cleaned
+
+    @field_validator("social_links")
+    @classmethod
+    def _clean_social(cls, v: list[SocialLink] | None) -> list[SocialLink]:
+        return v or []  # 同 tags:NOT NULL 欄位不吃 null
+
+    @field_validator("banner_dim", "banner_blur")
+    @classmethod
+    def _require_percent(cls, v: int | None) -> int:
+        # 這兩欄沒有「空」的意思,0 才是「不套效果」—— 送 null 是呼叫端搞錯了
+        if v is None:
+            raise ValueError("黑化與模糊程度須為 0 到 100 的數值")
+        return v
+
+    @field_validator("banner_text_mode")
+    @classmethod
+    def _require_text_mode(cls, v: BannerTextMode | None) -> BannerTextMode:
+        if v is None:
+            raise ValueError("字色模式須為 auto、light 或 dark")
+        return v
+
+    @field_validator("public_email")
+    @classmethod
+    def _valid_public_email(cls, v: str | None) -> str | None:
+        v = (v or "").strip()
+        if v and not _EMAIL_RE.match(v):
+            raise ValueError(f"對外聯絡信箱格式不正確:{v}")
+        return v or None
+
+    @field_validator("signup_url")
+    @classmethod
+    def _valid_signup_url(cls, v: str | None) -> str | None:
+        v = (v or "").strip()
+        return _http_url(v, "報名連結") if v else None
 
     @field_validator("intro")
     @classmethod

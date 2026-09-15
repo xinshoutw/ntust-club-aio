@@ -56,8 +56,10 @@ describe('profileChanged', () => {
     expect(profileChanged({ ...saved, advisorDept: undefined }, saved)).toBe(false)
   })
 
-  it('英文名稱不在 profile 欄位裡(改由行政端維護)', () => {
-    expect(Object.keys(saved)).not.toContain('enName')
+  // 驗送出去的內容,不驗 saved 的形狀:欄位改名或留一個 undefined 佔位,
+  // `Object.keys` 那種寫法照樣綠,卻什麼都沒保護到
+  it('英文名稱不會被這張表單送出(改由行政端維護)', () => {
+    expect(Object.keys(toProfileInput(saved))).not.toContain('enName')
   })
 
   // 標籤是陣列:拿 `?? ''` 比會把改動吞掉(儲存鈕永遠是乾淨的)
@@ -67,8 +69,9 @@ describe('profileChanged', () => {
   })
 
   it('形象圖不是表單欄位,換圖不會讓表單變 dirty', () => {
-    expect(Object.keys(saved)).not.toContain('avatarUrl')
-    expect(Object.keys(saved)).not.toContain('bannerUrl')
+    const sent = Object.keys(toProfileInput(saved))
+    expect(sent).not.toContain('avatarUrl')
+    expect(sent).not.toContain('bannerUrl')
   })
 })
 

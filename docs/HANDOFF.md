@@ -15,15 +15,16 @@
 「對外公開資料」全寬區塊、行政端兩頁的唯讀呈現與公開顯示開關,遷移 `a3f7c9e15b84`。
 規格在 `spec/shared/club-directory.md` 與 `club-detail.md`。
 
-**這條線還沒做的**(GAP-16 剩下的部分,依序):
+**端點也完成了**:`GET /public/clubs`、`/public/clubs/{id}`、`/public/clubs/{id}/activities`
+(公開活動=`approved` / `closing_pending_advisor` / `closed`,不另設勾選)、
+`GET /public/files/{id}`(只放行 `files.public`,長快取)。公開範圍的唯一白名單在
+`backend/app/schemas/public.py`。
 
-1. `GET /public/clubs`、`GET /public/clubs/{id}`、`GET /public/clubs/{id}/activities`
-   (公開活動=`approved` / `closing_pending_advisor` / `closed` 三個狀態,不另設勾選)
-2. `GET /public/files/{id}`(只放行 `files.public`,可長快取;與 `/files/{id}` 的
-   `Cache-Control: no-store` 不同)
-3. `/clubs` 與 `/clubs/:id` 兩頁前端
-4. 上線前把這些路徑排除在 edge 的台灣 IP 白名單外(`../../nginx`)—— 導覽頁一半的
-   價值是給校外看的
+**這條線還沒做的**(GAP-16 剩下的部分):
+
+1. `/clubs` 與 `/clubs/:id` 兩頁前端 —— 畫面與規則見兩份 spec
+2. 上線前把這兩條路徑與 `/api/v1/public/clubs*`、`/api/v1/public/files/*` 排除在 edge 的
+   台灣 IP 白名單外(`../../nginx`)—— 導覽頁一半的價值是給校外看的
 
 ## 接下來做什麼
 

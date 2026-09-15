@@ -1,58 +1,34 @@
 import re
 import uuid
 from datetime import date, datetime
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.core.semesters import SEMESTER_LABEL
-from app.models.enums import BannerTextMode, MemberKind, RecruitStatus
+from app.models.enums import MemberKind, RecruitStatus
 
 _DISCORD_WEBHOOK_RE = re.compile(r"^https://discord\.com/api/webhooks/\d+/[\w-]+$")
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 MAX_CONTACT_EMAILS = 3
-# 前端 `features/club-settings/PublicSection.tsx` 的 MAX_TAGS / MAX_TAG_LEN 是第二份,
-# 社群連結的上限在前端是「六個固定平台欄位」的結構本身,改動須同步
-MAX_TAGS = 5
-MAX_TAG_LEN = 8
-MAX_SOCIAL_LINKS = 6
+MAX_TAGS = 3
 
-# 前端 `api/clubProfile.ts` 的 SOCIAL_KINDS 是第二份,改動須同步
-SocialKind = Literal["instagram", "facebook", "discord", "youtube", "line", "other"]
+# 標籤主檔:社團只能從這裡挑,至多 3 個。自由填寫會讓導覽頁的篩選長歪 ——
+# 同一件事會出現「程式」「寫程式」「Coding」三種寫法,篩選器列不完也對不起來。
+# 前端 `api/clubProfile.ts` 的 CLUB_TAGS 是第二份,改動須同步
+CLUB_TAGS: tuple[str, ...] = (
+    "系學會", "技術", "程式", "表演", "音樂", "美術", "遊戲",
+    "聯誼", "服務", "喝酒", "運動", "武術", "戶外", "飲食",
+)
+
+# Instagram 帳號 ID(不含網址):IG 自己的規則是英數、底線與句點,最長 30
+_INSTAGRAM_RE = re.compile(r"^[A-Za-z0-9._]{1,30}$")
 
 
 def _http_url(v: str, label: str) -> str:
     if not v.startswith(("http://", "https://")):
         raise ValueError(f"{label}須為 http(s) 網址")
     return v
-
-
-class SocialLink(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    kind: SocialKind
-    url: str = Field(min_length=1, max_length=300)
-
-    @field_validator("url")
-    @classmethod
-    def _valid_url(cls, v: str) -> str:
-        return _http_url(v.strip(), "社群連結")
-
-
-class SocialLinkOut(BaseModel):
-    """輸出側的社群連結:**刻意不掛 `SocialLink` 的驗證**。
-
-    輸出 schema 沿用輸入的限制,等於把「使用者現在能送什麼」變成「庫裡准許存在什麼」。
-    `SocialKind` 的值日後改名或移除、`max_length` 收緊、或有人直接改 DB,
-    這一列就會讓 `ClubProfileOut.model_validate` 整個 500 —— 社團連自己的管理項目
-    都打不開,行政端也看不到那一社。
-    """
-
-    model_config = ConfigDict(from_attributes=True)
-
-    kind: str
-    url: str
 
 
 class ClubPublicOut(BaseModel):
@@ -68,18 +44,13 @@ class ClubPublicOut(BaseModel):
     tags: list[str]
     recruit_status: RecruitStatus | None
     public_email: str | None
-    social_links: list[SocialLinkOut]
+    instagram: str | None  # 帳號 ID,不含網址前綴
     office_location: str | None
     regular_schedule: str | None
     join_info: str | None
     signup_url: str | None
-    founded_year: int | None
     avatar_file_id: uuid.UUID | None
     banner_file_id: uuid.UUID | None
-    banner_dim: int
-    banner_blur: int
-    banner_text_mode: BannerTextMode
-    banner_luma: int | None  # auto 字色的推導依據;推導結果不入庫
 
 
 class ClubProfileOut(ClubPublicOut):
@@ -131,15 +102,12 @@ class ClubProfileUpdate(BaseModel):
     tags: list[str] | None = Field(None, max_length=MAX_TAGS)
     recruit_status: RecruitStatus | None = None
     public_email: str | None = Field(None, max_length=100)
-    social_links: list[SocialLink] | None = Field(None, max_length=MAX_SOCIAL_LINKS)
+    # 上限放寬到能容下整串貼上來的網址;真正的 30 字限制由驗證器在剝掉前綴之後才套
+    instagram: str | None = Field(None, max_length=200)
     office_location: str | None = Field(None, max_length=50)
     regular_schedule: str | None = Field(None, max_length=200)
     join_info: str | None = Field(None, max_length=500)
     signup_url: str | None = Field(None, max_length=500)
-    founded_year: int | None = Field(None, ge=1900, le=2100)
-    banner_dim: int | None = Field(None, ge=0, le=100)
-    banner_blur: int | None = Field(None, ge=0, le=100)
-    banner_text_mode: BannerTextMode | None = None
 
     @field_validator("tagline", "office_location", "regular_schedule", "join_info")
     @classmethod
@@ -156,35 +124,20 @@ class ClubProfileUpdate(BaseModel):
             tag = tag.strip()
             if not tag or tag in cleaned:
                 continue
-            if len(tag) > MAX_TAG_LEN:
-                raise ValueError(f"標籤長度不得超過 {MAX_TAG_LEN} 字:{tag}")
+            if tag not in CLUB_TAGS:
+                raise ValueError(f"不是可選的標籤:{tag}")
             cleaned.append(tag)
         return cleaned
 
-    @field_validator("social_links")
+    @field_validator("instagram")
     @classmethod
-    def _clean_social(cls, v: list[SocialLink] | None) -> list[SocialLink]:
-        # 同 tags:NOT NULL 欄位不吃 null。一平台一格 —— 前端本來就是六個固定欄位,
-        # 但直呼 API 送得出兩筆 instagram,而讀回來時只有最後一筆活得下來
-        seen: dict[str, SocialLink] = {}
-        for link in v or []:
-            seen[link.kind] = link
-        return list(seen.values())
-
-    @field_validator("banner_dim", "banner_blur")
-    @classmethod
-    def _require_percent(cls, v: int | None) -> int:
-        # 這兩欄沒有「空」的意思,0 才是「不套效果」—— 送 null 是呼叫端搞錯了
-        if v is None:
-            raise ValueError("黑化與模糊程度須為 0 到 100 的數值")
-        return v
-
-    @field_validator("banner_text_mode")
-    @classmethod
-    def _require_text_mode(cls, v: BannerTextMode | None) -> BannerTextMode:
-        if v is None:
-            raise ValueError("字色模式須為 auto、light 或 dark")
-        return v
+    def _clean_instagram(cls, v: str | None) -> str | None:
+        # 只存帳號 ID:貼整串網址或帶 @ 都收得下來,存進去的一律是純 ID
+        v = (v or "").strip()
+        v = re.sub(r"^https?://(?:www\.)?instagram\.com/", "", v).strip("/@")
+        if v and not _INSTAGRAM_RE.match(v):
+            raise ValueError(f"Instagram 帳號格式不正確:{v}")
+        return v or None
 
     @field_validator("public_email")
     @classmethod

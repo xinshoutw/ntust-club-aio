@@ -75,18 +75,12 @@ async def _replace_image(
     field = _IMAGE_FIELDS[slot]
     old_id = getattr(club, field)
 
-    new_row, luma = None, None
+    new_row = None
     if upload is not None:
         file_service.enforce_upload_rate(user.id)
-        new_row, luma = await file_service.save_club_image(
-            db, upload, slot=slot, uploaded_by=user.id
-        )
+        new_row = await file_service.save_club_image(db, upload, slot=slot, uploaded_by=user.id)
 
     setattr(club, field, new_row.id if new_row else None)
-    if slot == "banner":
-        # 亮度屬於「目前這張橫幅」,換圖與移除都要跟著走 ——
-        # 留著上一張的值,auto 字色就會拿舊圖的亮度判新圖
-        club.banner_luma = luma
 
     stale: Path | None = None
     if old_id is not None:

@@ -23,7 +23,7 @@ import pi_heif
 import sqlalchemy as sa
 from fastapi import UploadFile
 from fastapi.responses import FileResponse
-from PIL import Image, ImageOps, ImageStat
+from PIL import Image, ImageOps
 
 # pi-heif 是 pillow-heif 的 decode-only 版:同一位作者、同一套 API,
 # wheel 只帶 LGPL 的 libheif/libde265,
@@ -613,19 +613,16 @@ async def preview_of(disk: Path) -> Path | None:
 # 要換尺寸就請社團重傳 —— 留原圖等於每張圖存兩份,而重傳的成本落在幾十個社團、一次
 CLUB_IMAGE_SIZES: dict[str, tuple[int, int]] = {
     "avatar": (512, 512),  # 1:1
-    "banner": (1600, 1200),  # 4:3
+    "banner": (1800, 600),  # 3:1(字卡與詳細頁同一個比例,兩邊都不裁切)
 }
 _WEBP_QUALITY = 82
 
 
-def _fit_webp(src: Path, size: tuple[int, int]) -> tuple[bytes, int]:
-    """置中裁切成指定尺寸的 WebP;回傳 (WebP 位元組, 下三分之一平均亮度)。
+def _fit_webp(src: Path, size: tuple[int, int]) -> bytes:
+    """置中裁切成指定尺寸的 WebP;回傳 WebP 位元組。
 
     比例不合一律 `ImageOps.fit` 置中裁切 —— 換一套互動 cropper UI 得不到等值的效果,
     要精準構圖的社團自己先裁好再傳。
-
-    亮度只取**下三分之一**:橫幅上的字通常壓在底部,取全圖平均會在「上半天空、
-    下半暗地」這種圖上判出相反的字色。
 
     **回位元組而不是就地覆寫原檔**:`run_in_executor` 取消不會停 thread(見
     `_PREVIEW_POOL` 的註解)。寫回磁碟的話,請求被取消 → 交易收尾 →
@@ -646,19 +643,16 @@ def _fit_webp(src: Path, size: tuple[int, int]) -> tuple[bytes, int]:
         fitted = ImageOps.fit(img.convert("RGB"), size, method=Image.Resampling.LANCZOS)
         buf = io.BytesIO()
         fitted.save(buf, format="WEBP", quality=_WEBP_QUALITY)
-        bottom = fitted.crop((0, size[1] * 2 // 3, size[0], size[1])).convert("L")
-        return buf.getvalue(), round(ImageStat.Stat(bottom).mean[0])
+        return buf.getvalue()
 
 
 async def save_club_image(
     db: AsyncSession, upload: UploadFile, *, slot: str, uploaded_by: int
-) -> tuple[File, int]:
+) -> File:
     """社團形象圖:沿用 `save_upload` 的副檔名/魔術位元組/大小/磁碟閘,落盤後就地轉 WebP。
 
     `club_id` 留 NULL:形象圖**不計入社團儲存配額** —— 社團不該為了傳結案照片
     刪掉自己的橫幅。權限則由 `public=True` 承接(見 `can_access`)。
-
-    回傳 (File, 下三分之一平均亮度) —— 亮度屬於「這一張圖」,由呼叫端寫進 clubs.banner_luma。
 
     ponytail: 多寫一次原圖再覆寫,換掉一整套重抄的驗證邏輯;真的成為瓶頸再拆成串流轉檔
     """
@@ -675,7 +669,7 @@ async def save_club_image(
     )
     disk = Path(settings.upload_dir) / row.path
     try:
-        data, luma = await asyncio.get_running_loop().run_in_executor(
+        data = await asyncio.get_running_loop().run_in_executor(
             _PREVIEW_POOL, _fit_webp, disk, size_spec
         )
     except Exception as exc:
@@ -692,7 +686,7 @@ async def save_club_image(
     row.original_name = f"{slot}.webp"
     row.public = True
     await db.flush()
-    return row, luma
+    return row
 
 
 async def file_response(

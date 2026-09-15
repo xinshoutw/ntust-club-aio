@@ -11,7 +11,7 @@ from PIL import Image
 from app.core.config import settings
 from app.core.errors import AppError
 from app.models import Club, File
-from app.models.enums import BannerTextMode, UserRole
+from app.models.enums import UserRole
 from app.schemas.clubs import ClubProfileUpdate
 from app.services import files as file_service
 from tests.conftest import csrf_headers, login, make_club, make_user
@@ -30,23 +30,27 @@ def upload_of(name: str, content: bytes) -> UploadFile:
 # ---- schema:公開欄位的清理與 null 處理(ISS-105 那條坑的同類) ----
 
 
-def test_list_fields_take_explicit_null_as_empty():
-    """tags / social_links 是 NOT NULL 欄位:顯式 null 是「清空」,不能原樣 setattr 進去。"""
-    body = ClubProfileUpdate(tags=None, social_links=None)
-    assert body.model_dump(exclude_unset=True) == {"tags": [], "social_links": []}
+def test_tags_take_explicit_null_as_empty():
+    """tags 是 NOT NULL 欄位:顯式 null 是「清空」,不能原樣 setattr 進去。"""
+    assert ClubProfileUpdate(tags=None).model_dump(exclude_unset=True) == {"tags": []}
 
 
-def test_tags_are_trimmed_deduped_and_length_capped():
-    assert ClubProfileUpdate(tags=["  街舞 ", "街舞", "", "桌遊"]).tags == ["街舞", "桌遊"]
-    with pytest.raises(ValueError, match="標籤長度"):
-        ClubProfileUpdate(tags=["超過八個字的標籤名稱"])
+def test_tags_must_come_from_the_master_list():
+    """自由填寫會讓導覽頁的篩選長歪:同一件事三種寫法,篩選器列不完也對不起來。"""
+    assert ClubProfileUpdate(tags=["  程式 ", "程式", "運動"]).tags == ["程式", "運動"]
+    with pytest.raises(ValueError, match="不是可選的標籤"):
+        ClubProfileUpdate(tags=["街舞"])
 
 
-@pytest.mark.parametrize("field", ["banner_dim", "banner_blur", "banner_text_mode"])
-def test_display_params_reject_explicit_null(field):
-    """0 才是「不套效果」,auto 才是「自動」—— 這幾欄沒有「空」的意思。"""
-    with pytest.raises(ValueError):
-        ClubProfileUpdate(**{field: None})
+def test_instagram_is_stored_as_a_bare_id():
+    """貼整串網址或帶 @ 都收得下來,存進去的一律是純 ID。"""
+    full = "https://www.instagram.com/ntust_dance/"
+    assert ClubProfileUpdate(instagram=full).instagram == "ntust_dance"
+    assert ClubProfileUpdate(instagram="@ntust_dance").instagram == "ntust_dance"
+    assert ClubProfileUpdate(instagram="  ").instagram is None
+    with pytest.raises(ValueError, match="Instagram"):
+        ClubProfileUpdate(instagram="not a handle")
+
 
 
 def test_blank_text_fields_collapse_to_none():
@@ -61,10 +65,6 @@ def test_urls_and_emails_are_validated():
         ClubProfileUpdate(signup_url="ntust.edu.tw/join")
     with pytest.raises(ValueError, match="對外聯絡信箱"):
         ClubProfileUpdate(public_email="not-an-email")
-    with pytest.raises(ValueError, match="社群連結"):
-        ClubProfileUpdate(social_links=[{"kind": "instagram", "url": "instagram.com/x"}])
-    with pytest.raises(ValueError):
-        ClubProfileUpdate(social_links=[{"kind": "plurk", "url": "https://plurk.com/x"}])
 
 
 # ---- 形象圖:轉檔、尺寸、亮度、配額 ----
@@ -75,7 +75,7 @@ async def test_club_image_is_converted_to_fixed_size_webp(db):
     club = await make_club(db)
     user = await make_user(db, username="club01", club_id=club.id)
 
-    row, luma = await file_service.save_club_image(
+    row = await file_service.save_club_image(
         db, upload_of("logo.png", png_bytes(1200, 400)), slot="avatar", uploaded_by=user.id
     )
     await db.commit()
@@ -88,22 +88,6 @@ async def test_club_image_is_converted_to_fixed_size_webp(db):
     with Image.open(settings.upload_dir / row.path) as img:
         assert img.format == "WEBP"
         assert img.size == file_service.CLUB_IMAGE_SIZES["avatar"]
-    assert 0 <= luma <= 255
-
-
-async def test_banner_luma_reads_the_bottom_third(db):
-    """橫幅上的字壓在底部:亮度要取下三分之一,取全圖平均會在上亮下暗的圖上判反。"""
-    user = await make_user(db, username="club01")
-    tall = Image.new("RGB", (800, 600), (255, 255, 255))
-    tall.paste(Image.new("RGB", (800, 200), (0, 0, 0)), (0, 400))  # 下三分之一塗黑
-    buf = io.BytesIO()
-    tall.save(buf, format="PNG")
-
-    _, luma = await file_service.save_club_image(
-        db, upload_of("banner.png", buf.getvalue()), slot="banner", uploaded_by=user.id
-    )
-    await db.commit()
-    assert luma < 40  # 全圖平均會是 ~170
 
 
 async def test_undecodable_image_is_rejected_as_415_not_500(db):
@@ -129,7 +113,7 @@ async def test_public_files_bypass_the_role_matrix(db):
     owner = await make_user(db, username="club01", club_id=club.id)
     stranger = await make_user(db, username="club02", club_id=other.id)
 
-    row, _ = await file_service.save_club_image(
+    row = await file_service.save_club_image(
         db, upload_of("logo.png", png_bytes(300, 300)), slot="avatar", uploaded_by=owner.id
     )
     await db.commit()
@@ -177,14 +161,11 @@ async def test_club_uploads_and_removes_its_banner(client, db):
     assert res.status_code == 201, res.text
     data = res.json()["data"]
     assert data["banner_file_id"] is not None
-    assert data["banner_luma"] is not None
     file_id = data["banner_file_id"]
 
     res = await client.delete("/api/v1/club/profile/banner", headers=csrf_headers(client))
     assert res.status_code == 200
     assert res.json()["data"]["banner_file_id"] is None
-    # 亮度屬於「目前這張圖」:圖沒了值也要跟著走,否則 auto 字色會拿舊圖的亮度判新圖
-    assert res.json()["data"]["banner_luma"] is None
     assert await db.get(File, file_id) is None  # 舊檔不留版本
 
 
@@ -231,22 +212,18 @@ async def test_club_profile_round_trips_the_public_fields(client, db):
         "/api/v1/club/profile",
         json={
             "tagline": "每週三晚上一起跳舞",
-            "tags": ["街舞", "表演"],
-            "recruit_status": "招生中",
+            "tags": ["運動", "表演"],
+            "recruit_status": "歡迎加入",
             "public_email": "dance@ntust.edu.tw",
-            "social_links": [{"kind": "instagram", "url": "https://instagram.com/ntustdance"}],
-            "founded_year": 1988,
-            "banner_dim": 45,
-            "banner_text_mode": "light",
+            "instagram": "ntustdance",
         },
         headers=csrf_headers(client),
     )
     assert res.status_code == 200, res.text
     data = res.json()["data"]
     assert data["tagline"] == "每週三晚上一起跳舞"
-    assert data["tags"] == ["街舞", "表演"]
-    assert data["banner_dim"] == 45
-    assert data["banner_text_mode"] == BannerTextMode.LIGHT.value
+    assert data["tags"] == ["運動", "表演"]
+    assert data["instagram"] == "ntustdance"
     # 下架閥是行政端的處置,社團端看不到也改不動
     assert "public_visible" not in data
 
@@ -299,7 +276,7 @@ async def test_admin_hides_a_club_with_a_reason(client, db):
 async def test_admin_detail_carries_the_public_block(client, db):
     club = await make_club(db)
     club.tagline = "每週三晚上一起跳舞"
-    club.tags = ["街舞"]
+    club.tags = ["運動"]
     await db.commit()
     await make_user(db, username="admin01", role=UserRole.ADMIN, permissions=["aclub"])
     await login(client, "admin01")
@@ -308,7 +285,7 @@ async def test_admin_detail_carries_the_public_block(client, db):
     assert res.status_code == 200, res.text
     public = res.json()["data"]["public"]
     assert public["tagline"] == "每週三晚上一起跳舞"
-    assert public["tags"] == ["街舞"]
+    assert public["tags"] == ["運動"]
     # 公開區塊只帶公開欄位,對內欄位不得混進來
     assert "discord_webhook_url" not in public
     assert "advisor_name" not in public
@@ -367,7 +344,7 @@ async def test_a_club_with_images_can_still_be_deleted(client, db):
     """
     club = await make_club(db)
     owner = await make_user(db, username="club01", club_id=club.id)
-    row, _ = await file_service.save_club_image(
+    row = await file_service.save_club_image(
         db, upload_of("logo.png", png_bytes(300, 300)), slot="avatar", uploaded_by=owner.id
     )
     club.avatar_file_id = row.id
@@ -399,7 +376,7 @@ async def test_club_images_are_counted_in_the_file_management_page(client, db):
     """
     club = await make_club(db)
     owner = await make_user(db, username="club01", club_id=club.id)
-    row, _ = await file_service.save_club_image(
+    row = await file_service.save_club_image(
         db, upload_of("logo.png", png_bytes(600, 600)), slot="avatar", uploaded_by=owner.id
     )
     await db.commit()
@@ -431,14 +408,13 @@ def test_fit_webp_never_touches_the_source_file():
         src.write_bytes(png_bytes(900, 900, (200, 200, 200)))
         before = src.read_bytes()
 
-        data, luma = file_service._fit_webp(src, (256, 256))
+        data = file_service._fit_webp(src, (256, 256))
 
         assert src.read_bytes() == before  # 原檔一個位元組都沒動
         assert list(pathlib.Path(tmp).iterdir()) == [src]  # 也沒留下任何暫存檔
         with Image.open(io.BytesIO(data)) as out:
             assert out.format == "WEBP"
             assert out.size == (256, 256)
-        assert luma > 128  # 淺色來源 → 深色字
 
 
 async def test_removing_an_image_twice_is_not_an_error(client, db):
@@ -462,36 +438,24 @@ async def test_removing_an_image_twice_is_not_an_error(client, db):
     assert second.json()["data"]["avatar_file_id"] is None
 
 
-async def test_stale_social_links_do_not_break_reading_the_profile(db, client):
+async def test_a_stale_instagram_value_does_not_break_reading_the_profile(db, client):
     """輸出 schema 不沿用輸入的限制:庫裡的舊值不該讓社團連管理項目都打不開。
 
-    `SocialKind` 改名或移除、`max_length` 收緊、或有人直接改 DB,只要輸出側掛著
-    輸入的驗證,那一列一讀就 500(AGENTS.md 記下的坑,實測過 60 個活動打不開)。
+    帳號格式收緊、或有人直接改 DB,只要輸出側掛著輸入的驗證,那一列一讀就 500
+    (AGENTS.md 記下的坑,實測過 60 個活動打不開)。
     """
     club = await make_club(db)
     await make_user(db, username="club01", club_id=club.id)
-    # 直接寫進庫:模擬「規則收緊前存下的值」
-    club.social_links = [{"kind": "plurk", "url": "noturl"}]
+    club.instagram = "這不是合法帳號"
+    club.tags = ["已經不在主檔裡的標籤"]
     await db.commit()
 
     await login(client, "club01")
     res = await client.get("/api/v1/club/profile")
     assert res.status_code == 200, res.text
-    assert res.json()["data"]["social_links"] == [{"kind": "plurk", "url": "noturl"}]
+    assert res.json()["data"]["instagram"] == "這不是合法帳號"
+    assert res.json()["data"]["tags"] == ["已經不在主檔裡的標籤"]
 
-
-def test_social_links_are_deduped_by_platform():
-    links = ClubProfileUpdate(
-        social_links=[
-            {"kind": "instagram", "url": "https://instagram.com/old"},
-            {"kind": "instagram", "url": "https://instagram.com/new"},
-            {"kind": "line", "url": "https://line.me/x"},
-        ]
-    ).social_links
-    assert [(link.kind, link.url) for link in links] == [
-        ("instagram", "https://instagram.com/new"),
-        ("line", "https://line.me/x"),
-    ]
 
 
 async def test_image_changes_are_traceable_in_the_audit_trail(client, db):

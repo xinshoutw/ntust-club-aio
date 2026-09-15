@@ -3,16 +3,14 @@
 **公開範圍的唯一定義在這一檔**:逐欄白名單,不從 `ClubProfileOut` 或任何對內 schema
 挑減 —— 那樣的話,以後往 `clubs` 加一欄內部欄位,它會自己漏到校外去。
 
-驗證器也刻意不掛(`SocialLinkOut` 同理):輸出 schema 沿用輸入的限制,等於把
-「使用者現在能送什麼」變成「庫裡准許存在什麼」,舊值一讀就 500。
+驗證器也刻意不掛:輸出 schema 沿用輸入的限制,等於把「使用者現在能送什麼」變成
+「庫裡准許存在什麼」,舊值一讀就 500。
 """
 
 import uuid
 from datetime import date, time
 
 from pydantic import BaseModel, ConfigDict
-
-from app.schemas.clubs import SocialLinkOut
 
 
 class ClubCardOut(BaseModel):
@@ -33,11 +31,8 @@ class ClubCardOut(BaseModel):
     tags: list[str]
     recruit_status: str | None
     avatar_file_id: uuid.UUID | None
+    # 橫幅是 3:1,字卡與詳細頁用**同一個**比例,兩邊都不裁切;圖上不壓任何文字
     banner_file_id: uuid.UUID | None
-    banner_dim: int
-    banner_text_mode: str
-    banner_luma: int | None  # auto 字色的推導依據;推導結果不入庫
-    # banner_blur 不在字卡上:60 張卡同時跑 CSS filter 會掉幀,字卡只吃黑化
 
 
 class ClubDetailOut(ClubCardOut):
@@ -46,13 +41,11 @@ class ClubDetailOut(ClubCardOut):
     intro: str
     website_url: str | None
     public_email: str | None  # 對外窗口;**不是** contact_emails
-    social_links: list[SocialLinkOut]
+    instagram: str | None  # 帳號 ID,不含網址前綴
     office_location: str | None
     regular_schedule: str | None
     join_info: str | None
     signup_url: str | None
-    founded_year: int | None
-    banner_blur: int  # 詳細頁的英雄區才套模糊
 
 
 class PublicActivityOut(BaseModel):

@@ -48,9 +48,9 @@ async def seed_club(db, **kw):
     club = await make_club(db, **kw)
     club.intro = "我們是熱舞社"
     club.tagline = "每週三晚上一起跳舞"
-    club.tags = ["街舞"]
+    club.tags = ["運動"]
     club.public_email = "dance@ntust.edu.tw"
-    club.social_links = [{"kind": "instagram", "url": "https://instagram.com/x"}]
+    club.instagram = "ntust_dance"
     # 對內欄位:一個都不該出現在公開端點上
     club.contact_emails = ["inner@ntust.edu.tw"]
     club.discord_webhook_url = "https://discord.com/api/webhooks/1/abc"
@@ -90,7 +90,7 @@ async def test_clubs_with_a_banner_come_first(client, db):
     await make_club(db, name="吉他社")  # 無橫幅,名稱在前
     with_banner = await make_club(db, name="熱舞社")
     owner = await make_user(db, username="club01", club_id=with_banner.id)
-    row, _ = await file_service.save_club_image(
+    row = await file_service.save_club_image(
         db,
         UploadFile(io.BytesIO(png_bytes()), filename="b.png", size=len(png_bytes())),
         slot="banner",
@@ -110,10 +110,10 @@ async def test_the_card_carries_no_internal_fields(client, db):
     await seed_club(db)
     card = (await client.get(URL)).json()["data"][0]
     assert card["tagline"] == "每週三晚上一起跳舞"
-    assert card["tags"] == ["街舞"]
+    assert card["tags"] == ["運動"]
     # 字卡不帶長文:六十幾張卡一次回傳,詳細頁才要的東西不該跟著走一遍
     assert "intro" not in card and "join_info" not in card
-    assert "banner_blur" not in card  # 模糊只在詳細頁生效
+    assert "instagram" not in card
 
 
 @pytest.mark.parametrize(
@@ -141,18 +141,18 @@ async def test_detail_carries_the_public_fields(client, db):
     detail = (await client.get(f"{URL}/{club.id}")).json()["data"]
     assert detail["intro"] == "我們是熱舞社"
     assert detail["public_email"] == "dance@ntust.edu.tw"
-    assert detail["social_links"] == [{"kind": "instagram", "url": "https://instagram.com/x"}]
-    assert detail["banner_blur"] == 0
+    assert detail["instagram"] == "ntust_dance"
 
 
-async def test_stale_social_links_do_not_break_the_public_page(client, db):
+async def test_stale_values_do_not_break_the_public_page(client, db):
     """輸出側不掛輸入的驗證:庫裡的舊值不該讓整個社團的公開頁 500。"""
     club = await make_club(db)
-    club.social_links = [{"kind": "plurk", "url": "noturl"}]
+    club.instagram = "這不是合法帳號"
+    club.tags = ["已經不在主檔裡的標籤"]
     await db.commit()
     res = await client.get(f"{URL}/{club.id}")
     assert res.status_code == 200, res.text
-    assert res.json()["data"]["social_links"] == [{"kind": "plurk", "url": "noturl"}]
+    assert res.json()["data"]["instagram"] == "這不是合法帳號"
 
 
 # ---- 活動 ----
@@ -235,7 +235,7 @@ async def make_public_image(db, club, slot: str = "avatar") -> File:
     沒掛上去的孤兒檔本來就不該送得出去(上傳端點一律在同一個交易內掛好)。"""
     owner = await make_user(db, username=f"club{club.id}", club_id=club.id)
     content = png_bytes()
-    row, _ = await file_service.save_club_image(
+    row = await file_service.save_club_image(
         db,
         UploadFile(io.BytesIO(content), filename="a.png", size=len(content)),
         slot=slot,
@@ -336,7 +336,7 @@ async def test_an_unreferenced_public_file_is_not_served(client, db):
     club = await make_club(db)
     owner = await make_user(db, username="club01", club_id=club.id)
     content = png_bytes()
-    row, _ = await file_service.save_club_image(
+    row = await file_service.save_club_image(
         db,
         UploadFile(io.BytesIO(content), filename="a.png", size=len(content)),
         slot="avatar",

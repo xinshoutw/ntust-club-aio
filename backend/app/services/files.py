@@ -653,10 +653,26 @@ def _fit_webp(src: Path, size: tuple[int, int]) -> bytes:
         # 邊長取 2× 最長邊(與方向無關):留給 `fit` 的裁切還有餘裕,不會放大失真
         img.thumbnail((max(size) * 2, max(size) * 2), Image.Resampling.LANCZOS)
         img = ImageOps.exif_transpose(img) or img
-        fitted = ImageOps.fit(img.convert("RGB"), size, method=Image.Resampling.LANCZOS)
+        fitted = ImageOps.fit(_on_white(img), size, method=Image.Resampling.LANCZOS)
         buf = io.BytesIO()
         fitted.save(buf, format="WEBP", quality=_WEBP_QUALITY)
         return buf.getvalue()
+
+
+def _on_white(img: Image.Image) -> Image.Image:
+    """把透明底壓到白底上再轉 RGB。
+
+    `convert("RGB")` 是直接丟掉 alpha:透明像素留下的是底層的 RGB 值,而多數編碼器
+    在那裡寫 0 —— 社團上傳一張透明底的 logo,公開頁字卡上就是一塊黑方塊。
+    字卡與社團頁的底色都是白的,合到白底上看起來才和原圖一樣。
+    """
+    if img.mode not in ("RGBA", "LA", "P"):
+        return img.convert("RGB")
+    # P 模式的透明資訊在 `transparency` 裡,轉成 RGBA 才拿得到 alpha 通道
+    rgba = img.convert("RGBA")
+    white = Image.new("RGB", rgba.size, (255, 255, 255))
+    white.paste(rgba, mask=rgba.getchannel("A"))
+    return white
 
 
 async def save_club_image(

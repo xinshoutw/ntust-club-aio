@@ -1,5 +1,5 @@
 import { Navigate, Outlet, Route, Routes, useLocation } from 'react-router'
-import { useMemo, type ReactNode } from 'react'
+import { useEffect, useMemo, type ReactNode } from 'react'
 import { useAuth, type Role } from './app/auth'
 import { buildAdminNav, buildClubNav, buildPtNav, buildViewerNav } from './lib/nav'
 import { canAccessAdminPath } from './lib/permissions'
@@ -170,7 +170,20 @@ function RequireAuth({ children }: { children: ReactNode }) {
   return children
 }
 
+/** 換頁時捲回頁首。
+ *
+ *  `BrowserRouter` 不像 data router 有 `ScrollRestoration`,而瀏覽器只在上一頁／下一頁
+ *  時還原捲動位置 —— 一般的換頁會原地留在原本的高度。在導覽頁捲到第 40 個社團點進去,
+ *  社團頁會從中段開始,看不到橫幅也看不到社團名。 */
+function useScrollToTop(): void {
+  const { pathname } = useLocation()
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [pathname])
+}
+
 export default function App() {
+  useScrollToTop()
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />

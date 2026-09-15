@@ -271,7 +271,7 @@ export function useUploadClubImage() {
     mutationFn: ({ slot, file }: { slot: ClubImageSlot; file: File }) => {
       const fd = new FormData()
       fd.append('file', file)
-      return api<ClubProfileOut>(`/club/profile/${slot}`, { method: 'POST', body: fd }).then(
+      return api<ClubProfileOut>(`/club/profile/${slot}/upload`, { method: 'POST', body: fd }).then(
         toProfile,
       )
     },

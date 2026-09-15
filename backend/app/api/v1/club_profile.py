@@ -100,7 +100,12 @@ async def _replace_image(
 
 # 路由寫死 avatar / banner 而不是收一個 `{slot}` 參數:nginx 的上傳白名單是正規式比對,
 # 路徑上有自由參數就沒辦法保證它配得上(tests/test_upload_gateway.py 擋的正是這件事),
-# 而且路由本身就把不存在的欄位擋成 404,省掉一次執行期檢查
+# 而且路由本身就把不存在的欄位擋成 404,省掉一次執行期檢查。
+#
+# 上傳多一段 `/upload`,移除才是 `/{slot}` 本身:**nginx 的 location 是路徑比對、
+# 不分方法**,兩者共用同一個網址的話,移除也會跑 `auth_request /_upload_precheck`,
+# 於是磁碟到告警水位時社團連把橫幅移掉都會被擋 —— 那正是此刻該鼓勵的動作。
+# (子請求一律是 GET,`$request_method` 在那裡拿不到原方法,擋不掉只能靠分開路徑)
 
 
 async def _upload(slot: str, file: UploadFile, user, db, request) -> ApiResponse[ClubProfileOut]:
@@ -109,14 +114,14 @@ async def _upload(slot: str, file: UploadFile, user, db, request) -> ApiResponse
     return ApiResponse(data=await _replace_image(db, user, request, slot=slot, upload=file))
 
 
-@router.post("/avatar", status_code=201)
+@router.post("/avatar/upload", status_code=201)
 async def upload_avatar(
     file: UploadFile, user: ClubUser, db: DbDep, request: Request
 ) -> ApiResponse[ClubProfileOut]:
     return await _upload("avatar", file, user, db, request)
 
 
-@router.post("/banner", status_code=201)
+@router.post("/banner/upload", status_code=201)
 async def upload_banner(
     file: UploadFile, user: ClubUser, db: DbDep, request: Request
 ) -> ApiResponse[ClubProfileOut]:

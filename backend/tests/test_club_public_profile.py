@@ -169,7 +169,7 @@ async def test_club_uploads_and_removes_its_banner(client, db):
     await login(client, "club01")
 
     res = await client.post(
-        "/api/v1/club/profile/banner",
+        "/api/v1/club/profile/banner/upload",
         files={"file": ("b.png", png_bytes(2000, 500), "image/png")},
         headers=csrf_headers(client),
     )
@@ -193,13 +193,13 @@ async def test_replacing_an_image_drops_the_previous_file(client, db):
     await login(client, "club01")
 
     first = await client.post(
-        "/api/v1/club/profile/avatar",
+        "/api/v1/club/profile/avatar/upload",
         files={"file": ("a.png", png_bytes(400, 400, (200, 200, 200)), "image/png")},
         headers=csrf_headers(client),
     )
     old_id = first.json()["data"]["avatar_file_id"]
     second = await client.post(
-        "/api/v1/club/profile/avatar",
+        "/api/v1/club/profile/avatar/upload",
         files={"file": ("a.png", png_bytes(400, 400, (20, 20, 20)), "image/png")},
         headers=csrf_headers(client),
     )
@@ -214,7 +214,7 @@ async def test_unknown_image_slot_is_404(client, db):
     await make_user(db, username="club01", club_id=club.id)
     await login(client, "club01")
     res = await client.post(
-        "/api/v1/club/profile/mascot",
+        "/api/v1/club/profile/mascot/upload",
         files={"file": ("a.png", png_bytes(50, 50), "image/png")},
         headers=csrf_headers(client),
     )

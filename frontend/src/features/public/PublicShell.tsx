@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router'
 import { Button } from 'antd'
-import { CalendarOutlined, HomeOutlined, LoginOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, CalendarOutlined, HomeOutlined, LoginOutlined } from '@ant-design/icons'
 import { useAuth } from '../../app/auth'
 import { homeOf } from '../../lib/home'
 import '../../components/layout/shell.css'
@@ -11,9 +11,13 @@ import '../../components/layout/shell.css'
  *  匿名訪客沒有那些東西可以按。右上角固定兩顆:借用狀態與登入。 */
 export default function PublicShell({
   mobileTitle,
+  back,
   children,
 }: {
   mobileTitle: string
+  /** 顯示「回社團導覽」。手機 ≤767px 的 `.topbar-brand` 是 `display: none`,
+   *  沒有這顆鈕就只剩上一頁手勢回得去導覽頁 */
+  back?: boolean
   children: React.ReactNode
 }) {
   const navigate = useNavigate()
@@ -46,7 +50,23 @@ export default function PublicShell({
           頁面一多幾個區塊就會出現寬度對不齊的情形(尤其是 flex/grid 容器與被
           LoadingBlock 攤平出來的片段)。收成單一容器後,裡面的區塊一律等寬 */}
       <main className="shell-main">
-        <div className="public-page">{children}</div>
+        <div className="public-page">
+          {back && (
+            <div>
+              {/* 導向 `/clubs` 而不是 `/`:`/` 只有未登入時才是導覽頁,
+                  社團從「預覽社團頁」點進來會被丟回自己的總覽 */}
+              <Button
+                type="link"
+                icon={<ArrowLeftOutlined />}
+                style={{ paddingLeft: 0 }}
+                onClick={() => navigate('/clubs')}
+              >
+                回社團導覽
+              </Button>
+            </div>
+          )}
+          {children}
+        </div>
       </main>
     </div>
   )

@@ -8,7 +8,7 @@ import PublicShell from './PublicShell'
  *  首頁已改成社團導覽,這一頁由 topbar 的「借用狀態」進來。 */
 export default function PublicAvailabilityPage() {
   return (
-    <PublicShell mobileTitle="借用情形">
+    <PublicShell mobileTitle="借用情形" back>
       <PageHeader title="借用情形" sub="登入後才能提出借用申請" />
       <BookingGrid />
     </PublicShell>

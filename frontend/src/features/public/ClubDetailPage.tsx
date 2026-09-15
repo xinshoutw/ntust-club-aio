@@ -1,6 +1,5 @@
-import { useNavigate, useParams } from 'react-router'
+import { useParams } from 'react-router'
 import { Button } from 'antd'
-import { ArrowLeftOutlined } from '@ant-design/icons'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { Cols } from '../../components/ui/tableControls'
 import QueryError from '../../components/ui/QueryError'
@@ -14,7 +13,6 @@ import './publicClubs.css'
 const HTTP_URL = /^https?:\/\//
 
 export default function ClubDetailPage() {
-  const navigate = useNavigate()
   const { clubId } = useParams()
   const id = Number(clubId)
   // 主鍵是 int4:超界的值後端回 422,不必多打一趟才知道
@@ -41,21 +39,7 @@ export default function ClubDetailPage() {
 
   const c = club.data
   return (
-    <PublicShell mobileTitle={c?.name ?? '社團'}>
-      {/* 包一層:`.shell-main > *` 會把直接子元素撐成 1200px 置中,而 antd 的 Button 是
-          置中對齊的 inline-flex —— 這顆鈕會變成整列正中間的一個字。
-          導向 `/clubs` 而不是 `/`:`/` 只有未登入時才是導覽頁,社團從預覽點進來會被丟回總覽 */}
-      <div>
-        <Button
-          type="link"
-          icon={<ArrowLeftOutlined />}
-          style={{ paddingLeft: 0 }}
-          onClick={() => navigate('/clubs')}
-        >
-          回社團導覽
-        </Button>
-      </div>
-
+    <PublicShell mobileTitle={c?.name ?? '社團'} back>
       <LoadingBlock pending={club.isPending} rows={8}>
         {c && (
           <>

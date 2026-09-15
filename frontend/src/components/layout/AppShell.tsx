@@ -171,7 +171,7 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
           aria-label="社團導覽"
           onClick={() => guarded(() => navigate('/clubs'))}
         >
-          社團導覽
+          <span className="topbar-directory-label">社團導覽</span>
         </Button>
         <div className="topbar-divider" />
         <Dropdown menu={userMenu} trigger={['click']}>

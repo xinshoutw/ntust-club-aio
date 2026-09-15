@@ -6,38 +6,25 @@ import { suspendedNow } from '../lib/status'
 
 const slashDate = (iso: string): string => dayjs(iso).format('YYYY/MM/DD')
 
-/** 後端 `schemas/clubs.SocialKind` 是第一份,改動須同步。 */
-export const SOCIAL_KINDS = ['instagram', 'facebook', 'discord', 'youtube', 'line', 'other'] as const
-export type SocialKind = (typeof SOCIAL_KINDS)[number]
-
-export const SOCIAL_LABELS: Record<SocialKind, string> = {
-  instagram: 'Instagram',
-  facebook: 'Facebook',
-  discord: 'Discord',
-  youtube: 'YouTube',
-  line: 'Line',
-  other: '其他',
-}
+/** 後端 `schemas/clubs.CLUB_TAGS` 是第一份,改動須同步。社團至多選 3 個。 */
+export const CLUB_TAGS = [
+  '系學會', '技術', '程式', '表演', '音樂', '美術', '遊戲',
+  '聯誼', '服務', '喝酒', '運動', '武術', '戶外', '飲食',
+] as const
+export const MAX_TAGS = 3
 
 /** 後端 `models/enums.RecruitStatus` 是第一份,改動須同步。 */
-export const RECRUIT_STATUSES = ['招生中', '額滿', '不定期', '暫停招生'] as const
-/** 後端 `models/enums.BannerTextMode` 是第一份,改動須同步。 */
-export const BANNER_TEXT_MODES = ['auto', 'light', 'dark'] as const
-export type BannerTextMode = (typeof BANNER_TEXT_MODES)[number]
+export const RECRUIT_STATUSES = ['歡迎加入', '暫不開放', '額滿'] as const
 
-/** 形象圖尺寸(後端 `services/files.CLUB_IMAGE_SIZES` 是第一份);預覽容器據此定比例。 */
-export const CLUB_IMAGE_RATIO = { avatar: 1, banner: 4 / 3 } as const
+/** 形象圖比例(後端 `services/files.CLUB_IMAGE_SIZES` 是第一份)。
+ *  橫幅的字卡與詳細頁用**同一個**比例,一張圖兩處都不裁切。 */
+export const CLUB_IMAGE_RATIO = { avatar: 1, banner: 3 } as const
 export type ClubImageSlot = keyof typeof CLUB_IMAGE_RATIO
 
-/** auto 字色的判定:亮度過半用深色字。後端只存亮度,推導結果不入庫。 */
-export const LUMA_MIDPOINT = 128
-export const resolveTextMode = (mode: BannerTextMode, luma: number | null): 'light' | 'dark' => {
-  if (mode !== 'auto') return mode
-  // 拿不到亮度(沒有橫幅,或舊資料)時用淺色字:預設底色是深的
-  return luma != null && luma > LUMA_MIDPOINT ? 'dark' : 'light'
-}
 
 export interface ClubProfile {
+  /** 預覽按鈕要用它組 /clubs/:id */
+  id: number
   name: string
   /** 社團/學會 */
   kind: string
@@ -66,18 +53,14 @@ export interface ClubPublicProfile {
   recruitStatus: string
   publicEmail: string
   /** 一平台一格(表單是六個固定欄位);未填的平台不進陣列 */
-  socialLinks: Partial<Record<SocialKind, string>>
+  /** 帳號 ID,不含網址前綴 */
+  instagram: string
   officeLocation: string
   regularSchedule: string
   joinInfo: string
   signupUrl: string
-  foundedYear: number | null
   avatarUrl: string | null
   bannerUrl: string | null
-  bannerDim: number
-  bannerBlur: number
-  bannerTextMode: BannerTextMode
-  bannerLuma: number | null
 }
 
 /** 公開欄位的原始形狀。後端的 `ClubPublicOut` 也是巢狀掛在行政端詳情底下,
@@ -87,18 +70,13 @@ export interface ClubPublicOut {
   tags: string[]
   recruit_status: string | null
   public_email: string | null
-  social_links: { kind: SocialKind; url: string }[]
+  instagram: string | null
   office_location: string | null
   regular_schedule: string | null
   join_info: string | null
   signup_url: string | null
-  founded_year: number | null
   avatar_file_id: string | null
   banner_file_id: string | null
-  banner_dim: number
-  banner_blur: number
-  banner_text_mode: BannerTextMode
-  banner_luma: number | null
 }
 
 interface ClubProfileOut extends ClubPublicOut {
@@ -129,21 +107,17 @@ export const toPublicProfile = (c: ClubPublicOut): ClubPublicProfile => ({
   tags: c.tags ?? [],
   recruitStatus: c.recruit_status ?? '',
   publicEmail: c.public_email ?? '',
-  socialLinks: Object.fromEntries((c.social_links ?? []).map((l) => [l.kind, l.url])),
+  instagram: c.instagram ?? '',
   officeLocation: c.office_location ?? '',
   regularSchedule: c.regular_schedule ?? '',
   joinInfo: c.join_info ?? '',
   signupUrl: c.signup_url ?? '',
-  foundedYear: c.founded_year,
   avatarUrl: imageUrl(c.avatar_file_id),
   bannerUrl: imageUrl(c.banner_file_id),
-  bannerDim: c.banner_dim,
-  bannerBlur: c.banner_blur,
-  bannerTextMode: c.banner_text_mode,
-  bannerLuma: c.banner_luma,
 })
 
 const toProfile = (c: ClubProfileOut): ClubProfile => ({
+  id: c.id,
   name: c.name,
   kind: c.kind,
   enName: c.en_name ?? '',
@@ -206,20 +180,17 @@ export interface ClubProfileInput {
   advisorOutName: string
   advisorOutDept: string
   advisorOutEmail: string
-  // 對外公開資料;表單是一平台一欄,送出時才收成 [{kind,url}]
+  // 對外公開資料
   tagline: string
   tags: string[]
   recruitStatus: string
   publicEmail: string
-  socialLinks: Partial<Record<SocialKind, string>>
+  /** 帳號 ID,不含網址前綴 */
+  instagram: string
   officeLocation: string
   regularSchedule: string
   joinInfo: string
   signupUrl: string
-  foundedYear: number | null
-  bannerDim: number
-  bannerBlur: number
-  bannerTextMode: BannerTextMode
 }
 
 export function useUpdateClubProfile() {
@@ -244,19 +215,11 @@ export function useUpdateClubProfile() {
           tags: b.tags,
           recruit_status: b.recruitStatus || null,
           public_email: b.publicEmail.trim() || null,
-          // 空欄=沒有那個平台的連結,不送空字串進陣列(後端的 url 是必填)
-          social_links: SOCIAL_KINDS.flatMap((kind) => {
-            const url = (b.socialLinks[kind] ?? '').trim()
-            return url ? [{ kind, url }] : []
-          }),
+          instagram: b.instagram.trim() || null,
           office_location: b.officeLocation.trim() || null,
           regular_schedule: b.regularSchedule.trim() || null,
           join_info: b.joinInfo.trim() || null,
           signup_url: b.signupUrl.trim() || null,
-          founded_year: b.foundedYear,
-          banner_dim: b.bannerDim,
-          banner_blur: b.bannerBlur,
-          banner_text_mode: b.bannerTextMode,
         }),
       }).then(toProfile),
     // 儲存成功即以 server 回傳值為新基準

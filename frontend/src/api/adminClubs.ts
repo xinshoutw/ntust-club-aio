@@ -104,12 +104,11 @@ export const hasPublicData = (p: ClubPublicProfile): boolean =>
       p.tags.length ||
       p.recruitStatus ||
       p.publicEmail ||
-      Object.keys(p.socialLinks).length ||
+      p.instagram ||
       p.officeLocation ||
       p.regularSchedule ||
       p.joinInfo ||
       p.signupUrl ||
-      p.foundedYear ||
       p.avatarUrl ||
       p.bannerUrl,
   )

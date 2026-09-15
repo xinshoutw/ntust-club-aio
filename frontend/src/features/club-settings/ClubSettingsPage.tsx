@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { App, Button, Form, Input } from 'antd'
+import { confirmDialog } from '../../lib/confirm'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
@@ -49,7 +50,7 @@ export default function ClubSettingsPage() {
 // 全頁單一表單:被修改的欄位以橘黃外框標示(.field-dirty),右下角統一儲存
 function SettingsForm({ profile }: { profile: ClubProfile }) {
   const { refresh } = useAuth()
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const update = useUpdateClubProfile()
   const [form] = Form.useForm<SettingsValues>()
   const [saved, setSaved] = useState<SettingsValues>(() => fromProfile(profile))
@@ -69,11 +70,21 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
 
   const itemClass = (k: keyof SettingsValues) => (dirty.has(k) ? 'field-dirty' : undefined)
 
-  // 橫幅預覽要跟著滑桿即時走,所以讀的是表單當下的值而不是 saved。
-  // 首次 render 時 useWatch 還沒有值,退回 saved(`??` 不會把 0 當成沒有值)
-  const bannerDim = Form.useWatch('bannerDim', form) ?? saved.bannerDim
-  const bannerBlur = Form.useWatch('bannerBlur', form) ?? saved.bannerBlur
-  const bannerTextMode = Form.useWatch('bannerTextMode', form) ?? saved.bannerTextMode
+  // 預覽開的是公開頁,看到的是**已儲存**的內容 —— 有未存變更時先講清楚
+  const previewPublicPage = () => {
+    const open = () => window.open(`/clubs/${profile.id}`, '_blank', 'noopener')
+    if (dirty.size === 0) {
+      open()
+      return
+    }
+    confirmDialog(modal, {
+      title: '尚有未儲存的變更',
+      content: '預覽顯示的是已儲存的內容，未儲存的修改不會出現',
+      okText: '仍要預覽',
+      cancelText: '取消',
+      onOk: open,
+    })
+  }
 
   // 網頁連結與簡介必填(D-19),但只在**這次真的要存 profile** 時擋:
   // 密碼是同一張表單裡的另一支 API,而遷入的社團有一批簡介是空字串、網頁連結是 NULL
@@ -214,13 +225,7 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
         </div>
 
         {/* 對外公開資料:唯一會被校外看到的一段,獨立成全寬區塊擺在對內設定之上 */}
-        <PublicSection
-          image={profile.public}
-          itemClass={itemClass}
-          dim={bannerDim}
-          blur={bannerBlur}
-          textMode={bannerTextMode}
-        />
+        <PublicSection image={profile.public} itemClass={itemClass} onPreview={previewPublicPage} />
 
         {/* 聯絡與通知、更換密碼並排 */}
         <div className="form-grid-2" style={{ marginTop: 16, alignItems: 'stretch' }}>

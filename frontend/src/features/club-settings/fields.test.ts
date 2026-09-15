@@ -8,22 +8,18 @@ const emptyPublic: ClubPublicProfile = {
   tags: [],
   recruitStatus: '',
   publicEmail: '',
-  socialLinks: {},
+  instagram: '',
   officeLocation: '',
   regularSchedule: '',
   joinInfo: '',
   signupUrl: '',
-  foundedYear: null,
   avatarUrl: null,
   bannerUrl: null,
-  bannerDim: 0,
-  bannerBlur: 0,
-  bannerTextMode: 'auto',
-  bannerLuma: null,
 }
 
 // 遷入的社團有一批是這樣的:簡介空字串、網頁連結 NULL(migration/cms_import.py)
 const migrated: ClubProfile = {
+  id: 1,
   name: '熱舞社',
   kind: '社團',
   enName: '',
@@ -63,15 +59,10 @@ describe('profileChanged', () => {
     expect(Object.keys(saved)).not.toContain('enName')
   })
 
-  // 標籤是陣列、黑化程度是數字:拿 `?? ''` 比會把改動吞掉(儲存鈕永遠是乾淨的)
+  // 標籤是陣列:拿 `?? ''` 比會把改動吞掉(儲存鈕永遠是乾淨的)
   it('陣列欄位的內容變了算動過', () => {
-    expect(profileChanged({ ...saved, tags: ['街舞'] }, saved)).toBe(true)
+    expect(profileChanged({ ...saved, tags: ['運動'] }, saved)).toBe(true)
     expect(profileChanged({ ...saved, tags: [] }, saved)).toBe(false)
-  })
-
-  it('數值欄位從 0 改成別的值算動過', () => {
-    expect(profileChanged({ ...saved, bannerDim: 40 }, saved)).toBe(true)
-    expect(profileChanged({ ...saved, bannerDim: 0 }, saved)).toBe(false)
   })
 
   it('形象圖不是表單欄位,換圖不會讓表單變 dirty', () => {
@@ -83,9 +74,9 @@ describe('profileChanged', () => {
 describe('toProfileInput', () => {
   const saved = fromProfile(migrated)
 
-  it('社群連結由攤平的六欄收回一平台一格', () => {
-    const input = toProfileInput({ ...saved, socialInstagram: 'https://instagram.com/x' })
-    expect(input.socialLinks.instagram).toBe('https://instagram.com/x')
-    expect(input.socialLinks.facebook).toBe('')
+  it('未填的欄位一律送空字串,由後端收成 null', () => {
+    const input = toProfileInput({ ...saved, instagram: 'ntust_dance' })
+    expect(input.instagram).toBe('ntust_dance')
+    expect(input.tagline).toBe('')
   })
 })

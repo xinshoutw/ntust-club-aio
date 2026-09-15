@@ -68,18 +68,13 @@ describe('hasPublicData', () => {
     tags: [],
     recruitStatus: '',
     publicEmail: '',
-    socialLinks: {},
+    instagram: '',
     officeLocation: '',
     regularSchedule: '',
     joinInfo: '',
     signupUrl: '',
-    foundedYear: null,
     avatarUrl: null,
     bannerUrl: null,
-    bannerDim: 0,
-    bannerBlur: 0,
-    bannerTextMode: 'auto',
-    bannerLuma: null,
   }
 
   // 全空時行政端只顯示一句「尚未填寫」,不鋪一排 —— 整排 `—` 看起來像載入壞了
@@ -89,13 +84,9 @@ describe('hasPublicData', () => {
 
   it('任何一欄有值就算有', () => {
     expect(hasPublicData({ ...empty, tagline: '每週三一起跳舞' })).toBe(true)
-    expect(hasPublicData({ ...empty, tags: ['街舞'] })).toBe(true)
-    expect(hasPublicData({ ...empty, socialLinks: { instagram: 'https://x.tw' } })).toBe(true)
+    expect(hasPublicData({ ...empty, tags: ['運動'] })).toBe(true)
+    expect(hasPublicData({ ...empty, instagram: 'ntust_dance' })).toBe(true)
     expect(hasPublicData({ ...empty, bannerUrl: '/api/v1/files/x' })).toBe(true)
   })
 
-  // 黑化/模糊是顯示參數,沒有圖的時候它們的值不代表「填了東西」
-  it('只有顯示參數不算有公開資料', () => {
-    expect(hasPublicData({ ...empty, bannerDim: 40, bannerBlur: 20 })).toBe(false)
-  })
 })

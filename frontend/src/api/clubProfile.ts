@@ -78,24 +78,9 @@ export interface ClubPublicProfile {
   bannerLuma: number | null
 }
 
-interface ClubProfileOut {
-  id: number
-  name: string
-  kind: string
-  en_name: string | null
-  attribute: string | null
-  intro: string
-  website_url: string | null
-  contact_emails: string[]
-  discord_webhook_url: string | null
-  advisor_name: string | null
-  advisor_dept: string | null
-  advisor_email: string | null
-  advisor_out_name: string | null
-  advisor_out_dept: string | null
-  advisor_out_email: string | null
-  suspended_until: string | null
-  suspend_reason: string | null
+/** 公開欄位的原始形狀。後端的 `ClubPublicOut` 也是巢狀掛在行政端詳情底下,
+ *  兩端共用同一支轉換(`toPublicProfile`)—— 公開範圍只該有一個定義。 */
+export interface ClubPublicOut {
   tagline: string | null
   tags: string[]
   recruit_status: string | null
@@ -114,10 +99,30 @@ interface ClubProfileOut {
   banner_luma: number | null
 }
 
+interface ClubProfileOut extends ClubPublicOut {
+  id: number
+  name: string
+  kind: string
+  en_name: string | null
+  attribute: string | null
+  intro: string
+  website_url: string | null
+  contact_emails: string[]
+  discord_webhook_url: string | null
+  advisor_name: string | null
+  advisor_dept: string | null
+  advisor_email: string | null
+  advisor_out_name: string | null
+  advisor_out_dept: string | null
+  advisor_out_email: string | null
+  suspended_until: string | null
+  suspend_reason: string | null
+}
+
 const imageUrl = (fileId: string | null): string | null =>
   fileId ? `${API_BASE}/files/${fileId}` : null
 
-export const toPublicProfile = (c: ClubProfileOut): ClubPublicProfile => ({
+export const toPublicProfile = (c: ClubPublicOut): ClubPublicProfile => ({
   tagline: c.tagline ?? '',
   tags: c.tags ?? [],
   recruitStatus: c.recruit_status ?? '',

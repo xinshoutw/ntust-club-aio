@@ -6,7 +6,8 @@ import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
 import type { StatusKey } from '../../lib/status'
 import { roomEntryText } from '../../api/bookings'
-import { useAdminClubDetail } from '../../api/adminClubs'
+import { hasPublicData, useAdminClubDetail } from '../../api/adminClubs'
+import ClubPublicSummary from '../../components/ui/ClubPublicSummary'
 import { fileDownloadUrl } from '../../api/adminFiles'
 import {
   useAdminBookingMutations,
@@ -243,7 +244,20 @@ export default function ClubOverviewPage() {
             <div style={label}>簡介</div><div style={{ lineHeight: 1.7 }}>{info?.intro || '—'}</div>
             <div style={label}>聯絡 Email</div>
             <div className="num">{info?.contactEmails.filter(Boolean).join('、') || '—'}</div>
+            <div style={label}>公開顯示</div>
+            <div>
+              {info ? (info.publicVisible ? '導覽頁顯示中' : '已從導覽頁下架') : '—'}
+            </div>
           </div>
+          {/* 對外公開資料(唯讀):開關在管理項目,本頁只看得到目前是開是關 */}
+          <div style={{ fontSize: 13, color: 'var(--steel)', margin: '18px 0 10px' }}>
+            對外公開資料
+          </div>
+          {info && hasPublicData(info.public) ? (
+            <ClubPublicSummary data={info.public} />
+          ) : (
+            <div style={{ fontSize: 13, color: 'var(--steel)' }}>尚未填寫對外公開資料</div>
+          )}
           {/* 背景重抓失敗:資料照舊,底下補一行說明 */}
           {detailQuery.isError && info && (
             <QueryError

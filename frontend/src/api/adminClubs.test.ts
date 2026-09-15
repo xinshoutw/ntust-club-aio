@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fetchAllAdminMembers, groupActiveClubs, type ClubOption } from './adminClubs'
+import { fetchAllAdminMembers, groupActiveClubs, hasPublicData, type ClubOption } from './adminClubs'
+import type { ClubPublicProfile } from './clubProfile'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -58,5 +59,43 @@ describe('groupActiveClubs', () => {
       { label: '藝術性', options: ['熱舞社'] },
       { label: '未分類', options: ['待補性質社'] },
     ])
+  })
+})
+
+describe('hasPublicData', () => {
+  const empty: ClubPublicProfile = {
+    tagline: '',
+    tags: [],
+    recruitStatus: '',
+    publicEmail: '',
+    socialLinks: {},
+    officeLocation: '',
+    regularSchedule: '',
+    joinInfo: '',
+    signupUrl: '',
+    foundedYear: null,
+    avatarUrl: null,
+    bannerUrl: null,
+    bannerDim: 0,
+    bannerBlur: 0,
+    bannerTextMode: 'auto',
+    bannerLuma: null,
+  }
+
+  // 全空時行政端只顯示一句「尚未填寫」,不鋪一排 —— 整排 `—` 看起來像載入壞了
+  it('一欄都沒填就是沒有公開資料', () => {
+    expect(hasPublicData(empty)).toBe(false)
+  })
+
+  it('任何一欄有值就算有', () => {
+    expect(hasPublicData({ ...empty, tagline: '每週三一起跳舞' })).toBe(true)
+    expect(hasPublicData({ ...empty, tags: ['街舞'] })).toBe(true)
+    expect(hasPublicData({ ...empty, socialLinks: { instagram: 'https://x.tw' } })).toBe(true)
+    expect(hasPublicData({ ...empty, bannerUrl: '/api/v1/files/x' })).toBe(true)
+  })
+
+  // 黑化/模糊是顯示參數,沒有圖的時候它們的值不代表「填了東西」
+  it('只有顯示參數不算有公開資料', () => {
+    expect(hasPublicData({ ...empty, bannerDim: 40, bannerBlur: 20 })).toBe(false)
   })
 })

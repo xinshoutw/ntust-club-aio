@@ -56,8 +56,13 @@
     border-color 0.12s ease,
     transform 0.12s ease;
 }
-.club-card:hover {
+/* color 要在 hover/active 再寫一次:antd 注入的全域 `a:hover`(0,1,1)壓得過
+   `.club-card { color: inherit }`(0,1,0),社團名會跟著變成連結色。
+   站內其他 <a> 也是這樣處理的(sidebar.css、overview.css) */
+.club-card:hover,
+.club-card:active {
   border-color: var(--seal);
+  color: inherit;
 }
 /* 六十幾張卡是鍵盤使用者 Tab 過去的主要路徑,瀏覽器預設焦點框對不上站內樣式 */
 .club-card:focus-visible {

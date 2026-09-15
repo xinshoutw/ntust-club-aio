@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Annotated
 
 import sqlalchemy as sa
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Response
 from fastapi import Path as PathParam
 from fastapi.responses import FileResponse
 
@@ -152,20 +152,24 @@ async def equipment_usage(
 
 
 @router.get("/clubs")
-async def list_clubs(db: DbDep) -> ApiResponse[list[ClubCardOut]]:
+async def list_clubs(db: DbDep, response: Response) -> ApiResponse[list[ClubCardOut]]:
     """導覽字卡:**全量回傳**,不分頁。
 
     在校社團約 60 個,導覽頁本質是主檔;搜尋與篩選由前端在手上這份做完,
     再打一次伺服器只是多一次往返。
 
     排序:有橫幅圖的在前,其次社團名稱 —— 沒有任何一張圖的頁面不會有人看第二次,
-    先讓有備料的社團撐起版面。
+    先讓有備料的社團撐起版面。名稱排序走的是 DB 的 collation(正式庫是 `en_US.utf8`,
+    對中文等於碼位序);要筆畫或注音順序得在前端用 `Intl.Collator('zh-Hant')` 重排 ——
+    手上本來就是全量,但重排時要保住「有橫幅在前」那一段。
     """
     rows = await db.scalars(
         sa.select(Club)
         .where(*_VISIBLE)
         .order_by(Club.banner_file_id.is_(None), Club.name, Club.id)
     )
+    # 一份幾乎不變的主檔,沒有理由每次進站、每次上一頁都重查(全域預設是 no-store)
+    response.headers["Cache-Control"] = "public, max-age=300"
     return ApiResponse(data=[ClubCardOut.model_validate(c) for c in rows])
 
 

@@ -64,6 +64,9 @@ class PublicActivityOut(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    # 前端不顯示單號(design-guide §6),但列表要一個穩定的 key ——
+    # 拿 index 或「日期+名稱」當 key 會在同日同名時互撞
+    id: int
     name: str
     date: date | None
     end_date: date | None

@@ -407,3 +407,27 @@ async def test_file_management_offers_to_download_what_anyone_can_already_fetch(
     mine = next(f for f in listed if f["original_name"] == "avatar.webp")
     assert mine["can_download"] is True
     assert (await client.get(f"/api/v1/files/{row.id}")).status_code == 200
+
+
+async def test_the_directory_list_is_cacheable(client, db):
+    """一份幾乎不變的主檔,全域的 no-store 會讓每次進站、每次上一頁都重查一遍。"""
+    await make_club(db)
+    res = await client.get(URL)
+    assert "max-age" in res.headers["cache-control"]
+    assert "no-store" not in res.headers["cache-control"]
+
+
+async def test_activity_rows_carry_a_stable_key(client, db):
+    """前端不顯示單號,但列表要一個穩定的 key —— 同日同名的兩場活動會互撞。"""
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    row = await make_activity(
+        db,
+        club,
+        name="成果發表",
+        status=ActivityStatus.APPROVED,
+        day=dt.date(2026, 3, 1),
+        created_by=user.id,
+    )
+    listed = (await client.get(f"{URL}/{club.id}/activities")).json()["data"]
+    assert listed[0]["id"] == row.id

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fromProfile, profileChanged, toProfileInput } from './fields'
+import { PROFILE_KEYS, fromProfile, profileChanged, toProfileInput } from './fields'
 import type { ClubProfile, ClubPublicProfile } from '../../api/clubProfile'
 
 // 對外公開資料一欄都沒填(遷入的社團與新社團都是這樣起步的)
@@ -42,10 +42,10 @@ const migrated: ClubProfile = {
 describe('profileChanged', () => {
   const saved = fromProfile(migrated)
 
-  // 網頁連結與詳細介紹的必填掛在這個判定上:一律擋的話,遷入時這兩欄是空的社團
-  // (`migration/cms_import.py`)連碰都不能碰
-  it('什麼都沒改不算動過', () => {
-    expect(profileChanged({ ...saved }, saved)).toBe(false)
+  // 兩份欄位清單少一邊就出事:dirty 迭代的是 `fromProfile` 的鍵,`profileChanged`
+  // 問的是 `PROFILE_KEYS` —— 分岔就會變成「橘框亮著卻說沒改」或反過來
+  it('PROFILE_KEYS 與 fromProfile 蓋的是同一組欄位', () => {
+    expect([...PROFILE_KEYS].sort()).toEqual(Object.keys(saved).sort())
   })
 
   it('動到 profile 的任何一欄都算', () => {

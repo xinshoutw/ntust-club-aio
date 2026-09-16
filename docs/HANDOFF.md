@@ -225,6 +225,15 @@ Opus 交叉審查後補的:`media_import --reset` 改走 `unlink_quiet`(原本�
   社團簡介貼 YouTube 網址(56 字)會把整頁推成可以左右拉(`pre-wrap` 不拆無空白字串),
   社團自填的長文欄位一律補 `overflow-wrap: anywhere`;抽屜標題改放帳號名稱
   (`.topbar-username` 在 ≤767px 是 display:none,手機上本來看不出登入的是誰)
+- **PR #30 的 bot 審查後補的**:活動紀錄只有欄位標籤、沒有紀錄邊界 —— 輔助技術數不出有
+  幾場活動。列從 `display: contents` 改成 **`grid-template-columns: subgrid`**(真盒子,
+  `role="listitem"` 才立得住;`display: contents` 的元素在舊引擎會連 role 一起被拿掉),
+  `.act-list` 掛 `role="list"`,分隔線順勢掛回列上。欄寬與字卡版面零變動。
+  另外 topbar 六個圖示補 `aria-hidden`(AntD 的 icon 自帶 `role="img"` 與名稱,
+  按鈕已有 `aria-label` 時等於唸兩遍;側欄的 `.sidebar-item-icon` 本來就是這樣)。
+  **駁回一條**:CodeRabbit 說 `.sidebar-item { cursor: pointer }` 會讓反灰項目看起來可點 ——
+  `.sidebar-item.disabled` 的 `not-allowed` 特異性 0,2,0 壓得過,實測 computed cursor 正確,
+  而且 `<span>` 版一定同時帶 `disabled`
 - **版面本身沒有自動測試**:repo 沒有 Playwright/e2e,jsdom 量不到欄寬與斷點。上面所有寬度
   都是這一輪用 playwright 手動掃過(6 頁 × 11 個寬度,零水平溢位),**改動這幾條 CSS 之後
   要自己重掃**,`pnpm test` 不會替你發現破版

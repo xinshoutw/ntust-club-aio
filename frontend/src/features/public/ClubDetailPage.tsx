@@ -1,7 +1,7 @@
 import { useParams } from 'react-router'
 import { Button } from 'antd'
+import { EnvironmentOutlined } from '@ant-design/icons'
 import LoadingBlock from '../../components/ui/LoadingBlock'
-import { Cols } from '../../components/ui/tableControls'
 import QueryError from '../../components/ui/QueryError'
 import { ApiError } from '../../api/client'
 import { usePublicClub, usePublicClubActivities } from '../../api/publicClubs'
@@ -192,33 +192,31 @@ export default function ClubDetailPage() {
                   {(activities.data ?? []).length === 0 ? (
                     <p style={{ margin: 0, color: 'var(--steel)' }}>這個社團還沒有公開的活動紀錄</p>
                   ) : (
-                    <div style={{ overflowX: 'auto' }}>
-                      {/* `tb fixed` + <Cols> 是全站表格慣例:欄寬固定,日期與時間才不會被
-                          內容擠到換行;minWidth 讓窄螢幕產生水平捲軸而不是壓縮欄位 */}
-                      <table className="tb fixed" style={{ minWidth: 600 }} aria-label="活動紀錄">
-                        {/* 190/120:扣掉 td 的 32px padding 還容得下跨日的
-                            「2026/09/15 – 2026/09/16」與「19:00 – 21:00」 */}
-                        <Cols widths={[190, 120, 'auto', 200]} />
-                        <thead>
-                          <tr>
-                            <th scope="col">日期</th>
-                            <th scope="col">時間</th>
-                            <th scope="col">活動名稱</th>
-                            <th scope="col">地點</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(activities.data ?? []).map((a) => (
-                            <tr key={a.id}>
-                              <td className="num nowrap">{a.dateSpan}</td>
-                              {/* 起訖時間是選填:拿不到值顯示 —,不用 00:00 頂替 */}
-                              <td className="num nowrap">{a.timeSpan || '—'}</td>
-                              <td>{a.name}</td>
-                              <td>{a.location}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                    /* 不是 `tb fixed` 表格:固定欄寬把地點鎖在 200px,「趨勢科技 Trend Micro
+                       股份有限公司」在 1440px 上照樣折成兩行,而活動名稱那一欄空著三百多 px。
+                       改成四欄 grid —— 日期、時間與地點各取自己的 max-content,活動名稱吃掉
+                       剩下的所有寬度。手機上同一份標記換成一列一張字卡(`publicClubs.css`),
+                       不再是 600px 寬、要左右拉才看得到名稱與地點的表格 */
+                    <div className="act-list">
+                      <div className="act-row act-head">
+                        <span>日期</span>
+                        <span>時間</span>
+                        <span>活動名稱</span>
+                        <span>地點</span>
+                      </div>
+                      {(activities.data ?? []).map((a) => (
+                        <div className="act-row" key={a.id}>
+                          <span className="act-date num">{a.dateSpan}</span>
+                          {/* 起訖時間是選填:拿不到值顯示 —,不用 00:00 頂替 */}
+                          <span className="act-time num">{a.timeSpan || '—'}</span>
+                          <span className="act-name">{a.name}</span>
+                          <span className="act-where">
+                            {/* 字卡上沒有欄位標題,地點要自己說明自己(桌機的表頭還在,圖示收掉) */}
+                            <EnvironmentOutlined className="act-where-icon" aria-hidden="true" />
+                            {a.location}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </LoadingBlock>

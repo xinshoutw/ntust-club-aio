@@ -250,12 +250,12 @@
    活動名稱那欄空一大片;`max-content` 讓地點自己決定,名稱吃掉剩下的全部 */
 .act-list {
   display: grid;
+  /* 名稱欄的 `12em` 下限是地點欄的煞車:地點拿的是自己的 `max-content`,而庫裡最長的
+     地點有 42 個字(518px)—— 沒有下限的話它在 768px 上會把名稱壓到見底。
+     有下限時換成地點先讓步,寬螢幕上照樣一行不折 */
   grid-template-columns: max-content max-content minmax(12em, 1fr) minmax(0, max-content);
   font-size: 14px;
 }
-/* 名稱欄的 `12em` 下限是地點欄的煞車:地點拿的是自己的 `max-content`,
-   而庫裡最長的地點有 42 個字(518px)—— 沒有下限的話它在 768px 上會把名稱壓到見底。
-   有下限時換成地點先讓步,寬螢幕上照樣一行不折 */
 /* 每一列的四格直接當 grid item,欄寬才會由整份清單一起決定 */
 .act-row {
   display: contents;

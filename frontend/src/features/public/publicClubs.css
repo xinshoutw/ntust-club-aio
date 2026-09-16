@@ -264,6 +264,9 @@
    一列的下框線斷成四截 */
 .act-row > * {
   min-width: 0;
+  /* 舊的 `.tb.fixed td` 有 break-word;沒有空白可斷的長地點(網址、整串英文)
+     在 grid 軌道裡會直接溢出去 */
+  overflow-wrap: anywhere;
   padding: 12px 24px 12px 0;
   border-bottom: 1px solid var(--line);
 }
@@ -298,33 +301,40 @@
     grid-template-columns: 1fr;
     gap: 10px;
   }
-  /* 一則紀錄一張字卡:名稱獨佔一行,日期與時間並排,地點自己一行 */
+  /* 一則紀錄一張字卡:名稱獨佔一行,日期與時間並排,地點自己一行。
+     第二欄**必須留成 flexible track**:名稱與地點各跨兩欄,而跨到彈性軌道的項目
+     不參與內在尺寸分配 —— 兩欄都寫 `max-content` 的話,600px 寬的長活動名稱
+     會直接把整列撐成 600px */
   .act-row {
     display: grid;
     grid-template-areas:
       'name name'
       'date time'
       'where where';
-    grid-template-columns: max-content 1fr;
+    grid-template-columns: minmax(0, max-content) 1fr;
     column-gap: 12px;
     row-gap: 2px;
     padding: 12px 14px;
     border: 1px solid var(--line);
     border-radius: 6px;
   }
-  /* 表頭要排在 .act-row 之後才蓋得掉上面那條 display(同一個 specificity) */
-  .act-head {
+  .act-list .act-head {
     display: none;
   }
   .act-row > * {
     padding: 0;
     border-bottom: none;
   }
+  /* 日期可折行、時間拿回自己的最小內容寬:基礎規則的 `min-width: 0` 把時間欄的
+     自動最小值打成 0,而時間是 `nowrap` —— 跨日日期在 360px 上會把
+     「13:00 – 20:00」擠成 36px,整段衝出卡片外被螢幕切掉 */
   .act-date {
     grid-area: date;
+    white-space: normal;
   }
   .act-time {
     grid-area: time;
+    min-width: auto;
   }
   .act-name {
     grid-area: name;

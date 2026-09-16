@@ -476,6 +476,22 @@
   line-height: 1.7;
 }
 
+/* 社團自己填的長文(簡介、入社方式)。`pre-wrap` 不拆開沒有空白的字串,而把 YouTube
+   頻道網址(56 字)貼進簡介是常態 —— 320px 上那一行會把整頁推成可以左右拉。
+   同一類欄位一律在這裡收口,不要各自在 style 裡寫一次 */
+.club-text {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.8;
+}
+.club-text,
+.club-kv dd,
+.club-head .tagline,
+.club-tagline,
+.club-ident .en {
+  overflow-wrap: anywhere;
+}
+
 .club-links {
   display: grid;
   gap: 10px;

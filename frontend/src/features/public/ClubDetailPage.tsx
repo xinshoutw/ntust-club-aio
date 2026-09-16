@@ -86,7 +86,7 @@ export default function ClubDetailPage() {
               <div className="col">
                 <section className="card fill" style={{ padding: 24 }}>
                   <h2 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 16px' }}>社團介紹</h2>
-                  <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{c.intro}</p>
+                  <p className="club-text">{c.intro}</p>
                   {(c.officeLocation || c.regularSchedule) && (
                     <dl className="club-kv">
                       {c.officeLocation && (
@@ -156,7 +156,7 @@ export default function ClubDetailPage() {
                   <section className="card" style={{ padding: 24 }}>
                     <h2 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 16px' }}>怎麼加入</h2>
                     {c.joinInfo && (
-                      <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{c.joinInfo}</p>
+                      <p className="club-text">{c.joinInfo}</p>
                     )}
                     {/* 守衛同 websiteUrl:輸出端刻意不驗證(後端只收口輸入),
                         遷入或匯入腳本塞進來的值會直接變成一顆可點的連結 */}

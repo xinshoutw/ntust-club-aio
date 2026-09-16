@@ -193,13 +193,17 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
       {/* 蓋板公告:僅社團端,每次登入顯示 */}
       {user?.role === 'club' && <TakeoverOverlay />}
 
+      {/* 抽屜標題放帳號名稱:`.topbar-username` 在 ≤767px 是 display:none,所以這裡是
+          手機上唯一看得出「現在登入的是誰」的地方。一社一帳號、幹部常共用一支手機,
+          登錯帳號送出去的申請收不回來(design-guide §4.1:選單裡放得下的東西也必須
+          在抽屜裡有一份) */}
       <Drawer
         placement="left"
         size={264}
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         styles={{ body: { padding: 0 } }}
-        title="臺科大社團管理系統"
+        title={displayName || '臺科大社團管理系統'}
       >
         <Sidebar groups={nav} onNavigate={() => setDrawerOpen(false)} />
         <div style={{ borderTop: '1px solid var(--line)', padding: '10px 10px 16px' }}>

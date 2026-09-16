@@ -22,13 +22,44 @@
 }
 /* 不自己設高:AntD 主題的 controlHeight 已經是 40(design-guide §3.5)。
    同時設在 affix wrapper 與內層 input 上,內層被撐滿又帶自己的 padding,字就掉下去了 */
+.dir-filter {
+  width: 132px;
+}
 .dir-search {
   width: 240px;
 }
+/* 平板:三個下拉加搜尋框在 768px 剛好把標題擠掉一整列,四個一起縮一號就排得回同一行 */
+@media (max-width: 991px) {
+  .dir-filter {
+    width: 108px;
+  }
+  .dir-search {
+    width: 168px;
+  }
+}
+/* 桌機:三顆下拉直接當工具列的 flex 子元素,包住它們的那層不參與版面 */
+.dir-filters {
+  display: contents;
+}
+/* 手機:標題自己一列、三個下拉平分一列、搜尋自己一列。
+   下拉改由 grid 平分而不是 flex-wrap —— 132px 三顆在 375px 排不下會掉成 2+1,
+   落單的那顆被 flex-grow 拉成整列寬,三個同類篩選器長得不一樣寬。
+   106px 是「全部性質」四個字加上 AntD 的內距與箭頭的實測下限;窄到排不下三欄
+   (約 370px 以下,三欄要 3×106 + 2×10 = 338px)時 auto-fit 自己收成兩欄,寬度仍然一致 */
 @media (max-width: 680px) {
   .dir-toolbar h1 {
     margin-right: 0;
     width: 100%;
+  }
+  .dir-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(106px, 1fr));
+    gap: 10px;
+    width: 100%;
+  }
+  .dir-filter {
+    width: auto;
+    min-width: 0;
   }
   .dir-search {
     width: 100%;
@@ -213,9 +244,118 @@
   border-style: solid;
 }
 
-/* 日期與時間不換行(club-detail.md);`.tb.fixed td` 預設是 break-word */
-.tb.fixed td.nowrap {
+/* ---- 詳細頁的活動紀錄 ----
+   桌機是四欄 grid,手機是一列一張字卡,**同一份標記**。用 grid 而不是表格:
+   固定欄寬(`tb fixed` + `<Cols>`)得先猜地點要多寬,猜窄了長地點折行、猜寬了
+   活動名稱那欄空一大片;`max-content` 讓地點自己決定,名稱吃掉剩下的全部 */
+.act-list {
+  display: grid;
+  /* 名稱欄的 `12em` 下限是地點欄的煞車:地點拿的是自己的 `max-content`,而庫裡最長的
+     地點有 42 個字(518px)—— 沒有下限的話它在 768px 上會把名稱壓到見底。
+     有下限時換成地點先讓步,寬螢幕上照樣一行不折 */
+  grid-template-columns: max-content max-content minmax(12em, 1fr) minmax(0, max-content);
+  column-gap: 24px;
+  font-size: 14px;
+}
+/* `subgrid` 而不是 `display: contents`:每一列要是真的盒子,`role="listitem"` 才立得住
+   (`display: contents` 的元素在舊版引擎會連同 role 一起被拿掉,一則紀錄就沒有邊界,
+   輔助技術數不出有幾筆)。欄寬仍然由整份清單一起決定 —— 這正是 subgrid 的用途。
+   連帶好處:分隔線可以掛回列上,不必每一格畫一段再想辦法接起來 */
+.act-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  border-bottom: 1px solid var(--line);
+}
+.act-row:last-child {
+  border-bottom: none;
+}
+.act-row > * {
+  min-width: 0;
+  /* 舊的 `.tb.fixed td` 有 break-word;沒有空白可斷的長地點(網址、整串英文)
+     在 grid 軌道裡會直接溢出去 */
+  overflow-wrap: anywhere;
+  padding: 12px 0;
+}
+.act-head > * {
+  padding-top: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--steel);
   white-space: nowrap;
+}
+/* 日期與時間不換行(club-detail.md);地點靠 max-content 的欄寬,寬度真的不夠時
+   才折行 —— 比釘死 `white-space: nowrap` 撐破版面好 */
+.act-date,
+.act-time {
+  white-space: nowrap;
+}
+.act-where {
+  color: var(--steel);
+}
+.act-where-icon {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .act-list {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  /* 一則紀錄一張字卡:名稱獨佔一行,日期與時間並排,地點自己一行。
+     第二欄**必須留成 flexible track**:名稱與地點各跨兩欄,而跨到彈性軌道的項目
+     不參與內在尺寸分配 —— 兩欄都寫 `max-content` 的話,600px 寬的長活動名稱
+     會直接把整列撐成 600px */
+  .act-row {
+    grid-template-areas:
+      'name name'
+      'date time'
+      'where where';
+    grid-template-columns: minmax(0, max-content) 1fr;
+    column-gap: 12px;
+    row-gap: 2px;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+  }
+  .act-list .act-head {
+    display: none;
+  }
+  .act-row > * {
+    padding: 0;
+    border-bottom: none;
+  }
+  /* 日期可折行、時間拿回自己的最小內容寬:基礎規則的 `min-width: 0` 把時間欄的
+     自動最小值打成 0,而時間是 `nowrap` —— 跨日日期在 360px 上會把
+     「13:00 – 20:00」擠成 36px,整段衝出卡片外被螢幕切掉 */
+  .act-date {
+    grid-area: date;
+    white-space: normal;
+  }
+  .act-time {
+    grid-area: time;
+    min-width: auto;
+  }
+  .act-name {
+    grid-area: name;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  /* flex 而不是行內圖示:地點折行時第二行才會對齊第一行的字,不會縮回圖示底下 */
+  .act-where {
+    grid-area: where;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  /* `--muted` 在白底上只有 2.6:1,低於非文字元素的 3:1 門檻;這顆圖示在字卡上是
+     「這一行是地點」的唯一視覺線索,不是裝飾 */
+  .act-where-icon {
+    display: inline-flex;
+    flex: none;
+    margin-top: 0.3em;
+    color: var(--steel);
+  }
 }
 
 /* ---- 詳細頁 ---- */
@@ -334,6 +474,22 @@
 .club-kv dd.pre {
   white-space: pre-wrap;
   line-height: 1.7;
+}
+
+/* 社團自己填的長文(簡介、入社方式)。`pre-wrap` 不拆開沒有空白的字串,而把 YouTube
+   頻道網址(56 字)貼進簡介是常態 —— 320px 上那一行會把整頁推成可以左右拉。
+   同一類欄位一律在這裡收口,不要各自在 style 裡寫一次 */
+.club-text {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.8;
+}
+.club-text,
+.club-kv dd,
+.club-head .tagline,
+.club-tagline,
+.club-ident .en {
+  overflow-wrap: anywhere;
 }
 
 .club-links {

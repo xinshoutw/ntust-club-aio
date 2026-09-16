@@ -3,12 +3,15 @@ import { Button } from 'antd'
 import { AppstoreOutlined, ArrowLeftOutlined, CalendarOutlined, HomeOutlined, LoginOutlined } from '@ant-design/icons'
 import { useAuth } from '../../app/auth'
 import { homeOf } from '../../lib/home'
+import TopbarButton from '../../components/layout/TopbarButton'
 import '../../components/layout/shell.css'
 
 /** 免登入頁面共用的外殼。
  *
  *  借用 shell 的 topbar 與內容寬(不另開一套 CSS),但**沒有側欄、鈴鐺與帳號選單** ——
  *  匿名訪客沒有那些東西可以按。右上角固定兩顆:另一邊的公開頁與登入。 */
+/** 鈕上的圖示一律 `aria-hidden`:名字由 `label`(或按鈕文字)給,圖示再帶一次
+ *  自己的名稱只是讓輔助技術把同一顆鈕唸兩遍。全站慣例,側欄的 `.sidebar-item-icon` 同樣 */
 export default function PublicShell({
   mobileTitle,
   back,
@@ -37,22 +40,31 @@ export default function PublicShell({
         <div className="topbar-mobile-title">{mobileTitle}</div>
         <div className="topbar-spacer" />
         {onAvailability ? (
-          <Button icon={<AppstoreOutlined />} onClick={() => navigate('/clubs')}>
-            社團導覽
-          </Button>
+          <TopbarButton
+            label="社團導覽"
+            icon={<AppstoreOutlined aria-hidden="true" />}
+            onClick={() => navigate('/clubs')}
+          />
         ) : (
-          <Button icon={<CalendarOutlined />} onClick={() => navigate('/availability')}>
-            借用情形
-          </Button>
+          <TopbarButton
+            label="借用情形"
+            icon={<CalendarOutlined aria-hidden="true" />}
+            onClick={() => navigate('/availability')}
+          />
         )}
         {user ? (
-          <Button icon={<HomeOutlined />} onClick={() => navigate(homeOf(user.role))}>
-            控制台
-          </Button>
+          <TopbarButton
+            label="控制台"
+            icon={<HomeOutlined aria-hidden="true" />}
+            onClick={() => navigate(homeOf(user.role))}
+          />
         ) : (
-          <Button type="primary" icon={<LoginOutlined />} onClick={() => navigate('/login')}>
-            登入
-          </Button>
+          <TopbarButton
+            label="登入"
+            type="primary"
+            icon={<LoginOutlined aria-hidden="true" />}
+            onClick={() => navigate('/login')}
+          />
         )}
       </header>
       {/* 整頁包一層:`.shell-main > *` 會把**每個直接子元素**各自撐成 1200px 置中,
@@ -66,7 +78,7 @@ export default function PublicShell({
                   社團從「預覽社團頁」點進來會被丟回自己的總覽 */}
               <Button
                 type="link"
-                icon={<ArrowLeftOutlined />}
+                icon={<ArrowLeftOutlined aria-hidden="true" />}
                 style={{ paddingLeft: 0 }}
                 href="/clubs"
                 onClick={(e) => {

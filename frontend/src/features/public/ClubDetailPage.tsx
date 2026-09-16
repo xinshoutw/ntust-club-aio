@@ -1,7 +1,7 @@
 import { useParams } from 'react-router'
 import { Button } from 'antd'
+import { EnvironmentOutlined } from '@ant-design/icons'
 import LoadingBlock from '../../components/ui/LoadingBlock'
-import { Cols } from '../../components/ui/tableControls'
 import QueryError from '../../components/ui/QueryError'
 import { ApiError } from '../../api/client'
 import { usePublicClub, usePublicClubActivities } from '../../api/publicClubs'
@@ -86,7 +86,7 @@ export default function ClubDetailPage() {
               <div className="col">
                 <section className="card fill" style={{ padding: 24 }}>
                   <h2 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 16px' }}>社團介紹</h2>
-                  <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{c.intro}</p>
+                  <p className="club-text">{c.intro}</p>
                   {(c.officeLocation || c.regularSchedule) && (
                     <dl className="club-kv">
                       {c.officeLocation && (
@@ -156,7 +156,7 @@ export default function ClubDetailPage() {
                   <section className="card" style={{ padding: 24 }}>
                     <h2 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 16px' }}>怎麼加入</h2>
                     {c.joinInfo && (
-                      <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>{c.joinInfo}</p>
+                      <p className="club-text">{c.joinInfo}</p>
                     )}
                     {/* 守衛同 websiteUrl:輸出端刻意不驗證(後端只收口輸入),
                         遷入或匯入腳本塞進來的值會直接變成一顆可點的連結 */}
@@ -177,8 +177,12 @@ export default function ClubDetailPage() {
             </div>
 
             {/* 活動紀錄:全寬。日期與時間各自一欄且不換行 */}
-            <section className="card" style={{ padding: 24 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 16px' }}>活動紀錄</h2>
+            {/* 具名的 section 才會是可跳轉的 region;原本那份名字掛在 `<table aria-label>` 上,
+                表格收掉之後要有人接手 */}
+            <section className="card" style={{ padding: 24 }} aria-labelledby="act-heading">
+              <h2 id="act-heading" style={{ fontSize: 18, fontWeight: 600, margin: '0 0 16px' }}>
+                活動紀錄
+              </h2>
               {activities.isLoadingError ? (
                 <QueryError
                   compact
@@ -192,33 +196,46 @@ export default function ClubDetailPage() {
                   {(activities.data ?? []).length === 0 ? (
                     <p style={{ margin: 0, color: 'var(--steel)' }}>這個社團還沒有公開的活動紀錄</p>
                   ) : (
-                    <div style={{ overflowX: 'auto' }}>
-                      {/* `tb fixed` + <Cols> 是全站表格慣例:欄寬固定,日期與時間才不會被
-                          內容擠到換行;minWidth 讓窄螢幕產生水平捲軸而不是壓縮欄位 */}
-                      <table className="tb fixed" style={{ minWidth: 600 }} aria-label="活動紀錄">
-                        {/* 190/120:扣掉 td 的 32px padding 還容得下跨日的
-                            「2026/09/15 – 2026/09/16」與「19:00 – 21:00」 */}
-                        <Cols widths={[190, 120, 'auto', 200]} />
-                        <thead>
-                          <tr>
-                            <th scope="col">日期</th>
-                            <th scope="col">時間</th>
-                            <th scope="col">活動名稱</th>
-                            <th scope="col">地點</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(activities.data ?? []).map((a) => (
-                            <tr key={a.id}>
-                              <td className="num nowrap">{a.dateSpan}</td>
-                              {/* 起訖時間是選填:拿不到值顯示 —,不用 00:00 頂替 */}
-                              <td className="num nowrap">{a.timeSpan || '—'}</td>
-                              <td>{a.name}</td>
-                              <td>{a.location}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                    /* 不是 `tb fixed` 表格:固定欄寬把地點鎖在 200px,「趨勢科技 Trend Micro
+                       股份有限公司」在 1440px 上照樣折成兩行,而活動名稱那一欄空著三百多 px。
+                       改成四欄 grid —— 日期、時間與地點各取自己的 max-content,活動名稱吃掉
+                       剩下的所有寬度。手機上同一份標記換成一列一張字卡(`publicClubs.css`),
+                       不再是 600px 寬、要左右拉才看得到名稱與地點的表格 */
+                    <div className="act-list" role="list">
+                      {/* 清單而不是表格:一則紀錄一個 `listitem`,輔助技術才數得出有幾筆、
+                          跳得到下一筆(欄位由每一格自己的 `.sr-only` 標籤交代,手機的
+                          字卡連表頭都沒有)。列是 `subgrid` 的真盒子,role 立得住;
+                          `display: contents` 的元素在舊版引擎會連 role 一起被拿掉。
+                          表頭只給眼睛看,所以整列 `aria-hidden` */}
+                      <div className="act-row act-head" aria-hidden="true">
+                        <span>日期</span>
+                        <span>時間</span>
+                        <span>活動名稱</span>
+                        <span>地點</span>
+                      </div>
+                      {(activities.data ?? []).map((a) => (
+                        <div className="act-row" role="listitem" key={a.id}>
+                          <span className="act-date num">
+                            <span className="sr-only">日期 </span>
+                            {a.dateSpan}
+                          </span>
+                          {/* 起訖時間是選填:拿不到值顯示 —,不用 00:00 頂替 */}
+                          <span className="act-time num">
+                            <span className="sr-only">時間 </span>
+                            {a.timeSpan || '—'}
+                          </span>
+                          <span className="act-name">
+                            <span className="sr-only">活動名稱 </span>
+                            {a.name}
+                          </span>
+                          <span className="act-where">
+                            {/* 圖示是給眼睛的第二份線索,唸出來的是旁邊那個 `.sr-only` */}
+                            <EnvironmentOutlined className="act-where-icon" aria-hidden="true" />
+                            <span className="sr-only">地點 </span>
+                            {a.location}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </LoadingBlock>

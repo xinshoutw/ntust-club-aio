@@ -18,6 +18,9 @@
   user-select: none;
 }
 
+/* 同一個 class 掛在 `<a>`(NavLink)、`<span>`(反灰項)與抽屜底部的 `<button>` 上。
+   `<button>` 的 UA 樣式自帶 `text-align: center`、自己的 font 與灰底外框 ——
+   不在這裡一起收掉,手機抽屜裡的「更換密碼 / 登出」文字會置中,跟上面每一列都對不齊 */
 .sidebar-item {
   position: relative;
   display: flex;
@@ -27,7 +30,16 @@
   padding: 0 12px;
   margin: 2px 0;
   border-radius: 6px;
+  font: inherit;
   font-size: 14px;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  /* `<button>` 是 shrink-to-fit 的:`display: flex` 不會讓它像 `<a>` 那樣撐滿一列。
+     沒有全域的 box-sizing reset,所以要自己收 —— 否則 `<a>` 會被 padding 撐出去 24px */
+  box-sizing: border-box;
+  width: 100%;
   color: var(--ink);
   text-decoration: none;
   transition: background 0.1s ease;

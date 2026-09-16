@@ -38,10 +38,12 @@
   height: 26px;
   flex-shrink: 0;
 }
+/* 頁名頂替收掉的 `.topbar-brand`,所以**靠左**:`.topbar-spacer` 同樣是 flex:1,
+   置中只會把字排在左半邊的正中間(看起來既不靠左也不置中),而且頁名只分得到
+   一半的餘裕 —— 手機上的社團頁因此把「開源技術開發研究社」截成「開源技術…」 */
 .topbar-mobile-title {
   display: none;
   flex: 1;
-  text-align: center;
   font-weight: 600;
   font-size: 15px;
   white-space: nowrap;
@@ -214,18 +216,20 @@
   .topbar-user {
     display: none;
   }
-  /* 社團導覽收成圖示鈕:四個字加圖示會把頁名擠掉。整顆不隱藏 ——
-     抽屜的側欄沒有這一項,藏掉等於手機上沒有入口(aria-label 仍在)。
-     只藏自己那顆 span,不要去猜 AntD 的內部結構:圖示包在 `.ant-btn-icon` 裡
-     而不是 `.anticon`,用 `:not(.anticon)` 會把圖示一起藏掉,剩一顆空按鈕 */
-  .topbar-directory-label {
+  /* topbar 的文字鈕一律收成圖示鈕(`TopbarButton`):理由與作法寫在該元件。
+     公開頁的 topbar 右側有兩顆,`.topbar-brand` 收掉之後仍會把頁名擠成「社團…」 */
+  .topbar-cta-label {
     display: none;
   }
-  .topbar-directory {
+  .topbar-cta {
     padding-inline: 10px;
   }
   .topbar-mobile-title {
     display: block;
+  }
+  /* 餘裕整份給頁名(頁名一定有值:AppShell 退回「社團管理系統」,PublicShell 是必填 prop) */
+  .topbar-spacer {
+    flex: none;
   }
   .shell-main {
     padding: 20px 16px 48px;

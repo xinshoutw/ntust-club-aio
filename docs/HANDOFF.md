@@ -212,7 +212,22 @@ Opus 交叉審查後補的:`media_import --reset` 改走 `unlink_quiet`(原本�
   活動名稱欄空著三百多 px;手機更糟 —— `min-width: 600px` 配水平捲軸,只看得到日期與時間兩欄。
   現在日期、時間與地點各取自己的 `max-content`,名稱吃掉剩下的全部並有 `12em` 下限
   (庫裡最長的地點 42 字 = 518px,沒有下限會把名稱壓到見底);≤767px **同一份標記**變成
-  一列一張字卡。`ClubDetailPage.test.tsx` 兩則
+  一列一張字卡。`ClubDetailPage.test.tsx` 三則
+- **Opus 交叉審查後補的**:活動紀錄的無障礙樹原本整段塌成一個文字節點,跨日日期與開始時間
+  黏成「2025/12/0713:00」,而 `<table aria-label="活動紀錄">` 那份名字也一起沒了 ——
+  每一格改成自帶 `.sr-only` 欄位名(新的全站工具 class)、表頭 `aria-hidden`、section 具名。
+  **刻意不用 ARIA 的 `role="row"/"cell"`**:`.act-row` 是 `display: contents`,舊版引擎會把
+  這種元素連同 role 一起從無障礙樹拿掉,`table` 少了 `row` 只剩孤兒 `cell`,比現在更糟。
+  另外:地點圖示 `--muted` 在白底只有 2.60:1(非文字門檻 3:1)改 `--steel`;
+  跨日日期在 360px 上把 `nowrap` 的時間擠成 36px 衝出卡片外(`.act-row > *` 的
+  `min-width: 0` 打掉了時間欄的自動最小值),**修法第二欄一定要留成 flexible track** ——
+  兩欄都寫 `max-content` 的話,跨兩欄的長活動名稱會把整列撐成它的 600px;
+  社團簡介貼 YouTube 網址(56 字)會把整頁推成可以左右拉(`pre-wrap` 不拆無空白字串),
+  社團自填的長文欄位一律補 `overflow-wrap: anywhere`;抽屜標題改放帳號名稱
+  (`.topbar-username` 在 ≤767px 是 display:none,手機上本來看不出登入的是誰)
+- **版面本身沒有自動測試**:repo 沒有 Playwright/e2e,jsdom 量不到欄寬與斷點。上面所有寬度
+  都是這一輪用 playwright 手動掃過(6 頁 × 11 個寬度,零水平溢位),**改動這幾條 CSS 之後
+  要自己重掃**,`pnpm test` 不會替你發現破版
 
 **要跑遷移**:D-21/D-22 是 drop column,`alembic upgrade head` 之後舊號碼就沒了。
 D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)—— 走 `--reset` 重灌,

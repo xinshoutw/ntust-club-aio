@@ -38,10 +38,12 @@
   height: 26px;
   flex-shrink: 0;
 }
+/* 頁名頂替收掉的 `.topbar-brand`,所以**靠左**:`.topbar-spacer` 同樣是 flex:1,
+   置中只會把字排在左半邊的正中間(看起來既不靠左也不置中),而且頁名只分得到
+   一半的餘裕 —— 手機上的社團頁因此把「開源技術開發研究社」截成「開源技術…」 */
 .topbar-mobile-title {
   display: none;
   flex: 1;
-  text-align: center;
   font-weight: 600;
   font-size: 15px;
   white-space: nowrap;
@@ -224,6 +226,10 @@
   }
   .topbar-mobile-title {
     display: block;
+  }
+  /* 餘裕整份給頁名(頁名一定有值:AppShell 退回「社團管理系統」,PublicShell 是必填 prop) */
+  .topbar-spacer {
+    flex: none;
   }
   .shell-main {
     padding: 20px 16px 48px;

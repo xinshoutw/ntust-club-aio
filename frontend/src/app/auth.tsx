@@ -65,13 +65,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 會被原封畫給下一個看畫面的人(login/logout 兩條路徑本來就在清)
   useEffect(() => {
     const expire = () => {
+      // **沒登入過就沒有 session 可以過期**:匿名開 `/clubs` 時開機的 `/auth/me`
+      // 必定 401,照清的話會連同時間抓回來的公開社團一起清掉 —— 而被 `qc.clear()`
+      // 移走的查詢不會自己重抓,導覽頁就永遠停在骨架上(對外那一半的訪客全中)。
+      // 要防的外流只發生在「本來有人登入」的情形,login/logout 另有自己的 clear
+      if (!user) return
       qc.clear()
       setUser(null)
       setBootError(null)
     }
     window.addEventListener(UNAUTHORIZED_EVENT, expire)
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, expire)
-  }, [qc])
+  }, [qc, user])
 
   const login = useCallback(
     async (username: string, password: string): Promise<SessionUser> => {

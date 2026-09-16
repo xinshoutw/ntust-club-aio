@@ -133,8 +133,12 @@ topbar 的文字鈕在 <768px 一律收成圖示鈕(`TopbarButton`):頁名頂替
 
 - 資料表一律 `tb fixed` + `<Cols>` 固定欄寬;`th` 一律 `scope="col"`(全站無列首 `th`)
 - **唯一例外是社團頁的活動紀錄**(`.act-list`):固定欄寬得先猜地點要多寬,猜窄了長地點折行、
-  猜寬了活動名稱那欄空一大片,所以改成讓欄位各取自己的 `max-content`。**要開第二個例外前先問
-  「欄寬真的無法預先決定嗎」** —— 排序、篩選與分頁那幾件事 grid 都沒有現成的,表格有
+  猜寬了活動名稱那欄空一大片。改成**日期、時間與地點各取自己的內容寬(`max-content`),
+  活動名稱吃掉剩下的空間(`1fr`)並帶 `12em` 下限** —— 四欄都寫 `max-content` 的話,
+  一個長活動名稱就會把整列撐開。列是 `subgrid` 的真盒子(不是 `display: contents`),
+  `role="list"` / `role="listitem"` 才立得住,輔助技術數得出有幾筆。
+  **要開第二個例外前先問「欄寬真的無法預先決定嗎」** —— 排序、篩選與分頁那幾件事
+  grid 都沒有現成的,表格有
 - 整列可點時 `onClick` 掛在 `<tr>` 上只服務滑鼠,鍵盤入口是主要欄位裡的 `.row-open-btn`(記得 `stopPropagation`);卡片等非表格區塊用 `lib/clickable` 的 `clickableProps`
 - 排序一律 `useMultiSort` + `MultiSortButton`(伺服器端以 `sortParam` 帶查詢):至多 3 鍵、無移除態,指示器呈現實際生效的排序鏈。點主鍵=升降互換,點已啟用的次鍵=升為主鍵並保留方向,點新欄=插為主鍵。**僅 sort icon 變色**,不整欄變色
 - 篩選用 `FilterButton`,收進表頭,不做一排篩選器牆

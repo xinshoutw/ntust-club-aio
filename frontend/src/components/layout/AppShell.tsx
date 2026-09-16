@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router'
-import { App, Badge, Button, Drawer, Dropdown, Popover } from 'antd'
+import { App, Badge, Drawer, Dropdown, Popover } from 'antd'
 import { confirmDialog } from '../../lib/confirm'
 import QueryError from '../ui/QueryError'
 import { AppstoreOutlined, BellOutlined, DownOutlined, HistoryOutlined, LockOutlined, LogoutOutlined, MenuOutlined, SettingOutlined } from '@ant-design/icons'
@@ -12,6 +12,7 @@ import type { NavGroup } from '../../lib/nav'
 import { canAccessAdminPath } from '../../lib/permissions'
 import ChangePasswordModal from '../../features/auth/ChangePasswordModal'
 import Sidebar from './Sidebar'
+import TopbarButton from './TopbarButton'
 import TakeoverOverlay from './TakeoverOverlay'
 import './shell.css'
 
@@ -165,14 +166,11 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
         </Popover>
         {/* 社團導覽是免登入頁,登入中的人照樣進得去(spec:公開頁不在角色閘底下)。
             手機上只留圖示 —— topbar 放不下四個字,而抽屜裡的側欄沒有這一項 */}
-        <Button
-          className="topbar-directory"
+        <TopbarButton
+          label="社團導覽"
           icon={<AppstoreOutlined />}
-          aria-label="社團導覽"
           onClick={() => guarded(() => navigate('/clubs'))}
-        >
-          <span className="topbar-directory-label">社團導覽</span>
-        </Button>
+        />
         <div className="topbar-divider" />
         <Dropdown menu={userMenu} trigger={['click']}>
           <button type="button" className="topbar-user" aria-label="帳號選單">

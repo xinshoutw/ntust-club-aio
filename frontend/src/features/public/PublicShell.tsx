@@ -3,6 +3,7 @@ import { Button } from 'antd'
 import { AppstoreOutlined, ArrowLeftOutlined, CalendarOutlined, HomeOutlined, LoginOutlined } from '@ant-design/icons'
 import { useAuth } from '../../app/auth'
 import { homeOf } from '../../lib/home'
+import TopbarButton from '../../components/layout/TopbarButton'
 import '../../components/layout/shell.css'
 
 /** 免登入頁面共用的外殼。
@@ -37,22 +38,31 @@ export default function PublicShell({
         <div className="topbar-mobile-title">{mobileTitle}</div>
         <div className="topbar-spacer" />
         {onAvailability ? (
-          <Button icon={<AppstoreOutlined />} onClick={() => navigate('/clubs')}>
-            社團導覽
-          </Button>
+          <TopbarButton
+            label="社團導覽"
+            icon={<AppstoreOutlined />}
+            onClick={() => navigate('/clubs')}
+          />
         ) : (
-          <Button icon={<CalendarOutlined />} onClick={() => navigate('/availability')}>
-            借用情形
-          </Button>
+          <TopbarButton
+            label="借用情形"
+            icon={<CalendarOutlined />}
+            onClick={() => navigate('/availability')}
+          />
         )}
         {user ? (
-          <Button icon={<HomeOutlined />} onClick={() => navigate(homeOf(user.role))}>
-            控制台
-          </Button>
+          <TopbarButton
+            label="控制台"
+            icon={<HomeOutlined />}
+            onClick={() => navigate(homeOf(user.role))}
+          />
         ) : (
-          <Button type="primary" icon={<LoginOutlined />} onClick={() => navigate('/login')}>
-            登入
-          </Button>
+          <TopbarButton
+            label="登入"
+            type="primary"
+            icon={<LoginOutlined />}
+            onClick={() => navigate('/login')}
+          />
         )}
       </header>
       {/* 整頁包一層:`.shell-main > *` 會把**每個直接子元素**各自撐成 1200px 置中,

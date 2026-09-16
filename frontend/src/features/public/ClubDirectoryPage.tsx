@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { Button, Input, Select } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
@@ -18,6 +18,8 @@ const UNCLASSIFIED = '未分類'
 // 需求方指定的特例:這一社固定排在自己性質的第一個。**不是通則**,也不做成設定 ——
 // 一個名字換一行比較誠實,好過一張沒人維護的排序主檔
 const PINNED_FIRST = '開源技術開發研究社'
+// 留一份 collator 重複用:`localeCompare(…, 'zh-Hant')` 每呼叫一次都要解析一次 locale
+const collator = new Intl.Collator('zh-Hant')
 const rank = (attr: string | null): number => {
   const i = ATTR_ORDER.indexOf(attr as (typeof ATTR_ORDER)[number])
   return i < 0 ? ATTR_ORDER.length : i
@@ -27,13 +29,18 @@ const options = (values: readonly string[], all: string) => [
   { value: '', label: all },
   ...values.map((v) => ({ value: v, label: v })),
 ]
+// 三份選單都是主檔,一次算完即可。寫在元件裡的話每次改篩選都會生出新的陣列,
+// rc-select 的 label 對照表跟著整份重建
+const ATTR_OPTIONS = options([...ATTR_ORDER, UNCLASSIFIED], '全部性質')
+const TAG_OPTIONS = options(CLUB_TAGS, '全部標籤')
+const RECRUIT_OPTIONS = options(RECRUIT_STATUSES, '全部招生')
 
 /** 整張卡是一個連結,不是按鈕。
  *
  *  `<button onClick={navigate}>` 看起來一樣,但不能 ⌘-click 開新分頁、不能右鍵複製
  *  連結,搜尋引擎也爬不到任何一個社團頁 —— 對一個明說要給校外看的目錄是實質損失。
  *  `<Link>` 自己處理修飾鍵與中鍵,SPA 導航照舊。 */
-function ClubCardTile({ club }: { club: ClubCard }) {
+const ClubCardTile = memo(function ClubCardTile({ club }: { club: ClubCard }) {
   return (
     <Link className="club-card" to={`/clubs/${club.id}`}>
       <div className="club-banner">
@@ -68,7 +75,7 @@ function ClubCardTile({ club }: { club: ClubCard }) {
       </div>
     </Link>
   )
-}
+})
 
 export default function ClubDirectoryPage() {
   const query = usePublicClubs()
@@ -85,27 +92,33 @@ export default function ClubDirectoryPage() {
     setRecruit('')
   }
 
-  // 全量在手上,搜尋與篩選都在前端做完 —— 再打一次伺服器只是多一次往返
-  const rows = useMemo(() => {
-    const keyword = q.trim().toLowerCase()
-    return (query.data ?? [])
-      .filter((c) => {
-        if (keyword && ![c.name, c.enName, c.tagline].some((v) => v.toLowerCase().includes(keyword)))
-          return false
-        if (attr && (attr === UNCLASSIFIED ? c.attribute !== null : c.attribute !== attr))
-          return false
-        if (tag && !c.tags.includes(tag)) return false
-        if (recruit && c.recruitStatus !== recruit) return false
-        return true
-      })
-      .sort(
+  // 排序只跟資料有關,**與篩選無關** —— 過濾不會改變剩下那些社團的相對順序。
+  // 併在同一個 useMemo 裡的話,每一次按鍵與每一次切下拉都要把八十幾個社團
+  // 用 zh-Hant collator 重排一次,而那是這一頁最貴的一筆
+  const sorted = useMemo(
+    () =>
+      [...(query.data ?? [])].sort(
         (a, b) =>
           rank(a.attribute) - rank(b.attribute) ||
           Number(b.name === PINNED_FIRST) - Number(a.name === PINNED_FIRST) ||
           // DB 的 collation 對中文是碼位序,這裡用 zh-Hant 重排
-          a.name.localeCompare(b.name, 'zh-Hant'),
-      )
-  }, [query.data, q, attr, tag, recruit])
+          collator.compare(a.name, b.name),
+      ),
+    [query.data],
+  )
+
+  // 全量在手上,搜尋與篩選都在前端做完 —— 再打一次伺服器只是多一次往返
+  const rows = useMemo(() => {
+    const keyword = q.trim().toLowerCase()
+    return sorted.filter((c) => {
+      if (keyword && ![c.name, c.enName, c.tagline].some((v) => v.toLowerCase().includes(keyword)))
+        return false
+      if (attr && (attr === UNCLASSIFIED ? c.attribute !== null : c.attribute !== attr)) return false
+      if (tag && !c.tags.includes(tag)) return false
+      if (recruit && c.recruitStatus !== recruit) return false
+      return true
+    })
+  }, [sorted, q, attr, tag, recruit])
 
   return (
     <PublicShell mobileTitle="社團導覽">
@@ -117,21 +130,21 @@ export default function ClubDirectoryPage() {
           <Select
             value={attr}
             onChange={setAttr}
-            options={options([...ATTR_ORDER, UNCLASSIFIED], '全部性質')}
+            options={ATTR_OPTIONS}
             aria-label="依性質篩選"
             className="dir-filter"
           />
           <Select
             value={tag}
             onChange={setTag}
-            options={options(CLUB_TAGS, '全部標籤')}
+            options={TAG_OPTIONS}
             aria-label="依標籤篩選"
             className="dir-filter"
           />
           <Select
             value={recruit}
             onChange={setRecruit}
-            options={options(RECRUIT_STATUSES, '全部招生')}
+            options={RECRUIT_OPTIONS}
             aria-label="依招生狀態篩選"
             className="dir-filter"
           />

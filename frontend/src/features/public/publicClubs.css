@@ -45,7 +45,7 @@
    下拉改由 grid 平分而不是 flex-wrap —— 132px 三顆在 375px 排不下會掉成 2+1,
    落單的那顆被 flex-grow 拉成整列寬,三個同類篩選器長得不一樣寬。
    106px 是「全部性質」四個字加上 AntD 的內距與箭頭的實測下限;窄到排不下三欄
-   (320px)時 auto-fit 自己收成兩欄,寬度仍然一致 */
+   (約 370px 以下,三欄要 3×106 + 2×10 = 338px)時 auto-fit 自己收成兩欄,寬度仍然一致 */
 @media (max-width: 680px) {
   .dir-toolbar h1 {
     margin-right: 0;

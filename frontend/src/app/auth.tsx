@@ -68,7 +68,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // **沒登入過就沒有 session 可以過期**:匿名開 `/clubs` 時開機的 `/auth/me`
       // 必定 401,照清的話會連同時間抓回來的公開社團一起清掉 —— 而被 `qc.clear()`
       // 移走的查詢不會自己重抓,導覽頁就永遠停在骨架上(對外那一半的訪客全中)。
-      // 要防的外流只發生在「本來有人登入」的情形,login/logout 另有自己的 clear
+      // 要防的外流只發生在「本來有人登入」的情形,login/logout 另有自己的 clear。
+      // 順帶收掉一個副作用:`setBootError(null)` 原本也對匿名 401 執行,等於把
+      // 「無法確認登入狀態」(非 401 的開機失敗)偷偷換成「已登出」,而 gate 是
+      // bootError 先判 —— 正是上面 verify() 的註解在防的事
       if (!user) return
       qc.clear()
       setUser(null)

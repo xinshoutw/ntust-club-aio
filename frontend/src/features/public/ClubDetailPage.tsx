@@ -201,12 +201,12 @@ export default function ClubDetailPage() {
                        改成四欄 grid —— 日期、時間與地點各取自己的 max-content,活動名稱吃掉
                        剩下的所有寬度。手機上同一份標記換成一列一張字卡(`publicClubs.css`),
                        不再是 600px 寬、要左右拉才看得到名稱與地點的表格 */
-                    <div className="act-list">
-                      {/* 表頭只給眼睛看:沒有表格語意可以把它跟下面的格子關聯起來,
-                          每一格自己帶 `.sr-only` 標籤(手機的字卡連表頭都沒有)。
-                          不加 `role="row"/"cell"` 是因為 `.act-row` 是 `display: contents` ——
-                          舊版瀏覽器會把這種元素連同它的 role 一起從無障礙樹拿掉,
-                          `table` 少了 `row` 只會剩下一堆孤兒 `cell`,比現在更糟 */}
+                    <div className="act-list" role="list">
+                      {/* 清單而不是表格:一則紀錄一個 `listitem`,輔助技術才數得出有幾筆、
+                          跳得到下一筆(欄位由每一格自己的 `.sr-only` 標籤交代,手機的
+                          字卡連表頭都沒有)。列是 `subgrid` 的真盒子,role 立得住;
+                          `display: contents` 的元素在舊版引擎會連 role 一起被拿掉。
+                          表頭只給眼睛看,所以整列 `aria-hidden` */}
                       <div className="act-row act-head" aria-hidden="true">
                         <span>日期</span>
                         <span>時間</span>
@@ -214,7 +214,7 @@ export default function ClubDetailPage() {
                         <span>地點</span>
                       </div>
                       {(activities.data ?? []).map((a) => (
-                        <div className="act-row" key={a.id}>
+                        <div className="act-row" role="listitem" key={a.id}>
                           <span className="act-date num">
                             <span className="sr-only">日期 </span>
                             {a.dateSpan}

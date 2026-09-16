@@ -69,6 +69,14 @@ describe('社團詳細的活動紀錄', () => {
     expect(document.querySelector('.act-head')?.getAttribute('aria-hidden')).toBe('true')
   })
 
+  // 一則紀錄一個 listitem:欄位標籤只說得出「這格是什麼」,說不出「一筆到哪裡結束」——
+  // 沒有清單語意的話輔助技術數不出有幾場活動,也跳不到下一場
+  test('活動紀錄是一份清單，一則一個項目', () => {
+    renderPage()
+    expect(screen.getByRole('list')).toBe(document.querySelector('.act-list'))
+    expect(screen.getAllByRole('listitem')).toHaveLength(activities.length)
+  })
+
   test('沒填起訖時間時顯示 —，不用 00:00 頂替', () => {
     renderPage()
     expect(screen.getByText('—')).toBeTruthy()

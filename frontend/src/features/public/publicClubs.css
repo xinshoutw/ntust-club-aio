@@ -254,27 +254,28 @@
      地點有 42 個字(518px)—— 沒有下限的話它在 768px 上會把名稱壓到見底。
      有下限時換成地點先讓步,寬螢幕上照樣一行不折 */
   grid-template-columns: max-content max-content minmax(12em, 1fr) minmax(0, max-content);
+  column-gap: 24px;
   font-size: 14px;
 }
-/* 每一列的四格直接當 grid item,欄寬才會由整份清單一起決定 */
+/* `subgrid` 而不是 `display: contents`:每一列要是真的盒子,`role="listitem"` 才立得住
+   (`display: contents` 的元素在舊版引擎會連同 role 一起被拿掉,一則紀錄就沒有邊界,
+   輔助技術數不出有幾筆)。欄寬仍然由整份清單一起決定 —— 這正是 subgrid 的用途。
+   連帶好處:分隔線可以掛回列上,不必每一格畫一段再想辦法接起來 */
 .act-row {
-  display: contents;
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  border-bottom: 1px solid var(--line);
 }
-/* 欄距用 padding 不用 column-gap:gap 會在每一格的分隔線之間留缺口,
-   一列的下框線斷成四截 */
+.act-row:last-child {
+  border-bottom: none;
+}
 .act-row > * {
   min-width: 0;
   /* 舊的 `.tb.fixed td` 有 break-word;沒有空白可斷的長地點(網址、整串英文)
      在 grid 軌道裡會直接溢出去 */
   overflow-wrap: anywhere;
-  padding: 12px 24px 12px 0;
-  border-bottom: 1px solid var(--line);
-}
-.act-row > :last-child {
-  padding-right: 0;
-}
-.act-row:last-child > * {
-  border-bottom: none;
+  padding: 12px 0;
 }
 .act-head > * {
   padding-top: 0;
@@ -306,7 +307,6 @@
      不參與內在尺寸分配 —— 兩欄都寫 `max-content` 的話,600px 寬的長活動名稱
      會直接把整列撐成 600px */
   .act-row {
-    display: grid;
     grid-template-areas:
       'name name'
       'date time'

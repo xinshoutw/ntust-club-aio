@@ -177,8 +177,12 @@ export default function ClubDetailPage() {
             </div>
 
             {/* 活動紀錄:全寬。日期與時間各自一欄且不換行 */}
-            <section className="card" style={{ padding: 24 }}>
-              <h2 style={{ fontSize: 18, fontWeight: 600, margin: '0 0 16px' }}>活動紀錄</h2>
+            {/* 具名的 section 才會是可跳轉的 region;原本那份名字掛在 `<table aria-label>` 上,
+                表格收掉之後要有人接手 */}
+            <section className="card" style={{ padding: 24 }} aria-labelledby="act-heading">
+              <h2 id="act-heading" style={{ fontSize: 18, fontWeight: 600, margin: '0 0 16px' }}>
+                活動紀錄
+              </h2>
               {activities.isLoadingError ? (
                 <QueryError
                   compact
@@ -198,7 +202,12 @@ export default function ClubDetailPage() {
                        剩下的所有寬度。手機上同一份標記換成一列一張字卡(`publicClubs.css`),
                        不再是 600px 寬、要左右拉才看得到名稱與地點的表格 */
                     <div className="act-list">
-                      <div className="act-row act-head">
+                      {/* 表頭只給眼睛看:沒有表格語意可以把它跟下面的格子關聯起來,
+                          每一格自己帶 `.sr-only` 標籤(手機的字卡連表頭都沒有)。
+                          不加 `role="row"/"cell"` 是因為 `.act-row` 是 `display: contents` ——
+                          舊版瀏覽器會把這種元素連同它的 role 一起從無障礙樹拿掉,
+                          `table` 少了 `row` 只會剩下一堆孤兒 `cell`,比現在更糟 */}
+                      <div className="act-row act-head" aria-hidden="true">
                         <span>日期</span>
                         <span>時間</span>
                         <span>活動名稱</span>
@@ -206,13 +215,23 @@ export default function ClubDetailPage() {
                       </div>
                       {(activities.data ?? []).map((a) => (
                         <div className="act-row" key={a.id}>
-                          <span className="act-date num">{a.dateSpan}</span>
+                          <span className="act-date num">
+                            <span className="sr-only">日期 </span>
+                            {a.dateSpan}
+                          </span>
                           {/* 起訖時間是選填:拿不到值顯示 —,不用 00:00 頂替 */}
-                          <span className="act-time num">{a.timeSpan || '—'}</span>
-                          <span className="act-name">{a.name}</span>
+                          <span className="act-time num">
+                            <span className="sr-only">時間 </span>
+                            {a.timeSpan || '—'}
+                          </span>
+                          <span className="act-name">
+                            <span className="sr-only">活動名稱 </span>
+                            {a.name}
+                          </span>
                           <span className="act-where">
-                            {/* 字卡上沒有欄位標題,地點要自己說明自己(桌機的表頭還在,圖示收掉) */}
+                            {/* 圖示是給眼睛的第二份線索,唸出來的是旁邊那個 `.sr-only` */}
                             <EnvironmentOutlined className="act-where-icon" aria-hidden="true" />
+                            <span className="sr-only">地點 </span>
                             {a.location}
                           </span>
                         </div>

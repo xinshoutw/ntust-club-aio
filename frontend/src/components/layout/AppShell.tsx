@@ -208,7 +208,6 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
           <button
             type="button"
             className="sidebar-item"
-            style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', font: 'inherit' }}
             onClick={() => {
               setDrawerOpen(false)
               setPwOpen(true)
@@ -220,7 +219,6 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
           <button
             type="button"
             className="sidebar-item"
-            style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', font: 'inherit' }}
             onClick={() =>
               guarded(() => {
                 // 與桌面選單一致:session 銷毀完成才導頁,避免 /login 又被既有 session 彈回
@@ -229,7 +227,7 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
             }
           >
             <span className="sidebar-item-icon" aria-hidden="true"><LogoutOutlined /></span>
-            <span className="sidebar-item-label">登出({user?.name})</span>
+            <span className="sidebar-item-label">登出</span>
           </button>
         </div>
       </Drawer>

@@ -184,6 +184,36 @@ Opus 交叉審查後補的:`media_import --reset` 改走 `unlink_quiet`(原本�
 「所有場地/器材借用」每一格改單行截斷(`useFitRows` 量第一列,一換行整頁列數算成一半)、器材欄 240px、
 器材頁多一個器材漏斗(`equipment_id=` 可重複,`GET /admin/equipment` 讀取鍵多 `aloanlist`)。
 
+**公開頁的 RWD 與活動紀錄改版**(2026-09-16):
+
+- **匿名進 `/clubs` 會永遠停在骨架上**(已修):開機的 `/auth/me` 對匿名一定回 401,
+  `auth.tsx` 的 401 handler 照著 `qc.clear()`,把同一時間抓回來的 `/public/clubs` 一起清掉 ——
+  而被 `qc.clear()` 移走的查詢**不會自己重抓**。守衛改成「沒登入過就沒有 session 可以過期」
+  (`if (!user) return`),login/logout 本來就各有自己的 clear。登入中開這一頁看不出問題,
+  所以整條對外的路徑一直沒人踩到。`src/app/auth.test.tsx` 兩則正反測試
+- **topbar 文字鈕在 <768px 收成圖示鈕**:抽出 `components/layout/TopbarButton.tsx`,
+  AppShell 與 PublicShell 共用(CSS 由 `.topbar-directory*` 改名 `.topbar-cta*`)。
+  連帶修兩件本來就歪的事:`.topbar-mobile-title` 的 `text-align: center` 搭上同樣 `flex: 1`
+  的 `.topbar-spacer`,字是排在左半邊的正中間、而且只分得到一半餘裕(社團頁在 320px 被截成
+  「開源技術…」);`.sidebar-item` 掛在 `<a>` / `<span>` / `<button>` 三種元素上,只有連結吃到
+  版面 —— button 的 UA 樣式自帶 `text-align: center`、自己的 font 與 shrink-to-fit 寬度,
+  抽屜底部的「更換密碼 / 登出」因此置中在一個比整列窄的盒子裡。reset 收進 class,
+  AppShell 兩份 inline style 一起退休
+- **導覽頁工具列三段式**:991px 以下四個控制項各縮一號;680px 以下標題自己一列、三個下拉由
+  grid 平分(`auto-fit` + `minmax(106px, 1fr)`,320px 自動收成兩欄)。**不靠 flex-wrap** ——
+  落單那顆會被 grow 拉成整列寬
+- **排序與過濾拆開**:過濾不會改變剩下那些社團的相對順序,所以 zh-Hant collator 那一趟只跟
+  資料有關;順帶共用一份 `Intl.Collator`、options 提到模組層、字卡加 `memo`。
+  **正式 build 在 4x CPU throttle 下**:套用篩選 56ms → 48ms(JS 25 → 21ms)、最慢的一次
+  按鍵 23ms → 15ms。**「點篩選很慢」的主因是 dev server**(同一份操作在 dev 是 168 → 128ms),
+  正式 build 本來就在門檻內 —— 之後有人再回報這一頁慢,先問是不是在 `vite dev` 上量的
+- **活動紀錄改成四欄 grid**(`.act-list`,design-guide §6 的唯一例外):`tb fixed` 的固定欄寬
+  得先猜地點多寬,200px 讓「趨勢科技 Trend Micro 股份有限公司」在 1440px 上照樣折行,而旁邊的
+  活動名稱欄空著三百多 px;手機更糟 —— `min-width: 600px` 配水平捲軸,只看得到日期與時間兩欄。
+  現在日期、時間與地點各取自己的 `max-content`,名稱吃掉剩下的全部並有 `12em` 下限
+  (庫裡最長的地點 42 字 = 518px,沒有下限會把名稱壓到見底);≤767px **同一份標記**變成
+  一列一張字卡。`ClubDetailPage.test.tsx` 兩則
+
 **要跑遷移**:D-21/D-22 是 drop column,`alembic upgrade head` 之後舊號碼就沒了。
 D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)—— 走 `--reset` 重灌,
 或把該學期匯出再匯入一次。
@@ -191,8 +221,9 @@ D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)
 ## 驗證現況
 
 - 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **620 passed**;`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **279 passed**(59 檔)、
-  `pnpm run lint` 8 個既有的 fast-refresh warning
+- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **324 passed**(66 檔)、
+  `pnpm run lint` 56 個既有 warning(fast-refresh / set-state-in-effect / refs;
+  基準值,新增變更前後要一樣)
 - 新測試做過 mutation 驗證(改回舊寫法會紅;已知例外:`exif_transpose` 那行拿掉不會紅,見測試 docstring);借用色格圖那支另在 `TZ=UTC` 與 `TZ=Pacific/Honolulu` 下各跑過一次
 
 ## 開發庫(正式資料 snapshot,2026-08-29 dump)

@@ -53,12 +53,20 @@ const renderPage = () =>
   )
 
 describe('社團詳細的活動紀錄', () => {
-  // 一則紀錄一列(手機上同一份標記就是一張字卡);四個欄位都要出得去
-  test('每一則活動都畫出日期、時間、名稱與地點', () => {
+  // 一則紀錄一列(手機上同一份標記就是一張字卡);四個欄位都要出得去,而且每一格
+  // 自己帶得出欄位名 —— 沒有表格語意可以關聯表頭,而手機的字卡連表頭都沒有。
+  // 斷言的字串就是螢幕閱讀器唸出來的那一串:少了標籤會變成「2026/03/0419:00」
+  test('每一則活動都畫出日期、時間、名稱與地點，而且每一格自己說得出欄位名', () => {
     renderPage()
     const rows = document.querySelectorAll('.act-row:not(.act-head)')
     expect(rows).toHaveLength(2)
-    expect(rows[0].textContent).toBe('2026/03/0419:00 – 21:00社員大會TR-214')
+    expect(rows[0].textContent).toBe('日期 2026/03/04時間 19:00 – 21:00活動名稱 社員大會地點 TR-214')
+  })
+
+  // 表頭是視覺鷹架:格子自己帶標籤之後再讓它進無障礙樹只是唸兩遍
+  test('表頭不進無障礙樹', () => {
+    renderPage()
+    expect(document.querySelector('.act-head')?.getAttribute('aria-hidden')).toBe('true')
   })
 
   test('沒填起訖時間時顯示 —，不用 00:00 頂替', () => {

@@ -168,7 +168,7 @@ function ShellInner({ nav, badgeLabel }: AppShellProps) {
             手機上只留圖示 —— topbar 放不下四個字,而抽屜裡的側欄沒有這一項 */}
         <TopbarButton
           label="社團導覽"
-          icon={<AppstoreOutlined />}
+          icon={<AppstoreOutlined aria-hidden="true" />}
           onClick={() => guarded(() => navigate('/clubs'))}
         />
         <div className="topbar-divider" />

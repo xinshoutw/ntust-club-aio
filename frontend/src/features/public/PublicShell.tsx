@@ -10,6 +10,8 @@ import '../../components/layout/shell.css'
  *
  *  借用 shell 的 topbar 與內容寬(不另開一套 CSS),但**沒有側欄、鈴鐺與帳號選單** ——
  *  匿名訪客沒有那些東西可以按。右上角固定兩顆:另一邊的公開頁與登入。 */
+/** 鈕上的圖示一律 `aria-hidden`:名字由 `label`(或按鈕文字)給,圖示再帶一次
+ *  自己的名稱只是讓輔助技術把同一顆鈕唸兩遍。全站慣例,側欄的 `.sidebar-item-icon` 同樣 */
 export default function PublicShell({
   mobileTitle,
   back,
@@ -40,27 +42,27 @@ export default function PublicShell({
         {onAvailability ? (
           <TopbarButton
             label="社團導覽"
-            icon={<AppstoreOutlined />}
+            icon={<AppstoreOutlined aria-hidden="true" />}
             onClick={() => navigate('/clubs')}
           />
         ) : (
           <TopbarButton
             label="借用情形"
-            icon={<CalendarOutlined />}
+            icon={<CalendarOutlined aria-hidden="true" />}
             onClick={() => navigate('/availability')}
           />
         )}
         {user ? (
           <TopbarButton
             label="控制台"
-            icon={<HomeOutlined />}
+            icon={<HomeOutlined aria-hidden="true" />}
             onClick={() => navigate(homeOf(user.role))}
           />
         ) : (
           <TopbarButton
             label="登入"
             type="primary"
-            icon={<LoginOutlined />}
+            icon={<LoginOutlined aria-hidden="true" />}
             onClick={() => navigate('/login')}
           />
         )}
@@ -76,7 +78,7 @@ export default function PublicShell({
                   社團從「預覽社團頁」點進來會被丟回自己的總覽 */}
               <Button
                 type="link"
-                icon={<ArrowLeftOutlined />}
+                icon={<ArrowLeftOutlined aria-hidden="true" />}
                 style={{ paddingLeft: 0 }}
                 href="/clubs"
                 onClick={(e) => {

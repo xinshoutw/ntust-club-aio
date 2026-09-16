@@ -22,13 +22,44 @@
 }
 /* 不自己設高:AntD 主題的 controlHeight 已經是 40(design-guide §3.5)。
    同時設在 affix wrapper 與內層 input 上,內層被撐滿又帶自己的 padding,字就掉下去了 */
+.dir-filter {
+  width: 132px;
+}
 .dir-search {
   width: 240px;
 }
+/* 平板:三個下拉加搜尋框在 768px 剛好把標題擠掉一整列,四個一起縮一號就排得回同一行 */
+@media (max-width: 991px) {
+  .dir-filter {
+    width: 108px;
+  }
+  .dir-search {
+    width: 168px;
+  }
+}
+/* 桌機:三顆下拉直接當工具列的 flex 子元素,包住它們的那層不參與版面 */
+.dir-filters {
+  display: contents;
+}
+/* 手機:標題自己一列、三個下拉平分一列、搜尋自己一列。
+   下拉改由 grid 平分而不是 flex-wrap —— 132px 三顆在 375px 排不下會掉成 2+1,
+   落單的那顆被 flex-grow 拉成整列寬,三個同類篩選器長得不一樣寬。
+   106px 是「全部性質」四個字加上 AntD 的內距與箭頭的實測下限;窄到排不下三欄
+   (320px)時 auto-fit 自己收成兩欄,寬度仍然一致 */
 @media (max-width: 680px) {
   .dir-toolbar h1 {
     margin-right: 0;
     width: 100%;
+  }
+  .dir-filters {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(106px, 1fr));
+    gap: 10px;
+    width: 100%;
+  }
+  .dir-filter {
+    width: auto;
+    min-width: 0;
   }
   .dir-search {
     width: 100%;

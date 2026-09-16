@@ -111,27 +111,31 @@ export default function ClubDirectoryPage() {
     <PublicShell mobileTitle="社團導覽">
       <div className="dir-toolbar">
         <h1>社團導覽</h1>
-        <Select
-          value={attr}
-          onChange={setAttr}
-          options={options([...ATTR_ORDER, UNCLASSIFIED], '全部性質')}
-          aria-label="依性質篩選"
-          style={{ width: 132 }}
-        />
-        <Select
-          value={tag}
-          onChange={setTag}
-          options={options(CLUB_TAGS, '全部標籤')}
-          aria-label="依標籤篩選"
-          style={{ width: 132 }}
-        />
-        <Select
-          value={recruit}
-          onChange={setRecruit}
-          options={options(RECRUIT_STATUSES, '全部招生')}
-          aria-label="依招生狀態篩選"
-          style={{ width: 132 }}
-        />
+        {/* 三顆下拉包一層:手機上它們要自成一列並平分寬度,桌機上 `display: contents`
+            讓它們照舊直接排在工具列的 flex 裡 */}
+        <div className="dir-filters">
+          <Select
+            value={attr}
+            onChange={setAttr}
+            options={options([...ATTR_ORDER, UNCLASSIFIED], '全部性質')}
+            aria-label="依性質篩選"
+            className="dir-filter"
+          />
+          <Select
+            value={tag}
+            onChange={setTag}
+            options={options(CLUB_TAGS, '全部標籤')}
+            aria-label="依標籤篩選"
+            className="dir-filter"
+          />
+          <Select
+            value={recruit}
+            onChange={setRecruit}
+            options={options(RECRUIT_STATUSES, '全部招生')}
+            aria-label="依招生狀態篩選"
+            className="dir-filter"
+          />
+        </div>
         <Input
           className="dir-search"
           allowClear

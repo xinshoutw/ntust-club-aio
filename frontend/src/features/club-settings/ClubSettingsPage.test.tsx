@@ -94,4 +94,10 @@ describe('管理項目的儲存', () => {
     expect(await toast()).toBe('請輸入指導老師姓名')
     expect(patch).not.toHaveBeenCalled()
   })
+
+  test('形象圖那一段自己說得出「選擇後即儲存」', () => {
+    profile = migrated
+    renderPage()
+    expect(screen.getByText('形象圖（選擇後即儲存）')).toBeTruthy()
+  })
 })

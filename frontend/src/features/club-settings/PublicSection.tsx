@@ -225,7 +225,9 @@ export default function PublicSection({
         </Tooltip>
       </div>
 
-      <div style={subhead}>形象圖</div>
+      {/* 這兩張圖選檔即上傳,不隨下方的「儲存」—— 不說的話換完圖的人會去按儲存,
+          然後被告知「沒有變更」,看起來像圖沒存成功 */}
+      <div style={subhead}>形象圖（選擇後即儲存）</div>
       <div className="form-grid-2" style={{ alignItems: 'start' }}>
         <ImagePicker
           slot="avatar"

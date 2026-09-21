@@ -242,10 +242,21 @@ Opus 交叉審查後補的:`media_import --reset` 改走 `unlink_quiet`(原本�
 D-27 的殘留職稱不會被重跑遷移修好(`cms_import` 不更新既有列)—— 走 `--reset` 重灌,
 或把該學期匯出再匯入一次。
 
+**只換形象圖時「儲存」按了像壞掉**(2026-09-21):同學回報「只更新 banner/avatar 時無法儲存」。
+查證:按鈕從頭到尾都按得下去(只有存檔進行中才 disabled),壞的是按下去之後 —— 形象圖走自己的
+上傳端點(選檔即上傳),所以只換圖時表單一欄都沒動,而**指導老師姓名與聯絡信箱 1 的必填沒有
+D-19 那道「只在真的要存 profile 時擋」的閘**,於是那一按跳的是紅字「請輸入指導老師姓名」,
+看起來就是圖存不了(開發庫 87 個啟用社團裡 36 個 `advisor_name` 空、`contact_emails` 87 個全空 ——
+`migration/set_contact_emails.py` 還沒跑)。必填齊全的社團則是得到「沒有變更」,同樣像被拒絕。
+修法兩件:四個必填(指導老師姓名、聯絡信箱 1、網頁連結、詳細介紹)改走同一個 `requiredOnProfileSave`
+閘 —— 真的要存時照擋,什麼都沒改時不擋(反正一個請求都不會送);段落標題改成
+「形象圖（選擇後即儲存）」,全頁唯一不走右下角「儲存」的一段要自己說出來。
+`ClubSettingsPage.test.tsx` 三則(三處改回舊寫法各會紅)。
+
 ## 驗證現況
 
 - 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **620 passed**;`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **324 passed**(66 檔)、
+- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **329 passed**(67 檔)、
   `pnpm run lint` 56 個既有 warning(fast-refresh / set-state-in-effect / refs;
   基準值,新增變更前後要一樣)
 - 新測試做過 mutation 驗證(改回舊寫法會紅;已知例外:`exif_transpose` 那行拿掉不會紅,見測試 docstring);借用色格圖那支另在 `TZ=UTC` 與 `TZ=Pacific/Honolulu` 下各跑過一次

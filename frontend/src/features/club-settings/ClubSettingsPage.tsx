@@ -80,9 +80,10 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
     })
   }
 
-  // 網頁連結與詳細介紹必填(D-19),但只在**這次真的要存 profile** 時擋:遷入的社團
-  // 有一批簡介是空字串、網頁連結是 NULL(`migration/cms_import.py`),開頁就擋等於那些
-  // 社團什麼都動不了。一旦動到 profile 的任何一欄,這兩欄就得補齊
+  // 這一頁的必填(指導老師姓名、聯絡信箱、網頁連結、詳細介紹)一律只在**這次真的要存
+  // profile** 時擋:遷入的社團有一批這些欄位是空的(`migration/cms_import.py`),開頁就擋
+  // 等於那些社團什麼都動不了。一旦動到 profile 的任何一欄,這幾欄就得補齊。
+  // 形象圖走自己的端點、不在 profile 裡 —— 只換圖的人按「儲存」時不該被沒碰過的欄位攔下來
   const requiredOnProfileSave = (msg: string) => ({
     validator: (_: unknown, v: string | undefined) => {
       const cur = form.getFieldsValue(true) as SettingsValues
@@ -143,7 +144,8 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
                 name="advisorName"
                 label="姓名"
                 className={itemClass('advisorName')}
-                rules={[{ required: true, message: '請輸入指導老師姓名' }]}
+                required // 必填的星號:規則是自訂 validator,AntD 推導不出來
+                rules={[requiredOnProfileSave('請輸入指導老師姓名')]}
                 style={{ marginBottom: 0 }}
               >
                 <Input />
@@ -188,8 +190,9 @@ function SettingsForm({ profile }: { profile: ClubProfile }) {
               name="email1"
               label="聯絡通知信箱"
               className={itemClass('email1')}
+              required
               rules={[
-                { required: true, message: '請至少填寫一組聯絡信箱' },
+                requiredOnProfileSave('請至少填寫一組聯絡信箱'),
                 { type: 'email', message: '信箱格式不正確' },
               ]}
             >

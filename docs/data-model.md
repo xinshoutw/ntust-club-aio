@@ -122,7 +122,7 @@ erDiagram
 |---|---|---|
 | public_visible | bool | **行政端下架閥**,預設 true。關掉即該社從所有公開端點消失;與 `is_active` 是兩個判定 |
 | tagline | text NULL | 一句話介紹(≤40),字卡上放不下 `intro` |
-| tags | text[] | **固定主檔**(`schemas/clubs.CLUB_TAGS`,14 個),至多 3 個。自由填寫會讓導覽頁的篩選長歪:同一件事三種寫法,篩選器列不完也對不起來 |
+| tags | text[] | **固定主檔**(`schemas/clubs.CLUB_TAGS`,14 個),至多 3 個。只顯示在導覽頁字卡與詳細頁上(不做篩選器)。自由填寫會讓同一件事出現三種寫法,一整面字卡各說各話 |
 | recruit_status | enum(歡迎加入,暫不開放,額滿) NULL | NULL=未設定,公開頁不顯示 |
 | public_email | text NULL | 對外窗口。**與 `contact_emails` 是兩回事**,那三組是公告通知收件人 |
 | instagram | text NULL | **只存帳號 ID**(不含網址前綴);貼整串網址或帶 `@` 由 schema 正規化。其餘平台實測沒人填 |

@@ -253,10 +253,24 @@ D-19 那道「只在真的要存 profile 時擋」的閘**,於是那一按跳的
 「形象圖（選擇後即儲存）」,全頁唯一不走右下角「儲存」的一段要自己說出來。
 `ClubSettingsPage.test.tsx` 三則(三處改回舊寫法各會紅)。
 
+**導覽頁移除標籤篩選**(2026-09-22):`/`、`/clubs` 的工具列剩兩個下拉(性質 / 招生)加搜尋框 ——
+至多 3 個標籤在 60 個社團上切不出有意義的集合。**標籤改由搜尋框涵蓋**:關鍵字同時比對名稱、
+英文名稱、一句話介紹與標籤,否則「武術」這種主題詞會一個入口都不剩(標籤照舊顯示在字卡與詳細頁,
+主檔與社團端挑選器不動;後端本來就沒有 `tag=` 這個查詢字串)。
+標籤主檔的存在理由原本寫「自由填寫會讓導覽頁的**篩選**長歪」,四份(`schemas/clubs.py`、
+`models/clubs.py`、`data-model.md`、`club-settings.md`)一起改成「一整面字卡各說各話」。
+**手機斷點跟著重量**:680px 是為四個控制項調的,少一個之後提早約 120px 觸發 —— 561–680px
+被硬拆成三列,而兩顆 select 在 680px 各被拉成 319px。改成 **560px**(縮一號後三控制項需 510px,
+≤767px 內容寬 = viewport − 32,542 以下才排不下),grid 從 `auto-fit + minmax(106px, 1fr)`
+簡化成 `1fr 1fr`(106px 那個實測值是為「三欄收成兩欄」存在的,兩欄用不到)。
+**量法是 CSS harness,不是整頁掃描**:同一份 `publicClubs.css` 加 shell 的內容寬規則,
+320–1200px 逐 px 量工具列列數與水平溢位(零溢位)—— 上面 2026-09-16 那條的
+「991px 以下**四個**控制項」「**三個**下拉」已經過期,**整頁的 playwright 寬度掃描這次沒有重跑**。
+
 ## 驗證現況
 
 - 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **620 passed**;`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **329 passed**(67 檔)、
+- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **330 passed**(67 檔)、
   `pnpm run lint` 56 個既有 warning(fast-refresh / set-state-in-effect / refs;
   基準值,新增變更前後要一樣)
 - 新測試做過 mutation 驗證(改回舊寫法會紅;已知例外:`exif_transpose` 那行拿掉不會紅,見測試 docstring);借用色格圖那支另在 `TZ=UTC` 與 `TZ=Pacific/Honolulu` 下各跑過一次

@@ -671,6 +671,23 @@ async def test_every_non_browser_image_format_gets_a_preview(client, db, name, c
     assert resp.headers["content-type"] == "image/jpeg", mime
 
 
+async def test_logged_in_previews_are_not_held_to_the_public_backlog(client, db, monkeypatch):
+    """排隊上限只給匿名的照片通道:社團頁被灌到滿的時候,承辦的 HEIC 縮圖牆照樣要轉 ——
+    拿到原檔的話瀏覽器解不了,整面是破圖。"""
+    import asyncio
+    from pathlib import Path
+
+    loop = asyncio.get_running_loop()
+    full = {Path(f"/elsewhere/{i}"): loop.create_future() for i in range(100)}
+    monkeypatch.setattr(file_service, "_PREVIEW_INFLIGHT", full)
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    row = await _image_upload(db, club, user, "a.heic", HEIC_SMALL)
+    await login(client, "club01")
+    resp = await client.get(f"/api/v1/files/{row.id}", headers={"Sec-Fetch-Dest": "image"})
+    assert resp.headers["content-type"] == "image/jpeg"
+
+
 async def test_preview_is_bounded_and_honours_exif_orientation(client, db):
     """長邊封頂 1600;EXIF 方向要套上(iPhone 直拍的照片存的是橫的加旋轉標記)。
 

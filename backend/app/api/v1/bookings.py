@@ -421,13 +421,15 @@ async def create_venue_booking(
         for slot in body.slots
     ]
     db.add_all(rows)
-    # 一張單一筆(與逐張送出時的筆數一致),帶上是哪一格才對得回單;寫法同手動借用
-    for slot in body.slots:
+    # 一張單一筆(與逐張送出時的筆數一致)。先 flush 拿單號:之後的核准、退回、取消、撤銷
+    # 都記 `venue_booking={id}`,送出這筆也要對得上;後面接的格子說明寫法同手動借用
+    await db.flush()
+    for row in rows:
         audit.record(
             db,
             action="venue_booking_submitted",
             user=user,
-            detail=f"{venue.name} {slot.date} 時段 {','.join(slot.periods)}",
+            detail=f"venue_booking={row.id};{venue.name} {row.date} 時段 {','.join(row.periods)}",
             ip=client_ip(request),
         )
     await db.commit()

@@ -718,7 +718,8 @@ async def test_each_slot_becomes_its_own_booking(client, db, monkeypatch):
     # 通知一批一則,三個時段都在裡面(整句比對:只查日期的話,第三筆與第一筆同一天,漏了也照樣綠)
     assert len(sent) == 1
     assert sent[0][2].endswith(f"精誠廣場({d1} 時段 3,4、{d2} 時段 A,B、{d1} 時段 8)")
-    # 稽核一張單一筆,各自帶是哪一格 —— 三筆一模一樣的話對不回是哪一張單
+    # 稽核一張單一筆,各自帶單號與是哪一格 —— 後續的核准、退回、取消都以單號記,
+    # 送出這筆對不上單號的話,同一格取消後重送就只能靠時間去猜
     details = (
         await db.scalars(
             sa.select(AuditLog.detail)
@@ -726,10 +727,11 @@ async def test_each_slot_becomes_its_own_booking(client, db, monkeypatch):
             .order_by(AuditLog.id)
         )
     ).all()
+    ids = [r["id"] for r in data]
     assert details == [
-        f"精誠廣場 {d1} 時段 3,4",
-        f"精誠廣場 {d2} 時段 A,B",
-        f"精誠廣場 {d1} 時段 8",
+        f"venue_booking={ids[0]};精誠廣場 {d1} 時段 3,4",
+        f"venue_booking={ids[1]};精誠廣場 {d2} 時段 A,B",
+        f"venue_booking={ids[2]};精誠廣場 {d1} 時段 8",
     ]
 
 

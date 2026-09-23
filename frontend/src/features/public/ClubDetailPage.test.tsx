@@ -145,6 +145,24 @@ describe('活動彈窗', () => {
     expect(within(dialog).queryByText('活動照片')).toBeNull()
   })
 
+  // 收掉一張會讓組內少一張:預覽開在第二張時就變成「2 / 1」的空白。開著時先留著,關掉才收
+  test('預覽開著時載不出來的照片先留著，關掉預覽才收', async () => {
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: '社員大會' }))
+    const dialog = await screen.findByRole('dialog', { name: '社員大會' })
+    const [first, second] = within(dialog).getAllByRole('img', { name: /^活動照片/ })
+    fireEvent.click(second)
+    const preview = document.querySelector('.ant-image-preview') as HTMLElement
+
+    fireEvent.error(first)
+    expect(preview.querySelector('.ant-image-preview-img')?.getAttribute('src')).toBe(photos[1])
+    expect(preview.textContent).toContain('2 / 2')
+
+    fireEvent.click(preview.querySelector('.ant-image-preview-close')!)
+    const left = within(dialog).getAllByRole('img', { name: /^活動照片/ })
+    expect(left.map((i) => i.getAttribute('src'))).toEqual([photos[1]])
+  })
+
   test('沒有照片就不出現照片區；沒填的時間與內容顯示 —', async () => {
     renderPage()
     fireEvent.click(screen.getByRole('button', { name: '企業參訪' }))

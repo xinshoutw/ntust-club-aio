@@ -291,7 +291,10 @@ interface ActivityModalProps {
 function ActivityModal({ activity, open, onClose, afterClose }: ActivityModalProps) {
   // 以網址記:照片 id 全站唯一,換一場活動也不會誤收
   const [broken, setBroken] = useState<ReadonlySet<string>>(new Set())
-  const photos = activity?.photoUrls.filter((url) => !broken.has(url)) ?? []
+  // 預覽開著時組內張數不能變:收掉一張,預覽就停在「5 / 4」的空白 —— 開著的期間沿用
+  // 打開那一刻的清單,關掉再收
+  const [frozen, setFrozen] = useState<readonly string[] | null>(null)
+  const photos = frozen ?? activity?.photoUrls.filter((url) => !broken.has(url)) ?? []
   return (
     <Modal
       open={open}
@@ -324,7 +327,9 @@ function ActivityModal({ activity, open, onClose, afterClose }: ActivityModalPro
                   同一組照片在預覽裡左右切換 */}
               <div className="act-photos">
                 {/* 成組時 rc-image 不把縮圖的 alt 交給預覽層,預覽對話框的名字在這裡給 */}
-                <Image.PreviewGroup preview={{ alt: '活動照片' }}>
+                <Image.PreviewGroup
+                  preview={{ alt: '活動照片', onOpenChange: (next) => setFrozen(next ? photos : null) }}
+                >
                   {photos.map((url, i) => (
                     <Image
                       key={url}

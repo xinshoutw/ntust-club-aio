@@ -320,7 +320,7 @@ function ActivityModal({ activity, open, onClose, afterClose }: ActivityModalPro
             <dd className="num">{activity.timeSpan || '—'}</dd>
             <dt>地點</dt>
             <dd>{activity.location}</dd>
-            <dt>活動內容</dt>
+            <dt>內容</dt>
             <dd className="pre">{activity.content || '—'}</dd>
           </dl>
           {/* 只有結案通過的活動有照片;沒有(或全都載不出來)就整段不出現,不畫一個空的標題 */}

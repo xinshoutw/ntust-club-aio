@@ -274,11 +274,13 @@ D-19 那道「只在真的要存 profile 時擋」的閘**,於是那一按跳的
   載不出來的那張收掉)。`/public/clubs/{id}/activities` 多回 `content` 與 `photo_file_ids`
   (金額照樣不出去);照片走新通道 `/public/files/activity-photos/{id}`,與清單共用
   `public._public_photos`,**一律送 1600px 的 JPEG 預覽、不送原檔**(不帶 EXIF/XMP/註解,ICC 保留),
-  轉不出來 404。申請表的「活動內容」欄加了 tooltip「會顯示在社團公開頁」。
+  轉不出來 404。申請表的「活動內容」欄下方常駐提示「審核通過後公開在社團頁」(`extra`,
+  tooltip 鍵盤與手機拿不到;design-guide §7 已寫成例外)。
   **待拍板**:照片是結案佐證,社團上傳時不知道會公開,也沒有撤下單張的入口(D-42 末段)
 - `/bookings/venue` 的時段區改成多列:每列日期 + 節次,右側「+」「−」,至多 10 列。
   `POST /club/venue-bookings` 改收 `slots: [{date, periods}]`,一列一張單、**整批同一個交易**
-  (一列不成立就一張都不建,錯誤訊息帶那一列的日期,重複申請再帶節次);同一天節次重疊前後端都擋;
+  (一列不成立就一張都不建,錯誤訊息開頭「第 N 筆 日期」,信封 `meta.slot` 帶同一個 N,
+  前端把那一列標紅並捲過去);同一天節次重疊前後端都擋;
   Discord 一批一則、稽核一張單一筆並帶是哪一格。**API 形狀是破壞性的**:舊前端送的
   `date`/`periods` 會 422(還沒上線,沒有開著舊分頁的人;前後端在同一個 commit)
 - **全站圖片預覽一律 AntD 內建的 `Image`**(使用者指定,design-guide §6 已寫成規則):
@@ -290,7 +292,7 @@ D-19 那道「只在真的要存 profile 時擋」的閘**,於是那一按跳的
   - 全站那條「預覽不從點擊位置飛出」的 CSS(需求方 2026-07-21)在 AntD 6 早就失效
     (`.ant-image-preview-wrap` 已不存在,origin 掛在 `.ant-image-preview-body`),`index.css.test.ts`
     現在拿 AntD 實際的 DOM 釘住那個 class
-  - `files.preview_of` 轉不出來的來源記在行程內(`_PREVIEW_FAILED`),同一張壞圖只解一次 ——
+  - `files.preview_of` 轉不出來的來源記在行程內(`_PREVIEW_FAILED`,10 分鐘後才重試)——
     開發庫就有一張截斷的 JPEG(活動 818),匿名打得到;照片通道排隊轉檔前先 `db.close()` 還連線
   - 借用頁:日期欄 Enter 不再隱式送出整批;增刪列後焦點不掉到 body;列寬不到 914px 就兩行版面
     (container query,依列本身的寬度 —— 用視窗斷點的話 Windows 的常駐捲軸會讓 1280px 的一行版面裁掉 D 節),
@@ -305,23 +307,45 @@ D-19 那道「只在真的要存 profile 時擋」的閘**,於是那一按跳的
   (`components/ui/AttachmentLinks` 統一);結案頁縮圖可點開(`PhotoThumbs`);借用頁改 container query、
   逐列錯誤訊息帶「第 N 筆」、場況圖不給今天已開始的節次;`/files/{id}` 排隊轉檔前也釋放 DB 連線;
   同一張照片並發只轉一次、轉檔失敗冷卻 10 分鐘後重試
-- **第三輪審查還沒處理的 LOW**(下個 session 先做):預覽的 ICC 沒設上限(可塞 8 MB 任意資料,
-  建議 >64 KB 丟掉);`files._render_preview` 與 `public.py` 開頭「公開通道只送形象圖」的註解過期、
-  `spec/admin/files.md` 搬檔說明沒提結案照片的 `.preview.jpg`;公開彈窗在預覽開著時收掉壞圖會變成
-  「5 / 4」空白(要等預覽關掉再收);AntD `Image` 的 `loading="lazy"` 無效(rc-image 會先預載),
-  兩處可拿掉;預覽畫面沒有檔名(可用 `countRender` 顯示);審核彈窗縮圖的焦點框不是 §8 的藍框;
-  「會顯示在社團公開頁」只在 hover tooltip,鍵盤與手機拿不到,應改進 placeholder;測試缺口:
-  結案附件與申請附件的 group、照片牆預覽對話框名稱、`index.css.test.ts` 的選擇器 regex 太寬。
-  另外開發機上既有的 `.preview.jpg` 是舊規則轉的(帶 COM、沒 ICC),要看新結果就刪掉讓它重轉
+- 第三輪的 LOW 與第四輪 Opus 審查(同日傍晚)後補的,各自一個 commit:
+  - 預覽:ICC 超過 64 KB 丟掉(可夾帶任意資料出公開通道);公開彈窗在預覽開著、淡出跑完之前
+    不收壞圖(不再停在「5 / 4」),收掉的只記到彈窗關掉為止;拿掉無效的 `loading="lazy"`(rc-image
+    另開 Image() 驗圖,一掛上就整張下載);檢視器底部顯示「檔名（2 / 5）」;可預覽縮圖一律 §8 藍框
+    (`index.css` 一條全域規則);附件列的圖片又是 `<a href>` 了,一般左鍵開預覽、Ctrl/⌘/中鍵拿原檔
+    (預覽畫不出來的 TIFF 掃描檔、磁碟告警時的 HEIC 才有退路,表格格子的省略號也回來了)
+  - 轉檔資源:形象圖轉 WebP 另走一條 thread(`_CLUB_IMAGE_POOL`)—— 它拿著全站唯一的上傳鎖在等,
+    排在照片預覽後面的話匿名灌照片通道就能卡住全站上傳;照片通道轉檔池已有 16 張在排
+    (`public.PUBLIC_PREVIEW_BACKLOG`)就不排新的、回 404 不記失敗,每分鐘至多記一筆 log
+    (uvicorn 斷線不取消 handler,排進去的一律跑完)
+  - 借用:「已開始」改用台北牆鐘(`lib/today.taipeiNow`,紐約的裝置原本把今天整排算成已開始);
+    container query 改範圍語法(縮放 125%/150% 的 913.5px 兩條都不中);後端逐列錯誤帶 `meta.slot`
+    (`AppError(meta=...)`,前端 `ApiError.meta`)
+  - 測試補齊:申請附件與結案附件的 group、檢視器對話框名稱、`index.css.test.ts` 兩支選擇器 regex
+    只收整條選擇器、已開始那一筆的批次錯誤(`freeze_taipei` 搬到 `tests/test_bookings.py`)、
+    15 天場況圖、只缺日期的列也捲得到、修飾鍵點附件、登入端 HEIC 預覽不吃排隊上限
 - **沒做**:社團設定與行政端的形象圖只有顯示沒有預覽(不在這次的範圍);
   活動審核彈窗的 docx 附件仍無法線上預覽(評鑑兩頁會先抓 blob,彈窗沒有,既有的不一致);
-  `lib/periods.startedPeriods` 用裝置時間而不是台北時間(既有,境外裝置會少擋);
-  公開照片的預覽快取是被看到才轉,沒有預先暖好(全部轉一輪約 950 MB,`DEPLOY_CHECKLIST.md` 已補)
+  公開照片的預覽快取是被看到才轉,沒有預先暖好(全部轉一輪約 950 MB,`DEPLOY_CHECKLIST.md` 已補)——
+  要讓匿名通道完全不轉檔,得改成結案通過時就先轉好並補一支 backfill,現在靠的是排隊上限
+- **審查提出、這次沒修的 LOW**(下個 session 可接):
+  - 其他借用端點的稽核沒帶單號:`manual_venue_booking_created`(之後會以 `venue_booking={id}` 撤銷,
+    建立那筆對不上)、`manual_equipment_loan_created`,`room_booking_submitted` 與
+    `equipment_loan_submitted` 連 detail 都沒有 —— 修法同 384fd23a(先 flush 再記 `{kind}={id};...`)
+  - 場況圖的「已開始」只在重畫時判斷:頁面開著跨過節次起點,那一格仍可點,點進去是有日期、
+    沒節次的一列;今天已開始的空格仍標「可借」、同色,看不出為什麼點不動
+  - 借用頁 Form 的 `scrollToFirstError` 沒有測試(AntD 用 scroll-into-view-if-needed,jsdom 攔不到)
+  - 轉檔池、single-flight、冷卻與排隊上限都是每個 worker 行程一份(現在單一 worker,註解已寫)
+  - 行政端 `BookingReviewModal` 與 `lib/status` 仍用裝置本地日比「過去日」(承辦都在台灣,影響小)
+  - `index.css.test.ts` 的選擇器 regex 仍會接受包在 `@media` 裡的規則
+  - 既有矛盾:design-guide §8 寫 `prefers-reduced-motion` 全關,`index.css` 寫全站刻意不響應它
+    (2026-08-31 事故),兩份要對齊
+- 開發機上既有的 15 個 `.preview.jpg` 是舊規則轉的(帶 COM、沒 ICC):要看新結果就
+  `find backend/data/uploads -name '*.preview.jpg' -delete`,被看到時會重轉
 
 ## 驗證現況
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **738 passed**;`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **370 passed**(71 檔)、
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **743 passed**;`ruff check .` 全綠
+- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **386 passed**(71 檔)、
   `pnpm run lint` 56 個既有 warning(fast-refresh / set-state-in-effect / refs;
   基準值,新增變更前後要一樣)
 - 新測試做過 mutation 驗證(改回舊寫法會紅;已知例外:`exif_transpose` 那行拿掉不會紅,見測試 docstring);借用色格圖那支另在 `TZ=UTC` 與 `TZ=Pacific/Honolulu` 下各跑過一次

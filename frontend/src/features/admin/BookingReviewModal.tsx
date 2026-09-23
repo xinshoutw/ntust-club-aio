@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { App, Button, Input, InputNumber, Modal } from 'antd'
 import dayjs from 'dayjs'
 import StatusPill from '../../components/ui/StatusPill'
+import { taipeiToday } from '../../lib/today'
 import { DOW_TEXT } from '../../api/bookings'
 import { CONFLICT_TEXT, conflictNote } from '../../api/adminBookings'
 import type {
@@ -57,7 +58,7 @@ export default function BookingReviewModal({
   const canReview = item.data.status === 'pending' && !!onApprove && !!onReject
   // 後端對臨時場地擋「日期已過」;過期單顯示撤銷鈕只會換來 409
   const notPast =
-    item.kind !== 'venue' || !dayjs(item.data.date, 'YYYY/MM/DD').isBefore(dayjs(), 'day')
+    item.kind !== 'venue' || !dayjs(item.data.date, 'YYYY/MM/DD').isBefore(taipeiToday(), 'day')
   const canRevoke = item.data.status === 'approved' && !!onRevoke && notPast
   const title =
     item.kind === 'venue' ? item.data.venue : item.kind === 'room' ? item.data.room : `${item.data.equipment} ×${item.data.qty}`

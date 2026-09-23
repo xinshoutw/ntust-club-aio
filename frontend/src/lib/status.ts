@@ -1,4 +1,5 @@
 import dayjs from 'dayjs'
+import { taipeiToday } from './today'
 
 export type StatusKey =
   | 'draft'
@@ -73,7 +74,7 @@ export const STATUS: Record<StatusKey, StatusStyle> = {
 
 /**
  * 社團停權中(含到期當日)。解除停權是把 `suspended_until` 清成 null,
- * 但過期未清的殘留值不該顯示成停權中 —— 與後端攔截同界(`suspended_until >= today`)。
+ * 但過期未清的殘留值不該顯示成停權中 —— 與後端攔截同界(`suspended_until >= today`,台北日)。
  */
 export const suspendedNow = (until: string | null | undefined): boolean =>
-  !!until && !dayjs(until, 'YYYY/MM/DD').isBefore(dayjs(), 'day')
+  !!until && !dayjs(until, 'YYYY/MM/DD').isBefore(taipeiToday(), 'day')

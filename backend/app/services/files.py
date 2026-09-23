@@ -583,6 +583,10 @@ PREVIEW_MAX_ICC_BYTES = 64 * 1024
 # 而不是 Semaphore:請求被取消時 to_thread 裡的 thread 不會停,Semaphore 卻會先放行下一張,
 # 「最多 2 張」就不是真的;pool 本身封頂,取消只是讓等待的人先走
 _PREVIEW_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="preview")
+# 形象圖轉 WebP 另走一條:`save_club_image` 是拿著全站唯一的上傳鎖(`_STORAGE_LOCK_KEY`)在等轉檔,
+# 排在照片預覽後面的話,匿名把預覽池塞滿,全站的上傳就一起卡在那把鎖上(還各握一條 DB 連線)。
+# 換圖很少見,多一條 thread 的峰值記憶體(一張 50MP 約 450MB)偶爾才會疊上去
+_CLUB_IMAGE_POOL = ThreadPoolExecutor(max_workers=1, thread_name_prefix="club-image")
 
 
 def _render_preview(src: Path, dst: Path) -> None:
@@ -743,7 +747,7 @@ async def save_club_image(
     disk = Path(settings.upload_dir) / row.path
     try:
         data = await asyncio.get_running_loop().run_in_executor(
-            _PREVIEW_POOL, _fit_webp, disk, size_spec
+            _CLUB_IMAGE_POOL, _fit_webp, disk, size_spec
         )
     except Exception as exc:
         # 副檔名與魔術位元組都對了卻解不開(截斷、超大、編碼不支援):

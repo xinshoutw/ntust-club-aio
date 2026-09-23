@@ -575,6 +575,9 @@ PREVIEW_MAX_EDGE = 1600  # 預覽彈窗最大 76vh,更大只是白轉
 # Pillow 自己的炸彈防護要到 179MP 才真的丟例外,中間那一段照解不誤
 PREVIEW_MAX_SOURCE_BYTES = 20 * 1024 * 1024
 PREVIEW_MAX_PIXELS = 50_000_000
+# 色彩描述檔照抄進預覽,但 Pillow 不驗內容:大於這個的不是顯示用的 profile(sRGB 約 3 KB、
+# iPhone 的 Display P3 約 0.5 KB),是搭公開通道(D-42)出去的任意資料,整段丟掉
+PREVIEW_MAX_ICC_BYTES = 64 * 1024
 # 同時最多轉幾張:正式機是 2 vCPU + 4GB 還跟 PostgreSQL 同住,asyncio 預設 thread pool 會放 6 條進去,
 # 結案照片牆一次要 20 張縮圖就是 6 張同時解 —— 兩張已經吃滿兩顆核心。用專屬的 2 條 thread pool
 # 而不是 Semaphore:請求被取消時 to_thread 裡的 thread 不會停,Semaphore 卻會先放行下一張,
@@ -605,6 +608,8 @@ def _render_preview(src: Path, dst: Path) -> None:
             # iPhone 的 Display P3 少了它會被當成 sRGB,整張變淡;CMYK/灰階的 profile 套在
             # 轉完的 RGB 上則是錯的。JPEG 沒有 alpha:直接 convert("RGB") 透明處是一塊黑(`_on_white`)
             icc = img.info.get("icc_profile") if img.mode in ("RGB", "RGBA") else None
+            if icc and len(icc) > PREVIEW_MAX_ICC_BYTES:
+                icc = None
             _on_white(img).save(tmp, format="JPEG", quality=85, comment=b"", icc_profile=icc)
         tmp.replace(dst)
     finally:

@@ -559,6 +559,21 @@ async def test_a_photo_goes_out_as_a_bounded_jpeg_without_metadata(client, db):
         assert img.info.get("icc_profile") == icc
 
 
+async def test_an_oversized_colour_profile_is_dropped(client, db):
+    """ICC 的內容 Pillow 不驗,照抄的話社團上傳的照片可以夾帶幾 MB 任意資料由公開通道送出去。"""
+    buf = io.BytesIO()
+    Image.new("RGB", (64, 48), (10, 200, 30)).save(
+        buf, format="JPEG", icc_profile=b"x" * (file_service.PREVIEW_MAX_ICC_BYTES + 1)
+    )
+    _, activity, _ = await activity_with_photos(db, n=0)
+    photo = await make_photo(db, activity, content=buf.getvalue())
+
+    res = await client.get(f"{PHOTO_URL}/{photo.id}")
+    assert res.status_code == 200, res.text
+    with Image.open(io.BytesIO(res.content)) as img:
+        assert "icc_profile" not in img.info
+
+
 @pytest.mark.parametrize("hide", [{"public_visible": False}, {"is_active": False}])
 async def test_photos_of_a_hidden_club_stop_being_served(client, db, hide):
     club, _, photos = await activity_with_photos(db, n=1)

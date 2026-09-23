@@ -1,9 +1,9 @@
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 
 import pytest
 import sqlalchemy as sa
 
-from app.core.semesters import next_semester_range, semester_of, semester_range
+from app.core.semesters import TAIPEI, next_semester_range, semester_of, semester_range
 from app.models import (
     Activity,
     AuditLog,
@@ -25,6 +25,14 @@ def single_slot(body: dict) -> dict:
     `date` + `periods`(覆寫也好寫:`{**body, "periods": [...]}`),由這裡包成一筆。"""
     rest = {k: v for k, v in body.items() if k not in ("date", "periods")}
     return {**rest, "slots": [{k: body[k] for k in ("date", "periods") if k in body}]}
+
+
+def freeze_taipei(monkeypatch, day: date, hhmm: str) -> datetime:
+    """把借用領域時鐘釘在台北時區某日某時刻,節次邊界測試不依賴牆鐘。"""
+    hour, minute = (int(x) for x in hhmm.split(":"))
+    fixed = datetime.combine(day, time(hour, minute), tzinfo=TAIPEI).astimezone(UTC)
+    monkeypatch.setattr(booking_service, "now_utc", lambda: fixed)
+    return fixed
 
 
 def first_thursday(start: date) -> date:
@@ -735,8 +743,8 @@ async def test_each_slot_becomes_its_own_booking(client, db, monkeypatch):
     ]
 
 
-@pytest.mark.parametrize("bad", ["past", "blocked", "duplicate"])
-async def test_one_bad_slot_rejects_the_whole_batch(client, db, bad):
+@pytest.mark.parametrize("bad", ["past", "started", "blocked", "duplicate"])
+async def test_one_bad_slot_rejects_the_whole_batch(client, db, bad, monkeypatch):
     """整批同一個交易:一筆不成立就一張都不建,錯誤訊息說出是哪一天。
     只建成一半的話,社團改完重送時,建成的那幾筆會變成重複申請把整批擋下來。"""
     from app.models import User, VenueBlockRule
@@ -745,8 +753,13 @@ async def test_one_bad_slot_rejects_the_whole_batch(client, db, bad):
     venue = await make_venue(db, name="精誠廣場", allow_fixed=False, allow_temp=True)
     activity = await make_activity(db, club)
     good = date.today() + timedelta(days=14)
-    bad_day = date.today() - timedelta(days=1) if bad == "past" else good + timedelta(days=2)
-    if bad == "blocked":
+    bad_day = {
+        "past": date.today() - timedelta(days=1),
+        "started": date.today(),
+    }.get(bad, good + timedelta(days=2))
+    if bad == "started":
+        freeze_taipei(monkeypatch, bad_day, "23:00")  # 第 5 節 12:20 起,早就開始了
+    elif bad == "blocked":
         creator = await db.scalar(sa.select(User.id).order_by(User.id).limit(1))
         db.add(VenueBlockRule(venue_id=venue.id, start_date=bad_day, end_date=bad_day,
                               weekdays=[], periods=["5"], reason="整修", created_by=creator))

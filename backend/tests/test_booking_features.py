@@ -1,27 +1,25 @@
 """2026-07-21 需求方新功能:取消借用、場地不開放規則、單次可借上限、行政手動借用、
 過去時間全面禁止(節次時刻表)。"""
 
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import date, timedelta
 
 import sqlalchemy as sa
 
-from app.core.semesters import TAIPEI, next_semester_range
+from app.core.semesters import next_semester_range
 from app.models import EquipmentLoan, RoomBookingRequest, VenueBooking
 from app.models.enums import BookingStatus, LoanStatus
 from app.services import booking_service
 from tests.conftest import csrf_headers, login, make_club, make_user
-from tests.test_bookings import make_activity, make_equipment, make_venue, single_slot
+from tests.test_bookings import (
+    freeze_taipei,
+    make_activity,
+    make_equipment,
+    make_venue,
+    single_slot,
+)
 
 TOMORROW = date.today() + timedelta(days=7)
 YESTERDAY = date.today() - timedelta(days=7)
-
-
-def freeze_taipei(monkeypatch, day: date, hhmm: str) -> datetime:
-    """把借用領域時鐘釘在台北時區某日某時刻,節次邊界測試不依賴牆鐘。"""
-    hour, minute = (int(x) for x in hhmm.split(":"))
-    fixed = datetime.combine(day, time(hour, minute), tzinfo=TAIPEI).astimezone(UTC)
-    monkeypatch.setattr(booking_service, "now_utc", lambda: fixed)
-    return fixed
 
 
 async def seed_club(client, db):

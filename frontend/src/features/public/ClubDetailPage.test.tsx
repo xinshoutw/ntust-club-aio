@@ -174,6 +174,27 @@ describe('活動彈窗', () => {
     )
   })
 
+  // 404 也可能只是轉檔排太長(照片通道有排隊上限):關掉再打開要重新要一次,不能藏到重新整理
+  test('關掉再打開同一場，先前載不出來的照片會再試一次', async () => {
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: '社員大會' }))
+    const dialog = await screen.findByRole('dialog', { name: '社員大會' })
+    fireEvent.error(within(dialog).getAllByRole('img', { name: /^活動照片/ })[0])
+    expect(within(dialog).getAllByRole('img', { name: /^活動照片/ })).toHaveLength(1)
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Close' }))
+    // jsdom 不跑動畫:等彈窗進到 leave-active 再手動收尾,afterClose 才會跑
+    const panel = dialog.closest('.ant-modal') as HTMLElement
+    await waitFor(() => expect(panel.className).toContain('-leave-active'))
+    fireEvent.animationEnd(panel)
+    fireEvent.transitionEnd(panel)
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '社員大會' })).toBeNull())
+
+    fireEvent.click(screen.getByRole('button', { name: '社員大會' }))
+    const again = await screen.findByRole('dialog', { name: '社員大會' })
+    expect(within(again).getAllByRole('img', { name: /^活動照片/ })).toHaveLength(2)
+  })
+
   test('沒有照片就不出現照片區；沒填的時間與內容顯示 —', async () => {
     renderPage()
     fireEvent.click(screen.getByRole('button', { name: '企業參訪' }))

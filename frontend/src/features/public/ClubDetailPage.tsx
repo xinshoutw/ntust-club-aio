@@ -289,7 +289,7 @@ interface ActivityModalProps {
 /** 活動紀錄點開的彈窗。資料全在清單那一列上(內容與照片 id 一起來),不另打詳情端點,
  *  所以沒有載入中的狀態;個別照片轉不出來(通道回 404)就收掉那一張,不留破圖 */
 function ActivityModal({ activity, open, onClose, afterClose }: ActivityModalProps) {
-  // 以網址記:照片 id 全站唯一,換一場活動也不會誤收
+  // 以網址記(照片 id 全站唯一,換一場活動也不會誤收);彈窗關掉就清掉,見 afterClose
   const [broken, setBroken] = useState<ReadonlySet<string>>(new Set())
   // 預覽開著時組內張數不能變:收掉一張,預覽就停在「5 / 4」的空白 —— 開著的期間沿用
   // 打開那一刻的清單,淡出動畫跑完(afterOpenChange)才收,淡出中也不能縮
@@ -299,7 +299,13 @@ function ActivityModal({ activity, open, onClose, afterClose }: ActivityModalPro
     <Modal
       open={open}
       onCancel={onClose}
-      afterClose={afterClose}
+      afterClose={() => {
+        // 收掉的照片只記到這次關掉為止:404 也可能只是轉檔排太長(照片通道有排隊上限),
+        // 再打開要重新要一次,不能一直藏到重新整理
+        setBroken(new Set())
+        setFrozen(null)
+        afterClose()
+      }}
       footer={null}
       width={640}
       title={activity?.name}

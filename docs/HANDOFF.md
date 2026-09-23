@@ -353,7 +353,7 @@ D-19 那道「只在真的要存 profile 時擋」的閘**,於是那一按跳的
 ## 驗證現況
 
 - 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **743 passed**;`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **388 passed**(71 檔)、
+- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **389 passed**(71 檔,`TZ=UTC` 下也全過)、
   `pnpm run lint` 56 個既有 warning(fast-refresh / set-state-in-effect / refs;
   基準值,新增變更前後要一樣)
 - 新測試做過 mutation 驗證(改回舊寫法會紅;已知例外:`exif_transpose` 那行拿掉不會紅,見測試 docstring);借用色格圖那支另在 `TZ=UTC` 與 `TZ=Pacific/Honolulu` 下各跑過一次

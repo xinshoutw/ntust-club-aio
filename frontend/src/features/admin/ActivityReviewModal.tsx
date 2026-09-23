@@ -1039,7 +1039,9 @@ export default function ActivityReviewModal({
             ）張
           </SectionTitle>
           {/* 縮圖本身就是 AntD Image 的預覽鈕(role=button、Enter/Space 可開),
-              同一場活動的照片在預覽裡左右切換 —— 與社團頁的活動彈窗同一套 */}
+              同一場活動的照片在預覽裡左右切換 —— 與社團頁的活動彈窗同一套。
+              不掛 loading="lazy":rc-image 另開一個 Image() 驗圖,縮圖一掛上就整張下載,
+              掛了也不會延後 */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {/* 成組時 rc-image 不把縮圖的 alt 交給預覽層,預覽對話框的名字在這裡給 */}
             <Image.PreviewGroup preview={{ alt: '活動照片' }}>
@@ -1049,7 +1051,6 @@ export default function ActivityReviewModal({
                   src={p.url}
                   alt={p.name}
                   title={p.name}
-                  loading="lazy"
                   width={96}
                   height={72}
                   styles={{ root: { borderRadius: 6, overflow: 'hidden' }, image: { objectFit: 'cover' } }}

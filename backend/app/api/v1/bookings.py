@@ -368,7 +368,8 @@ async def create_venue_booking(
     background: BackgroundTasks,
 ) -> ApiResponse[list[VenueBookingOut]]:
     """一次送一或多個時段(D-43):一筆一張單、各自審核,**整批同一個交易** ——
-    有一筆不成立就一張都不建,錯誤訊息開頭帶那一筆的日期(只送一筆時也帶,不另分支)。"""
+    有一筆不成立就一張都不建,錯誤訊息開頭是「第 N 筆 日期」、`meta.slot` 是同一個 N
+    (只送一筆時也帶,不另分支;見 `_slot_labels`)。"""
     await _ensure_not_suspended(db, user)
     venue = await db.get(Venue, body.venue_id)
     if venue is None or not venue.is_active or not venue.allow_temp:

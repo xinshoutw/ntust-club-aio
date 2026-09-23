@@ -233,3 +233,12 @@ test('今天已開始的節次點不動，明天照常；行政補登不受限',
   render(<BookingGrid allowPast onBookVenue={onBookVenue} bookLabel="手動借用" />)
   expect(cells(/點擊前往手動借用/)).toHaveLength(1)
 })
+
+test('單一場地 15 天檢視也不給今天已開始的節次入口，其他天的同一節照常', () => {
+  started = ['3']
+  render(<BookingGrid onBookVenue={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: /檢視 精誠廣場/ }))
+  const today = taipeiToday().format('MM/DD')
+  expect(cells(new RegExp(`^${today} 第3節`))).toHaveLength(0)
+  expect(cells()).toHaveLength(7) // 今天前後各 7 天:前 7 天已過去,只剩後 7 天
+})

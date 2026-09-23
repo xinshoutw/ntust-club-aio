@@ -383,6 +383,21 @@ test('送出被擋時捲到第一個出問題的列', async () => {
   }
 })
 
+// 只缺日期的列沒有整列紅框,紅的是日期欄本身:捲動也要找得到它
+test('只缺日期的列也捲得到', async () => {
+  const scroll = vi.spyOn(Element.prototype, 'scrollIntoView')
+  try {
+    renderPage()
+    addAfter(1)
+    pickPeriod(rows()[1], '4')
+    submit()
+    await waitFor(() => expect(scroll).toHaveBeenCalled())
+    expect(rows()[1].contains(scroll.mock.contexts[0] as Node)).toBe(true)
+  } finally {
+    scroll.mockRestore()
+  }
+})
+
 // 已開始、不開放、與既有申請重複只有後端驗得出來,訊息說「第 N 筆」,但列上沒有看得到的編號:
 // 靠信封的 meta.slot 把那一列標紅、捲過去,改了那一列就解除
 test('後端指出第幾筆出錯時，那一列標紅並捲過去', async () => {

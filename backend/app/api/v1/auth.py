@@ -43,7 +43,7 @@ async def login(
 ) -> ApiResponse[UserOut]:
     ip = client_ip(request)
     if login_limiter.blocked(ip or "unknown"):
-        raise rate_limited("登入嘗試過於頻繁,請稍後再試")
+        raise rate_limited("登入嘗試過於頻繁，請稍後再試")
     try:
         user, session = await auth_service.login(
             db,
@@ -78,7 +78,7 @@ async def upload_precheck(auth: AuthDep, request: Request) -> Response:
     session, user = auth
     token = request.headers.get(CSRF_HEADER, "")
     if not token or not secrets.compare_digest(token, session.csrf_token):
-        raise forbidden("CSRF 驗證失敗,請重新整理頁面", code="CSRF_FAILED")
+        raise forbidden("CSRF 驗證失敗，請重新整理頁面", code="CSRF_FAILED")
     if user.must_change_password:
         raise forbidden("首次登入請先變更密碼", code="PASSWORD_CHANGE_REQUIRED")
     # 容量前置閘(ISS-43):磁碟到告警水位就不收新檔,暫存檔連落地都不落地。

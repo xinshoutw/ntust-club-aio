@@ -152,7 +152,8 @@ describe('活動彈窗', () => {
     const dialog = await screen.findByRole('dialog', { name: '社員大會' })
     const [first, second] = within(dialog).getAllByRole('img', { name: /^活動照片/ })
     fireEvent.click(second)
-    const preview = document.querySelector('.ant-image-preview') as HTMLElement
+    // 成組時 rc-image 不把縮圖的 alt 交給預覽層:對話框的名字是 preview.alt 給的
+    const preview = screen.getByRole('dialog', { name: '活動照片' })
 
     fireEvent.error(first)
     expect(preview.querySelector('.ant-image-preview-img')?.getAttribute('src')).toBe(photos[1])

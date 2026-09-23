@@ -590,7 +590,7 @@ function ActivityForm({
               <Form.Item
                 name="content"
                 label="活動內容（至多 150 字）"
-                extra="審核通過後公開在社團頁"
+                extra="審核通過後，將公開在社團頁面"
                 style={{ marginBottom: 0 }}
               >
                 <Input.TextArea rows={6} maxLength={150} showCount placeholder="活動目的、內容、預期效益" />

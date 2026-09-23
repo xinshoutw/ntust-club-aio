@@ -29,8 +29,11 @@ test('圖片預覽的 transform-origin 由 index.css 蓋回置中', () => {
   )
   expect(carrier).toBeDefined()
   const cls = [...carrier!.classList].find((c) => c.startsWith('ant-image-preview-'))
-  // 選擇器清單裡(單獨或與別的並列)有這個 class,而且那一條規則把 origin 蓋回置中
-  const rule = new RegExp(`\\.${cls}(?![\\w-])[^{]*\\{[^}]*transform-origin:\\s*center center !important`)
+  // 選擇器清單裡有一整條就是這個 class(單獨或與別的並列),而且那一條規則把 origin 蓋回置中 ——
+  // `.cls .child`、`.cls:hover` 這種指到別的元素或別的狀態的不算
+  const rule = new RegExp(
+    `(?:^|[{},])\\s*\\.${cls}\\s*(?:,[^{]*)?\\{[^}]*transform-origin:\\s*center center !important`,
+  )
   // 註解先拿掉:註解裡提到那個 class 不算數
   const css = readFileSync('src/index.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
   expect(css).toMatch(rule)

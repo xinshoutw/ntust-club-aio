@@ -159,6 +159,8 @@ describe('臨時場地借用的時段列', () => {
     // 修改該欄即解除(design-guide §6)
     pickPeriod(second, '4')
     expect(second.classList.contains('area-error')).toBe(false)
+    pickDate(second, '2099/01/03')
+    expect(second.querySelector('.ant-picker-status-error')).toBeNull()
   })
 
   // 同一天節次重疊的兩筆送出去就是重複申請(後端 `_no_overlap` 同一條);
@@ -265,4 +267,58 @@ test('每一列是一個有名字的群組', () => {
   addAfter(1)
   expect(screen.getByRole('group', { name: '第 1 筆時段' })).toBe(rows()[0])
   expect(screen.getByRole('group', { name: '第 2 筆時段' })).toBe(rows()[1])
+})
+
+// 最常見的用法:同樣的節次連借好幾天。重疊只看同一天,不同天的同一節不算
+test('不同天選同樣的節次照送', async () => {
+  renderPage()
+  addAfter(1)
+  pickDate(rows()[1], '2099/01/02')
+  pickPeriod(rows()[1], '3')
+  submit()
+  await waitFor(() => expect(mutate).toHaveBeenCalled())
+  expect(slotsSent()).toEqual([
+    ['2099/01/01', ['3']],
+    ['2099/01/02', ['3']],
+  ])
+})
+
+// 已開始的節次只跟「今天」那一列有關:未來那幾列選好的節次不能被一起刪掉
+test('只有日期是今天的那一列停用並剔除已開始的節次，其他列不動', () => {
+  started = ['3']
+  try {
+    renderPage(`venue=9&date=${taipeiToday().format('YYYY/MM/DD')}&period=4`)
+    const button = (row: number, p: string) => within(rows()[row]).getByRole('button', { name: p })
+    expect(button(0, '3')).toHaveProperty('disabled', true)
+    addAfter(1)
+    pickDate(rows()[1], '2099/01/02')
+    pickPeriod(rows()[1], '3')
+    pickPeriod(rows()[1], '4')
+    expect(button(1, '3')).toHaveProperty('disabled', false)
+
+    // 過了第 4 節的起點:下一次重畫時,今天那一列的第 4 節被收走,未來那一列照舊
+    started = ['3', '4']
+    addAfter(2)
+    expect(button(0, '4').getAttribute('aria-pressed')).toBe('false')
+    expect(button(0, '4')).toHaveProperty('disabled', true)
+    expect(button(1, '3').getAttribute('aria-pressed')).toBe('true')
+    expect(button(1, '4').getAttribute('aria-pressed')).toBe('true')
+  } finally {
+    started = []
+  }
+})
+
+test('送出成功後時段回到一列空白的，也不再算有未存檔的修改', async () => {
+  mutate.mockImplementationOnce((_input: VenueBookingInput, opts: { onSuccess: (rows: unknown[]) => void }) =>
+    opts.onSuccess([{ periods: ['3'] }, { periods: ['4'] }]),
+  )
+  renderPage()
+  addAfter(1)
+  pickDate(rows()[1], '2099/01/02')
+  pickPeriod(rows()[1], '4')
+  submit()
+  expect(await screen.findByText('已送出「精誠廣場」2 筆借用申請')).toBeTruthy()
+  expect(rows()).toHaveLength(1)
+  expect((within(rows()[0]).getByPlaceholderText('日期') as HTMLInputElement).value).toBe('')
+  expect(slotsDirty).toBe(false)
 })

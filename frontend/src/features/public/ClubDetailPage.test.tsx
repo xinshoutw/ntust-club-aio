@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import { App } from 'antd'
 import { MemoryRouter, Route, Routes } from 'react-router'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import ClubDetailPage from './ClubDetailPage'
 import type { ClubDetail, PublicActivity } from '../../api/publicClubs'
 
@@ -26,10 +26,28 @@ const club: ClubDetail = {
   signupUrl: '',
 }
 
+const photos = ['/api/v1/public/files/activity-photos/p1', '/api/v1/public/files/activity-photos/p2']
 const activities: PublicActivity[] = [
-  { id: 1, name: '社員大會', dateSpan: '2026/03/04', timeSpan: '19:00 – 21:00', location: 'TR-214' },
-  // 只填日期不填時間的活動:畫面上是 —,不可以用 00:00 頂替(全站慣例)
-  { id: 2, name: '企業參訪', dateSpan: '2025/12/11', timeSpan: '', location: '趨勢科技 Trend Micro 股份有限公司' },
+  {
+    id: 1,
+    name: '社員大會',
+    dateSpan: '2026/03/04',
+    timeSpan: '19:00 – 21:00',
+    location: 'TR-214',
+    content: '期末社員大會，討論下學期社課',
+    photoUrls: photos,
+  },
+  // 只填日期不填時間的活動:畫面上是 —,不可以用 00:00 頂替(全站慣例)。
+  // 還沒結案,所以沒有照片;活動內容也沒填
+  {
+    id: 2,
+    name: '企業參訪',
+    dateSpan: '2025/12/11',
+    timeSpan: '',
+    location: '趨勢科技 Trend Micro 股份有限公司',
+    content: '',
+    photoUrls: [],
+  },
 ]
 
 const ok = { isPending: false, isLoadingError: false, isFetching: false, error: null, refetch: vi.fn() }
@@ -81,5 +99,45 @@ describe('社團詳細的活動紀錄', () => {
     renderPage()
     expect(screen.getByText('—')).toBeTruthy()
     expect(screen.queryByText(/00:00/)).toBeNull()
+  })
+})
+
+describe('活動彈窗', () => {
+  test('點活動名稱開出彈窗：標題是活動名稱，列出日期、時間、地點與活動內容', async () => {
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: '社員大會' }))
+    const dialog = await screen.findByRole('dialog', { name: '社員大會' })
+    for (const text of ['2026/03/04', '19:00 – 21:00', 'TR-214', '期末社員大會，討論下學期社課']) {
+      expect(within(dialog).getByText(text)).toBeTruthy()
+    }
+  })
+
+  // 名稱那顆按鈕是鍵盤入口;整列的 click 是給滑鼠的,點在地點上一樣要開
+  test('點在列上的其他地方也會開', async () => {
+    renderPage()
+    fireEvent.click(screen.getByText('TR-214'))
+    expect(await screen.findByRole('dialog', { name: '社員大會' })).toBeTruthy()
+  })
+
+  test('結案照片依序畫出來，每一張都是預覽鈕', async () => {
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: '社員大會' }))
+    const dialog = await screen.findByRole('dialog', { name: '社員大會' })
+    const imgs = within(dialog).getAllByRole('img', { name: /^活動照片/ })
+    expect(imgs.map((i) => i.getAttribute('src'))).toEqual(photos)
+    // 縮圖本身要能用鍵盤開預覽:AntD Image 可預覽時外層是 role=button、tabIndex=0
+    for (const img of imgs) {
+      const trigger = img.closest('[role="button"]')
+      expect(trigger?.getAttribute('tabindex')).toBe('0')
+    }
+  })
+
+  test('沒有照片就不出現照片區；沒填的時間與內容顯示 —', async () => {
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: '企業參訪' }))
+    const dialog = await screen.findByRole('dialog', { name: '企業參訪' })
+    expect(within(dialog).queryByText('活動照片')).toBeNull()
+    expect(within(dialog).queryAllByRole('img', { name: /^活動照片/ })).toHaveLength(0)
+    expect(within(dialog).getAllByText('—')).toHaveLength(2)
   })
 })

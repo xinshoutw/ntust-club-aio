@@ -297,6 +297,15 @@
 .act-where-icon {
   display: none;
 }
+/* 整列可點(開活動彈窗)。hover 的底色左右各多塗 12px:列沒有水平內距 —— 欄寬由
+   subgrid 決定,加內距會連表頭一起位移 —— 直接塗底色的話字會貼著色塊邊緣。
+   box-shadow 只畫不排版,碰不到欄寬 */
+.act-row.click-tint {
+  cursor: pointer;
+}
+.act-row.click-tint:hover {
+  box-shadow: -12px 0 0 var(--seal-tint), 12px 0 0 var(--seal-tint);
+}
 
 @media (max-width: 767px) {
   .act-list {
@@ -357,6 +366,42 @@
     margin-top: 0.3em;
     color: var(--steel);
   }
+  /* 字卡自己有內距與圓角,底色塗在卡上就好 */
+  .act-row.click-tint:hover {
+    box-shadow: none;
+  }
+}
+
+/* ---- 活動彈窗(點活動紀錄開)---- */
+.act-kv {
+  margin-top: 4px;
+}
+.act-photos-heading {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 20px 0 10px;
+}
+/* 縮圖牆:手機上彈窗內寬約 240px,104px 的下限讓它仍排得出兩欄 */
+.act-photos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+}
+/* 照片比例不一:一律 4:3 置中裁切,整面縮圖才排得齊;完整的圖在預覽裡看 */
+.act-photos .ant-image {
+  display: block;
+  aspect-ratio: 4 / 3;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--paper);
+}
+.act-photos .ant-image:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.act-photos .ant-image-img {
+  height: 100%;
+  object-fit: cover;
 }
 
 /* ---- 詳細頁 ---- */

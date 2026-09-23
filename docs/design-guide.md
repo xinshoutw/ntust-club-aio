@@ -139,7 +139,7 @@ topbar 的文字鈕在 <768px 一律收成圖示鈕(`TopbarButton`):頁名頂替
   `role="list"` / `role="listitem"` 才立得住,輔助技術數得出有幾筆。
   **要開第二個例外前先問「欄寬真的無法預先決定嗎」** —— 排序、篩選與分頁那幾件事
   grid 都沒有現成的,表格有
-- 整列可點時 `onClick` 掛在 `<tr>` 上只服務滑鼠,鍵盤入口是主要欄位裡的 `.row-open-btn`(記得 `stopPropagation`);卡片等非表格區塊用 `lib/clickable` 的 `clickableProps`
+- 整列可點時 `onClick` 掛在 `<tr>` 上只服務滑鼠,鍵盤入口是主要欄位裡的 `.row-open-btn`(記得 `stopPropagation`);卡片等非表格區塊用 `lib/clickable` 的 `clickableProps`。**清單列同表格列**(社團頁的活動紀錄):列是 `listitem`,掛 `role="button"` 會蓋掉它,所以一樣是列上 `onClick` + 名稱欄的 `.row-open-btn`
 - 排序一律 `useMultiSort` + `MultiSortButton`(伺服器端以 `sortParam` 帶查詢):至多 3 鍵、無移除態,指示器呈現實際生效的排序鏈。點主鍵=升降互換,點已啟用的次鍵=升為主鍵並保留方向,點新欄=插為主鍵。**僅 sort icon 變色**,不整欄變色
 - 篩選用 `FilterButton`,收進表頭,不做一排篩選器牆
 - 分頁一律 `Pager`(AntD Pagination `simple`):置中、只有一頁也顯示;禁用數字頁碼鈕

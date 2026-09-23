@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { API_BASE } from './client'
-import { publicFileUrl, toActivity, type ActivityOut } from './publicClubs'
+import { publicFileUrl, publicPhotoUrl, toActivity, type ActivityOut } from './publicClubs'
 
 const activity = (over: Partial<ActivityOut>): ActivityOut => ({
   id: 1,
@@ -10,6 +10,8 @@ const activity = (over: Partial<ActivityOut>): ActivityOut => ({
   start_time: null,
   end_time: null,
   location: 'TR-101',
+  content: '',
+  photo_file_ids: [],
   ...over,
 })
 
@@ -42,6 +44,22 @@ describe('toActivity', () => {
     ['兩個都沒有', { start_time: null, end_time: null }],
   ])('%s 時給空字串', (_label, over) => {
     expect(toActivity(activity(over)).timeSpan).toBe('')
+  })
+})
+
+describe('toActivity 的彈窗欄位', () => {
+  test('活動內容原樣帶過去', () => {
+    expect(toActivity(activity({ content: '期末成果發表' })).content).toBe('期末成果發表')
+  })
+
+  // 形象圖與結案照片是兩條通道:照片走 activity-photos,拿到的是轉過的 JPEG,不是原檔
+  test('照片 id 依序換成結案照片通道的網址', () => {
+    const a = toActivity(activity({ photo_file_ids: ['p1', 'p2'] }))
+    expect(a.photoUrls).toEqual([
+      `${API_BASE}/public/files/activity-photos/p1`,
+      `${API_BASE}/public/files/activity-photos/p2`,
+    ])
+    expect(a.photoUrls[0]).toBe(publicPhotoUrl('p1'))
   })
 })
 

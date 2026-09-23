@@ -41,9 +41,13 @@ interface SlotDraft {
   periods: string[]
 }
 
-/** 未存檔守衛的比對值:只看日期與節次(`key` 會隨增刪變,不算修改) */
+/** 未存檔守衛的比對值:只看填了東西的列的日期與節次 —— 按「+」多一列空白不算修改,
+ *  `key` 隨增刪變也不算 */
 const slotsKey = (slots: SlotDraft[]) =>
-  slots.map((s) => `${s.date?.format('YYYY-MM-DD') ?? ''}:${s.periods.join(',')}`).join('|')
+  slots
+    .filter((s) => s.date || s.periods.length)
+    .map((s) => `${s.date?.format('YYYY-MM-DD') ?? ''}:${s.periods.join(',')}`)
+    .join('|')
 const BLANK_KEY = slotsKey([{ key: 0, date: null, periods: [] }])
 
 /** 同一天、節次跟前面某一列重疊的列:送出去就是重複申請(後端 `_no_overlap` 同一條)。
@@ -85,14 +89,18 @@ export default function VenueBookingPage() {
       ? rawDate
       : undefined
   const qPeriod = params.get('period')
-  // 從場況圖點格進來時第一筆已帶好日期與節次
-  const [slots, setSlots] = useState<SlotDraft[]>(() => [
-    {
-      key: 0,
-      date: qDate ? dayjs(qDate, 'YYYY/MM/DD') : null,
-      periods: qPeriod && periodAxis.includes(qPeriod) ? [qPeriod] : [],
-    },
-  ])
+  const todayStart = taipeiToday()
+  // 過去時間全面禁止:過去日期不可選;選「今天」時已開始節次禁選(後端亦擋)
+  const started = startedPeriods(periodCatalogue)
+  const isToday = (d: Dayjs | null) => !!d?.isSame(todayStart, 'day')
+  // 從場況圖點格進來時第一筆已帶好日期與節次。今天已開始的那一節本來就選不到:不帶入 ——
+  // 帶了也會被下面的剔除收走,頁面一進來就算已修改,什麼都沒動也被未存檔守衛攔下
+  const [slots, setSlots] = useState<SlotDraft[]>(() => {
+    const date = qDate ? dayjs(qDate, 'YYYY/MM/DD') : null
+    const usable =
+      qPeriod && periodAxis.includes(qPeriod) && !(isToday(date) && started.includes(qPeriod))
+    return [{ key: 0, date, periods: usable ? [qPeriod] : [] }]
+  })
   const nextKey = useRef(1)
   // 與初值相同不算 dirty(否則從場況圖點進來,一進頁就被攔)
   const [cleanKey, setCleanKey] = useState(() => slotsKey(slots))
@@ -118,11 +126,7 @@ export default function VenueBookingPage() {
   const recentTotal = recentQuery.data?.total ?? 0
   const decision = useDecisionReason()
   const { createVenueBooking, cancelVenueBooking } = useBookingMutations()
-  const todayStart = taipeiToday()
 
-  // 過去時間全面禁止:過去日期不可選;選「今天」時已開始節次禁選(後端亦擋)
-  const started = startedPeriods(periodCatalogue)
-  const isToday = (d: Dayjs | null) => !!d?.isSame(todayStart, 'day')
   const startedKey = started.join(',')
   const todayRows = slots.filter((s) => isToday(s.date)).map((s) => s.key).join(',')
   useEffect(() => {

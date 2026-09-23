@@ -5,9 +5,26 @@ import { MemoryRouter } from 'react-router'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import VenueBookingPage from './VenueBookingPage'
 import type { VenueBookingInput } from '../../api/bookings'
+import { taipeiToday } from '../../lib/today'
 
 // 一次送多個時段(D-43):每一筆右側「+」「−」,送出時一筆一張單
 const mutate = vi.fn()
+// 未存檔守衛收到的「時段有沒有改過」;頁面其餘欄位走 AntD 的 onValuesChange,這裡不管
+let slotsDirty: boolean | null = null
+// 「今天」已開始的節次:startedPeriods 讀的是裝置時鐘,釘成常數才不隨跑測試的時刻與時區翻
+let started: string[] = []
+
+vi.mock('../../app/unsaved', () => ({
+  useFormUnsavedGuard: (dirty: boolean) => {
+    slotsDirty = dirty
+    return { onValuesChange: () => {}, clear: () => {} }
+  },
+}))
+
+vi.mock('../../lib/periods', async (orig) => ({
+  ...(await orig<typeof import('../../lib/periods')>()),
+  startedPeriods: () => started,
+}))
 
 vi.mock('../../app/auth', () => ({
   useAuth: () => ({
@@ -47,11 +64,11 @@ vi.mock('../../api/bookings', async (importOriginal) => ({
 }))
 
 // 場地、第一筆的日期與節次走借用總覽的帶入路徑
-const renderPage = () => {
+const renderPage = (query = 'venue=9&date=2099/01/01&period=3') => {
   mutate.mockClear()
   render(
     <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter initialEntries={['/bookings/venue?venue=9&date=2099/01/01&period=3']}>
+      <MemoryRouter initialEntries={[`/bookings/venue?${query}`]}>
         <App>
           <VenueBookingPage />
         </App>
@@ -212,4 +229,32 @@ test('重疊解除後紅框跟著消失', async () => {
   expect(rows()[1].classList.contains('area-error')).toBe(true)
   fireEvent.click(screen.getByRole('button', { name: '移除第 1 筆時段' }))
   expect(rows()[0].classList.contains('area-error')).toBe(false)
+})
+
+describe('未存檔守衛', () => {
+  // 帶入的那一筆是初值,不算修改;多一列空白也不算 —— 否則按一下「+」就離不開這一頁
+  test('多一列空白不算修改，填了東西才算', () => {
+    renderPage()
+    expect(slotsDirty).toBe(false)
+    addAfter(1)
+    expect(slotsDirty).toBe(false)
+    pickPeriod(rows()[1], '4')
+    expect(slotsDirty).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: '移除第 2 筆時段' }))
+    expect(slotsDirty).toBe(false)
+  })
+
+  // 從場況圖點「今天、已經開始」的那一格進來:那一節選不到,不帶入,也就不會一進頁就算已修改
+  test('今天已開始的節次不帶入，一進頁不算修改', () => {
+    started = ['3']
+    try {
+      renderPage(`venue=9&date=${taipeiToday().format('YYYY/MM/DD')}&period=3`)
+      expect(slotsDirty).toBe(false)
+      const three = within(rows()[0]).getByRole('button', { name: '3' })
+      expect(three.getAttribute('aria-pressed')).toBe('false')
+      expect(three).toHaveProperty('disabled', true)
+    } finally {
+      started = []
+    }
+  })
 })

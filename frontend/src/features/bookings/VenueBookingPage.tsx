@@ -188,8 +188,12 @@ export default function VenueBookingPage() {
     }
     setSlotErrors(errors)
     setChecked(true)
-    if (overlap.first) return `${overlap.first} 的時段重複`
-    return errors.size ? '請為每一筆選擇日期與時段' : null
+    // 缺欄位與重疊可能同時存在:兩件都說,不要只說一半
+    const problems = [
+      ...(errors.size ? ['請為每一筆選擇日期與時段'] : []),
+      ...(overlap.first ? [`${overlap.first} 的時段重複`] : []),
+    ]
+    return problems.length ? problems.join('；') : null
   }
 
   const cancelRow = (v: { id: number; venueName: string; date: string }) =>
@@ -258,8 +262,11 @@ export default function VenueBookingPage() {
           form={form}
           layout="vertical"
           onFinish={submit}
-          // 其他欄位沒過時 onFinish 不會跑:時段的錯誤要跟著一起標出來,不必送第二次才看到
-          onFinishFailed={() => void validateSlots()}
+          // 其他欄位沒過時 onFinish 不會跑:時段的問題一起標、一起說,不必送第二次才看到
+          onFinishFailed={() => {
+            const problem = validateSlots()
+            if (problem) message.error(problem)
+          }}
           requiredMark
         >
           <div className="form-grid-2">

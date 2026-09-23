@@ -322,3 +322,24 @@ test('送出成功後時段回到一列空白的，也不再算有未存檔的�
   expect((within(rows()[0]).getByPlaceholderText('日期') as HTMLInputElement).value).toBe('')
   expect(slotsDirty).toBe(false)
 })
+
+// 缺欄位與重疊可能同時存在:兩件都要說,而且說得出是哪一列(同一天可以有好幾列)
+test('缺欄位與重疊一起說，重疊指得出是第幾筆', async () => {
+  renderPage()
+  addAfter(1)
+  pickDate(rows()[1], '2099/01/01')
+  pickPeriod(rows()[1], '3')
+  addAfter(2) // 第三筆空著
+  submit()
+  expect(await screen.findByText('請為每一筆選擇日期與時段；第 2 筆 2099/01/01 的時段重複')).toBeTruthy()
+  expect(mutate).not.toHaveBeenCalled()
+})
+
+// 其他欄位沒過時 onFinish 不會跑:時段的問題要跟著一起說,不能只剩一個沒有說明的紅框
+test('用途沒填時，時段的問題照樣說出來', async () => {
+  renderPage()
+  addAfter(1)
+  fireEvent.click(screen.getByRole('button', { name: '送出申請' }))
+  expect(await screen.findByText('請為每一筆選擇日期與時段')).toBeTruthy()
+  expect(rows()[1].classList.contains('area-error')).toBe(true)
+})

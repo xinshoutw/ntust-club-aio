@@ -337,8 +337,6 @@ D-19 那道「只在真的要存 profile 時擋」的閘**,於是那一按跳的
   - 轉檔池、single-flight、冷卻與排隊上限都是每個 worker 行程一份(現在單一 worker,註解已寫)
   - 行政端 `BookingReviewModal` 與 `lib/status` 仍用裝置本地日比「過去日」(承辦都在台灣,影響小)
   - `index.css.test.ts` 的選擇器 regex 仍會接受包在 `@media` 裡的規則
-  - 既有矛盾:design-guide §8 寫 `prefers-reduced-motion` 全關,`index.css` 寫全站刻意不響應它
-    (2026-08-31 事故),兩份要對齊
 - 開發機上既有的 15 個 `.preview.jpg` 是舊規則轉的(帶 COM、沒 ICC):要看新結果就
   `find backend/data/uploads -name '*.preview.jpg' -delete`,被看到時會重轉
 

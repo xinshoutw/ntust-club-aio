@@ -207,7 +207,7 @@ topbar 的文字鈕在 <768px 一律收成圖示鈕(`TopbarButton`):頁名頂替
 
 ## 8. 動效與無障礙
 
-- 動效只有章軌當前節點脈動,加上 AntD 自身的過場(`motionUnit: 0.06`);`prefers-reduced-motion` 全關
+- 動效只有章軌當前節點脈動,加上 AntD 自身的過場(`motionUnit: 0.06`);**刻意不響應 `prefers-reduced-motion`**,動畫一律照跑(2026-08-31 事故:用 CSS 關掉動畫,rc-motion 等不到結束事件,透明的彈窗遮罩吃掉全站點擊)。要重新支援,改用 ConfigProvider 的 `motion: false`,不要用 CSS(`index.css` 那段註解、`index.css.test.ts` 守著)
 - 對比 WCAG AA;focus ring 2px `#2F6FBF`;表格可鍵盤導航;所有 icon 按鈕帶 aria-label;可點列須有鍵盤入口
 
 ## 9. 禁止

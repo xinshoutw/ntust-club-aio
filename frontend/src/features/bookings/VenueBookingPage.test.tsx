@@ -343,3 +343,19 @@ test('用途沒填時，時段的問題照樣說出來', async () => {
   expect(await screen.findByText('請為每一筆選擇日期與時段')).toBeTruthy()
   expect(rows()[1].classList.contains('area-error')).toBe(true)
 })
+
+// 列一多,紅框可能在畫面外,而提示幾秒就消失(design-guide §6:捲動到第一個錯誤)
+test('送出被擋時捲到第一個出問題的列', async () => {
+  const scroll = vi.spyOn(Element.prototype, 'scrollIntoView')
+  try {
+    renderPage()
+    addAfter(1)
+    addAfter(2)
+    pickDate(rows()[2], '2099/01/03') // 第三筆有日期沒節次,第二筆全空
+    submit()
+    await waitFor(() => expect(scroll).toHaveBeenCalled())
+    expect(scroll.mock.contexts[0]).toBe(rows()[1])
+  } finally {
+    scroll.mockRestore()
+  }
+})

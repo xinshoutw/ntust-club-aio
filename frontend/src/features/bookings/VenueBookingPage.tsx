@@ -103,6 +103,7 @@ export default function VenueBookingPage() {
     return [{ key: 0, date, periods: usable ? [qPeriod] : [] }]
   })
   const nextKey = useRef(1)
+  const slotsRef = useRef<HTMLDivElement>(null)
   // 與初值相同不算 dirty(否則從場況圖點進來,一進頁就被攔)
   const [cleanKey, setCleanKey] = useState(() => slotsKey(slots))
   const guard = useFormUnsavedGuard(slotsKey(slots) !== cleanKey)
@@ -195,6 +196,14 @@ export default function VenueBookingPage() {
     ]
     return problems.length ? problems.join('；') : null
   }
+  // 捲到第一個出問題的列(design-guide §6):列一多,紅框可能在畫面外,而提示幾秒就消失。
+  // 等這一輪的紅框畫出來再找
+  const scrollToFirstSlotError = () =>
+    setTimeout(() =>
+      slotsRef.current
+        ?.querySelector('.slot-row.area-error, .ant-picker-status-error')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+    )
 
   const cancelRow = (v: { id: number; venueName: string; date: string }) =>
     confirmDialog(modal, {
@@ -222,6 +231,7 @@ export default function VenueBookingPage() {
     const problem = validateSlots()
     if (problem) {
       message.error(problem)
+      scrollToFirstSlotError()
       return
     }
     const venueName = tempVenues.find((v) => v.id === values.venue)?.name ?? ''
@@ -263,10 +273,12 @@ export default function VenueBookingPage() {
           layout="vertical"
           onFinish={submit}
           // 其他欄位沒過時 onFinish 不會跑:時段的問題一起標、一起說,不必送第二次才看到
+          // (那些欄位在時段上面,捲動交給 scrollToFirstError)
           onFinishFailed={() => {
             const problem = validateSlots()
             if (problem) message.error(problem)
           }}
+          scrollToFirstError
           requiredMark
         >
           <div className="form-grid-2">
@@ -317,6 +329,7 @@ export default function VenueBookingPage() {
             時段 <span style={{ color: '#C13B34' }}>*</span>
           </div>
           <div
+            ref={slotsRef}
             className="slot-rows"
             // 日期欄打完字按 Enter 是在確認那個日期,不是送出:冒泡到這裡時 AntD 已經收下日期,
             // 這裡只擋掉瀏覽器的隱式送出 —— 否則多列還沒填完,整批就先送出去了

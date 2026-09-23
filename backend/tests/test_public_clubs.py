@@ -703,7 +703,9 @@ async def test_a_failed_photo_is_retried_after_a_while(client, db, monkeypatch):
     assert (await client.get(url)).status_code == 200
 
 
-async def test_the_photo_channel_does_not_queue_past_a_short_backlog(client, db, monkeypatch):
+async def test_the_photo_channel_does_not_queue_past_a_short_backlog(
+    client, db, monkeypatch, caplog
+):
     """斷線不會取消 handler,排進去的轉檔一律跑完:從清單列舉 id 一張張打,就能排出幾分鐘
     吃滿兩顆核心的佇列。超過上限的先回 404,但不記成失敗 —— 空下來之後同一張照常轉。"""
     import asyncio
@@ -712,6 +714,7 @@ async def test_the_photo_channel_does_not_queue_past_a_short_backlog(client, db,
     from app.api.v1 import public
 
     monkeypatch.setattr(public, "PUBLIC_PREVIEW_BACKLOG", 2)
+    monkeypatch.setattr(file_service, "_backlog_warned_at", float("-inf"))
     _, _, photos = await activity_with_photos(db, n=3)
     release = threading.Event()
     real = file_service._render_preview
@@ -728,6 +731,10 @@ async def test_the_photo_channel_does_not_queue_past_a_short_backlog(client, db,
                 break
             await asyncio.sleep(0.02)
         assert (await client.get(f"{PHOTO_URL}/{photos[2].id}")).status_code == 404
+        assert (await client.get(f"{PHOTO_URL}/{photos[2].id}")).status_code == 404
+        # 拒絕對外跟壞檔一樣是 404:log 要看得出是排隊滿了,而且被灌時不跟著灌
+        full = [r for r in caplog.records if "preview backlog full" in r.getMessage()]
+        assert len(full) == 1
     finally:
         release.set()
     assert [r.status_code for r in await asyncio.gather(*queued)] == [200, 200]

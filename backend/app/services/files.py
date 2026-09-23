@@ -633,6 +633,10 @@ _PREVIEW_FAILED: dict[Path, float] = {}  # 原檔 → 失敗的時刻(monotonic)
 # 同一張正在轉:後到的請求等同一份結果,不各自再解一次 —— 一波並發打同一張(冷快取的好圖,
 # 或一張壞圖)只佔一次轉檔池
 _PREVIEW_INFLIGHT: dict[Path, asyncio.Future[Path | None]] = {}
+# 公開通道因排隊上限拒絕時記一筆,至多每分鐘一筆:被灌的時候看得出來,又不會反過來灌爆 log
+# (拒絕對外是 404,跟壞檔分不出來)
+BACKLOG_WARN_EVERY = 60  # 秒
+_backlog_warned_at = float("-inf")
 
 
 async def preview_of(disk: Path, *, max_backlog: int | None = None) -> Path | None:
@@ -657,6 +661,7 @@ async def preview_of(disk: Path, *, max_backlog: int | None = None) -> Path | No
     job = _PREVIEW_INFLIGHT.get(disk)
     if job is None:
         if max_backlog is not None and len(_PREVIEW_INFLIGHT) >= max_backlog:
+            _warn_backlog_full()
             return None
         job = asyncio.ensure_future(_convert(disk, dst))
         _PREVIEW_INFLIGHT[disk] = job
@@ -664,6 +669,16 @@ async def preview_of(disk: Path, *, max_backlog: int | None = None) -> Path | No
     # shield:等的人被取消(逾時、伺服器改成斷線即取消)不該讓等同一張的其他請求一起落空。
     # 目前的 uvicorn 斷線並不取消 handler,排進去的轉檔一律跑完(公開通道因此有排隊上限)
     return await asyncio.shield(job)
+
+
+def _warn_backlog_full() -> None:
+    global _backlog_warned_at
+    now = time.monotonic()
+    if now - _backlog_warned_at >= BACKLOG_WARN_EVERY:
+        _backlog_warned_at = now
+        logger.warning(
+            "preview backlog full (%d pending), refusing new ones", len(_PREVIEW_INFLIGHT)
+        )
 
 
 async def _convert(disk: Path, dst: Path) -> Path | None:

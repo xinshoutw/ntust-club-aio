@@ -400,7 +400,11 @@ async def create_venue_booking(
             )
         )
         if dup:
-            raise conflict(f"{slot.date:%Y/%m/%d} 同一場地同一天的相同節次已有申請")
+            # 同一天可以有好幾列:只給日期的話分不出是哪一列撞到
+            raise conflict(
+                f"{slot.date:%Y/%m/%d} 同一場地同一天的相同節次已有申請"
+                f"(時段 {','.join(slot.periods)})"
+            )
 
     rows = [
         VenueBooking(

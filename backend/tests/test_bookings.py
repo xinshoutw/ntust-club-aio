@@ -772,6 +772,9 @@ async def test_one_bad_slot_rejects_the_whole_batch(client, db, bad):
     )
     assert resp.status_code == (409 if bad == "duplicate" else 422), resp.text
     assert f"{bad_day:%Y/%m/%d}" in resp.json()["error"]
+    # 同一天可以有好幾列:重複申請的訊息連節次一起給,才分得出是哪一列
+    if bad == "duplicate":
+        assert "(時段 5)" in resp.json()["error"]
     assert await _venue_booking_count(db) == before
 
 

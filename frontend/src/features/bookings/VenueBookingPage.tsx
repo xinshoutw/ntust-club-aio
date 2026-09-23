@@ -17,6 +17,7 @@ import StatusPill from '../../components/ui/StatusPill'
 import { Cols, Pager } from '../../components/ui/tableControls'
 import SuspensionNote from '../../components/ui/SuspensionNote'
 import { useClubSuspension } from '../../api/clubProfile'
+import { ApiError } from '../../api/client'
 import {
   useBookingMutations,
   useActiveVenueBookings,
@@ -116,7 +117,8 @@ export default function VenueBookingPage() {
     )
   const current = comparable(slots)
   const guard = useFormUnsavedGuard(current !== BLANK_KEY && current !== comparable(cleanSlots))
-  // 送出驗證的錯誤集合(design-guide §6):`date:<key>` / `periods:<key>`,改到哪一格就解除哪一格
+  // 送出驗證的錯誤集合(design-guide §6):`date:<key>` / `periods:<key>`,改到哪一格就解除哪一格;
+  // `row:<key>` 是後端指出的整列(已開始、不開放、與既有申請重複),那一列動了哪一格都解除
   const [slotErrors, setSlotErrors] = useState<ReadonlySet<string>>(new Set())
   // 重疊不進錯誤集合:送出過一次之後照目前的列當場標
   const [checked, setChecked] = useState(false)
@@ -159,9 +161,10 @@ export default function VenueBookingPage() {
     setSlots((cur) => cur.map((s) => (s.key === key ? { ...s, ...patch } : s)))
     const field = 'date' in patch ? 'date' : 'periods'
     setSlotErrors((cur) => {
-      if (!cur.has(`${field}:${key}`)) return cur
+      const cleared = [`${field}:${key}`, `row:${key}`].filter((k) => cur.has(k))
+      if (!cleared.length) return cur
       const next = new Set(cur)
-      next.delete(`${field}:${key}`)
+      cleared.forEach((k) => next.delete(k))
       return next
     })
   }
@@ -268,7 +271,15 @@ export default function VenueBookingPage() {
           setCleanSlots([])
           setChecked(false)
         },
-        onError: (e) => message.error(e.message),
+        onError: (e) => {
+          message.error(e.message)
+          // 後端逐筆才驗得出的錯誤帶著是第幾筆(meta.slot,與訊息的「第 N 筆」同一個 N):
+          // 列上沒有看得到的編號,標紅那一列、捲過去,不讓人照著幾秒就消失的提示自己數
+          const hit = e instanceof ApiError ? slots[Number(e.meta.slot) - 1] : undefined
+          if (!hit) return
+          setSlotErrors(new Set([`row:${hit.key}`]))
+          scrollToFirstSlotError()
+        },
       },
     )
   }
@@ -356,7 +367,9 @@ export default function VenueBookingPage() {
                 role="group"
                 aria-label={`第 ${i + 1} 筆時段`}
                 className={
-                  slotErrors.has(`periods:${s.key}`) || (checked && overlap.keys.has(s.key))
+                  slotErrors.has(`periods:${s.key}`) ||
+                  slotErrors.has(`row:${s.key}`) ||
+                  (checked && overlap.keys.has(s.key))
                     ? 'slot-row area-error'
                     : 'slot-row'
                 }

@@ -350,10 +350,13 @@ async def list_venue_bookings(
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 
-def _slot_labels(slots: list[VenueSlotIn]) -> list[tuple[str, VenueSlotIn]]:
-    """每一列的錯誤訊息開頭:「第 N 筆 日期」。同一天可以有好幾列,只給日期分不出是哪一列;
-    N 對得上畫面由上往下數第幾列(前端送的順序就是列的順序)。"""
-    return [(f"第 {i} 筆 {slot.date:%Y/%m/%d}", slot) for i, slot in enumerate(slots, 1)]
+def _slot_labels(slots: list[VenueSlotIn]) -> list[tuple[str, dict[str, int], VenueSlotIn]]:
+    """每一列的錯誤訊息開頭「第 N 筆 日期」與錯誤信封的 `meta.slot`(同一個 N)。同一天可以有
+    好幾列,只給日期分不出是哪一列;N 對得上畫面由上往下數第幾列(前端送的順序就是列的順序)。
+    列上沒有看得到的編號,前端靠 `meta.slot` 把那一列標紅、捲過去,不必讓人照著訊息去數。"""
+    return [
+        (f"第 {i} 筆 {slot.date:%Y/%m/%d}", {"slot": i}, slot) for i, slot in enumerate(slots, 1)
+    ]
 
 
 @router.post("/venue-bookings", status_code=201)
@@ -378,24 +381,26 @@ async def create_venue_booking(
         raise validation_error("請選擇借用活動")
 
     today = svc.today_taipei()
-    for where, slot in _slot_labels(body.slots):
+    for where, row, slot in _slot_labels(body.slots):
         # 過去時間全面禁止:過去日期直接擋;
         # 今天則以節次時刻表擋「最早節次已開始」的申請
         if slot.date < today:
-            raise validation_error(f"{where} 借用日期不得早於今天")
+            raise validation_error(f"{where} 借用日期不得早於今天", meta=row)
         if svc.booking_started(slot.date, slot.periods):
-            raise validation_error(f"{where} 所選時段已開始，請選擇尚未開始的時段")
+            raise validation_error(f"{where} 所選時段已開始，請選擇尚未開始的時段", meta=row)
         # 場地不開放規則:申請時即擋,核准端亦驗(與社團無關,放在鎖外)
         hit = await svc.blocked_periods(db, venue.id, slot.date, slot.periods)
         if hit:
-            raise validation_error(f"{where} 所選時段不開放借用（第 {'、'.join(hit)} 節）")
+            raise validation_error(
+                f"{where} 所選時段不開放借用（第 {'、'.join(hit)} 節）", meta=row
+            )
 
     # 同社同場地同日「節次重疊」才算重複(不同社的衝突由審核關把關)。
     # 節次不重疊的兩張單是兩件事:上午擺攤、晚上彩排本來就該各送一張。
     # 先鎖住這個社團:守門是先查再寫,雙擊送出的第二筆會查不到第一筆。
     # 同一批彼此重疊的在 schema 就擋掉了(`VenueBookingIn._no_overlap`)
     await svc.lock_resource(db, "club", user.club_id)
-    for where, slot in _slot_labels(body.slots):
+    for where, row, slot in _slot_labels(body.slots):
         dup = await db.scalar(
             sa.select(VenueBooking.id).where(
                 VenueBooking.club_id == user.club_id,
@@ -406,7 +411,7 @@ async def create_venue_booking(
             )
         )
         if dup:
-            raise conflict(f"{where} 同一場地同一天的相同節次已有申請")
+            raise conflict(f"{where} 同一場地同一天的相同節次已有申請", meta=row)
 
     rows = [
         VenueBooking(

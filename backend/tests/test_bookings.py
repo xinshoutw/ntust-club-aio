@@ -773,8 +773,11 @@ async def test_one_bad_slot_rejects_the_whole_batch(client, db, bad):
         headers=csrf_headers(client),
     )
     assert resp.status_code == (409 if bad == "duplicate" else 422), resp.text
-    # 同一天可以有好幾列:訊息開頭帶「第幾筆」與日期,才分得出是哪一列
-    assert resp.json()["error"].startswith(f"第 2 筆 {bad_day:%Y/%m/%d} ")
+    # 同一天可以有好幾列:訊息開頭帶「第幾筆」與日期,才分得出是哪一列;
+    # meta.slot 是同一個 N,前端拿它把那一列標紅(列上沒有看得到的編號)
+    body = resp.json()
+    assert body["error"].startswith(f"第 2 筆 {bad_day:%Y/%m/%d} ")
+    assert body["meta"]["slot"] == 2
     assert await _venue_booking_count(db) == before
 
 

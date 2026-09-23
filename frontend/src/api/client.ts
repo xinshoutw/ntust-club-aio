@@ -92,11 +92,14 @@ export class ApiError extends Error {
   status: number
   /** 信封的 meta.code(如 CLUB_HAS_MEMBERS);非 JSON 信封的錯誤沒有,為 undefined */
   code?: string
-  constructor(message: string, status: number, code?: string) {
+  /** 信封的整個 meta:code 以外的機器可讀附帶資訊(例:一次送多筆時出錯的是第幾筆,`slot`) */
+  meta: Record<string, unknown>
+  constructor(message: string, status: number, code?: string, meta: Record<string, unknown> = {}) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
+    this.meta = meta
   }
 }
 
@@ -150,7 +153,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<ApiResp
     const error = body.error ?? `HTTP ${res.status}`
     const detail = validationDetail((body.meta as { detail?: unknown } | null)?.detail)
     const code = (body.meta as { code?: string } | null)?.code
-    throw new ApiError(detail ? `${error}:${detail}` : error, res.status, code)
+    throw new ApiError(detail ? `${error}:${detail}` : error, res.status, code, body.meta ?? {})
   }
   return body
 }

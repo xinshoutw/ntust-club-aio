@@ -103,7 +103,7 @@ def _envelope(status: int, error: str, meta: dict | None = None) -> JSONResponse
 # 錯誤也走統一信封 { success, data, error, meta },前端只需解析一種格式
 @app.exception_handler(AppError)
 async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
-    return _envelope(exc.status, exc.message, {"code": exc.code})
+    return _envelope(exc.status, exc.message, {**exc.meta, "code": exc.code})
 
 
 @app.exception_handler(StarletteHTTPException)

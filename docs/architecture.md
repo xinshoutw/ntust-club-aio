@@ -75,7 +75,7 @@ REST JSON,前綴 `/api/v1`。回應信封:
 { "success": false, "data": null, "error": "使用者可讀訊息", "meta": { "code": "機器碼" } }
 ```
 
-`error` 一律繁中、面向使用者、不含內部細節;未攔截例外回 500 通用訊息,細節只進 log(engine 開 `hide_parameters`,繫結參數不進 log)。`meta.code` 是機器可讀錯誤碼;前端 `client.ts` 目前只取 `error` 字串拋出、不讀 code(首登改密的導轉走 `user.mustChangePassword`),要依錯誤分流時再於該層取用。
+`error` 一律繁中、面向使用者、不含內部細節;未攔截例外回 500 通用訊息,細節只進 log(engine 開 `hide_parameters`,繫結參數不進 log)。`meta.code` 是機器可讀錯誤碼;`meta` 也可以帶其他機器可讀的附帶資訊(`AppError(meta=...)`,例:一次送多筆的臨時場地借用出錯時帶 `slot`,是第幾筆,從 1 起)。前端 `client.ts` 把 `error` 當訊息拋出 `ApiError`,`code` 與整個 `meta` 掛在上面(首登改密的導轉走 `user.mustChangePassword`,不靠錯誤碼)。
 
 | HTTP | code | 情境 |
 |------|------|------|

@@ -6,6 +6,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import VenueBookingPage from './VenueBookingPage'
 import type { VenueBookingInput } from '../../api/bookings'
 import { taipeiToday } from '../../lib/today'
+import { ApiError } from '../../api/client'
 
 // 一次送多個時段(D-43):每一筆右側「+」「−」,送出時一筆一張單
 const mutate = vi.fn()
@@ -377,6 +378,36 @@ test('送出被擋時捲到第一個出問題的列', async () => {
     submit()
     await waitFor(() => expect(scroll).toHaveBeenCalled())
     expect(scroll.mock.contexts[0]).toBe(rows()[1])
+  } finally {
+    scroll.mockRestore()
+  }
+})
+
+// 已開始、不開放、與既有申請重複只有後端驗得出來,訊息說「第 N 筆」,但列上沒有看得到的編號:
+// 靠信封的 meta.slot 把那一列標紅、捲過去,改了那一列就解除
+test('後端指出第幾筆出錯時，那一列標紅並捲過去', async () => {
+  const scroll = vi.spyOn(Element.prototype, 'scrollIntoView')
+  try {
+    renderPage()
+    addAfter(1)
+    pickDate(rows()[1], '2099/01/03')
+    pickPeriod(rows()[1], '4')
+    mutate.mockImplementationOnce((_input, { onError }) =>
+      onError(
+        new ApiError('第 2 筆 2099/01/03 同一場地同一天的相同節次已有申請', 409, 'CONFLICT', {
+          code: 'CONFLICT',
+          slot: 2,
+        }),
+      ),
+    )
+    submit()
+    expect(await screen.findByText('第 2 筆 2099/01/03 同一場地同一天的相同節次已有申請')).toBeTruthy()
+    expect(rows().map((r) => r.classList.contains('area-error'))).toEqual([false, true])
+    await waitFor(() => expect(scroll).toHaveBeenCalled())
+    expect(scroll.mock.contexts[0]).toBe(rows()[1])
+
+    pickPeriod(rows()[1], '3')
+    expect(rows()[1].classList.contains('area-error')).toBe(false)
   } finally {
     scroll.mockRestore()
   }

@@ -581,7 +581,9 @@ PREVIEW_MAX_ICC_BYTES = 64 * 1024
 # 同時最多轉幾張:正式機是 2 vCPU + 4GB 還跟 PostgreSQL 同住,asyncio 預設 thread pool 會放 6 條進去,
 # 結案照片牆一次要 20 張縮圖就是 6 張同時解 —— 兩張已經吃滿兩顆核心。用專屬的 2 條 thread pool
 # 而不是 Semaphore:請求被取消時 to_thread 裡的 thread 不會停,Semaphore 卻會先放行下一張,
-# 「最多 2 張」就不是真的;pool 本身封頂,取消只是讓等待的人先走
+# 「最多 2 張」就不是真的;pool 本身封頂,取消只是讓等待的人先走。
+# 這些都是每個行程各一份(pool、下面的 single-flight 與失敗記錄):現在是單一 worker,
+# 改成 `--workers N` 的話同時轉的是 2N 張,冷卻與公開通道的排隊上限也各算各的
 _PREVIEW_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="preview")
 # 形象圖轉 WebP 另走一條:`save_club_image` 是拿著全站唯一的上傳鎖(`_STORAGE_LOCK_KEY`)在等轉檔,
 # 排在照片預覽後面的話,匿名把預覽池塞滿,全站的上傳就一起卡在那把鎖上(還各握一條 DB 連線)。
@@ -595,12 +597,12 @@ def _render_preview(src: Path, dst: Path) -> None:
     站內只轉瀏覽器解不了的(`_PREVIEW_CONVERTIBLE`,見 file_response);社團頁的照片通道
     每一張都轉,什麼格式都一樣(D-42)。
 
-    先寫暫存再 rename:暫存名帶 uuid —— 同一張同時被兩個請求轉(preview_of 的檢查與轉檔之間
-    有空窗),各寫各的、誰後 rename 誰的留下;用 pid 命名的話兩條 thread 是同一個 pid,
+    先寫暫存再 rename:暫存名帶 uuid —— 同一行程內 preview_of 已把同一張合併成一次,
+    但多個 worker 行程仍可能同時轉同一張,各寫各的、誰後 rename 誰的留下;共用一個暫存名的話
     會交錯寫進同一個檔,壞掉的 JPEG 從此被永久快取。失敗或中斷都不留 .part。
     """
     if dst.is_file():
-        return  # 排隊時前一個已經轉好同一張(preview_of 的檢查與這裡之間有空窗)
+        return  # 另一個 worker 行程已經轉好同一張
     tmp = dst.with_name(f"{dst.name}.{uuid.uuid4().hex}.part")
     try:
         with Image.open(src) as img:
@@ -659,7 +661,8 @@ async def preview_of(disk: Path, *, max_backlog: int | None = None) -> Path | No
         job = asyncio.ensure_future(_convert(disk, dst))
         _PREVIEW_INFLIGHT[disk] = job
         job.add_done_callback(lambda _: _PREVIEW_INFLIGHT.pop(disk, None))
-    # shield:一個請求被取消(使用者關掉頁面)不該讓等同一張的其他請求一起落空
+    # shield:等的人被取消(逾時、伺服器改成斷線即取消)不該讓等同一張的其他請求一起落空。
+    # 目前的 uvicorn 斷線並不取消 handler,排進去的轉檔一律跑完(公開通道因此有排隊上限)
     return await asyncio.shield(job)
 
 
@@ -774,7 +777,11 @@ async def save_club_image(
 async def file_response(
     db: AsyncSession, file_id: uuid.UUID, user: User, *, as_image: bool = False
 ) -> FileResponse:
-    """`as_image`=請求來自 <img>(router 由 Sec-Fetch-Dest 判定):瀏覽器解不了的圖改送 JPEG 預覽。"""
+    """`as_image`=請求來自 <img>(router 由 Sec-Fetch-Dest 判定):瀏覽器解不了的圖改送 JPEG 預覽。
+
+    要轉檔時會先 `db.close()` 把連線還回池子再排隊:呼叫端之後不能再用這個 session,
+    手上的 `file`/`user` 也已經是 detached 物件(要補寫稽核之類的,得在呼叫之前做)。
+    """
     file = await db.get(File, file_id)
     if file is None or not await can_access(db, file, user):
         raise not_found("找不到檔案")  # 無權限與不存在同訊息,避免探測

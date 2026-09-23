@@ -35,3 +35,12 @@ test('圖片預覽的 transform-origin 由 index.css 蓋回置中', () => {
   const css = readFileSync('src/index.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
   expect(css).toMatch(rule)
 })
+
+// design-guide §8 的焦點框:縮圖牆的鍵盤入口是 AntD 掛上 role=button 的那一層,選擇器要對得上它
+test('可預覽的圖片縮圖拿到焦點時是 §8 的藍框', () => {
+  render(createElement(Image, { src: '/a.jpg', alt: 'a' }))
+  const trigger = screen.getByRole('img', { name: 'a' }).closest('[tabindex="0"]')
+  expect(trigger?.matches(".ant-image[role='button']")).toBe(true)
+  const css = readFileSync('src/index.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+  expect(css).toMatch(/\.ant-image\[role='button'\]:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--focus\)/)
+})

@@ -162,6 +162,13 @@ body {
   outline-offset: 2px;
 }
 
+/* AntD 的圖片縮圖可預覽時本身就是按鈕(role=button、tabIndex=0):焦點框同上,
+   不然各處縮圖牆是瀏覽器預設那圈 */
+.ant-image[role='button']:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 /* 非單一控件的區塊(照片區等)送出驗證未過時的紅框;搭配常駐透明邊框避免版面位移 */
 .area-error {
   border-color: #c13b34 !important;

@@ -11,7 +11,7 @@ import {
 } from '@ant-design/icons'
 import QueryError from '../../components/ui/QueryError'
 import { useAuth } from '../../app/auth'
-import { periodKeys, usePeriodCatalogue } from '../../lib/periods'
+import { periodKeys, startedPeriods, usePeriodCatalogue } from '../../lib/periods'
 import {
   useAvailability,
   useAvailabilityDays,
@@ -287,8 +287,13 @@ export default function BookingGrid({
 
   const thStyle: React.CSSProperties = { fontSize: 11, fontWeight: 500, color: 'var(--steel)' }
 
-  // 可點=呼叫端給得出入口,且那一天還借得到
-  const canBook = (d: Dayjs) => !!onBookVenue && (allowPast || !d.isBefore(todayStart, 'day'))
+  // 可點=呼叫端給得出入口,且那一格還借得到:過去的日子不行,今天已開始的節次也不行 ——
+  // 申請頁選不到那一節(前後端都擋),點進去只會是一列有日期、沒有節次的表單。行政補登不受限
+  const started = startedPeriods(periodCatalogue.periods)
+  const canBook = (d: Dayjs, period: string) =>
+    !!onBookVenue &&
+    (allowPast ||
+      (!d.isBefore(todayStart, 'day') && !(d.isSame(todayStart, 'day') && started.includes(period))))
   const canBorrow = (d: Dayjs) => !!onBookEquipment && (allowPast || !d.isBefore(todayStart, 'day'))
 
   return (
@@ -491,7 +496,7 @@ export default function BookingGrid({
                             club={club}
                             pending={pending}
                             onOpenPending={onOpenPending}
-                            bookable={canBook(gridDate)}
+                            bookable={canBook(gridDate, p)}
                             bookLabel={bookLabel}
                             onBook={() => onBookVenue?.(v.id, gridDate, p)}
                           />
@@ -532,7 +537,7 @@ export default function BookingGrid({
                               club={club}
                               pending={pending}
                               onOpenPending={onOpenPending}
-                              bookable={canBook(d)}
+                              bookable={canBook(d, p)}
                               bookLabel={bookLabel}
                               onBook={() => onBookVenue?.(venueDef.id, d, p)}
                             />

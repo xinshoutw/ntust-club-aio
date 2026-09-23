@@ -99,7 +99,7 @@ def venue_booking_started_expr(now: datetime | None = None) -> sa.ColumnElement[
     正在申請/最近申請的分界:時間經過申請起始時刻即移到「最近」。
     遷移自舊系統的資料 periods 未必有序,不能只看陣列第一個元素;
     以「與今天已開始節次集合重疊(&&)」逐元素比對,結果與元素順序無關
-    (新資料由 VenueBookingIn 依節次順序排序後存入,兩種資料皆正確)。
+    (新資料由 VenueSlotIn 依節次順序排序後存入,兩種資料皆正確)。
     """
     today = today_taipei(now)
     expr: sa.ColumnElement[bool] = VenueBooking.date < today

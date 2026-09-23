@@ -319,10 +319,16 @@ D-19 那道「只在真的要存 profile 時擋」的閘**,於是那一按跳的
     (uvicorn 斷線不取消 handler,排進去的一律跑完)
   - 借用:「已開始」改用台北牆鐘(`lib/today.taipeiNow`,紐約的裝置原本把今天整排算成已開始);
     container query 改範圍語法(縮放 125%/150% 的 913.5px 兩條都不中);後端逐列錯誤帶 `meta.slot`
-    (`AppError(meta=...)`,前端 `ApiError.meta`)
+    (`AppError(meta=...)`,前端 `ApiError.meta`),頁面在 onError 當下依列的 key 捲過去
+    (onError 不在 React 事件裡,「等紅框畫出來再找」在 Chromium 與 Firefox 都找不到 —— jsdom 重現不了,
+    測試改成要求 onError 當下就捲);前端驗證失敗不再擦掉後端標的那一列;
+    停權判斷(`lib/status.suspendedNow`,借用三頁的送出鈕靠它)與行政端撤銷鈕改用台北日
   - 測試補齊:申請附件與結案附件的 group、檢視器對話框名稱、`index.css.test.ts` 兩支選擇器 regex
     只收整條選擇器、已開始那一筆的批次錯誤(`freeze_taipei` 搬到 `tests/test_bookings.py`)、
-    15 天場況圖、只缺日期的列也捲得到、修飾鍵點附件、登入端 HEIC 預覽不吃排隊上限
+    15 天場況圖、只缺日期的列也捲得到、修飾鍵點附件(Ctrl/⌘/Shift/Alt/中鍵)、登入端 HEIC 預覽
+    不吃排隊上限、`api()` 把信封的 `meta` 掛上 `ApiError`
+  - 文件:design-guide §7 的「提示放 `extra`」例外、§8 改成照實寫「刻意不響應 `prefers-reduced-motion`」
+    (2026-08-31 事故後的決定,原本寫「全關」);D-43 講清楚批內重疊是 schema 的 422、沒有 `meta.slot`
 - **沒做**:社團設定與行政端的形象圖只有顯示沒有預覽(不在這次的範圍);
   活動審核彈窗的 docx 附件仍無法線上預覽(評鑑兩頁會先抓 blob,彈窗沒有,既有的不一致);
   公開照片的預覽快取是被看到才轉,沒有預先暖好(全部轉一輪約 950 MB,`DEPLOY_CHECKLIST.md` 已補)——
@@ -335,7 +341,11 @@ D-19 那道「只在真的要存 profile 時擋」的閘**,於是那一按跳的
     沒節次的一列;今天已開始的空格仍標「可借」、同色,看不出為什麼點不動
   - 借用頁 Form 的 `scrollToFirstError` 沒有測試(AntD 用 scroll-into-view-if-needed,jsdom 攔不到)
   - 轉檔池、single-flight、冷卻與排隊上限都是每個 worker 行程一份(現在單一 worker,註解已寫)
-  - 行政端 `BookingReviewModal` 與 `lib/status` 仍用裝置本地日比「過去日」(承辦都在台灣,影響小)
+  - 還在拿裝置時鐘比台北時間的既有程式(審查列的,這次只修了停權與撤銷鈕):
+    時刻 —— `ActivityFormPage` 新申請的開始時刻(後端 `_require_future_start` 用台北時間)、
+    `SignupBuilderPage`、`SignupEditModal`;日界 —— `TakeoverOverlay`、`ViolationsPage`、
+    `api/overview`、`OverduePage`、`AnnouncementsPage`、`SignupBuilderPage`、`PtViolationFormPage`、
+    `ActivityFormPage`、`api/adminSignups`(design-guide 規定一律 `taipeiToday` / `taipeiNow`)
   - `index.css.test.ts` 的選擇器 regex 仍會接受包在 `@media` 裡的規則
 - 開發機上既有的 15 個 `.preview.jpg` 是舊規則轉的(帶 COM、沒 ICC):要看新結果就
   `find backend/data/uploads -name '*.preview.jpg' -delete`,被看到時會重轉
@@ -343,7 +353,7 @@ D-19 那道「只在真的要存 profile 時擋」的閘**,於是那一按跳的
 ## 驗證現況
 
 - 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **743 passed**;`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **386 passed**(71 檔)、
+- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **388 passed**(71 檔)、
   `pnpm run lint` 56 個既有 warning(fast-refresh / set-state-in-effect / refs;
   基準值,新增變更前後要一樣)
 - 新測試做過 mutation 驗證(改回舊寫法會紅;已知例外:`exif_transpose` 那行拿掉不會紅,見測試 docstring);借用色格圖那支另在 `TZ=UTC` 與 `TZ=Pacific/Honolulu` 下各跑過一次

@@ -606,19 +606,31 @@ def _render_preview(src: Path, dst: Path) -> None:
         tmp.unlink(missing_ok=True)
 
 
+# 轉不出來的來源記在行程內:壞檔每次都要整張解到最後才失敗,而社團頁的照片通道匿名打得到
+# (D-42)—— 不記的話,同一張壞圖可以被拿來反覆佔住只有兩條的轉檔池、寫一份份 traceback。
+# 重啟即清(換過原檔的也就重試了);只有真的壞掉的檔會進來,大小以此為界
+_PREVIEW_FAILED: set[Path] = set()
+
+
 async def preview_of(disk: Path) -> Path | None:
     """轉檔預覽的磁碟路徑;沒有快取就轉一次(專屬 thread pool,不擋 event loop,同時最多兩張)。
 
-    磁碟到告警水位(90%,與上傳閘同一條線)就**不再建新快取**、回 None 讓呼叫端給原檔:
+    轉不出來(壞檔、超過像素上限、原檔不見)記 log、回 None,同一張之後直接回 None 不再解碼。
+    磁碟到告警水位(90%,與上傳閘同一條線)就**不再建新快取**、回 None:
     上傳被擋住了,瀏覽幾 GB 的歷史 HEIC 卻還在寫快取,吃掉的是留給 PostgreSQL 與 log 的最後空間。
-    已經轉好的照常給。
+    已經轉好的照常給。回 None 時怎麼辦由呼叫端決定(站內給原檔,公開通道 404)。
     """
     dst = disk.with_name(disk.name + PREVIEW_SUFFIX)
     if dst.is_file():
         return dst
-    if disk_level() == "alert":
+    if disk in _PREVIEW_FAILED or disk_level() == "alert":
         return None
-    await asyncio.get_running_loop().run_in_executor(_PREVIEW_POOL, _render_preview, disk, dst)
+    try:
+        await asyncio.get_running_loop().run_in_executor(_PREVIEW_POOL, _render_preview, disk, dst)
+    except Exception:
+        _PREVIEW_FAILED.add(disk)
+        logger.exception("preview render failed: %s", disk)
+        return None
     return dst
 
 
@@ -736,12 +748,8 @@ async def file_response(
         and file.mime in _PREVIEW_CONVERTIBLE
         and file.size <= PREVIEW_MAX_SOURCE_BYTES
     ):
-        try:
-            preview = await preview_of(disk)
-        except Exception:
-            # 轉不了(檔案壞了、太大、編碼不支援)就照舊給原檔;破圖總比 500 好,log 才查得到是哪一張
-            logger.exception("preview render failed: file=%s mime=%s", file.id, file.mime)
-            preview = None
+        # 轉不了(檔案壞了、太大、編碼不支援)就照舊給原檔:破圖總比 500 好(preview_of 會記 log)
+        preview = await preview_of(disk)
         if preview is not None:
             response = FileResponse(
                 preview,

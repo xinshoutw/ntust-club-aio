@@ -7,7 +7,6 @@
 不開放原因,拿不到的只有待審單清單。
 """
 
-import logging
 import uuid
 from collections import defaultdict
 from datetime import date
@@ -33,8 +32,6 @@ from app.schemas.public import ClubCardOut, ClubDetailOut, PublicActivityOut
 from app.services import activity_service
 from app.services import booking_service as svc
 from app.services import files as file_service
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/public", tags=["public"])
 
@@ -327,12 +324,13 @@ async def public_activity_photo(file_id: uuid.UUID, db: DbDep) -> Response:
     file = await db.scalar(_public_photos(File).where(File.id == file_id))
     if file is None:
         raise not_found("找不到檔案")
-    try:
-        preview = await file_service.preview_of(Path(settings.upload_dir) / file.path)
-    except Exception:
-        # 壞檔、超過像素上限或盤上根本沒有這個檔:log 才查得到是哪一張;對外一律 404
-        logger.exception("public photo preview failed: file=%s", file.id)
-        preview = None
+    disk = Path(settings.upload_dir) / file.path
+    # 排隊等轉檔之前先把連線還回池子:轉檔池只有兩條,匿名的請求在那裡等的時候
+    # 不該同時握著全站共用的 DB 連線
+    await db.close()
+    # 壞檔、超過像素上限、原檔不見或磁碟到告警水位:對外一律 404(preview_of 記 log,
+    # 壞檔只解一次)
+    preview = await file_service.preview_of(disk)
     if preview is None:
         raise not_found("找不到檔案")
     # 當場讀進來(同形象圖):數百 KB 的成品,換掉「檢查與開檔之間被刪」的 500

@@ -602,3 +602,40 @@ async def test_an_unrenderable_photo_is_404_never_the_original(client, db, monke
         monkeypatch.setattr(file_service, "disk_level", lambda usage=None: "alert")
 
     assert (await client.get(f"{PHOTO_URL}/{photos[0].id}")).status_code == 404
+
+
+async def test_a_broken_photo_is_decoded_once_not_on_every_request(client, db, monkeypatch):
+    """壞檔每次都要整張解到最後才失敗,而這條通道匿名打得到:不記住的話,
+    同一張壞圖可以被拿來反覆佔住只有兩條的轉檔池(開發庫就有一張截斷的 JPEG)。"""
+    _, _, photos = await activity_with_photos(db, n=1)
+    (settings.upload_dir / photos[0].path).write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
+    calls: list = []
+    real = file_service._render_preview
+
+    def counting(src, dst):
+        calls.append(src)
+        real(src, dst)
+
+    monkeypatch.setattr(file_service, "_render_preview", counting)
+    for _ in range(3):
+        assert (await client.get(f"{PHOTO_URL}/{photos[0].id}")).status_code == 404
+    assert len(calls) == 1
+
+
+async def test_no_db_connection_is_held_while_waiting_for_the_converter(client, db, monkeypatch):
+    """轉檔池只有兩條,匿名請求在那裡排隊時不該同時握著全站共用的 DB 連線 ——
+    否則幾十個並發請求就把連線池借光,登入後的頁面跟著逾時。"""
+    from app.core.db import engine
+
+    _, _, photos = await activity_with_photos(db, n=1)
+    await db.close()  # 測試自己的 session 也還回去,量到的才只有請求那一條
+    held: list[int] = []
+    real = file_service._render_preview
+
+    def measuring(src, dst):
+        held.append(engine.pool.checkedout())
+        real(src, dst)
+
+    monkeypatch.setattr(file_service, "_render_preview", measuring)
+    assert (await client.get(f"{PHOTO_URL}/{photos[0].id}")).status_code == 200
+    assert held == [0]

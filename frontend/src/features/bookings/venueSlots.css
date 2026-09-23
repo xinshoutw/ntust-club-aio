@@ -3,6 +3,9 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  /* 版面依這一欄自己的寬度切,不看視窗:側欄、外殼內距與捲軸寬(Windows 常駐 17px,
+     headless 量測時是 0)都會改變「視窗多寬時列有多寬」,用 viewport 斷點算不準 */
+  container-type: inline-size;
 }
 .slot-row {
   display: grid;
@@ -28,11 +31,10 @@
   display: flex;
   gap: 6px;
 }
-/* 節次那一排(14 顆至少 638px)要跟日期、「+」「−」擠在同一行,整列得有 900px 上下 ——
-   側欄展開時約是視窗 1270px 以上。不夠寬就改兩行:日期與「+」「−」一行、節次獨佔下一行
-   (flex-wrap 的話按鈕會被擠到第三行自成一列;硬擠一行則 1024px 上 10、A–D 要橫捲才看得到,
-   晚間節次正是社團常借的)。兩行時日期欄可以縮:320px 上固定 140 會被「+」壓住 */
-@media (max-width: 1279px) {
+/* 一行放得下日期 140、節次 14 顆(638)、「+」「−」86,加兩個間距與列的內距邊框,
+   整列要 914px。不夠寬就改兩行:日期與「+」「−」一行、節次獨佔下一行(flex-wrap 的話
+   按鈕會被擠到第三行自成一列)。節次那一行再不夠寬(整列 < 664px)就照舊橫捲 */
+@container (max-width: 913px) {
   .slot-row {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
@@ -40,8 +42,9 @@
       'periods periods';
   }
 }
-/* 320px 上日期欄只剩 114px,日期本身塞不下:日曆圖示讓位(點欄位照樣開日曆) */
-@media (max-width: 359px) {
+/* 兩行時日期欄跟著縮;整列 < 264px 時它已不到 140,日期本身塞不下:日曆圖示讓位
+   (點欄位照樣開日曆) */
+@container (max-width: 263px) {
   .slot-row .ant-picker-suffix {
     display: none;
   }

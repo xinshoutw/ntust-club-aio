@@ -45,5 +45,8 @@ test('可預覽的圖片縮圖拿到焦點時是 §8 的藍框', () => {
   const trigger = screen.getByRole('img', { name: 'a' }).closest('[tabindex="0"]')
   expect(trigger?.matches(".ant-image[role='button']")).toBe(true)
   const css = readFileSync('src/index.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
-  expect(css).toMatch(/\.ant-image\[role='button'\]:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--focus\)/)
+  // 一整條選擇器就是它(同上一支):`.act-photos .ant-image[...]` 這種只管得到某一區的不算
+  expect(css).toMatch(
+    /(?:^|[{},])\s*\.ant-image\[role='button'\]:focus-visible\s*(?:,[^{]*)?\{[^}]*outline:\s*2px solid var\(--focus\)/,
+  )
 })

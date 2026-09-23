@@ -8,7 +8,7 @@ import type { StatusKey } from '../../lib/status'
 import { roomEntryText } from '../../api/bookings'
 import { hasPublicData, useAdminClubDetail } from '../../api/adminClubs'
 import ClubPublicSummary from '../../components/ui/ClubPublicSummary'
-import { fileDownloadUrl } from '../../api/adminFiles'
+import AttachmentLinks from '../../components/ui/AttachmentLinks'
 import {
   useAdminBookingMutations,
   type AdminRoomRequest,
@@ -132,20 +132,7 @@ export default function ClubOverviewPage() {
         // 佐證是報修的判斷依據,唯讀詳情也要看得到
         [
           '佐證',
-          m.evidence.length ? (
-            <span key="ev">
-              {m.evidence.map((f, i) => (
-                <span key={f.id}>
-                  {i > 0 && ' · '}
-                  <a href={fileDownloadUrl(f.id)} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--focus)' }}>
-                    {f.name}
-                  </a>
-                </span>
-              ))}
-            </span>
-          ) : (
-            '—'
-          ),
+          m.evidence.length ? <AttachmentLinks key="ev" files={m.evidence} inline /> : '—',
         ],
         ...(m.handleNote ? ([['處理備註', m.handleNote]] as [string, React.ReactNode][]) : []),
       ],

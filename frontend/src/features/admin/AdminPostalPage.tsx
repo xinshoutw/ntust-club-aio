@@ -3,7 +3,7 @@ import LoadingBlock from '../../components/ui/LoadingBlock'
 import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { Cols, Pager } from '../../components/ui/tableControls'
-import { fileDownloadUrl } from '../../api/adminFiles'
+import AttachmentLinks from '../../components/ui/AttachmentLinks'
 import { StatusCell } from './ApplicationStatusCell'
 import {
   APPLICATIONS_PAGE_SIZE,
@@ -65,14 +65,7 @@ export default function AdminPostalPage() {
                   {/* 承辦要核對局號帳號,存簿影本不該只在檔案管理找得到 */}
                   <td className="cell-clip" style={{ fontSize: 13 }} title={p.passbook.map((f) => f.name).join('、')}>
                     {p.passbook.length
-                      ? p.passbook.map((f, i) => (
-                          <span key={f.id}>
-                            {i > 0 && ' · '}
-                            <a href={fileDownloadUrl(f.id)} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--focus)' }}>
-                              {f.name}
-                            </a>
-                          </span>
-                        ))
+                      ? <AttachmentLinks files={p.passbook} inline />
                       : <span style={{ color: 'var(--steel)' }}>—</span>}
                   </td>
                   <td className="num" style={{ fontSize: 13 }}>{p.date}</td>

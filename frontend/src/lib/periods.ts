@@ -1,3 +1,4 @@
+import { useEffect, useReducer } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useAuth } from '../app/auth'
@@ -59,6 +60,17 @@ export const bookingStartAt = (periods: readonly Period[], date: string, picked:
 export const bookingStarted = (periods: readonly Period[], date: string, picked: string[]): boolean => {
   const start = bookingStartAt(periods, date, picked)
   return picked.length > 0 && start.isValid() && !start.isAfter(taipeiNow())
+}
+
+/** 每分鐘重畫一次:「已開始」是時間走出來的,不是資料變出來的 —— 頁面開著跨過節次起點時,
+ *  場況圖的入口與申請頁的節次要跟著收,不能等到別的東西觸發重畫(那樣只會在送出時吃後端的 422)。
+ *  ponytail: 固定每分鐘,不對齊下一個節次起點;節次起點精確到分,最多晚一分鐘,後端照樣會擋 */
+export function useMinuteTick(): void {
+  const [, tick] = useReducer((n: number) => n + 1, 0)
+  useEffect(() => {
+    const id = setInterval(tick, 60_000)
+    return () => clearInterval(id)
+  }, [])
 }
 
 /** 台北現在已開始的節次(起點 ≤ now):選「今天」時禁選用 */

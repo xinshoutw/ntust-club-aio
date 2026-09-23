@@ -11,7 +11,7 @@ import {
 } from '@ant-design/icons'
 import QueryError from '../../components/ui/QueryError'
 import { useAuth } from '../../app/auth'
-import { periodKeys, startedPeriods, usePeriodCatalogue } from '../../lib/periods'
+import { periodKeys, startedPeriods, useMinuteTick, usePeriodCatalogue } from '../../lib/periods'
 import {
   useAvailability,
   useAvailabilityDays,
@@ -213,6 +213,7 @@ export default function BookingGrid({
   onOpenPending,
 }: BookingGridProps) {
   const periodCatalogue = usePeriodCatalogue()
+  useMinuteTick() // 今天已開始的節次跟著時間收掉入口
   const periodAxis = periodKeys(periodCatalogue.periods)
   // 「我的借用」只有社團帳號標得出來(後端以 own_club_id 判定);
   // 行政端與未登入首頁列了也永遠不會出現,圖例就不該有那一格

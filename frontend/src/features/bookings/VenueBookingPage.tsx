@@ -9,7 +9,7 @@ import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
 import { PHONE_RULE, normalizePhone } from '../../lib/form'
 import { confirmDialog } from '../../lib/confirm'
-import { bookingStarted, periodKeys, startedPeriods, usePeriods } from '../../lib/periods'
+import { bookingStarted, periodKeys, startedPeriods, useMinuteTick, usePeriods } from '../../lib/periods'
 import { notFoundText } from '../../lib/selectOptions'
 import { useNoActivityAccount } from '../../lib/noActivityAccount'
 import QueryError from '../../components/ui/QueryError'
@@ -75,6 +75,7 @@ const overlappingSlots = (slots: SlotDraft[]): { keys: Set<number>; first: strin
 export default function VenueBookingPage() {
   const { message, modal } = App.useApp()
   const periodCatalogue = usePeriods()
+  useMinuteTick() // 表單開著跨過節次起點:今天那幾列已選的節次跟著收(見下方的剔除 effect)
   const periodAxis = periodKeys(periodCatalogue)
   const [form] = Form.useForm()
   const { suspended } = useClubSuspension()

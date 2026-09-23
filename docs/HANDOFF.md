@@ -337,8 +337,8 @@ D-19 那道「只在真的要存 profile 時擋」的閘**,於是那一按跳的
   - 其他借用端點的稽核沒帶單號:`manual_venue_booking_created`(之後會以 `venue_booking={id}` 撤銷,
     建立那筆對不上)、`manual_equipment_loan_created`,`room_booking_submitted` 與
     `equipment_loan_submitted` 連 detail 都沒有 —— 修法同 384fd23a(先 flush 再記 `{kind}={id};...`)
-  - 場況圖的「已開始」只在重畫時判斷:頁面開著跨過節次起點,那一格仍可點,點進去是有日期、
-    沒節次的一列;今天已開始的空格仍標「可借」、同色,看不出為什麼點不動
+  - 今天已開始的空格仍標「可借」、同色,看不出為什麼點不動(「已開始」本身現在每分鐘重算,
+    `lib/periods.useMinuteTick`,PR #35 的 Greptile 審查)
   - 借用頁 Form 的 `scrollToFirstError` 沒有測試(AntD 用 scroll-into-view-if-needed,jsdom 攔不到)
   - 轉檔池、single-flight、冷卻與排隊上限都是每個 worker 行程一份(現在單一 worker,註解已寫)
   - 還在拿裝置時鐘比台北時間的既有程式(審查列的,這次只修了停權與撤銷鈕):

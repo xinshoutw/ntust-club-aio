@@ -1,6 +1,6 @@
 import { beforeEach, expect, test, vi } from 'vitest'
 import dayjs from 'dayjs'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import BookingGrid from './BookingGrid'
 import { taipeiToday } from '../../lib/today'
 import type { Period } from '../../api/auth'
@@ -241,4 +241,18 @@ test('單一場地 15 天檢視也不給今天已開始的節次入口，其他�
   const today = taipeiToday().format('MM/DD')
   expect(cells(new RegExp(`^${today} 第3節`))).toHaveLength(0)
   expect(cells()).toHaveLength(7) // 今天前後各 7 天:前 7 天已過去,只剩後 7 天
+})
+
+// 「已開始」是時間走出來的:頁面開著跨過節次起點,不能等別的東西觸發重畫才收掉入口
+test('頁面開著跨過節次起點，一分鐘內那一格就不給入口', () => {
+  vi.useFakeTimers()
+  try {
+    render(<BookingGrid onBookVenue={vi.fn()} />)
+    expect(cells()).toHaveLength(1)
+    started = ['3']
+    act(() => vi.advanceTimersByTime(60_000))
+    expect(cells()).toHaveLength(0)
+  } finally {
+    vi.useRealTimers()
+  }
 })

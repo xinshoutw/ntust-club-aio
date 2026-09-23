@@ -2,7 +2,7 @@ import { describe, expect, test, vi } from 'vitest'
 import { App } from 'antd'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import VenueBookingPage from './VenueBookingPage'
 import type { VenueBookingInput } from '../../api/bookings'
 import { taipeiToday } from '../../lib/today'
@@ -437,5 +437,22 @@ test('後端指出第幾筆出錯時，那一列標紅並捲過去', async () =>
     expect(rows()[1].classList.contains('area-error')).toBe(false)
   } finally {
     scroll.mockRestore()
+  }
+})
+
+// 表單開著跨過節次起點:不必等使用者再動一下,一分鐘內今天那一列已選的那一節就收掉
+test('表單開著跨過節次起點，一分鐘內今天已選的那一節就收掉', () => {
+  vi.useFakeTimers()
+  try {
+    renderPage(`venue=9&date=${taipeiToday().format('YYYY/MM/DD')}&period=4`)
+    const four = () => within(rows()[0]).getByRole('button', { name: '4' })
+    expect(four().getAttribute('aria-pressed')).toBe('true')
+    started = ['3', '4']
+    act(() => vi.advanceTimersByTime(60_000))
+    expect(four().getAttribute('aria-pressed')).toBe('false')
+    expect(four()).toHaveProperty('disabled', true)
+  } finally {
+    started = []
+    vi.useRealTimers()
   }
 })

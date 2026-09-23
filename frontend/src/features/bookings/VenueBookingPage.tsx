@@ -201,7 +201,8 @@ export default function VenueBookingPage() {
       if (!s.date) errors.add(`date:${s.key}`)
       if (!s.periods.length) errors.add(`periods:${s.key}`)
     }
-    setSlotErrors(errors)
+    // 後端標的整列(`row:`)留著:那一列沒動過,問題還在;改了那一列才解除(patchSlot)
+    setSlotErrors((cur) => new Set([...[...cur].filter((k) => k.startsWith('row:')), ...errors]))
     setChecked(true)
     // 缺欄位與重疊可能同時存在:兩件都說,不要只說一半
     const problems = [

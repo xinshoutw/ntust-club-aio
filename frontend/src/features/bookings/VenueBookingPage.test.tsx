@@ -427,6 +427,12 @@ test('後端指出第幾筆出錯時，那一列標紅並捲過去', async () =>
     expect(rows().map((r) => r.classList.contains('area-error'))).toEqual([false, true])
     expect(scrolledInOnError).toBe(true)
 
+    // 別的欄位沒過、這次沒送到後端:那一列沒動過,紅框留著
+    fireEvent.change(screen.getByLabelText('用途'), { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: '送出申請' }))
+    expect(await screen.findByText('請輸入用途')).toBeTruthy()
+    expect(rows()[1].classList.contains('area-error')).toBe(true)
+
     pickPeriod(rows()[1], '3')
     expect(rows()[1].classList.contains('area-error')).toBe(false)
   } finally {

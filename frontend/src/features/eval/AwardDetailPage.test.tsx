@@ -1,10 +1,12 @@
 import { describe, expect, test, vi } from 'vitest'
 import { App } from 'antd'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import AwardDetailPage from './AwardDetailPage'
 import type { AwardDetail } from '../../api/eval'
 
 let locked = false
+const PDF = { uploadId: 9, id: 'f1', name: '簡介.pdf', type: 'pdf' as const, size: 1024, url: '', uploadedAt: '2026/08/01' }
+let uploads: AwardDetail['items'][number]['uploads'] = [PDF]
 
 const detail = (): AwardDetail => ({
   id: 'club',
@@ -20,9 +22,7 @@ const detail = (): AwardDetail => ({
       help: '',
       groupLabel: '',
       isAdminItem: false,
-      uploads: [
-        { uploadId: 9, id: 'f1', name: '簡介.pdf', type: 'pdf', size: 1024, url: '', uploadedAt: '2026/08/01' },
-      ],
+      uploads,
     },
   ],
 })
@@ -61,4 +61,21 @@ describe('AwardDetailPage 的上傳鎖', () => {
     expect(uploadBtn().disabled).toBe(true)
     expect(screen.queryByLabelText('移除 簡介.pdf')).toBeNull()
   })
+})
+
+// 同一個細項的上傳檔:圖片開 AntD 的圖片預覽並可左右切換,PDF 不算在切換裡
+test('細項裡的圖片開圖片預覽，同一項的圖片左右切換', () => {
+  const img = (uploadId: number, id: string, name: string) => ({
+    uploadId, id, name, type: 'image' as const, size: 2048, url: `/api/v1/files/${id}`, uploadedAt: '2026/08/02',
+  })
+  uploads = [img(10, 'i1', '社課.jpg'), PDF, img(11, 'i2', '成發.jpg')]
+  try {
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: '成發.jpg' }))
+    const preview = screen.getByRole('dialog', { name: '成發.jpg' })
+    expect(preview.querySelector('.ant-image-preview-img')?.getAttribute('src')).toBe('/api/v1/files/i2')
+    expect(preview.textContent).toContain('2 / 2')
+  } finally {
+    uploads = [PDF]
+  }
 })

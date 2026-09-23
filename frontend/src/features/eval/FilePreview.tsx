@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Modal } from 'antd'
+import { Image, Modal } from 'antd'
 import type { EvalFile } from './types'
 
 const fmtSize = (b: number) => (b >= 1048576 ? `${(b / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`)
@@ -84,14 +84,66 @@ function DocView({ file }: { file: EvalFile }) {
 
 interface FilePreviewProps {
   file: EvalFile | null
+  /** 與 file 同一組的檔案(同一欄附件、同一個評分細項):其中的圖片在預覽裡左右切換 */
+  group?: readonly EvalFile[]
   open: boolean
   onClose: () => void
   afterClose: () => void
 }
 
-// 檔案即時預覽:圖片(img)、PDF(瀏覽器原生 iframe)、doc/docx(mammoth)
+interface ImageViewerProps {
+  images: readonly EvalFile[]
+  start: number
+  open: boolean
+  onClose: () => void
+  afterClose: () => void
+}
+
+// 圖片走 AntD 內建的預覽(縮放、旋轉、同一組左右切換),與社團頁的活動彈窗同一套。
+// 只渲染預覽層、沒有縮圖:呼叫端的入口是檔名連結。`afterOpenChange` 在離場動畫結束才觸發,
+// 等同 Modal 的 afterClose —— 提早清掉 file 會讓關閉中的那張圖先變成破圖
+function ImageViewer({ images, start, open, onClose, afterClose }: ImageViewerProps) {
+  const [current, setCurrent] = useState(start)
+  return (
+    <Image.PreviewGroup
+      items={images.map((f) => ({ src: f.url, alt: f.name }))}
+      preview={{
+        open,
+        current,
+        // 成組時 rc-image 不把 items 的 alt 交給預覽層:在這裡給,圖片與預覽對話框才有名字
+        alt: images[current]?.name,
+        onChange: setCurrent,
+        onOpenChange: (next) => {
+          if (!next) onClose()
+        },
+        afterOpenChange: (next) => {
+          if (!next) afterClose()
+        },
+      }}
+    />
+  )
+}
+
+// 檔案即時預覽:圖片交給 AntD 的圖片預覽,PDF(瀏覽器原生 iframe)與 doc/docx(mammoth)開彈窗
 // zIndex 高於一般 Modal:預覽常由其他 popup 內開啟,避免被蓋住
-export default function FilePreview({ file, open, onClose, afterClose }: FilePreviewProps) {
+export default function FilePreview({ file, group, open, onClose, afterClose }: FilePreviewProps) {
+  if (file?.type === 'image') {
+    // 同一組裡的圖片才切得過去;組裡找不到自己(呼叫端傳錯)就只看這一張,不要開到別張
+    const images = group?.some((f) => f.id === file.id)
+      ? group.filter((f) => f.type === 'image')
+      : [file]
+    return (
+      <ImageViewer
+        // 換一張圖從頭開:起始位置只在掛載時讀一次
+        key={file.id}
+        images={images}
+        start={images.findIndex((f) => f.id === file.id)}
+        open={open}
+        onClose={onClose}
+        afterClose={afterClose}
+      />
+    )
+  }
   return (
     <Modal
       open={open}
@@ -113,11 +165,6 @@ export default function FilePreview({ file, open, onClose, afterClose }: FilePre
         )
       }
     >
-      {file?.type === 'image' && (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 8 }}>
-          <img src={file.url} alt={file.name} style={{ maxWidth: '100%', maxHeight: '76vh', borderRadius: 4 }} />
-        </div>
-      )}
       {file?.type === 'pdf' &&
         (file.url ? (
           <iframe

@@ -323,7 +323,8 @@ function ActivityModal({ activity, open, onClose, afterClose }: ActivityModalPro
               {/* 縮圖本身就是 AntD Image 的預覽鈕(role=button、Enter/Space 可開),
                   同一組照片在預覽裡左右切換 */}
               <div className="act-photos">
-                <Image.PreviewGroup>
+                {/* 成組時 rc-image 不把縮圖的 alt 交給預覽層,預覽對話框的名字在這裡給 */}
+                <Image.PreviewGroup preview={{ alt: '活動照片' }}>
                   {photos.map((url, i) => (
                     <Image
                       key={url}

@@ -168,7 +168,9 @@ export default function VenueBookingPage() {
   // 焦點不能跟著被移除或停用的按鈕一起掉到 body(WCAG 2.4.3):移除後落在補位那一列的「+」,
   // 「+」補滿上限(這顆跟著停用)就落在新那一列的「−」。flushSync 讓新的列先畫出來才找得到
   const focusSlotButton = (key: number, action: 'add' | 'remove') =>
-    document.querySelector<HTMLButtonElement>(`[data-slot="${key}"] [data-action="${action}"]`)?.focus()
+    slotsRef.current
+      ?.querySelector<HTMLButtonElement>(`[data-slot="${key}"] [data-action="${action}"]`)
+      ?.focus()
   // 「+」在這一筆的正下方插一筆空白的;「−」移除這一筆(至少留一筆)
   const addSlotAfter = (key: number) => {
     // key 在 updater 外取號:StrictMode 會把 updater 跑兩次

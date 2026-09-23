@@ -171,7 +171,7 @@ describe('臨時場地借用的時段列', () => {
     pickDate(rows()[1], '2099/01/01')
     pickPeriod(rows()[1], '3')
     submit()
-    expect(await screen.findByText('2099/01/01 的時段重複')).toBeTruthy()
+    expect(await screen.findByText('第 2 筆 2099/01/01 的時段重複')).toBeTruthy()
     expect(mutate).not.toHaveBeenCalled()
     expect(rows()[1].classList.contains('area-error')).toBe(true)
 
@@ -221,7 +221,7 @@ test('重疊解除後紅框跟著消失', async () => {
   pickDate(rows()[1], '2099/01/01')
   pickPeriod(rows()[1], '3')
   submit()
-  expect(await screen.findByText('2099/01/01 的時段重複')).toBeTruthy()
+  expect(await screen.findByText('第 2 筆 2099/01/01 的時段重複')).toBeTruthy()
   expect(rows()[1].classList.contains('area-error')).toBe(true)
 
   pickDate(rows()[1], '2099/01/05')

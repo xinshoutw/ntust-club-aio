@@ -771,10 +771,8 @@ async def test_one_bad_slot_rejects_the_whole_batch(client, db, bad):
         headers=csrf_headers(client),
     )
     assert resp.status_code == (409 if bad == "duplicate" else 422), resp.text
-    assert f"{bad_day:%Y/%m/%d}" in resp.json()["error"]
-    # 同一天可以有好幾列:重複申請的訊息連節次一起給,才分得出是哪一列
-    if bad == "duplicate":
-        assert "(時段 5)" in resp.json()["error"]
+    # 同一天可以有好幾列:訊息開頭帶「第幾筆」與日期,才分得出是哪一列
+    assert resp.json()["error"].startswith(f"第 2 筆 {bad_day:%Y/%m/%d} ")
     assert await _venue_booking_count(db) == before
 
 
@@ -797,7 +795,7 @@ async def test_slots_overlapping_within_a_batch_are_rejected(client, db):
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
-    assert f"{day:%Y/%m/%d} 的時段重複" in resp.text
+    assert f"第 2 筆 {day:%Y/%m/%d} 的時段重複" in resp.text
     assert await _venue_booking_count(db) == 0
 
 

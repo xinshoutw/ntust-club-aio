@@ -51,23 +51,24 @@ const slotsKey = (slots: SlotDraft[]) =>
 const BLANK_KEY = slotsKey([{ key: 0, date: null, periods: [] }])
 
 /** 同一天、節次跟前面某一列重疊的列:送出去就是重複申請(後端 `_no_overlap` 同一條)。
- *  從列的內容當場推,不存成狀態 —— 重疊一解除,紅框就跟著消失 */
-const overlappingSlots = (slots: SlotDraft[]): { keys: Set<number>; firstDay: string | null } => {
+ *  從列的內容當場推,不存成狀態 —— 重疊一解除,紅框就跟著消失。
+ *  `first` 是第一個重疊列的「第 N 筆 日期」:同一天可以有好幾列,只給日期分不出是哪一列 */
+const overlappingSlots = (slots: SlotDraft[]): { keys: Set<number>; first: string | null } => {
   const keys = new Set<number>()
-  let firstDay: string | null = null
+  let first: string | null = null
   const taken = new Map<string, Set<string>>()
-  for (const s of slots) {
-    if (!s.date || !s.periods.length) continue
+  slots.forEach((s, i) => {
+    if (!s.date || !s.periods.length) return
     const day = s.date.format('YYYY/MM/DD')
     const seen = taken.get(day) ?? new Set<string>()
     if (s.periods.some((p) => seen.has(p))) {
       keys.add(s.key)
-      firstDay ??= day
+      first ??= `第 ${i + 1} 筆 ${day}`
     }
     s.periods.forEach((p) => seen.add(p))
     taken.set(day, seen)
-  }
-  return { keys, firstDay }
+  })
+  return { keys, first }
 }
 
 export default function VenueBookingPage() {
@@ -187,7 +188,7 @@ export default function VenueBookingPage() {
     }
     setSlotErrors(errors)
     setChecked(true)
-    if (overlap.firstDay) return `${overlap.firstDay} 的時段重複`
+    if (overlap.first) return `${overlap.first} 的時段重複`
     return errors.size ? '請為每一筆選擇日期與時段' : null
   }
 

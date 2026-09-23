@@ -244,10 +244,11 @@ class VenueBookingIn(BaseModel):
         """同一天節次重疊的兩筆擋在門口:建下去第二張就是第一張的重複申請。
         同一天、節次不重疊的兩筆照收(上午擺攤、晚上彩排本來就是兩張單)。"""
         taken: dict[date, set[str]] = {}
-        for slot in v:
+        for i, slot in enumerate(v, 1):
             day = taken.setdefault(slot.date, set())
             if day & set(slot.periods):
-                raise ValueError(f"{slot.date:%Y/%m/%d} 的時段重複")
+                # 「第 N 筆」與端點其餘逐列訊息同一個開頭(`bookings._slot_labels`)
+                raise ValueError(f"第 {i} 筆 {slot.date:%Y/%m/%d} 的時段重複")
             day.update(slot.periods)
         return v
 

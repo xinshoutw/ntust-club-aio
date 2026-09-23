@@ -599,7 +599,8 @@ def _render_preview(src: Path, dst: Path) -> None:
             # 這行是保險(換解碼器也不會躺著輸出),測試驗的是結果不是這一行
             img = ImageOps.exif_transpose(img) or img
             img.thumbnail((PREVIEW_MAX_EDGE, PREVIEW_MAX_EDGE))
-            img.convert("RGB").save(tmp, format="JPEG", quality=85)
+            # JPEG 沒有 alpha:直接 convert("RGB") 的話透明處是一塊黑(見 `_on_white`)
+            _on_white(img).save(tmp, format="JPEG", quality=85)
         tmp.replace(dst)
     finally:
         tmp.unlink(missing_ok=True)

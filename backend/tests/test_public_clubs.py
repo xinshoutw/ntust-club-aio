@@ -559,6 +559,22 @@ async def test_a_photo_goes_out_as_a_bounded_jpeg_without_metadata(client, db):
         assert img.info.get("icc_profile") == icc
 
 
+async def test_a_cache_left_by_the_old_renderer_is_not_served(client, db):
+    """舊規則(v1,`.preview.jpg`)轉出的快取沒清 COM 註解:升級後照片通道不能拿它直接送,
+    要照新規則重轉。"""
+    _, _, photos = await activity_with_photos(db, n=1)
+    stale = io.BytesIO()
+    Image.new("RGB", (64, 48), (10, 200, 30)).save(
+        stale, format="JPEG", comment=b'{"uploader": "x"}'
+    )
+    (settings.upload_dir / (photos[0].path + ".preview.jpg")).write_bytes(stale.getvalue())
+
+    res = await client.get(f"{PHOTO_URL}/{photos[0].id}")
+    assert res.status_code == 200, res.text
+    with Image.open(io.BytesIO(res.content)) as img:
+        assert "comment" not in img.info
+
+
 async def test_an_oversized_colour_profile_is_dropped(client, db):
     """ICC 的內容 Pillow 不驗,照抄的話社團上傳的照片可以夾帶幾 MB 任意資料由公開通道送出去。"""
     buf = io.BytesIO()

@@ -566,10 +566,13 @@ _INLINE_MIMES = {
 
 # <img> 要圖時(瀏覽器帶 `Sec-Fetch-Dest: image`)轉成 JPEG 給它看:iPhone 拍的結案照片是 HEIC,
 # Chrome/Firefox 解不了,縮圖與預覽彈窗就是一片破圖。下載連結與 fetch 不帶這個值,拿到的仍是原檔。
-# 轉檔結果快取在原檔旁(`<path>.preview.jpg`),刪原檔時一併清(unlink_quiet);
+# 轉檔結果快取在原檔旁(`<path>` + `PREVIEW_SUFFIX`),刪原檔時一併清(unlink_quiet);
 # 快取不計入 files.size(配額看的是原檔),實際磁碟佔用會高於檔案管理頁的邏輯總量
 _PREVIEW_CONVERTIBLE = {"image/heic", "image/heif", "image/tiff", "image/bmp"}
-PREVIEW_SUFFIX = ".preview.jpg"
+# 檔名帶轉檔規則的版本:快取一旦存在就直接送(preview_of),規則改了而檔名沒換,舊規則轉出來的
+# 就會照送。v1(`.preview.jpg`)沒清 JPEG 的 COM 註解,不能由公開照片通道(D-42)送出去;
+# 升級後舊檔是孤兒,DEPLOY_CHECKLIST 有一次性清除的指令。改 `_render_preview` 輸出的規則就換號
+PREVIEW_SUFFIX = ".preview-v2.jpg"
 PREVIEW_MAX_EDGE = 1600  # 預覽彈窗最大 76vh,更大只是白轉
 # 這兩個上限擋的是「解開來會吃掉半台機器」的來源:20MB 的 HEIC 可以是 48MP,解成 RGB 就是 150MB;
 # Pillow 自己的炸彈防護要到 179MP 才真的丟例外,中間那一段照解不誤

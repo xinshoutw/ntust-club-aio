@@ -347,8 +347,9 @@ D-19 那道「只在真的要存 profile 時擋」的閘**,於是那一按跳的
     `api/overview`、`OverduePage`、`AnnouncementsPage`、`SignupBuilderPage`、`PtViolationFormPage`、
     `ActivityFormPage`、`api/adminSignups`(design-guide 規定一律 `taipeiToday` / `taipeiNow`)
   - `index.css.test.ts` 的選擇器 regex 仍會接受包在 `@media` 裡的規則
-- 開發機上既有的 15 個 `.preview.jpg` 是舊規則轉的(帶 COM、沒 ICC):要看新結果就
-  `find backend/data/uploads -name '*.preview.jpg' -delete`,被看到時會重轉
+- 預覽快取的檔名帶版號(`files.PREVIEW_SUFFIX` = `.preview-v2.jpg`,PR #35 的 Greptile 審查):
+  舊規則轉的 `.preview.jpg` 不再被送出去,開發機上那 15 個成了孤兒,
+  `find backend/data/uploads -name '*.preview.jpg' -delete` 回收即可(正式機同一條在 DEPLOY_CHECKLIST)
 
 ## 驗證現況
 

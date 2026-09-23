@@ -695,6 +695,29 @@ async def test_preview_is_bounded_and_honours_exif_orientation(client, db):
         assert img.size == (30, 40)
 
 
+async def test_no_db_connection_is_held_while_waiting_for_the_converter(client, db, monkeypatch):
+    """轉檔池只有兩條:一整面 HEIC 縮圖同時打進來時,握著連線排隊的請求會把全站共用的
+    連線池借光,別人的請求跟著逾時(公開照片通道同一條規則)。"""
+    from app.core.db import engine
+
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    row = await _heic_upload(db, club, user)
+    await login(client, "club01")
+    await db.close()  # 測試自己的 session 也還回去,量到的才只有請求那一條
+    held: list[int] = []
+    real = file_service._render_preview
+
+    def measuring(src, dst):
+        held.append(engine.pool.checkedout())
+        real(src, dst)
+
+    monkeypatch.setattr(file_service, "_render_preview", measuring)
+    resp = await client.get(f"/api/v1/files/{row.id}", headers={"Sec-Fetch-Dest": "image"})
+    assert resp.headers["content-type"] == "image/jpeg"
+    assert held == [0]
+
+
 async def test_transparent_areas_turn_white_not_black(client, db):
     """JPEG 沒有 alpha:直接 `convert("RGB")` 會把透明處留成底層的 RGB 值,多數編碼器寫 0,
     預覽上就是一塊黑。社團頁的活動照片同樣走這條(開發庫的結案 PNG 有 8 張真的有透明像素)。"""

@@ -752,6 +752,9 @@ async def file_response(
         and file.mime in _PREVIEW_CONVERTIBLE
         and file.size <= PREVIEW_MAX_SOURCE_BYTES
     ):
+        # 排隊等轉檔之前先把連線還回池子(同公開照片通道):轉檔池只有兩條,一整面 HEIC 縮圖同時
+        # 打進來時,握著連線排隊的請求會把全站共用的連線池借光。之後只用到已經讀進來的欄位
+        await db.close()
         # 轉不了(檔案壞了、太大、編碼不支援)就照舊給原檔:破圖總比 500 好(preview_of 會記 log)
         preview = await preview_of(disk)
         if preview is not None:

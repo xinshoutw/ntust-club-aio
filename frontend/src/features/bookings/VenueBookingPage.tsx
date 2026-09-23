@@ -105,8 +105,17 @@ export default function VenueBookingPage() {
   const nextKey = useRef(1)
   const slotsRef = useRef<HTMLDivElement>(null)
   // 與初值相同不算 dirty(否則從場況圖點進來,一進頁就被攔)
-  const [cleanKey, setCleanKey] = useState(() => slotsKey(slots))
-  const guard = useFormUnsavedGuard(slotsKey(slots) !== cleanKey)
+  const [cleanSlots, setCleanSlots] = useState(slots)
+  // 比對前先拿掉「今天已開始」的節次:那是時間走過節次起點、由系統剔除的,不是使用者改的。
+  // 全部清成空白也不算修改 —— 沒有東西會遺失
+  const comparable = (list: SlotDraft[]) =>
+    slotsKey(
+      list.map((s) =>
+        isToday(s.date) ? { ...s, periods: s.periods.filter((p) => !started.includes(p)) } : s,
+      ),
+    )
+  const current = comparable(slots)
+  const guard = useFormUnsavedGuard(current !== BLANK_KEY && current !== comparable(cleanSlots))
   // 送出驗證的錯誤集合(design-guide §6):`date:<key>` / `periods:<key>`,改到哪一格就解除哪一格
   const [slotErrors, setSlotErrors] = useState<ReadonlySet<string>>(new Set())
   // 重疊不進錯誤集合:送出過一次之後照目前的列當場標
@@ -254,7 +263,7 @@ export default function VenueBookingPage() {
           form.resetFields()
           guard.clear()
           setSlots([{ key: nextKey.current++, date: null, periods: [] }])
-          setCleanKey(BLANK_KEY)
+          setCleanSlots([])
           setChecked(false)
         },
         onError: (e) => message.error(e.message),

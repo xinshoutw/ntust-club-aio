@@ -246,6 +246,28 @@ describe('未存檔守衛', () => {
     expect(slotsDirty).toBe(false)
   })
 
+  // 從場況圖帶進來的那一筆刪掉、只剩空白列:沒有東西會遺失,不算修改
+  test('刪到只剩空白列不算修改', () => {
+    renderPage()
+    addAfter(1)
+    fireEvent.click(screen.getByRole('button', { name: '移除第 1 筆時段' }))
+    expect(slotsDirty).toBe(false)
+  })
+
+  // 頁面開著、時間走過節次起點:那一節是系統剔除的,不是使用者改的
+  test('時間走過節次起點剔除了今天的節次，不算修改', () => {
+    renderPage(`venue=9&date=${taipeiToday().format('YYYY/MM/DD')}&period=4`)
+    expect(slotsDirty).toBe(false)
+    started = ['3', '4']
+    try {
+      addAfter(1) // 任何一次重畫都會觸發剔除
+      expect(within(rows()[0]).getByRole('button', { name: '4' }).getAttribute('aria-pressed')).toBe('false')
+      expect(slotsDirty).toBe(false)
+    } finally {
+      started = []
+    }
+  })
+
   // 從場況圖點「今天、已經開始」的那一格進來:那一節選不到,不帶入,也就不會一進頁就算已修改
   test('今天已開始的節次不帶入，一進頁不算修改', () => {
     started = ['3']

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { flushSync } from 'react-dom'
 import { useSearchParams } from 'react-router'
 import dayjs, { type Dayjs } from 'dayjs'
 import { App, Button, DatePicker, Form, Input, Select } from 'antd'
@@ -126,16 +127,29 @@ export default function VenueBookingPage() {
       return next
     })
   }
+  // 焦點不能跟著被移除或停用的按鈕一起掉到 body(WCAG 2.4.3):移除後落在補位那一列的「+」,
+  // 「+」補滿上限(這顆跟著停用)就落在新那一列的「−」。flushSync 讓新的列先畫出來才找得到
+  const focusSlotButton = (key: number, action: 'add' | 'remove') =>
+    document.querySelector<HTMLButtonElement>(`[data-slot="${key}"] [data-action="${action}"]`)?.focus()
   // 「+」在這一筆的正下方插一筆空白的;「−」移除這一筆(至少留一筆)
   const addSlotAfter = (key: number) => {
     // key 在 updater 外取號:StrictMode 會把 updater 跑兩次
     const blank: SlotDraft = { key: nextKey.current++, date: null, periods: [] }
-    setSlots((cur) => {
-      const at = cur.findIndex((s) => s.key === key) + 1
-      return [...cur.slice(0, at), blank, ...cur.slice(at)]
-    })
+    const full = slots.length + 1 >= MAX_SLOTS
+    flushSync(() =>
+      setSlots((cur) => {
+        const at = cur.findIndex((s) => s.key === key) + 1
+        return [...cur.slice(0, at), blank, ...cur.slice(at)]
+      }),
+    )
+    if (full) focusSlotButton(blank.key, 'remove')
   }
-  const removeSlot = (key: number) => setSlots((cur) => cur.filter((s) => s.key !== key))
+  const removeSlot = (key: number) => {
+    const at = slots.findIndex((s) => s.key === key)
+    const neighbor = slots[at + 1] ?? slots[at - 1]
+    flushSync(() => setSlots((cur) => cur.filter((s) => s.key !== key)))
+    if (neighbor) focusSlotButton(neighbor.key, 'add')
+  }
 
   /** 每一筆都要有日期與節次;同一天節次重疊的兩筆送出去就是重複申請(後端 `_no_overlap` 同一條)。
    *  回傳要提示的訊息,沒問題回 null */
@@ -288,6 +302,7 @@ export default function VenueBookingPage() {
             {slots.map((s, i) => (
               <div
                 key={s.key}
+                data-slot={s.key}
                 className={slotErrors.has(`periods:${s.key}`) ? 'slot-row area-error' : 'slot-row'}
               >
                 <DatePicker
@@ -311,12 +326,14 @@ export default function VenueBookingPage() {
                 </div>
                 <div className="slot-row-actions">
                   <Button
+                    data-action="add"
                     icon={<PlusOutlined />}
                     aria-label={`在第 ${i + 1} 筆下方新增時段`}
                     disabled={slots.length >= MAX_SLOTS}
                     onClick={() => addSlotAfter(s.key)}
                   />
                   <Button
+                    data-action="remove"
                     icon={<MinusOutlined />}
                     aria-label={`移除第 ${i + 1} 筆時段`}
                     disabled={slots.length === 1}

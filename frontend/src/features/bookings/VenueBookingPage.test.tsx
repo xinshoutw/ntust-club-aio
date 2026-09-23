@@ -179,3 +179,18 @@ test('日期欄按 Enter 只確認日期，不送出表單', () => {
   expect((input as HTMLInputElement).value).toBe('2099/01/02')
   expect(mutate).not.toHaveBeenCalled()
 })
+
+// 焦點跟著被移除(或停用)的按鈕掉到 body 的話,鍵盤使用者得從頁首重新 Tab 過來(WCAG 2.4.3)
+test('移除後焦點落在補位那一列的「+」，補滿上限時落在新那一列的「−」', () => {
+  renderPage()
+  addAfter(1)
+  addAfter(2)
+  const plus = (n: number) => screen.getByRole('button', { name: `在第 ${n} 筆下方新增時段` })
+  fireEvent.click(screen.getByRole('button', { name: '移除第 2 筆時段' }))
+  expect(document.activeElement).toBe(plus(2)) // 原本的第 3 筆補上來
+  fireEvent.click(screen.getByRole('button', { name: '移除第 2 筆時段' }))
+  expect(document.activeElement).toBe(plus(1)) // 刪的是最後一筆:落在前一筆
+
+  for (let n = 1; n < 10; n += 1) addAfter(n)
+  expect(document.activeElement).toBe(screen.getByRole('button', { name: '移除第 10 筆時段' }))
+})

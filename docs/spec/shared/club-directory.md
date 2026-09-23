@@ -74,6 +74,9 @@
   不讓人靠狀態碼探測 id;`media_type` 另有白名單(只送影像),`inline` 的同源 HTML 即使被
   CSP 擋掉 script,`form-action` 在 CSP3 不 fallback 到 `default-src`,純表單釣魚頁仍成立。
   回應帶 `Cache-Control: private, max-age=3600` 蓋掉全域的 `no-store`。
+  **結案照片是第二條公開通道**(`/public/files/activity-photos/{id}`,D-42):公開與否不看
+  `files.public`,而是由「活動結案通過、社團公開中」當場推導(`public._public_photos`),
+  只送轉過的 JPEG,見 [club-detail.md](club-detail.md)。
   **`private` 不是 `public`**:社團下架的理由常常正是那張圖,`public` 會讓 CDN 與
   公司 proxy 替**別人**留一份;瀏覽器自己的快取照舊。**刻意不用
   `immutable`、也不放到一週**:內容確實不可變(換圖產生的是新的 id),但**授權會變** ——
@@ -92,5 +95,5 @@
   名字照樣出得去。那支端點的「匿名看得到借用單位名稱」是需求方拍板的規則
   ([public-availability.md](public-availability.md):校內張貼在場地門口的同一件事),與本頁「對外沒有必要
   交代某個社團曾經存在」相衝。**要先定哪一邊才動手** —— `_VISIBLE` 目前不是全站唯一判定
-- 社團相簿(多張照片)未做:目前公開圖片只有頭像與橫幅各一張
+- 社團自選的相簿未做(挑照片、排順序、不公開某一張);結案通過的活動照片已在社團頁的活動彈窗(D-42)
 - 全校活動總覽與 `.ics` 訂閱未做(單一社團的活動列表已在詳細頁)

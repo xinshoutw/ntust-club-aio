@@ -248,7 +248,7 @@ approved 且 end_date + N 天已過且未送結案 → 逾期鎖定(推導,非�
 | sha256 | text | 前端先算、後端驗證 |
 | path | text | `{module}/{YYYY}/{MM}/{uuid}` |
 | archived_at | timestamptz NULL | 已備份下載並自磁碟刪除;非 NULL 時下載回 410、不計配額 |
-| public | bool | 免登入取得。**只有社團形象圖會是 true**;`can_access()` 的四種角色判定管不到匿名,公開檔必須是檔案自己的屬性而不是在權限函式裡多開一個分支 |
+| public | bool | 免登入取得。**只有社團形象圖會是 true**;`can_access()` 的四種角色判定管不到匿名,公開檔必須是檔案自己的屬性而不是在權限函式裡多開一個分支。**結案照片不靠這一欄**:它們公不公開是推導出來的(活動結案通過、社團公開中,`api/v1/public._public_photos`),走另一條只送轉檔預覽的通道(D-42) |
 
 兩個 partial unique index 把去重收口在 DB 層,併發的先查後寫由索引攔下並回 409:
 

@@ -77,7 +77,7 @@
 
 前端 Vite + React + TS + Ant Design 6 + TanStack Query + pnpm;後端 FastAPI + Python 3.14 + uv + SQLAlchemy 2(async)+ Alembic + PostgreSQL 18;Docker Compose 部署於 GCE。無特殊理由一律用最新穩定版。細節見 `docs/architecture.md`。
 
-三條 UI 硬規則(其餘見 `docs/design-guide.md`):**全站禁用 emoji**,圖示一律 AntD SVG icon;**UI 文字精簡**,說明收進 Tooltip/Popover;**內容寬由 shell 統一約束**,頁面不得自設 maxWidth。
+三條 UI 硬規則(其餘見 `docs/design-guide.md`):**全站禁用 emoji**,圖示一律 AntD SVG icon;**UI 文字精簡**,說明收進 Tooltip/Popover(填之前就得知道的提醒例外,放 `extra` 常駐,見 design-guide §7);**內容寬由 shell 統一約束**,頁面不得自設 maxWidth。
 
 ## 開發慣例
 

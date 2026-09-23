@@ -278,7 +278,11 @@ export default function VenueBookingPage() {
           const hit = e instanceof ApiError ? slots[Number(e.meta.slot) - 1] : undefined
           if (!hit) return
           setSlotErrors(new Set([`row:${hit.key}`]))
-          scrollToFirstSlotError()
+          // 列本來就在畫面上:當下依 key 捲過去。這裡不在 React 事件裡,紅框要晚一拍才畫 ——
+          // 等紅框再找(scrollToFirstSlotError)在 Chromium 與 Firefox 都找不到那一列
+          slotsRef.current
+            ?.querySelector(`[data-slot="${hit.key}"]`)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
         },
       },
     )

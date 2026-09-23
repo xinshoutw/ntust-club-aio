@@ -407,19 +407,25 @@ test('後端指出第幾筆出錯時，那一列標紅並捲過去', async () =>
     addAfter(1)
     pickDate(rows()[1], '2099/01/03')
     pickPeriod(rows()[1], '4')
+    // 回應在 fetch 之後才到,onError 不在任何 React 事件裡:瀏覽器裡紅框要晚一拍才畫,
+    // 「等紅框畫出來再找」的寫法在 Chromium 與 Firefox 都找不到那一列(jsdom 的排程重現不了),
+    // 所以要求 onError 當下就捲 —— 不靠紅框,只靠列的 key
+    let scrolledInOnError = false
     mutate.mockImplementationOnce((_input, { onError }) =>
-      onError(
-        new ApiError('第 2 筆 2099/01/03 同一場地同一天的相同節次已有申請', 409, 'CONFLICT', {
-          code: 'CONFLICT',
-          slot: 2,
-        }),
-      ),
+      setTimeout(() => {
+        onError(
+          new ApiError('第 2 筆 2099/01/03 同一場地同一天的相同節次已有申請', 409, 'CONFLICT', {
+            code: 'CONFLICT',
+            slot: 2,
+          }),
+        )
+        scrolledInOnError = scroll.mock.contexts[0] === rows()[1]
+      }),
     )
     submit()
     expect(await screen.findByText('第 2 筆 2099/01/03 同一場地同一天的相同節次已有申請')).toBeTruthy()
     expect(rows().map((r) => r.classList.contains('area-error'))).toEqual([false, true])
-    await waitFor(() => expect(scroll).toHaveBeenCalled())
-    expect(scroll.mock.contexts[0]).toBe(rows()[1])
+    expect(scrolledInOnError).toBe(true)
 
     pickPeriod(rows()[1], '3')
     expect(rows()[1].classList.contains('area-error')).toBe(false)

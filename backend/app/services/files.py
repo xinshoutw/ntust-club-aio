@@ -79,7 +79,7 @@ def unlink_quiet(path: Path) -> None:
     上傳超額回滾(413)、去重衝突(409)、commit 後的磁碟清理都走這裡;
     刪不掉頂多留孤兒檔(可清掃),換成 500 反而誤導呼叫端。
     """
-    # 轉檔預覽的快取跟著原檔走(HEIC 等瀏覽器不會解的圖,見 file_response);
+    # 轉檔預覽的快取跟著原檔走(HEIC 等瀏覽器不會解的圖、社團頁看過的結案照片,見 preview_of);
     # 各自 try:原檔刪失敗不該連快取也留下,而 log 要指得出到底是哪一個沒刪掉
     for target in (path.with_name(path.name + PREVIEW_SUFFIX), path):
         try:
@@ -586,7 +586,10 @@ _PREVIEW_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="preview")
 
 
 def _render_preview(src: Path, dst: Path) -> None:
-    """HEIC/HEIF/TIFF/BMP → JPEG(長邊封頂、套 EXIF 方向)。
+    """圖片 → JPEG(長邊封頂、套 EXIF 方向、不帶來源的 metadata)。
+
+    站內只轉瀏覽器解不了的(`_PREVIEW_CONVERTIBLE`,見 file_response);社團頁的照片通道
+    每一張都轉,什麼格式都一樣(D-42)。
 
     先寫暫存再 rename:暫存名帶 uuid —— 同一張同時被兩個請求轉(preview_of 的檢查與轉檔之間
     有空窗),各寫各的、誰後 rename 誰的留下;用 pid 命名的話兩條 thread 是同一個 pid,

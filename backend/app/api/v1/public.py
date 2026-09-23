@@ -42,7 +42,7 @@ MAX_PUBLIC_ACTIVITIES = 10
 # 主鍵是 PostgreSQL 的 int4:超界的值會在 asyncpg 綁參數時 OverflowError → 500,
 # 而這些是**匿名打得到**的路徑 —— 未登入、零成本就能一次塞進三十份 traceback。
 # 擋在 schema 就回 422,連 DB 都不必碰
-# 公開通道只送形象圖。`media_type` 取自 DB 的 `files.mime`,而唯一的 writer
+# 形象圖通道(`public_file`)送原檔,`media_type` 取自 DB 的 `files.mime`,而唯一的 writer
 # (`save_club_image`)無條件寫 image/webp —— 但那是一條靠人記住的約定,不是程式收口。
 # 真的被改成 text/html 的話,`content_disposition_type="inline"` 會讓它以同源 HTML 渲染;
 # 全域的 `default-src 'none'` 擋得下 script,**但 CSP3 的 form-action 不 fallback 到
@@ -329,7 +329,7 @@ async def public_activity_photo(file_id: uuid.UUID, db: DbDep) -> Response:
     # 不該同時握著全站共用的 DB 連線
     await db.close()
     # 壞檔、超過像素上限、原檔不見或磁碟到告警水位:對外一律 404(preview_of 記 log,
-    # 壞檔只解一次)
+    # 壞檔冷卻期內不再解)
     preview = await file_service.preview_of(disk)
     if preview is None:
         raise not_found("找不到檔案")

@@ -12,6 +12,7 @@ import hashlib
 import io
 import logging
 import shutil
+import time
 import uuid
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
@@ -610,31 +611,49 @@ def _render_preview(src: Path, dst: Path) -> None:
         tmp.unlink(missing_ok=True)
 
 
-# 轉不出來的來源記在行程內:壞檔每次都要整張解到最後才失敗,而社團頁的照片通道匿名打得到
+# 轉不出來的來源記一段時間:壞檔每次都要整張解到最後才失敗,而社團頁的照片通道匿名打得到
 # (D-42)—— 不記的話,同一張壞圖可以被拿來反覆佔住只有兩條的轉檔池、寫一份份 traceback。
-# 重啟即清(換過原檔的也就重試了);只有真的壞掉的檔會進來,大小以此為界
-_PREVIEW_FAILED: set[Path] = set()
+# 記的是時間不是到重啟為止:原檔暫時讀不到、磁碟滿、記憶體不夠這類會好的錯誤,過一陣子要能重試
+PREVIEW_RETRY_AFTER = 600  # 秒
+_PREVIEW_FAILED: dict[Path, float] = {}  # 原檔 → 失敗的時刻(monotonic)
+# 同一張正在轉:後到的請求等同一份結果,不各自再解一次 —— 一波並發打同一張(冷快取的好圖,
+# 或一張壞圖)只佔一次轉檔池
+_PREVIEW_INFLIGHT: dict[Path, asyncio.Future[Path | None]] = {}
 
 
 async def preview_of(disk: Path) -> Path | None:
     """轉檔預覽的磁碟路徑;沒有快取就轉一次(專屬 thread pool,不擋 event loop,同時最多兩張)。
 
-    轉不出來(壞檔、超過像素上限、原檔不見)記 log、回 None,同一張之後直接回 None 不再解碼。
-    磁碟到告警水位(90%,與上傳閘同一條線)就**不再建新快取**、回 None:
+    轉不出來(壞檔、超過像素上限、原檔不見)記 log、回 None,`PREVIEW_RETRY_AFTER` 內同一張
+    直接回 None 不再解碼。磁碟到告警水位(90%,與上傳閘同一條線)就**不再建新快取**、回 None:
     上傳被擋住了,瀏覽幾 GB 的歷史 HEIC 卻還在寫快取,吃掉的是留給 PostgreSQL 與 log 的最後空間。
     已經轉好的照常給。回 None 時怎麼辦由呼叫端決定(站內給原檔,公開通道 404)。
     """
     dst = disk.with_name(disk.name + PREVIEW_SUFFIX)
     if dst.is_file():
         return dst
-    if disk in _PREVIEW_FAILED or disk_level() == "alert":
+    failed_at = _PREVIEW_FAILED.get(disk)
+    if failed_at is not None and time.monotonic() - failed_at < PREVIEW_RETRY_AFTER:
         return None
+    if disk_level() == "alert":
+        return None
+    job = _PREVIEW_INFLIGHT.get(disk)
+    if job is None:
+        job = asyncio.ensure_future(_convert(disk, dst))
+        _PREVIEW_INFLIGHT[disk] = job
+        job.add_done_callback(lambda _: _PREVIEW_INFLIGHT.pop(disk, None))
+    # shield:一個請求被取消(使用者關掉頁面)不該讓等同一張的其他請求一起落空
+    return await asyncio.shield(job)
+
+
+async def _convert(disk: Path, dst: Path) -> Path | None:
     try:
         await asyncio.get_running_loop().run_in_executor(_PREVIEW_POOL, _render_preview, disk, dst)
     except Exception:
-        _PREVIEW_FAILED.add(disk)
+        _PREVIEW_FAILED[disk] = time.monotonic()
         logger.exception("preview render failed: %s", disk)
         return None
+    _PREVIEW_FAILED.pop(disk, None)
     return dst
 
 

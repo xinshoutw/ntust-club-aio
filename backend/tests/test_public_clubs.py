@@ -650,3 +650,39 @@ async def test_no_db_connection_is_held_while_waiting_for_the_converter(client, 
     monkeypatch.setattr(file_service, "_render_preview", measuring)
     assert (await client.get(f"{PHOTO_URL}/{photos[0].id}")).status_code == 200
     assert held == [0]
+
+
+async def test_one_burst_for_one_photo_converts_it_once(client, db, monkeypatch):
+    """一波並發打同一張(冷快取):後到的等同一份結果,不各自再解一次 —— 轉檔池只有兩條。"""
+    import asyncio
+    import time
+
+    _, _, photos = await activity_with_photos(db, n=1)
+    calls: list = []
+    real = file_service._render_preview
+
+    def slow(src, dst):
+        calls.append(src)
+        time.sleep(0.2)  # 讓整波請求都在第一張轉完之前抵達
+        real(src, dst)
+
+    monkeypatch.setattr(file_service, "_render_preview", slow)
+    url = f"{PHOTO_URL}/{photos[0].id}"
+    results = await asyncio.gather(*(client.get(url) for _ in range(5)))
+    assert [r.status_code for r in results] == [200] * 5
+    assert len(calls) == 1
+
+
+async def test_a_failed_photo_is_retried_after_a_while(client, db, monkeypatch):
+    """記住失敗是為了擋反覆解碼,不是判死到重啟:原檔修好(或暫時讀不到的錯誤過去)之後要能重試。"""
+    _, _, photos = await activity_with_photos(db, n=1)
+    disk = settings.upload_dir / photos[0].path
+    good = disk.read_bytes()
+    disk.write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
+    url = f"{PHOTO_URL}/{photos[0].id}"
+    assert (await client.get(url)).status_code == 404
+
+    disk.write_bytes(good)
+    assert (await client.get(url)).status_code == 404  # 還在冷卻期,不重解
+    monkeypatch.setattr(file_service, "PREVIEW_RETRY_AFTER", 0)
+    assert (await client.get(url)).status_code == 200

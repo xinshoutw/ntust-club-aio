@@ -317,9 +317,12 @@ export default function VenueBookingPage() {
             }}
           >
             {slots.map((s, i) => (
+              // 每一列的日期欄與節次群組名字都一樣,沒有外層的名字讀螢幕軟體分不出是哪一筆
               <div
                 key={s.key}
                 data-slot={s.key}
+                role="group"
+                aria-label={`第 ${i + 1} 筆時段`}
                 className={
                   slotErrors.has(`periods:${s.key}`) || (checked && overlap.keys.has(s.key))
                     ? 'slot-row area-error'

@@ -258,3 +258,11 @@ describe('未存檔守衛', () => {
     }
   })
 })
+
+// 每一列的日期欄與節次群組名字都一樣:外層要有自己的名字,讀螢幕軟體才分得出是哪一筆
+test('每一列是一個有名字的群組', () => {
+  renderPage()
+  addAfter(1)
+  expect(screen.getByRole('group', { name: '第 1 筆時段' })).toBe(rows()[0])
+  expect(screen.getByRole('group', { name: '第 2 筆時段' })).toBe(rows()[1])
+})

@@ -21,7 +21,7 @@ import {
   type MaintenanceItem,
   type MaintenanceStatus,
 } from '../../api/adminMaintenance'
-import { fileDownloadUrl } from '../../api/adminFiles'
+import AttachmentLinks from '../../components/ui/AttachmentLinks'
 
 const STATUS_LABELS: Record<MaintenanceStatus, string> = {
   pending: '待處理',
@@ -99,14 +99,7 @@ export default function AdminMaintenancePage() {
                   {/* 照片/影片是最主要的判斷依據,不該只在檔案管理找得到 */}
                   <td className="cell-clip" style={{ fontSize: 13 }} title={q.evidence.map((f) => f.name).join('、')}>
                     {q.evidence.length
-                      ? q.evidence.map((f, i) => (
-                          <span key={f.id}>
-                            {i > 0 && ' · '}
-                            <a href={fileDownloadUrl(f.id)} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--focus)' }}>
-                              {f.name}
-                            </a>
-                          </span>
-                        ))
+                      ? <AttachmentLinks files={q.evidence} inline />
                       : <span style={{ color: 'var(--steel)' }}>—</span>}
                   </td>
                   <td className="num" style={{ fontSize: 13 }}>{q.date}</td>

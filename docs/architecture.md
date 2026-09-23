@@ -75,7 +75,7 @@ REST JSON,前綴 `/api/v1`。回應信封:
 { "success": false, "data": null, "error": "使用者可讀訊息", "meta": { "code": "機器碼" } }
 ```
 
-`error` 一律繁中、面向使用者、不含內部細節;未攔截例外回 500 通用訊息,細節只進 log(engine 開 `hide_parameters`,繫結參數不進 log)。`meta.code` 是機器可讀錯誤碼;前端 `client.ts` 目前只取 `error` 字串拋出、不讀 code(首登改密的導轉走 `user.mustChangePassword`),要依錯誤分流時再於該層取用。
+`error` 一律繁中、面向使用者、不含內部細節;未攔截例外回 500 通用訊息,細節只進 log(engine 開 `hide_parameters`,繫結參數不進 log)。`meta.code` 是機器可讀錯誤碼;`meta` 也可以帶其他機器可讀的附帶資訊(`AppError(meta=...)`,例:一次送多筆的臨時場地借用出錯時帶 `slot`,是第幾筆,從 1 起)。前端 `client.ts` 把 `error` 當訊息拋出 `ApiError`,`code` 與整個 `meta` 掛在上面(首登改密的導轉走 `user.mustChangePassword`,不靠錯誤碼)。
 
 | HTTP | code | 情境 |
 |------|------|------|
@@ -107,7 +107,7 @@ REST JSON,前綴 `/api/v1`。回應信封:
 
 - **分頁**:`?page=1&page_size=20`(1-based,page_size 上限 100),回應 `meta = { page, page_size, total }`。歷史型列表一律分頁;主檔與選項端點為全量回傳
 - **排序**:`?sort=field` 升冪、`-field` 降冪,逗號分隔多鍵;欄位採各端點白名單,未知欄位 422;非唯一排序鍵一律補 id tiebreak
-- **免登入端點**:只有 `/public/*`(節次目錄、場地主檔、場況與器材佔用,以及社團導覽的 `clubs*` 與 `files/{id}`)—— 免登入的借用情形頁(`/availability`)讀這一組,社團端與行政端的同一張色格圖也讀它,不另開第二份。全部唯讀 GET;帶著有效 session 進來時仍認得使用者,並依身分**多回**兩樣東西:社團拿得到自己的 `mine` 格、審這一關的承辦(`abooking`,且已改過密)拿得到每格的待審單清單。認不出來就當訪客,唯一不給的是待審單(不開放原因匿名照給:那格是實心深灰,沒有 hover 就什麼也看不出來)
+- **免登入端點**:只有 `/public/*`(節次目錄、場地主檔、場況與器材佔用,以及社團導覽的 `clubs*`、`files/{id}` 與 `files/activity-photos/{id}`)—— 免登入的借用情形頁(`/availability`)讀這一組,社團端與行政端的同一張色格圖也讀它,不另開第二份。全部唯讀 GET;帶著有效 session 進來時仍認得使用者,並依身分**多回**兩樣東西:社團拿得到自己的 `mine` 格、審這一關的承辦(`abooking`,且已改過密)拿得到每格的待審單清單。認不出來就當訪客,唯一不給的是待審單(不開放原因匿名照給:那格是實心深灰,沒有 hover 就什麼也看不出來)
 - **CSRF**:登入時發 `csrf_token` cookie(非 HttpOnly,double-submit 綁 session 列);除 `/auth/login`(此時尚無 session)外,所有寫入請求須帶 `X-CSRF-Token`,前端 `client.ts` 自動附帶
 
 ## 5. Repo 結構

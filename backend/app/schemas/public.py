@@ -49,10 +49,10 @@ class ClubDetailOut(ClubCardOut):
 
 
 class PublicActivityOut(BaseModel):
-    """公開活動列表的一列。
+    """公開活動列表的一列;社團詳細頁點開的活動彈窗也只讀這一列(D-42)。
 
-    **不回 `content` 與任何金額**:公開頁回答的是「這個社團在辦什麼」,
-    不是「這張單裡寫了什麼」。要對外宣傳細節的社團填在簡介或社群連結裡。
+    **回 `content`(活動內容)、不回任何金額**:活動內容是申請時寫的那段介紹(上限 150 字),
+    點開一場活動想知道的就是它;補助、經費來源與承辦備註是學務處與社團之間的事。
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -68,3 +68,7 @@ class PublicActivityOut(BaseModel):
     location: str
     type: str  # 社課或會議 / 活動
     is_large: bool
+    content: str
+    # 結案照片:只有結案通過的活動有(`api/v1/public._public_photos`),
+    # 經 `/public/files/activity-photos/{id}` 取轉過的 JPEG
+    photo_file_ids: list[uuid.UUID] = []

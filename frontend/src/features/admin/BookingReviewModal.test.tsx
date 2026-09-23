@@ -59,3 +59,41 @@ test('只接核准不接退回不算審核模式:不畫出按了只會假成功�
   expect(screen.queryByRole('button', { name: /退\s*回/ })).toBeNull()
   expect(screen.queryByRole('button', { name: '核 准' })).toBeNull()
 })
+
+// 後端以台北日擋「已結束的借用不需撤銷」:承辦的裝置在台北以西、過了台北午夜時,
+// 前一天那張單不能再出撤銷鈕(按下去只會拿到 409)
+test('撤銷鈕以台北日判斷場地單是否已過', () => {
+  vi.useFakeTimers().setSystemTime(new Date('2026-09-01T16:30:00Z')) // 台北 9/2 00:30
+  const orig = process.env.TZ
+  process.env.TZ = 'America/New_York' // 裝置上是 9/1 12:30
+  const venue = (date: string): BookingReviewItem => ({
+    kind: 'venue',
+    data: {
+      id: '9',
+      apiId: 9,
+      club: '熱舞社',
+      venue: '精誠廣場',
+      date,
+      periods: ['3'],
+      purpose: '練舞',
+      phone: '0912345678',
+      status: 'approved',
+      createdAt: '2026/08/20 10:00',
+    },
+  })
+  const modal = (date: string) => (
+    <App>
+      <BookingReviewModal item={venue(date)} open onClose={vi.fn()} afterClose={vi.fn()} onRevoke={vi.fn()} />
+    </App>
+  )
+  try {
+    const view = render(modal('2026/09/01'))
+    expect(screen.queryByRole('button', { name: '撤銷借用' })).toBeNull()
+    view.rerender(modal('2026/09/02'))
+    expect(screen.getByRole('button', { name: '撤銷借用' })).toBeTruthy()
+  } finally {
+    if (orig === undefined) delete process.env.TZ
+    else process.env.TZ = orig
+    vi.useRealTimers()
+  }
+})

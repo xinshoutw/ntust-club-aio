@@ -9,6 +9,7 @@ import PageHeader from '../../components/ui/PageHeader'
 import QueryError from '../../components/ui/QueryError'
 import { confirmDialog } from '../../lib/confirm'
 import { blurLeavesRow } from '../../lib/form'
+import PhotoThumbs from './PhotoThumbs'
 import { notFoundText } from '../../lib/selectOptions'
 import {
   CLOSE_DOC_ACCEPT,
@@ -883,34 +884,22 @@ function CloseForm({
                 className={errors.has('photos') ? 'area-error' : undefined}
                 style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: 6, margin: -6, border: '1px solid transparent', borderRadius: 6 }}
               >
-                {existing.map((f) => (
-                  <span key={f.id} style={{ position: 'relative', display: 'inline-flex' }}>
-                    <img src={f.url} alt={f.name} title={f.name} style={{ width: 52, height: 40, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--line)' }} />
-                    <button
-                      type="button"
-                      className="link-btn danger"
-                      aria-label={`移除 ${f.name}`}
-                      style={{ position: 'absolute', top: -6, right: -6, background: '#fff', border: '1px solid var(--line)', borderRadius: '50%', width: 16, height: 16, lineHeight: '12px', padding: 0, fontSize: 11 }}
-                      onClick={() => void removeExisting(f)}
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-                {photos.map((p) => (
-                  <span key={p.key} style={{ position: 'relative', display: 'inline-flex' }}>
-                    <img src={p.url} alt={p.file.name} title={p.file.name} style={{ width: 52, height: 40, objectFit: 'cover', borderRadius: 4, border: '1px solid var(--line)' }} />
-                    <button
-                      type="button"
-                      className="link-btn danger"
-                      aria-label={`移除 ${p.file.name}`}
-                      style={{ position: 'absolute', top: -6, right: -6, background: '#fff', border: '1px solid var(--line)', borderRadius: '50%', width: 16, height: 16, lineHeight: '12px', padding: 0, fontSize: 11 }}
-                      onClick={() => removePhoto(p.key)}
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
+                <PhotoThumbs
+                  items={[
+                    ...existing.map((f) => ({
+                      key: `saved-${f.id}`,
+                      url: f.url,
+                      name: f.name,
+                      onRemove: () => void removeExisting(f),
+                    })),
+                    ...photos.map((p) => ({
+                      key: `new-${p.key}`,
+                      url: p.url,
+                      name: p.file.name,
+                      onRemove: () => removePhoto(p.key),
+                    })),
+                  ]}
+                />
                 <Upload
                   accept={IMAGE_ACCEPT}
                   multiple

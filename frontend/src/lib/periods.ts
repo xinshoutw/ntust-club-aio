@@ -1,8 +1,10 @@
+import { useEffect, useReducer } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useAuth } from '../app/auth'
 import { api } from '../api/client'
 import type { Period } from '../api/auth'
+import { taipeiNow } from './today'
 
 // 節次(第 1–10 節、A–D 節)的單一真相在後端 services/booking_service.PERIOD_TIMES,
 // 隨 /auth/me 下發。登入後的借用頁取用時 user 必定已就緒(全在 RequireRole 之後)。
@@ -52,16 +54,27 @@ export const bookingStartAt = (periods: readonly Period[], date: string, picked:
   return start ? dayjs(`${date} ${start}`, 'YYYY/MM/DD HH:mm') : dayjs(null)
 }
 
-/** 是否已過申請起始時刻(含相等=已開始;與後端 booking_started 同規則)。
+/** 是否已過申請起始時刻(含相等=已開始;與後端 booking_started 同規則,以台北時間比)。
  *  算不出起始時刻時一律回 false:「還沒開始」讓使用者按得到取消鈕,後端會再擋一次;
  *  反過來就是把還能取消的單變成不能取消,而且畫面上看不出原因。 */
 export const bookingStarted = (periods: readonly Period[], date: string, picked: string[]): boolean => {
   const start = bookingStartAt(periods, date, picked)
-  return picked.length > 0 && start.isValid() && !start.isAfter(dayjs())
+  return picked.length > 0 && start.isValid() && !start.isAfter(taipeiNow())
 }
 
-/** 現在時刻已開始的節次(起點 ≤ now):選「今天」時禁選用 */
+/** 每分鐘重畫一次:「已開始」是時間走出來的,不是資料變出來的 —— 頁面開著跨過節次起點時,
+ *  場況圖的入口與申請頁的節次要跟著收,不能等到別的東西觸發重畫(那樣只會在送出時吃後端的 422)。
+ *  ponytail: 固定每分鐘,不對齊下一個節次起點;節次起點精確到分,最多晚一分鐘,後端照樣會擋 */
+export function useMinuteTick(): void {
+  const [, tick] = useReducer((n: number) => n + 1, 0)
+  useEffect(() => {
+    const id = setInterval(tick, 60_000)
+    return () => clearInterval(id)
+  }, [])
+}
+
+/** 台北現在已開始的節次(起點 ≤ now):選「今天」時禁選用 */
 export const startedPeriods = (periods: readonly Period[]): string[] => {
-  const now = dayjs().format('HH:mm')
+  const now = taipeiNow().format('HH:mm')
   return periods.filter((p) => p.start <= now).map((p) => p.key)
 }

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { ApiError, isUnauthorized, validationDetail } from './client'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { ApiError, api, isUnauthorized, validationDetail } from './client'
 
 describe('validationDetail', () => {
   it('自訂驗證器的中文訊息連欄位一起帶出', () => {
@@ -52,5 +52,19 @@ describe('isUnauthorized', () => {
 
   it('訊息像也不算(沒有狀態碼就不能下結論)', () => {
     expect(isUnauthorized(new Error('請先登入'))).toBe(false)
+  })
+})
+
+describe('api 的錯誤', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  // 臨時場地借用一次送多筆:後端在 meta.slot 說是第幾筆,頁面靠它標出那一列
+  it('信封的 meta 整個掛在 ApiError 上，code 也在', async () => {
+    const body = { success: false, data: null, error: '第 2 筆 2099/01/03 已有申請', meta: { code: 'CONFLICT', slot: 2 } }
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(body), { status: 409 })))
+    const err = await api('/club/venue-bookings', { method: 'POST', body: '{}' }).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    expect((err as ApiError).code).toBe('CONFLICT')
+    expect((err as ApiError).meta.slot).toBe(2)
   })
 })

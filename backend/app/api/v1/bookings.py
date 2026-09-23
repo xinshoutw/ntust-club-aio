@@ -40,6 +40,7 @@ from app.schemas.bookings import (
     RoomBookingOut,
     VenueBookingIn,
     VenueBookingOut,
+    VenueSlotIn,
 )
 from app.schemas.common import ApiResponse
 from app.services import activity_service, approvals, audit, notify
@@ -349,6 +350,15 @@ async def list_venue_bookings(
     return ApiResponse(data=data, meta=page.meta(total or 0))
 
 
+def _slot_labels(slots: list[VenueSlotIn]) -> list[tuple[str, dict[str, int], VenueSlotIn]]:
+    """每一列的錯誤訊息開頭「第 N 筆 日期」與錯誤信封的 `meta.slot`(同一個 N)。同一天可以有
+    好幾列,只給日期分不出是哪一列;N 對得上畫面由上往下數第幾列(前端送的順序就是列的順序)。
+    列上沒有看得到的編號,前端靠 `meta.slot` 把那一列標紅、捲過去,不必讓人照著訊息去數。"""
+    return [
+        (f"第 {i} 筆 {slot.date:%Y/%m/%d}", {"slot": i}, slot) for i, slot in enumerate(slots, 1)
+    ]
+
+
 @router.post("/venue-bookings", status_code=201)
 async def create_venue_booking(
     body: VenueBookingIn,
@@ -356,7 +366,10 @@ async def create_venue_booking(
     db: DbDep,
     request: Request,
     background: BackgroundTasks,
-) -> ApiResponse[VenueBookingOut]:
+) -> ApiResponse[list[VenueBookingOut]]:
+    """一次送一或多個時段(D-43):一筆一張單、各自審核,**整批同一個交易** ——
+    有一筆不成立就一張都不建,錯誤訊息開頭是「第 N 筆 日期」、`meta.slot` 是同一個 N
+    (只送一筆時也帶,不另分支;見 `_slot_labels`)。"""
     await _ensure_not_suspended(db, user)
     venue = await db.get(Venue, body.venue_id)
     if venue is None or not venue.is_active or not venue.allow_temp:
@@ -368,57 +381,76 @@ async def create_venue_booking(
     elif not await _skips_activity(db, user):
         raise validation_error("請選擇借用活動")
 
-    # 過去時間全面禁止:過去日期直接擋;
-    # 今天則以節次時刻表擋「最早節次已開始」的申請
-    if body.date < svc.today_taipei():
-        raise validation_error("借用日期不得早於今天")
-    if svc.booking_started(body.date, body.periods):
-        raise validation_error("所選時段已開始,請選擇尚未開始的時段")
-
-    # 場地不開放規則:申請時即擋,核准端亦驗(與社團無關,放在鎖外)
-    hit = await svc.blocked_periods(db, venue.id, body.date, body.periods)
-    if hit:
-        raise validation_error(f"所選時段不開放借用(時段 {','.join(hit)})")
+    today = svc.today_taipei()
+    for where, row, slot in _slot_labels(body.slots):
+        # 過去時間全面禁止:過去日期直接擋;
+        # 今天則以節次時刻表擋「最早節次已開始」的申請
+        if slot.date < today:
+            raise validation_error(f"{where} 借用日期不得早於今天", meta=row)
+        if svc.booking_started(slot.date, slot.periods):
+            raise validation_error(f"{where} 所選時段已開始，請選擇尚未開始的時段", meta=row)
+        # 場地不開放規則:申請時即擋,核准端亦驗(與社團無關,放在鎖外)
+        hit = await svc.blocked_periods(db, venue.id, slot.date, slot.periods)
+        if hit:
+            raise validation_error(
+                f"{where} 所選時段不開放借用（第 {'、'.join(hit)} 節）", meta=row
+            )
 
     # 同社同場地同日「節次重疊」才算重複(不同社的衝突由審核關把關)。
     # 節次不重疊的兩張單是兩件事:上午擺攤、晚上彩排本來就該各送一張。
-    # 先鎖住這個社團:守門是先查再寫,雙擊送出的第二筆會查不到第一筆
+    # 先鎖住這個社團:守門是先查再寫,雙擊送出的第二筆會查不到第一筆。
+    # 同一批彼此重疊的在 schema 就擋掉了(`VenueBookingIn._no_overlap`)
     await svc.lock_resource(db, "club", user.club_id)
-    dup = await db.scalar(
-        sa.select(VenueBooking.id).where(
-            VenueBooking.club_id == user.club_id,
-            VenueBooking.venue_id == venue.id,
-            VenueBooking.date == body.date,
-            VenueBooking.periods.overlap(body.periods),
-            VenueBooking.status.notin_([BookingStatus.REJECTED, BookingStatus.CANCELLED]),
+    for where, row, slot in _slot_labels(body.slots):
+        dup = await db.scalar(
+            sa.select(VenueBooking.id).where(
+                VenueBooking.club_id == user.club_id,
+                VenueBooking.venue_id == venue.id,
+                VenueBooking.date == slot.date,
+                VenueBooking.periods.overlap(slot.periods),
+                VenueBooking.status.notin_([BookingStatus.REJECTED, BookingStatus.CANCELLED]),
+            )
         )
-    )
-    if dup:
-        raise conflict("同一場地同一天的相同節次已有申請")
+        if dup:
+            raise conflict(f"{where} 同一場地同一天的相同節次已有申請", meta=row)
 
-    row = VenueBooking(
-        club_id=user.club_id,
-        venue_id=venue.id,
-        activity_id=activity.id if activity else None,
-        date=body.date,
-        periods=body.periods,
-        purpose=body.purpose,
-        phone=body.phone,
-    )
-    db.add(row)
-    audit.record(db, action="venue_booking_submitted", user=user, ip=client_ip(request))
+    rows = [
+        VenueBooking(
+            club_id=user.club_id,
+            venue_id=venue.id,
+            activity_id=activity.id if activity else None,
+            date=slot.date,
+            periods=slot.periods,
+            purpose=body.purpose,
+            phone=body.phone,
+        )
+        for slot in body.slots
+    ]
+    db.add_all(rows)
+    # 一張單一筆(與逐張送出時的筆數一致)。先 flush 拿單號:之後的核准、退回、取消、撤銷
+    # 都記 `venue_booking={id}`,送出這筆也要對得上;後面接的格子說明寫法同手動借用
+    await db.flush()
+    for row in rows:
+        audit.record(
+            db,
+            action="venue_booking_submitted",
+            user=user,
+            detail=f"venue_booking={row.id};{venue.name} {row.date} 時段 {','.join(row.periods)}",
+            ip=client_ip(request),
+        )
     await db.commit()
+    # 通知一批一則:同一次送出拆成十則訊息只會洗掉頻道
+    slots_text = "、".join(f"{s.date} 時段 {','.join(s.periods)}" for s in body.slots)
     await _notify_submit(
-        background,
-        db,
-        user,
-        "臨時場地借用申請",
-        f"{user.name}:{venue.name}({body.date} 時段 {','.join(body.periods)})",
+        background, db, user, "臨時場地借用申請", f"{user.name}:{venue.name}({slots_text})"
     )
-    out = VenueBookingOut.model_validate(row)
-    out.venue_name = venue.name
-    out.activity_name = activity.name if activity else None
-    return ApiResponse(data=out)
+    data = []
+    for row in rows:
+        out = VenueBookingOut.model_validate(row)
+        out.venue_name = venue.name
+        out.activity_name = activity.name if activity else None
+        data.append(out)
+    return ApiResponse(data=data)
 
 
 # ---- 器材借用 ----

@@ -58,7 +58,8 @@
 
 - [ ] 應辦 **backend healthcheck**:`compose.yml` 只有 db 有,web 的 `depends_on: backend` 也沒有 `condition: service_healthy`。啟動時可能短暫 502(內層 nginx 變數 upstream + resolver 會自行恢復,不會卡死)
 - [ ] 應辦 **log 輪替與保留**(磁碟使用率見容量告警、backend 存活見 Uptime Kuma)
-- [ ] 應辦 **磁碟容量**:系統總量讀實體磁碟可用空間,不設邏輯容量;HEIC/HEIF/TIFF/BMP 的轉檔預覽快取(`<path>.preview.jpg`,長邊 1600 的 JPEG)**不計入 `files.size`**,實際佔用會高於檔案管理頁的邏輯總量;到 90% 告警水位就不再建新快取;實體磁碟還要容 OS/Docker/PostgreSQL/log/multipart temp,以 `df` 與 GCE 實際容量驗證
+- [ ] 應辦 **磁碟容量**:系統總量讀實體磁碟可用空間,不設邏輯容量;HEIC/HEIF/TIFF/BMP 的轉檔預覽快取(`<path>.preview-v2.jpg`,長邊 1600 的 JPEG)**不計入 `files.size`**,實際佔用會高於檔案管理頁的邏輯總量;社團頁活動彈窗的結案照片(D-42)對外一律送這份預覽,所以 JPEG/PNG 也會長出快取 —— 開發庫實測平均 241 KB/張,4,017 張已結案照片全被看過一輪約 950 MB;到 90% 告警水位就不再建新快取;實體磁碟還要容 OS/Docker/PostgreSQL/log/multipart temp,以 `df` 與 GCE 實際容量驗證
+- [ ] 應辦 **清掉 v1 預覽快取**:升級到帶社團頁活動彈窗(D-42)的版本後跑一次 `find <upload_dir> -name '*.preview.jpg' -delete`。v1 沒清 JPEG 的 COM 註解,但新版的快取檔名是 `.preview-v2.jpg`,舊檔不會再被送出去 —— 這一步只是回收空間
 - [ ] 待決 **限流與 session**:限流是行程內記憶體(單機可行,重啟歸零);過期 session 於登入時順手清除,不另設排程
 - [ ] 應辦 **逾期提醒排程**:host cron 每上班日 10:35 呼叫 `scripts/send_overdue_reminders.py`(cron 行見該檔 docstring);未設排程則只剩人工按鈕
 - [ ] 應辦 **每日備份**:host cron 03:15 呼叫 `scripts/backup_db.sh`

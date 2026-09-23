@@ -3,7 +3,7 @@ import { Link } from 'react-router'
 import { Button, Input, Select } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import QueryError from '../../components/ui/QueryError'
-import { CLUB_TAGS, RECRUIT_STATUSES } from '../../api/clubProfile'
+import { RECRUIT_STATUSES } from '../../api/clubProfile'
 import { usePublicClubs, type ClubCard } from '../../api/publicClubs'
 import useDocumentTitle from './useDocumentTitle'
 import ClubArt, { BADGE_CLASS } from './clubArt'
@@ -29,10 +29,9 @@ const options = (values: readonly string[], all: string) => [
   { value: '', label: all },
   ...values.map((v) => ({ value: v, label: v })),
 ]
-// 三份選單都是主檔,一次算完即可。寫在元件裡的話每次改篩選都會生出新的陣列,
+// 兩份選單都是主檔,一次算完即可。寫在元件裡的話每次改篩選都會生出新的陣列,
 // rc-select 的 label 對照表跟著整份重建
 const ATTR_OPTIONS = options([...ATTR_ORDER, UNCLASSIFIED], '全部性質')
-const TAG_OPTIONS = options(CLUB_TAGS, '全部標籤')
 const RECRUIT_OPTIONS = options(RECRUIT_STATUSES, '全部招生')
 
 /** 整張卡是一個連結,不是按鈕。
@@ -81,14 +80,12 @@ export default function ClubDirectoryPage() {
   const query = usePublicClubs()
   const [q, setQ] = useState('')
   const [attr, setAttr] = useState('')
-  const [tag, setTag] = useState('')
   const [recruit, setRecruit] = useState('')
   useDocumentTitle('社團導覽')
 
   const clearFilters = () => {
     setQ('')
     setAttr('')
-    setTag('')
     setRecruit('')
   }
 
@@ -111,20 +108,20 @@ export default function ClubDirectoryPage() {
   const rows = useMemo(() => {
     const keyword = q.trim().toLowerCase()
     return sorted.filter((c) => {
-      if (keyword && ![c.name, c.enName, c.tagline].some((v) => v.toLowerCase().includes(keyword)))
-        return false
+      // 標籤沒有自己的篩選器,所以要進搜尋 —— 不然「武術」這種主題詞一個入口都不剩
+      const fields = [c.name, c.enName, c.tagline, ...c.tags]
+      if (keyword && !fields.some((v) => v.toLowerCase().includes(keyword))) return false
       if (attr && (attr === UNCLASSIFIED ? c.attribute !== null : c.attribute !== attr)) return false
-      if (tag && !c.tags.includes(tag)) return false
       if (recruit && c.recruitStatus !== recruit) return false
       return true
     })
-  }, [sorted, q, attr, tag, recruit])
+  }, [sorted, q, attr, recruit])
 
   return (
     <PublicShell mobileTitle="社團導覽">
       <div className="dir-toolbar">
         <h1>社團導覽</h1>
-        {/* 三顆下拉包一層:手機上它們要自成一列並平分寬度,桌機上 `display: contents`
+        {/* 兩顆下拉包一層:手機上它們要自成一列並平分寬度,桌機上 `display: contents`
             讓它們照舊直接排在工具列的 flex 裡 */}
         <div className="dir-filters">
           <Select
@@ -132,13 +129,6 @@ export default function ClubDirectoryPage() {
             onChange={setAttr}
             options={ATTR_OPTIONS}
             aria-label="依性質篩選"
-            className="dir-filter"
-          />
-          <Select
-            value={tag}
-            onChange={setTag}
-            options={TAG_OPTIONS}
-            aria-label="依標籤篩選"
             className="dir-filter"
           />
           <Select
@@ -173,7 +163,7 @@ export default function ClubDirectoryPage() {
               className="card"
               style={{ padding: 48, textAlign: 'center', color: 'var(--steel)' }}
             >
-              {q || attr || tag || recruit ? (
+              {q || attr || recruit ? (
                 <>
                   沒有符合條件的社團
                   <div style={{ marginTop: 16 }}>

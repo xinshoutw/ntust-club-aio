@@ -28,7 +28,8 @@
 .dir-search {
   width: 240px;
 }
-/* 平板:三個下拉加搜尋框在 768px 剛好把標題擠掉一整列,四個一起縮一號就排得回同一行 */
+/* 平板:三個控制項縮一號。768px 其實還排得下原尺寸(630 / 704),真正排不下是 660 左右 ——
+   留著是為了與其餘頁面的平板尺寸一致,也讓 561-680px 那一段有餘裕 */
 @media (max-width: 991px) {
   .dir-filter {
     width: 108px;
@@ -37,23 +38,23 @@
     width: 168px;
   }
 }
-/* 桌機:三顆下拉直接當工具列的 flex 子元素,包住它們的那層不參與版面 */
+/* 桌機:兩顆下拉直接當工具列的 flex 子元素,包住它們的那層不參與版面 */
 .dir-filters {
   display: contents;
 }
-/* 手機:標題自己一列、三個下拉平分一列、搜尋自己一列。
-   下拉改由 grid 平分而不是 flex-wrap —— 132px 三顆在 375px 排不下會掉成 2+1,
-   落單的那顆被 flex-grow 拉成整列寬,三個同類篩選器長得不一樣寬。
-   106px 是「全部性質」四個字加上 AntD 的內距與箭頭的實測下限;窄到排不下三欄
-   (約 370px 以下,三欄要 3×106 + 2×10 = 338px)時 auto-fit 自己收成兩欄,寬度仍然一致 */
-@media (max-width: 680px) {
+/* 手機:標題自己一列、兩個下拉平分一列、搜尋自己一列。
+   560px 是量出來的:縮一號後三個控制項要 510px,而 ≤767px 的內容寬是 viewport - 32,
+   542px 以下才真的排不下(標籤篩選還在時這個數字是 660,所以斷點才設 680)。
+   下拉用 grid 平分而不是 flex-wrap —— flex 下它們只會各自維持 108px 擠在左邊,
+   右邊空一大塊,而底下的搜尋框是滿版的 */
+@media (max-width: 560px) {
   .dir-toolbar h1 {
     margin-right: 0;
     width: 100%;
   }
   .dir-filters {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(106px, 1fr));
+    grid-template-columns: 1fr 1fr;
     gap: 10px;
     width: 100%;
   }
@@ -296,6 +297,15 @@
 .act-where-icon {
   display: none;
 }
+/* 整列可點(開活動彈窗)。hover 的底色左右各多塗 12px:列沒有水平內距 —— 欄寬由
+   subgrid 決定,加內距會連表頭一起位移 —— 直接塗底色的話字會貼著色塊邊緣。
+   box-shadow 只畫不排版,碰不到欄寬 */
+.act-row.click-tint {
+  cursor: pointer;
+}
+.act-row.click-tint:hover {
+  box-shadow: -12px 0 0 var(--seal-tint), 12px 0 0 var(--seal-tint);
+}
 
 @media (max-width: 767px) {
   .act-list {
@@ -356,6 +366,38 @@
     margin-top: 0.3em;
     color: var(--steel);
   }
+  /* 字卡自己有內距與圓角,底色塗在卡上就好 */
+  .act-row.click-tint:hover {
+    box-shadow: none;
+  }
+}
+
+/* ---- 活動彈窗(點活動紀錄開)---- */
+.act-kv {
+  margin-top: 4px;
+}
+.act-photos-heading {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 20px 0 10px;
+}
+/* 縮圖牆:手機上彈窗內寬約 240px,104px 的下限讓它仍排得出兩欄 */
+.act-photos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 8px;
+}
+/* 照片比例不一:一律 4:3 置中裁切,整面縮圖才排得齊;完整的圖在預覽裡看 */
+.act-photos .ant-image {
+  display: block;
+  aspect-ratio: 4 / 3;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--paper);
+}
+.act-photos .ant-image-img {
+  height: 100%;
+  object-fit: cover;
 }
 
 /* ---- 詳細頁 ---- */

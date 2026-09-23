@@ -211,20 +211,46 @@ def _validate_phone_required(v: str) -> str:
     return out
 
 
-class VenueBookingIn(BaseModel):
-    venue_id: int
-    activity_id: int | None = None  # 借用活動(限審核通過);留空僅 NO_ACTIVITY_ACCOUNT 可用
+# 一次送出的時段筆數上限(前端同值:features/bookings/VenueBookingPage MAX_SLOTS)。
+# 每週同一時段借整學期的走固定場地借用,臨時借用多到十天以上多半是填錯了
+MAX_VENUE_SLOTS = 10
+
+
+class VenueSlotIn(BaseModel):
+    """一天的借用時段;一筆成一張單。"""
+
     date: date
     periods: list[str] = Field(min_length=1, max_length=14)
-    purpose: str = Field(min_length=1, max_length=200)  # 用途必填
-    phone: str = Field(min_length=1, max_length=30)  # 聯絡電話必填
-
-    _phone = field_validator("phone")(_validate_phone_required)
 
     @field_validator("periods")
     @classmethod
     def _periods(cls, v: list[str]) -> list[str]:
         return _validate_periods(v)
+
+
+class VenueBookingIn(BaseModel):
+    venue_id: int
+    activity_id: int | None = None  # 借用活動(限審核通過);留空僅 NO_ACTIVITY_ACCOUNT 可用
+    # 一次送多個時段(D-43):一筆一張單、各自審核,場地、活動、用途與電話共用
+    slots: list[VenueSlotIn] = Field(min_length=1, max_length=MAX_VENUE_SLOTS)
+    purpose: str = Field(min_length=1, max_length=200)  # 用途必填
+    phone: str = Field(min_length=1, max_length=30)  # 聯絡電話必填
+
+    _phone = field_validator("phone")(_validate_phone_required)
+
+    @field_validator("slots")
+    @classmethod
+    def _no_overlap(cls, v: list[VenueSlotIn]) -> list[VenueSlotIn]:
+        """同一天節次重疊的兩筆擋在門口:建下去第二張就是第一張的重複申請。
+        同一天、節次不重疊的兩筆照收(上午擺攤、晚上彩排本來就是兩張單)。"""
+        taken: dict[date, set[str]] = {}
+        for i, slot in enumerate(v, 1):
+            day = taken.setdefault(slot.date, set())
+            if day & set(slot.periods):
+                # 「第 N 筆」與端點其餘逐列訊息同一個開頭(`bookings._slot_labels`)
+                raise ValueError(f"第 {i} 筆 {slot.date:%Y/%m/%d} 的時段重複")
+            day.update(slot.periods)
+        return v
 
 
 class VenueBookingOut(BaseModel):

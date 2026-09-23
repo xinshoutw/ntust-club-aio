@@ -16,6 +16,19 @@ const CATALOGUE: Period[] = [
 
 afterEach(() => vi.useRealTimers())
 
+// 節次時刻是台北的牆鐘:裝置在哪個時區,判定都要一樣(台北 17:30 = 09:30Z)
+const ZONES = ['Asia/Taipei', 'America/New_York', 'Europe/London']
+const inZone = (tz: string, fn: () => void) => {
+  const orig = process.env.TZ
+  process.env.TZ = tz
+  try {
+    fn()
+  } finally {
+    if (orig === undefined) delete process.env.TZ
+    else process.env.TZ = orig
+  }
+}
+
 describe('periodKeys', () => {
   test('保留後端給的節次順序(不是字串排序)', () => {
     expect(periodKeys(CATALOGUE)).toEqual(['1', '9', '10', 'A'])
@@ -29,11 +42,12 @@ describe('bookingStartAt', () => {
 })
 
 describe('bookingStarted', () => {
-  test('已過起始時刻即為已開始(相等也算)', () => {
-    // 以本地時間建構:節次時刻與 dayjs() 都是牆鐘時間,測試不依賴執行機器的時區
-    vi.useFakeTimers().setSystemTime(new Date(2026, 7, 20, 16, 30))
-    expect(bookingStarted(CATALOGUE, '2026/08/20', ['9'])).toBe(true)
-    expect(bookingStarted(CATALOGUE, '2026/08/20', ['A'])).toBe(false)
+  test.each(ZONES)('已過台北的起始時刻即為已開始(相等也算;裝置在 %s)', (tz) => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-08-20T08:30:00Z')) // 台北 16:30
+    inZone(tz, () => {
+      expect(bookingStarted(CATALOGUE, '2026/08/20', ['9'])).toBe(true)
+      expect(bookingStarted(CATALOGUE, '2026/08/20', ['A'])).toBe(false)
+    })
   })
 
   test('沒有節次就不算開始', () => {
@@ -42,8 +56,8 @@ describe('bookingStarted', () => {
 })
 
 describe('startedPeriods', () => {
-  test('只回起點已過的節次', () => {
-    vi.useFakeTimers().setSystemTime(new Date(2026, 7, 20, 17, 30))
-    expect(startedPeriods(CATALOGUE)).toEqual(['1', '9', '10'])
+  test.each(ZONES)('只回台北時間起點已過的節次(裝置在 %s)', (tz) => {
+    vi.useFakeTimers().setSystemTime(new Date('2026-08-20T09:30:00Z')) // 台北 17:30
+    inZone(tz, () => expect(startedPeriods(CATALOGUE)).toEqual(['1', '9', '10']))
   })
 })

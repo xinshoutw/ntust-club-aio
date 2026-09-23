@@ -50,8 +50,8 @@ class Club(Base, TimestampMixin):
     # 而這裡關掉的社團帳號仍照常登入做事
     public_visible: Mapped[bool] = mapped_column(default=True, server_default=sa.true())
     tagline: Mapped[str | None] = mapped_column(sa.Text)  # 一句話介紹(字卡塞不下 intro)
-    # 固定主檔(`schemas/clubs.CLUB_TAGS`),社團至多選 3 個 —— 自由填寫會讓導覽頁的
-    # 篩選長歪:同一件事會出現「程式」「寫程式」「Coding」三種寫法,篩選器列不完也對不起來
+    # 固定主檔(`schemas/clubs.CLUB_TAGS`),社團至多選 3 個 —— 自由填寫會讓同一件事出現
+    # 「程式」「寫程式」「Coding」三種寫法,一整面字卡各說各話,搜尋也對不起來
     tags: Mapped[list[str]] = mapped_column(
         ARRAY(sa.Text), default=list, server_default=sa.text("'{}'::text[]")
     )

@@ -21,6 +21,7 @@ from tests.test_bookings import (
     make_venue,
     open_fixed_window,
     setup_session,
+    single_slot,
 )
 
 
@@ -83,17 +84,17 @@ async def test_k2_venue_booking_self_cancel(client, db, monkeypatch):
     day = date.today() + timedelta(days=14)
     created = await client.post(
         "/api/v1/club/venue-bookings",
-        json={
+        json=single_slot({
             "venue_id": venue.id,
             "activity_id": activity.id,
             "date": day.isoformat(),
             "periods": ["3", "4"],
             "purpose": "擺攤",
             "phone": "0912000111",
-        },
+        }),
         headers=csrf_headers(client),
     )
-    booking_id = created.json()["data"]["id"]
+    booking_id = created.json()["data"][0]["id"]
     spy.club.clear()
 
     resp = await client.post(

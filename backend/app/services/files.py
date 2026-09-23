@@ -12,6 +12,7 @@ import hashlib
 import io
 import logging
 import shutil
+import time
 import uuid
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
@@ -78,7 +79,7 @@ def unlink_quiet(path: Path) -> None:
     上傳超額回滾(413)、去重衝突(409)、commit 後的磁碟清理都走這裡;
     刪不掉頂多留孤兒檔(可清掃),換成 500 反而誤導呼叫端。
     """
-    # 轉檔預覽的快取跟著原檔走(HEIC 等瀏覽器不會解的圖,見 file_response);
+    # 轉檔預覽的快取跟著原檔走(HEIC 等瀏覽器不會解的圖、社團頁看過的結案照片,見 preview_of);
     # 各自 try:原檔刪失敗不該連快取也留下,而 log 要指得出到底是哪一個沒刪掉
     for target in (path.with_name(path.name + PREVIEW_SUFFIX), path):
         try:
@@ -565,31 +566,46 @@ _INLINE_MIMES = {
 
 # <img> 要圖時(瀏覽器帶 `Sec-Fetch-Dest: image`)轉成 JPEG 給它看:iPhone 拍的結案照片是 HEIC,
 # Chrome/Firefox 解不了,縮圖與預覽彈窗就是一片破圖。下載連結與 fetch 不帶這個值,拿到的仍是原檔。
-# 轉檔結果快取在原檔旁(`<path>.preview.jpg`),刪原檔時一併清(unlink_quiet);
+# 轉檔結果快取在原檔旁(`<path>` + `PREVIEW_SUFFIX`),刪原檔時一併清(unlink_quiet);
 # 快取不計入 files.size(配額看的是原檔),實際磁碟佔用會高於檔案管理頁的邏輯總量
 _PREVIEW_CONVERTIBLE = {"image/heic", "image/heif", "image/tiff", "image/bmp"}
-PREVIEW_SUFFIX = ".preview.jpg"
+# 檔名帶轉檔規則的版本:快取一旦存在就直接送(preview_of),規則改了而檔名沒換,舊規則轉出來的
+# 就會照送。v1(`.preview.jpg`)沒清 JPEG 的 COM 註解,不能由公開照片通道(D-42)送出去;
+# 升級後舊檔是孤兒,DEPLOY_CHECKLIST 有一次性清除的指令。改 `_render_preview` 輸出的規則就換號
+PREVIEW_SUFFIX = ".preview-v2.jpg"
 PREVIEW_MAX_EDGE = 1600  # 預覽彈窗最大 76vh,更大只是白轉
 # 這兩個上限擋的是「解開來會吃掉半台機器」的來源:20MB 的 HEIC 可以是 48MP,解成 RGB 就是 150MB;
 # Pillow 自己的炸彈防護要到 179MP 才真的丟例外,中間那一段照解不誤
 PREVIEW_MAX_SOURCE_BYTES = 20 * 1024 * 1024
 PREVIEW_MAX_PIXELS = 50_000_000
+# 色彩描述檔照抄進預覽,但 Pillow 不驗內容:大於這個的不是顯示用的 profile(sRGB 約 3 KB、
+# iPhone 的 Display P3 約 0.5 KB),是搭公開通道(D-42)出去的任意資料,整段丟掉
+PREVIEW_MAX_ICC_BYTES = 64 * 1024
 # 同時最多轉幾張:正式機是 2 vCPU + 4GB 還跟 PostgreSQL 同住,asyncio 預設 thread pool 會放 6 條進去,
 # 結案照片牆一次要 20 張縮圖就是 6 張同時解 —— 兩張已經吃滿兩顆核心。用專屬的 2 條 thread pool
 # 而不是 Semaphore:請求被取消時 to_thread 裡的 thread 不會停,Semaphore 卻會先放行下一張,
-# 「最多 2 張」就不是真的;pool 本身封頂,取消只是讓等待的人先走
+# 「最多 2 張」就不是真的;pool 本身封頂,取消只是讓等待的人先走。
+# 這些都是每個行程各一份(pool、下面的 single-flight 與失敗記錄):現在是單一 worker,
+# 改成 `--workers N` 的話同時轉的是 2N 張,冷卻與公開通道的排隊上限也各算各的
 _PREVIEW_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="preview")
+# 形象圖轉 WebP 另走一條:`save_club_image` 是拿著全站唯一的上傳鎖(`_STORAGE_LOCK_KEY`)在等轉檔,
+# 排在照片預覽後面的話,匿名把預覽池塞滿,全站的上傳就一起卡在那把鎖上(還各握一條 DB 連線)。
+# 換圖很少見(上傳鎖也讓它同時只有一張),`_fit_webp` 先縮再轉,多疊上去的約是一次完整解碼(150–200MB)
+_CLUB_IMAGE_POOL = ThreadPoolExecutor(max_workers=1, thread_name_prefix="club-image")
 
 
 def _render_preview(src: Path, dst: Path) -> None:
-    """HEIC/HEIF/TIFF/BMP → JPEG(長邊封頂、套 EXIF 方向)。
+    """圖片 → JPEG(長邊封頂、套 EXIF 方向、不帶來源的 metadata)。
 
-    先寫暫存再 rename:暫存名帶 uuid —— 同一張同時被兩個請求轉(preview_of 的檢查與轉檔之間
-    有空窗),各寫各的、誰後 rename 誰的留下;用 pid 命名的話兩條 thread 是同一個 pid,
+    站內只轉瀏覽器解不了的(`_PREVIEW_CONVERTIBLE`,見 file_response);社團頁的照片通道
+    每一張都轉,什麼格式都一樣(D-42)。
+
+    先寫暫存再 rename:暫存名帶 uuid —— 同一行程內 preview_of 已把同一張合併成一次,
+    但多個 worker 行程仍可能同時轉同一張,各寫各的、誰後 rename 誰的留下;共用一個暫存名的話
     會交錯寫進同一個檔,壞掉的 JPEG 從此被永久快取。失敗或中斷都不留 .part。
     """
     if dst.is_file():
-        return  # 排隊時前一個已經轉好同一張(preview_of 的檢查與這裡之間有空窗)
+        return  # 另一個 worker 行程已經轉好同一張
     tmp = dst.with_name(f"{dst.name}.{uuid.uuid4().hex}.part")
     try:
         with Image.open(src) as img:
@@ -599,25 +615,83 @@ def _render_preview(src: Path, dst: Path) -> None:
             # 這行是保險(換解碼器也不會躺著輸出),測試驗的是結果不是這一行
             img = ImageOps.exif_transpose(img) or img
             img.thumbnail((PREVIEW_MAX_EDGE, PREVIEW_MAX_EDGE))
-            img.convert("RGB").save(tmp, format="JPEG", quality=85)
+            # 不帶來源的 metadata(公開通道就送這一份,D-42):EXIF 與 XMP 本來就不會寫出去,
+            # COM 註解要明講清空(Pillow 預設沿用來源的)。ICC 留著、只留 RGB 來源的 ——
+            # iPhone 的 Display P3 少了它會被當成 sRGB,整張變淡;CMYK/灰階的 profile 套在
+            # 轉完的 RGB 上則是錯的。JPEG 沒有 alpha:直接 convert("RGB") 透明處是一塊黑(`_on_white`)
+            icc = img.info.get("icc_profile") if img.mode in ("RGB", "RGBA") else None
+            if icc and len(icc) > PREVIEW_MAX_ICC_BYTES:
+                icc = None
+            _on_white(img).save(tmp, format="JPEG", quality=85, comment=b"", icc_profile=icc)
         tmp.replace(dst)
     finally:
         tmp.unlink(missing_ok=True)
 
 
-async def preview_of(disk: Path) -> Path | None:
+# 轉不出來的來源記一段時間:壞檔每次都要整張解到最後才失敗,而社團頁的照片通道匿名打得到
+# (D-42)—— 不記的話,同一張壞圖可以被拿來反覆佔住只有兩條的轉檔池、寫一份份 traceback。
+# 記的是時間不是到重啟為止:原檔暫時讀不到、磁碟滿、記憶體不夠這類會好的錯誤,過一陣子要能重試
+PREVIEW_RETRY_AFTER = 600  # 秒
+_PREVIEW_FAILED: dict[Path, float] = {}  # 原檔 → 失敗的時刻(monotonic)
+# 同一張正在轉:後到的請求等同一份結果,不各自再解一次 —— 一波並發打同一張(冷快取的好圖,
+# 或一張壞圖)只佔一次轉檔池
+_PREVIEW_INFLIGHT: dict[Path, asyncio.Future[Path | None]] = {}
+# 公開通道因排隊上限拒絕時記一筆,至多每分鐘一筆:被灌的時候看得出來,又不會反過來灌爆 log
+# (拒絕對外是 404,跟壞檔分不出來)
+BACKLOG_WARN_EVERY = 60  # 秒
+_backlog_warned_at = float("-inf")
+
+
+async def preview_of(disk: Path, *, max_backlog: int | None = None) -> Path | None:
     """轉檔預覽的磁碟路徑;沒有快取就轉一次(專屬 thread pool,不擋 event loop,同時最多兩張)。
 
-    磁碟到告警水位(90%,與上傳閘同一條線)就**不再建新快取**、回 None 讓呼叫端給原檔:
+    `max_backlog`:正在轉與排隊中的已達這麼多張,就不再排新的一張、回 None(不記失敗 ——
+    不是這張的錯,空下來之後照常轉)。給匿名通道用:斷線不會取消 handler,排進去的一律跑完。
+
+    轉不出來(壞檔、超過像素上限、原檔不見)記 log、回 None,`PREVIEW_RETRY_AFTER` 內同一張
+    直接回 None 不再解碼。磁碟到告警水位(90%,與上傳閘同一條線)就**不再建新快取**、回 None:
     上傳被擋住了,瀏覽幾 GB 的歷史 HEIC 卻還在寫快取,吃掉的是留給 PostgreSQL 與 log 的最後空間。
-    已經轉好的照常給。
+    已經轉好的照常給。回 None 時怎麼辦由呼叫端決定(站內給原檔,公開通道 404)。
     """
     dst = disk.with_name(disk.name + PREVIEW_SUFFIX)
     if dst.is_file():
         return dst
+    failed_at = _PREVIEW_FAILED.get(disk)
+    if failed_at is not None and time.monotonic() - failed_at < PREVIEW_RETRY_AFTER:
+        return None
     if disk_level() == "alert":
         return None
-    await asyncio.get_running_loop().run_in_executor(_PREVIEW_POOL, _render_preview, disk, dst)
+    job = _PREVIEW_INFLIGHT.get(disk)
+    if job is None:
+        if max_backlog is not None and len(_PREVIEW_INFLIGHT) >= max_backlog:
+            _warn_backlog_full()
+            return None
+        job = asyncio.ensure_future(_convert(disk, dst))
+        _PREVIEW_INFLIGHT[disk] = job
+        job.add_done_callback(lambda _: _PREVIEW_INFLIGHT.pop(disk, None))
+    # shield:等的人被取消(逾時、伺服器改成斷線即取消)不該讓等同一張的其他請求一起落空。
+    # 目前的 uvicorn 斷線並不取消 handler,排進去的轉檔一律跑完(公開通道因此有排隊上限)
+    return await asyncio.shield(job)
+
+
+def _warn_backlog_full() -> None:
+    global _backlog_warned_at
+    now = time.monotonic()
+    if now - _backlog_warned_at >= BACKLOG_WARN_EVERY:
+        _backlog_warned_at = now
+        logger.warning(
+            "preview backlog full (%d pending), refusing new ones", len(_PREVIEW_INFLIGHT)
+        )
+
+
+async def _convert(disk: Path, dst: Path) -> Path | None:
+    try:
+        await asyncio.get_running_loop().run_in_executor(_PREVIEW_POOL, _render_preview, disk, dst)
+    except Exception:
+        _PREVIEW_FAILED[disk] = time.monotonic()
+        logger.exception("preview render failed: %s", disk)
+        return None
+    _PREVIEW_FAILED.pop(disk, None)
     return dst
 
 
@@ -647,7 +721,7 @@ def _fit_webp(src: Path, size: tuple[int, int]) -> bytes:
         if img.width * img.height > PREVIEW_MAX_PIXELS:
             raise ValueError(f"image too large: {img.width}x{img.height}")
         # **先縮再轉 RGB**:反過來(`fit(img.convert("RGB"))`)會先把全尺寸解成 RGB,
-        # 一張 50MP 圖的峰值是「解碼 + transpose + RGB」約 3×150MB,而 pool 有兩條 thread,
+        # 一張 50MP 圖的峰值是「解碼 + transpose + RGB」約 3×150MB,而它與兩條預覽 thread 同時在跑,
         # 正式機是 2 vCPU / 4GB 還跟 PostgreSQL 同住。`thumbnail` 對 JPEG 會自動用
         # `draft()` 讓 libjpeg 直接以較低倍率解碼,省的是解碼本身。
         # 邊長取 2× 最長邊(與方向無關):留給 `fit` 的裁切還有餘裕,不會放大失真
@@ -699,7 +773,7 @@ async def save_club_image(
     disk = Path(settings.upload_dir) / row.path
     try:
         data = await asyncio.get_running_loop().run_in_executor(
-            _PREVIEW_POOL, _fit_webp, disk, size_spec
+            _CLUB_IMAGE_POOL, _fit_webp, disk, size_spec
         )
     except Exception as exc:
         # 副檔名與魔術位元組都對了卻解不開(截斷、超大、編碼不支援):
@@ -721,7 +795,12 @@ async def save_club_image(
 async def file_response(
     db: AsyncSession, file_id: uuid.UUID, user: User, *, as_image: bool = False
 ) -> FileResponse:
-    """`as_image`=請求來自 <img>(router 由 Sec-Fetch-Dest 判定):瀏覽器解不了的圖改送 JPEG 預覽。"""
+    """`as_image`=請求來自 <img>(router 由 Sec-Fetch-Dest 判定):瀏覽器解不了的圖改送 JPEG 預覽。
+
+    要轉檔時會先 `db.close()` 把連線還回池子再排隊:呼叫端之後不能再用這個 session,
+    手上的 `file`/`user` 也已經是 detached 物件。要補寫稽核之類的得在呼叫之前**commit**:
+    close 會把還沒 commit 的新增一起丟掉(`audit.record` 只做 add)。
+    """
     file = await db.get(File, file_id)
     if file is None or not await can_access(db, file, user):
         raise not_found("找不到檔案")  # 無權限與不存在同訊息,避免探測
@@ -735,12 +814,11 @@ async def file_response(
         and file.mime in _PREVIEW_CONVERTIBLE
         and file.size <= PREVIEW_MAX_SOURCE_BYTES
     ):
-        try:
-            preview = await preview_of(disk)
-        except Exception:
-            # 轉不了(檔案壞了、太大、編碼不支援)就照舊給原檔;破圖總比 500 好,log 才查得到是哪一張
-            logger.exception("preview render failed: file=%s mime=%s", file.id, file.mime)
-            preview = None
+        # 排隊等轉檔之前先把連線還回池子(同公開照片通道):轉檔池只有兩條,一整面 HEIC 縮圖同時
+        # 打進來時,握著連線排隊的請求會把全站共用的連線池借光。之後只用到已經讀進來的欄位
+        await db.close()
+        # 轉不了(檔案壞了、太大、編碼不支援)就照舊給原檔:破圖總比 500 好(preview_of 會記 log)
+        preview = await preview_of(disk)
         if preview is not None:
             response = FileResponse(
                 preview,

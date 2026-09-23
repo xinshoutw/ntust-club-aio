@@ -8,6 +8,7 @@
 """
 
 import uuid
+from collections import defaultdict
 from datetime import date
 from pathlib import Path
 from typing import Annotated
@@ -28,18 +29,26 @@ from app.schemas.auth import PeriodOut
 from app.schemas.bookings import EquipmentUsageOut, VenueOut
 from app.schemas.common import ApiResponse
 from app.schemas.public import ClubCardOut, ClubDetailOut, PublicActivityOut
+from app.services import activity_service
 from app.services import booking_service as svc
+from app.services import files as file_service
 
 router = APIRouter(prefix="/public", tags=["public"])
 
 MAX_AVAILABILITY_SPAN_DAYS = 31  # 單一場地 15 天檢視用;上限防範圍濫用
 # 公開頁只列最近 10 次:導覽頁要回答的是「這個社團在辦什麼」,不是完整流水帳
 MAX_PUBLIC_ACTIVITIES = 10
+# 照片通道最多讓轉檔池排這麼多張(含登入端正在轉的):斷線不會取消 handler,排進去的轉檔一律
+# 跑完 —— 從活動清單列舉出幾千張照片 id 一張張打,就是幾分鐘吃滿兩顆核心的佇列。超過就先回 404
+# (不記失敗、記一筆每分鐘至多一次的 log);被拒的那張沒有排進去,彈窗先收掉它,關掉再打開會重要一次。
+# 一場活動的結案照片通常 5 張(開發庫結案的活動全是 5 張),留三場同時開的量
+# ponytail: 全域一個上限;真的有人持續打冷門照片,改成結案通過時就先轉好(DEPLOY_CHECKLIST 的預熱)
+PUBLIC_PREVIEW_BACKLOG = 16
 
 # 主鍵是 PostgreSQL 的 int4:超界的值會在 asyncpg 綁參數時 OverflowError → 500,
 # 而這些是**匿名打得到**的路徑 —— 未登入、零成本就能一次塞進三十份 traceback。
 # 擋在 schema 就回 422,連 DB 都不必碰
-# 公開通道只送形象圖。`media_type` 取自 DB 的 `files.mime`,而唯一的 writer
+# 形象圖通道(`public_file`)送原檔,`media_type` 取自 DB 的 `files.mime`,而唯一的 writer
 # (`save_club_image`)無條件寫 image/webp —— 但那是一條靠人記住的約定,不是程式收口。
 # 真的被改成 text/html 的話,`content_disposition_type="inline"` 會讓它以同源 HTML 渲染;
 # 全域的 `default-src 'none'` 擋得下 script,**但 CSP3 的 form-action 不 fallback 到
@@ -60,6 +69,30 @@ PUBLIC_ACTIVITY_STATUSES = (
 
 # 公開社團的唯一判定:停社與行政端下架的一筆都不回(不是灰掉,是不存在)
 _VISIBLE = VISIBLE_CLUB
+
+
+def _public_photos(*columns) -> sa.Select:
+    """公開得出去的結案照片(D-42):**結案通過**的活動、公開中的社團、未歸檔。
+
+    活動清單(列出 id)與照片通道(送檔)共用這一份 —— 各寫一份的話,
+    清單列得出來、點下去 404,或者清單不列、拿 id 卻打得到。
+    只收 `closed`:結案準備中(`approved`)的照片是社團還在刪換的草稿,
+    送審中的還沒有承辦看過。超過預覽來源上限的不列:通道只送轉過的 JPEG,送不出來的不該出現在清單上。
+    """
+    return (
+        sa.select(*columns)
+        .select_from(File)
+        .join(Activity, Activity.id == File.subject_id)
+        .join(Club, Club.id == Activity.club_id)
+        .where(
+            File.subject_type == activity_service.PHOTO_SUBJECT,
+            File.slot == activity_service.PHOTO_SLOT,
+            File.archived_at.is_(None),
+            File.size <= file_service.PREVIEW_MAX_SOURCE_BYTES,
+            Activity.status == ActivityStatus.CLOSED,
+            *_VISIBLE,
+        )
+    )
 
 
 def _sees_pending(user: User | None) -> bool:
@@ -199,6 +232,7 @@ async def club_activities(
     """該社通過審核以後的活動,開始日新到舊,一律只回最近十筆。
 
     學期不是欄位而是由開始日推導(`core/semesters`),所以這裡篩的是日期區間。
+    彈窗要的活動內容與照片 id 一併帶上(十筆、內容上限 150 字,不值得另開一支詳情端點)。
     """
     await _public_club(db, club_id)  # 社團不公開時連活動都不該查得到
     query = sa.select(Activity).where(
@@ -209,10 +243,25 @@ async def club_activities(
     if semester is not None:
         start, end = semester_range(semester)
         query = query.where(Activity.date >= start, Activity.date <= end)
-    rows = await db.scalars(
-        query.order_by(Activity.date.desc(), Activity.id.desc()).limit(MAX_PUBLIC_ACTIVITIES)
+    rows = list(
+        await db.scalars(
+            query.order_by(Activity.date.desc(), Activity.id.desc()).limit(MAX_PUBLIC_ACTIVITIES)
+        )
     )
-    return ApiResponse(data=[PublicActivityOut.model_validate(a) for a in rows])
+    photos: defaultdict[int, list[uuid.UUID]] = defaultdict(list)
+    if rows:
+        for activity_id, file_id in await db.execute(
+            _public_photos(File.subject_id, File.id)
+            .where(File.subject_id.in_([a.id for a in rows]))
+            .order_by(File.created_at, File.id)
+        ):
+            photos[activity_id].append(file_id)
+    data = []
+    for a in rows:
+        out = PublicActivityOut.model_validate(a)
+        out.photo_file_ids = photos[a.id]
+        data.append(out)
+    return ApiResponse(data=data)
 
 
 @router.get("/files/{file_id}")
@@ -261,5 +310,42 @@ async def public_file(file_id: uuid.UUID, db: DbDep) -> Response:
     )
     # private:瀏覽器照樣快取,但 CDN 與公司 proxy 不會替**別人**留一份。
     # 社團下架的理由常常正是那張圖,撤不回來的範圍能小一點是一點
+    response.headers["Cache-Control"] = "private, max-age=3600"
+    return response
+
+
+@router.get("/files/activity-photos/{file_id}")
+async def public_activity_photo(file_id: uuid.UUID, db: DbDep) -> Response:
+    """社團詳細頁活動彈窗裡的結案照片(D-42),範圍見 `_public_photos`。
+
+    **一律送轉過的 JPEG,不送原檔**(`file_service.preview_of`:長邊 1600、套 EXIF 方向,
+    與站內 `<img>` 看 HEIC 的預覽共用同一份快取):手機原圖動輒數 MB,而且 EXIF 帶拍攝座標 ——
+    開發庫抽樣 300 張有 20 張有 GPS,重新編碼出來的 JPEG 不帶 EXIF、XMP 與註解(色彩描述檔保留)。
+    轉不出來(解不開、超過像素上限、磁碟到告警水位不再建新快取)一律 404,不退回原檔。
+
+    掛在 `/public/files/` 底下是為了吃 nginx 給圖片的限流桶(`public_files`):一個彈窗
+    五張照片,與其餘公開端點共用 60r/m 的桶,連翻幾場活動就 429。
+    快取與形象圖同一個取捨(`private`、一小時):社團下架或活動被刪之後撤得回來。
+    """
+    file = await db.scalar(_public_photos(File).where(File.id == file_id))
+    if file is None:
+        raise not_found("找不到檔案")
+    disk = Path(settings.upload_dir) / file.path
+    # 排隊等轉檔之前先把連線還回池子:轉檔池只有兩條,匿名的請求在那裡等的時候
+    # 不該同時握著全站共用的 DB 連線
+    await db.close()
+    # 壞檔、超過像素上限、原檔不見或磁碟到告警水位:對外一律 404(preview_of 記 log,
+    # 壞檔冷卻期內不再解)
+    preview = await file_service.preview_of(disk, max_backlog=PUBLIC_PREVIEW_BACKLOG)
+    if preview is None:
+        raise not_found("找不到檔案")
+    # 當場讀進來(同形象圖):數百 KB 的成品,換掉「檢查與開檔之間被刪」的 500
+    try:
+        content = await anyio.to_thread.run_sync(preview.read_bytes)
+    except OSError:
+        raise not_found("找不到檔案") from None
+    response = Response(
+        content=content, media_type="image/jpeg", headers={"content-disposition": "inline"}
+    )
     response.headers["Cache-Control"] = "private, max-age=3600"
     return response

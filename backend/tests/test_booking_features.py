@@ -1,27 +1,25 @@
 """2026-07-21 需求方新功能:取消借用、場地不開放規則、單次可借上限、行政手動借用、
 過去時間全面禁止(節次時刻表)。"""
 
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import date, timedelta
 
 import sqlalchemy as sa
 
-from app.core.semesters import TAIPEI, next_semester_range
+from app.core.semesters import next_semester_range
 from app.models import EquipmentLoan, RoomBookingRequest, VenueBooking
 from app.models.enums import BookingStatus, LoanStatus
 from app.services import booking_service
 from tests.conftest import csrf_headers, login, make_club, make_user
-from tests.test_bookings import make_activity, make_equipment, make_venue
+from tests.test_bookings import (
+    freeze_taipei,
+    make_activity,
+    make_equipment,
+    make_venue,
+    single_slot,
+)
 
 TOMORROW = date.today() + timedelta(days=7)
 YESTERDAY = date.today() - timedelta(days=7)
-
-
-def freeze_taipei(monkeypatch, day: date, hhmm: str) -> datetime:
-    """把借用領域時鐘釘在台北時區某日某時刻,節次邊界測試不依賴牆鐘。"""
-    hour, minute = (int(x) for x in hhmm.split(":"))
-    fixed = datetime.combine(day, time(hour, minute), tzinfo=TAIPEI).astimezone(UTC)
-    monkeypatch.setattr(booking_service, "now_utc", lambda: fixed)
-    return fixed
 
 
 async def seed_club(client, db):
@@ -83,13 +81,13 @@ async def test_cancel_venue_booking(client, db):
     activity = await make_activity(db, club, day=TOMORROW)
     resp = await client.post(
         "/api/v1/club/venue-bookings",
-        json={"venue_id": venue.id, "activity_id": activity.id,
+        json=single_slot({"venue_id": venue.id, "activity_id": activity.id,
               "date": str(TOMORROW), "periods": ["5"], "purpose": "重新申請",
-              "phone": "0912345678"},
+              "phone": "0912345678"}),
         headers=csrf_headers(client),
     )
     assert resp.status_code == 201, resp.text
-    assert resp.json()["data"]["phone"] == "0912345678"
+    assert resp.json()["data"][0]["phone"] == "0912345678"
 
 
 async def test_cancel_equipment_loan(client, db):
@@ -181,12 +179,12 @@ async def test_venue_block_rules(client, db):
     body = {"venue_id": venue.id, "activity_id": activity.id, "date": str(TOMORROW),
             "periods": ["4", "5"], "purpose": "社課", "phone": "0912000111"}
     resp = await client.post(
-        "/api/v1/club/venue-bookings", json=body, headers=csrf_headers(client)
+        "/api/v1/club/venue-bookings", json=single_slot(body), headers=csrf_headers(client)
     )
     assert resp.status_code == 422
     resp = await client.post(
         "/api/v1/club/venue-bookings",
-        json={**body, "periods": ["5", "6"]},
+        json=single_slot({**body, "periods": ["5", "6"]}),
         headers=csrf_headers(client),
     )
     assert resp.status_code == 201, resp.text
@@ -463,7 +461,7 @@ async def test_venue_booking_rejects_past_date(client, db):
     body = {"venue_id": venue.id, "activity_id": activity.id, "date": str(YESTERDAY),
             "periods": ["5"], "purpose": "社課", "phone": "0912000111"}
     resp = await client.post(
-        "/api/v1/club/venue-bookings", json=body, headers=csrf_headers(client)
+        "/api/v1/club/venue-bookings", json=single_slot(body), headers=csrf_headers(client)
     )
     assert resp.status_code == 422
     assert "早於今天" in resp.json()["error"]
@@ -483,7 +481,7 @@ async def test_venue_booking_today_started_period_boundary(client, db, monkeypat
     # 已開始節次(且 periods 無序:最早者為第 3 節)→ 422
     resp = await client.post(
         "/api/v1/club/venue-bookings",
-        json={**body, "periods": ["5", "3"]},
+        json=single_slot({**body, "periods": ["5", "3"]}),
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
@@ -491,7 +489,7 @@ async def test_venue_booking_today_started_period_boundary(client, db, monkeypat
     # 未開始節次 → 201
     resp = await client.post(
         "/api/v1/club/venue-bookings",
-        json={**body, "periods": ["5", "6"]},
+        json=single_slot({**body, "periods": ["5", "6"]}),
         headers=csrf_headers(client),
     )
     assert resp.status_code == 201, resp.text
@@ -500,7 +498,7 @@ async def test_venue_booking_today_started_period_boundary(client, db, monkeypat
     freeze_taipei(monkeypatch, today, "12:20")
     resp = await client.post(
         "/api/v1/club/venue-bookings",
-        json={**body, "periods": ["5"]},
+        json=single_slot({**body, "periods": ["5"]}),
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
@@ -511,7 +509,7 @@ async def test_venue_booking_today_started_period_boundary(client, db, monkeypat
     freeze_taipei(monkeypatch, today, "00:30")
     resp = await client.post(
         "/api/v1/club/venue-bookings",
-        json={**body, "venue_id": other_venue.id, "periods": ["1"]},
+        json=single_slot({**body, "venue_id": other_venue.id, "periods": ["1"]}),
         headers=csrf_headers(client),
     )
     assert resp.status_code == 201, resp.text
@@ -553,12 +551,12 @@ async def test_phone_must_be_a_mobile_or_a_4_digit_extension(client, db):
     body = {"venue_id": venue.id, "activity_id": activity.id, "date": str(TOMORROW),
             "periods": ["5"], "purpose": "x", "phone": "0912-345-678"}
     resp = await client.post(
-        "/api/v1/club/venue-bookings", json=body, headers=csrf_headers(client)
+        "/api/v1/club/venue-bookings", json=single_slot(body), headers=csrf_headers(client)
     )
     assert resp.status_code == 201, resp.text
     resp = await client.post(
         "/api/v1/club/venue-bookings",
-        json={**body, "periods": ["6"], "phone": "7604"},  # 校內分機
+        json=single_slot({**body, "periods": ["6"], "phone": "7604"}),  # 校內分機
         headers=csrf_headers(client),
     )
     assert resp.status_code == 201, resp.text
@@ -567,7 +565,7 @@ async def test_phone_must_be_a_mobile_or_a_4_digit_extension(client, db):
     for bad in ("0912-345 678", "(02)2737#123*", "0912345", "02-27333141"):
         resp = await client.post(
             "/api/v1/club/venue-bookings",
-            json={**body, "periods": ["7"], "phone": bad},
+            json=single_slot({**body, "periods": ["7"], "phone": bad}),
             headers=csrf_headers(client),
         )
         assert resp.status_code == 422, bad

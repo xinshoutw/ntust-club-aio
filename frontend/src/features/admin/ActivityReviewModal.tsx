@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { App, Button, Checkbox, Input, InputNumber, Modal, Segmented, Skeleton, Tooltip } from 'antd'
+import { App, Button, Checkbox, Image, Input, InputNumber, Modal, Segmented, Skeleton, Tooltip } from 'antd'
 import { DownloadOutlined } from '@ant-design/icons'
 import QueryError from '../../components/ui/QueryError'
 import StatusPill from '../../components/ui/StatusPill'
@@ -795,7 +795,10 @@ export default function ActivityReviewModal({
             <div style={detailLabel}>附件</div>
             <div>
               {files?.length ? (
-                <FileLinks files={files} onPreview={(f) => filePreview.preview(toEvalFile(f))} />
+                <FileLinks
+                  files={files}
+                  onPreview={(f) => filePreview.preview(toEvalFile(f), files.map(toEvalFile))}
+                />
               ) : d?.attachments.length ? (
                 d.attachments.map((f, i) => (
                   <span key={f}>
@@ -1014,7 +1017,10 @@ export default function ActivityReviewModal({
             )}
             <div style={detailLabel}>結案附件</div>
             <div>
-              <FileLinks files={closeDocs} onPreview={(f) => filePreview.preview(toEvalFile(f))} />
+              <FileLinks
+                files={closeDocs}
+                onPreview={(f) => filePreview.preview(toEvalFile(f), closeDocs.map(toEvalFile))}
+              />
             </div>
           </div>
         </div>
@@ -1032,27 +1038,25 @@ export default function ActivityReviewModal({
             </Tooltip>
             ）張
           </SectionTitle>
+          {/* 縮圖本身就是 AntD Image 的預覽鈕(role=button、Enter/Space 可開),
+              同一場活動的照片在預覽裡左右切換 —— 與社團頁的活動彈窗同一套。
+              不掛 loading="lazy":rc-image 另開一個 Image() 驗圖,縮圖一掛上就整張下載,
+              掛了也不會延後 */}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {photos.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                className="link-btn"
-                style={{ padding: 0 }}
-                title={p.name}
-                aria-label={`預覽 ${p.name}`}
-                onClick={() => filePreview.preview(toEvalFile(p))}
-              >
-                <img
+            {/* 成組時 rc-image 不把縮圖的 alt 交給預覽層,預覽對話框的名字在這裡給 */}
+            <Image.PreviewGroup preview={{ alt: '活動照片' }}>
+              {photos.map((p) => (
+                <Image
+                  key={p.id}
                   src={p.url}
                   alt={p.name}
-                  loading="lazy"
+                  title={p.name}
                   width={96}
                   height={72}
-                  style={{ width: 96, height: 72, objectFit: 'cover', borderRadius: 6, display: 'block' }}
+                  styles={{ root: { borderRadius: 6, overflow: 'hidden' }, image: { objectFit: 'cover' } }}
                 />
-              </button>
-            ))}
+              ))}
+            </Image.PreviewGroup>
           </div>
           <SectionTitle>成果影片</SectionTitle>
           <div style={{ fontSize: 13, wordBreak: 'break-all' }}>

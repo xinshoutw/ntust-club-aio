@@ -139,7 +139,7 @@ topbar 的文字鈕在 <768px 一律收成圖示鈕(`TopbarButton`):頁名頂替
   `role="list"` / `role="listitem"` 才立得住,輔助技術數得出有幾筆。
   **要開第二個例外前先問「欄寬真的無法預先決定嗎」** —— 排序、篩選與分頁那幾件事
   grid 都沒有現成的,表格有
-- 整列可點時 `onClick` 掛在 `<tr>` 上只服務滑鼠,鍵盤入口是主要欄位裡的 `.row-open-btn`(記得 `stopPropagation`);卡片等非表格區塊用 `lib/clickable` 的 `clickableProps`
+- 整列可點時 `onClick` 掛在 `<tr>` 上只服務滑鼠,鍵盤入口是主要欄位裡的 `.row-open-btn`(記得 `stopPropagation`);卡片等非表格區塊用 `lib/clickable` 的 `clickableProps`。**清單列同表格列**(社團頁的活動紀錄):列是 `listitem`,掛 `role="button"` 會蓋掉它,所以一樣是列上 `onClick` + 名稱欄的 `.row-open-btn`
 - 排序一律 `useMultiSort` + `MultiSortButton`(伺服器端以 `sortParam` 帶查詢):至多 3 鍵、無移除態,指示器呈現實際生效的排序鏈。點主鍵=升降互換,點已啟用的次鍵=升為主鍵並保留方向,點新欄=插為主鍵。**僅 sort icon 變色**,不整欄變色
 - 篩選用 `FilterButton`,收進表頭,不做一排篩選器牆
 - 分頁一律 `Pager`(AntD Pagination `simple`):置中、只有一頁也顯示;禁用數字頁碼鈕
@@ -155,20 +155,21 @@ topbar 的文字鈕在 <768px 一律收成圖示鈕(`TopbarButton`):頁名頂替
 - 點擊即開、內容以 Skeleton 補齊。**Skeleton 一定要配一個錯誤分支** —— 它沒有終點,詳情查詢失敗就是永遠轉圈;
   失敗時內容整塊換成 `QueryError` + 重試,並收掉需要那份詳情的動作鈕(讀不到內容就按核准是最貴的一種 fail-open)
 - 審核用 popup Modal,不用 Drawer
+- **圖片預覽一律用 AntD 內建的 `Image`**(縮放、旋轉、同一組左右切換):縮圖牆直接放 `Image` 包在 `Image.PreviewGroup` 裡(縮圖本身就是預覽鈕,鍵盤可開);檔名連結走 `features/eval/useFilePreview` 的 `preview(f, group)`,圖片開 AntD 的圖片預覽、`group` 裡的其他圖片左右切換(底部顯示檔名與第幾張),PDF 與 Word 才開彈窗。附件列(`components/ui/AttachmentLinks`)裡的圖片仍是 `<a href>`,只有一般左鍵與 Enter 改開預覽:預覽畫不出來的圖(超過轉檔上限、磁碟告警時沒快取過的 HEIC)還能 Ctrl/⌘ 點、中鍵或右鍵另存拿原檔。不要再刻 `<img>` 放進 Modal 的預覽。成組時 rc-image 不把縮圖的 alt 交給預覽層,`preview.alt` 要自己給,預覽對話框才有名字
 
 **表單**
 
 - 區塊化(基本資料/經費明細/附件),區塊標 16px;必填星號,行內驗證
 - 送出驗證:errors Set + AntD `status="error"` + 區塊紅框 `.area-error`(常駐透明邊框防位移);修改該欄即解除,並捲動到第一個錯誤
 - 被修改但未儲存的欄位以橘黃外框 `.field-dirty` 標示;dirty 時離開頁面須確認
-- 動態列(經費明細、工作分配、借用時段)自動增列,尾端保證一列空白;空列於 blur 時移除,打字中不消失
+- 動態列(經費明細、工作分配)自動增列,尾端保證一列空白;空列於 blur 時移除,打字中不消失。**臨時場地借用的時段列例外**:一列是日期選擇器 + 節次按鈕,沒有「打字中」與「空列 blur」可言,改用列右側的「+」「−」(D-43)
 - 上傳一律 `lib/uploads.ts` + `components/ui/AttachmentArea`:魔術位元組驗證、SHA-256 內容去重、單檔與加總容量驗證、顯示「已使用 X/Y MB」。允許圖片處含 HEIC/HEIF/AVIF(評鑑上傳例外,後端只收 jpg/png)。**預覽不必分網址**:`<img src>` 打 `GET /files/{id}` 時瀏覽器帶 `Sec-Fetch-Dest: image`,後端對 HEIC/HEIF/TIFF/BMP 這些瀏覽器解不了的圖回轉好的 JPEG(長邊 1600、快取在原檔旁;AVIF 三大瀏覽器都原生解得了,直接 inline);下載連結與 fetch 拿到的仍是原檔
 - 上限值讀 `GET /club/config`,前端不放容量常數(郵局與獎項上傳頁仍各自硬編碼 50MB,待收斂)
 - 送出動作一律要擋 in-flight,三種寫法各有各的漏法:`htmlType="submit"` 的鈕 `loading` 與 `disabled` 成對(AntD 的 `loading` 只擋 React onClick、不設 DOM `disabled`);**表單一定要有一顆 submit 鈕**,別用 Modal `onOk` + `form.submit()` 代替 —— 沒有 submit 鈕時 Enter 會直接送 form,`confirmLoading` 攔不到;`onPressEnter` 直接接 mutation 的地方自己擋 `isPending`
 
 **其他**
 
-- **日界一律用 `lib/today.taipeiToday()`**,不用 `dayjs().startOf('day')`:後端全走台北時區,裝置本地日在境外會差一天 —— 畫面說可以申請、送出卻回「不得早於今天」
+- **日界一律用 `lib/today.taipeiToday()`**,不用 `dayjs().startOf('day')`:後端全走台北時區,裝置本地日在境外會差一天 —— 畫面說可以申請、送出卻回「不得早於今天」;節次「已開始」也一樣,拿 `lib/today.taipeiNow()` 跟節次起點比,不用 `dayjs()`
 - 可點卡片/列 hover 一律變色(`.click-tint`)
 - 空狀態:一句話 + 主動作按鈕,不放插圖
 - 載入一律 `components/ui/LoadingBlock`(`pending` 傳 `isPending`,即手上一筆資料都沒有時),鋪 Skeleton 取代內容,不用 spinner;
@@ -196,7 +197,7 @@ topbar 的文字鈕在 <768px 一律收成圖示鈕(`TopbarButton`):頁名頂替
 
 ## 7. 文案
 
-繁體中文;按鈕動詞開頭且前後一致(「送出申請」→ toast「已送出」);狀態是名詞;不用驚嘆號、不用表情、不道歉。**說明文字能省則省,版面上不堆說明段落**,欄位說明放 placeholder 或 Tooltip。
+繁體中文;按鈕動詞開頭且前後一致(「送出申請」→ toast「已送出」);狀態是名詞;不用驚嘆號、不用表情、不道歉。**說明文字能省則省,版面上不堆說明段落**,欄位說明放 placeholder 或 Tooltip。例外是**填之前就得知道的提醒**(例:活動內容審核通過後會公開),放 Form.Item 的 `extra` 常駐 —— Tooltip 只有滑鼠懸停看得到,鍵盤與手機拿不到,placeholder 一打字就消失
 
 **標點**:畫面上看得到的字一律**全形**(`，、（）：；？「」`),**不寫句號**——最後一句也不收尾。
 半形只留給程式碼、路徑、檔名與純數字串(`YYYY/MM/DD`、`A3*10份`)。同一句裡中英數之間不補空格,
@@ -206,7 +207,7 @@ topbar 的文字鈕在 <768px 一律收成圖示鈕(`TopbarButton`):頁名頂替
 
 ## 8. 動效與無障礙
 
-- 動效只有章軌當前節點脈動,加上 AntD 自身的過場(`motionUnit: 0.06`);`prefers-reduced-motion` 全關
+- 動效只有章軌當前節點脈動,加上 AntD 自身的過場(`motionUnit: 0.06`);**刻意不響應 `prefers-reduced-motion`**,動畫一律照跑(2026-08-31 事故:用 CSS 關掉動畫,rc-motion 等不到結束事件,透明的彈窗遮罩吃掉全站點擊)。要重新支援,改用 ConfigProvider 的 `motion: false`,不要用 CSS(`index.css` 那段註解、`index.css.test.ts` 守著)
 - 對比 WCAG AA;focus ring 2px `#2F6FBF`;表格可鍵盤導航;所有 icon 按鈕帶 aria-label;可點列須有鍵盤入口
 
 ## 9. 禁止

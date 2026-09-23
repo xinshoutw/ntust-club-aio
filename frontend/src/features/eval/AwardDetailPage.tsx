@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { Link, useParams } from 'react-router'
 import { App, Button, Tooltip, Upload } from 'antd'
 import { LeftOutlined, UploadOutlined } from '@ant-design/icons'
@@ -9,7 +9,7 @@ import { fmtMB, isImageFile, sha256 } from '../../lib/uploads'
 import { useAwardDetail, useEvalUploadMutations, type AwardRubricItem, type AwardUploadFile } from '../../api/eval'
 import { fetchFile } from '../../api/client'
 import { fileTypeOf, type EvalFile } from './types'
-import FilePreview from './FilePreview'
+import { useFilePreview } from './useFilePreview'
 
 // 對齊後端 EVAL_POLICY:pdf/doc/docx/jpg/jpeg/png/zip,單檔 50MB
 const ACCEPT = '.pdf,.doc,.docx,.jpg,.jpeg,.png,.zip'
@@ -34,8 +34,7 @@ export default function AwardDetailPage() {
   // 本次 session 上傳檔的 SHA-256(uploadId → hash):同獎項內容去重(沿改版前跨槽位語意);
   // 後端另有未開放/型別/容量重驗,拒絕時以 message.error 顯示(跨 session 去重目前後端未做)
   const sessionHashes = useRef(new Map<number, string>())
-  const [preview, setPreview] = useState<EvalFile | null>(null)
-  const [previewOpen, setPreviewOpen] = useState(false)
+  const filePreview = useFilePreview()
 
   // 手上還沒有資料才換成錯誤(同 ClubSettingsPage):上傳/刪除都會 invalidate,
   // 那次重抓失敗不該把整頁連已上傳清單一起換掉。真的「不存在」幾乎不可能 ——
@@ -106,7 +105,8 @@ export default function AwardDetailPage() {
     )
   }
 
-  const openPreview = async (f: EvalFile) => {
+  // group:同一個細項的上傳檔,其中的圖片在預覽裡左右切換
+  const openPreview = async (f: EvalFile, group: readonly EvalFile[]) => {
     // docx 預覽需要原始檔內容(mammoth);伺服器檔案先抓回 blob 再開
     if (f.type === 'doc' && !f.raw) {
       try {
@@ -116,8 +116,7 @@ export default function AwardDetailPage() {
         // 抓取失敗:仍開啟預覽視窗,由 DocView 顯示無法預覽說明
       }
     }
-    setPreview(f)
-    setPreviewOpen(true)
+    filePreview.preview(f, group)
   }
 
   return (
@@ -166,7 +165,7 @@ export default function AwardDetailPage() {
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
                     {item.uploads.map((f) => (
                       <span key={f.uploadId} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, background: 'var(--paper)', border: '1px solid var(--line)', borderRadius: 4, padding: '2px 6px' }}>
-                        <button type="button" className="link-btn" style={{ padding: 0, fontSize: 12 }} onClick={() => void openPreview(f)}>
+                        <button type="button" className="link-btn" style={{ padding: 0, fontSize: 12 }} onClick={() => void openPreview(f, item.uploads)}>
                           {f.name}
                         </button>
                         {/* 刪除吃同一把鎖(後端 409):鎖著就不畫 × */}
@@ -224,7 +223,7 @@ export default function AwardDetailPage() {
         </div>
       ))}
 
-      <FilePreview file={preview} open={previewOpen} onClose={() => setPreviewOpen(false)} afterClose={() => setPreview(null)} />
+      {filePreview.node}
     </div>
   )
 }

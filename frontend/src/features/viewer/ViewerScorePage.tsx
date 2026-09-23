@@ -7,7 +7,7 @@ import QueryError from '../../components/ui/QueryError'
 import { fetchFile } from '../../api/client'
 import { Cols, Pager, sortRows, type SortEntry } from '../../components/ui/tableControls'
 import { notFoundText } from '../../lib/selectOptions'
-import FilePreview from '../eval/FilePreview'
+import { useFilePreview } from '../eval/useFilePreview'
 import type { EvalFile } from '../eval/types'
 import {
   PRESENTATION_MAX,
@@ -208,10 +208,10 @@ function ScoreModal({
   onSaved: (next: boolean, total: number) => void
 }) {
   const detailQuery = useClubAwardDetail(clubId, award?.awardId ?? '')
-  const [preview, setPreview] = useState<EvalFile | null>(null)
-  const [previewOpen, setPreviewOpen] = useState(false)
+  const filePreview = useFilePreview()
 
-  const openPreview = async (f: EvalFile) => {
+  // group:同一個細項的上傳檔,其中的圖片在預覽裡左右切換
+  const openPreview = async (f: EvalFile, group: readonly EvalFile[]) => {
     // docx 預覽需要原始檔內容(mammoth);伺服器檔案先抓回 blob 再開(比照 AwardDetailPage)
     if (f.type === 'doc' && !f.raw) {
       try {
@@ -221,8 +221,7 @@ function ScoreModal({
         // 抓取失敗:仍開啟預覽視窗,由 DocView 顯示無法預覽說明
       }
     }
-    setPreview(f)
-    setPreviewOpen(true)
+    filePreview.preview(f, group)
   }
 
   return (
@@ -257,11 +256,11 @@ function ScoreModal({
             clubId={clubId}
             detail={detailQuery.data}
             onSaved={onSaved}
-            onPreview={(f) => void openPreview(f)}
+            onPreview={(f, group) => void openPreview(f, group)}
           />
         )}
       </Modal>
-      <FilePreview file={preview} open={previewOpen} onClose={() => setPreviewOpen(false)} afterClose={() => setPreview(null)} />
+      {filePreview.node}
     </>
   )
 }
@@ -279,7 +278,7 @@ function ScorePanel({
   clubId: number
   detail: ClubAwardDetail
   onSaved: (next: boolean, total: number) => void
-  onPreview: (f: EvalFile) => void
+  onPreview: (f: EvalFile, group: readonly EvalFile[]) => void
 }) {
   const { message } = App.useApp()
   const save = useSaveScore()
@@ -387,7 +386,7 @@ function ScorePanel({
                         type="button"
                         className="link-btn"
                         style={{ padding: 0, fontSize: 13, textAlign: 'left', overflowWrap: 'anywhere' }}
-                        onClick={() => onPreview(f)}
+                        onClick={() => onPreview(f, files)}
                       >
                         {f.name}
                       </button>

@@ -478,3 +478,73 @@ describe('刪除活動', () => {
     expect(li.className).not.toContain('disabled')
   })
 })
+
+// 照片與附件的預覽都走 AntD 的圖片預覽(與社團頁的活動彈窗同一套):
+// 縮圖本身是預覽鈕,同一場的照片左右切換;附件連結裡的圖片同理,PDF 仍開彈窗
+describe('照片與附件的圖片預覽', () => {
+  const ref = (id: string, name: string) => ({ id, name, url: `/api/v1/files/${id}`, size: 2048 })
+  const report = {
+    memberCount: 20,
+    nonMemberCount: 3,
+    actualStart: '19:00',
+    actualEnd: '21:00',
+    actualLocation: 'TR-214',
+    highlights: '重點',
+    goals: '目標',
+    others: '其他',
+    reviewMeeting: false,
+    expense: 0,
+    submittedAt: '2026/09/21 10:00',
+    reflections: [],
+    photosConfirmed: true,
+    reportConfirmed: true,
+    reflectionsConfirmed: true,
+  }
+  const showClose = () =>
+    show([], {
+      status: 'closing_pending_advisor',
+      report,
+      photos: [ref('p1', '合照.jpg'), ref('p2', '講者.jpg')],
+      closeDocs: [ref('d1', '簽到表.pdf'), ref('d2', '海報.png'), ref('d3', '名單.jpg')],
+    })
+
+  test('照片縮圖是預覽鈕，點開是同一場照片的預覽', () => {
+    showClose()
+    const thumbs = screen.getAllByRole('img', { name: /^(合照|講者)\.jpg$/ })
+    expect(thumbs.map((t) => t.getAttribute('src'))).toEqual(['/api/v1/files/p1', '/api/v1/files/p2'])
+    const trigger = thumbs[1].closest('[role="button"]') as HTMLElement
+    expect(trigger.getAttribute('tabindex')).toBe('0')
+
+    fireEvent.click(trigger)
+    // 成組時 rc-image 不把縮圖的 alt 交給預覽層:對話框的名字是 preview.alt 給的
+    const preview = screen.getByRole('dialog', { name: '活動照片' })
+    expect(preview.querySelector('.ant-image-preview-img')?.getAttribute('src')).toBe('/api/v1/files/p2')
+    expect(preview.textContent).toContain('2 / 2')
+  })
+
+  test('結案附件裡的圖片開圖片預覽，PDF 開彈窗', () => {
+    showClose()
+    fireEvent.click(screen.getByRole('button', { name: '海報.png' }))
+    const preview = screen.getByRole('dialog', { name: '海報.png' })
+    expect(preview.classList.contains('ant-image-preview')).toBe(true)
+    // 同一欄結案附件裡的圖片左右切換,PDF 不算在內
+    expect(preview.querySelector('.ant-image-preview-progress')?.textContent).toBe('海報.png（1 / 2）')
+
+    fireEvent.click(preview.querySelector('.ant-image-preview-close')!)
+    fireEvent.click(screen.getByRole('button', { name: '簽到表.pdf' }))
+    expect(screen.getByTitle('簽到表.pdf').tagName).toBe('IFRAME')
+  })
+
+  test('申請附件裡的圖片同一欄左右切換', () => {
+    show([], {
+      detail: {
+        attachments: [],
+        budget: [],
+        attachmentFiles: [ref('a1', '企劃書.pdf'), ref('a2', '場地.jpg'), ref('a3', '動線.png')],
+      },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '動線.png' }))
+    const preview = screen.getByRole('dialog', { name: '動線.png' })
+    expect(preview.querySelector('.ant-image-preview-progress')?.textContent).toBe('動線.png（2 / 2）')
+  })
+})

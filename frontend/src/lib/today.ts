@@ -10,3 +10,12 @@ import dayjs, { type Dayjs } from 'dayjs'
  */
 export const taipeiToday = (): Dayjs =>
   dayjs(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Taipei' }))
+
+/**
+ * 台北的現在(牆鐘時刻,以裝置時區的 Dayjs 表示 —— 只拿來和同樣是台北牆鐘的節次時刻比)。
+ *
+ * 節次起點是台北的上課時間:拿 `dayjs()` 比,台北 09:30 時紐約的裝置會把今天整排算成已開始、
+ * 倫敦的裝置則一節都還沒開始(送出才吃後端的「已開始」)。
+ */
+export const taipeiNow = (): Dayjs =>
+  dayjs(new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Taipei' }))

@@ -78,6 +78,13 @@ describe('社團導覽', () => {
     expect(shown()).toEqual(['開源技術開發研究社'])
   })
 
+  // 標籤退出篩選器之後,搜尋是它唯一的入口
+  test('搜尋比對標籤', () => {
+    renderPage()
+    fireEvent.change(screen.getByPlaceholderText('搜尋關鍵字'), { target: { value: '武術' } })
+    expect(shown()).toEqual(['合氣道社'])
+  })
+
   test('搜尋不到時給的是空狀態，不是一片空白', () => {
     renderPage()
     fireEvent.change(screen.getByPlaceholderText('搜尋關鍵字'), { target: { value: '不存在的社團' } })
@@ -85,7 +92,7 @@ describe('社團導覽', () => {
     expect(screen.getByText(/沒有符合條件的社團/)).toBeTruthy()
   })
 
-  // 三個下拉一個一個轉回「全部」很煩,空狀態要給得出路
+  // 兩個下拉一個一個轉回「全部」很煩,空狀態要給得出路
   test('空狀態的「清除所有篩選」把社團找回來', () => {
     renderPage()
     fireEvent.change(screen.getByPlaceholderText('搜尋關鍵字'), { target: { value: '不存在的社團' } })
@@ -100,9 +107,10 @@ describe('社團導覽', () => {
   })
 
   // 性質不上字卡(它在篩選器裡),招生狀態則貼在字卡右下角
-  test('字卡不顯示性質，但顯示招生狀態', () => {
+  test('字卡不顯示性質，但顯示標籤與招生狀態', () => {
     renderPage()
     expect(screen.queryByText('體育性')).toBeNull()
+    expect(screen.getByText('武術')).toBeTruthy()
     expect(screen.getByText('歡迎加入')).toBeTruthy()
     expect(screen.getByText('額滿')).toBeTruthy()
   })

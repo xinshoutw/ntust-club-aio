@@ -1,10 +1,11 @@
+import { useState } from 'react'
 import { useParams } from 'react-router'
-import { Button } from 'antd'
+import { Button, Image, Modal } from 'antd'
 import { EnvironmentOutlined } from '@ant-design/icons'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import QueryError from '../../components/ui/QueryError'
 import { ApiError } from '../../api/client'
-import { usePublicClub, usePublicClubActivities } from '../../api/publicClubs'
+import { type PublicActivity, usePublicClub, usePublicClubActivities } from '../../api/publicClubs'
 import useDocumentTitle from './useDocumentTitle'
 import ClubArt, { BADGE_CLASS } from './clubArt'
 import PublicShell from './PublicShell'
@@ -20,6 +21,13 @@ export default function ClubDetailPage() {
   const club = usePublicClub(valid ? id : null)
   const activities = usePublicClubActivities(valid ? id : null)
   useDocumentTitle(club.data?.name ?? null)
+  // 彈窗常駐(design-guide §6):關閉動畫結束才清掉內容,否則標題會先變空
+  const [open, setOpen] = useState(false)
+  const [shown, setShown] = useState<PublicActivity | null>(null)
+  const openActivity = (a: PublicActivity) => {
+    setShown(a)
+    setOpen(true)
+  }
 
   // 認 status 不認訊息字串:後端把「找不到社團」改成別的說法,這裡就會變成無限重試
   // 一個永久 404;反過來任何含「找不到」的 5xx 會被當成停社而藏掉重試鈕
@@ -214,7 +222,14 @@ export default function ClubDetailPage() {
                         <span>地點</span>
                       </div>
                       {(activities.data ?? []).map((a) => (
-                        <div className="act-row" role="listitem" key={a.id}>
+                        // 整列 onClick 只服務滑鼠,鍵盤入口是名稱那顆按鈕(design-guide §6);
+                        // 列本身不能掛 role=button,那會蓋掉 listitem
+                        <div
+                          className="act-row click-tint"
+                          role="listitem"
+                          key={a.id}
+                          onClick={() => openActivity(a)}
+                        >
                           <span className="act-date num">
                             <span className="sr-only">日期 </span>
                             {a.dateSpan}
@@ -226,7 +241,17 @@ export default function ClubDetailPage() {
                           </span>
                           <span className="act-name">
                             <span className="sr-only">活動名稱 </span>
-                            {a.name}
+                            <button
+                              type="button"
+                              className="row-open-btn"
+                              aria-haspopup="dialog"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                openActivity(a)
+                              }}
+                            >
+                              {a.name}
+                            </button>
                           </span>
                           <span className="act-where">
                             {/* 圖示是給眼睛的第二份線索,唸出來的是旁邊那個 `.sr-only` */}
@@ -244,6 +269,92 @@ export default function ClubDetailPage() {
           </>
         )}
       </LoadingBlock>
+      <ActivityModal
+        activity={shown}
+        open={open}
+        onClose={() => setOpen(false)}
+        afterClose={() => setShown(null)}
+      />
     </PublicShell>
+  )
+}
+
+interface ActivityModalProps {
+  activity: PublicActivity | null
+  open: boolean
+  onClose: () => void
+  afterClose: () => void
+}
+
+/** 活動紀錄點開的彈窗。資料全在清單那一列上(內容與照片 id 一起來),不另打詳情端點,
+ *  所以沒有載入中的狀態;個別照片轉不出來(通道回 404)就收掉那一張,不留破圖 */
+function ActivityModal({ activity, open, onClose, afterClose }: ActivityModalProps) {
+  // 以網址記(照片 id 全站唯一,換一場活動也不會誤收);彈窗關掉就清掉,見 afterClose
+  const [broken, setBroken] = useState<ReadonlySet<string>>(new Set())
+  // 預覽開著時組內張數不能變:收掉一張,預覽就停在「5 / 4」的空白 —— 開著的期間沿用
+  // 打開那一刻的清單,淡出動畫跑完(afterOpenChange)才收,淡出中也不能縮
+  const [frozen, setFrozen] = useState<readonly string[] | null>(null)
+  const photos = frozen ?? activity?.photoUrls.filter((url) => !broken.has(url)) ?? []
+  return (
+    <Modal
+      open={open}
+      onCancel={onClose}
+      afterClose={() => {
+        // 收掉的照片只記到這次關掉為止:404 也可能只是轉檔排太長(照片通道有排隊上限),
+        // 再打開要重新要一次,不能一直藏到重新整理
+        setBroken(new Set())
+        setFrozen(null)
+        afterClose()
+      }}
+      footer={null}
+      width={640}
+      title={activity?.name}
+    >
+      {activity && (
+        <>
+          <dl className="club-kv act-kv">
+            <dt>日期</dt>
+            <dd className="num">{activity.dateSpan}</dd>
+            <dt>時間</dt>
+            {/* 起訖時間是選填:拿不到值顯示 —,不用 00:00 頂替 */}
+            <dd className="num">{activity.timeSpan || '—'}</dd>
+            <dt>地點</dt>
+            <dd>{activity.location}</dd>
+            <dt>活動內容</dt>
+            <dd className="pre">{activity.content || '—'}</dd>
+          </dl>
+          {/* 只有結案通過的活動有照片;沒有(或全都載不出來)就整段不出現,不畫一個空的標題 */}
+          {photos.length > 0 && (
+            <section aria-labelledby="act-photos-heading">
+              <h3 id="act-photos-heading" className="act-photos-heading">
+                活動照片
+              </h3>
+              {/* 縮圖本身就是 AntD Image 的預覽鈕(role=button、Enter/Space 可開),
+                  同一組照片在預覽裡左右切換。不掛 loading="lazy":rc-image 另開一個 Image() 驗圖,
+                  縮圖一掛上就整張下載,掛了也不會延後 */}
+              <div className="act-photos">
+                {/* 成組時 rc-image 不把縮圖的 alt 交給預覽層,預覽對話框的名字在這裡給 */}
+                <Image.PreviewGroup
+                  preview={{
+                    alt: '活動照片',
+                    onOpenChange: (next) => next && setFrozen(photos),
+                    afterOpenChange: (next) => !next && setFrozen(null),
+                  }}
+                >
+                  {photos.map((url, i) => (
+                    <Image
+                      key={url}
+                      src={url}
+                      alt={`活動照片${i + 1}`}
+                      onError={() => setBroken((cur) => new Set(cur).add(url))}
+                    />
+                  ))}
+                </Image.PreviewGroup>
+              </div>
+            </section>
+          )}
+        </>
+      )}
+    </Modal>
   )
 }

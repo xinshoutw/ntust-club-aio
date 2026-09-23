@@ -122,7 +122,7 @@ erDiagram
 |---|---|---|
 | public_visible | bool | **行政端下架閥**,預設 true。關掉即該社從所有公開端點消失;與 `is_active` 是兩個判定 |
 | tagline | text NULL | 一句話介紹(≤40),字卡上放不下 `intro` |
-| tags | text[] | **固定主檔**(`schemas/clubs.CLUB_TAGS`,14 個),至多 3 個。自由填寫會讓導覽頁的篩選長歪:同一件事三種寫法,篩選器列不完也對不起來 |
+| tags | text[] | **固定主檔**(`schemas/clubs.CLUB_TAGS`,14 個),至多 3 個。只顯示在導覽頁字卡與詳細頁上(不做篩選器)。自由填寫會讓同一件事出現三種寫法,一整面字卡各說各話 |
 | recruit_status | enum(歡迎加入,暫不開放,額滿) NULL | NULL=未設定,公開頁不顯示 |
 | public_email | text NULL | 對外窗口。**與 `contact_emails` 是兩回事**,那三組是公告通知收件人 |
 | instagram | text NULL | **只存帳號 ID**(不含網址前綴);貼整串網址或帶 `@` 由 schema 正規化。其餘平台實測沒人填 |
@@ -248,7 +248,7 @@ approved 且 end_date + N 天已過且未送結案 → 逾期鎖定(推導,非�
 | sha256 | text | 前端先算、後端驗證 |
 | path | text | `{module}/{YYYY}/{MM}/{uuid}` |
 | archived_at | timestamptz NULL | 已備份下載並自磁碟刪除;非 NULL 時下載回 410、不計配額 |
-| public | bool | 免登入取得。**只有社團形象圖會是 true**;`can_access()` 的四種角色判定管不到匿名,公開檔必須是檔案自己的屬性而不是在權限函式裡多開一個分支 |
+| public | bool | 免登入取得。**只有社團形象圖會是 true**;`can_access()` 的四種角色判定管不到匿名,公開檔必須是檔案自己的屬性而不是在權限函式裡多開一個分支。**結案照片不靠這一欄**:它們公不公開是推導出來的(活動結案通過、社團公開中,`api/v1/public._public_photos`),走另一條只送轉檔預覽的通道(D-42) |
 
 兩個 partial unique index 把去重收口在 DB 層,併發的先查後寫由索引攔下並回 409:
 

@@ -162,6 +162,13 @@ body {
   outline-offset: 2px;
 }
 
+/* AntD 的圖片縮圖可預覽時本身就是按鈕(role=button、tabIndex=0):焦點框同上,
+   不然各處縮圖牆是瀏覽器預設那圈 */
+.ant-image[role='button']:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
 /* 非單一控件的區塊(照片區等)送出驗證未過時的紅框;搭配常駐透明邊框避免版面位移 */
 .area-error {
   border-color: #c13b34 !important;
@@ -287,9 +294,11 @@ body {
    class —— rc-motion 不進動畫流程,自然不必等事件。 */
 
 /* 彈窗進場固定在目的地淡入/縮放,取消自點擊位置飛入的 transform-origin
-   (2026-07-21 需求方:過場位移動畫造成不適;AntD 以 inline style 設 origin,需 !important 蓋過) */
+   (2026-07-21 需求方:過場位移動畫造成不適;AntD 以 inline style 設 origin,需 !important 蓋過)。
+   圖片預覽在 AntD 6 是 `.ant-image-preview-body` 帶那個 inline origin(縮圖中心),
+   v5 的 `.ant-image-preview-wrap` 已經不存在 —— 寫錯 class 不會報錯,只會默默失效 */
 .ant-modal,
-.ant-image-preview-wrap .ant-image-preview-img {
+.ant-image-preview-body {
   transform-origin: center center !important;
 }
 

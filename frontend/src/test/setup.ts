@@ -27,5 +27,10 @@ if (!window.ResizeObserver) {
   }
 }
 
+// 送出驗證失敗時頁面會捲到第一個紅框(design-guide §6);jsdom 沒有這支,呼叫就是 TypeError
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {}
+}
+
 // RTL 的自動 cleanup 只在 globals: true 時掛得上;這裡沿用「測試檔自己 import」的慣例,所以手動掛。
 afterEach(cleanup)

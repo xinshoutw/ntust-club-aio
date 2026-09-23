@@ -161,6 +161,30 @@ async def test_club_image_is_converted_to_fixed_size_webp(db):
         assert img.size == file_service.CLUB_IMAGE_SIZES["avatar"]
 
 
+async def test_club_image_upload_does_not_queue_behind_photo_previews(db):
+    """換形象圖是拿著全站唯一的上傳鎖在等轉檔:排在照片預覽後面的話,匿名把預覽池塞滿
+    (社團頁的照片通道打得到),全站的上傳就一起卡在那把鎖上。"""
+    import asyncio
+    import threading
+
+    user = await make_user(db, username="club01")
+    release = threading.Event()
+    loop = asyncio.get_running_loop()
+    # 兩條都在轉、還有一張排隊
+    busy = [loop.run_in_executor(file_service._PREVIEW_POOL, release.wait, 10) for _ in range(3)]
+    try:
+        row = await asyncio.wait_for(
+            file_service.save_club_image(
+                db, upload_of("logo.png", png_bytes(300, 300)), slot="avatar", uploaded_by=user.id
+            ),
+            timeout=3,
+        )
+        assert row.mime == "image/webp"
+    finally:
+        release.set()
+        await asyncio.gather(*busy)
+
+
 async def test_undecodable_image_is_rejected_as_415_not_500(db):
     """副檔名與魔術位元組都對、內容卻解不開(截斷檔):回 415 讓社團換一張。"""
     user = await make_user(db, username="club01")

@@ -8,6 +8,10 @@ import { API_BASE, api } from './client'
 export const publicFileUrl = (fileId: string | null): string | null =>
   fileId ? `${API_BASE}/public/files/${fileId}` : null
 
+/** 結案照片的公開通道:一律是後端轉過的 JPEG(長邊 1600、不帶 EXIF),不是原檔。 */
+export const publicPhotoUrl = (fileId: string): string =>
+  `${API_BASE}/public/files/activity-photos/${fileId}`
+
 export interface ClubCard {
   id: number
   name: string
@@ -43,6 +47,10 @@ export interface PublicActivity {
   /** HH:mm – HH:mm;沒填時間為空字串(畫面顯示 —,不可用 00:00 頂替) */
   timeSpan: string
   location: string
+  /** 活動內容(申請時填的,上限 150 字);沒填為空字串 */
+  content: string
+  /** 結案照片;只有結案通過的活動有 */
+  photoUrls: string[]
 }
 
 interface CardOut {
@@ -77,6 +85,8 @@ export interface ActivityOut {
   start_time: string | null
   end_time: string | null
   location: string
+  content: string
+  photo_file_ids: string[]
 }
 
 const toCard = (c: CardOut): ClubCard => ({
@@ -121,6 +131,8 @@ export const toActivity = (a: ActivityOut): PublicActivity => ({
   // 起訖時間是選填:缺一個就當沒有,畫面顯示 —(拿不到值不用預設值頂替)
   timeSpan: a.start_time && a.end_time ? `${hhmm(a.start_time)} – ${hhmm(a.end_time)}` : '',
   location: a.location,
+  content: a.content,
+  photoUrls: a.photo_file_ids.map(publicPhotoUrl),
 })
 
 export const publicClubKeys = {

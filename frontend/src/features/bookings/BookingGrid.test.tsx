@@ -1,6 +1,6 @@
 import { beforeEach, expect, test, vi } from 'vitest'
 import dayjs from 'dayjs'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import BookingGrid from './BookingGrid'
 import { taipeiToday } from '../../lib/today'
 import type { Period } from '../../api/auth'
@@ -22,12 +22,15 @@ let catalogue: {
 let venues: { id: number; name: string; capacity: number | null; allowFixed: boolean; allowTemp: boolean }[]
 let usage: { start: string; end: string; items: unknown[] } | undefined
 let grid: Record<string, Record<string, unknown>> = {}
+// 今天已開始的節次:startedPeriods 讀時鐘,釘成常數才不隨跑測試的時刻翻(第 3 節 10:20 起)
+let started: string[] = []
 let range: Record<string, Record<string, Record<string, unknown>>> = {}
 
 vi.mock('../../app/auth', () => ({ useAuth: () => ({ user }) }))
 vi.mock('../../lib/periods', async (orig) => ({
   ...(await orig<typeof import('../../lib/periods')>()),
   usePeriodCatalogue: () => catalogue,
+  startedPeriods: () => started,
 }))
 vi.mock('../../api/bookings', () => ({
   useVenues: () => ({ data: venues, isPending: false, isError: false }),
@@ -39,6 +42,7 @@ vi.mock('../../api/bookings', () => ({
 
 beforeEach(() => {
   user = null
+  started = []
   catalogue = { periods: [P3], isPending: false, isLoadingError: false, refetch: vi.fn() }
   venues = [{ id: 7, name: '精誠廣場', capacity: 50, allowFixed: false, allowTemp: true }]
   usage = undefined
@@ -213,4 +217,42 @@ test('待審單:同一格多筆要每筆都點得到,固定借用標示得到但
   expect(onOpenPending).toHaveBeenCalledWith({ id: 12, club: '吉他社', kind: 'temp' })
   // 固定借用沒有申請 id,選單裡不該出現
   expect(screen.queryByText('審核 弓道社 的申請')).toBeNull()
+})
+
+// 申請頁選不到今天已開始的節次(前後端都擋):場況圖不能給那一格入口,
+// 否則點進去是一列有日期、沒有節次的表單。明天的同一節照常;行政補登不受限
+test('今天已開始的節次點不動，明天照常；行政補登不受限', () => {
+  started = ['3']
+  const onBookVenue = vi.fn()
+  const club = render(<BookingGrid onBookVenue={onBookVenue} />)
+  expect(cells()).toHaveLength(0)
+  fireEvent.click(screen.getByRole('button', { name: '後一天' }))
+  expect(cells()).toHaveLength(1)
+  club.unmount()
+
+  render(<BookingGrid allowPast onBookVenue={onBookVenue} bookLabel="手動借用" />)
+  expect(cells(/點擊前往手動借用/)).toHaveLength(1)
+})
+
+test('單一場地 15 天檢視也不給今天已開始的節次入口，其他天的同一節照常', () => {
+  started = ['3']
+  render(<BookingGrid onBookVenue={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: /檢視 精誠廣場/ }))
+  const today = taipeiToday().format('MM/DD')
+  expect(cells(new RegExp(`^${today} 第3節`))).toHaveLength(0)
+  expect(cells()).toHaveLength(7) // 今天前後各 7 天:前 7 天已過去,只剩後 7 天
+})
+
+// 「已開始」是時間走出來的:頁面開著跨過節次起點,不能等別的東西觸發重畫才收掉入口
+test('頁面開著跨過節次起點，一分鐘內那一格就不給入口', () => {
+  vi.useFakeTimers()
+  try {
+    render(<BookingGrid onBookVenue={vi.fn()} />)
+    expect(cells()).toHaveLength(1)
+    started = ['3']
+    act(() => vi.advanceTimersByTime(60_000))
+    expect(cells()).toHaveLength(0)
+  } finally {
+    vi.useRealTimers()
+  }
 })

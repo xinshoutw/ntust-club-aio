@@ -253,10 +253,108 @@ D-19 那道「只在真的要存 profile 時擋」的閘**,於是那一按跳的
 「形象圖（選擇後即儲存）」,全頁唯一不走右下角「儲存」的一段要自己說出來。
 `ClubSettingsPage.test.tsx` 三則(三處改回舊寫法各會紅)。
 
+**導覽頁移除標籤篩選**(2026-09-22):`/`、`/clubs` 的工具列剩兩個下拉(性質 / 招生)加搜尋框 ——
+至多 3 個標籤在 60 個社團上切不出有意義的集合。**標籤改由搜尋框涵蓋**:關鍵字同時比對名稱、
+英文名稱、一句話介紹與標籤,否則「武術」這種主題詞會一個入口都不剩(標籤照舊顯示在字卡與詳細頁,
+主檔與社團端挑選器不動;後端本來就沒有 `tag=` 這個查詢字串)。
+標籤主檔的存在理由原本寫「自由填寫會讓導覽頁的**篩選**長歪」,四份(`schemas/clubs.py`、
+`models/clubs.py`、`data-model.md`、`club-settings.md`)一起改成「一整面字卡各說各話」。
+**手機斷點跟著重量**:680px 是為四個控制項調的,少一個之後提早約 120px 觸發 —— 561–680px
+被硬拆成三列,而兩顆 select 在 680px 各被拉成 319px。改成 **560px**(縮一號後三控制項需 510px,
+≤767px 內容寬 = viewport − 32,542 以下才排不下),grid 從 `auto-fit + minmax(106px, 1fr)`
+簡化成 `1fr 1fr`(106px 那個實測值是為「三欄收成兩欄」存在的,兩欄用不到)。
+**量法是 CSS harness,不是整頁掃描**:同一份 `publicClubs.css` 加 shell 的內容寬規則,
+320–1200px 逐 px 量工具列列數與水平溢位(零溢位)—— 上面 2026-09-16 那條的
+「991px 以下**四個**控制項」「**三個**下拉」已經過期,**整頁的 playwright 寬度掃描這次沒有重跑**。
+
+**社團頁的活動彈窗、多時段臨時場地借用、全站圖片預覽改 AntD**(2026-09-23,D-42 / D-43):
+
+- `/clubs/:clubId` 的活動紀錄整列可點(滑鼠)、名稱是 `.row-open-btn`(鍵盤),開 AntD Modal:
+  日期、時間、地點、活動內容;**結案通過**的活動多一段「活動照片」(`Image.PreviewGroup` 預覽,
+  載不出來的那張收掉)。`/public/clubs/{id}/activities` 多回 `content` 與 `photo_file_ids`
+  (金額照樣不出去);照片走新通道 `/public/files/activity-photos/{id}`,與清單共用
+  `public._public_photos`,**一律送 1600px 的 JPEG 預覽、不送原檔**(不帶 EXIF/XMP/註解,ICC 保留),
+  轉不出來 404。申請表的「活動內容」欄下方常駐提示「審核通過後公開在社團頁」(`extra`,
+  tooltip 鍵盤與手機拿不到;design-guide §7 已寫成例外)。
+  **已拍板(2026-09-23)**:照片是結案佐證、社團上傳時不知道會公開,既有紀錄仍照樣公開;撤下單張照片的入口列為後續(D-42 末段)
+- `/bookings/venue` 的時段區改成多列:每列日期 + 節次,右側「+」「−」,至多 10 列。
+  `POST /club/venue-bookings` 改收 `slots: [{date, periods}]`,一列一張單、**整批同一個交易**
+  (一列不成立就一張都不建,錯誤訊息開頭「第 N 筆 日期」,信封 `meta.slot` 帶同一個 N,
+  前端把那一列標紅並捲過去);同一天節次重疊前後端都擋;
+  Discord 一批一則、稽核一張單一筆並帶是哪一格。**API 形狀是破壞性的**:舊前端送的
+  `date`/`periods` 會 422(還沒上線,沒有開著舊分頁的人;前後端在同一個 commit)
+- **全站圖片預覽一律 AntD 內建的 `Image`**(使用者指定,design-guide §6 已寫成規則):
+  `features/eval/FilePreview` 的圖片分支改成受控的 `Image.PreviewGroup`(縮放、旋轉、同一組左右切換),
+  PDF/Word 仍開彈窗;`useFilePreview().preview(f, group)` 是唯一入口 —— 評鑑上傳頁與評審評分頁
+  原本各自接 `FilePreview`,現在也走它,group 是同一細項的檔案;活動審核彈窗(行政端與社團端共用)
+  的照片牆換成 AntD `Image` 縮圖。成組時 rc-image 不把 alt 交給預覽層,`preview.alt` 要自己給
+- 兩輪 Opus 交叉審查後補的(各自一個 commit):
+  - 全站那條「預覽不從點擊位置飛出」的 CSS(需求方 2026-07-21)在 AntD 6 早就失效
+    (`.ant-image-preview-wrap` 已不存在,origin 掛在 `.ant-image-preview-body`),`index.css.test.ts`
+    現在拿 AntD 實際的 DOM 釘住那個 class
+  - `files.preview_of` 轉不出來的來源記在行程內(`_PREVIEW_FAILED`,10 分鐘後才重試)——
+    開發庫就有一張截斷的 JPEG(活動 818),匿名打得到;照片通道排隊轉檔前先 `db.close()` 還連線
+  - 借用頁:日期欄 Enter 不再隱式送出整批;增刪列後焦點不掉到 body;列寬不到 914px 就兩行版面
+    (container query,依列本身的寬度 —— 用視窗斷點的話 Windows 的常駐捲軸會讓 1280px 的一行版面裁掉 D 節),
+    窄到日期欄不足 140 時收起日曆圖示;重疊紅框從目前的列當場推;
+    未存檔守衛不再把「多一列空白」「今天已開始的節次」算成修改;每列 `role=group`
+- 版面用 playwright 量過(數值,不是截圖):社團頁 1440/375/320 零水平溢位;借用頁 320–1440 零溢位、
+  日期欄不被遮、一行版面時 14 節全露。**headless Chromium 預設 `--hide-scrollbars`**:要量 Windows 的常駐捲軸,
+  得 `launch(ignore_default_args=["--hide-scrollbars"])` 再注入 `::-webkit-scrollbar` 寬度,只注入 CSS 沒有用。
+  兩行版面的節次在整列 < 664px 時照舊橫捲(常駐捲軸下 1024px 差 11px、768px 差 27px,既有的窄螢幕行為);
+  活動審核彈窗用真實的 `/club/activities/{id}` 回應在瀏覽器內攔截重放,照片牆與預覽在 1440/375 正常
+- 第三輪 Opus 審查後補的:報修佐證、存簿影本、違規附件與社團總覽報修詳情的圖片也改走 AntD 預覽
+  (`components/ui/AttachmentLinks` 統一);結案頁縮圖可點開(`PhotoThumbs`);借用頁改 container query、
+  逐列錯誤訊息帶「第 N 筆」、場況圖不給今天已開始的節次;`/files/{id}` 排隊轉檔前也釋放 DB 連線;
+  同一張照片並發只轉一次、轉檔失敗冷卻 10 分鐘後重試
+- 第三輪的 LOW 與第四輪 Opus 審查(同日傍晚)後補的,各自一個 commit:
+  - 預覽:ICC 超過 64 KB 丟掉(可夾帶任意資料出公開通道);公開彈窗在預覽開著、淡出跑完之前
+    不收壞圖(不再停在「5 / 4」),收掉的只記到彈窗關掉為止;拿掉無效的 `loading="lazy"`(rc-image
+    另開 Image() 驗圖,一掛上就整張下載);檢視器底部顯示「檔名（2 / 5）」;可預覽縮圖一律 §8 藍框
+    (`index.css` 一條全域規則);附件列的圖片又是 `<a href>` 了,一般左鍵開預覽、Ctrl/⌘/中鍵拿原檔
+    (預覽畫不出來的 TIFF 掃描檔、磁碟告警時的 HEIC 才有退路,表格格子的省略號也回來了)
+  - 轉檔資源:形象圖轉 WebP 另走一條 thread(`_CLUB_IMAGE_POOL`)—— 它拿著全站唯一的上傳鎖在等,
+    排在照片預覽後面的話匿名灌照片通道就能卡住全站上傳;照片通道轉檔池已有 16 張在排
+    (`public.PUBLIC_PREVIEW_BACKLOG`)就不排新的、回 404 不記失敗,每分鐘至多記一筆 log
+    (uvicorn 斷線不取消 handler,排進去的一律跑完)
+  - 借用:「已開始」改用台北牆鐘(`lib/today.taipeiNow`,紐約的裝置原本把今天整排算成已開始);
+    container query 改範圍語法(縮放 125%/150% 的 913.5px 兩條都不中);後端逐列錯誤帶 `meta.slot`
+    (`AppError(meta=...)`,前端 `ApiError.meta`),頁面在 onError 當下依列的 key 捲過去
+    (onError 不在 React 事件裡,「等紅框畫出來再找」在 Chromium 與 Firefox 都找不到 —— jsdom 重現不了,
+    測試改成要求 onError 當下就捲);前端驗證失敗不再擦掉後端標的那一列;
+    停權判斷(`lib/status.suspendedNow`,借用三頁的送出鈕靠它)與行政端撤銷鈕改用台北日
+  - 測試補齊:申請附件與結案附件的 group、檢視器對話框名稱、`index.css.test.ts` 兩支選擇器 regex
+    只收整條選擇器、已開始那一筆的批次錯誤(`freeze_taipei` 搬到 `tests/test_bookings.py`)、
+    15 天場況圖、只缺日期的列也捲得到、修飾鍵點附件(Ctrl/⌘/Shift/Alt/中鍵)、登入端 HEIC 預覽
+    不吃排隊上限、`api()` 把信封的 `meta` 掛上 `ApiError`
+  - 文件:design-guide §7 的「提示放 `extra`」例外、§8 改成照實寫「刻意不響應 `prefers-reduced-motion`」
+    (2026-08-31 事故後的決定,原本寫「全關」);D-43 講清楚批內重疊是 schema 的 422、沒有 `meta.slot`
+- **沒做**:社團設定與行政端的形象圖只有顯示沒有預覽(不在這次的範圍);
+  活動審核彈窗的 docx 附件仍無法線上預覽(評鑑兩頁會先抓 blob,彈窗沒有,既有的不一致);
+  公開照片的預覽快取是被看到才轉,沒有預先暖好(全部轉一輪約 950 MB,`DEPLOY_CHECKLIST.md` 已補)——
+  要讓匿名通道完全不轉檔,得改成結案通過時就先轉好並補一支 backfill,現在靠的是排隊上限
+- **審查提出、這次沒修的 LOW**(下個 session 可接):
+  - 其他借用端點的稽核沒帶單號:`manual_venue_booking_created`(之後會以 `venue_booking={id}` 撤銷,
+    建立那筆對不上)、`manual_equipment_loan_created`,`room_booking_submitted` 與
+    `equipment_loan_submitted` 連 detail 都沒有 —— 修法同 384fd23a(先 flush 再記 `{kind}={id};...`)
+  - 今天已開始的空格仍標「可借」、同色,看不出為什麼點不動(「已開始」本身現在每分鐘重算,
+    `lib/periods.useMinuteTick`,PR #35 的 Greptile 審查)
+  - 借用頁 Form 的 `scrollToFirstError` 沒有測試(AntD 用 scroll-into-view-if-needed,jsdom 攔不到)
+  - 轉檔池、single-flight、冷卻與排隊上限都是每個 worker 行程一份(現在單一 worker,註解已寫)
+  - 還在拿裝置時鐘比台北時間的既有程式(審查列的,這次只修了停權與撤銷鈕):
+    時刻 —— `ActivityFormPage` 新申請的開始時刻(後端 `_require_future_start` 用台北時間)、
+    `SignupBuilderPage`、`SignupEditModal`;日界 —— `TakeoverOverlay`、`ViolationsPage`、
+    `api/overview`、`OverduePage`、`AnnouncementsPage`、`SignupBuilderPage`、`PtViolationFormPage`、
+    `ActivityFormPage`、`api/adminSignups`(design-guide 規定一律 `taipeiToday` / `taipeiNow`)
+  - `index.css.test.ts` 的選擇器 regex 仍會接受包在 `@media` 裡的規則
+- 預覽快取的檔名帶版號(`files.PREVIEW_SUFFIX` = `.preview-v2.jpg`,PR #35 的 Greptile 審查):
+  舊規則轉的 `.preview.jpg` 不再被送出去,開發機上那 15 個成了孤兒,
+  `find backend/data/uploads -name '*.preview.jpg' -delete` 回收即可(正式機同一條在 DEPLOY_CHECKLIST)
+
 ## 驗證現況
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **620 passed**;`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **329 passed**(67 檔)、
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **743 passed**;`ruff check .` 全綠
+- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **389 passed**(71 檔,`TZ=UTC` 下也全過)、
   `pnpm run lint` 56 個既有 warning(fast-refresh / set-state-in-effect / refs;
   基準值,新增變更前後要一樣)
 - 新測試做過 mutation 驗證(改回舊寫法會紅;已知例外:`exif_transpose` 那行拿掉不會紅,見測試 docstring);借用色格圖那支另在 `TZ=UTC` 與 `TZ=Pacific/Honolulu` 下各跑過一次

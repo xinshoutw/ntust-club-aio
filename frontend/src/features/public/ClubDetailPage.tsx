@@ -287,8 +287,11 @@ interface ActivityModalProps {
 }
 
 /** 活動紀錄點開的彈窗。資料全在清單那一列上(內容與照片 id 一起來),不另打詳情端點,
- *  所以沒有載入中與失敗的狀態 */
+ *  所以沒有載入中的狀態;個別照片轉不出來(通道回 404)就收掉那一張,不留破圖 */
 function ActivityModal({ activity, open, onClose, afterClose }: ActivityModalProps) {
+  // 以網址記:照片 id 全站唯一,換一場活動也不會誤收
+  const [broken, setBroken] = useState<ReadonlySet<string>>(new Set())
+  const photos = activity?.photoUrls.filter((url) => !broken.has(url)) ?? []
   return (
     <Modal
       open={open}
@@ -311,8 +314,8 @@ function ActivityModal({ activity, open, onClose, afterClose }: ActivityModalPro
             <dt>活動內容</dt>
             <dd className="pre">{activity.content || '—'}</dd>
           </dl>
-          {/* 只有結案通過的活動有照片;沒有就整段不出現,不畫一個空的標題 */}
-          {activity.photoUrls.length > 0 && (
+          {/* 只有結案通過的活動有照片;沒有(或全都載不出來)就整段不出現,不畫一個空的標題 */}
+          {photos.length > 0 && (
             <section aria-labelledby="act-photos-heading">
               <h3 id="act-photos-heading" className="act-photos-heading">
                 活動照片
@@ -321,8 +324,14 @@ function ActivityModal({ activity, open, onClose, afterClose }: ActivityModalPro
                   同一組照片在預覽裡左右切換 */}
               <div className="act-photos">
                 <Image.PreviewGroup>
-                  {activity.photoUrls.map((url, i) => (
-                    <Image key={url} src={url} alt={`活動照片 ${i + 1}`} />
+                  {photos.map((url, i) => (
+                    <Image
+                      key={url}
+                      src={url}
+                      alt={`活動照片${i + 1}`}
+                      loading="lazy"
+                      onError={() => setBroken((cur) => new Set(cur).add(url))}
+                    />
                   ))}
                 </Image.PreviewGroup>
               </div>

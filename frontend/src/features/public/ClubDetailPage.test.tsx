@@ -132,6 +132,19 @@ describe('活動彈窗', () => {
     }
   })
 
+  // 通道轉不出來的照片回 404(壞檔、磁碟到告警水位):收掉那一張,全壞就整段不出現
+  test('載不出來的照片收掉，全都載不出來就不出現照片區', async () => {
+    renderPage()
+    fireEvent.click(screen.getByRole('button', { name: '社員大會' }))
+    const dialog = await screen.findByRole('dialog', { name: '社員大會' })
+    fireEvent.error(within(dialog).getAllByRole('img', { name: /^活動照片/ })[0])
+    const left = within(dialog).getAllByRole('img', { name: /^活動照片/ })
+    expect(left.map((i) => i.getAttribute('src'))).toEqual([photos[1]])
+
+    fireEvent.error(left[0])
+    expect(within(dialog).queryByText('活動照片')).toBeNull()
+  })
+
   test('沒有照片就不出現照片區；沒填的時間與內容顯示 —', async () => {
     renderPage()
     fireEvent.click(screen.getByRole('button', { name: '企業參訪' }))

@@ -22,7 +22,7 @@ let catalogue: {
 let venues: { id: number; name: string; capacity: number | null; allowFixed: boolean; allowTemp: boolean }[]
 let usage: { start: string; end: string; items: unknown[] } | undefined
 let grid: Record<string, Record<string, unknown>> = {}
-// 今天已開始的節次:startedPeriods 讀裝置時鐘,釘成常數才不隨跑測試的時刻翻(第 3 節 10:20 起)
+// 今天已開始的節次:startedPeriods 讀時鐘,釘成常數才不隨跑測試的時刻翻(第 3 節 10:20 起)
 let started: string[] = []
 let range: Record<string, Record<string, Record<string, unknown>>> = {}
 

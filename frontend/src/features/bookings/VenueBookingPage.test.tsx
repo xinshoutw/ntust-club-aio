@@ -11,7 +11,7 @@ import { taipeiToday } from '../../lib/today'
 const mutate = vi.fn()
 // 未存檔守衛收到的「時段有沒有改過」;頁面其餘欄位走 AntD 的 onValuesChange,這裡不管
 let slotsDirty: boolean | null = null
-// 「今天」已開始的節次:startedPeriods 讀的是裝置時鐘,釘成常數才不隨跑測試的時刻與時區翻
+// 「今天」已開始的節次:startedPeriods 讀的是時鐘,釘成常數才不隨跑測試的時刻與時區翻
 let started: string[] = []
 
 vi.mock('../../app/unsaved', () => ({

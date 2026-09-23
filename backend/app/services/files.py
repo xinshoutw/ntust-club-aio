@@ -599,8 +599,12 @@ def _render_preview(src: Path, dst: Path) -> None:
             # 這行是保險(換解碼器也不會躺著輸出),測試驗的是結果不是這一行
             img = ImageOps.exif_transpose(img) or img
             img.thumbnail((PREVIEW_MAX_EDGE, PREVIEW_MAX_EDGE))
-            # JPEG 沒有 alpha:直接 convert("RGB") 的話透明處是一塊黑(見 `_on_white`)
-            _on_white(img).save(tmp, format="JPEG", quality=85)
+            # 不帶來源的 metadata(公開通道就送這一份,D-42):EXIF 與 XMP 本來就不會寫出去,
+            # COM 註解要明講清空(Pillow 預設沿用來源的)。ICC 留著、只留 RGB 來源的 ——
+            # iPhone 的 Display P3 少了它會被當成 sRGB,整張變淡;CMYK/灰階的 profile 套在
+            # 轉完的 RGB 上則是錯的。JPEG 沒有 alpha:直接 convert("RGB") 透明處是一塊黑(`_on_white`)
+            icc = img.info.get("icc_profile") if img.mode in ("RGB", "RGBA") else None
+            _on_white(img).save(tmp, format="JPEG", quality=85, comment=b"", icc_profile=icc)
         tmp.replace(dst)
     finally:
         tmp.unlink(missing_ok=True)

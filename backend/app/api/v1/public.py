@@ -314,7 +314,7 @@ async def public_activity_photo(file_id: uuid.UUID, db: DbDep) -> Response:
 
     **一律送轉過的 JPEG,不送原檔**(`file_service.preview_of`:長邊 1600、套 EXIF 方向,
     與站內 `<img>` 看 HEIC 的預覽共用同一份快取):手機原圖動輒數 MB,而且 EXIF 帶拍攝座標 ——
-    開發庫抽樣 300 張有 20 張有 GPS,重新編碼出來的 JPEG 不帶任何 metadata。
+    開發庫抽樣 300 張有 20 張有 GPS,重新編碼出來的 JPEG 不帶 EXIF、XMP 與註解(色彩描述檔保留)。
     轉不出來(解不開、超過像素上限、磁碟到告警水位不再建新快取)一律 404,不退回原檔。
 
     掛在 `/public/files/` 底下是為了吃 nginx 給圖片的限流桶(`public_files`):一個彈窗

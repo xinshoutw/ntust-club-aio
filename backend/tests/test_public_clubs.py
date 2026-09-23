@@ -531,12 +531,21 @@ async def test_only_closed_activities_publish_their_photos(client, db, status, p
 
 
 async def test_a_photo_goes_out_as_a_bounded_jpeg_without_metadata(client, db):
-    """不送原檔:手機原圖動輒數 MB,EXIF 還帶拍攝座標(開發庫抽樣 300 張有 20 張)。"""
+    """不送原檔:手機原圖動輒數 MB,EXIF 還帶拍攝座標(開發庫抽樣 300 張有 20 張)。
+    COM 註解也不帶(開發庫有 72 張帶著 Discord 寫進去的 JSON);色彩描述檔留著,
+    P3 的照片少了它會被當成 sRGB、整張變淡。"""
+    from PIL import ImageCms
+
     exif = Image.Exif()
     exif[ExifTags.Base.Make] = "Apple"
     exif.get_ifd(ExifTags.IFD.GPSInfo)[ExifTags.GPS.GPSLatitude] = (25.0, 0.0, 0.0)
+    icc = ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
+    buf = io.BytesIO()
+    Image.new("RGB", (3200, 1600), (200, 60, 90)).save(
+        buf, format="JPEG", exif=exif, comment=b'{"uploader": "someone"}', icc_profile=icc
+    )
     _, activity, _ = await activity_with_photos(db, n=0)
-    photo = await make_photo(db, activity, content=jpeg_bytes((3200, 1600), exif))
+    photo = await make_photo(db, activity, content=buf.getvalue())
 
     res = await client.get(f"{PHOTO_URL}/{photo.id}")
     assert res.status_code == 200, res.text
@@ -546,6 +555,8 @@ async def test_a_photo_goes_out_as_a_bounded_jpeg_without_metadata(client, db):
     with Image.open(io.BytesIO(res.content)) as img:
         assert (img.format, img.size) == ("JPEG", (1600, 800))
         assert not img.getexif()
+        assert "comment" not in img.info
+        assert img.info.get("icc_profile") == icc
 
 
 @pytest.mark.parametrize("hide", [{"public_visible": False}, {"is_active": False}])

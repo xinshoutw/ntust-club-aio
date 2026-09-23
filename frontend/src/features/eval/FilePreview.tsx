@@ -112,6 +112,8 @@ function ImageViewer({ images, start, open, onClose, afterClose }: ImageViewerPr
         current,
         // 成組時 rc-image 不把 items 的 alt 交給預覽層:在這裡給,圖片與預覽對話框才有名字
         alt: images[current]?.name,
+        // 看圖時也要知道是哪個檔(換成圖片預覽之前,彈窗標題就是檔名);只有一張時不報「1 / 1」
+        countRender: (n, total) => (total > 1 ? `${images[n - 1]?.name}（${n} / ${total}）` : images[n - 1]?.name),
         onChange: setCurrent,
         onOpenChange: (next) => {
           if (!next) onClose()

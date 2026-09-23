@@ -25,8 +25,8 @@ describe('FilePreview', () => {
     const dialog = screen.getByRole('dialog', { name: 'c.jpg' })
     expect(dialog.classList.contains('ant-image-preview')).toBe(true)
     expect(dialog.querySelector('img')?.getAttribute('src')).toBe('/api/v1/files/c')
-    // 組裡的 PDF 不算:兩張圖,開在第二張
-    expect(dialog.textContent).toContain('2 / 2')
+    // 組裡的 PDF 不算:兩張圖,開在第二張;看圖時也看得到檔名
+    expect(dialog.querySelector('.ant-image-preview-progress')?.textContent).toBe('c.jpg（2 / 2）')
   })
 
   test('左右切換時預覽的名字跟著換', () => {
@@ -42,6 +42,7 @@ describe('FilePreview', () => {
     const dialog = screen.getByRole('dialog', { name: 'c.jpg' })
     expect(dialog.querySelector('img')?.getAttribute('src')).toBe('/api/v1/files/c')
     expect(document.querySelector('.ant-image-preview-switch')).toBeNull()
+    expect(dialog.querySelector('.ant-image-preview-progress')?.textContent).toBe('c.jpg')
   })
 
   test('關閉預覽會通知呼叫端', () => {

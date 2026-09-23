@@ -309,7 +309,8 @@ export default function VenueBookingPage() {
                   className="slot-row-date"
                   format="YYYY/MM/DD"
                   placeholder="日期"
-                  style={{ width: 140 }}
+                  // 一行版面的欄寬就是 140;兩行版面(venueSlots.css)讓它在窄螢幕上縮
+                  style={{ width: '100%', maxWidth: 140 }}
                   value={s.date}
                   status={slotErrors.has(`date:${s.key}`) ? 'error' : undefined}
                   disabledDate={(d) => d.isBefore(taipeiToday())}

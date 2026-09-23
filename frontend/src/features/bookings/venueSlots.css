@@ -1,6 +1,4 @@
-/* 臨時場地借用的時段列(D-43):日期、節次,右側「+」「−」。
-   窄螢幕上節次那一排擠不進同一行:改成日期與「+」「−」一行、節次獨佔下一行 ——
-   用 flex-wrap 的話按鈕會被擠到第三行自成一列 */
+/* 臨時場地借用的時段列(D-43):日期、節次,右側「+」「−」 */
 .slot-rows {
   display: flex;
   flex-direction: column;
@@ -14,7 +12,7 @@
   gap: 12px;
   padding: 10px 12px;
   background: var(--paper);
-  border-radius: 8px;
+  border-radius: 6px;
   /* 常駐透明邊框:送出驗證的 `.area-error` 換上紅框時不位移 */
   border: 1px solid transparent;
 }
@@ -30,14 +28,21 @@
   display: flex;
   gap: 6px;
 }
-@media (max-width: 767px) {
+/* 節次那一排(14 顆至少 638px)要跟日期、「+」「−」擠在同一行,整列得有 900px 上下 ——
+   側欄展開時約是視窗 1270px 以上。不夠寬就改兩行:日期與「+」「−」一行、節次獨佔下一行
+   (flex-wrap 的話按鈕會被擠到第三行自成一列;硬擠一行則 1024px 上 10、A–D 要橫捲才看得到,
+   晚間節次正是社團常借的)。兩行時日期欄可以縮:320px 上固定 140 會被「+」壓住 */
+@media (max-width: 1279px) {
   .slot-row {
-    grid-template-columns: 140px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       'date actions'
       'periods periods';
   }
-  .slot-row-actions {
-    justify-self: end;
+}
+/* 320px 上日期欄只剩 114px,日期本身塞不下:日曆圖示讓位(點欄位照樣開日曆) */
+@media (max-width: 359px) {
+  .slot-row .ant-picker-suffix {
+    display: none;
   }
 }

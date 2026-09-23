@@ -587,7 +587,7 @@ PREVIEW_MAX_ICC_BYTES = 64 * 1024
 _PREVIEW_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="preview")
 # 形象圖轉 WebP 另走一條:`save_club_image` 是拿著全站唯一的上傳鎖(`_STORAGE_LOCK_KEY`)在等轉檔,
 # 排在照片預覽後面的話,匿名把預覽池塞滿,全站的上傳就一起卡在那把鎖上(還各握一條 DB 連線)。
-# 換圖很少見,多一條 thread 的峰值記憶體(一張 50MP 約 450MB)偶爾才會疊上去
+# 換圖很少見(上傳鎖也讓它同時只有一張),`_fit_webp` 先縮再轉,多疊上去的約是一次完整解碼(150–200MB)
 _CLUB_IMAGE_POOL = ThreadPoolExecutor(max_workers=1, thread_name_prefix="club-image")
 
 
@@ -718,7 +718,7 @@ def _fit_webp(src: Path, size: tuple[int, int]) -> bytes:
         if img.width * img.height > PREVIEW_MAX_PIXELS:
             raise ValueError(f"image too large: {img.width}x{img.height}")
         # **先縮再轉 RGB**:反過來(`fit(img.convert("RGB"))`)會先把全尺寸解成 RGB,
-        # 一張 50MP 圖的峰值是「解碼 + transpose + RGB」約 3×150MB,而 pool 有兩條 thread,
+        # 一張 50MP 圖的峰值是「解碼 + transpose + RGB」約 3×150MB,而它與兩條預覽 thread 同時在跑,
         # 正式機是 2 vCPU / 4GB 還跟 PostgreSQL 同住。`thumbnail` 對 JPEG 會自動用
         # `draft()` 讓 libjpeg 直接以較低倍率解碼,省的是解碼本身。
         # 邊長取 2× 最長邊(與方向無關):留給 `fit` 的裁切還有餘裕,不會放大失真
@@ -795,7 +795,8 @@ async def file_response(
     """`as_image`=請求來自 <img>(router 由 Sec-Fetch-Dest 判定):瀏覽器解不了的圖改送 JPEG 預覽。
 
     要轉檔時會先 `db.close()` 把連線還回池子再排隊:呼叫端之後不能再用這個 session,
-    手上的 `file`/`user` 也已經是 detached 物件(要補寫稽核之類的,得在呼叫之前做)。
+    手上的 `file`/`user` 也已經是 detached 物件。要補寫稽核之類的得在呼叫之前**commit**:
+    close 會把還沒 commit 的新增一起丟掉(`audit.record` 只做 add)。
     """
     file = await db.get(File, file_id)
     if file is None or not await can_access(db, file, user):

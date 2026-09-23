@@ -5,10 +5,11 @@
 
 import datetime as dt
 import io
+import itertools
 
 import pytest
 from fastapi import UploadFile
-from PIL import Image
+from PIL import ExifTags, Image
 
 from app.core.config import settings
 from app.models import Activity, File
@@ -31,7 +32,7 @@ async def make_activity(
     row = Activity(
         club_id=club.id,
         name=name,
-        content="內部核銷用的活動內容",
+        content="期末成果發表，歡迎自由入場",
         location="體育館",
         type=ActivityType.EVENT,
         date=day,
@@ -186,10 +187,11 @@ async def test_only_approved_activities_are_public(client, db, status, public):
     assert bool(rows) is public
 
 
-async def test_activity_rows_carry_no_content_or_money(client, db):
+async def test_activity_rows_carry_the_content_but_no_money(client, db):
+    """活動彈窗(D-42)要活動內容;補助、經費來源與承辦備註是學務處與社團之間的事。"""
     club = await make_club(db)
     user = await make_user(db, username="club01", club_id=club.id)
-    await make_activity(
+    activity = await make_activity(
         db,
         club,
         name="成果發表",
@@ -197,13 +199,18 @@ async def test_activity_rows_carry_no_content_or_money(client, db):
         day=dt.date(2026, 3, 1),
         created_by=user.id,
     )
+    activity.school_approved = 3000
+    activity.fund_source = "學務處補助"
+    activity.admin_note = "結案記得附收據"
+    await db.commit()
 
     row = (await client.get(f"{URL}/{club.id}/activities")).json()["data"][0]
     assert row["name"] == "成果發表"
     assert row["location"] == "體育館"
-    # 公開頁回答的是「這個社團在辦什麼」,不是「這張單裡寫了什麼」
-    for field in ("content", "school_approved", "admin_note", "fund_source", "status"):
+    assert row["content"] == "期末成果發表，歡迎自由入場"
+    for field in ("school_approved", "admin_note", "fund_source", "status", "budget_items"):
         assert field not in row
+    assert "3000" not in str(row) and "收據" not in str(row)
 
 
 async def test_only_the_ten_most_recent_activities_are_public(client, db):
@@ -458,3 +465,140 @@ async def test_activity_rows_carry_a_stable_key(client, db):
     )
     listed = (await client.get(f"{URL}/{club.id}/activities")).json()["data"]
     assert listed[0]["id"] == row.id
+
+
+# ---- 結案照片(社團詳細頁的活動彈窗,D-42)----
+
+PHOTO_URL = "/api/v1/public/files/activity-photos"
+_colors = itertools.count(1)
+
+
+def jpeg_bytes(size: tuple[int, int] = (64, 48), exif: Image.Exif | None = None) -> bytes:
+    """每次呼叫換一個顏色:同社的結案照片有 SHA-256 唯一索引,一模一樣的位元組會撞
+    (色差要拉開:JPEG 量化會把只差 1 的純色編成同一串位元組)。"""
+    n = next(_colors)
+    buf = io.BytesIO()
+    Image.new("RGB", size, (n * 40 % 256, n * 90 % 256, 90)).save(
+        buf, format="JPEG", **({"exif": exif} if exif is not None else {})
+    )
+    return buf.getvalue()
+
+
+async def make_photo(db, activity, *, content: bytes | None = None, slot="report_photo") -> File:
+    """與 `api/v1/activities.upload_photo` 同一組定位:subject=activity、slot=report_photo。"""
+    data = content or jpeg_bytes()
+    row = await file_service.save_upload(
+        db,
+        UploadFile(io.BytesIO(data), filename="p.jpg", size=len(data)),
+        policy=file_service.IMAGE,
+        module="reports",
+        uploaded_by=activity.created_by,
+        club_id=activity.club_id,
+        subject_type="activity",
+        subject_id=activity.id,
+        slot=slot,
+    )
+    await db.commit()
+    return row
+
+
+async def activity_with_photos(db, n: int = 2, status=ActivityStatus.CLOSED):
+    club = await make_club(db)
+    user = await make_user(db, username="club01", club_id=club.id)
+    activity = await make_activity(
+        db, club, name="成果發表", status=status, day=dt.date(2026, 3, 1), created_by=user.id
+    )
+    return club, activity, [await make_photo(db, activity) for _ in range(n)]
+
+
+@pytest.mark.parametrize(
+    ("status", "public"),
+    [
+        (ActivityStatus.APPROVED, False),
+        (ActivityStatus.CLOSING_PENDING_ADVISOR, False),
+        (ActivityStatus.CLOSED, True),
+    ],
+)
+async def test_only_closed_activities_publish_their_photos(client, db, status, public):
+    """結案準備中的照片是社團還在刪換的草稿,送審中的還沒有承辦看過 —— 結案通過才公開。
+    清單與通道同一條界線:拿得到 id 卻打不開,或打得開卻不在清單上,都是漏一邊。"""
+    club, _, photos = await activity_with_photos(db, status=status)
+
+    row = (await client.get(f"{URL}/{club.id}/activities")).json()["data"][0]
+    assert row["photo_file_ids"] == ([str(p.id) for p in photos] if public else [])
+    for p in photos:
+        assert (await client.get(f"{PHOTO_URL}/{p.id}")).status_code == (200 if public else 404)
+
+
+async def test_a_photo_goes_out_as_a_bounded_jpeg_without_metadata(client, db):
+    """不送原檔:手機原圖動輒數 MB,EXIF 還帶拍攝座標(開發庫抽樣 300 張有 20 張)。"""
+    exif = Image.Exif()
+    exif[ExifTags.Base.Make] = "Apple"
+    exif.get_ifd(ExifTags.IFD.GPSInfo)[ExifTags.GPS.GPSLatitude] = (25.0, 0.0, 0.0)
+    _, activity, _ = await activity_with_photos(db, n=0)
+    photo = await make_photo(db, activity, content=jpeg_bytes((3200, 1600), exif))
+
+    res = await client.get(f"{PHOTO_URL}/{photo.id}")
+    assert res.status_code == 200, res.text
+    assert res.headers["content-type"] == "image/jpeg"
+    # 同形象圖:瀏覽器留一小時,CDN 與 proxy 不替別人留(下架撤得回來)
+    assert res.headers["cache-control"] == "private, max-age=3600"
+    with Image.open(io.BytesIO(res.content)) as img:
+        assert (img.format, img.size) == ("JPEG", (1600, 800))
+        assert not img.getexif()
+
+
+@pytest.mark.parametrize("hide", [{"public_visible": False}, {"is_active": False}])
+async def test_photos_of_a_hidden_club_stop_being_served(client, db, hide):
+    club, _, photos = await activity_with_photos(db, n=1)
+    url = f"{PHOTO_URL}/{photos[0].id}"
+    assert (await client.get(url)).status_code == 200
+
+    for field, value in hide.items():
+        setattr(club, field, value)
+    await db.commit()
+    assert (await client.get(url)).status_code == 404
+
+
+async def test_only_unarchived_report_photos_go_out(client, db):
+    """同一場活動的結案附件(保單、簽到表)與行政歸檔的照片都不走這條通道。"""
+    club, activity, photos = await activity_with_photos(db, n=2)
+    photos[1].archived_at = dt.datetime.now(dt.UTC)
+    await db.commit()
+    doc = await make_photo(db, activity, slot="report_doc")
+
+    row = (await client.get(f"{URL}/{club.id}/activities")).json()["data"][0]
+    assert row["photo_file_ids"] == [str(photos[0].id)]
+    for f in (photos[1], doc):
+        assert (await client.get(f"{PHOTO_URL}/{f.id}")).status_code == 404
+
+
+async def test_club_images_do_not_go_out_through_the_photo_channel(client, db):
+    club = await make_club(db)
+    image = await make_public_image(db, club)
+    assert (await client.get(f"{PHOTO_URL}/{image.id}")).status_code == 404
+
+
+async def test_oversized_sources_are_neither_listed_nor_served(client, db, monkeypatch):
+    """通道只送轉得出來的 JPEG;轉不了的來源不該在清單上列一個點下去 404 的 id。"""
+    club, _, photos = await activity_with_photos(db, n=1)
+    monkeypatch.setattr(file_service, "PREVIEW_MAX_SOURCE_BYTES", photos[0].size - 1)
+
+    row = (await client.get(f"{URL}/{club.id}/activities")).json()["data"][0]
+    assert row["photo_file_ids"] == []
+    assert (await client.get(f"{PHOTO_URL}/{photos[0].id}")).status_code == 404
+
+
+@pytest.mark.parametrize("breakage", ["missing", "corrupt", "disk_alert"])
+async def test_an_unrenderable_photo_is_404_never_the_original(client, db, monkeypatch, breakage):
+    """轉不出來就 404,不退回原檔 —— 那等於把 EXIF 連同座標一起送出去;也不是 500。"""
+    _, _, photos = await activity_with_photos(db, n=1)
+    disk = settings.upload_dir / photos[0].path
+    if breakage == "missing":
+        disk.unlink()
+    elif breakage == "corrupt":
+        disk.write_bytes(b"\xff\xd8\xff" + b"\x00" * 64)
+    else:  # 告警水位不建新快取(已有的照給,見 test_files)
+        monkeypatch.setattr(file_service, "disk_level", lambda usage=None: "alert")
+
+    assert (await client.get(f"{PHOTO_URL}/{photos[0].id}")).status_code == 404

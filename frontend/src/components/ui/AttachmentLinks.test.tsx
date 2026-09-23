@@ -29,6 +29,19 @@ describe('AttachmentLinks', () => {
     expect(preview.textContent).toContain('2 / 2') // 影片不在切換裡
   })
 
+  // design-guide §6 承諾的退路:預覽畫不出來時,帶修飾鍵點或中鍵還拿得到原檔
+  test.each([
+    ['Ctrl', { ctrlKey: true }],
+    ['⌘', { metaKey: true }],
+    ['Shift', { shiftKey: true }],
+    ['Alt', { altKey: true }],
+    ['中鍵', { button: 1 }],
+  ])('圖片連結用 %s 點不攔，照瀏覽器預設拿原檔', (_, init) => {
+    render(<AttachmentLinks files={files} />)
+    expect(fireEvent.click(screen.getByRole('link', { name: '現場1.jpg' }), init)).toBe(true)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
   test('inline 只出連結本身；沒有附件回 null', () => {
     const { container, rerender } = render(<AttachmentLinks files={files} inline />)
     expect(container.firstElementChild?.tagName).toBe('SPAN')

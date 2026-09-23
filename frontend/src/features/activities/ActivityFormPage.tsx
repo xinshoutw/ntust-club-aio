@@ -584,7 +584,13 @@ function ActivityForm({
                   <InputNumber style={{ width: '100%' }} min={0} precision={0} />
                 </Form.Item>
               </div>
-              <Form.Item name="content" label="活動內容（至多 150 字）" style={{ marginBottom: 0 }}>
+              {/* 活動通過審核後,這段會出現在社團公開頁的活動彈窗(D-42) */}
+              <Form.Item
+                name="content"
+                label="活動內容（至多 150 字）"
+                tooltip="會顯示在社團公開頁"
+                style={{ marginBottom: 0 }}
+              >
                 <Input.TextArea rows={6} maxLength={150} showCount placeholder="活動目的、內容、預期效益" />
               </Form.Item>
 

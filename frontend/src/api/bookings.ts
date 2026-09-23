@@ -579,12 +579,17 @@ export interface RoomBookingInput {
   slots: { weekday: number; period: string }[]
 }
 
+export interface VenueSlotInput {
+  date: Dayjs
+  periods: string[]
+}
+
 export interface VenueBookingInput {
   venueId: number
   /** null = 免綁活動(僅 802 國際事務處,見 VenueBookingPage) */
   activityId: number | null
-  date: Dayjs
-  periods: string[]
+  /** 一筆一張單、各自審核;整批同一個交易,有一筆不成立就一張都不建(D-43) */
+  slots: VenueSlotInput[]
   purpose: string
   phone: string
 }
@@ -616,13 +621,12 @@ export function useBookingMutations() {
   })
   const createVenueBooking = useMutation({
     mutationFn: (b: VenueBookingInput) =>
-      api<VenueBookingOut>('/club/venue-bookings', {
+      api<VenueBookingOut[]>('/club/venue-bookings', {
         method: 'POST',
         body: JSON.stringify({
           venue_id: b.venueId,
           activity_id: b.activityId,
-          date: toIso(b.date),
-          periods: b.periods,
+          slots: b.slots.map((s) => ({ date: toIso(s.date), periods: s.periods })),
           purpose: b.purpose,
           phone: b.phone.trim(),
         }),

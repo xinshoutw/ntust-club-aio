@@ -1,5 +1,50 @@
-import { describe, expect, it } from 'vitest'
-import { roomEntryText, toEquipmentLoan, toRoomBooking } from './bookings'
+import { describe, expect, it, vi } from 'vitest'
+import { createElement, type ReactNode } from 'react'
+import dayjs from 'dayjs'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { act, renderHook } from '@testing-library/react'
+
+vi.mock('./client', async (orig) => ({
+  ...(await orig<typeof import('./client')>()),
+  api: vi.fn(),
+}))
+
+import { api } from './client'
+import { roomEntryText, toEquipmentLoan, toRoomBooking, useBookingMutations } from './bookings'
+
+describe('createVenueBooking', () => {
+  // 後端 `VenueBookingIn.slots`(D-43):一筆一張單,每一筆各帶自己的日期與節次
+  it('一次送出的每一筆時段各帶自己的日期與節次', async () => {
+    vi.mocked(api).mockResolvedValue([])
+    const wrapper = ({ children }: { children: ReactNode }) =>
+      createElement(QueryClientProvider, { client: new QueryClient() }, children)
+    const { result } = renderHook(() => useBookingMutations(), { wrapper })
+    await act(() =>
+      result.current.createVenueBooking.mutateAsync({
+        venueId: 9,
+        activityId: 1,
+        slots: [
+          { date: dayjs('2099-01-01'), periods: ['3', '4'] },
+          { date: dayjs('2099-01-02'), periods: ['A'] },
+        ],
+        purpose: '成發彩排',
+        phone: ' 0912345678 ',
+      }),
+    )
+    const [path, init] = vi.mocked(api).mock.calls[0]
+    expect(path).toBe('/club/venue-bookings')
+    expect(JSON.parse(String(init?.body))).toEqual({
+      venue_id: 9,
+      activity_id: 1,
+      slots: [
+        { date: '2099-01-01', periods: ['3', '4'] },
+        { date: '2099-01-02', periods: ['A'] },
+      ],
+      purpose: '成發彩排',
+      phone: '0912345678',
+    })
+  })
+})
 
 describe('toRoomBooking', () => {
   it('slots 依星期分組、節次照課表排序(數字在前、A–D 在後)', () => {

@@ -1,0 +1,43 @@
+/* 臨時場地借用的時段列(D-43):日期、節次,右側「+」「−」。
+   窄螢幕上節次那一排擠不進同一行:改成日期與「+」「−」一行、節次獨佔下一行 ——
+   用 flex-wrap 的話按鈕會被擠到第三行自成一列 */
+.slot-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.slot-row {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr) auto;
+  grid-template-areas: 'date periods actions';
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--paper);
+  border-radius: 8px;
+  /* 常駐透明邊框:送出驗證的 `.area-error` 換上紅框時不位移 */
+  border: 1px solid transparent;
+}
+.slot-row-date {
+  grid-area: date;
+}
+.slot-row-periods {
+  grid-area: periods;
+  min-width: 0;
+}
+.slot-row-actions {
+  grid-area: actions;
+  display: flex;
+  gap: 6px;
+}
+@media (max-width: 767px) {
+  .slot-row {
+    grid-template-columns: 140px minmax(0, 1fr);
+    grid-template-areas:
+      'date actions'
+      'periods periods';
+  }
+  .slot-row-actions {
+    justify-self: end;
+  }
+}

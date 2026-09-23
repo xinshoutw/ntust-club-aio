@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import dayjs, { type Dayjs } from 'dayjs'
 import { App, Button, DatePicker, Form, Input, Select } from 'antd'
+import { MinusOutlined, PlusOutlined } from '@ant-design/icons'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import { useFormUnsavedGuard } from '../../app/unsaved'
 import PageHeader from '../../components/ui/PageHeader'
@@ -27,6 +28,22 @@ import { useApprovedActivities } from '../../api/activities'
 import PeriodPicker from './PeriodPicker'
 import { useDecisionReason } from './DecisionReasonModal'
 import { taipeiToday } from '../../lib/today'
+import './venueSlots.css'
+
+// 一次送出的時段筆數上限(後端同值:schemas/bookings.MAX_VENUE_SLOTS)
+const MAX_SLOTS = 10
+
+/** 一筆時段 = 一天的節次,送出後各成一張單(D-43)。`key` 只給 React 認列,不上後端 */
+interface SlotDraft {
+  key: number
+  date: Dayjs | null
+  periods: string[]
+}
+
+/** 未存檔守衛的比對值:只看日期與節次(`key` 會隨增刪變,不算修改) */
+const slotsKey = (slots: SlotDraft[]) =>
+  slots.map((s) => `${s.date?.format('YYYY-MM-DD') ?? ''}:${s.periods.join(',')}`).join('|')
+const BLANK_KEY = slotsKey([{ key: 0, date: null, periods: [] }])
 
 export default function VenueBookingPage() {
   const { message, modal } = App.useApp()
@@ -47,11 +64,20 @@ export default function VenueBookingPage() {
       ? rawDate
       : undefined
   const qPeriod = params.get('period')
-  const [periods, setPeriods] = useState<string[]>(() => (qPeriod && periodAxis.includes(qPeriod) ? [qPeriod] : []))
-  // 從場況圖點格進來時 periods 已有初值,與初值相同不算 dirty(否則一進頁就被攔)
-  const initialPeriods = useRef(periods.join())
-  const guard = useFormUnsavedGuard(periods.join() !== initialPeriods.current)
-  const [periodsError, setPeriodsError] = useState(false)
+  // 從場況圖點格進來時第一筆已帶好日期與節次
+  const [slots, setSlots] = useState<SlotDraft[]>(() => [
+    {
+      key: 0,
+      date: qDate ? dayjs(qDate, 'YYYY/MM/DD') : null,
+      periods: qPeriod && periodAxis.includes(qPeriod) ? [qPeriod] : [],
+    },
+  ])
+  const nextKey = useRef(1)
+  // 與初值相同不算 dirty(否則從場況圖點進來,一進頁就被攔)
+  const [cleanKey, setCleanKey] = useState(() => slotsKey(slots))
+  const guard = useFormUnsavedGuard(slotsKey(slots) !== cleanKey)
+  // 送出驗證的錯誤集合(design-guide §6):`date:<key>` / `periods:<key>`,改到哪一格就解除哪一格
+  const [slotErrors, setSlotErrors] = useState<ReadonlySet<string>>(new Set())
 
   const venuesQuery = useVenues()
   const venues = venuesQuery.data ?? []
@@ -71,15 +97,69 @@ export default function VenueBookingPage() {
   const todayStart = taipeiToday()
 
   // 過去時間全面禁止:過去日期不可選;選「今天」時已開始節次禁選(後端亦擋)
-  const dateValue = Form.useWatch('date', form) as Dayjs | undefined
-  const disabledPeriods = dateValue?.isSame(todayStart, 'day') ? startedPeriods(periodCatalogue) : []
-  const disabledKey = disabledPeriods.join(',')
+  const started = startedPeriods(periodCatalogue)
+  const isToday = (d: Dayjs | null) => !!d?.isSame(todayStart, 'day')
+  const startedKey = started.join(',')
+  const todayRows = slots.filter((s) => isToday(s.date)).map((s) => s.key).join(',')
   useEffect(() => {
-    // 日期切到今天、或表單開著跨過節次起點時,已選到的已開始節次自動剔除
+    // 某一筆的日期切到今天、或表單開著跨過節次起點時,那幾筆已選到的已開始節次自動剔除
     // (disabled 按鈕不可再點,靠這裡收走,避免卡住送不出)
-    if (!disabledKey) return
-    setPeriods((cur) => cur.filter((p) => !disabledKey.split(',').includes(p)))
-  }, [disabledKey])
+    if (!startedKey || !todayRows) return
+    const off = startedKey.split(',')
+    const rows = todayRows.split(',').map(Number)
+    setSlots((cur) =>
+      cur.map((s) =>
+        rows.includes(s.key) && s.periods.some((p) => off.includes(p))
+          ? { ...s, periods: s.periods.filter((p) => !off.includes(p)) }
+          : s,
+      ),
+    )
+  }, [startedKey, todayRows])
+
+  const patchSlot = (key: number, patch: Partial<Omit<SlotDraft, 'key'>>) => {
+    setSlots((cur) => cur.map((s) => (s.key === key ? { ...s, ...patch } : s)))
+    const field = 'date' in patch ? 'date' : 'periods'
+    setSlotErrors((cur) => {
+      if (!cur.has(`${field}:${key}`)) return cur
+      const next = new Set(cur)
+      next.delete(`${field}:${key}`)
+      return next
+    })
+  }
+  // 「+」在這一筆的正下方插一筆空白的;「−」移除這一筆(至少留一筆)
+  const addSlotAfter = (key: number) => {
+    // key 在 updater 外取號:StrictMode 會把 updater 跑兩次
+    const blank: SlotDraft = { key: nextKey.current++, date: null, periods: [] }
+    setSlots((cur) => {
+      const at = cur.findIndex((s) => s.key === key) + 1
+      return [...cur.slice(0, at), blank, ...cur.slice(at)]
+    })
+  }
+  const removeSlot = (key: number) => setSlots((cur) => cur.filter((s) => s.key !== key))
+
+  /** 每一筆都要有日期與節次;同一天節次重疊的兩筆送出去就是重複申請(後端 `_no_overlap` 同一條)。
+   *  回傳要提示的訊息,沒問題回 null */
+  const validateSlots = (): string | null => {
+    const errors = new Set<string>()
+    const taken = new Map<string, Set<string>>()
+    let overlap: string | null = null
+    for (const s of slots) {
+      if (!s.date) errors.add(`date:${s.key}`)
+      if (!s.periods.length) errors.add(`periods:${s.key}`)
+      if (!s.date || !s.periods.length) continue
+      const day = s.date.format('YYYY/MM/DD')
+      const seen = taken.get(day) ?? new Set<string>()
+      if (s.periods.some((p) => seen.has(p))) {
+        errors.add(`periods:${s.key}`)
+        overlap ??= day
+      }
+      s.periods.forEach((p) => seen.add(p))
+      taken.set(day, seen)
+    }
+    setSlotErrors(errors)
+    if (overlap) return `${overlap} 的時段重複`
+    return errors.size ? '請為每一筆選擇日期與時段' : null
+  }
 
   const cancelRow = (v: { id: number; venueName: string; date: string }) =>
     confirmDialog(modal, {
@@ -103,10 +183,10 @@ export default function VenueBookingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [venuesQuery.data])
 
-  const submit = (values: { venue: number; activity?: number; purpose: string; phone: string; date: Dayjs }) => {
-    if (!periods.length) {
-      setPeriodsError(true)
-      message.error('請選擇至少一個時段')
+  const submit = (values: { venue: number; activity?: number; purpose: string; phone: string }) => {
+    const problem = validateSlots()
+    if (problem) {
+      message.error(problem)
       return
     }
     const venueName = tempVenues.find((v) => v.id === values.venue)?.name ?? ''
@@ -114,17 +194,22 @@ export default function VenueBookingPage() {
       {
         venueId: values.venue,
         activityId: noActivity ? null : (values.activity ?? null),
-        date: values.date,
-        periods,
+        // validateSlots 已確認每一筆都有日期
+        slots: slots.map((s) => ({ date: s.date as Dayjs, periods: s.periods })),
         purpose: values.purpose,
         phone: values.phone,
       },
       {
-        onSuccess: () => {
-          message.success(`已送出「${venueName}」借用申請（${periods.join('、')}）`)
+        onSuccess: (rows) => {
+          message.success(
+            rows.length === 1
+              ? `已送出「${venueName}」借用申請（${rows[0].periods.join('、')}）`
+              : `已送出「${venueName}」${rows.length} 筆借用申請`,
+          )
           form.resetFields()
           guard.clear()
-          setPeriods([])
+          setSlots([{ key: nextKey.current++, date: null, periods: [] }])
+          setCleanKey(BLANK_KEY)
         },
         onError: (e) => message.error(e.message),
       },
@@ -141,8 +226,9 @@ export default function VenueBookingPage() {
           form={form}
           layout="vertical"
           onFinish={submit}
+          // 其他欄位沒過時 onFinish 不會跑:時段的錯誤要跟著一起標出來,不必送第二次才看到
+          onFinishFailed={() => void validateSlots()}
           requiredMark
-          initialValues={{ date: qDate ? dayjs(qDate, 'YYYY/MM/DD') : undefined }}
         >
           <div className="form-grid-2">
             <Form.Item name="venue" label="場地" rules={[{ required: true, message: '請選擇場地' }]} style={{ marginBottom: 0 }}>
@@ -191,30 +277,47 @@ export default function VenueBookingPage() {
           <div style={{ fontSize: 13, fontWeight: 500, margin: '18px 0 8px' }}>
             時段 <span style={{ color: '#C13B34' }}>*</span>
           </div>
-          <div
-            className={periodsError ? 'area-error' : undefined}
-            style={{ background: 'var(--paper)', borderRadius: 8, padding: '10px 12px', border: '1px solid transparent', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}
-          >
-            <Form.Item name="date" rules={[{ required: true, message: '請選擇日期' }]} style={{ marginBottom: 0, flexShrink: 0 }}>
-              <DatePicker
-                format="YYYY/MM/DD"
-                placeholder="日期"
-                style={{ width: 140 }}
-                disabledDate={(d) => d.isBefore(taipeiToday())}
-              />
-            </Form.Item>
-            <div style={{ flex: 1, minWidth: 280 }}>
-              <PeriodPicker
-                size="small"
-                nowrap
-                value={periods}
-                disabledPeriods={disabledPeriods}
-                onChange={(next) => {
-                  setPeriodsError(false)
-                  setPeriods(next)
-                }}
-              />
-            </div>
+          <div className="slot-rows">
+            {slots.map((s, i) => (
+              <div
+                key={s.key}
+                className={slotErrors.has(`periods:${s.key}`) ? 'slot-row area-error' : 'slot-row'}
+              >
+                <DatePicker
+                  className="slot-row-date"
+                  format="YYYY/MM/DD"
+                  placeholder="日期"
+                  style={{ width: 140 }}
+                  value={s.date}
+                  status={slotErrors.has(`date:${s.key}`) ? 'error' : undefined}
+                  disabledDate={(d) => d.isBefore(taipeiToday())}
+                  onChange={(d) => patchSlot(s.key, { date: d })}
+                />
+                <div className="slot-row-periods">
+                  <PeriodPicker
+                    size="small"
+                    nowrap
+                    value={s.periods}
+                    disabledPeriods={isToday(s.date) ? started : []}
+                    onChange={(next) => patchSlot(s.key, { periods: next })}
+                  />
+                </div>
+                <div className="slot-row-actions">
+                  <Button
+                    icon={<PlusOutlined />}
+                    aria-label={`在第 ${i + 1} 筆下方新增時段`}
+                    disabled={slots.length >= MAX_SLOTS}
+                    onClick={() => addSlotAfter(s.key)}
+                  />
+                  <Button
+                    icon={<MinusOutlined />}
+                    aria-label={`移除第 ${i + 1} 筆時段`}
+                    disabled={slots.length === 1}
+                    onClick={() => removeSlot(s.key)}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
             <Button type="primary" htmlType="submit" loading={createVenueBooking.isPending} disabled={createVenueBooking.isPending || suspended}>送出申請</Button>

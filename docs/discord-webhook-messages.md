@@ -64,7 +64,8 @@
 - **D1 固定借用申請** `POST /club/room-bookings` · submit
   `固定場地借用申請` / `{user.name}:{venue.name}({n} 個每週時段)`
 - **D2 臨時借用申請** `POST /club/venue-bookings` · submit
-  `臨時場地借用申請` / `{user.name}:{venue.name}({date} 時段 {periods})`
+  `臨時場地借用申請` / `{user.name}:{venue.name}({date} 時段 {periods})`;一次送多個時段時
+  **一批一則**,括號內各時段以「、」相連(D-43)
 - **D3 器材借用申請** `POST /club/equipment-loans` · submit
   `器材借用申請` / `{user.name}:{equipment.name} ×{qty}({start}~{end},活動:{activity.name})`
   (免綁活動的單沒有「,活動:…」那一段,見 D-36)

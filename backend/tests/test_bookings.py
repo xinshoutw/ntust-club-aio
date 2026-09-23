@@ -19,6 +19,13 @@ from app.services.booking_service import next_workday, overdue_deadline, parse_r
 from tests.conftest import csrf_headers, login, make_club, make_user
 
 
+def single_slot(body: dict) -> dict:
+    """臨時場地借用一次可送多個時段(`slots`,D-43)。只測一個時段的測試照舊寫扁平的
+    `date` + `periods`(覆寫也好寫:`{**body, "periods": [...]}`),由這裡包成一筆。"""
+    rest = {k: v for k, v in body.items() if k not in ("date", "periods")}
+    return {**rest, "slots": [{k: body[k] for k in ("date", "periods") if k in body}]}
+
+
 def first_thursday(start: date) -> date:
     return start + timedelta(days=(4 - start.isoweekday()) % 7)
 
@@ -424,14 +431,14 @@ async def test_venue_booking_locks_before_the_duplicate_check(client, db):
     try:
         resp = await client.post(
             "/api/v1/club/venue-bookings",
-            json={
+            json=single_slot({
                 "venue_id": venue.id,
                 "activity_id": activity.id,
                 "date": (date.today() + timedelta(days=14)).isoformat(),
                 "periods": ["3", "4"],
                 "purpose": "擺攤",
                 "phone": "0912000111",
-            },
+            }),
             headers=csrf_headers(client),
         )
     finally:
@@ -456,17 +463,19 @@ async def test_venue_booking_activity_optional_only_for_802(client, db):
         "purpose": "國際生說明會",
         "phone": "0912000111",
     }
-    resp = await client.post("/api/v1/club/venue-bookings", json=body, headers=csrf_headers(client))
+    resp = await client.post(
+        "/api/v1/club/venue-bookings", json=single_slot(body), headers=csrf_headers(client)
+    )
     assert resp.status_code == 201, resp.text
-    assert resp.json()["data"]["activity_id"] is None
-    assert resp.json()["data"]["activity_name"] is None
+    assert resp.json()["data"][0]["activity_id"] is None
+    assert resp.json()["data"][0]["activity_name"] is None
 
     # 代碼 802、社團改名 → 不再吃這條例外(比的是活的 Club.name,不是建帳當下的 User.name)
     club.name = "國際事務中心"
     await db.commit()
     resp = await client.post(
         "/api/v1/club/venue-bookings",
-        json={**body, "periods": ["6", "7"]},
+        json=single_slot({**body, "periods": ["6", "7"]}),
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
@@ -478,7 +487,7 @@ async def test_venue_booking_activity_optional_only_for_802(client, db):
     await login(client, "803")
     resp = await client.post(
         "/api/v1/club/venue-bookings",
-        json={**body, "periods": ["8", "9"]},
+        json=single_slot({**body, "periods": ["8", "9"]}),
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
@@ -490,7 +499,7 @@ async def test_venue_booking_activity_optional_only_for_802(client, db):
     await login(client, "club01")
     resp = await client.post(
         "/api/v1/club/venue-bookings",
-        json={**body, "periods": ["A", "B"]},
+        json=single_slot({**body, "periods": ["A", "B"]}),
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
@@ -564,16 +573,20 @@ async def test_venue_booking_requires_approved_activity(client, db):
         "purpose": "擺攤",
         "phone": "0912000111",
     }
-    resp = await client.post("/api/v1/club/venue-bookings", json=body, headers=csrf_headers(client))
+    resp = await client.post(
+        "/api/v1/club/venue-bookings", json=single_slot(body), headers=csrf_headers(client)
+    )
     assert resp.status_code == 201, resp.text
-    assert resp.json()["data"]["activity_name"] == "迎新宿營"
+    assert resp.json()["data"][0]["activity_name"] == "迎新宿營"
 
     # 同場地同日、節次重疊 → 409
-    resp = await client.post("/api/v1/club/venue-bookings", json=body, headers=csrf_headers(client))
+    resp = await client.post(
+        "/api/v1/club/venue-bookings", json=single_slot(body), headers=csrf_headers(client)
+    )
     assert resp.status_code == 409
     resp = await client.post(
         "/api/v1/club/venue-bookings",
-        json={**body, "periods": ["4", "5"]},  # 第 4 節重疊
+        json=single_slot({**body, "periods": ["4", "5"]}),  # 第 4 節重疊
         headers=csrf_headers(client),
     )
     assert resp.status_code == 409
@@ -581,7 +594,7 @@ async def test_venue_booking_requires_approved_activity(client, db):
     # 同場地同日但節次完全不重疊 → 各自成立(上午擺攤、晚上彩排是兩件事)
     resp = await client.post(
         "/api/v1/club/venue-bookings",
-        json={**body, "periods": ["6", "7"]},
+        json=single_slot({**body, "periods": ["6", "7"]}),
         headers=csrf_headers(client),
     )
     assert resp.status_code == 201, resp.text
@@ -589,7 +602,9 @@ async def test_venue_booking_requires_approved_activity(client, db):
     # 未核准活動 → 422
     resp = await client.post(
         "/api/v1/club/venue-bookings",
-        json={**body, "date": (day + timedelta(days=1)).isoformat(), "activity_id": pending.id},
+        json=single_slot(
+            {**body, "date": (day + timedelta(days=1)).isoformat(), "activity_id": pending.id}
+        ),
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
@@ -599,11 +614,11 @@ async def test_venue_booking_requires_approved_activity(client, db):
     other_activity = await make_activity(db, other, name="他社活動")
     resp = await client.post(
         "/api/v1/club/venue-bookings",
-        json={
+        json=single_slot({
             **body,
             "date": (day + timedelta(days=2)).isoformat(),
             "activity_id": other_activity.id,
-        },
+        }),
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
@@ -614,7 +629,9 @@ async def test_venue_booking_requires_approved_activity(client, db):
     )
     resp = await client.post(
         "/api/v1/club/venue-bookings",
-        json={**body, "date": (day + timedelta(days=4)).isoformat(), "activity_id": ended.id},
+        json=single_slot(
+            {**body, "date": (day + timedelta(days=4)).isoformat(), "activity_id": ended.id}
+        ),
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
@@ -623,14 +640,176 @@ async def test_venue_booking_requires_approved_activity(client, db):
     # 缺 activity_id → 422(必填)
     resp = await client.post(
         "/api/v1/club/venue-bookings",
-        json={"venue_id": venue.id, "date": (day + timedelta(days=3)).isoformat(),
-              "periods": ["3"], "purpose": "x", "phone": "0912000111"},
+        json=single_slot({"venue_id": venue.id, "date": (day + timedelta(days=3)).isoformat(),
+              "periods": ["3"], "purpose": "x", "phone": "0912000111"}),
         headers=csrf_headers(client),
     )
     assert resp.status_code == 422
 
     listing = (await client.get("/api/v1/club/venue-bookings")).json()["data"]
     assert listing[0]["activity_id"] == approved.id
+
+
+# ---- 一次送多個時段(D-43) ----
+
+
+def _venue_batch(venue, activity, slots) -> dict:
+    return {
+        "venue_id": venue.id,
+        "activity_id": activity.id,
+        "slots": slots,
+        "purpose": "成發彩排",
+        "phone": "0912000111",
+    }
+
+
+async def _venue_booking_count(db) -> int:
+    from app.models import VenueBooking
+
+    return await db.scalar(sa.select(sa.func.count()).select_from(VenueBooking))
+
+
+async def test_each_slot_becomes_its_own_booking(client, db, monkeypatch):
+    """一筆一張單、各自審核;場地、活動、用途與電話共用。
+    同一天節次不重疊的兩筆照收(上午擺攤、晚上彩排本來就是兩張單)。"""
+    from app.services import notify
+
+    sent: list[tuple] = []
+
+    async def club_event(kind, title, description="", club_webhook=None):
+        sent.append((kind, title, description))
+
+    monkeypatch.setattr(notify, "club_event", club_event)
+    club = await setup_session(client, db)
+    venue = await make_venue(db, name="精誠廣場", allow_fixed=False, allow_temp=True)
+    activity = await make_activity(db, club)
+    d1 = date.today() + timedelta(days=14)
+    d2 = d1 + timedelta(days=1)
+
+    resp = await client.post(
+        "/api/v1/club/venue-bookings",
+        json=_venue_batch(
+            venue,
+            activity,
+            [
+                {"date": d1.isoformat(), "periods": ["4", "3"]},
+                {"date": d2.isoformat(), "periods": ["A", "B"]},
+                {"date": d1.isoformat(), "periods": ["8"]},
+            ],
+        ),
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201, resp.text
+    data = resp.json()["data"]
+    assert [(r["date"], r["periods"]) for r in data] == [
+        (d1.isoformat(), ["3", "4"]),
+        (d2.isoformat(), ["A", "B"]),
+        (d1.isoformat(), ["8"]),
+    ]
+    assert len({r["id"] for r in data}) == 3
+    assert {
+        (r["venue_name"], r["activity_name"], r["purpose"], r["phone"], r["status"]) for r in data
+    } == {("精誠廣場", "迎新宿營", "成發彩排", "0912000111", "pending")}
+    listing = (
+        await client.get("/api/v1/club/venue-bookings", params={"active": "true"})
+    ).json()["data"]
+    assert len(listing) == 3
+    # 通知一批一則,三個時段都在裡面
+    assert len(sent) == 1
+    assert all(f"{d} 時段" in sent[0][2] for d in (d1, d2))
+
+
+@pytest.mark.parametrize("bad", ["past", "blocked", "duplicate"])
+async def test_one_bad_slot_rejects_the_whole_batch(client, db, bad):
+    """整批同一個交易:一筆不成立就一張都不建,錯誤訊息說出是哪一天。
+    只建成一半的話,社團改完重送時,建成的那幾筆會變成重複申請把整批擋下來。"""
+    from app.models import User, VenueBlockRule
+
+    club = await setup_session(client, db)
+    venue = await make_venue(db, name="精誠廣場", allow_fixed=False, allow_temp=True)
+    activity = await make_activity(db, club)
+    good = date.today() + timedelta(days=14)
+    bad_day = date.today() - timedelta(days=1) if bad == "past" else good + timedelta(days=2)
+    if bad == "blocked":
+        creator = await db.scalar(sa.select(User.id).order_by(User.id).limit(1))
+        db.add(VenueBlockRule(venue_id=venue.id, start_date=bad_day, end_date=bad_day,
+                              weekdays=[], periods=["5"], reason="整修", created_by=creator))
+        await db.commit()
+    elif bad == "duplicate":
+        first = await client.post(
+            "/api/v1/club/venue-bookings",
+            json=_venue_batch(venue, activity, [{"date": bad_day.isoformat(), "periods": ["5"]}]),
+            headers=csrf_headers(client),
+        )
+        assert first.status_code == 201, first.text
+    before = await _venue_booking_count(db)
+
+    resp = await client.post(
+        "/api/v1/club/venue-bookings",
+        json=_venue_batch(
+            venue,
+            activity,
+            [
+                {"date": good.isoformat(), "periods": ["3"]},
+                {"date": bad_day.isoformat(), "periods": ["5"]},
+            ],
+        ),
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == (409 if bad == "duplicate" else 422), resp.text
+    assert f"{bad_day:%Y/%m/%d}" in resp.json()["error"]
+    assert await _venue_booking_count(db) == before
+
+
+async def test_slots_overlapping_within_a_batch_are_rejected(client, db):
+    club = await setup_session(client, db)
+    venue = await make_venue(db, name="精誠廣場", allow_fixed=False, allow_temp=True)
+    activity = await make_activity(db, club)
+    day = date.today() + timedelta(days=14)
+
+    resp = await client.post(
+        "/api/v1/club/venue-bookings",
+        json=_venue_batch(
+            venue,
+            activity,
+            [
+                {"date": day.isoformat(), "periods": ["3", "4"]},
+                {"date": day.isoformat(), "periods": ["4", "5"]},  # 第 4 節重疊
+            ],
+        ),
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 422
+    assert f"{day:%Y/%m/%d} 的時段重複" in resp.text
+    assert await _venue_booking_count(db) == 0
+
+
+async def test_a_batch_holds_one_to_ten_slots(client, db):
+    from app.schemas.bookings import MAX_VENUE_SLOTS
+
+    club = await setup_session(client, db)
+    venue = await make_venue(db, name="精誠廣場", allow_fixed=False, allow_temp=True)
+    activity = await make_activity(db, club)
+    start = date.today() + timedelta(days=14)
+    slots = [
+        {"date": (start + timedelta(days=i)).isoformat(), "periods": ["3"]}
+        for i in range(MAX_VENUE_SLOTS + 1)
+    ]
+
+    for too_many_or_none in (slots, []):
+        resp = await client.post(
+            "/api/v1/club/venue-bookings",
+            json=_venue_batch(venue, activity, too_many_or_none),
+            headers=csrf_headers(client),
+        )
+        assert resp.status_code == 422
+    resp = await client.post(
+        "/api/v1/club/venue-bookings",
+        json=_venue_batch(venue, activity, slots[:MAX_VENUE_SLOTS]),
+        headers=csrf_headers(client),
+    )
+    assert resp.status_code == 201, resp.text
+    assert len(resp.json()["data"]) == MAX_VENUE_SLOTS == 10
 
 
 # ---- 借用總覽色格 ----
@@ -649,14 +828,14 @@ async def test_availability_grid_statuses(client, db):
     # 自己的臨時申請(pending)→ pending(2026-07-17:自己審核中不再標 mine)
     await client.post(
         "/api/v1/club/venue-bookings",
-        json={
+        json=single_slot({
             "venue_id": venue.id,
             "activity_id": activity.id,
             "date": thu.isoformat(),
             "periods": ["3"],
             "purpose": "擺攤",
             "phone": "0912000111",
-        },
+        }),
         headers=csrf_headers(client),
     )
     # 他社:固定借用已核准 → 每週該星期呈 fixed;審核中固定借用不顯示;臨時 pending → pending
@@ -676,14 +855,14 @@ async def test_availability_grid_statuses(client, db):
     rid = resp.json()["data"]["id"]
     await client.post(
         "/api/v1/club/venue-bookings",
-        json={
+        json=single_slot({
             "venue_id": venue.id,
             "activity_id": other_activity.id,
             "date": thu.isoformat(),
             "periods": ["7"],
             "purpose": "活動",
             "phone": "0912000111",
-        },
+        }),
         headers=csrf_headers(client),
     )
 
@@ -735,14 +914,14 @@ async def test_availability_range(client, db):
 
     await client.post(
         "/api/v1/club/venue-bookings",
-        json={
+        json=single_slot({
             "venue_id": venue.id,
             "activity_id": activity.id,
             "date": thu.isoformat(),
             "periods": ["3"],
             "purpose": "擺攤",
             "phone": "0912000111",
-        },
+        }),
         headers=csrf_headers(client),
     )
     resp = await client.post(
@@ -1178,7 +1357,7 @@ async def test_suspended_club_cannot_book(client, db):
         "phone": "0912000111",
     }
     resp = await client.post(
-        "/api/v1/club/venue-bookings", json=venue_body, headers=csrf_headers(client)
+        "/api/v1/club/venue-bookings", json=single_slot(venue_body), headers=csrf_headers(client)
     )
     assert resp.status_code == 403
 
@@ -1186,7 +1365,7 @@ async def test_suspended_club_cannot_book(client, db):
     club.suspended_until = date_cls.today() - timedelta(days=1)
     await db.commit()
     resp = await client.post(
-        "/api/v1/club/venue-bookings", json=venue_body, headers=csrf_headers(client)
+        "/api/v1/club/venue-bookings", json=single_slot(venue_body), headers=csrf_headers(client)
     )
     assert resp.status_code == 201
 

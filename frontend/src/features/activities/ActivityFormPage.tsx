@@ -584,11 +584,13 @@ function ActivityForm({
                   <InputNumber style={{ width: '100%' }} min={0} precision={0} />
                 </Form.Item>
               </div>
-              {/* 活動通過審核後,這段會出現在社團公開頁的活動彈窗(D-42) */}
+              {/* 活動通過審核後,這段會出現在社團公開頁的活動彈窗(D-42)。提示放 extra 常駐:
+                  tooltip 只有滑鼠懸停看得到,鍵盤與手機拿不到;extra 也會掛進欄位的 aria-describedby。
+                  字數壓短:320px 寬時欄內約 238px,提示 154px 與右側的字數計數(58px)同一行不重疊 */}
               <Form.Item
                 name="content"
                 label="活動內容（至多 150 字）"
-                tooltip="會顯示在社團公開頁"
+                extra="審核通過後公開在社團頁"
                 style={{ marginBottom: 0 }}
               >
                 <Input.TextArea rows={6} maxLength={150} showCount placeholder="活動目的、內容、預期效益" />

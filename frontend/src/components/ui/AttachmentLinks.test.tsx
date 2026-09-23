@@ -11,14 +11,19 @@ const files = [
 ]
 
 describe('AttachmentLinks', () => {
-  test('圖片開圖片預覽，同一行的圖片左右切換；影片照舊新分頁', () => {
+  test('圖片開圖片預覽，同一行的圖片左右切換，Ctrl 點照樣拿原檔；影片照舊新分頁', () => {
     render(<AttachmentLinks files={files} />)
     const video = screen.getByRole('link', { name: '現場.mp4' })
     expect(video.getAttribute('target')).toBe('_blank')
     expect(video.getAttribute('href')).toMatch(/\/files\/v$/)
-    expect(screen.queryByRole('link', { name: '現場1.jpg' })).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: '現場2.HEIC' }))
+    // 圖片也是連結(預覽畫不出來時還拿得到原檔):一般左鍵才改開預覽
+    const image = screen.getByRole('link', { name: '現場2.HEIC' })
+    expect(image.getAttribute('href')).toMatch(/\/files\/b$/)
+    expect(fireEvent.click(image, { ctrlKey: true })).toBe(true) // 沒攔:照瀏覽器預設開新分頁
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    expect(fireEvent.click(image)).toBe(false)
     const preview = screen.getByRole('dialog', { name: '現場2.HEIC' })
     expect(preview.querySelector('.ant-image-preview-img')?.getAttribute('src')).toMatch(/\/files\/b$/)
     expect(preview.textContent).toContain('2 / 2') // 影片不在切換裡

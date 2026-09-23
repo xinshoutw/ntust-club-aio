@@ -27,6 +27,8 @@ interface AttachmentLinksProps {
 /**
  * 單據附件的一行連結(「a.jpg · b.mp4」)。圖片開 AntD 的圖片預覽,同一行的圖片左右切換
  * (design-guide §6,`<img>` 來要圖時後端把 HEIC 轉成 JPEG);影片與文件照舊新分頁開 GET /files/{id}。
+ * 圖片也是真的連結,只有一般左鍵(與 Enter)改開預覽:預覽畫不出來的圖(超過轉檔上限的 TIFF 掃描檔、
+ * 磁碟告警時沒快取過的 HEIC)還拿得到原檔 —— Ctrl/⌘ 點、中鍵、右鍵另存都照瀏覽器預設。
  * 違規勸導三端列表、報修與郵局管理、社團總覽的報修詳情共用。沒有附件回 null
  */
 export default function AttachmentLinks({ files, inline = false }: AttachmentLinksProps) {
@@ -36,20 +38,22 @@ export default function AttachmentLinks({ files, inline = false }: AttachmentLin
   const links = files.map((f, i) => (
     <span key={f.id}>
       {i > 0 && ' · '}
-      {fileTypeOf(f.name) === 'image' ? (
-        <button
-          type="button"
-          className="link-btn"
-          style={{ padding: 0, fontSize: 'inherit', color: 'var(--focus)' }}
-          onClick={() => viewer.preview(asImage(f), images)}
-        >
-          {f.name}
-        </button>
-      ) : (
-        <a href={fileDownloadUrl(f.id)} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--focus)' }}>
-          {f.name}
-        </a>
-      )}
+      <a
+        href={fileDownloadUrl(f.id)}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{ color: 'var(--focus)' }}
+        {...(fileTypeOf(f.name) === 'image' && {
+          'aria-haspopup': 'dialog' as const,
+          onClick: (e: React.MouseEvent) => {
+            if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
+            e.preventDefault()
+            viewer.preview(asImage(f), images)
+          },
+        })}
+      >
+        {f.name}
+      </a>
     </span>
   ))
   if (inline) {

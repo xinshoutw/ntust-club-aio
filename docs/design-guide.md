@@ -155,7 +155,7 @@ topbar 的文字鈕在 <768px 一律收成圖示鈕(`TopbarButton`):頁名頂替
 - 點擊即開、內容以 Skeleton 補齊。**Skeleton 一定要配一個錯誤分支** —— 它沒有終點,詳情查詢失敗就是永遠轉圈;
   失敗時內容整塊換成 `QueryError` + 重試,並收掉需要那份詳情的動作鈕(讀不到內容就按核准是最貴的一種 fail-open)
 - 審核用 popup Modal,不用 Drawer
-- **圖片預覽一律用 AntD 內建的 `Image`**(縮放、旋轉、同一組左右切換):縮圖牆直接放 `Image` 包在 `Image.PreviewGroup` 裡(縮圖本身就是預覽鈕,鍵盤可開);檔名連結走 `features/eval/useFilePreview` 的 `preview(f, group)`,圖片開 AntD 的圖片預覽、`group` 裡的其他圖片左右切換(底部顯示檔名與第幾張),PDF 與 Word 才開彈窗。不要再刻 `<img>` 放進 Modal 的預覽。成組時 rc-image 不把縮圖的 alt 交給預覽層,`preview.alt` 要自己給,預覽對話框才有名字
+- **圖片預覽一律用 AntD 內建的 `Image`**(縮放、旋轉、同一組左右切換):縮圖牆直接放 `Image` 包在 `Image.PreviewGroup` 裡(縮圖本身就是預覽鈕,鍵盤可開);檔名連結走 `features/eval/useFilePreview` 的 `preview(f, group)`,圖片開 AntD 的圖片預覽、`group` 裡的其他圖片左右切換(底部顯示檔名與第幾張),PDF 與 Word 才開彈窗。附件列(`components/ui/AttachmentLinks`)裡的圖片仍是 `<a href>`,只有一般左鍵與 Enter 改開預覽:預覽畫不出來的圖(超過轉檔上限、磁碟告警時沒快取過的 HEIC)還能 Ctrl/⌘ 點、中鍵或右鍵另存拿原檔。不要再刻 `<img>` 放進 Modal 的預覽。成組時 rc-image 不把縮圖的 alt 交給預覽層,`preview.alt` 要自己給,預覽對話框才有名字
 
 **表單**
 

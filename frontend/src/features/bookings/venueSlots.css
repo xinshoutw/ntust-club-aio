@@ -33,8 +33,10 @@
 }
 /* 一行放得下日期 140、節次 14 顆(638)、「+」「−」86,加兩個間距與列的內距邊框,
    整列要 914px。不夠寬就改兩行:日期與「+」「−」一行、節次獨佔下一行(flex-wrap 的話
-   按鈕會被擠到第三行自成一列)。節次那一行再不夠寬(整列 < 664px)就照舊橫捲 */
-@container (max-width: 913px) {
+   按鈕會被擠到第三行自成一列)。節次那一行再不夠寬(整列 < 664px)就照舊橫捲。
+   用範圍語法 `width < 914px` 而不是 `max-width: 913px`:縮放 125%/150% 時寬度常是小數,
+   913.5px 兩條都不中,一行版面就差那半格 */
+@container (width < 914px) {
   .slot-row {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
@@ -44,7 +46,7 @@
 }
 /* 兩行時日期欄跟著縮;整列 < 264px 時它已不到 140,日期本身塞不下:日曆圖示讓位
    (點欄位照樣開日曆) */
-@container (max-width: 263px) {
+@container (width < 264px) {
   .slot-row .ant-picker-suffix {
     display: none;
   }

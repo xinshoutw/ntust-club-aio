@@ -415,8 +415,15 @@ async def create_venue_booking(
         for slot in body.slots
     ]
     db.add_all(rows)
-    for _ in rows:  # 一張單一筆,與逐張送出時的稽核筆數一致
-        audit.record(db, action="venue_booking_submitted", user=user, ip=client_ip(request))
+    # 一張單一筆(與逐張送出時的筆數一致),帶上是哪一格才對得回單;寫法同手動借用
+    for slot in body.slots:
+        audit.record(
+            db,
+            action="venue_booking_submitted",
+            user=user,
+            detail=f"{venue.name} {slot.date} 時段 {','.join(slot.periods)}",
+            ip=client_ip(request),
+        )
     await db.commit()
     # 通知一批一則:同一次送出拆成十則訊息只會洗掉頻道
     slots_text = "、".join(f"{s.date} 時段 {','.join(s.periods)}" for s in body.slots)

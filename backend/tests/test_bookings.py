@@ -6,6 +6,7 @@ import sqlalchemy as sa
 from app.core.semesters import next_semester_range, semester_of, semester_range
 from app.models import (
     Activity,
+    AuditLog,
     Equipment,
     EquipmentLoan,
     Holiday,
@@ -714,9 +715,22 @@ async def test_each_slot_becomes_its_own_booking(client, db, monkeypatch):
         await client.get("/api/v1/club/venue-bookings", params={"active": "true"})
     ).json()["data"]
     assert len(listing) == 3
-    # 通知一批一則,三個時段都在裡面
+    # 通知一批一則,三個時段都在裡面(整句比對:只查日期的話,第三筆與第一筆同一天,漏了也照樣綠)
     assert len(sent) == 1
-    assert all(f"{d} 時段" in sent[0][2] for d in (d1, d2))
+    assert sent[0][2].endswith(f"精誠廣場({d1} 時段 3,4、{d2} 時段 A,B、{d1} 時段 8)")
+    # 稽核一張單一筆,各自帶是哪一格 —— 三筆一模一樣的話對不回是哪一張單
+    details = (
+        await db.scalars(
+            sa.select(AuditLog.detail)
+            .where(AuditLog.action == "venue_booking_submitted")
+            .order_by(AuditLog.id)
+        )
+    ).all()
+    assert details == [
+        f"精誠廣場 {d1} 時段 3,4",
+        f"精誠廣場 {d2} 時段 A,B",
+        f"精誠廣場 {d1} 時段 8",
+    ]
 
 
 @pytest.mark.parametrize("bad", ["past", "blocked", "duplicate"])

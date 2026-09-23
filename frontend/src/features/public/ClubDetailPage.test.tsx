@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from 'vitest'
 import { App } from 'antd'
 import { MemoryRouter, Route, Routes } from 'react-router'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import ClubDetailPage from './ClubDetailPage'
 import type { ClubDetail, PublicActivity } from '../../api/publicClubs'
 
@@ -145,7 +145,8 @@ describe('活動彈窗', () => {
     expect(within(dialog).queryByText('活動照片')).toBeNull()
   })
 
-  // 收掉一張會讓組內少一張:預覽開在第二張時就變成「2 / 1」的空白。開著時先留著,關掉才收
+  // 收掉一張會讓組內少一張:預覽開在第二張時就變成「2 / 1」的空白。開著時先留著,
+  // 淡出動畫跑完才收(淡出中縮了一樣閃一下空白)
   test('預覽開著時載不出來的照片先留著，關掉預覽才收', async () => {
     renderPage()
     fireEvent.click(screen.getByRole('button', { name: '社員大會' }))
@@ -160,8 +161,17 @@ describe('活動彈窗', () => {
     expect(preview.textContent).toContain('2 / 2')
 
     fireEvent.click(preview.querySelector('.ant-image-preview-close')!)
-    const left = within(dialog).getAllByRole('img', { name: /^活動照片/ })
-    expect(left.map((i) => i.getAttribute('src'))).toEqual([photos[1]])
+    // 淡出中(jsdom 不跑動畫,停在 leave-active 等結束事件):組內張數還不能變
+    await waitFor(() => expect(preview.className).toContain('-leave-active'))
+    expect(preview.textContent).toContain('2 / 2')
+    fireEvent.transitionEnd(preview)
+    await waitFor(() =>
+      expect(
+        within(dialog)
+          .getAllByRole('img', { name: /^活動照片/ })
+          .map((i) => i.getAttribute('src')),
+      ).toEqual([photos[1]]),
+    )
   })
 
   test('沒有照片就不出現照片區；沒填的時間與內容顯示 —', async () => {

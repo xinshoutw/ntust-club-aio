@@ -277,7 +277,14 @@ export default function VenueBookingPage() {
           <div style={{ fontSize: 13, fontWeight: 500, margin: '18px 0 8px' }}>
             時段 <span style={{ color: '#C13B34' }}>*</span>
           </div>
-          <div className="slot-rows">
+          <div
+            className="slot-rows"
+            // 日期欄打完字按 Enter 是在確認那個日期,不是送出:冒泡到這裡時 AntD 已經收下日期,
+            // 這裡只擋掉瀏覽器的隱式送出 —— 否則多列還沒填完,整批就先送出去了
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && e.target instanceof HTMLInputElement) e.preventDefault()
+            }}
+          >
             {slots.map((s, i) => (
               <div
                 key={s.key}

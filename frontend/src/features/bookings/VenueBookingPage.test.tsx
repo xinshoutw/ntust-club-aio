@@ -166,3 +166,16 @@ describe('臨時場地借用的時段列', () => {
     ])
   })
 })
+
+// 日期欄打完字按 Enter 是在確認日期:瀏覽器的隱式送出會把還沒填完的整批先送出去。
+// jsdom 不做隱式送出,驗的是 Enter 的預設動作被擋下、而日期照樣收進去
+test('日期欄按 Enter 只確認日期，不送出表單', () => {
+  renderPage()
+  addAfter(1)
+  const input = within(rows()[1]).getByPlaceholderText('日期')
+  fireEvent.mouseDown(input)
+  fireEvent.change(input, { target: { value: '2099/01/02' } })
+  expect(fireEvent.keyDown(input, { key: 'Enter', code: 'Enter' })).toBe(false)
+  expect((input as HTMLInputElement).value).toBe('2099/01/02')
+  expect(mutate).not.toHaveBeenCalled()
+})

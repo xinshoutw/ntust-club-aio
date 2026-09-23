@@ -267,10 +267,61 @@ D-19 那道「只在真的要存 profile 時擋」的閘**,於是那一按跳的
 320–1200px 逐 px 量工具列列數與水平溢位(零溢位)—— 上面 2026-09-16 那條的
 「991px 以下**四個**控制項」「**三個**下拉」已經過期,**整頁的 playwright 寬度掃描這次沒有重跑**。
 
+**社團頁的活動彈窗、多時段臨時場地借用、全站圖片預覽改 AntD**(2026-09-23,D-42 / D-43):
+
+- `/clubs/:clubId` 的活動紀錄整列可點(滑鼠)、名稱是 `.row-open-btn`(鍵盤),開 AntD Modal:
+  日期、時間、地點、活動內容;**結案通過**的活動多一段「活動照片」(`Image.PreviewGroup` 預覽,
+  載不出來的那張收掉)。`/public/clubs/{id}/activities` 多回 `content` 與 `photo_file_ids`
+  (金額照樣不出去);照片走新通道 `/public/files/activity-photos/{id}`,與清單共用
+  `public._public_photos`,**一律送 1600px 的 JPEG 預覽、不送原檔**(不帶 EXIF/XMP/註解,ICC 保留),
+  轉不出來 404。申請表的「活動內容」欄加了 tooltip「會顯示在社團公開頁」。
+  **待拍板**:照片是結案佐證,社團上傳時不知道會公開,也沒有撤下單張的入口(D-42 末段)
+- `/bookings/venue` 的時段區改成多列:每列日期 + 節次,右側「+」「−」,至多 10 列。
+  `POST /club/venue-bookings` 改收 `slots: [{date, periods}]`,一列一張單、**整批同一個交易**
+  (一列不成立就一張都不建,錯誤訊息帶那一列的日期,重複申請再帶節次);同一天節次重疊前後端都擋;
+  Discord 一批一則、稽核一張單一筆並帶是哪一格。**API 形狀是破壞性的**:舊前端送的
+  `date`/`periods` 會 422(還沒上線,沒有開著舊分頁的人;前後端在同一個 commit)
+- **全站圖片預覽一律 AntD 內建的 `Image`**(使用者指定,design-guide §6 已寫成規則):
+  `features/eval/FilePreview` 的圖片分支改成受控的 `Image.PreviewGroup`(縮放、旋轉、同一組左右切換),
+  PDF/Word 仍開彈窗;`useFilePreview().preview(f, group)` 是唯一入口 —— 評鑑上傳頁與評審評分頁
+  原本各自接 `FilePreview`,現在也走它,group 是同一細項的檔案;活動審核彈窗(行政端與社團端共用)
+  的照片牆換成 AntD `Image` 縮圖。成組時 rc-image 不把 alt 交給預覽層,`preview.alt` 要自己給
+- 兩輪 Opus 交叉審查後補的(各自一個 commit):
+  - 全站那條「預覽不從點擊位置飛出」的 CSS(需求方 2026-07-21)在 AntD 6 早就失效
+    (`.ant-image-preview-wrap` 已不存在,origin 掛在 `.ant-image-preview-body`),`index.css.test.ts`
+    現在拿 AntD 實際的 DOM 釘住那個 class
+  - `files.preview_of` 轉不出來的來源記在行程內(`_PREVIEW_FAILED`),同一張壞圖只解一次 ——
+    開發庫就有一張截斷的 JPEG(活動 818),匿名打得到;照片通道排隊轉檔前先 `db.close()` 還連線
+  - 借用頁:日期欄 Enter 不再隱式送出整批;增刪列後焦點不掉到 body;列寬不到 914px 就兩行版面
+    (container query,依列本身的寬度 —— 用視窗斷點的話 Windows 的常駐捲軸會讓 1280px 的一行版面裁掉 D 節),
+    窄到日期欄不足 140 時收起日曆圖示;重疊紅框從目前的列當場推;
+    未存檔守衛不再把「多一列空白」「今天已開始的節次」算成修改;每列 `role=group`
+- 版面用 playwright 量過(數值,不是截圖):社團頁 1440/375/320 零水平溢位;借用頁 320–1440 零溢位、
+  日期欄不被遮、一行版面時 14 節全露。**headless Chromium 預設 `--hide-scrollbars`**:要量 Windows 的常駐捲軸,
+  得 `launch(ignore_default_args=["--hide-scrollbars"])` 再注入 `::-webkit-scrollbar` 寬度,只注入 CSS 沒有用。
+  兩行版面的節次在整列 < 664px 時照舊橫捲(常駐捲軸下 1024px 差 11px、768px 差 27px,既有的窄螢幕行為);
+  活動審核彈窗用真實的 `/club/activities/{id}` 回應在瀏覽器內攔截重放,照片牆與預覽在 1440/375 正常
+- 第三輪 Opus 審查後補的:報修佐證、存簿影本、違規附件與社團總覽報修詳情的圖片也改走 AntD 預覽
+  (`components/ui/AttachmentLinks` 統一);結案頁縮圖可點開(`PhotoThumbs`);借用頁改 container query、
+  逐列錯誤訊息帶「第 N 筆」、場況圖不給今天已開始的節次;`/files/{id}` 排隊轉檔前也釋放 DB 連線;
+  同一張照片並發只轉一次、轉檔失敗冷卻 10 分鐘後重試
+- **第三輪審查還沒處理的 LOW**(下個 session 先做):預覽的 ICC 沒設上限(可塞 8 MB 任意資料,
+  建議 >64 KB 丟掉);`files._render_preview` 與 `public.py` 開頭「公開通道只送形象圖」的註解過期、
+  `spec/admin/files.md` 搬檔說明沒提結案照片的 `.preview.jpg`;公開彈窗在預覽開著時收掉壞圖會變成
+  「5 / 4」空白(要等預覽關掉再收);AntD `Image` 的 `loading="lazy"` 無效(rc-image 會先預載),
+  兩處可拿掉;預覽畫面沒有檔名(可用 `countRender` 顯示);審核彈窗縮圖的焦點框不是 §8 的藍框;
+  「會顯示在社團公開頁」只在 hover tooltip,鍵盤與手機拿不到,應改進 placeholder;測試缺口:
+  結案附件與申請附件的 group、照片牆預覽對話框名稱、`index.css.test.ts` 的選擇器 regex 太寬。
+  另外開發機上既有的 `.preview.jpg` 是舊規則轉的(帶 COM、沒 ICC),要看新結果就刪掉讓它重轉
+- **沒做**:社團設定與行政端的形象圖只有顯示沒有預覽(不在這次的範圍);
+  活動審核彈窗的 docx 附件仍無法線上預覽(評鑑兩頁會先抓 blob,彈窗沒有,既有的不一致);
+  `lib/periods.startedPeriods` 用裝置時間而不是台北時間(既有,境外裝置會少擋);
+  公開照片的預覽快取是被看到才轉,沒有預先暖好(全部轉一輪約 950 MB,`DEPLOY_CHECKLIST.md` 已補)
+
 ## 驗證現況
 
-- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **620 passed**;`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **330 passed**(67 檔)、
+- 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **738 passed**;`ruff check .` 全綠
+- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **370 passed**(71 檔)、
   `pnpm run lint` 56 個既有 warning(fast-refresh / set-state-in-effect / refs;
   基準值,新增變更前後要一樣)
 - 新測試做過 mutation 驗證(改回舊寫法會紅;已知例外:`exif_transpose` 那行拿掉不會紅,見測試 docstring);借用色格圖那支另在 `TZ=UTC` 與 `TZ=Pacific/Honolulu` 下各跑過一次

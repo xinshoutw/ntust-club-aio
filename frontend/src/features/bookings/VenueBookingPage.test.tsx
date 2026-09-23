@@ -194,3 +194,22 @@ test('移除後焦點落在補位那一列的「+」，補滿上限時落在新�
   for (let n = 1; n < 10; n += 1) addAfter(n)
   expect(document.activeElement).toBe(screen.getByRole('button', { name: '移除第 10 筆時段' }))
 })
+
+// 重疊的紅框跟著列的內容走:改掉日期或刪掉另一列,重疊不在了紅框就要消失,不必再送一次
+test('重疊解除後紅框跟著消失', async () => {
+  renderPage()
+  addAfter(1)
+  pickDate(rows()[1], '2099/01/01')
+  pickPeriod(rows()[1], '3')
+  submit()
+  expect(await screen.findByText('2099/01/01 的時段重複')).toBeTruthy()
+  expect(rows()[1].classList.contains('area-error')).toBe(true)
+
+  pickDate(rows()[1], '2099/01/05')
+  expect(rows()[1].classList.contains('area-error')).toBe(false)
+
+  pickDate(rows()[1], '2099/01/01') // 再撞回來:送出過之後照目前的列當場標
+  expect(rows()[1].classList.contains('area-error')).toBe(true)
+  fireEvent.click(screen.getByRole('button', { name: '移除第 1 筆時段' }))
+  expect(rows()[0].classList.contains('area-error')).toBe(false)
+})

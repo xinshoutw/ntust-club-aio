@@ -46,6 +46,26 @@ const slotsKey = (slots: SlotDraft[]) =>
   slots.map((s) => `${s.date?.format('YYYY-MM-DD') ?? ''}:${s.periods.join(',')}`).join('|')
 const BLANK_KEY = slotsKey([{ key: 0, date: null, periods: [] }])
 
+/** 同一天、節次跟前面某一列重疊的列:送出去就是重複申請(後端 `_no_overlap` 同一條)。
+ *  從列的內容當場推,不存成狀態 —— 重疊一解除,紅框就跟著消失 */
+const overlappingSlots = (slots: SlotDraft[]): { keys: Set<number>; firstDay: string | null } => {
+  const keys = new Set<number>()
+  let firstDay: string | null = null
+  const taken = new Map<string, Set<string>>()
+  for (const s of slots) {
+    if (!s.date || !s.periods.length) continue
+    const day = s.date.format('YYYY/MM/DD')
+    const seen = taken.get(day) ?? new Set<string>()
+    if (s.periods.some((p) => seen.has(p))) {
+      keys.add(s.key)
+      firstDay ??= day
+    }
+    s.periods.forEach((p) => seen.add(p))
+    taken.set(day, seen)
+  }
+  return { keys, firstDay }
+}
+
 export default function VenueBookingPage() {
   const { message, modal } = App.useApp()
   const periodCatalogue = usePeriods()
@@ -79,6 +99,9 @@ export default function VenueBookingPage() {
   const guard = useFormUnsavedGuard(slotsKey(slots) !== cleanKey)
   // 送出驗證的錯誤集合(design-guide §6):`date:<key>` / `periods:<key>`,改到哪一格就解除哪一格
   const [slotErrors, setSlotErrors] = useState<ReadonlySet<string>>(new Set())
+  // 重疊不進錯誤集合:送出過一次之後照目前的列當場標
+  const [checked, setChecked] = useState(false)
+  const overlap = overlappingSlots(slots)
 
   const venuesQuery = useVenues()
   const venues = venuesQuery.data ?? []
@@ -151,27 +174,16 @@ export default function VenueBookingPage() {
     if (neighbor) focusSlotButton(neighbor.key, 'add')
   }
 
-  /** 每一筆都要有日期與節次;同一天節次重疊的兩筆送出去就是重複申請(後端 `_no_overlap` 同一條)。
-   *  回傳要提示的訊息,沒問題回 null */
+  /** 每一筆都要有日期與節次,同一天的節次不能重疊。回傳要提示的訊息,沒問題回 null */
   const validateSlots = (): string | null => {
     const errors = new Set<string>()
-    const taken = new Map<string, Set<string>>()
-    let overlap: string | null = null
     for (const s of slots) {
       if (!s.date) errors.add(`date:${s.key}`)
       if (!s.periods.length) errors.add(`periods:${s.key}`)
-      if (!s.date || !s.periods.length) continue
-      const day = s.date.format('YYYY/MM/DD')
-      const seen = taken.get(day) ?? new Set<string>()
-      if (s.periods.some((p) => seen.has(p))) {
-        errors.add(`periods:${s.key}`)
-        overlap ??= day
-      }
-      s.periods.forEach((p) => seen.add(p))
-      taken.set(day, seen)
     }
     setSlotErrors(errors)
-    if (overlap) return `${overlap} 的時段重複`
+    setChecked(true)
+    if (overlap.firstDay) return `${overlap.firstDay} 的時段重複`
     return errors.size ? '請為每一筆選擇日期與時段' : null
   }
 
@@ -224,6 +236,7 @@ export default function VenueBookingPage() {
           guard.clear()
           setSlots([{ key: nextKey.current++, date: null, periods: [] }])
           setCleanKey(BLANK_KEY)
+          setChecked(false)
         },
         onError: (e) => message.error(e.message),
       },
@@ -303,7 +316,11 @@ export default function VenueBookingPage() {
               <div
                 key={s.key}
                 data-slot={s.key}
-                className={slotErrors.has(`periods:${s.key}`) ? 'slot-row area-error' : 'slot-row'}
+                className={
+                  slotErrors.has(`periods:${s.key}`) || (checked && overlap.keys.has(s.key))
+                    ? 'slot-row area-error'
+                    : 'slot-row'
+                }
               >
                 <DatePicker
                   className="slot-row-date"

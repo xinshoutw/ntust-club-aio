@@ -633,8 +633,11 @@ _PREVIEW_FAILED: dict[Path, float] = {}  # 原檔 → 失敗的時刻(monotonic)
 _PREVIEW_INFLIGHT: dict[Path, asyncio.Future[Path | None]] = {}
 
 
-async def preview_of(disk: Path) -> Path | None:
+async def preview_of(disk: Path, *, max_backlog: int | None = None) -> Path | None:
     """轉檔預覽的磁碟路徑;沒有快取就轉一次(專屬 thread pool,不擋 event loop,同時最多兩張)。
+
+    `max_backlog`:正在轉與排隊中的已達這麼多張,就不再排新的一張、回 None(不記失敗 ——
+    不是這張的錯,空下來之後照常轉)。給匿名通道用:斷線不會取消 handler,排進去的一律跑完。
 
     轉不出來(壞檔、超過像素上限、原檔不見)記 log、回 None,`PREVIEW_RETRY_AFTER` 內同一張
     直接回 None 不再解碼。磁碟到告警水位(90%,與上傳閘同一條線)就**不再建新快取**、回 None:
@@ -651,6 +654,8 @@ async def preview_of(disk: Path) -> Path | None:
         return None
     job = _PREVIEW_INFLIGHT.get(disk)
     if job is None:
+        if max_backlog is not None and len(_PREVIEW_INFLIGHT) >= max_backlog:
+            return None
         job = asyncio.ensure_future(_convert(disk, dst))
         _PREVIEW_INFLIGHT[disk] = job
         job.add_done_callback(lambda _: _PREVIEW_INFLIGHT.pop(disk, None))

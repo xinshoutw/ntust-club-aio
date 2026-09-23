@@ -38,6 +38,11 @@ router = APIRouter(prefix="/public", tags=["public"])
 MAX_AVAILABILITY_SPAN_DAYS = 31  # 單一場地 15 天檢視用;上限防範圍濫用
 # 公開頁只列最近 10 次:導覽頁要回答的是「這個社團在辦什麼」,不是完整流水帳
 MAX_PUBLIC_ACTIVITIES = 10
+# 照片通道最多讓轉檔池排這麼多張(含登入端正在轉的):斷線不會取消 handler,排進去的轉檔一律
+# 跑完 —— 從活動清單列舉出幾千張照片 id 一張張打,就是幾分鐘吃滿兩顆核心的佇列。超過就先回 404
+# (彈窗收掉那一張),轉完的有快取,下次打開就在。一場活動的結案照片通常 5 張,留三場同時開的量
+# ponytail: 全域一個上限;真的有人持續打冷門照片,改成結案通過時就先轉好(DEPLOY_CHECKLIST 的預熱)
+PUBLIC_PREVIEW_BACKLOG = 16
 
 # 主鍵是 PostgreSQL 的 int4:超界的值會在 asyncpg 綁參數時 OverflowError → 500,
 # 而這些是**匿名打得到**的路徑 —— 未登入、零成本就能一次塞進三十份 traceback。
@@ -330,7 +335,7 @@ async def public_activity_photo(file_id: uuid.UUID, db: DbDep) -> Response:
     await db.close()
     # 壞檔、超過像素上限、原檔不見或磁碟到告警水位:對外一律 404(preview_of 記 log,
     # 壞檔冷卻期內不再解)
-    preview = await file_service.preview_of(disk)
+    preview = await file_service.preview_of(disk, max_backlog=PUBLIC_PREVIEW_BACKLOG)
     if preview is None:
         raise not_found("找不到檔案")
     # 當場讀進來(同形象圖):數百 KB 的成品,換掉「檢查與開檔之間被刪」的 500

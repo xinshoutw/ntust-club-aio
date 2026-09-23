@@ -701,3 +701,34 @@ async def test_a_failed_photo_is_retried_after_a_while(client, db, monkeypatch):
     assert (await client.get(url)).status_code == 404  # 還在冷卻期,不重解
     monkeypatch.setattr(file_service, "PREVIEW_RETRY_AFTER", 0)
     assert (await client.get(url)).status_code == 200
+
+
+async def test_the_photo_channel_does_not_queue_past_a_short_backlog(client, db, monkeypatch):
+    """斷線不會取消 handler,排進去的轉檔一律跑完:從清單列舉 id 一張張打,就能排出幾分鐘
+    吃滿兩顆核心的佇列。超過上限的先回 404,但不記成失敗 —— 空下來之後同一張照常轉。"""
+    import asyncio
+    import threading
+
+    from app.api.v1 import public
+
+    monkeypatch.setattr(public, "PUBLIC_PREVIEW_BACKLOG", 2)
+    _, _, photos = await activity_with_photos(db, n=3)
+    release = threading.Event()
+    real = file_service._render_preview
+
+    def stuck(src, dst):
+        release.wait(10)
+        real(src, dst)
+
+    monkeypatch.setattr(file_service, "_render_preview", stuck)
+    queued = [asyncio.ensure_future(client.get(f"{PHOTO_URL}/{p.id}")) for p in photos[:2]]
+    try:
+        for _ in range(100):
+            if len(file_service._PREVIEW_INFLIGHT) == 2:
+                break
+            await asyncio.sleep(0.02)
+        assert (await client.get(f"{PHOTO_URL}/{photos[2].id}")).status_code == 404
+    finally:
+        release.set()
+    assert [r.status_code for r in await asyncio.gather(*queued)] == [200, 200]
+    assert (await client.get(f"{PHOTO_URL}/{photos[2].id}")).status_code == 200

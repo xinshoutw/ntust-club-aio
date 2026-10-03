@@ -606,7 +606,8 @@ export default function ActivityReviewModal({
           {item && (
             <DownloadMenu
               items={[
-                { key: 'photos', label: '下載照片檔', disabled: photos.length === 0 },
+                // 與照片牆同一條界線(有結案報告才畫):還沒送結案的照片是社團存在草稿裡的(D-44)
+                { key: 'photos', label: '下載照片檔', disabled: !report || photos.length === 0 },
                 { key: 'apply', label: '下載社團活動申請表' },
                 { type: 'divider' },
                 {

@@ -378,11 +378,14 @@ export function useActivitySemesters() {
   })
 }
 
+export const fetchActivityDetail = (id: number): Promise<ClubActivityDetail> =>
+  api<ActivityDetailOut>(`/club/activities/${id}`).then(toDetail)
+
 export function useActivityDetail(id: number | undefined) {
   return useQuery({
     queryKey: keys.detail(id ?? -1),
     enabled: id != null,
-    queryFn: () => api<ActivityDetailOut>(`/club/activities/${id}`).then(toDetail),
+    queryFn: () => fetchActivityDetail(id!),
   })
 }
 

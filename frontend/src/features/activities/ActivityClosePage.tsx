@@ -24,6 +24,7 @@ import {
 import {
   deleteActivityCloseDoc,
   deleteActivityPhoto,
+  fetchActivityDetail,
   saveCloseDraft,
   submitClose,
   uploadActivityCloseDoc,
@@ -474,11 +475,18 @@ function CloseForm({
     reflections: filledReflects.map(({ name, dept, text }) => ({ name: name.trim(), dept: dept.trim(), text: text.trim() })),
   })
 
+  // 上傳失敗不代表伺服器沒收到(回應在路上遺失):對一次帳,伺服器上已有同內容的就當作傳成功。
+  // 不對帳的話照片重按會一直吃後端的 sha256 去重(409),附件則會多存一份
+  const alreadyOnServer = async (hash: string, slot: 'photos' | 'closeDocs') =>
+    (await fetchActivityDetail(activity.id).catch(() => null))?.[slot].find((f) => f.hash === hash)
+
   // 待傳的照片與附件逐檔上傳,傳上去一檔就移進「已上傳」,從此跟著草稿留在伺服器上。
-  // 中途失敗就停在那一檔、已上傳的不回滾 —— 重按只傳剩下的(重傳同一張會吃後端的 sha256 去重)
+  // 中途失敗就停在那一檔、已上傳的不回滾 —— 重按只傳剩下的
   const uploadPending = async () => {
     for (const p of [...photosRef.current]) {
-      const up = await uploadActivityPhoto(activity.id, p.file).catch((e: unknown) => {
+      const up = await uploadActivityPhoto(activity.id, p.file).catch(async (e: unknown) => {
+        const saved = await alreadyOnServer(p.hash, 'photos')
+        if (saved) return saved
         throw new Error(`照片「${p.file.name}」上傳失敗：${errMsg(e)}`)
       })
       URL.revokeObjectURL(p.url)
@@ -486,7 +494,9 @@ function CloseForm({
       setExisting((xs) => [...xs, up])
     }
     for (const p of [...docsRef.current]) {
-      const up = await uploadActivityCloseDoc(activity.id, p.file).catch((e: unknown) => {
+      const up = await uploadActivityCloseDoc(activity.id, p.file).catch(async (e: unknown) => {
+        const saved = await alreadyOnServer(p.hash, 'closeDocs')
+        if (saved) return saved
         throw new Error(`附件「${p.file.name}」上傳失敗：${errMsg(e)}`)
       })
       commitDocs(docsRef.current.filter((x) => x.key !== p.key))

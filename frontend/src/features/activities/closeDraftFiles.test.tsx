@@ -3,6 +3,7 @@ import { App } from 'antd'
 import { Link, MemoryRouter, Route, Routes } from 'react-router'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import ActivityClosePage from './ActivityClosePage'
+import { sha256 } from '../../lib/uploads'
 import type { ClubActivityDetail } from '../../api/activities'
 
 // 結案草稿保存照片與附件(D-44):按下「儲存草稿」就把新選的檔案傳上去,下次開啟是已上傳的那一組。
@@ -51,6 +52,7 @@ let detail = blank
 const api = vi.hoisted(() => ({
   saveCloseDraft: vi.fn(async (_id: number, _data: unknown) => null),
   submitClose: vi.fn(),
+  fetchActivityDetail: vi.fn(),
   uploadActivityPhoto: vi.fn(),
   uploadActivityCloseDoc: vi.fn(),
   deleteActivityPhoto: vi.fn(async (_id: number, _fileId: string) => null),
@@ -92,6 +94,7 @@ beforeEach(() => {
   api.uploadActivityPhoto.mockReset().mockImplementation(asUploaded)
   api.uploadActivityCloseDoc.mockReset().mockImplementation(asUploaded)
   api.submitClose.mockReset().mockResolvedValue({})
+  api.fetchActivityDetail.mockReset().mockImplementation(async () => detail)
   // jsdom 沒有 object URL
   URL.createObjectURL = vi.fn(() => 'blob:x')
   URL.revokeObjectURL = vi.fn()
@@ -135,6 +138,8 @@ describe('結案草稿保存照片與附件', () => {
     const [a, b] = [png('a.png', 1), png('b.png', 2)]
     const second = hold()
     api.uploadActivityPhoto.mockImplementationOnce(asUploaded).mockImplementationOnce(() => second.promise)
+    // 失敗後對帳看到的伺服器現況:只有 a —— 內容不同的檔不能拿來頂替 b
+    api.fetchActivityDetail.mockResolvedValue({ ...blank, photos: [{ ...(await asUploaded(7, a)), hash: await sha256(a) }] })
     fireEvent.change(photoInput, { target: { files: [a, b] } })
     await screen.findByText('2 張')
 
@@ -154,6 +159,25 @@ describe('結案草稿保存照片與附件', () => {
     fireEvent.click(saveButton())
     await screen.findByText('離開表單')
     expect(api.uploadActivityPhoto.mock.calls).toEqual([[7, a], [7, b], [7, b]])
+  })
+
+  test('上傳回報失敗、伺服器其實收到(回應遺失):對帳後當作傳成功,不重傳也不報錯', async () => {
+    const { photoInput, docInput } = renderClose()
+    const a = png('a.png', 1)
+    const doc = new File(['%PDF-1.4'], '保單.pdf')
+    const onServer = async (f: File) => ({ id: `srv-${f.name}`, name: f.name, type: 'image', size: f.size, url: '', hash: await sha256(f), uploadedAt: '—' })
+    api.uploadActivityPhoto.mockRejectedValueOnce(new Error('連線中斷'))
+    api.uploadActivityCloseDoc.mockRejectedValueOnce(new Error('連線中斷'))
+    api.fetchActivityDetail.mockResolvedValue({ ...blank, photos: [await onServer(a)], closeDocs: [await onServer(doc)] })
+    fireEvent.change(photoInput, { target: { files: [a] } })
+    fireEvent.change(docInput, { target: { files: [doc] } })
+    await screen.findByText('1 張 · 1 件')
+
+    fireEvent.click(saveButton())
+    await screen.findByText('離開表單')
+    expect(api.uploadActivityPhoto).toHaveBeenCalledTimes(1)
+    expect(api.uploadActivityCloseDoc).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText(/上傳失敗/)).toBeNull()
   })
 
   test('送出失敗:已上傳的不刪,重送不再傳一次', async () => {

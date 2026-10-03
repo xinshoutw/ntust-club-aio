@@ -522,6 +522,21 @@ describe('照片與附件的圖片預覽', () => {
     expect(preview.textContent).toContain('2 / 2')
   })
 
+  // 結案退回後活動回到 approved、結案報告還在,伺服器上的檔案卻是社團正在改的工作集(D-44)
+  test('結案退回後:報告照樣看得到,照片牆、結案附件與下載收起', async () => {
+    show([], {
+      status: 'approved',
+      report,
+      photos: [ref('p1', '合照.jpg')],
+      closeDocs: [ref('d1', '簽到表.pdf')],
+    })
+    expect(screen.getByText('結案成果')).toBeTruthy()
+    expect(screen.queryByRole('img', { name: '合照.jpg' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '簽到表.pdf' })).toBeNull()
+    fireEvent.click(screen.getByLabelText('更多操作'))
+    expect((await screen.findByText('下載照片檔')).closest('li')!.className).toContain('disabled')
+  })
+
   test('結案附件裡的圖片開圖片預覽，PDF 開彈窗', () => {
     showClose()
     fireEvent.click(screen.getByRole('button', { name: '海報.png' }))

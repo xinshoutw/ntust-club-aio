@@ -341,6 +341,10 @@ export default function ActivityReviewModal({
   const report = item?.report
   const photos = item?.photos ?? []
   const closeDocs = item?.closeDocs ?? []
+  // 結案的照片與附件只在送出中或已結案時算數。結案退回後活動回到 approved、結案報告還在,
+  // 但伺服器上那組檔案是社團正在改的工作集,混著退回後新存的草稿(D-44),分不出哪些是當初送出的 ——
+  // 照片牆、結案附件與下載一律收起,等重新送出
+  const filesSent = item?.status === 'closing_pending_advisor' || item?.status === 'closed'
   // 結案側:有結案資料,或有結案的簽核列(逾期手動解鎖寫的是 activity_close,
   // 那種單多半還沒送過結案 —— 只看 report 的話「誰解了這張單的鎖」兩側都看不到)
   const closeRows = (item?.detail?.approvals ?? []).filter((r) => r.isClose)
@@ -606,8 +610,8 @@ export default function ActivityReviewModal({
           {item && (
             <DownloadMenu
               items={[
-                // 與照片牆同一條界線(有結案報告才畫):還沒送結案的照片是社團存在草稿裡的(D-44)
-                { key: 'photos', label: '下載照片檔', disabled: !report || photos.length === 0 },
+                // 與照片牆同一條界線:畫面上看不到的照片不給下載
+                { key: 'photos', label: '下載照片檔', disabled: !report || !filesSent || photos.length === 0 },
                 { key: 'apply', label: '下載社團活動申請表' },
                 { type: 'divider' },
                 {
@@ -1016,17 +1020,23 @@ export default function ActivityReviewModal({
                 </div>
               </>
             )}
-            <div style={detailLabel}>結案附件</div>
-            <div>
-              <FileLinks
-                files={closeDocs}
-                onPreview={(f) => filePreview.preview(toEvalFile(f), closeDocs.map(toEvalFile))}
-              />
-            </div>
+            {filesSent && (
+              <>
+                <div style={detailLabel}>結案附件</div>
+                <div>
+                  <FileLinks
+                    files={closeDocs}
+                    onPreview={(f) => filePreview.preview(toEvalFile(f), closeDocs.map(toEvalFile))}
+                  />
+                </div>
+              </>
+            )}
           </div>
         </div>
 
         <div>
+          {filesSent && (
+          <>
           <SectionTitle first>
             活動照片（
             <Tooltip title={photoShort ? `未達 ${MIN_PHOTOS} 張且無影片連結` : undefined}>
@@ -1059,7 +1069,9 @@ export default function ActivityReviewModal({
               ))}
             </Image.PreviewGroup>
           </div>
-          <SectionTitle>成果影片</SectionTitle>
+          </>
+          )}
+          <SectionTitle first={!filesSent}>成果影片</SectionTitle>
           <div style={{ fontSize: 13, wordBreak: 'break-all' }}>
             {report.videoUrl ? (
               <a href={report.videoUrl} target="_blank" rel="noopener noreferrer">{report.videoUrl}</a>

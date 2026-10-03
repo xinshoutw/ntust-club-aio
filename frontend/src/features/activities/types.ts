@@ -82,7 +82,7 @@ export interface Activity {
   status: StatusKey
   budget: BudgetItem[]
   report?: ActivityReport // 已送結案後存在
-  closeDraft?: Partial<ActivityReport> // 結案草稿(不含照片檔)
+  closeDraft?: Partial<ActivityReport> // 結案草稿的文字欄位(照片與附件在 photos / closeDocs)
   closeDeadline?: string
   closeDaysLeft?: number
   submittedAt?: string

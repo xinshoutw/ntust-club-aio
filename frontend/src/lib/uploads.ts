@@ -7,7 +7,7 @@ export const IMAGE_ACCEPT = 'image/*,.heic,.heif,.avif'
 // 結案附件(保單、租車契約、簽到表、講師資料…):收的正是站內預覽得了的四類,
 // 與後端 files.REPORT_DOC 同一組。改這裡就要改那裡。
 // 選檔對話框可切「所有檔案」繞過 accept,選檔時另比一次副檔名 ——
-// 不擋的話 .zip 要等按下送出、照片都傳完之後才吃後端 415,然後整批回滾
+// 不擋的話 .zip 要等按下儲存或送出、前面的照片都傳完才吃後端 415
 export const IMAGE_EXTENSIONS = [
   '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff', '.heic', '.heif', '.avif',
 ]
@@ -16,7 +16,7 @@ export const CLOSE_DOC_EXTENSIONS = ['.pdf', '.doc', '.docx', ...IMAGE_EXTENSION
 export const VIDEO_EXTENSIONS = ['.mp4', '.mov']
 
 /** 後端以副檔名收口(`files._extension`),魔術位元組驗的是內容 —— 兩道都要過。
- *  內容是 PNG 但檔名 `photo.txt` 的檔前端全放行,送出時才 415、整批回滾 */
+ *  內容是 PNG 但檔名 `photo.txt` 的檔前端全放行,上傳時才吃 415 */
 export const hasAllowedExtension = (name: string, exts: readonly string[]): boolean =>
   exts.some((ext) => name.toLowerCase().endsWith(ext))
 // 逐項列舉而不用 `image/*`:那會讓選檔器收得下後端不收的 svg/ico,

@@ -522,6 +522,35 @@ describe('照片與附件的圖片預覽', () => {
     expect(preview.textContent).toContain('2 / 2')
   })
 
+  // 結案退回後活動回到 approved、結案報告還在,伺服器上的檔案卻是社團正在改的工作集(D-44)
+  test('結案退回後:報告照樣看得到,照片牆、結案附件與下載收起', async () => {
+    show([], {
+      status: 'approved',
+      report,
+      photos: [ref('p1', '合照.jpg')],
+      closeDocs: [ref('d1', '簽到表.pdf')],
+    })
+    expect(screen.getByText('結案成果')).toBeTruthy()
+    expect(screen.queryByRole('img', { name: '合照.jpg' })).toBeNull()
+    expect(screen.queryByRole('button', { name: '簽到表.pdf' })).toBeNull()
+    expect(screen.queryByText('繳交確認')).toBeNull()
+    fireEvent.click(screen.getByLabelText('更多操作'))
+    expect((await screen.findByText('下載照片檔')).closest('li')!.className).toContain('disabled')
+  })
+
+  test('已結案:照片牆、結案附件與下載都在', async () => {
+    show([], {
+      status: 'closed',
+      report,
+      photos: [ref('p1', '合照.jpg')],
+      closeDocs: [ref('d1', '簽到表.pdf')],
+    })
+    expect(screen.getByRole('img', { name: '合照.jpg' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '簽到表.pdf' })).toBeTruthy()
+    fireEvent.click(screen.getByLabelText('更多操作'))
+    expect((await screen.findByText('下載照片檔')).closest('li')!.className).not.toContain('disabled')
+  })
+
   test('結案附件裡的圖片開圖片預覽，PDF 開彈窗', () => {
     showClose()
     fireEvent.click(screen.getByRole('button', { name: '海報.png' }))
@@ -547,4 +576,11 @@ describe('照片與附件的圖片預覽', () => {
     const preview = screen.getByRole('dialog', { name: '動線.png' })
     expect(preview.querySelector('.ant-image-preview-progress')?.textContent).toBe('動線.png（2 / 2）')
   })
+})
+
+// 結案照片存草稿就會上傳(D-44):還沒送結案的單有照片但沒有結案報告,照片牆不畫,下載也不給
+test('還沒送結案、照片只在草稿裡:下載照片檔反灰', async () => {
+  show([], { status: 'approved', photos: [{ id: 'p1', name: '合照.jpg', url: '/api/v1/files/p1', size: 2048 }] })
+  fireEvent.click(screen.getByLabelText('更多操作'))
+  expect((await screen.findByText('下載照片檔')).closest('li')!.className).toContain('disabled')
 })

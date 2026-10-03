@@ -475,32 +475,46 @@ function CloseForm({
     reflections: filledReflects.map(({ name, dept, text }) => ({ name: name.trim(), dept: dept.trim(), text: text.trim() })),
   })
 
-  // 上傳失敗不代表伺服器沒收到(回應在路上遺失):對一次帳,伺服器上已有同內容的就當作傳成功。
-  // 不對帳的話照片重按會一直吃後端的 sha256 去重(409),附件則會多存一份
-  const alreadyOnServer = async (hash: string, slot: 'photos' | 'closeDocs') =>
-    (await fetchActivityDetail(activity.id).catch(() => null))?.[slot].find((f) => f.hash === hash)
+  // 傳上去的檔從待傳移進「已上傳」,從此跟著草稿留在伺服器上
+  const settlePhoto = (p: PhotoBag, f: EvalFile) => {
+    URL.revokeObjectURL(p.url)
+    commitPhotos(photosRef.current.filter((x) => x.key !== p.key))
+    setExisting((xs) => [...xs, f])
+  }
+  const settleDoc = (p: PhotoBag, f: EvalFile) => {
+    commitDocs(docsRef.current.filter((x) => x.key !== p.key))
+    setExistingDocs((xs) => [...xs, f])
+  }
+  // 上傳失敗不代表伺服器沒收到(回應在路上遺失)。有檔失敗過,下一輪就先拿伺服器現況對帳,
+  // 已有同內容(sha256)的當作傳成功 —— 不對帳的話照片重按會一直吃 409,附件會多存一份。
+  // 對帳本身失敗就整輪不傳:寧可再按一次,也不要多存一份
+  const unsettled = useRef(false)
 
-  // 待傳的照片與附件逐檔上傳,傳上去一檔就移進「已上傳」,從此跟著草稿留在伺服器上。
-  // 中途失敗就停在那一檔、已上傳的不回滾 —— 重按只傳剩下的
+  // 待傳的照片與附件逐檔上傳;中途失敗就停在那一檔、已上傳的不回滾,重按只傳剩下的
   const uploadPending = async () => {
-    for (const p of [...photosRef.current]) {
-      const up = await uploadActivityPhoto(activity.id, p.file).catch(async (e: unknown) => {
-        const saved = await alreadyOnServer(p.hash, 'photos')
-        if (saved) return saved
-        throw new Error(`照片「${p.file.name}」上傳失敗：${errMsg(e)}`)
+    if (unsettled.current) {
+      const server = await fetchActivityDetail(activity.id).catch((e: unknown) => {
+        throw new Error(`無法確認上次的上傳結果：${errMsg(e)}`)
       })
-      URL.revokeObjectURL(p.url)
-      commitPhotos(photosRef.current.filter((x) => x.key !== p.key))
-      setExisting((xs) => [...xs, up])
+      for (const p of [...photosRef.current]) {
+        const f = server.photos.find((x) => x.hash === p.hash)
+        if (f) settlePhoto(p, f)
+      }
+      for (const p of [...docsRef.current]) {
+        const f = server.closeDocs.find((x) => x.hash === p.hash)
+        if (f) settleDoc(p, f)
+      }
+      unsettled.current = false
+    }
+    const fail = (kind: string, p: PhotoBag) => (e: unknown): never => {
+      unsettled.current = true
+      throw new Error(`${kind}「${p.file.name}」上傳失敗：${errMsg(e)}`)
+    }
+    for (const p of [...photosRef.current]) {
+      settlePhoto(p, await uploadActivityPhoto(activity.id, p.file).catch(fail('照片', p)))
     }
     for (const p of [...docsRef.current]) {
-      const up = await uploadActivityCloseDoc(activity.id, p.file).catch(async (e: unknown) => {
-        const saved = await alreadyOnServer(p.hash, 'closeDocs')
-        if (saved) return saved
-        throw new Error(`附件「${p.file.name}」上傳失敗：${errMsg(e)}`)
-      })
-      commitDocs(docsRef.current.filter((x) => x.key !== p.key))
-      setExistingDocs((xs) => [...xs, up])
+      settleDoc(p, await uploadActivityCloseDoc(activity.id, p.file).catch(fail('附件', p)))
     }
   }
 

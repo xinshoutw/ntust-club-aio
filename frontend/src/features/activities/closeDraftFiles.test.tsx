@@ -138,7 +138,7 @@ describe('結案草稿保存照片與附件', () => {
     const [a, b] = [png('a.png', 1), png('b.png', 2)]
     const second = hold()
     api.uploadActivityPhoto.mockImplementationOnce(asUploaded).mockImplementationOnce(() => second.promise)
-    // 失敗後對帳看到的伺服器現況:只有 a —— 內容不同的檔不能拿來頂替 b
+    // 下一輪對帳看到的伺服器現況:只有 a —— 內容不同的檔不能拿來頂替 b
     api.fetchActivityDetail.mockResolvedValue({ ...blank, photos: [{ ...(await asUploaded(7, a)), hash: await sha256(a) }] })
     fireEvent.change(photoInput, { target: { files: [a, b] } })
     await screen.findByText('2 張')
@@ -161,23 +161,43 @@ describe('結案草稿保存照片與附件', () => {
     expect(api.uploadActivityPhoto.mock.calls).toEqual([[7, a], [7, b], [7, b]])
   })
 
-  test('上傳回報失敗、伺服器其實收到(回應遺失):對帳後當作傳成功,不重傳也不報錯', async () => {
+  test('回應遺失(伺服器其實收到):下一輪先對帳認領,照片不重傳、附件不多存一份', async () => {
     const { photoInput, docInput } = renderClose()
     const a = png('a.png', 1)
     const doc = new File(['%PDF-1.4'], '保單.pdf')
     const onServer = async (f: File) => ({ id: `srv-${f.name}`, name: f.name, type: 'image', size: f.size, url: '', hash: await sha256(f), uploadedAt: '—' })
     api.uploadActivityPhoto.mockRejectedValueOnce(new Error('連線中斷'))
     api.uploadActivityCloseDoc.mockRejectedValueOnce(new Error('連線中斷'))
-    api.fetchActivityDetail.mockResolvedValue({ ...blank, photos: [await onServer(a)], closeDocs: [await onServer(doc)] })
     fireEvent.change(photoInput, { target: { files: [a] } })
     fireEvent.change(docInput, { target: { files: [doc] } })
     await screen.findByText('1 張 · 1 件')
 
     fireEvent.click(saveButton())
+    await screen.findByText('照片「a.png」上傳失敗：連線中斷')
+    // 第二輪:對帳認領照片,接著附件的回應也遺失
+    api.fetchActivityDetail.mockResolvedValue({ ...blank, photos: [await onServer(a)] })
+    fireEvent.click(saveButton())
+    await screen.findByText('附件「保單.pdf」上傳失敗：連線中斷')
+    // 第三輪:認領附件,整份存完
+    api.fetchActivityDetail.mockResolvedValue({ ...blank, photos: [await onServer(a)], closeDocs: [await onServer(doc)] })
+    fireEvent.click(saveButton())
     await screen.findByText('離開表單')
     expect(api.uploadActivityPhoto).toHaveBeenCalledTimes(1)
     expect(api.uploadActivityCloseDoc).toHaveBeenCalledTimes(1)
-    expect(screen.queryByText(/上傳失敗/)).toBeNull()
+  })
+
+  test('對帳本身失敗:整輪不傳,不冒多存一份的險', async () => {
+    const { photoInput } = renderClose()
+    api.uploadActivityPhoto.mockRejectedValueOnce(new Error('連線中斷'))
+    fireEvent.change(photoInput, { target: { files: [png('a.png', 1)] } })
+    await screen.findByText('1 張')
+    fireEvent.click(saveButton())
+    await screen.findByText('照片「a.png」上傳失敗：連線中斷')
+
+    api.fetchActivityDetail.mockRejectedValueOnce(new Error('連線中斷'))
+    fireEvent.click(saveButton())
+    await screen.findByText('無法確認上次的上傳結果：連線中斷')
+    expect(api.uploadActivityPhoto).toHaveBeenCalledTimes(1)
   })
 
   test('送出失敗:已上傳的不刪,重送不再傳一次', async () => {

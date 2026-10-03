@@ -517,7 +517,7 @@ function CloseForm({
 
   const submit = async () => {
     if (processing > 0) {
-      message.error('照片處理中，請稍候再送出')
+      message.error('檔案處理中，請稍候再送出')
       return
     }
     // 除影片連結外全必填:一次收集所有缺漏欄位,全部標紅框,訊息提示第一項

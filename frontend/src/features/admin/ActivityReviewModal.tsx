@@ -552,9 +552,10 @@ export default function ActivityReviewModal({
   }
 
   // 繳交確認與簽核鈕同一列(靠左):未勾之項目評鑑以 0 分計,承辦是連著這兩顆鈕一起決定的。
-  // 只在結案側出現 —— 申請側的 footer 不該長出結案的東西
+  // 只在結案側出現 —— 申請側的 footer 不該長出結案的東西;結案退回件也不出現(照片收起來了,
+  // 照片那一勾卻是拿社團正在改的那組推導的)
   const confirmRow =
-    activeTab === 'close' && report ? (
+    activeTab === 'close' && report && filesSent ? (
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 12, color: 'var(--steel)' }}>繳交確認</span>
         {SUBMISSION_CHECKS.map((c) => (

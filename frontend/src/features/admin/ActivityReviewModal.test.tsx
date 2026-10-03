@@ -533,6 +533,7 @@ describe('照片與附件的圖片預覽', () => {
     expect(screen.getByText('結案成果')).toBeTruthy()
     expect(screen.queryByRole('img', { name: '合照.jpg' })).toBeNull()
     expect(screen.queryByRole('button', { name: '簽到表.pdf' })).toBeNull()
+    expect(screen.queryByText('繳交確認')).toBeNull()
     fireEvent.click(screen.getByLabelText('更多操作'))
     expect((await screen.findByText('下載照片檔')).closest('li')!.className).toContain('disabled')
   })

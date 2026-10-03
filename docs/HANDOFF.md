@@ -355,16 +355,19 @@ D-19 那道「只在真的要存 profile 時擋」的閘**,於是那一按跳的
 結案附件(`uploadPending`,送出結案共用同一步),傳上去一檔就轉為已上傳;中途失敗停在那一檔、**不回滾**,
 送出失敗原本的刪檔回滾一併拿掉。存檔與送出途中整張表單唯讀(AntD `ConfigProvider componentDisabled`,
 兩種 × 是自刻的鈕另給 disabled),途中離開這頁則檔案照樣傳完、不再把人拉回列表。後端沒改 —— 照片/附件端點本來就只看
-`approved`,公開通道只送 `closed`。連帶:行政端與社團端共用的活動彈窗,「下載照片檔」改成有結案報告才給
-(照片牆本來就是),否則社團還沒送出的草稿照片下載得到。活動申請的草稿不在範圍,仍是「附件不會隨草稿保存」的確認。
-`closeDraftFiles.test.tsx` 四則;Opus 交叉審查後補的是表單唯讀、卸載後不導頁與測試斷言。**沒做**:上傳回應遺失
-(伺服器其實收到)時畫面以為失敗 —— 照片重按會吃 409、附件會多存一份,重新整理頁面就對得上;選檔後的
-hash 佇列守衛(`processing`)沒有測試(時序不好造)
+`approved`,公開通道只送 `closed`。連帶:行政端與社團端共用的活動彈窗,照片牆、結案附件與「下載照片檔」只在
+結案送出中或已結案時出現(`filesSent`)—— 沒送過結案的、結案退回後正在改的,伺服器上那組檔案都是草稿;
+退回件的結案成果與心得照樣看得到(開發庫有 5 件已核准又帶著結案資料的遷移件)。
+活動申請的草稿不在範圍,仍是「附件不會隨草稿保存」的確認。`closeDraftFiles.test.tsx` 五則。
+Opus 交叉審查後補的是表單唯讀、卸載後不導頁與測試斷言;PR #41 的 bot 審查後補的是上傳失敗先依 sha256 跟伺服器對帳
+(回應遺失時伺服器其實收到了,`fetchActivityDetail`,Greptile)與上面那條彈窗界線(Greptile、CodeRabbit 都提,
+原本只看「有沒有結案資料」,擋不住退回後新存的照片)。**沒做**:選檔後的 hash 佇列守衛(`processing`)沒有測試
+(時序不好造);退回件連「當初送出的那組照片」也一起收起來了 —— 要留著得在送出時拍快照
 
 ## 驗證現況
 
 - 後端 `CLUB_AIO_TEST_DB=<name> timeout 900 uv run pytest -q` → **743 passed**;`ruff check .` 全綠
-- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **396 passed**(72 檔,`TZ=UTC` 下也全過)、
+- 前端 `pnpm exec tsc -b --force` 0 錯、`pnpm test` → **398 passed**(72 檔,`TZ=UTC` 下也全過)、
   `pnpm run lint` 56 個既有 warning(fast-refresh / set-state-in-effect / refs;
   基準值,新增變更前後要一樣)
 - 新測試做過 mutation 驗證(改回舊寫法會紅;已知例外:`exif_transpose` 那行拿掉不會紅,見測試 docstring);借用色格圖那支另在 `TZ=UTC` 與 `TZ=Pacific/Honolulu` 下各跑過一次

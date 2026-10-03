@@ -538,6 +538,19 @@ describe('照片與附件的圖片預覽', () => {
     expect((await screen.findByText('下載照片檔')).closest('li')!.className).toContain('disabled')
   })
 
+  test('已結案:照片牆、結案附件與下載都在', async () => {
+    show([], {
+      status: 'closed',
+      report,
+      photos: [ref('p1', '合照.jpg')],
+      closeDocs: [ref('d1', '簽到表.pdf')],
+    })
+    expect(screen.getByRole('img', { name: '合照.jpg' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: '簽到表.pdf' })).toBeTruthy()
+    fireEvent.click(screen.getByLabelText('更多操作'))
+    expect((await screen.findByText('下載照片檔')).closest('li')!.className).not.toContain('disabled')
+  })
+
   test('結案附件裡的圖片開圖片預覽，PDF 開彈窗', () => {
     showClose()
     fireEvent.click(screen.getByRole('button', { name: '海報.png' }))

@@ -657,7 +657,7 @@ async def _create_activities(
         staff_text="主持:林小芳", participants=(35, 5),
         budget=(("膳食費", "茶點與飲料", 1500, 0, None),),
     )
-    # 11. 已核准・已結束・存有結案草稿(照片不隨草稿)。
+    # 11. 已核准・已結束・存有結案草稿(只有文字、沒附照片)。
     # close_draft 為前端 opaque JSON,鍵名須與前端 buildDraftReport() 的 camelCase 一致;
     # 用 snake_case 會讓結案頁讀到 undefined 而整頁白畫面
     acts["close_draft"] = _add_activity(

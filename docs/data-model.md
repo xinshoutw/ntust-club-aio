@@ -177,7 +177,7 @@ erDiagram
 | status | enum,見下 | |
 | submitted_at | timestamptz NULL | 送出審核的時刻,**每次送審覆寫**(D-29);草稿為 NULL。待審佇列與行政端「送件時間」欄依它排序 —— 取 `created_at` 的話,七月建的草稿八月才送審會排在八月初就送件的活動前面 |
 | close_unlocked | bool | 逾期鎖定的管理員解鎖旗標 |
-| close_draft | jsonb NULL | 結案草稿(跨裝置續填),不含照片;送出結案時清除 |
+| close_draft | jsonb NULL | 結案草稿的文字欄位(跨裝置續填),送出結案時清除。照片與附件不在這欄:存草稿時就上傳成 `files` 列(D-44),送出後即為結案資料 |
 
 金額與人數欄位一律有非負 CHECK(`ck_activities_amounts_non_negative`、`ck_activity_budget_items_amounts_non_negative`、`ck_activity_reports_counts_non_negative`;器材為 `ck_equipment_qty_non_negative` 與 `ck_equipment_loans_qty_positive` ≥1)—— schema 擋 API,匯入腳本與 raw SQL 由這層收口。
 

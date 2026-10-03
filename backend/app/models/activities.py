@@ -64,7 +64,8 @@ class Activity(Base, TimestampMixin):
     # 待審佇列依它排序 —— 取 created_at 的話,七月建的草稿八月才送審會排在八月初送件的前面
     submitted_at: Mapped[dt.datetime | None] = mapped_column(sa.DateTime(timezone=True))
     close_unlocked: Mapped[bool] = mapped_column(default=False)  # 逾期鎖定的管理員解鎖
-    close_draft: Mapped[dict[str, Any] | None] = mapped_column(JSONB)  # 結案草稿(不含照片)
+    # 結案草稿的文字欄位;照片與附件存草稿時就上傳成 files 列(D-44)
+    close_draft: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     created_by: Mapped[int] = mapped_column(sa.ForeignKey("users.id"))
 
     budget_items: Mapped[list[ActivityBudgetItem]] = relationship(

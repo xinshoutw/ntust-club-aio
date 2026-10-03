@@ -464,7 +464,7 @@ async def delete_photo(
 ) -> ApiResponse[None]:
     activity = await svc.get_own_activity(db, user, activity_id)
     # 鎖活動列並重讀狀態:submit_close 先 commit 時,這裡看到 closing → 409,
-    # 不會出現「送審已成立、照片卻被(逾時回滾等)後續刪除」的結案
+    # 不會出現「送審已成立、照片卻被(另一個分頁按 × 等)後續刪除」的結案
     await db.refresh(activity, attribute_names=["status"], with_for_update=True)
     if activity.status != ActivityStatus.APPROVED:
         raise conflict("結案已送出,照片不可移除")

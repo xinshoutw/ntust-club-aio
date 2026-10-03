@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { App, Button, DatePicker, Input, InputNumber, Select, TimePicker, Tooltip, Upload } from 'antd'
+import { App, Button, ConfigProvider, DatePicker, Input, InputNumber, Select, TimePicker, Tooltip, Upload } from 'antd'
 import LoadingBlock from '../../components/ui/LoadingBlock'
 import dayjs, { type Dayjs } from 'dayjs'
 import { InfoCircleOutlined, RightOutlined, UploadOutlined } from '@ant-design/icons'
@@ -47,7 +47,7 @@ interface ReflectRow extends Reflection {
   key: number
 }
 
-// 送出前暫存於前端的照片(含預覽 URL 與內容雜湊,供去重)
+// 上傳前暫存於前端的照片(含預覽 URL 與內容雜湊,供去重)
 interface PhotoBag {
   key: number
   file: File
@@ -58,7 +58,7 @@ interface PhotoBag {
 const isReflectEmpty = (r: ReflectRow) => !r.name.trim() && !r.dept.trim() && !r.text.trim()
 
 // 結案附件的一列(照片走縮圖,文件走檔名)
-function DocChip({ name, onRemove }: { name: string; onRemove: () => void }) {
+function DocChip({ name, onRemove, disabled }: { name: string; onRemove: () => void; disabled?: boolean }) {
   return (
     <span
       style={{
@@ -77,6 +77,7 @@ function DocChip({ name, onRemove }: { name: string; onRemove: () => void }) {
         type="button"
         className="link-btn danger"
         aria-label={`移除 ${name}`}
+        disabled={disabled}
         style={{ padding: 0, fontSize: 12, lineHeight: 1 }}
         onClick={onRemove}
       >
@@ -275,10 +276,10 @@ function CloseForm({
     return [...saved, ...Array.from({ length: blanks }, () => ({ key: nextKey(), name: '', dept: '', text: '' }))]
   })
 
-  // 照片一律於送出結案時才上傳,不進草稿,在此之前僅暫存於前端。
-  // 頁內去重以 SHA-256、加總容量上限皆於選檔時檢核;跨活動重複由後端 sha256 於送出時拒絕。
-  // APPROVED 狀態下 detail.photos 有兩種來源:結案送出後被退回(admin close-reject 不刪照片,
-  // 這是常態路徑),或送出失敗而回滾沒刪乾淨。兩者對使用者是同一件事 —— 這張已經在伺服器上、
+  // 照片於儲存草稿或送出結案時才上傳(uploadPending),在此之前僅暫存於前端。
+  // 頁內去重以 SHA-256、加總容量上限皆於選檔時檢核;跨活動重複由後端 sha256 於上傳時拒絕。
+  // APPROVED 狀態下 detail.photos 有三種來源:先前存的草稿、結案送出後被退回(admin close-reject
+  // 不刪照片),或送出失敗前已上傳的那幾張。對使用者是同一件事 —— 這張已經在伺服器上、
   // 佔加總與張數、按 × 就刪掉,所以畫面不分辨、也不多寫一句(分辨了也不影響他要做的決定)
   const [existing, setExisting] = useState<EvalFile[]>(() => detail.photos)
   const existingRef = useRef(existing)
@@ -295,7 +296,7 @@ function CloseForm({
     setPhotos(next)
   }
   const [processing, setProcessing] = useState(0)
-  // 結案附件(保單、租車契約、簽到表…):與照片同一條路 —— 送出時才上傳、
+  // 結案附件(保單、租車契約、簽到表…):與照片同一條路 —— 存草稿或送出時才上傳、
   // 共用 close_photo_total_mb 這一個額度,畫面上因此只有一個「已用 / 上限」
   const [existingDocs, setExistingDocs] = useState<EvalFile[]>(() => detail.closeDocs)
   const existingDocsRef = useRef(existingDocs)
@@ -317,7 +318,7 @@ function CloseForm({
     existingDocsRef.current.reduce((s, f) => s + f.size, 0)
 
   // 未存檔守衛:與載入草稿時的快照比對。這頁沒有 AntD Form 可掛 onValuesChange,
-  // 而照片是離開後唯一救不回來的東西(草稿不含檔案),必須納入比對
+  // 而還沒存的照片是離開後救不回來的東西(按下儲存草稿才上傳),必須納入比對
   const snapshot = JSON.stringify([
     memberCount, nonMemberCount, actualStart, actualEnd, actualLocation,
     highlights, goals, others, reviewMeeting, reviewDate, reviewAttendees,
@@ -330,6 +331,14 @@ function CloseForm({
 
   // 卸載時釋放所有預覽 URL(避免記憶體洩漏)
   useEffect(() => () => photosRef.current.forEach((p) => URL.revokeObjectURL(p.url)), [])
+  // 存檔途中離開這頁(側欄、頁首換活動):檔案照樣傳完,但傳完不能再把人拉回列表
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    return () => {
+      alive.current = false
+    }
+  }, [])
 
   const addPhoto = (f: File) => {
     setProcessing((n) => n + 1)
@@ -340,7 +349,7 @@ function CloseForm({
           return
         }
         // 單檔上限與後端 IMAGE policy 同一個值(system_settings 可調):
-        // 不比的話 12MB 的照片要等按下送出才吃 413,前面傳好的整批回滾
+        // 不比的話 12MB 的照片要等按下儲存或送出、前面的都傳完才吃 413
         if (f.size > imgBytes) {
           message.error(`「${f.name}」超過 ${Math.round(imgBytes / 1024 / 1024)} MB 單檔上限`)
           return
@@ -465,15 +474,41 @@ function CloseForm({
     reflections: filledReflects.map(({ name, dept, text }) => ({ name: name.trim(), dept: dept.trim(), text: text.trim() })),
   })
 
-  // 草稿寫 DB 跨裝置續填;照片已即時上傳,不受草稿影響
+  // 待傳的照片與附件逐檔上傳,傳上去一檔就移進「已上傳」,從此跟著草稿留在伺服器上。
+  // 中途失敗就停在那一檔、已上傳的不回滾 —— 重按只傳剩下的(重傳同一張會吃後端的 sha256 去重)
+  const uploadPending = async () => {
+    for (const p of [...photosRef.current]) {
+      const up = await uploadActivityPhoto(activity.id, p.file).catch((e: unknown) => {
+        throw new Error(`照片「${p.file.name}」上傳失敗：${errMsg(e)}`)
+      })
+      URL.revokeObjectURL(p.url)
+      commitPhotos(photosRef.current.filter((x) => x.key !== p.key))
+      setExisting((xs) => [...xs, up])
+    }
+    for (const p of [...docsRef.current]) {
+      const up = await uploadActivityCloseDoc(activity.id, p.file).catch((e: unknown) => {
+        throw new Error(`附件「${p.file.name}」上傳失敗：${errMsg(e)}`)
+      })
+      commitDocs(docsRef.current.filter((x) => x.key !== p.key))
+      setExistingDocs((xs) => [...xs, up])
+    }
+  }
+
+  // 草稿寫 DB 跨裝置續填,照片與附件一併上傳。文字先存:檔案傳到一半失敗時,填的字不跟著丟
   const saveDraft = async () => {
+    if (processing > 0) {
+      message.error('檔案處理中，請稍候再儲存')
+      return
+    }
     setBusy('draft')
     try {
       await saveCloseDraft(activity.id, buildDraftReport())
+      await uploadPending()
       invalidate()
       message.success('已暫存結案草稿')
-      onDone()
+      if (alive.current) onDone()
     } catch (e) {
+      invalidate() // 失敗前可能已經傳上去幾檔
       message.error(errMsg(e))
     } finally {
       setBusy(null)
@@ -575,29 +610,15 @@ function CloseForm({
 
   const doSubmit = async (body: CloseSubmitInput) => {
     setBusy('submit')
-    // 照片在此(送出時)才上傳,不進草稿;送出失敗時回滾本次已上傳的照片,
-    // 避免留下孤兒檔並阻擋下次(後端跨活動 sha256 去重)重傳
-    const uploaded: string[] = []
-    const uploadedDocs: string[] = []
     try {
-      for (const p of photos) {
-        const up = await uploadActivityPhoto(activity.id, p.file)
-        uploaded.push(up.id)
-      }
-      for (const p of docs) {
-        const up = await uploadActivityCloseDoc(activity.id, p.file)
-        uploadedDocs.push(up.id)
-      }
+      // 送出失敗不回滾已上傳的檔案:與存草稿同一條路,畫面上它們已經轉為已上傳
+      await uploadPending()
       // 送出 → closing_pending_advisor;成果報告/心得 PDF 由後端依模板於下載時生成
       await submitClose(activity.id, body)
       invalidate()
       message.success('已送出結案，等待審核')
-      onDone()
+      if (alive.current) onDone()
     } catch (e) {
-      await Promise.allSettled([
-        ...uploaded.map((id) => deleteActivityPhoto(activity.id, id)),
-        ...uploadedDocs.map((id) => deleteActivityCloseDoc(activity.id, id)),
-      ])
       invalidate()
       message.error(errMsg(e))
     } finally {
@@ -605,8 +626,10 @@ function CloseForm({
     }
   }
 
+  // 存草稿/送出途中整張表單唯讀:文字在上傳前就存了,途中改的存不進去,傳完還會直接離開這頁。
+  // ConfigProvider 只管得到 AntD 元件,兩種 × 是自刻的鈕,另外給 disabled
   return (
-    <>
+    <ConfigProvider componentDisabled={busy != null}>
       <div style={{ fontSize: 13, color: 'var(--steel)', marginTop: 12, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
         <span style={{ fontWeight: 500, color: 'var(--ink)' }}>{activity.name}</span>
         <span className="num">{dateRangeText(activity)}</span>
@@ -885,6 +908,7 @@ function CloseForm({
                 style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', padding: 6, margin: -6, border: '1px solid transparent', borderRadius: 6 }}
               >
                 <PhotoThumbs
+                  disabled={busy != null}
                   items={[
                     ...existing.map((f) => ({
                       key: `saved-${f.id}`,
@@ -933,10 +957,10 @@ function CloseForm({
                 <div style={label}>結案附件</div>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   {existingDocs.map((f) => (
-                    <DocChip key={f.id} name={f.name} onRemove={() => void removeExistingDoc(f)} />
+                    <DocChip key={f.id} name={f.name} disabled={busy != null} onRemove={() => void removeExistingDoc(f)} />
                   ))}
                   {docs.map((d) => (
-                    <DocChip key={d.key} name={d.file.name} onRemove={() => removeDoc(d.key)} />
+                    <DocChip key={d.key} name={d.file.name} disabled={busy != null} onRemove={() => removeDoc(d.key)} />
                   ))}
                 </div>
               </div>
@@ -980,6 +1004,6 @@ function CloseForm({
           </div>
         </div>
       </div>
-    </>
+    </ConfigProvider>
   )
 }

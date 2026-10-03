@@ -109,6 +109,11 @@ body {
 .link-btn.danger:hover {
   color: #c13b34;
 }
+.link-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+  text-decoration: none;
+}
 
 /* 可點的場地名稱:hover 整字圓角反白(取代底線) */
 .venue-btn {
